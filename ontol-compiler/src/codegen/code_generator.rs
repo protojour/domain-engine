@@ -478,7 +478,8 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
                 self.builder.append_pop_until(block, top, span);
             }
-            ontol_hir::Kind::DeclSeq(..) => {
+            ontol_hir::Kind::MatchRegex(..) => todo!(),
+            ontol_hir::Kind::DeclSeq(..) | ontol_hir::Kind::Regex(..) => {
                 unreachable!("decl-seq is only declarative, not used in code generation");
             }
         }

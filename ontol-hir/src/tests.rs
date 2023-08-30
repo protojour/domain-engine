@@ -167,3 +167,19 @@ fn test_let() {
     };
     assert_eq!(src, parse_print(src));
 }
+
+#[test]
+fn test_regex() {
+    let src = indoc! {"
+        (regex def@0:0 ())"
+    };
+    assert_eq!(src, parse_print(src));
+}
+
+#[test]
+fn test_match_regex() {
+    let src = indoc! {"
+        (match-regex $a def@0:0 ($b $c) $b)"
+    };
+    assert_eq!(src, parse_print(src));
+}

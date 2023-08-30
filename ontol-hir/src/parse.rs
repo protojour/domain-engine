@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use ontol_runtime::vm::proc::BuiltinProc;
+use ontol_runtime::{vm::proc::BuiltinProc, PackageId};
 
 use crate::*;
 
@@ -37,6 +37,8 @@ pub enum Class {
     Hash,
     At,
     Property,
+    Number,
+    Colon,
 }
 
 #[derive(Debug)]
@@ -51,6 +53,7 @@ pub enum Token<'s> {
     At,
     Underscore,
     Questionmark,
+    Colon,
 }
 
 type ParseResult<'s, T> = Result<(T, &'s str), Error<'s>>;
@@ -176,6 +179,31 @@ impl<L: Lang> Parser<L> {
                             rel: Box::new(rel),
                             val: Box::new(val),
                         },
+                    )),
+                    next,
+                ))
+            }
+            ("regex", next) => {
+                let (regex_def_id, next) = parse_def_id(next)?;
+                let (captures, next) = parse_paren_delimited(next, |next| {
+                    self.parse_many(next, |_, next| parse_dollar_var(next))
+                })?;
+
+                Ok((self.make_node(Kind::Regex(regex_def_id, captures)), next))
+            }
+            ("match-regex", next) => {
+                let (string_var, next) = parse_dollar_var(next)?;
+                let (regex_def_id, next) = parse_def_id(next)?;
+                let (captures, next) = parse_paren_delimited(next, |next| {
+                    self.parse_many(next, |_, next| parse_dollar_var(next))
+                })?;
+                let (children, next) = self.parse_many(next, Self::parse)?;
+                Ok((
+                    self.make_node(Kind::MatchRegex(
+                        string_var,
+                        regex_def_id,
+                        captures,
+                        children,
                     )),
                     next,
                 ))
@@ -419,6 +447,36 @@ fn parse_at_label(next: &str) -> ParseResult<Label> {
     }
 }
 
+fn parse_def_id(next: &str) -> ParseResult<DefId> {
+    let (sym, next_outer) = parse_symbol(next)?;
+    let Some(next) = sym.strip_prefix("def") else {
+        return Err(Error::Expected(Class::Symbol, Found(Token::Symbol(sym))));
+    };
+    let next = match parse_token(next)? {
+        (Token::At, next) => next,
+        (token, _) => return Err(Error::Expected(Class::At, Found(token))),
+    };
+    let (pkg, next) = parse_i64(next)?;
+    let (_, next) = parse_colon(next)?;
+    let (idx, _) = parse_i64(next)?;
+
+    Ok((DefId(PackageId(pkg as u16), idx as u16), next_outer))
+}
+
+fn parse_i64(next: &str) -> ParseResult<i64> {
+    match parse_token(next)? {
+        (Token::I64(n), next) => Ok((n, next)),
+        (token, _) => Err(Error::Expected(Class::Number, Found(token))),
+    }
+}
+
+fn parse_colon(next: &str) -> ParseResult<()> {
+    match parse_token(next)? {
+        (Token::Colon, next) => Ok(((), next)),
+        (token, _) => Err(Error::Expected(Class::Colon, Found(token))),
+    }
+}
+
 fn parse_lparen(next: &str) -> ParseResult<()> {
     match parse_token(next)? {
         (Token::LParen, next) => Ok(((), next)),
@@ -452,14 +510,15 @@ fn parse_raw_token(next: &str) -> ParseResult<Token> {
         Some((_, '#')) => Ok((Token::Hash, chars.as_str())),
         Some((_, '@')) => Ok((Token::At, chars.as_str())),
         Some((_, '_')) => Ok((Token::Underscore, chars.as_str())),
+        Some((_, ':')) => Ok((Token::Colon, chars.as_str())),
         Some((_, char)) if char.is_numeric() => {
             for (index, char) in chars.by_ref() {
                 if !char.is_numeric() && char != '.' {
-                    return Ok((parse_number(&next[0..index])?, &next[index..]));
+                    return Ok((interpret_number(&next[0..index])?, &next[index..]));
                 }
             }
 
-            Ok((parse_number(next)?, chars.as_str()))
+            Ok((interpret_number(next)?, chars.as_str()))
         }
         Some((_, char)) if char.is_ascii() => {
             for (index, char) in chars.by_ref() {
@@ -474,7 +533,7 @@ fn parse_raw_token(next: &str) -> ParseResult<Token> {
     }
 }
 
-fn parse_number(num: &str) -> Result<Token, Error> {
+fn interpret_number(num: &str) -> Result<Token, Error> {
     if num.contains('.') {
         let result: Result<f64, _> = num.parse();
         match result {

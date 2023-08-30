@@ -145,6 +145,21 @@ impl<'a, L: Lang> Print<Kind<'a, L>> for Printer<L> {
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
+            Kind::Regex(regex_def_id, captures) => {
+                write!(f, "{sep}(regex {regex_def_id:?} (")?;
+                let multi = self.print_all(Sep::None, captures.iter(), f)?;
+                self.print_rparen(multi, f)?;
+                self.print_rparen(multi, f)?;
+                Ok(sep.multiline())
+            }
+            Kind::MatchRegex(var, regex_def_id, captures, children) => {
+                write!(f, "{indent}(match-regex {var} {regex_def_id:?} (")?;
+                let multi = self.print_all(Sep::None, captures.iter(), f)?;
+                self.print_rparen(multi, f)?;
+                let multi = self.print_all(Sep::Space, children.iter().map(GetKind::kind), f)?;
+                self.print_rparen(multi, f)?;
+                Ok(Multiline(true))
+            }
         }
     }
 }
@@ -251,6 +266,13 @@ impl<'a, L: Lang> Print<Binding<'a, L>> for Printer<L> {
                 write!(f, "{sep}$_")?;
             }
         }
+        Ok(Multiline(false))
+    }
+}
+
+impl<L: Lang> Print<Var> for Printer<L> {
+    fn print(self, sep: Sep, var: &Var, f: &mut std::fmt::Formatter) -> PrintResult {
+        write!(f, "{sep}{var}")?;
         Ok(Multiline(false))
     }
 }

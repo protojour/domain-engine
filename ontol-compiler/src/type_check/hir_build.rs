@@ -364,6 +364,40 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
             }
+            (ExprKind::Regex(expr_regex), Some(expected_ty)) => match expected_ty {
+                // TODO: Handle compile-time match of string constant?
+                Type::Primitive(PrimitiveKind::String, _) | Type::StringConstant(_) => {
+                    for var in expr_regex.captures.keys() {
+                        let arm = ctx.arm;
+                        let explicit_variable =
+                            ctx.expr_variables.get_mut(var).expect("variable not found");
+
+                        let arm_expr_id = {
+                            let hir_arm =
+                                explicit_variable.hir_arms.entry(arm).or_insert_with(|| {
+                                    let expr_id = self.expressions.alloc_expr_id();
+
+                                    ExplicitVariableArm {
+                                        expr_id,
+                                        span: expr.span,
+                                    }
+                                });
+                            hir_arm.expr_id
+                        };
+
+                        let _type_var = ctx.inference.new_type_variable(arm_expr_id);
+                    }
+
+                    TypedHirNode(
+                        ontol_hir::Kind::I64(-1),
+                        Meta {
+                            ty: expected_ty,
+                            span: expr.span,
+                        },
+                    )
+                }
+                _ => self.error_node(CompileError::IncompatibleLiteral, &expr.span),
+            },
             (kind, ty) => self.error_node(
                 CompileError::TODO(smart_format!(
                     "Not enough type information for {kind:?}, expected_ty = {ty:?}"

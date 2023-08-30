@@ -719,7 +719,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                         captures: Default::default(),
                     },
                     regex_span: &span,
-                    src: &self.src,
+                    src: self.src,
                     errors: &mut self.compiler.errors,
                     var_table,
                 };

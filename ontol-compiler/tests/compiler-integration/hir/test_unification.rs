@@ -1080,3 +1080,39 @@ mod unify_seq_scope_escape_2 {
         assert_eq!(expected, output);
     }
 }
+
+#[test]
+fn test_unify_regex_capture1() {
+    let output = test_unify(
+        "
+        (struct ($b)
+            (prop $b S:0:0
+                (#u
+                    (regex def@0:0 ($a))
+                )
+            )
+        )
+        ",
+        "
+        (struct ($c)
+            (prop $c O:0:0
+                (#u $a)
+            )
+        )
+        ",
+    );
+    let expected = indoc! {"
+        |$b| (struct ($c)
+            (match-prop $b S:0:0
+                (($_ $d)
+                    (match-regex $d def@0:0 ($a)
+                        (prop $c O:0:0
+                            (#u $a)
+                        )
+                    )
+                )
+            )
+        )"
+    };
+    assert_eq!(expected, output);
+}

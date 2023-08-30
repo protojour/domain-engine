@@ -327,7 +327,6 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                     ctx.expr_variables.insert(
                         *var,
                         ExpressionVariable {
-                            // *var,
                             ctrl_group: parent_aggr_group,
                             hir_arms: Default::default(),
                         },

@@ -65,6 +65,26 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     node: unified.node,
                 })
             }
+            (expr_kind, scope::Kind::Regex(string_var, regex_def_id, captures)) => {
+                let const_scope = self.const_scope();
+                let unified = self.unify(const_scope, expr::Expr(expr_kind, expr_meta.clone()))?;
+
+                Ok(UnifiedNode {
+                    typed_binder: Some(TypedBinder {
+                        var: string_var,
+                        ty: scope_meta.hir_meta.ty,
+                    }),
+                    node: TypedHirNode(
+                        ontol_hir::Kind::MatchRegex(
+                            string_var,
+                            regex_def_id,
+                            captures.iter().collect(),
+                            vec![unified.node],
+                        ),
+                        expr_meta.hir_meta,
+                    ),
+                })
+            }
             // ### Expr constants - no scope needed:
             (expr::Kind::Unit, _) => Ok(UnifiedNode {
                 typed_binder: None,
@@ -667,6 +687,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 todo!("struct block scope");
             }
             scope::Kind::Gen(_) => todo!("Gen"),
+            scope::Kind::Regex(..) => todo!("Regex"),
             scope::Kind::Escape(_) => todo!("Escape"),
         }
     }

@@ -142,9 +142,15 @@ impl<'m> ExprBuilder<'m> {
                     },
                 )
             }),
+            ontol_hir::Kind::Regex(..) => {
+                todo!()
+            }
             ontol_hir::Kind::Prop(..) => panic!("standalone prop"),
             ontol_hir::Kind::MatchProp(..) => {
                 unimplemented!("BUG: MatchProp is an output node")
+            }
+            ontol_hir::Kind::MatchRegex(..) => {
+                unimplemented!("BUG: MatchRegex is an output node")
             }
             ontol_hir::Kind::Sequence(..) => {
                 todo!()

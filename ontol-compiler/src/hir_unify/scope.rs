@@ -1,4 +1,4 @@
-use ontol_runtime::value::PropertyId;
+use ontol_runtime::{value::PropertyId, DefId};
 
 use crate::{
     hir_unify::VarSet,
@@ -44,6 +44,8 @@ pub enum Kind<'m> {
     Let(Let<'m>),
     /// Puts a sequence generator into scope
     Gen(Gen<'m>),
+    /// Puts the result of a regex match into scope
+    Regex(ontol_hir::Var, DefId, VarSet),
     /// Escape one level of scope
     Escape(Box<Self>),
 }
@@ -64,6 +66,7 @@ impl<'m> Kind<'m> {
             ),
             Self::Let(let_) => format!("Let({})", let_.inner_binder.var),
             Self::Gen(gen) => format!("Gen({})", gen.input_seq),
+            Self::Regex(_, _, captures) => format!("Regex({:?})", captures),
             Self::Escape(inner) => format!("Esc({})", inner.debug_short()),
         }
     }
@@ -85,6 +88,7 @@ impl<'m> Kind<'m> {
                 gen.bindings.0.collect_seq_labels(output);
                 gen.bindings.1.collect_seq_labels(output);
             }
+            Self::Regex(..) => {}
             Self::Escape(inner) => {
                 inner.collect_seq_labels(output);
             }

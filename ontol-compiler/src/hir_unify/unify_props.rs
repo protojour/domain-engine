@@ -117,7 +117,7 @@ pub(super) trait UnifyProps<'m>: Sized {
         sub_scoped: SubTree<Self, scope::Prop<'m>>,
     ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
         match scope_kind {
-            scope::Kind::Const | scope::Kind::Var(_) => {
+            scope::Kind::Const | scope::Kind::Var(_) | scope::Kind::Regex(..) => {
                 Self::unify_sub_scoped(unifier, scope::Scope(scope_kind, scope_meta), sub_scoped)
             }
             scope::Kind::Let(let_scope) => {

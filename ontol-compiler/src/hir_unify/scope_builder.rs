@@ -179,9 +179,35 @@ impl<'m> ScopeBuilder<'m> {
                     ),
                 })
             }),
+            ontol_hir::Kind::Regex(regex_def_id, captures) => {
+                let mut vars = VarSet::default();
+                for capture in captures {
+                    vars.insert(*capture);
+                }
+
+                let input_string = self.var_allocator.alloc();
+
+                Ok(ScopeBinder {
+                    binder: Some(TypedBinder {
+                        var: input_string,
+                        ty: hir_meta.ty,
+                    }),
+                    scope: scope::Scope(
+                        scope::Kind::Regex(input_string, *regex_def_id, vars.clone()),
+                        scope::Meta {
+                            vars,
+                            dependencies: VarSet::default(),
+                            hir_meta,
+                        },
+                    ),
+                })
+            }
             ontol_hir::Kind::Prop(..) => panic!("standalone prop"),
             ontol_hir::Kind::MatchProp(..) => {
                 unimplemented!("BUG: MatchProp is an output node")
+            }
+            ontol_hir::Kind::MatchRegex(..) => {
+                unimplemented!("BUG: MatchRegex is an output node")
             }
             ontol_hir::Kind::Sequence(..) => {
                 todo!()
