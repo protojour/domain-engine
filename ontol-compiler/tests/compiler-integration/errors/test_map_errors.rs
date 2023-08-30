@@ -239,3 +239,20 @@ fn map_invalid_unit_rel_params() {
     "
     .compile_fail();
 }
+
+#[test]
+fn duplicate_capture_groups_in_regex_map() {
+    r"
+    def a { rel .'a': string }
+    def b {}
+    map {
+        a {
+            'a': /(?<dupe>\w+) (?<dupe>\w+)!/ // ERROR invalid regex: duplicate capture group name
+        }
+        b {}
+    }
+    "
+    .compile_fail_then(|errors| {
+        expect_eq!(actual = errors[0].span_text, expected = "dupe");
+    })
+}

@@ -285,10 +285,10 @@ fn error_invalid_fmt_semantics() {
 
 #[test]
 fn error_spans_are_correct_projected_from_regex_syntax_errors() {
-    r#"
+    r"
     def lol {}
     rel () /abc\/(?P<42>.)/: lol // ERROR invalid regex: invalid capture group character
-    "#
+    "
     .compile_fail_then(|errors| {
         expect_eq!(actual = errors[0].span_text, expected = "4");
     })
