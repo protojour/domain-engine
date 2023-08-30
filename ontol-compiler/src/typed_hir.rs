@@ -32,7 +32,10 @@ impl ontol_hir::Lang for TypedHir {
     fn make_binder<'a>(&self, var: Var) -> Self::Binder<'a> {
         TypedBinder {
             var,
-            ty: &Type::Error,
+            meta: Meta {
+                ty: &Type::Error,
+                span: NO_SPAN,
+            },
         }
     }
 
@@ -121,7 +124,7 @@ impl<'m> Display for HirFunc<'m> {
 #[derive(Clone, Copy, Debug)]
 pub struct TypedBinder<'m> {
     pub var: Var,
-    pub ty: TypeRef<'m>,
+    pub meta: Meta<'m>,
 }
 
 impl<'m> ontol_hir::GetVar<'m, TypedHir> for TypedBinder<'m> {

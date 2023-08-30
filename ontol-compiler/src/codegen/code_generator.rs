@@ -81,7 +81,7 @@ pub(super) fn map_codegen<'m>(
     builder.commit(root_block, Terminator::Return(builder.top()));
 
     match (
-        type_mapper.find_domain_mapping_info(func.arg.ty),
+        type_mapper.find_domain_mapping_info(func.arg.meta.ty),
         type_mapper.find_domain_mapping_info(return_ty),
     ) {
         (Some(from_info), Some(to_info)) => {
@@ -344,7 +344,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                             let val_local = self.builder.top();
                             let rel_local = self.builder.top_minus(1);
 
-                            let Type::Seq(_, seq_item_ty) = binder.ty else {
+                            let Type::Seq(_, seq_item_ty) = binder.meta.ty else {
                                 panic!("Not a sequence");
                             };
 
@@ -487,6 +487,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                         group_index: capture_group.index,
                         type_def_id: capture_group
                             .binder
+                            .meta
                             .ty
                             .get_single_def_id()
                             .expect("Unable to get type of capture group"),

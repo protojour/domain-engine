@@ -81,7 +81,10 @@ pub(super) trait UnifyProps<'m>: Sized {
                         pattern: ontol_hir::PropPattern::Seq(
                             ontol_hir::Binding::Binder(TypedBinder {
                                 var: ontol_hir::Var(typed_label.label.0),
-                                ty: typed_label.ty,
+                                meta: Meta {
+                                    ty: typed_label.ty,
+                                    span: NO_SPAN,
+                                },
                             }),
                             has_default,
                         ),

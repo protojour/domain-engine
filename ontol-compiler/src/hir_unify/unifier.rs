@@ -60,7 +60,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 Ok(UnifiedNode {
                     typed_binder: Some(TypedBinder {
                         var,
-                        ty: scope_meta.hir_meta.ty,
+                        meta: scope_meta.hir_meta,
                     }),
                     node: unified.node,
                 })
@@ -80,7 +80,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 Ok(UnifiedNode {
                     typed_binder: Some(TypedBinder {
                         var: string_var,
-                        ty: scope_meta.hir_meta.ty,
+                        meta: scope_meta.hir_meta,
                     }),
                     node: TypedHirNode(
                         ontol_hir::Kind::MatchRegex(
@@ -199,7 +199,10 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         ontol_hir::Kind::Sequence(
                             TypedBinder {
                                 var: ontol_hir::Var(label.0),
-                                ty: seq_ty,
+                                meta: Meta {
+                                    ty: seq_ty,
+                                    span: NO_SPAN,
+                                },
                             },
                             sequence_body,
                         ),
@@ -325,13 +328,16 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     ontol_hir::Kind::Sequence(
                         TypedBinder {
                             var: gen_scope.output_seq,
-                            ty: seq_ty,
+                            meta: Meta {
+                                ty: seq_ty,
+                                span: scope_meta.hir_meta.span,
+                            },
                         },
                         sequence_body,
                     ),
                     Meta {
                         ty: seq_ty,
-                        span: NO_SPAN,
+                        span: scope_meta.hir_meta.span,
                     },
                 );
 
@@ -388,7 +394,10 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     ontol_hir::Kind::Sequence(
                         TypedBinder {
                             var: gen_scope.output_seq,
-                            ty: seq_ty,
+                            meta: Meta {
+                                ty: seq_ty,
+                                span: scope_meta.hir_meta.span,
+                            },
                         },
                         vec![TypedHirNode(
                             ontol_hir::Kind::ForEach(
@@ -434,6 +443,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 })
             }
             (expr::Kind::Push(seq_var, attr), scope_kind) => {
+                let scope_hir_meta = scope_meta.hir_meta;
                 let scope = scope::Scope(scope_kind, scope_meta);
                 let rel = self.unify(scope.clone(), attr.rel)?;
                 let val = self.unify(scope, attr.val)?;
@@ -441,7 +451,10 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 Ok(UnifiedNode {
                     typed_binder: Some(TypedBinder {
                         var: seq_var,
-                        ty: self.types.unit_type(),
+                        meta: Meta {
+                            ty: self.types.unit_type(),
+                            span: scope_hir_meta.span,
+                        },
                     }),
                     node: TypedHirNode(
                         ontol_hir::Kind::Push(
@@ -523,7 +536,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 Ok(UnifiedNode {
                     typed_binder: scope_binder.map(|binder| TypedBinder {
                         var: binder.var,
-                        ty: scope_meta.hir_meta.ty,
+                        meta: scope_meta.hir_meta,
                     }),
                     node: TypedHirNode(
                         ontol_hir::Kind::Struct(expr_binder, flags, nodes),
@@ -622,7 +635,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 Ok(UnifiedNode {
                     typed_binder: scope_binder.map(|binder| TypedBinder {
                         var: binder.var,
-                        ty: scope_meta.hir_meta.ty,
+                        meta: scope_meta.hir_meta,
                     }),
                     node,
                 })
@@ -663,7 +676,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     1 => Ok(UnifiedNode {
                         typed_binder: Some(TypedBinder {
                             var,
-                            ty: scope_meta.hir_meta.ty,
+                            meta: scope_meta.hir_meta,
                         }),
                         node: block.into_iter().next().unwrap(),
                     }),

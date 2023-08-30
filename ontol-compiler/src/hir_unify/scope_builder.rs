@@ -70,7 +70,7 @@ impl<'m> ScopeBuilder<'m> {
             ontol_hir::Kind::Var(var) => Ok(ScopeBinder {
                 binder: Some(TypedBinder {
                     var: *var,
-                    ty: hir_meta.ty,
+                    meta: hir_meta,
                 }),
                 scope: scope::Scope(
                     scope::Kind::Var(*var),
@@ -130,7 +130,7 @@ impl<'m> ScopeBuilder<'m> {
                             analysis,
                             TypedBinder {
                                 var: binder_var,
-                                ty: node.ty(),
+                                meta: hir_meta,
                             },
                             TypedHirNode(ontol_hir::Kind::Var(binder_var), hir_meta),
                             dependencies,
@@ -167,7 +167,7 @@ impl<'m> ScopeBuilder<'m> {
                 Ok(ScopeBinder {
                     binder: Some(TypedBinder {
                         var: binder.var,
-                        ty: hir_meta.ty,
+                        meta: hir_meta,
                     }),
                     scope: scope::Scope(
                         scope::Kind::PropSet(scope::PropSet(Some(*binder), props)),
@@ -197,7 +197,7 @@ impl<'m> ScopeBuilder<'m> {
                 Ok(ScopeBinder {
                     binder: Some(TypedBinder {
                         var: input_string,
-                        ty: hir_meta.ty,
+                        meta: hir_meta,
                     }),
                     scope: scope::Scope(
                         scope::Kind::Regex(input_string, *regex_def_id, scope_capture_groups),
@@ -368,7 +368,7 @@ impl<'m> ScopeBuilder<'m> {
                             outer_binder: Some(outer_binder),
                             inner_binder: TypedBinder {
                                 var: scoped_var,
-                                ty: next_let_def.meta().ty,
+                                meta: *next_let_def.meta(),
                             },
                             def: next_let_def,
                             sub_scope: Box::new(scope::Scope(

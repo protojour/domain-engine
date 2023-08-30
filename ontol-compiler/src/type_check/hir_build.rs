@@ -393,7 +393,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             index: named_capture.capture_index,
                             binder: TypedBinder {
                                 var: *var,
-                                ty: expected_ty,
+                                meta: Meta {
+                                    ty: expected_ty,
+                                    span: named_capture.name_span,
+                                },
                             },
                         })
                     }
@@ -465,7 +468,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Some(property_set) => {
                         let struct_binder = TypedBinder {
                             var: ctx.var_allocator.alloc(),
-                            ty: struct_ty,
+                            meta: Meta {
+                                ty: struct_ty,
+                                span,
+                            },
                         };
 
                         let mut match_properties = property_set

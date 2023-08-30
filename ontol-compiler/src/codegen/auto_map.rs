@@ -120,7 +120,10 @@ fn autogenerate_fmt_hir_struct<'m>(
         ontol_hir::Kind::Struct(
             TypedBinder {
                 var: binder_var,
-                ty: compiler.def_types.table.get(&def_id).unwrap(),
+                meta: Meta {
+                    ty: compiler.def_types.table.get(&def_id).unwrap(),
+                    span: NO_SPAN,
+                },
             },
             ontol_hir::StructFlags::empty(),
             nodes,

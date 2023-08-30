@@ -145,13 +145,13 @@ where
                             }
                             if let ontol_hir::Binding::Binder(binder) = val {
                                 self.add_dep(binder.var, *struct_var);
-                                value_def_id = binder.ty.get_single_def_id();
+                                value_def_id = binder.meta.ty.get_single_def_id();
                             }
                         }
                         ontol_hir::PropPattern::Seq(binding, _has_default) => {
                             if let ontol_hir::Binding::Binder(binder) = binding {
                                 self.add_dep(binder.var, *struct_var);
-                                value_def_id = match binder.ty {
+                                value_def_id = match binder.meta.ty {
                                     Type::Seq(_, val) => val.get_single_def_id(),
                                     _ => None,
                                 };

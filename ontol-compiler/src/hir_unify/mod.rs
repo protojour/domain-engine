@@ -8,7 +8,7 @@ use crate::{
     hir_unify::{expr_builder::ExprBuilder, scope_builder::ScopeBuilder, unifier::Unifier},
     mem::Intern,
     primitive::PrimitiveKind,
-    typed_hir::{HirFunc, TypedBinder, TypedHir, TypedHirNode},
+    typed_hir::{HirFunc, Meta, TypedBinder, TypedHir, TypedHirNode},
     types::Type,
     Compiler, SourceSpan,
 };
@@ -69,7 +69,7 @@ pub fn unify_to_function<'m>(
         Some(arg) => {
             // NB: Error is used in unification tests
             if !matches!(scope_ty, Type::Error) {
-                assert_eq!(arg.ty, scope_ty);
+                assert_eq!(arg.meta.ty, scope_ty);
             }
             if !matches!(expr_ty, Type::Error) {
                 assert_eq!(unified.node.ty(), expr_ty);
@@ -83,7 +83,10 @@ pub fn unify_to_function<'m>(
         None => Ok(HirFunc {
             arg: TypedBinder {
                 var: var_allocator.alloc(),
-                ty: scope_ty,
+                meta: Meta {
+                    ty: scope_ty,
+                    span: scope.span(),
+                },
             },
             body: unified.node,
         }),
