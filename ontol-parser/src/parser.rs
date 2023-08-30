@@ -336,11 +336,14 @@ fn expr_pattern() -> impl AstParser<Spanned<ExprPattern>> {
         let variable = variable().map(ExprPattern::Variable);
         let number_literal = number_literal().map(ExprPattern::NumberLiteral);
         let string_literal = string_literal().map(ExprPattern::StringLiteral);
+        let regex_literal =
+            select! { Token::Regex(string) => string }.map(ExprPattern::RegexLiteral);
         let group = expr_pattern.delimited_by(open('('), close(')'));
 
         let atom = spanned(variable)
             .or(spanned(number_literal))
             .or(spanned(string_literal))
+            .or(spanned(regex_literal))
             .or(group);
 
         // Consume operators by precedende
@@ -621,5 +624,20 @@ mod tests {
 
         let stmts = parse(source).unwrap();
         assert_matches!(stmts.as_slice(), [Statement::Map(_), Statement::Map(_)]);
+    }
+
+    #[test]
+    fn parse_regex_in_map() {
+        let source = r"
+        map {
+            foo: x
+            bar {
+                'foo': /Hello (?<name>\w+)!/
+            }
+        }
+        ";
+
+        let stmts = parse(source).unwrap();
+        assert_matches!(stmts.as_slice(), [Statement::Map(_)]);
     }
 }

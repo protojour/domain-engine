@@ -73,7 +73,9 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
         .or(double_quote_string_literal().map(Token::StringLiteral))
         .or(single_quote_string_literal().map(Token::StringLiteral))
         .or(regex().map(Token::Regex))
-        .or(just('/').then_ignore(none_of("/")).map(Token::Sigil))
+        .or(just('/')
+            .then_ignore(none_of("/").to(()).or(end()))
+            .map(Token::Sigil))
         .or(ident)
         .map_with_span(|token, span| (token, span))
         .padded_by(comment.repeated())
@@ -158,13 +160,14 @@ fn single_quote_string_literal() -> impl Parser<char, String, Error = Simple<cha
 }
 
 fn regex() -> impl Parser<char, String, Error = Simple<char>> {
-    let escape = just('\\').ignore_then(just('/'));
+    let slash_or_space_escaped = just('\\').ignore_then(one_of("/ "));
+    let slash_escaped_or_backslash = just('\\').ignore_then(just('/')).or(just('\\'));
 
     just('/')
-        .ignore_then(filter(|c: &char| *c != '/' && !c.is_whitespace()).or(escape))
+        .ignore_then(slash_or_space_escaped.or(filter(|c: &char| *c != '/' && !c.is_whitespace())))
         .chain::<char, Vec<_>, _>(
             filter(|c: &char| *c != '\\' && *c != '/')
-                .or(escape)
+                .or(slash_escaped_or_backslash)
                 .repeated(),
         )
         .then_ignore(just('/'))
@@ -211,13 +214,23 @@ mod tests {
         Token::Sym(input.into())
     }
 
-    #[test]
-    fn comment_at_eof() {
-        lex("foobar // comment ").unwrap();
+    fn regex(input: &str) -> Token {
+        Token::Regex(input.into())
     }
 
     #[test]
-    fn doc_comment_drops_spaces() {
+    fn test_comment_at_eof() {
+        lex("foobar // comment ").unwrap();
+    }
+
+    // BUG: We want to support only comments
+    #[test]
+    fn standalone_comment_bug() {
+        assert!(lex("// comment").is_err());
+    }
+
+    #[test]
+    fn test_doc_comment_drops_spaces() {
         let source = "
         ///      Over here
         pub type PubType
@@ -228,12 +241,12 @@ mod tests {
     }
 
     #[test]
-    fn empty() {
+    fn test_empty() {
         assert_eq!(&lex("").unwrap(), &[]);
     }
 
     #[test]
-    fn integer() {
+    fn test_integer() {
         assert_eq!(&lex("42").unwrap(), &[number("42")]);
         assert_eq!(&lex("-42").unwrap(), &[number("-42")]);
         assert_eq!(&lex("--42").unwrap(), &[Sigil('-'), number("-42")]);
@@ -247,7 +260,7 @@ mod tests {
     }
 
     #[test]
-    fn decimal() {
+    fn test_decimal() {
         assert_eq!(&lex(".42").unwrap(), &[Sigil('.'), number("42")]);
         assert_eq!(&lex("42.").unwrap(), &[number("42"), Sigil('.')]);
         assert_eq!(&lex("4.2").unwrap(), &[Number("4.2".into())]);
@@ -260,6 +273,23 @@ mod tests {
         assert_eq!(
             &lex("4..2").unwrap(),
             &[number("4"), Sigil('.'), Sigil('.'), number("2")]
+        );
+    }
+
+    #[test]
+    fn test_regex() {
+        assert_eq!(&lex(r"/").unwrap(), &[Sigil('/')]);
+        assert_eq!(&lex(r"/ ").unwrap(), &[Sigil('/')]);
+        // BUG: comment:
+        // assert_eq!(lex("//").unwrap(), &[]);
+        assert_eq!(&lex(r"/ /").unwrap(), &[Sigil('/'), Sigil('/')]);
+        assert_eq!(&lex(r"/\ /").unwrap(), &[regex(" ")]);
+        assert_eq!(&lex(r"/\  /").unwrap(), &[regex("  ")]);
+        assert_eq!(&lex(r"/\//").unwrap(), &[regex("/")]);
+        assert_eq!(&lex(r"/a/").unwrap(), &[regex("a")]);
+        assert_eq!(
+            &lex(r"/Hello (?<name>\w+)!/").unwrap(),
+            &[regex("Hello (?<name>\\w+)!")]
         );
     }
 }

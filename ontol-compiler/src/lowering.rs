@@ -700,6 +700,16 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ast::ExprPattern::StringLiteral(string) => {
                 Ok(self.expr(ExprKind::ConstString(string), &span))
             }
+            ast::ExprPattern::RegexLiteral(regex_literal) => {
+                let _def_id = self
+                    .compiler
+                    .defs
+                    .def_regex(&regex_literal, &span, &mut self.compiler.strings)
+                    .map_err(|(compile_error, err_span)| {
+                        (CompileError::InvalidRegex(compile_error), err_span)
+                    })?;
+                todo!()
+            }
             ast::ExprPattern::Binary(left, op, right) => {
                 let fn_ident = match op {
                     ast::BinaryOp::Add => "+",

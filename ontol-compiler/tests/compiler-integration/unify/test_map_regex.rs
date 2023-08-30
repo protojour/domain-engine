@@ -3,29 +3,34 @@ use serde_json::json;
 use test_log::test;
 
 #[test]
+#[should_panic = "not yet implemented"]
 fn map_regex_capture1() {
-    "
+    r#"
     pub def foo {
-        rel .'f': string
+        rel .'i': string
     }
     pub def bar {
-        rel .'b': string
+        rel .'o': string
     }
     map {
-        foo { 'f': // }
-        bar { 'b': x }
+        foo {
+            'i': /Hello (?P<name>\w+)!/
+        }
+        bar {
+            'o': name
+        }
     }
-    "
+    "#
     .compile_ok(|test| {
         test.assert_domain_map(
             ("foo", "bar"),
-            json!({ "f": "my_value"}),
-            json!({ "b": "my_value"}),
+            json!({ "f": "Hello world!"}),
+            json!({ "b": "world"}),
         );
         test.assert_domain_map(
             ("bar", "foo"),
-            json!({ "b": "my_value"}),
-            json!({ "f": "my_value"}),
+            json!({ "b": "world"}),
+            json!({ "f": "Hello world!"}),
         );
     });
 }

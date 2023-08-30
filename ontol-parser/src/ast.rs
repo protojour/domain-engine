@@ -146,6 +146,7 @@ pub enum ExprPattern {
     Variable(String),
     NumberLiteral(String),
     StringLiteral(String),
+    RegexLiteral(String),
     Binary(
         Box<Spanned<ExprPattern>>,
         BinaryOp,
