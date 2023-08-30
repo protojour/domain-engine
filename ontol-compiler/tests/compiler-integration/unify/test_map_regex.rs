@@ -1,7 +1,7 @@
 use ontol_test_utils::TestCompile;
+use serde_json::json;
 use test_log::test;
 
-// BUG: Make it work
 #[test]
 fn map_regex_capture1() {
     r#"
@@ -12,25 +12,20 @@ fn map_regex_capture1() {
         rel .'o': string
     }
     map {
-        foo {
-            'i': /Hello (?P<name>\w+)!/
+        // TODO: Backwards mapping
+        foo match {
+            'i': /Hello (?P<what>\w+)!/
         }
         bar {
-            'o': name // ERROR unbound variable
+            'o': what
         }
     }
     "#
-    .compile_fail();
-    // .compile_ok(|test| {
-    //     test.assert_domain_map(
-    //         ("foo", "bar"),
-    //         json!({ "f": "Hello world!"}),
-    //         json!({ "b": "world"}),
-    //     );
-    //     test.assert_domain_map(
-    //         ("bar", "foo"),
-    //         json!({ "b": "world"}),
-    //         json!({ "f": "Hello world!"}),
-    //     );
-    // });
+    .compile_ok(|test| {
+        test.assert_domain_map(
+            ("foo", "bar"),
+            json!({ "i": "Hello world!"}),
+            json!({ "o": "world"}),
+        );
+    });
 }

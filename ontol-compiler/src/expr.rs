@@ -58,7 +58,7 @@ pub struct ExprSeqElement {
 #[derive(Debug)]
 pub struct ExprRegex {
     pub regex_def_id: DefId,
-    pub captures: HashMap<ontol_hir::Var, String>,
+    pub captures: HashMap<ontol_hir::Var, usize>,
 }
 
 #[derive(Debug)]

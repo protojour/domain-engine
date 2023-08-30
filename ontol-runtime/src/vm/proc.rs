@@ -95,7 +95,7 @@ pub enum OpCode {
     /// Overwrite runtime type info with a new type
     TypePun(Local, DefId),
     /// Run a regex search on the first match of string at Local.
-    /// If successful, pushes n values on the stack: [..captures, I64(1)]
+    /// If successful, pushes n values on the stack: [I64(1), ..captures]
     /// If unsuccessful, pushes one value on the stakc: [I64(0)]
     RegexCapture(Local, DefId, Box<[PatternCaptureGroup]>),
     /// Yanks True from the stack and crashes unless true

@@ -1018,9 +1018,9 @@ impl<'s> RegexLowering<'s> {
             HirKind::Anchor(_) => {}
             HirKind::WordBoundary(_) => {}
             HirKind::Group(group) => match &group.kind {
-                GroupKind::CaptureName { name, index: _ } => {
+                GroupKind::CaptureName { name, index } => {
                     let var = self.var_table.get_or_create_var(name.into());
-                    self.output.captures.insert(var, name.into());
+                    self.output.captures.insert(var, *index as usize);
                 }
                 GroupKind::CaptureIndex(_) => {
                     // Found no way to extract spans from regex-syntax/Hir, they apparently

@@ -234,8 +234,8 @@ impl Processor for OntolProcessor {
                     })
                     .collect();
 
-                self.push_true();
                 self.stack.extend(tmp_stack);
+                self.push_true();
             }
             None => {
                 self.push_false();
