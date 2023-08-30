@@ -216,6 +216,9 @@ impl<'m> ScopeBuilder<'m> {
             ontol_hir::Kind::MatchRegex(..) => {
                 unimplemented!("BUG: MatchRegex is an output node")
             }
+            ontol_hir::Kind::StringPush(..) => {
+                unimplemented!("BUG: StringPush is an output node")
+            }
             ontol_hir::Kind::Sequence(..) => {
                 todo!()
             }

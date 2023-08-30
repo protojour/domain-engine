@@ -478,6 +478,14 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
                 self.builder.append_pop_until(block, top, span);
             }
+            ontol_hir::Kind::StringPush(to_var, node) => {
+                let top = self.builder.top();
+                let to_local = self.var_local(to_var);
+                self.gen_node(*node, block);
+                self.builder
+                    .append(block, Ir::AppendString(to_local), Delta(-1), span);
+                self.builder.append_pop_until(block, top, span);
+            }
             ontol_hir::Kind::MatchRegex(haystack_var, regex_def_id, capture_groups, nodes) => {
                 let haystack_local = self.var_local(haystack_var);
 

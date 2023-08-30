@@ -117,6 +117,10 @@ macro_rules! visitor_trait_methods {
                     self.visit_node(0, borrow!($ref attr.rel));
                     self.visit_node(1, borrow!($ref attr.val));
                 }
+                Kind::StringPush(to_var, node) => {
+                    self.visit_var(to_var);
+                    self.visit_node(0, node);
+                }
                 Kind::Regex(_, capture_groups) => {
                     for group in capture_groups.$iter() {
                         self.visit_binder(group.binder.$var());

@@ -141,13 +141,26 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                     },
                 )
             }),
-            ontol_hir::Kind::Regex(regex_def_id, _capture_groups) => {
+            ontol_hir::Kind::Regex(regex_def_id, capture_groups) => {
                 let _regex_meta = self
                     .defs
                     .literal_regex_meta_table
                     .get(regex_def_id)
                     .unwrap();
-                todo!()
+
+                let mut free_vars = VarSet::default();
+                for capture_group in capture_groups {
+                    free_vars.insert(capture_group.binder.var);
+                }
+
+                let var = self.var_allocator.alloc();
+                expr::Expr(
+                    expr::Kind::BuildString(TypedBinder { var, meta: *meta }),
+                    expr::Meta {
+                        hir_meta: *meta,
+                        free_vars,
+                    },
+                )
             }
             ontol_hir::Kind::Prop(..) => panic!("standalone prop"),
             ontol_hir::Kind::MatchProp(..) => {
@@ -155,6 +168,9 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
             }
             ontol_hir::Kind::MatchRegex(..) => {
                 unimplemented!("BUG: MatchRegex is an output node")
+            }
+            ontol_hir::Kind::StringPush(..) => {
+                unimplemented!("BUG: StringPush is an output node")
             }
             ontol_hir::Kind::Sequence(..) => {
                 todo!()

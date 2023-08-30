@@ -145,6 +145,12 @@ impl<'a, L: Lang> Print<Kind<'a, L>> for Printer<L> {
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
+            Kind::StringPush(to_var, node) => {
+                write!(f, "{indent}(string-push {to_var}",)?;
+                let multi = self.print(Sep::Space, node.kind(), f)?;
+                self.print_rparen(multi, f)?;
+                Ok(Multiline(true))
+            }
             Kind::Regex(regex_def_id, captures) => {
                 write!(f, "{sep}(regex {regex_def_id:?} (")?;
                 let multi = self.print_all(Sep::None, captures.iter(), f)?;

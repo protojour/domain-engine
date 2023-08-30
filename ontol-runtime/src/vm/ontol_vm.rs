@@ -193,6 +193,13 @@ impl Processor for OntolProcessor {
     }
 
     #[inline(always)]
+    fn append_string(&mut self, to: Local) {
+        let [appendee]: [String; 1] = self.pop_n();
+        let to = self.string_local_mut(to);
+        to.push_str(&appendee);
+    }
+
+    #[inline(always)]
     fn cond_predicate(&mut self, predicate: &Predicate) -> bool {
         match predicate {
             Predicate::MatchesDiscriminant(local, def_id) => {
@@ -296,6 +303,14 @@ impl OntolProcessor {
         match &mut self.local_mut(local).data {
             Data::I64(int) => int,
             _ => panic!("Value at {local:?} is not an int"),
+        }
+    }
+
+    #[inline(always)]
+    fn string_local_mut(&mut self, local: Local) -> &mut String {
+        match &mut self.local_mut(local).data {
+            Data::String(string) => string,
+            _ => panic!("Value at {local:?} is not a string"),
         }
     }
 

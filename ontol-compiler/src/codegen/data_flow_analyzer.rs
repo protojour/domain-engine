@@ -201,6 +201,11 @@ where
 
                 var_set
             }
+            ontol_hir::Kind::StringPush(to_var, node) => {
+                let var_set = self.analyze_node(node);
+                self.var_dependencies.insert(*to_var, var_set.clone());
+                var_set
+            }
             ontol_hir::Kind::Regex(_, _captures) => VarSet::default(),
             ontol_hir::Kind::MatchRegex(_, _string_var, _captures, _children) => VarSet::default(),
         }

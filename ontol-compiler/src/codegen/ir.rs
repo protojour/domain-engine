@@ -34,6 +34,7 @@ pub enum Ir {
     PutAttr1(Local, PropertyId),
     PutAttr2(Local, PropertyId),
     AppendAttr2(Local),
+    AppendString(Local),
     I64(i64, DefId),
     F64(f64, DefId),
     String(String, DefId),

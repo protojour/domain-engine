@@ -232,6 +232,20 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     })
                 }
             },
+            (expr::Kind::BuildString(binder), scope::Kind::Const) => Ok(UnifiedNode {
+                typed_binder: None,
+                node: TypedHirNode(
+                    ontol_hir::Kind::Let(
+                        binder,
+                        Box::new(TypedHirNode(
+                            ontol_hir::Kind::String("".into()),
+                            expr_meta.hir_meta,
+                        )),
+                        vec![],
+                    ),
+                    expr_meta.hir_meta,
+                ),
+            }),
             (expr::Kind::Prop(prop), scope::Kind::Escape(scope_kind)) => {
                 let expr::PropVariant::Singleton(attr) = prop.variant else {
                     panic!("expected gen scope");

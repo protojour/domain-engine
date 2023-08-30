@@ -45,6 +45,7 @@ pub enum Kind<'m> {
     Const(DefId),
     Seq(ontol_hir::Label, Box<ontol_hir::Attribute<Expr<'m>>>),
     Push(ontol_hir::Var, Box<ontol_hir::Attribute<Expr<'m>>>),
+    BuildString(TypedBinder<'m>),
 }
 
 impl<'m> Kind<'m> {
@@ -67,6 +68,7 @@ impl<'m> Kind<'m> {
             Self::Const(const_def_id) => format!("Const({const_def_id:?})"),
             Self::Seq(label, _) => format!("Seq({label})"),
             Self::Push(var, _) => format!("Push({var})"),
+            Self::BuildString(binder) => format!("BuildString({})", binder.var),
         }
     }
 }

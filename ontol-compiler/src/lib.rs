@@ -125,8 +125,8 @@ impl<'m> Compiler<'m> {
             self.lower_and_check_next_domain(parsed_package, src)?;
         }
 
-        compile_all_patterns(self);
         execute_codegen_tasks(self);
+        compile_all_patterns(self);
         self.check_error()
     }
 

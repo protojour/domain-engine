@@ -89,11 +89,14 @@ pub enum Kind<'a, L: Lang> {
     /// A property matcher/unpacker associated with a struct var
     MatchProp(Var, PropertyId, Vec<MatchArm<'a, L>>),
     /// A sequence with associated binder. The value is the sequence.
+    /// TODO: This can be done with Let!
     Sequence(L::Binder<'a>, Nodes<'a, L>),
     /// Iterate attributes in sequence var,
     ForEach(Var, (Binding<'a, L>, Binding<'a, L>), Nodes<'a, L>),
     /// Push an attribute to the end of a sequence
     SeqPush(Var, Attribute<Box<L::Node<'a>>>),
+    /// Push the second string at the end of the first string
+    StringPush(Var, Box<L::Node<'a>>),
     /// Declarative regex w/captures
     Regex(DefId, Vec<CaptureGroup<'a, L>>),
     /// A regex matcher/unpacker

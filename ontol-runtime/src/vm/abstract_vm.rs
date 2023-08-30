@@ -55,6 +55,7 @@ pub trait Processor {
     fn push_f64(&mut self, k: f64, result_type: DefId);
     fn push_string(&mut self, k: &str, result_type: DefId);
     fn append_attr2(&mut self, seq: Local);
+    fn append_string(&mut self, to: Local);
     fn cond_predicate(&mut self, predicate: &Predicate) -> bool;
     fn type_pun(&mut self, local: Local, def_id: DefId);
     fn regex_capture(
@@ -170,6 +171,10 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                 }
                 OpCode::AppendAttr2(seq) => {
                     processor.append_attr2(*seq);
+                    self.program_counter += 1;
+                }
+                OpCode::AppendString(to) => {
+                    processor.append_string(*to);
                     self.program_counter += 1;
                 }
                 OpCode::Cond(predicate, offset) => {

@@ -13,8 +13,7 @@ fn test_map_regex_capture1() {
         rel .'second': string
     }
     map {
-        // TODO: Backwards mapping
-        foo match {
+        foo {
             'input': /(?<one>\w+) (?<two>\w+)!/
         }
         bar {
@@ -28,6 +27,11 @@ fn test_map_regex_capture1() {
             ("foo", "bar"),
             json!({ "input": "Hello world!"}),
             json!({ "first": "Hello", "second": "world"}),
+        );
+        test.assert_domain_map(
+            ("bar", "foo"),
+            json!({ "first": "Get", "second": "outtahere"}),
+            json!({ "input": "Get outtahere!"}),
         );
     });
 }

@@ -84,6 +84,8 @@ pub enum OpCode {
     PutAttr2(Local, PropertyId),
     /// Pop 2 stack values, rel_params (top) then value, and append resulting attribute to sequence
     AppendAttr2(Local),
+    /// Pop 1 stack value, which must be Data::String, and append to local which must also be a string
+    AppendString(Local),
     /// Push a constant i64 to the stack.
     I64(i64, DefId),
     /// Push a constant f64 to the stack.
