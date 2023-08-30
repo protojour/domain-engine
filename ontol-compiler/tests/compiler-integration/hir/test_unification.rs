@@ -1116,3 +1116,45 @@ fn test_unify_regex_capture1() {
     };
     assert_eq!(expected, output);
 }
+
+#[test]
+fn test_unify_regex_capture2() {
+    let output = test_unify(
+        "
+        (struct ($c)
+            (prop $c S:0:0
+                (#u
+                    (regex def@0:0 ((1 $a) (2 $b)))
+                )
+            )
+        )
+        ",
+        "
+        (struct ($d)
+            (prop $d O:0:0 (#u $a))
+            (prop $d O:1:0 (#u $b))
+        )
+        ",
+    );
+
+    // BUG/FIXME: This generated code sucks!!
+    let expected = indoc! {"
+        |$c| (struct ($d)
+            (match-prop $c S:0:0
+                (($_ $e)
+                    (match-regex $e def@0:0 ((1 $a) (2 $b))
+                        (prop $d O:0:0
+                            (#u $a)
+                        )
+                    )
+                    (match-regex $e def@0:0 ((1 $a) (2 $b))
+                        (prop $d O:1:0
+                            (#u $b)
+                        )
+                    )
+                )
+            )
+        )"
+    };
+    assert_eq!(expected, output);
+}
