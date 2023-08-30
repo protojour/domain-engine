@@ -712,7 +712,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     .map_err(|(compile_error, err_span)| {
                         (CompileError::InvalidRegex(compile_error), err_span)
                     })?;
-                let regex_hir = self.compiler.defs.literal_regex_hirs.get(&def_id).unwrap();
+                let regex_ast = self.compiler.defs.literal_regex_asts.get(&def_id).unwrap();
                 let mut regex_lowering = RegexLowering {
                     output: ExprRegex {
                         regex_def_id: def_id,
@@ -723,7 +723,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     errors: &mut self.compiler.errors,
                     var_table,
                 };
-                regex_lowering.analyze_expr_regex(regex_hir)?;
+                regex_lowering.analyze_expr_regex(&regex_ast.hir)?;
                 let expr_regex = regex_lowering.output;
 
                 Ok(self.expr(ExprKind::Regex(expr_regex), &span))

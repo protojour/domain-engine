@@ -175,13 +175,13 @@ pub fn compile_all_patterns(compiler: &mut Compiler) {
 /// note: This processes all regex literals even if not "needed"
 /// by serializers etc
 fn compile_regex_literals(compiler: &mut Compiler) {
-    let literal_regex_hirs = std::mem::take(&mut compiler.defs.literal_regex_hirs);
+    let literal_regex_asts = std::mem::take(&mut compiler.defs.literal_regex_asts);
 
-    for (def_id, hir) in literal_regex_hirs {
+    for (def_id, ast) in literal_regex_asts {
         compiler.patterns.string_patterns.insert(
             def_id,
             StringPattern {
-                regex: compile_regex(hir),
+                regex: compile_regex(ast.hir),
                 constant_parts: vec![],
             },
         );

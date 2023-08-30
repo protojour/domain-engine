@@ -486,9 +486,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             DefKind::StringLiteral(str) => StringPatternSegment::new_literal(str),
             DefKind::Regex(_) => StringPatternSegment::Regex(
                 self.defs
-                    .literal_regex_hirs
+                    .literal_regex_asts
                     .get(&relation_def_id)
                     .expect("regex hir not found for literal regex")
+                    .hir
                     .clone(),
             ),
             _ => {
