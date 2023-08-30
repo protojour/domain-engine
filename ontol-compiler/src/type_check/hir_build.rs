@@ -369,7 +369,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 Type::Primitive(PrimitiveKind::String, _) | Type::StringConstant(_) => {
                     let mut capture_groups: Vec<_> = Vec::with_capacity(expr_regex.captures.len());
 
-                    for (var, group_index) in &expr_regex.captures {
+                    for (var, named_capture) in &expr_regex.captures {
                         let arm = ctx.arm;
                         let explicit_variable =
                             ctx.expr_variables.get_mut(var).expect("variable not found");
@@ -390,7 +390,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         let _type_var = ctx.inference.new_type_variable(arm_expr_id);
 
                         capture_groups.push(ontol_hir::CaptureGroup::<'m, TypedHir> {
-                            index: *group_index,
+                            index: named_capture.capture_index,
                             binder: TypedBinder {
                                 var: *var,
                                 ty: expected_ty,

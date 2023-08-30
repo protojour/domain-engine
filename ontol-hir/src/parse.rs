@@ -400,7 +400,7 @@ impl<L: Lang> Parser<L> {
 
             Ok((
                 CaptureGroup {
-                    index: index as usize,
+                    index: index as u32,
                     binder: self.make_binder(var),
                 },
                 next,

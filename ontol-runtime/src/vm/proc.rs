@@ -130,6 +130,6 @@ pub enum Predicate {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PatternCaptureGroup {
-    pub group_index: usize,
+    pub group_index: u32,
     pub type_def_id: DefId,
 }

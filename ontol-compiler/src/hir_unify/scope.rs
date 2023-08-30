@@ -175,7 +175,7 @@ impl<'m> PatternBinding<'m> {
 
 #[derive(Clone, Debug)]
 pub struct ScopeCaptureGroup<'m> {
-    pub index: usize,
+    pub index: u32,
     pub binder: TypedBinder<'m>,
 }
 

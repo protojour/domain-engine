@@ -153,12 +153,13 @@ pub struct Defs<'m> {
     pub(crate) table: FnvHashMap<DefId, &'m Def<'m>>,
     pub(crate) string_literals: HashMap<&'m str, DefId>,
     pub(crate) regex_strings: HashMap<&'m str, DefId>,
-    pub(crate) literal_regex_asts: FnvHashMap<DefId, RegexAst>,
+    pub(crate) literal_regex_meta_table: FnvHashMap<DefId, RegexMeta<'m>>,
     pub(crate) string_like_types: FnvHashMap<DefId, StringLikeType>,
 }
 
 #[derive(Debug)]
-pub struct RegexAst {
+pub struct RegexMeta<'m> {
+    pub pattern: &'m str,
     pub ast: regex_syntax::ast::Ast,
     pub hir: regex_syntax::hir::Hir,
 }
@@ -172,7 +173,7 @@ impl<'m> Defs<'m> {
             table: Default::default(),
             string_literals: Default::default(),
             regex_strings: Default::default(),
-            literal_regex_asts: Default::default(),
+            literal_regex_meta_table: Default::default(),
             string_like_types: Default::default(),
         }
     }
@@ -260,11 +261,11 @@ impl<'m> Defs<'m> {
         match self.regex_strings.get(&lit) {
             Some(def_id) => Ok(*def_id),
             None => {
-                let hir = parse_literal_regex(lit, span)?;
                 let lit = strings.intern(lit);
+                let hir = parse_literal_regex(lit, span)?;
                 let def_id = self.add_def(DefKind::Regex(lit), ONTOL_PKG, NO_SPAN);
                 self.regex_strings.insert(lit, def_id);
-                self.literal_regex_asts.insert(def_id, hir);
+                self.literal_regex_meta_table.insert(def_id, hir);
 
                 Ok(def_id)
             }

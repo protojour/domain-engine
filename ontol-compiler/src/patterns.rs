@@ -175,7 +175,7 @@ pub fn compile_all_patterns(compiler: &mut Compiler) {
 /// note: This processes all regex literals even if not "needed"
 /// by serializers etc
 fn compile_regex_literals(compiler: &mut Compiler) {
-    let literal_regex_asts = std::mem::take(&mut compiler.defs.literal_regex_asts);
+    let literal_regex_asts = std::mem::take(&mut compiler.defs.literal_regex_meta_table);
 
     for (def_id, ast) in literal_regex_asts {
         compiler.patterns.string_patterns.insert(

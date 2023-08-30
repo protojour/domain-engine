@@ -234,7 +234,7 @@ where
 
 #[derive(Clone, Debug)]
 pub struct CaptureGroup<'a, L: Lang> {
-    pub index: usize,
+    pub index: u32,
     pub binder: L::Binder<'a>,
 }
 

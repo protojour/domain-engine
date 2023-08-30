@@ -6,7 +6,7 @@ use ontol_runtime::{
     ontology::{PropertyCardinality, ValueCardinality},
     smart_format, DefId, RelationshipId,
 };
-use regex_syntax::hir::{Hir, HirKind};
+
 use smallvec::SmallVec;
 use smartstring::alias::String;
 use tracing::debug;
@@ -20,7 +20,8 @@ use crate::{
     },
     namespace::Space,
     package::{PackageReference, ONTOL_PKG},
-    CompileErrors, Compiler, Src,
+    regex_util::RegexToExprLowerer,
+    Compiler, Src,
 };
 
 pub struct Lowering<'s, 'm> {
@@ -712,19 +713,29 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     .map_err(|(compile_error, err_span)| {
                         (CompileError::InvalidRegex(compile_error), err_span)
                     })?;
-                let regex_ast = self.compiler.defs.literal_regex_asts.get(&def_id).unwrap();
-                let mut regex_lowering = RegexLowering {
+                let regex_meta = self
+                    .compiler
+                    .defs
+                    .literal_regex_meta_table
+                    .get(&def_id)
+                    .unwrap();
+                let mut regex_lowerer = RegexToExprLowerer {
                     output: ExprRegex {
                         regex_def_id: def_id,
                         captures: Default::default(),
                     },
-                    regex_span: &span,
+                    pattern_literal: regex_meta.pattern,
+                    pattern_span: &span,
                     src: self.src,
+                    named_capture_spans: Default::default(),
                     errors: &mut self.compiler.errors,
                     var_table,
                 };
-                regex_lowering.analyze_expr_regex(&regex_ast.hir)?;
-                let expr_regex = regex_lowering.output;
+
+                regex_syntax::ast::visit(&regex_meta.ast, regex_lowerer.visitor()).unwrap();
+                regex_syntax::hir::visit(&regex_meta.hir, regex_lowerer.visitor()).unwrap();
+
+                let expr_regex = regex_lowerer.finish();
 
                 Ok(self.expr(ExprKind::Regex(expr_regex), &span))
             }
@@ -970,12 +981,12 @@ enum BlockContext<'a> {
 }
 
 #[derive(Default)]
-struct ExprVarTable {
+pub struct ExprVarTable {
     variables: HashMap<String, ontol_hir::Var>,
 }
 
 impl ExprVarTable {
-    fn get_or_create_var(&mut self, ident: String) -> ontol_hir::Var {
+    pub fn get_or_create_var(&mut self, ident: String) -> ontol_hir::Var {
         let length = self.variables.len();
 
         *self
@@ -998,52 +1009,5 @@ fn convert_cardinality(
         ast::Cardinality::Optional => (PropertyCardinality::Optional, ValueCardinality::One),
         ast::Cardinality::Many => (PropertyCardinality::Mandatory, ValueCardinality::Many),
         ast::Cardinality::OptionalMany => (PropertyCardinality::Optional, ValueCardinality::Many),
-    }
-}
-
-pub struct RegexLowering<'s> {
-    output: ExprRegex,
-    regex_span: &'s Span,
-    src: &'s Src,
-    errors: &'s mut CompileErrors,
-    var_table: &'s mut ExprVarTable,
-}
-
-impl<'s> RegexLowering<'s> {
-    fn analyze_expr_regex(&mut self, hir: &Hir) -> Res<()> {
-        match hir.kind() {
-            HirKind::Empty => {}
-            HirKind::Literal(_) => {}
-            HirKind::Class(_) => {}
-            HirKind::Look(_) => {}
-            HirKind::Capture(capture) => {
-                if let Some(name) = &capture.name {
-                    let var = self.var_table.get_or_create_var(name.as_ref().into());
-                    self.output.captures.insert(var, capture.index as usize);
-                } else {
-                    // Found no way to extract spans from regex-syntax/Hir, they apparently
-                    // disappear in the AST => HIR translation
-                    self.errors.push(
-                        CompileError::TODO(smart_format!("Capture group must have a name"))
-                            .spanned(&self.src.span(self.regex_span)),
-                    );
-                }
-            }
-            HirKind::Repetition(rep) => {
-                self.analyze_expr_regex(&rep.sub)?;
-            }
-            HirKind::Concat(hirs) => {
-                for hir in hirs {
-                    self.analyze_expr_regex(hir)?;
-                }
-            }
-            HirKind::Alternation(hirs) => {
-                for hir in hirs {
-                    self.analyze_expr_regex(hir)?;
-                }
-            }
-        }
-
-        Ok(())
     }
 }

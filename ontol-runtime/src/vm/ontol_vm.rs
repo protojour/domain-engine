@@ -224,7 +224,7 @@ impl Processor for OntolProcessor {
                     .iter()
                     .map(|group| {
                         let capture_match = captures
-                            .get(group.group_index)
+                            .get(group.group_index as usize)
                             .expect("Capture group undefined");
 
                         Value::new(

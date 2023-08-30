@@ -1,14 +1,20 @@
-use std::str::Chars;
+use std::{collections::HashMap, str::Chars};
 
 use ontol_parser::Span;
 use ontol_runtime::smart_format;
 use regex_syntax::{
+    ast::{Ast, GroupKind},
     hir::{Class, ClassUnicode, ClassUnicodeRange, Hir, HirKind, Literal, Look, Repetition},
     Parser,
 };
 use smartstring::alias::String;
 
-use crate::def::RegexAst;
+use crate::{
+    def::RegexMeta,
+    expr::{ExprRegex, ExprRegexNamedCapture},
+    lowering::ExprVarTable,
+    CompileErrors, SourceSpan, Src,
+};
 
 pub fn uuid() -> Hir {
     let hex = Hir::class(Class::Unicode(ClassUnicode::new([
@@ -102,7 +108,10 @@ pub fn constant_prefix(hir: &Hir) -> Option<String> {
     }
 }
 
-pub fn parse_literal_regex(pattern: &str, pattern_span: &Span) -> Result<RegexAst, (String, Span)> {
+pub fn parse_literal_regex<'m>(
+    pattern: &'m str,
+    pattern_span: &Span,
+) -> Result<RegexMeta<'m>, (String, Span)> {
     let mut ast_parser = regex_syntax::ast::parse::Parser::new();
     let ast = match ast_parser.parse(pattern) {
         Ok(ast) => ast,
@@ -125,10 +134,89 @@ pub fn parse_literal_regex(pattern: &str, pattern_span: &Span) -> Result<RegexAs
         }
     };
 
-    Ok(RegexAst { ast, hir })
+    Ok(RegexMeta { pattern, ast, hir })
 }
 
-pub fn project_regex_span(
+pub struct RegexToExprLowerer<'a> {
+    pub output: ExprRegex,
+    pub pattern_literal: &'a str,
+    pub pattern_span: &'a Span,
+    pub src: &'a Src,
+    pub named_capture_spans: HashMap<String, SourceSpan>,
+    pub errors: &'a mut CompileErrors,
+    pub var_table: &'a mut ExprVarTable,
+}
+
+impl<'a> RegexToExprLowerer<'a> {
+    pub fn finish(self) -> ExprRegex {
+        self.output
+    }
+
+    pub fn visitor<'v>(&'v mut self) -> RegexVisitor<'v, 'a> {
+        RegexVisitor(self)
+    }
+}
+
+pub struct RegexVisitor<'l, 'a>(pub &'l mut RegexToExprLowerer<'a>);
+
+/// This is the first pass of regex for pattern/expr analysis.
+/// The AST visitor figures out variable spans of named capture groups.
+impl<'l, 'a> regex_syntax::ast::Visitor for RegexVisitor<'l, 'a> {
+    type Output = ();
+    type Err = ();
+
+    fn finish(self) -> Result<Self::Output, Self::Err> {
+        Ok(())
+    }
+
+    fn visit_pre(&mut self, ast: &Ast) -> Result<(), Self::Err> {
+        if let Ast::Group(group) = ast {
+            if let GroupKind::CaptureName { name, .. } = &group.kind {
+                self.0.named_capture_spans.insert(
+                    name.name.as_str().into(),
+                    self.0.src.span(&project_regex_span(
+                        self.0.pattern_literal,
+                        self.0.pattern_span,
+                        &name.span,
+                    )),
+                );
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// Second pass of regex for pattern/expr analysis.
+impl<'l, 'a> regex_syntax::hir::Visitor for RegexVisitor<'l, 'a> {
+    type Output = ();
+    type Err = ();
+
+    fn finish(self) -> Result<Self::Output, Self::Err> {
+        Ok(())
+    }
+
+    fn visit_pre(&mut self, hir: &Hir) -> Result<(), Self::Err> {
+        if let HirKind::Capture(capture) = hir.kind() {
+            if let Some(name) = &capture.name {
+                let span = self.0.named_capture_spans.get(name.as_ref()).unwrap();
+
+                let var = self.0.var_table.get_or_create_var(name.as_ref().into());
+                self.0.output.captures.insert(
+                    var,
+                    ExprRegexNamedCapture {
+                        capture_index: capture.index,
+                        name_span: *span,
+                    },
+                );
+            }
+        }
+
+        Ok(())
+    }
+}
+
+fn project_regex_span(
     pattern: &str,
     pattern_span: &Span,
     ast_span: &regex_syntax::ast::Span,
