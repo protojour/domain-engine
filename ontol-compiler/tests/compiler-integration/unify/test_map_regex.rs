@@ -3,29 +3,31 @@ use serde_json::json;
 use test_log::test;
 
 #[test]
-fn map_regex_capture1() {
+fn test_map_regex_capture1() {
     r#"
     pub def foo {
-        rel .'i': string
+        rel .'input': string
     }
     pub def bar {
-        rel .'o': string
+        rel .'first': string
+        rel .'second': string
     }
     map {
         // TODO: Backwards mapping
         foo match {
-            'i': /Hello (?P<what>\w+)!/
+            'input': /(?P<one>\w+) (?P<two>\w+)!/
         }
         bar {
-            'o': what
+            'first': one
+            'second': two
         }
     }
     "#
     .compile_ok(|test| {
         test.assert_domain_map(
             ("foo", "bar"),
-            json!({ "i": "Hello world!"}),
-            json!({ "o": "world"}),
+            json!({ "input": "Hello world!"}),
+            json!({ "first": "Hello", "second": "world"}),
         );
     });
 }
