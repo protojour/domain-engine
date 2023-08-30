@@ -179,7 +179,7 @@ fn test_regex() {
 #[test]
 fn test_match_regex() {
     let src = indoc! {"
-        (match-regex $a def@0:0 ($b $c) $b)"
+        (match-regex $a def@0:0 ((1 $b) (2 $c)) $b)"
     };
     assert_eq!(src, parse_print(src));
 }

@@ -75,8 +75,8 @@ pub enum OpCode {
     /// The attribute _must_ be present.
     TakeAttr2(Local, PropertyId),
     /// Try to take attr, with two outcomes:
-    /// If present, pushes three values on the stack: [value, rel_params, Int(1)].
-    /// If absent, pushes one value on the stack: [Int(0)].
+    /// If present, pushes three values on the stack: [value, rel_params, I64(1)].
+    /// If absent, pushes one value on the stack: [I64(0)].
     TryTakeAttr2(Local, PropertyId),
     /// Pop 1 value from stack, and move it into the specified local struct. Sets the attribute parameter to unit.
     PutAttr1(Local, PropertyId),
@@ -94,6 +94,12 @@ pub enum OpCode {
     Cond(Predicate, AddressOffset),
     /// Overwrite runtime type info with a new type
     TypePun(Local, DefId),
+    /// Run a regex search on the first match of string at Local.
+    /// If successful, pushes n values on the stack: [..captures, I64(1)]
+    /// If unsuccessful, pushes one value on the stakc: [I64(0)]
+    RegexCapture(Local, DefId, Box<[PatternCaptureGroup]>),
+    /// Yanks True from the stack and crashes unless true
+    AssertTrue,
 }
 
 /// A reference to a local on the value stack during procedure execution.
@@ -120,4 +126,10 @@ pub enum Predicate {
     YankTrue(Local),
     /// Test if not true. NB: Yanks from stack.
     YankFalse(Local),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct PatternCaptureGroup {
+    pub group_index: usize,
+    pub type_def_id: DefId,
 }

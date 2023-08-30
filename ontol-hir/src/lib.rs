@@ -95,9 +95,9 @@ pub enum Kind<'a, L: Lang> {
     /// Push an attribute to the end of a sequence
     Push(Var, Attribute<Box<L::Node<'a>>>),
     /// Declarative regex w/captures
-    Regex(DefId, Vec<Var>),
+    Regex(DefId, Vec<CaptureGroup<'a, L>>),
     /// A regex matcher/unpacker
-    MatchRegex(Var, DefId, Vec<Var>, Nodes<'a, L>),
+    MatchRegex(Var, DefId, Vec<CaptureGroup<'a, L>>, Nodes<'a, L>),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -230,6 +230,12 @@ where
             Self::Absent => Self::Absent,
         }
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct CaptureGroup<'a, L: Lang> {
+    pub index: usize,
+    pub binder: L::Binder<'a>,
 }
 
 #[derive(Clone, Copy, Debug)]

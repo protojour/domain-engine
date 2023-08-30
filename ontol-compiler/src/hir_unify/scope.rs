@@ -45,7 +45,7 @@ pub enum Kind<'m> {
     /// Puts a sequence generator into scope
     Gen(Gen<'m>),
     /// Puts the result of a regex match into scope
-    Regex(ontol_hir::Var, DefId, VarSet),
+    Regex(ontol_hir::Var, DefId, Box<[ScopeCaptureGroup<'m>]>),
     /// Escape one level of scope
     Escape(Box<Self>),
 }
@@ -171,6 +171,12 @@ impl<'m> PatternBinding<'m> {
             scope.0.collect_seq_labels(output);
         }
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct ScopeCaptureGroup<'m> {
+    pub index: usize,
+    pub binder: TypedBinder<'m>,
 }
 
 impl<'m> super::dep_tree::Scope for Scope<'m> {

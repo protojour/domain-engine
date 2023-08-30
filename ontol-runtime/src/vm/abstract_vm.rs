@@ -1,6 +1,8 @@
 use crate::{
+    ontology::Ontology,
+    string_pattern::StringPattern,
     value::PropertyId,
-    vm::proc::{BuiltinProc, Lib, Local, OpCode, Predicate, Procedure},
+    vm::proc::{BuiltinProc, Local, OpCode, Predicate, Procedure},
     DefId,
 };
 
@@ -9,7 +11,7 @@ use crate::{
 /// The stack of the stack machine is abstracted away.
 ///
 /// The abstract machine is in charge of the program counter and the call stack.
-pub struct AbstractVm<'l, P: Processor> {
+pub struct AbstractVm<'o, P: Processor> {
     /// The position of the pending program opcode
     program_counter: usize,
     /// The address where the current frame started executing
@@ -18,8 +20,7 @@ pub struct AbstractVm<'l, P: Processor> {
     /// When a `Return` opcode is executed and this stack is empty, the VM evaluation session ends.
     call_stack: Vec<CallStackFrame<P>>,
 
-    /// Reference to the ONTOL library being executed
-    pub(crate) lib: &'l Lib,
+    pub(crate) ontology: &'o Ontology,
 }
 
 /// A stack frame indicating a procedure called another procedure.
@@ -56,27 +57,34 @@ pub trait Processor {
     fn append_attr2(&mut self, seq: Local);
     fn cond_predicate(&mut self, predicate: &Predicate) -> bool;
     fn type_pun(&mut self, local: Local, def_id: DefId);
+    fn regex_capture(
+        &mut self,
+        local: Local,
+        string_pattern: &StringPattern,
+        capture_indexes: &[PatternCaptureGroup],
+    );
+    fn assert_true(&mut self);
 }
 
-impl<'l, P: Processor> AbstractVm<'l, P> {
-    pub fn new(lib: &'l Lib) -> Self {
+impl<'o, P: Processor> AbstractVm<'o, P> {
+    pub fn new(ontology: &'o Ontology) -> Self {
         Self {
             program_counter: 0,
             proc_address: 0,
-            lib,
+            ontology,
             call_stack: vec![],
         }
     }
 
     pub fn pending_opcode(&self) -> &OpCode {
-        &self.lib.opcodes[self.program_counter]
+        &self.ontology.lib.opcodes[self.program_counter]
     }
 
     pub fn execute(&mut self, procedure: Procedure, processor: &mut P, debug: &mut dyn VmDebug<P>) {
         self.program_counter = procedure.address.0 as usize;
         self.proc_address = procedure.address.0 as usize;
 
-        let opcodes = self.lib.opcodes.as_slice();
+        let opcodes = self.ontology.lib.opcodes.as_slice();
 
         loop {
             debug.tick(self, processor);
@@ -175,6 +183,15 @@ impl<'l, P: Processor> AbstractVm<'l, P> {
                     processor.type_pun(*local, *def_id);
                     self.program_counter += 1;
                 }
+                OpCode::RegexCapture(local, def_id, groups) => {
+                    let string_pattern = self.ontology.get_string_pattern(*def_id).unwrap();
+                    processor.regex_capture(*local, string_pattern, groups);
+                    self.program_counter += 1;
+                }
+                OpCode::AssertTrue => {
+                    processor.assert_true();
+                    self.program_counter += 1;
+                }
             }
         }
     }
@@ -210,6 +227,8 @@ macro_rules! return0 {
 }
 
 pub(crate) use return0;
+
+use super::proc::PatternCaptureGroup;
 
 pub trait VmDebug<P: Processor> {
     fn tick(&mut self, vm: &AbstractVm<P>, processor: &P);

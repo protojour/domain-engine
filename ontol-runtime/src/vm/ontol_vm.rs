@@ -5,13 +5,15 @@ use tracing::{debug, trace, Level};
 
 use crate::{
     cast::Cast,
+    ontology::Ontology,
+    string_pattern::StringPattern,
     value::{Attribute, Data, PropertyId, Value, ValueDebug},
     vm::abstract_vm::{AbstractVm, Processor, VmDebug},
-    vm::proc::{BuiltinProc, Lib, Local, Procedure},
+    vm::proc::{BuiltinProc, Local, Procedure},
     DefId,
 };
 
-use super::proc::Predicate;
+use super::proc::{PatternCaptureGroup, Predicate};
 
 /// Virtual machine for executing ONTOL procedures
 pub struct OntolVm<'l> {
@@ -19,10 +21,10 @@ pub struct OntolVm<'l> {
     processor: OntolProcessor,
 }
 
-impl<'l> OntolVm<'l> {
-    pub fn new(lib: &'l Lib) -> Self {
+impl<'o> OntolVm<'o> {
+    pub fn new(ontology: &'o Ontology) -> Self {
         Self {
-            abstract_vm: AbstractVm::new(lib),
+            abstract_vm: AbstractVm::new(ontology),
             processor: OntolProcessor::default(),
         }
     }
@@ -139,12 +141,12 @@ impl Processor for OntolProcessor {
         let map = self.struct_local_mut(source);
         match map.remove(&key) {
             Some(attribute) => {
-                self.stack.push(Value::new(Data::I64(1), DefId::unit()));
+                self.push_true();
                 self.stack.push(attribute.rel_params);
                 self.stack.push(attribute.value);
             }
             None => {
-                self.stack.push(Value::new(Data::I64(0), DefId::unit()));
+                self.push_false();
             }
         }
     }
@@ -205,6 +207,48 @@ impl Processor for OntolProcessor {
     #[inline(always)]
     fn type_pun(&mut self, local: Local, def_id: DefId) {
         self.local_mut(local).type_def_id = def_id;
+    }
+
+    fn regex_capture(
+        &mut self,
+        local: Local,
+        string_pattern: &StringPattern,
+        groups: &[PatternCaptureGroup],
+    ) {
+        let Data::String(haystack) = &self.local(local).data else {
+            panic!("Not a string");
+        };
+        match string_pattern.regex.captures(haystack) {
+            Some(captures) => {
+                let tmp_stack: Vec<Value> = groups
+                    .iter()
+                    .map(|group| {
+                        let capture_match = captures
+                            .get(group.group_index)
+                            .expect("Capture group undefined");
+
+                        Value::new(
+                            Data::String(capture_match.as_str().into()),
+                            group.type_def_id,
+                        )
+                    })
+                    .collect();
+
+                self.push_true();
+                self.stack.extend(tmp_stack);
+            }
+            None => {
+                self.push_false();
+            }
+        }
+    }
+
+    #[inline(always)]
+    fn assert_true(&mut self) {
+        let [val]: [Value; 1] = self.pop_n();
+        if !matches!(val.data, Data::I64(1)) {
+            panic!("Assertion failed");
+        }
     }
 }
 
@@ -292,6 +336,16 @@ impl OntolProcessor {
     fn yank(&mut self, local: Local) -> Value {
         self.stack.remove(local.0 as usize)
     }
+
+    #[inline(always)]
+    fn push_true(&mut self) {
+        self.stack.push(Value::new(Data::I64(1), DefId::unit()));
+    }
+
+    #[inline(always)]
+    fn push_false(&mut self) {
+        self.stack.push(Value::new(Data::I64(0), DefId::unit()));
+    }
 }
 
 struct Tracer;
@@ -313,8 +367,9 @@ mod tests {
     use test_log::test;
 
     use crate::{
+        ontology::Ontology,
         value::Value,
-        vm::proc::{AddressOffset, NParams, OpCode},
+        vm::proc::{AddressOffset, Lib, NParams, OpCode},
         DefId, PackageId,
     };
 
@@ -339,7 +394,8 @@ mod tests {
             ],
         );
 
-        let mut vm = OntolVm::new(&lib);
+        let ontology = Ontology::builder().lib(lib).build();
+        let mut vm = ontology.new_vm();
         let output = vm.eval(
             proc,
             [Value::new(
@@ -409,7 +465,8 @@ mod tests {
             ],
         );
 
-        let mut vm = OntolVm::new(&lib);
+        let ontology = Ontology::builder().lib(lib).build();
+        let mut vm = ontology.new_vm();
         let output = vm.eval(
             mapping_proc,
             [Value::new(
@@ -472,7 +529,8 @@ mod tests {
             ],
         );
 
-        let mut vm = OntolVm::new(&lib);
+        let ontology = Ontology::builder().lib(lib).build();
+        let mut vm = ontology.new_vm();
         let output = vm.eval(
             proc,
             [Value::new(
@@ -529,7 +587,8 @@ mod tests {
             ],
         );
 
-        let mut vm = OntolVm::new(&lib);
+        let ontology = Ontology::builder().lib(lib).build();
+        let mut vm = ontology.new_vm();
         let output = vm.eval(
             proc,
             [Value::new(
@@ -591,7 +650,8 @@ mod tests {
             ],
         );
 
-        let mut vm = OntolVm::new(&lib);
+        let ontology = Ontology::builder().lib(lib).build();
+        let mut vm = ontology.new_vm();
 
         assert_eq!(
             "{}",

@@ -3,8 +3,8 @@ use std::fmt::{Debug, Display};
 use ontol_runtime::vm::proc::BuiltinProc;
 
 use crate::{
-    Binding, GetKind, GetLabel, GetVar, HasDefault, Kind, Label, Lang, MatchArm, PropPattern,
-    PropVariant, SeqPropertyElement, StructFlags, Var,
+    Binding, CaptureGroup, GetKind, GetLabel, GetVar, HasDefault, Kind, Label, Lang, MatchArm,
+    PropPattern, PropVariant, SeqPropertyElement, StructFlags, Var,
 };
 
 impl<'a, L: Lang> std::fmt::Display for Kind<'a, L> {
@@ -270,9 +270,14 @@ impl<'a, L: Lang> Print<Binding<'a, L>> for Printer<L> {
     }
 }
 
-impl<L: Lang> Print<Var> for Printer<L> {
-    fn print(self, sep: Sep, var: &Var, f: &mut std::fmt::Formatter) -> PrintResult {
-        write!(f, "{sep}{var}")?;
+impl<'a, L: Lang> Print<CaptureGroup<'a, L>> for Printer<L> {
+    fn print(
+        self,
+        sep: Sep,
+        group: &CaptureGroup<'a, L>,
+        f: &mut std::fmt::Formatter,
+    ) -> PrintResult {
+        write!(f, "{sep}({} {})", group.index, group.binder.var())?;
         Ok(Multiline(false))
     }
 }

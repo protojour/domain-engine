@@ -157,6 +157,10 @@ impl ProcBuilder {
                         AddressOffset(block_addresses[block_index.0 as usize]),
                     ),
                     Ir::TypePun(local, def_id) => OpCode::TypePun(local, def_id),
+                    Ir::RegexCapture(local, def_id, groups) => {
+                        OpCode::RegexCapture(local, def_id, groups)
+                    }
+                    Ir::AssertTrue => OpCode::AssertTrue,
                 };
                 output.push((opcode, span));
             }

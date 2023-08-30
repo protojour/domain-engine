@@ -3,7 +3,7 @@ use ontol_hir::{GetKind, HasDefault, PropPattern, PropVariant};
 use ontol_runtime::{
     smart_format,
     value::PropertyId,
-    vm::proc::{BuiltinProc, Local, NParams, Predicate, Procedure},
+    vm::proc::{BuiltinProc, Local, NParams, PatternCaptureGroup, Predicate, Procedure},
     DefId,
 };
 use tracing::debug;
@@ -478,7 +478,51 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
                 self.builder.append_pop_until(block, top, span);
             }
-            ontol_hir::Kind::MatchRegex(..) => todo!(),
+            ontol_hir::Kind::MatchRegex(haystack_var, regex_def_id, capture_groups, nodes) => {
+                let haystack_local = self.var_local(haystack_var);
+
+                let vm_capture_groups: Box<[_]> = capture_groups
+                    .iter()
+                    .map(|capture_group| PatternCaptureGroup {
+                        group_index: capture_group.index,
+                        type_def_id: capture_group
+                            .binder
+                            .ty
+                            .get_single_def_id()
+                            .expect("Unable to get type of capture group"),
+                    })
+                    .collect();
+
+                let top = self.builder.top();
+
+                self.builder.append(
+                    block,
+                    Ir::RegexCapture(haystack_local, regex_def_id, vm_capture_groups),
+                    Delta((capture_groups.len() + 1) as i32),
+                    span,
+                );
+                // unconditional match (for now)
+                self.builder.append(block, Ir::AssertTrue, Delta(-1), span);
+
+                {
+                    // define scope for capture
+                    for (index, capture_group) in capture_groups.iter().enumerate() {
+                        let local = Local(top.0 + index as u16 + 1);
+                        if self.scope.insert(capture_group.binder.var, local).is_some() {
+                            panic!("Variable {} already in scope", capture_group.binder.var);
+                        }
+                    }
+
+                    for node in nodes {
+                        self.gen_node(node, block);
+                    }
+
+                    // pop scope
+                    for capture_group in capture_groups {
+                        self.scope.remove(&capture_group.binder.var);
+                    }
+                }
+            }
             ontol_hir::Kind::DeclSeq(..) | ontol_hir::Kind::Regex(..) => {
                 unreachable!("decl-seq is only declarative, not used in code generation");
             }

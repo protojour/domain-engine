@@ -117,15 +117,15 @@ macro_rules! visitor_trait_methods {
                     self.visit_node(0, borrow!($ref attr.rel));
                     self.visit_node(1, borrow!($ref attr.val));
                 }
-                Kind::Regex(_, vars) => {
-                    for var in vars.$iter() {
-                        self.visit_var(var);
+                Kind::Regex(_, capture_groups) => {
+                    for group in capture_groups.$iter() {
+                        self.visit_binder(group.binder.$var());
                     }
                 }
-                Kind::MatchRegex(string_var, _regex_def_id, captures, children) => {
+                Kind::MatchRegex(string_var, _regex_def_id, capture_groups, children) => {
                     self.visit_var(string_var);
-                    for capture in captures.$iter() {
-                        self.visit_var(capture);
+                    for group in capture_groups.$iter() {
+                        self.visit_binder(group.binder.$var());
                     }
                     for (index, child) in children.$iter().enumerate() {
                         self.visit_node(index, child);

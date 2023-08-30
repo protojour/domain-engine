@@ -1,6 +1,6 @@
 use ontol_runtime::{
     value::PropertyId,
-    vm::proc::{BuiltinProc, Local, Predicate, Procedure},
+    vm::proc::{BuiltinProc, Local, PatternCaptureGroup, Predicate, Procedure},
     DefId,
 };
 use smartstring::alias::String;
@@ -39,6 +39,8 @@ pub enum Ir {
     String(String, DefId),
     Cond(Predicate, BlockIndex),
     TypePun(Local, DefId),
+    RegexCapture(Local, DefId, Box<[PatternCaptureGroup]>),
+    AssertTrue,
 }
 
 #[derive(Clone, Debug)]

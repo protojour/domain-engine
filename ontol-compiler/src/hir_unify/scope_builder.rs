@@ -14,7 +14,7 @@ use crate::{
 use super::{
     dep_tree::Scope,
     dependent_scope_analyzer::{DepScopeAnalyzer, Path, PropAnalysis},
-    scope,
+    scope::{self, ScopeCaptureGroup},
 };
 
 #[derive(Debug)]
@@ -179,11 +179,18 @@ impl<'m> ScopeBuilder<'m> {
                     ),
                 })
             }),
-            ontol_hir::Kind::Regex(regex_def_id, captures) => {
+            ontol_hir::Kind::Regex(regex_def_id, capture_groups) => {
                 let mut vars = VarSet::default();
-                for capture in captures {
-                    vars.insert(*capture);
-                }
+                let scope_capture_groups = capture_groups
+                    .iter()
+                    .map(|capture_group| {
+                        vars.insert(capture_group.binder.var);
+                        ScopeCaptureGroup {
+                            index: capture_group.index,
+                            binder: capture_group.binder,
+                        }
+                    })
+                    .collect();
 
                 let input_string = self.var_allocator.alloc();
 
@@ -193,7 +200,7 @@ impl<'m> ScopeBuilder<'m> {
                         ty: hir_meta.ty,
                     }),
                     scope: scope::Scope(
-                        scope::Kind::Regex(input_string, *regex_def_id, vars.clone()),
+                        scope::Kind::Regex(input_string, *regex_def_id, scope_capture_groups),
                         scope::Meta {
                             vars,
                             dependencies: VarSet::default(),

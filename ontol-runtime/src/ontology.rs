@@ -31,11 +31,11 @@ pub struct Ontology {
     pub(crate) map_meta_table: FnvHashMap<(MapKey, MapKey), MapMeta>,
     pub(crate) string_like_types: FnvHashMap<DefId, StringLikeType>,
     pub(crate) string_patterns: FnvHashMap<DefId, StringPattern>,
+    pub(crate) lib: Lib,
 
     domain_table: FnvHashMap<PackageId, Domain>,
     package_config_table: FnvHashMap<PackageId, PackageConfig>,
     docs: FnvHashMap<DefId, Vec<String>>,
-    lib: Lib,
     serde_operators_per_def: HashMap<SerdeKey, SerdeOperatorId>,
     serde_operators: Vec<SerdeOperator>,
     dynamic_sequence_operator_id: SerdeOperatorId,
@@ -65,7 +65,7 @@ impl Ontology {
     }
 
     pub fn new_vm(&self) -> OntolVm<'_> {
-        OntolVm::new(&self.lib)
+        OntolVm::new(self)
     }
 
     pub fn get_type_info(&self, def_id: DefId) -> &TypeInfo {

@@ -65,9 +65,17 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     node: unified.node,
                 })
             }
-            (expr_kind, scope::Kind::Regex(string_var, regex_def_id, captures)) => {
+            (expr_kind, scope::Kind::Regex(string_var, regex_def_id, scope_capture_groups)) => {
                 let const_scope = self.const_scope();
                 let unified = self.unify(const_scope, expr::Expr(expr_kind, expr_meta.clone()))?;
+
+                let capture_groups = scope_capture_groups
+                    .iter()
+                    .map(|scope_capture_group| ontol_hir::CaptureGroup {
+                        index: scope_capture_group.index,
+                        binder: scope_capture_group.binder,
+                    })
+                    .collect();
 
                 Ok(UnifiedNode {
                     typed_binder: Some(TypedBinder {
@@ -78,7 +86,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         ontol_hir::Kind::MatchRegex(
                             string_var,
                             regex_def_id,
-                            captures.iter().collect(),
+                            capture_groups,
                             vec![unified.node],
                         ),
                         expr_meta.hir_meta,

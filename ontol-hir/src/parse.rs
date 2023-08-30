@@ -185,24 +185,27 @@ impl<L: Lang> Parser<L> {
             }
             ("regex", next) => {
                 let (regex_def_id, next) = parse_def_id(next)?;
-                let (captures, next) = parse_paren_delimited(next, |next| {
-                    self.parse_many(next, |_, next| parse_dollar_var(next))
+                let (capture_groups, next) = parse_paren_delimited(next, |next| {
+                    self.parse_many(next, Self::parse_capture_group)
                 })?;
 
-                Ok((self.make_node(Kind::Regex(regex_def_id, captures)), next))
+                Ok((
+                    self.make_node(Kind::Regex(regex_def_id, capture_groups)),
+                    next,
+                ))
             }
             ("match-regex", next) => {
                 let (string_var, next) = parse_dollar_var(next)?;
                 let (regex_def_id, next) = parse_def_id(next)?;
-                let (captures, next) = parse_paren_delimited(next, |next| {
-                    self.parse_many(next, |_, next| parse_dollar_var(next))
+                let (capture_groups, next) = parse_paren_delimited(next, |next| {
+                    self.parse_many(next, Self::parse_capture_group)
                 })?;
                 let (children, next) = self.parse_many(next, Self::parse)?;
                 Ok((
                     self.make_node(Kind::MatchRegex(
                         string_var,
                         regex_def_id,
-                        captures,
+                        capture_groups,
                         children,
                     )),
                     next,
@@ -388,6 +391,21 @@ impl<L: Lang> Parser<L> {
             (Token::Underscore, next) => Ok((Binding::Wildcard, next)),
             (token, _) => Err(Error::InvalidToken(token)),
         }
+    }
+
+    fn parse_capture_group<'a, 's>(&self, next: &'s str) -> ParseResult<'s, CaptureGroup<'a, L>> {
+        parse_paren_delimited(next, |next| {
+            let (index, next) = parse_i64(next)?;
+            let (var, next) = parse_dollar_var(next)?;
+
+            Ok((
+                CaptureGroup {
+                    index: index as usize,
+                    binder: self.make_binder(var),
+                },
+                next,
+            ))
+        })
     }
 
     fn make_node<'a>(&self, kind: Kind<'a, L>) -> L::Node<'a> {
