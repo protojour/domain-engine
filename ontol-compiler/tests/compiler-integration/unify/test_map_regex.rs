@@ -15,7 +15,7 @@ fn test_map_regex_capture1() {
     map {
         // TODO: Backwards mapping
         foo match {
-            'input': /(?P<one>\w+) (?P<two>\w+)!/
+            'input': /(?<one>\w+) (?<two>\w+)!/
         }
         bar {
             'first': one

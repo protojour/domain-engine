@@ -216,7 +216,7 @@ fn artist_and_instrument_id_as_relation_object() {
                     }
                 ]
             })),
-            r#"invalid type: string "junk", expected string matching /\Ainstrument/([0-9A-Fa-f]{32}|[0-9A-Fa-f]{8}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{12})\z/ at line 1 column 40"#
+            r#"invalid type: string "junk", expected string matching /(?:\A(?:instrument/)((?:[0-9A-Fa-f]{32}|(?:[0-9A-Fa-f]{8}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{12})))\z)/ at line 1 column 40"#
         );
         assert_error_msg!(
             create_de(&artist).data(json!({

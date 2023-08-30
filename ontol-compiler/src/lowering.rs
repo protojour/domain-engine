@@ -6,7 +6,7 @@ use ontol_runtime::{
     ontology::{PropertyCardinality, ValueCardinality},
     smart_format, DefId, RelationshipId,
 };
-use regex_syntax::hir::{GroupKind, Hir, HirKind};
+use regex_syntax::hir::{Hir, HirKind};
 use smallvec::SmallVec;
 use smartstring::alias::String;
 use tracing::debug;
@@ -1015,14 +1015,12 @@ impl<'s> RegexLowering<'s> {
             HirKind::Empty => {}
             HirKind::Literal(_) => {}
             HirKind::Class(_) => {}
-            HirKind::Anchor(_) => {}
-            HirKind::WordBoundary(_) => {}
-            HirKind::Group(group) => match &group.kind {
-                GroupKind::CaptureName { name, index } => {
-                    let var = self.var_table.get_or_create_var(name.into());
-                    self.output.captures.insert(var, *index as usize);
-                }
-                GroupKind::CaptureIndex(_) => {
+            HirKind::Look(_) => {}
+            HirKind::Capture(capture) => {
+                if let Some(name) = &capture.name {
+                    let var = self.var_table.get_or_create_var(name.as_ref().into());
+                    self.output.captures.insert(var, capture.index as usize);
+                } else {
                     // Found no way to extract spans from regex-syntax/Hir, they apparently
                     // disappear in the AST => HIR translation
                     self.errors.push(
@@ -1030,10 +1028,9 @@ impl<'s> RegexLowering<'s> {
                             .spanned(&self.src.span(self.regex_span)),
                     );
                 }
-                GroupKind::NonCapturing => {}
-            },
+            }
             HirKind::Repetition(rep) => {
-                self.analyze_expr_regex(&rep.hir)?;
+                self.analyze_expr_regex(&rep.sub)?;
             }
             HirKind::Concat(hirs) => {
                 for hir in hirs {

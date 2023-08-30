@@ -3,10 +3,7 @@ use std::str::Chars;
 use ontol_parser::Span;
 use ontol_runtime::smart_format;
 use regex_syntax::{
-    hir::{
-        Anchor, Class, ClassUnicode, ClassUnicodeRange, Hir, HirKind, Literal, Repetition,
-        RepetitionKind, RepetitionRange,
-    },
+    hir::{Class, ClassUnicode, ClassUnicodeRange, Hir, HirKind, Literal, Look, Repetition},
     Parser,
 };
 use smartstring::alias::String;
@@ -17,13 +14,14 @@ pub fn uuid() -> Hir {
         ClassUnicodeRange::new('a', 'f'),
         ClassUnicodeRange::new('A', 'F'),
     ])));
-    let dash = Hir::literal(Literal::Unicode('-'));
+    let dash = Hir::literal("-".as_bytes());
 
     fn repeat_exact(hir: Hir, n: u32) -> Hir {
         Hir::repetition(Repetition {
-            kind: RepetitionKind::Range(RepetitionRange::Exactly(n)),
+            min: n,
+            max: Some(n),
             greedy: true,
-            hir: Box::new(hir),
+            sub: Box::new(hir),
         })
     }
 
@@ -50,10 +48,7 @@ pub fn datetime_rfc3339() -> Hir {
 }
 
 pub fn empty_string() -> Hir {
-    Hir::concat(vec![
-        Hir::anchor(Anchor::StartText),
-        Hir::anchor(Anchor::EndText),
-    ])
+    Hir::concat(vec![Hir::look(Look::Start), Hir::look(Look::End)])
 }
 
 pub fn set_of_all_strings() -> Hir {
@@ -62,7 +57,7 @@ pub fn set_of_all_strings() -> Hir {
 
 pub fn collect_hir_constant_parts(hir: &Hir, parts: &mut String) {
     match hir.kind() {
-        HirKind::Literal(Literal::Unicode(char)) => parts.push(*char),
+        HirKind::Literal(Literal(bytes)) => parts.push_str(std::str::from_utf8(bytes).unwrap()),
         HirKind::Concat(hirs) => {
             for child in hirs {
                 collect_hir_constant_parts(child, parts);
@@ -78,7 +73,7 @@ pub fn constant_prefix(hir: &Hir) -> Option<String> {
         let first = iterator.next()?;
 
         match first.kind() {
-            HirKind::Anchor(Anchor::StartLine | Anchor::StartText) => {}
+            HirKind::Look(Look::Start | Look::StartLF | Look::StartCRLF) => {}
             _ => return None,
         }
 
@@ -86,8 +81,8 @@ pub fn constant_prefix(hir: &Hir) -> Option<String> {
 
         for next in iterator {
             match next.kind() {
-                HirKind::Literal(Literal::Unicode(char)) => {
-                    prefix.push(*char);
+                HirKind::Literal(Literal(bytes)) => {
+                    prefix.push_str(std::str::from_utf8(bytes).unwrap());
                 }
                 _ => {
                     break;

@@ -16,7 +16,7 @@ fn constant_string_pattern() {
         assert_json_io_matches!(foo, Create, "foo");
         assert_error_msg!(
             create_de(&foo).data(json!("fo")),
-            r#"invalid type: string "fo", expected string matching /\Afoo\z/ at line 1 column 4"#
+            r#"invalid type: string "fo", expected string matching /(?:\A(?:foo)\z)/ at line 1 column 4"#
         );
     });
 }
@@ -33,7 +33,7 @@ fn concatenated_constant_string_constructor_pattern() {
         assert_json_io_matches!(foobar, Create, "foobar");
         assert_error_msg!(
             create_de(&foobar).data(json!("fooba")),
-            r#"invalid type: string "fooba", expected string matching /\Afoobar\z/ at line 1 column 7"#
+            r#"invalid type: string "fooba", expected string matching /(?:\A(?:foobar)\z)/ at line 1 column 7"#
         );
     });
 }
@@ -59,7 +59,7 @@ fn uuid_in_string_constructor_pattern() {
         );
         assert_error_msg!(
             create_de(&foo).data(json!("foo")),
-            r#"invalid type: string "foo", expected string matching /\Afoo/([0-9A-Fa-f]{32}|[0-9A-Fa-f]{8}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{12})\z/ at line 1 column 5"#
+            r#"invalid type: string "foo", expected string matching /(?:\A(?:foo/)((?:[0-9A-Fa-f]{32}|(?:[0-9A-Fa-f]{8}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{12})))\z)/ at line 1 column 5"#
         );
     });
 }
@@ -111,7 +111,7 @@ fn test_regex_property() {
         assert_json_io_matches!(foo, Create, { "prop": "123abcccc" });
         assert_error_msg!(
             create_de(&foo).data(json!({ "prop": "123" })),
-            r#"invalid type: string "123", expected string matching /abc*/ at line 1 column 13"#
+            r#"invalid type: string "123", expected string matching /(?:(?:ab)c*)/ at line 1 column 13"#
         );
     });
 }
@@ -130,7 +130,7 @@ fn test_simple_regex_pattern_constructor() {
         assert_json_io_matches!(re, Create, "abccccc" == "ab");
         assert_error_msg!(
             create_de(&re).data(json!("a")),
-            r#"invalid type: string "a", expected string matching /\Aabc*\z/ at line 1 column 3"#
+            r#"invalid type: string "a", expected string matching /(?:\A(?:ab)c*\z)/ at line 1 column 3"#
         );
     });
 }
@@ -166,10 +166,10 @@ fn test_string_patterns() {
 fn regex_named_group_as_relation() {
     "
     def lol {
-        rel .is: /abc(?<named>.)/ // ERROR invalid regex: unrecognized flag
+        rel .is: /abc(?<named>.)/
     }
     "
-    .compile_fail()
+    .compile_ok(|_test| {});
 }
 
 #[test]

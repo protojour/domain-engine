@@ -7,12 +7,13 @@ use ontol_runtime::{
         operator::{FilteredVariants, SerdeOperator},
         processor::{ProcessorLevel, ProcessorMode, SerdeProcessor},
     },
+    string_pattern::StringPattern,
     string_types::StringLikeType,
     value::{Attribute, Data, Value},
     DefId,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use std::fmt::Write;
+use regex_generate::Generator;
 use tracing::debug;
 
 const MAX_REPEAT: u32 = 128;
@@ -125,39 +126,19 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                         }
                     }
                 } else {
-                    let pattern = self.ontology.get_string_pattern(*def_id).unwrap();
-                    let rand_regex =
-                        rand_regex::Regex::compile(pattern.regex.as_str(), MAX_REPEAT).unwrap();
-                    let string: std::string::String = self.rng.sample(&rand_regex);
-                    Value::new(Data::String(string.into()), *def_id)
+                    let string_pattern = self.ontology.get_string_pattern(*def_id).unwrap();
+                    let text = rand_text_matching_pattern(string_pattern, &mut self.rng);
+                    Value::new(Data::String(text.into()), *def_id)
                 }
             }
             SerdeOperator::CapturingStringPattern(def_id) => {
                 let string_pattern = self.ontology.get_string_pattern(*def_id).unwrap();
-                let mut parser = regex_syntax::ast::parse::Parser::new();
+                let text = rand_text_matching_pattern(string_pattern, &mut self.rng);
+                let data = string_pattern
+                    .try_capturing_match(&text, self.ontology)
+                    .unwrap();
 
-                if let Some(ast) =
-                    transform_regex(&parser.parse(string_pattern.regex.as_str()).unwrap())
-                {
-                    let ast_string = ast.to_string();
-                    let hir = regex_syntax::hir::translate::Translator::new()
-                        .translate(&ast_string, &ast)
-                        .unwrap();
-                    let mut expression = String::new();
-                    write!(&mut expression, "{hir}").unwrap();
-
-                    let rand_regex = rand_regex::Regex::compile(&expression, MAX_REPEAT).unwrap();
-
-                    let string: std::string::String = self.rng.sample(&rand_regex);
-
-                    let data = string_pattern
-                        .try_capturing_match(&string, self.ontology)
-                        .unwrap();
-
-                    Value::new(data, *def_id)
-                } else {
-                    panic!()
-                }
+                Value::new(data, *def_id)
             }
             SerdeOperator::DynamicSequence => {
                 return Ok(Value::new(Data::Sequence([].into()), DefId::unit()).into());
@@ -228,38 +209,9 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
     }
 }
 
-fn transform_regex(ast: &regex_syntax::ast::Ast) -> Option<regex_syntax::ast::Ast> {
-    use regex_syntax::ast::*;
-    match ast {
-        Ast::Group(Group { span, kind: _, ast }) => Some(Ast::Group(Group {
-            span: *span,
-            kind: GroupKind::NonCapturing(Flags {
-                span: Span::new(Position::new(0, 0, 0), Position::new(0, 0, 0)),
-                items: vec![],
-            }),
-            ast: ast.clone(),
-        })),
-        // Anchors are not supported by rand_regex
-        Ast::Assertion(_) => None,
-        Ast::Repetition(Repetition {
-            span,
-            op,
-            greedy,
-            ast,
-        }) => Some(Ast::Repetition(Repetition {
-            span: *span,
-            op: op.clone(),
-            greedy: *greedy,
-            ast: Box::new(transform_regex(ast)?),
-        })),
-        Ast::Alternation(Alternation { span, asts }) => Some(Ast::Alternation(Alternation {
-            span: *span,
-            asts: asts.iter().filter_map(transform_regex).collect(),
-        })),
-        Ast::Concat(Concat { span, asts }) => Some(Ast::Concat(Concat {
-            span: *span,
-            asts: asts.iter().filter_map(transform_regex).collect(),
-        })),
-        other => Some(other.clone()),
-    }
+fn rand_text_matching_pattern(string_pattern: &StringPattern, rng: &mut impl Rng) -> String {
+    let mut gen = Generator::new(string_pattern.regex.as_str(), rng, MAX_REPEAT).unwrap();
+    let mut bytes = vec![];
+    gen.generate(&mut bytes).unwrap();
+    String::from_utf8(bytes).unwrap()
 }

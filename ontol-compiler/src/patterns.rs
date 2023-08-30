@@ -5,7 +5,7 @@ use ontol_runtime::{
     DefId,
 };
 use regex::Regex;
-use regex_syntax::hir::{Anchor, Group, GroupKind, Hir, Literal};
+use regex_syntax::hir::{Capture, Hir, Look};
 use smartstring::alias::String;
 use std::fmt::Write;
 use tracing::debug;
@@ -99,19 +99,15 @@ impl StringPatternSegment {
         match self {
             Self::EmptyString => regex_util::empty_string(),
             Self::AllStrings => regex_util::set_of_all_strings(),
-            Self::Literal(string) => Hir::concat(
-                string
-                    .chars()
-                    .map(|char| Hir::literal(Literal::Unicode(char)))
-                    .collect(),
-            ),
+            Self::Literal(string) => Hir::literal(string.as_bytes()),
             Self::Regex(hir) => hir.clone(),
             Self::Property { segment, .. } => {
                 let index = capture_cursor.increment();
                 debug!("creating capture group with index {index}");
-                Hir::group(Group {
-                    kind: GroupKind::CaptureIndex(index),
-                    hir: Box::new(segment.to_regex_hir(capture_cursor)),
+                Hir::capture(Capture {
+                    index,
+                    name: None,
+                    sub: Box::new(segment.to_regex_hir(capture_cursor)),
                 })
             }
             Self::Concat(segments) => Hir::concat(
@@ -215,9 +211,9 @@ pub fn store_string_pattern_segment(
     segment: &StringPatternSegment,
 ) {
     let anchored_hir = Hir::concat(vec![
-        Hir::anchor(Anchor::StartText),
+        Hir::look(Look::Start),
         segment.to_regex_hir(&mut CaptureCursor(1)),
-        Hir::anchor(Anchor::EndText),
+        Hir::look(Look::End),
     ]);
 
     let mut constant_parts = vec![];
