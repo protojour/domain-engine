@@ -193,7 +193,7 @@ where
                 }
                 var_set
             }
-            ontol_hir::Kind::Push(var, attr) => {
+            ontol_hir::Kind::SeqPush(var, attr) => {
                 let mut var_set = self.analyze_node(&attr.rel);
                 var_set.union_with(&self.analyze_node(&attr.val));
 

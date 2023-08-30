@@ -133,8 +133,8 @@ impl<'a, L: Lang> Print<Kind<'a, L>> for Printer<L> {
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
-            Kind::Push(seq_var, attr) => {
-                write!(f, "{indent}(push {seq_var}",)?;
+            Kind::SeqPush(seq_var, attr) => {
+                write!(f, "{indent}(seq-push {seq_var}",)?;
                 let multi = self.print_all(
                     Sep::Space,
                     [attr.rel.as_ref(), attr.val.as_ref()]

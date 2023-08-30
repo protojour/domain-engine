@@ -134,7 +134,7 @@ fn test_analyze_seq1() {
                         (#u
                             (sequence ($d)
                                 (for-each $c ($_ $e)
-                                    (push $d #u
+                                    (seq-push $d #u
                                         (match-prop $e O:1:1
                                             (($_ $f) $f)
                                         )

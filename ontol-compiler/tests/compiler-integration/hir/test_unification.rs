@@ -358,7 +358,7 @@ fn test_unify_basic_seq_prop_no_default() {
                         (#u
                             (sequence ($e)
                                 (for-each $d ($_ $a)
-                                    (push $e #u $a)
+                                    (seq-push $e #u $a)
                                 )
                             )
                         )
@@ -399,11 +399,11 @@ fn test_unify_basic_seq_prop_element_iter_mix() {
                                     (prop $c S:1:1
                                         (#u
                                             (sequence ($e)
-                                                (push $e #u $a)
+                                                (seq-push $e #u $a)
                                                 (for-each $d ($_ $b)
-                                                    (push $e #u $b)
+                                                    (seq-push $e #u $b)
                                                 )
-                                                (push $e #u $c)
+                                                (seq-push $e #u $c)
                                             )
                                         )
                                     )
@@ -464,7 +464,7 @@ fn test_unify_seq_prop_deep() {
                         (#u
                             (sequence ($h)
                                 (for-each $f ($_ $c)
-                                    (push $h #u
+                                    (seq-push $h #u
                                         (struct ($e)
                                             (match-prop $c S:1:1
                                                 ((seq $g)
@@ -472,7 +472,7 @@ fn test_unify_seq_prop_deep() {
                                                         (#u
                                                             (sequence ($i)
                                                                 (for-each $g ($_ $a)
-                                                                    (push $i #u (map $a))
+                                                                    (seq-push $i #u (map $a))
                                                                 )
                                                             )
                                                         )
@@ -518,7 +518,7 @@ fn test_unify_basic_seq_prop_default_value() {
                         (#u
                             (sequence ($e)
                                 (for-each $d ($_ $a)
-                                    (push $e #u $a)
+                                    (seq-push $e #u $a)
                                 )
                             )
                         )
@@ -571,7 +571,7 @@ fn test_unify_flat_map1() {
                     ((seq $d)
                         (sequence ($g)
                             (for-each $d ($_ $e)
-                                (push $g #u
+                                (seq-push $g #u
                                     (struct ($f)
                                         (match-prop $e S:2:2
                                             (($_ $a)
@@ -929,7 +929,7 @@ mod unify_seq_scope_escape_1 {
                                         (#u
                                             (sequence ($f)
                                                 (for-each $a ($_ $b)
-                                                    (push $f #u $b)
+                                                    (seq-push $f #u $b)
                                                 )
                                             )
                                         )
@@ -964,7 +964,7 @@ mod unify_seq_scope_escape_1 {
                                     (#u
                                         (sequence ($f)
                                             (for-each $a ($_ $b)
-                                                (push $f #u $b)
+                                                (seq-push $f #u $b)
                                             )
                                         )
                                     )
@@ -1042,7 +1042,7 @@ mod unify_seq_scope_escape_2 {
                                         (#u
                                             (sequence ($j)
                                                 (for-each $c ($_ $d)
-                                                    (push $j #u $d)
+                                                    (seq-push $j #u $d)
                                                 )
                                             )
                                         )
@@ -1060,7 +1060,7 @@ mod unify_seq_scope_escape_2 {
                                                             (#u
                                                                 (sequence ($k)
                                                                     (for-each $a ($_ $b)
-                                                                        (push $k #u $b)
+                                                                        (seq-push $k #u $b)
                                                                     )
                                                                 )
                                                             )

@@ -93,7 +93,7 @@ pub enum Kind<'a, L: Lang> {
     /// Iterate attributes in sequence var,
     ForEach(Var, (Binding<'a, L>, Binding<'a, L>), Nodes<'a, L>),
     /// Push an attribute to the end of a sequence
-    Push(Var, Attribute<Box<L::Node<'a>>>),
+    SeqPush(Var, Attribute<Box<L::Node<'a>>>),
     /// Declarative regex w/captures
     Regex(DefId, Vec<CaptureGroup<'a, L>>),
     /// A regex matcher/unpacker

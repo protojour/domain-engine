@@ -112,7 +112,7 @@ macro_rules! visitor_trait_methods {
                         self.visit_node(index, child);
                     }
                 }
-                Kind::Push(seq_var, attr) => {
+                Kind::SeqPush(seq_var, attr) => {
                     self.visit_var(seq_var);
                     self.visit_node(0, borrow!($ref attr.rel));
                     self.visit_node(1, borrow!($ref attr.val));

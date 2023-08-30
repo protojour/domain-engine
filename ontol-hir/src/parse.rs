@@ -168,12 +168,12 @@ impl<L: Lang> Parser<L> {
                     next,
                 ))
             }
-            ("push", next) => {
+            ("seq-push", next) => {
                 let (seq_var, next) = parse_dollar_var(next)?;
                 let (rel, next) = self.parse(next)?;
                 let (val, next) = self.parse(next)?;
                 Ok((
-                    self.make_node(Kind::Push(
+                    self.make_node(Kind::SeqPush(
                         seq_var,
                         Attribute {
                             rel: Box::new(rel),

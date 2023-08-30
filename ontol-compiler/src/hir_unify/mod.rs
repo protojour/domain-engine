@@ -56,7 +56,7 @@ pub fn unify_to_function<'m>(
     };
 
     let (expr, var_allocator) = {
-        let mut expr_builder = ExprBuilder::new(var_allocator);
+        let mut expr_builder = ExprBuilder::new(var_allocator, &compiler.defs);
         let expr = expr_builder.hir_to_expr(expr);
         (expr, expr_builder.var_allocator())
     };

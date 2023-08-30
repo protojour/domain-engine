@@ -462,7 +462,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
                 self.builder.append_pop_until(block, counter, span);
             }
-            ontol_hir::Kind::Push(seq_var, attr) => {
+            ontol_hir::Kind::SeqPush(seq_var, attr) => {
                 let top = self.builder.top();
                 let seq_local = self.var_local(seq_var);
                 self.gen_node(*attr.rel, block);

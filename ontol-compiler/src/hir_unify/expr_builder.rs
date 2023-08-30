@@ -1,25 +1,24 @@
-use std::marker::PhantomData;
-
 use ontol_hir::{PropVariant, SeqPropertyVariant};
 
 use super::expr;
 use crate::{
+    def::Defs,
     hir_unify::VarSet,
     typed_hir::{TypedBinder, TypedHirNode},
 };
 
-pub struct ExprBuilder<'m> {
+pub struct ExprBuilder<'c, 'm> {
     in_scope: VarSet,
-    phantom: PhantomData<&'m ()>,
     var_allocator: ontol_hir::VarAllocator,
+    defs: &'c Defs<'m>,
 }
 
-impl<'m> ExprBuilder<'m> {
-    pub fn new(var_allocator: ontol_hir::VarAllocator) -> Self {
+impl<'c, 'm> ExprBuilder<'c, 'm> {
+    pub fn new(var_allocator: ontol_hir::VarAllocator, defs: &'c Defs<'m>) -> Self {
         Self {
             in_scope: Default::default(),
-            phantom: PhantomData,
             var_allocator,
+            defs,
         }
     }
 
@@ -142,7 +141,12 @@ impl<'m> ExprBuilder<'m> {
                     },
                 )
             }),
-            ontol_hir::Kind::Regex(..) => {
+            ontol_hir::Kind::Regex(regex_def_id, _capture_groups) => {
+                let _regex_meta = self
+                    .defs
+                    .literal_regex_meta_table
+                    .get(regex_def_id)
+                    .unwrap();
                 todo!()
             }
             ontol_hir::Kind::Prop(..) => panic!("standalone prop"),
@@ -158,7 +162,7 @@ impl<'m> ExprBuilder<'m> {
             ontol_hir::Kind::ForEach(..) => {
                 todo!()
             }
-            ontol_hir::Kind::Push(..) => {
+            ontol_hir::Kind::SeqPush(..) => {
                 todo!()
             }
         }

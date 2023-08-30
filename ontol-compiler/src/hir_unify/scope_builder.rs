@@ -222,7 +222,7 @@ impl<'m> ScopeBuilder<'m> {
             ontol_hir::Kind::ForEach(..) => {
                 todo!()
             }
-            ontol_hir::Kind::Push(..) => {
+            ontol_hir::Kind::SeqPush(..) => {
                 todo!()
             }
         }

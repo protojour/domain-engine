@@ -457,7 +457,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         },
                     }),
                     node: TypedHirNode(
-                        ontol_hir::Kind::Push(
+                        ontol_hir::Kind::SeqPush(
                             seq_var,
                             ontol_hir::Attribute {
                                 rel: Box::new(rel.node),
