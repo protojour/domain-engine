@@ -3,10 +3,14 @@ Monokai Sublime style. Derived from Monokai by noformnocontent http://nn.mit-lic
 */
 
 :root {
-  --inline-code-color: #f8f8f2;
+  --code-font-size: 15px;
 }
 
 .hljs {
+  background: #ededed;
+}
+
+pre code.hljs {
   display: block;
   overflow-x: auto;
   background: #23241f;

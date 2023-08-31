@@ -8,8 +8,10 @@
 
 ```ontol
 /// This is a doc comment.
-/// It usually precedes a `type` or `rel` statement.
-/// Doc comments can be multi-line, and are used in
-/// GraphQL, REST and Language Server documentation.
-type some_type
+/// It usually precedes a `def` or `rel` statement.
+/// A doc comments can be multi-line, can include **Markdown**,
+/// and is used in GraphQL, REST and Language Server documentation.
+def some_def {
+    // ...
+}
 ```

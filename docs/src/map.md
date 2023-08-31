@@ -1,34 +1,34 @@
 # map
 
-A map statement describes how one struct type maps to another (and vice versa). The map statement has two arms, each referring to a struct type.
+A `map` statement describes how one struct [`def`](def.md) maps to another (and vice versa). The `map` statement has two arms, each containing a `def` identifer.
 
-Variable names can be anything, you can make them up as you go along.
+For referring to properties between one arm and another, we use variables. Variable names can be anything, you can make them up as you go along.
 
 All variables mentioned must be present in both arms, and all properties must be accounted for.
 
 ```ontol
 map {
-    type_a {      // first map arm, name of a struct type
-        'foo': f  // name of a property in `type_a` and a variable name
-        'bar': b  // name of a property in `type_a` and a variable name
+    def_a {       // first map arm, name of a struct def
+        'foo': f  // name of a property in `def_a` and a variable name
+        'bar': b  // name of a property in `def_a` and a variable name
     }
-    type_b {      // second map arm, name of a struct type
-        'Foo': f  // name of a property in `type_b` and a variable name
-        'Bar': b  // name of a property in `type_b` and a variable name
+    def_b {       // second map arm, name of a struct def
+        'Foo': f  // name of a property in `def_b` and a variable name
+        'Bar': b  // name of a property in `def_b` and a variable name
     }
 }
 ```
 
-# one-way map
+# match map
 
-Following the `map` statement with an arrow operator `=>` indicates the mapping is one-way. `type_a` can be mapped to `type_b`, but not vice versa.
+If one map arm is followed by the `match` keyword, the semantics change. `def_a` can be mapped to `def_b`, but not vice versa, and `def_b` does not need to have all properties accounted for.
 
 ```ontol
-map => {
-    type_a {
+map {
+    def_a {
         // ...
     }
-    type_b {
+    def_b match {
         // ...
     }
 }

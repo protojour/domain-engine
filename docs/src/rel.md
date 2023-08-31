@@ -1,21 +1,21 @@
 # rel
 
-A `rel` statement describes a relation, and has three parameters; the first is the subject, the second is the relation, and the third is the object.
+The `rel` statement defines a relation, and has three parameters; the first is the subject, the second is the relation itself, and the third is the object.
 
-The properties of a struct type are defined using relations:
+The properties of a struct [`def`](def.md) are defined using relations:
 
 ```ontol
-rel some_type 'relation_name': string
+rel some_def 'relation_name': string
 ```
 
-Here `some_type` is the subject, `'relation_name':` is the relation, and `string` is the object. In other words `some_type` has a property called `'relation_name'` which is a `string`.
+Here `some_def` is the subject, `'relation_name':` names the relation itself, and `string` is the object. In other words `some_def` has a property called `'relation_name'` which is a `string`.
 
 ## local rel
 
-A common pattern is to define relations locally, within the block of a type. In this case, the subject can be replaced by a `.`.
+A common pattern is to define relations locally, within the block of a def. In this case, the subject can be replaced by a `.`.
 
 ```ontol
-type some_type {
+def some_def {
     rel . 'relation_name': string
 }
 ```
@@ -23,32 +23,34 @@ type some_type {
 This is the same as:
 
 ```ontol
-type some_type
-rel some_type 'relation_name': string
+def some_def {}
+rel some_def 'relation_name': string
 ```
 
-## one-to-one type relation
+## one-to-one def relation
 
-`rel` statements also describe relations between types. If the object is a struct type (i.e. not a simple scalar type like `string`),
+`rel` statements always describe relations between `def`s. If the object is a struct def (i.e. not a simple scalar def like `string`), the relation can have different names on each end of the relation. This is indicated by a `::` double colon operator:
 
 ```ontol
-rel type_a 'TypeB'::'TypeA' type_b
+rel def_a 'DefB'::'DefA' def_b
 ```
 
-## one-to-many type relation
+In a directed graph, the direction of the relation is indicated by the order. The relation goes from the subject to the object, or `def_a -> def_b`.
+
+## one-to-many def relation
 
 Cardinality is indicated by enclosing the subject and/or object in square brackets.
 
 ```ontol
-rel type_a 'TypeBs'::'TypeA' [type_b]
+rel def_a 'DefBs'::'DefA' [def_b]
 ```
 
-Here, `type_a` has a property called `'TypeBs'`, which is a relation to one or more `type_b`s. Each `type_b` has a property called `'TypeA'`, which is a relation to one `type_a`.
+Here, `def_a` has a property called `'DefBs'`, which is a relation to one or more `def_b`s. Each `def_b` has a property called `'DefA'`, which is a relation to one `def_a`.
 
-## many-to-many type relation
+## many-to-many def relation
 
 ```ontol
-rel [type_a] 'TypeBs'::'TypeAs' [type_b]
+rel [def_a] 'DefBs'::'DefAs' [def_b]
 ```
 
-Here, `type_a` has a property called `'TypeBs'`, which is a relation to one or more `type_b`s. Each `type_b` has a property called `'TypeAs'`, which is a one or more `type_a`s.
+Here, `def_a` has a property called `'DefBs'`, which is a relation to one or more `def_b`s. Each `def_b` has a property called `'DefAs'`, which is a one or more `def_a`s.

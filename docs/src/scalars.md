@@ -3,7 +3,7 @@
 (This documentation should be extracted from the ontol domain)
 
 ```ontol
-bool
+boolean
 number
 integer
 i64
