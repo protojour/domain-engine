@@ -12,7 +12,7 @@ use crate::{
     },
     def::Def,
     error::CompileError,
-    expr::{Expr, ExprId, ExprKind, Expressions},
+    expr::{Expr, ExprId, ExprKind, ExprRegexCaptureNode, Expressions},
     mem::Intern,
     type_check::hir_build_ctx::{Arm, VariableMapping},
     typed_hir::TypedHirNode,
@@ -314,18 +314,41 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                 self.register_variable(*var, &expr.span, parent_aggr_group, &mut group_set, ctx);
             }
             ExprKind::Regex(expr_regex) => {
-                for (var, named_capture) in &expr_regex.captures {
-                    self.register_variable(
-                        *var,
-                        &named_capture.name_span,
-                        parent_aggr_group,
-                        &mut group_set,
-                        ctx,
-                    );
-                }
+                group_set.join(self.analyze_regex_capture_node(
+                    &expr_regex.capture_node,
+                    parent_aggr_group,
+                    ctx,
+                )?);
             }
             ExprKind::ConstI64(_) | ExprKind::ConstString(_) => {}
         };
+
+        Ok(group_set)
+    }
+
+    fn analyze_regex_capture_node(
+        &mut self,
+        node: &ExprRegexCaptureNode,
+        parent_aggr_group: Option<CtrlFlowGroup>,
+        ctx: &mut HirBuildCtx<'m>,
+    ) -> Result<AggrGroupSet, AggrGroupError> {
+        let mut group_set = AggrGroupSet::new();
+        match node {
+            ExprRegexCaptureNode::Capture { var, name_span, .. } => {
+                self.register_variable(*var, &name_span, parent_aggr_group, &mut group_set, ctx);
+            }
+            ExprRegexCaptureNode::Concat { nodes } => {
+                for node in nodes {
+                    group_set.join(self.analyze_regex_capture_node(
+                        node,
+                        parent_aggr_group,
+                        ctx,
+                    )?);
+                }
+            }
+            ExprRegexCaptureNode::Alternation { .. } => {}
+            ExprRegexCaptureNode::Repetition { .. } => {}
+        }
 
         Ok(group_set)
     }

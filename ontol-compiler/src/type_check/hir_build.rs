@@ -12,7 +12,7 @@ use tracing::debug;
 use crate::{
     def::{Def, DefKind, LookupRelationshipMeta, RelParams},
     error::CompileError,
-    expr::{Expr, ExprId, ExprKind, ExprStructAttr, ExprStructModifier},
+    expr::{Expr, ExprId, ExprKind, ExprRegexCaptureNode, ExprStructAttr, ExprStructModifier},
     mem::Intern,
     primitive::PrimitiveKind,
     type_check::{
@@ -367,39 +367,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             (ExprKind::Regex(expr_regex), Some(expected_ty)) => match expected_ty {
                 // TODO: Handle compile-time match of string constant?
                 Type::Primitive(PrimitiveKind::String, _) | Type::StringConstant(_) => {
-                    let mut capture_groups: Vec<_> = Vec::with_capacity(expr_regex.captures.len());
-
-                    for (var, named_capture) in &expr_regex.captures {
-                        let arm = ctx.arm;
-                        let explicit_variable =
-                            ctx.expr_variables.get_mut(var).expect("variable not found");
-
-                        let arm_expr_id = {
-                            let hir_arm =
-                                explicit_variable.hir_arms.entry(arm).or_insert_with(|| {
-                                    let expr_id = self.expressions.alloc_expr_id();
-
-                                    ExplicitVariableArm {
-                                        expr_id,
-                                        span: expr.span,
-                                    }
-                                });
-                            hir_arm.expr_id
-                        };
-
-                        let _type_var = ctx.inference.new_type_variable(arm_expr_id);
-
-                        capture_groups.push(ontol_hir::CaptureGroup::<'m, TypedHir> {
-                            index: named_capture.capture_index,
-                            binder: TypedBinder {
-                                var: *var,
-                                meta: Meta {
-                                    ty: expected_ty,
-                                    span: named_capture.name_span,
-                                },
-                            },
-                        })
-                    }
+                    let capture_groups = self.build_regex_capture_groups(
+                        &expr_regex.capture_node,
+                        &expr.span,
+                        expected_ty,
+                        ctx,
+                    );
 
                     TypedHirNode(
                         ontol_hir::Kind::Regex(expr_regex.regex_def_id, capture_groups),
@@ -923,6 +896,65 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.error_node(CompileError::TODO(smart_format!("")), &prop_span)
             }
             _ => self.error_node(CompileError::TODO(smart_format!("")), &prop_span),
+        }
+    }
+
+    fn build_regex_capture_groups(
+        &mut self,
+        node: &ExprRegexCaptureNode,
+        pattern_span: &SourceSpan,
+        // BUG: We want type inference for the capture groups,
+        // that falls back to string if both sides are unknown
+        expected_ty: TypeRef<'m>,
+        ctx: &mut HirBuildCtx<'m>,
+    ) -> Vec<ontol_hir::CaptureGroup<'m, TypedHir>> {
+        match node {
+            ExprRegexCaptureNode::Capture {
+                var,
+                capture_index,
+                name_span,
+            } => {
+                let arm = ctx.arm;
+                let explicit_variable =
+                    ctx.expr_variables.get_mut(var).expect("variable not found");
+
+                let arm_expr_id = {
+                    let hir_arm = explicit_variable.hir_arms.entry(arm).or_insert_with(|| {
+                        let expr_id = self.expressions.alloc_expr_id();
+
+                        ExplicitVariableArm {
+                            expr_id,
+                            span: *pattern_span,
+                        }
+                    });
+                    hir_arm.expr_id
+                };
+
+                let _type_var = ctx.inference.new_type_variable(arm_expr_id);
+
+                vec![ontol_hir::CaptureGroup::<'m, TypedHir> {
+                    index: *capture_index,
+                    binder: TypedBinder {
+                        var: *var,
+                        meta: Meta {
+                            ty: expected_ty,
+                            span: *name_span,
+                        },
+                    },
+                }]
+            }
+            ExprRegexCaptureNode::Concat { nodes } => nodes
+                .iter()
+                .flat_map(|node| {
+                    self.build_regex_capture_groups(node, pattern_span, expected_ty, ctx)
+                })
+                .collect(),
+            ExprRegexCaptureNode::Alternation { .. } => {
+                todo!()
+            }
+            ExprRegexCaptureNode::Repetition { .. } => {
+                todo!()
+            }
         }
     }
 

@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use fnv::FnvHashMap;
 use ontol_runtime::DefId;
 use smartstring::alias::String;
@@ -58,13 +56,26 @@ pub struct ExprSeqElement {
 #[derive(Debug)]
 pub struct ExprRegex {
     pub regex_def_id: DefId,
-    pub captures: HashMap<ontol_hir::Var, ExprRegexNamedCapture>,
+    pub capture_node: ExprRegexCaptureNode,
 }
 
 #[derive(Debug)]
-pub struct ExprRegexNamedCapture {
-    pub capture_index: u32,
-    pub name_span: SourceSpan,
+pub enum ExprRegexCaptureNode {
+    // Capture: Leaf node
+    Capture {
+        var: ontol_hir::Var,
+        capture_index: u32,
+        name_span: SourceSpan,
+    },
+    /// "AND"
+    Concat { nodes: Vec<ExprRegexCaptureNode> },
+    /// "OR"
+    Alternation { variants: Vec<ExprRegexCaptureNode> },
+    /// "QUANTIFY"
+    Repetition {
+        expr_id: ExprId,
+        node: Box<ExprRegexCaptureNode>,
+    },
 }
 
 #[derive(Debug)]

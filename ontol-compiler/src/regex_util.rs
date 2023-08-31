@@ -1,20 +1,19 @@
 use std::{collections::HashMap, str::Chars};
 
 use ontol_parser::Span;
-use ontol_runtime::smart_format;
+use ontol_runtime::{smart_format, DefId};
 use regex_syntax::{
     ast::{Ast, GroupKind},
     hir::{Class, ClassUnicode, ClassUnicodeRange, Hir, HirKind, Literal, Look, Repetition},
     Parser,
 };
 use smartstring::alias::String;
-use tracing::debug;
 
 use crate::{
     def::RegexMeta,
-    expr::{ExprRegex, ExprRegexNamedCapture},
+    expr::{ExprRegex, ExprRegexCaptureNode, Expressions},
     lowering::ExprVarTable,
-    CompileErrors, SourceSpan, Src,
+    SourceSpan, Src,
 };
 
 pub fn uuid() -> Hir {
@@ -139,30 +138,105 @@ pub fn parse_literal_regex<'m>(
 }
 
 pub struct RegexToExprLowerer<'a> {
-    pub output: ExprRegex,
-    pub pattern_literal: &'a str,
-    pub pattern_span: &'a Span,
-    pub src: &'a Src,
-    pub named_capture_spans: HashMap<String, SourceSpan>,
-    pub errors: &'a mut CompileErrors,
-    pub var_table: &'a mut ExprVarTable,
+    named_capture_spans: HashMap<String, SourceSpan>,
+    current_nodes: Vec<ExprRegexCaptureNode>,
+    pushback: Vec<StackNode>,
+
+    pattern_literal: &'a str,
+    pattern_span: &'a Span,
+    src: &'a Src,
+    var_table: &'a mut ExprVarTable,
+    expressions: &'a mut Expressions,
 }
 
 impl<'a> RegexToExprLowerer<'a> {
-    pub fn finish(self) -> ExprRegex {
-        self.output
+    pub fn new(
+        pattern_literal: &'a str,
+        pattern_span: &'a Span,
+        src: &'a Src,
+        var_table: &'a mut ExprVarTable,
+        expressions: &'a mut Expressions,
+    ) -> Self {
+        Self {
+            named_capture_spans: Default::default(),
+            current_nodes: vec![],
+            pushback: vec![],
+            pattern_literal,
+            pattern_span,
+            src,
+            var_table,
+            expressions,
+        }
     }
 
-    pub fn visitor<'v>(&'v mut self) -> RegexVisitor<'v, 'a> {
-        RegexVisitor(self)
+    pub fn syntax_visitor(&mut self) -> RegexSyntaxVisitor<'_, 'a> {
+        RegexSyntaxVisitor(self)
+    }
+
+    pub fn into_expr(self, regex_def_id: DefId) -> ExprRegex {
+        let capture_node = Self::into_single_node(self.current_nodes);
+
+        ExprRegex {
+            regex_def_id,
+            capture_node,
+        }
+    }
+
+    fn pushback(&mut self, combinator: RegexCombinator) {
+        let pushed = std::mem::take(&mut self.current_nodes);
+        self.pushback.push(StackNode { combinator, pushed });
+    }
+
+    fn pop(&mut self) -> Vec<ExprRegexCaptureNode> {
+        let mut stack_node = self.pushback.pop().unwrap();
+        std::mem::swap(&mut stack_node.pushed, &mut self.current_nodes);
+        stack_node.pushed
+    }
+
+    fn into_single_node(mut nodes: Vec<ExprRegexCaptureNode>) -> ExprRegexCaptureNode {
+        loop {
+            match nodes.len() {
+                0 => {
+                    return ExprRegexCaptureNode::Concat { nodes: vec![] };
+                }
+                1 => match nodes.into_iter().next().unwrap() {
+                    node @ ExprRegexCaptureNode::Capture { .. } => return node,
+                    ExprRegexCaptureNode::Concat {
+                        nodes: concat_nodes,
+                    } => {
+                        nodes = concat_nodes;
+                    }
+                    ExprRegexCaptureNode::Alternation { variants } => {
+                        nodes = variants;
+                    }
+                    node @ ExprRegexCaptureNode::Repetition { .. } => {
+                        return node;
+                    }
+                },
+                _ => {
+                    return ExprRegexCaptureNode::Concat { nodes };
+                }
+            }
+        }
     }
 }
 
-pub struct RegexVisitor<'l, 'a>(pub &'l mut RegexToExprLowerer<'a>);
+struct StackNode {
+    combinator: RegexCombinator,
+    pushed: Vec<ExprRegexCaptureNode>,
+}
+
+enum RegexCombinator {
+    Concat,
+    Alt,
+    Rep,
+}
+
+pub struct RegexSyntaxVisitor<'l, 'a>(pub &'l mut RegexToExprLowerer<'a>);
 
 /// This is the first pass of regex for pattern/expr analysis.
 /// The AST visitor figures out variable spans of named capture groups.
-impl<'l, 'a> regex_syntax::ast::Visitor for RegexVisitor<'l, 'a> {
+impl<'l, 'a> regex_syntax::ast::Visitor for RegexSyntaxVisitor<'l, 'a> {
     type Output = ();
     type Err = ();
 
@@ -189,7 +263,7 @@ impl<'l, 'a> regex_syntax::ast::Visitor for RegexVisitor<'l, 'a> {
 }
 
 /// Second pass of regex for pattern/expr analysis.
-impl<'l, 'a> regex_syntax::hir::Visitor for RegexVisitor<'l, 'a> {
+impl<'l, 'a> regex_syntax::hir::Visitor for RegexSyntaxVisitor<'l, 'a> {
     type Output = ();
     type Err = ();
 
@@ -198,23 +272,90 @@ impl<'l, 'a> regex_syntax::hir::Visitor for RegexVisitor<'l, 'a> {
     }
 
     fn visit_pre(&mut self, hir: &Hir) -> Result<(), Self::Err> {
-        if let HirKind::Capture(capture) = hir.kind() {
-            if let Some(name) = &capture.name {
-                let span = self.0.named_capture_spans.get(name.as_ref()).unwrap();
+        match hir.kind() {
+            HirKind::Capture(capture) => {
+                if let Some(name) = &capture.name {
+                    let span = self.0.named_capture_spans.get(name.as_ref()).unwrap();
+                    let var = self.0.var_table.get_or_create_var(name.as_ref().into());
 
-                let var = self.0.var_table.get_or_create_var(name.as_ref().into());
-                self.0.output.captures.insert(
-                    var,
-                    ExprRegexNamedCapture {
+                    self.0.current_nodes.push(ExprRegexCaptureNode::Capture {
+                        var,
                         capture_index: capture.index,
                         name_span: *span,
-                    },
-                );
+                    });
+                }
             }
+            HirKind::Repetition(_) => {
+                self.0.pushback(RegexCombinator::Rep);
+            }
+            HirKind::Concat(_) => {
+                self.0.pushback(RegexCombinator::Concat);
+            }
+            HirKind::Alternation(_) => {
+                self.0.pushback(RegexCombinator::Alt);
+            }
+            _ => {}
         }
 
-        if let HirKind::Repetition(_) = hir.kind() {
-            debug!("Regex contains repetition");
+        Ok(())
+    }
+
+    fn visit_post(&mut self, hir: &Hir) -> Result<(), Self::Err> {
+        match hir.kind() {
+            HirKind::Repetition(_) => {
+                let nodes = self.0.pop();
+                if !nodes.is_empty() {
+                    let expr_id = self.0.expressions.alloc_expr_id();
+                    if nodes.len() == 1 {
+                        self.0.current_nodes.push(ExprRegexCaptureNode::Repetition {
+                            expr_id,
+                            node: Box::new(nodes.into_iter().next().unwrap()),
+                        });
+                    } else {
+                        self.0.current_nodes.push(ExprRegexCaptureNode::Repetition {
+                            expr_id,
+                            node: Box::new(ExprRegexCaptureNode::Concat { nodes }),
+                        });
+                    }
+                }
+            }
+            HirKind::Concat(_) => {
+                let nodes = self.0.pop();
+                if !nodes.is_empty() {
+                    if let Some(RegexCombinator::Concat) = self
+                        .0
+                        .pushback
+                        .last()
+                        .map(|stack_node| &stack_node.combinator)
+                    {
+                        // Merge into existing concat
+                        self.0.current_nodes.extend(nodes);
+                    } else {
+                        self.0
+                            .current_nodes
+                            .push(ExprRegexCaptureNode::Concat { nodes });
+                    }
+                }
+            }
+            HirKind::Alternation(_) => {
+                let variants = self.0.pop();
+                if !variants.is_empty() {
+                    if let Some(RegexCombinator::Alt) = self
+                        .0
+                        .pushback
+                        .last()
+                        .map(|stack_node| &stack_node.combinator)
+                    {
+                        // Merge into existing alternation
+                        self.0.current_nodes.extend(variants);
+                    } else {
+                        self.0
+                            .current_nodes
+                            .push(ExprRegexCaptureNode::Alternation { variants });
+                    }
+                }
+            }
+            _ => {}
         }
 
         Ok(())

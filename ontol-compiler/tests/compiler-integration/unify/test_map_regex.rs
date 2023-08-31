@@ -49,7 +49,7 @@ fn test_map_regex_repetition1() {
     }
     map {
         foo {
-            'input': /((?<one>\w+) (?<two>\w+),*)!/
+            'input': /((?<one>\w+) (?<two>\w+),)*!/
         }
         bar {
             'first': one

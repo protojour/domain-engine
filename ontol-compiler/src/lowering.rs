@@ -14,10 +14,7 @@ use tracing::debug;
 use crate::{
     def::{Def, DefKind, FmtFinalState, RelParams, Relationship, TypeDef},
     error::CompileError,
-    expr::{
-        Expr, ExprId, ExprKind, ExprRegex, ExprSeqElement, ExprStructAttr, ExprStructModifier,
-        TypePath,
-    },
+    expr::{Expr, ExprId, ExprKind, ExprSeqElement, ExprStructAttr, ExprStructModifier, TypePath},
     namespace::Space,
     package::{PackageReference, ONTOL_PKG},
     regex_util::RegexToExprLowerer,
@@ -706,7 +703,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 Ok(self.expr(ExprKind::ConstString(string), &span))
             }
             ast::ExprPattern::RegexLiteral(regex_literal) => {
-                let def_id = self
+                let regex_def_id = self
                     .compiler
                     .defs
                     .def_regex(&regex_literal, &span, &mut self.compiler.strings)
@@ -717,25 +714,21 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     .compiler
                     .defs
                     .literal_regex_meta_table
-                    .get(&def_id)
+                    .get(&regex_def_id)
                     .unwrap();
-                let mut regex_lowerer = RegexToExprLowerer {
-                    output: ExprRegex {
-                        regex_def_id: def_id,
-                        captures: Default::default(),
-                    },
-                    pattern_literal: regex_meta.pattern,
-                    pattern_span: &span,
-                    src: self.src,
-                    named_capture_spans: Default::default(),
-                    errors: &mut self.compiler.errors,
+
+                let mut regex_lowerer = RegexToExprLowerer::new(
+                    regex_meta.pattern,
+                    &span,
+                    self.src,
                     var_table,
-                };
+                    &mut self.compiler.expressions,
+                );
 
-                regex_syntax::ast::visit(&regex_meta.ast, regex_lowerer.visitor()).unwrap();
-                regex_syntax::hir::visit(&regex_meta.hir, regex_lowerer.visitor()).unwrap();
+                regex_syntax::ast::visit(&regex_meta.ast, regex_lowerer.syntax_visitor()).unwrap();
+                regex_syntax::hir::visit(&regex_meta.hir, regex_lowerer.syntax_visitor()).unwrap();
 
-                let expr_regex = regex_lowerer.finish();
+                let expr_regex = regex_lowerer.into_expr(regex_def_id);
 
                 Ok(self.expr(ExprKind::Regex(expr_regex), &span))
             }
