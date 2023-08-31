@@ -3,7 +3,7 @@ use serde_json::json;
 use test_log::test;
 
 #[test]
-fn test_map_regex_capture1() {
+fn test_map_regex_duplex1() {
     r#"
     pub def foo {
         rel .'input': string

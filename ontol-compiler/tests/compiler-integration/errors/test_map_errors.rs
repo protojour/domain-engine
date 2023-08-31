@@ -241,7 +241,7 @@ fn map_invalid_unit_rel_params() {
 }
 
 #[test]
-fn duplicate_capture_groups_in_regex_map() {
+fn map_duplicate_capture_groups_in_regex() {
     r"
     def a { rel .'a': string }
     def b {}
@@ -254,5 +254,22 @@ fn duplicate_capture_groups_in_regex_map() {
     "
     .compile_fail_then(|errors| {
         expect_eq!(actual = errors[0].span_text, expected = "dupe");
+    })
+}
+
+#[test]
+fn map_unbound_variable_in_regex_interpolation() {
+    r"
+    def a {}
+    def b { rel .'b': string }
+    map {
+        a {}
+        b {
+            'b': /(?<bad_var>\w+)!/ // ERROR unbound variable
+        }
+    }
+    "
+    .compile_fail_then(|errors| {
+        expect_eq!(actual = errors[0].span_text, expected = "bad_var");
     })
 }

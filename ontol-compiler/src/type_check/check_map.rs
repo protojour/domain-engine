@@ -311,48 +311,69 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                 }
             }
             ExprKind::Variable(var) => {
-                if let Some(explicit_variable) = ctx.expr_variables.get(var) {
-                    // Variable is used more than once
-                    if ctx.arm.is_first() && explicit_variable.ctrl_group != parent_aggr_group {
-                        self.error(
-                            CompileError::TODO(smart_format!("Incompatible aggregation group")),
-                            &expr.span,
-                        );
-                    }
-
-                    debug!("Join existing bound variable");
-
-                    group_set.add(explicit_variable.ctrl_group);
-                } else if ctx.arm.is_first() {
-                    ctx.expr_variables.insert(
+                self.register_variable(*var, &expr.span, parent_aggr_group, &mut group_set, ctx);
+            }
+            ExprKind::Regex(expr_regex) => {
+                for (var, named_capture) in &expr_regex.captures {
+                    self.register_variable(
                         *var,
-                        ExpressionVariable {
-                            ctrl_group: parent_aggr_group,
-                            hir_arms: Default::default(),
-                        },
+                        &named_capture.name_span,
+                        parent_aggr_group,
+                        &mut group_set,
+                        ctx,
                     );
-
-                    group_set.add(parent_aggr_group);
-                } else {
-                    match ctx.expr_variables.entry(*var) {
-                        Entry::Occupied(_occ) => {
-                            todo!();
-                        }
-                        Entry::Vacant(vac) => {
-                            vac.insert(ExpressionVariable {
-                                ctrl_group: parent_aggr_group,
-                                hir_arms: Default::default(),
-                            });
-                            group_set.add(parent_aggr_group);
-                        }
-                    }
                 }
             }
-            ExprKind::Regex(_) => {}
             ExprKind::ConstI64(_) | ExprKind::ConstString(_) => {}
         };
 
         Ok(group_set)
+    }
+
+    fn register_variable(
+        &mut self,
+        var: ontol_hir::Var,
+        span: &SourceSpan,
+        parent_aggr_group: Option<CtrlFlowGroup>,
+        group_set: &mut AggrGroupSet,
+        ctx: &mut HirBuildCtx<'m>,
+    ) {
+        if let Some(explicit_variable) = ctx.expr_variables.get(&var) {
+            // Variable is used more than once
+            if ctx.arm.is_first() && explicit_variable.ctrl_group != parent_aggr_group {
+                self.error(
+                    CompileError::TODO(smart_format!("Incompatible aggregation group")),
+                    span,
+                );
+            }
+
+            debug!("Join existing bound variable");
+
+            group_set.add(explicit_variable.ctrl_group);
+        } else if ctx.arm.is_first() {
+            ctx.expr_variables.insert(
+                var,
+                ExpressionVariable {
+                    ctrl_group: parent_aggr_group,
+                    hir_arms: Default::default(),
+                },
+            );
+
+            group_set.add(parent_aggr_group);
+        } else {
+            match ctx.expr_variables.entry(var) {
+                Entry::Occupied(_occ) => {
+                    todo!();
+                }
+                Entry::Vacant(vac) => {
+                    vac.insert(ExpressionVariable {
+                        ctrl_group: parent_aggr_group,
+                        hir_arms: Default::default(),
+                    });
+                    group_set.add(parent_aggr_group);
+                }
+            }
+        }
     }
 
     fn error(&mut self, error: CompileError, span: &SourceSpan) -> TypeRef<'m> {
