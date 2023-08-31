@@ -12,6 +12,7 @@ members = [
     "ontol-test-utils",
     "ontol-lsp",
     "ontool",
+    "onmap",
 ]
 resolver = "2"
 
