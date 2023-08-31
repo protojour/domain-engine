@@ -8,6 +8,7 @@ use regex_syntax::{
     Parser,
 };
 use smartstring::alias::String;
+use tracing::debug;
 
 use crate::{
     def::RegexMeta,
@@ -210,6 +211,10 @@ impl<'l, 'a> regex_syntax::hir::Visitor for RegexVisitor<'l, 'a> {
                     },
                 );
             }
+        }
+
+        if let HirKind::Repetition(_) = hir.kind() {
+            debug!("Regex contains repetition");
         }
 
         Ok(())
