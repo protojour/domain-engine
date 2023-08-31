@@ -12,7 +12,7 @@ use crate::{
 
 use super::{
     dep_tree::{DepTreeBuilder, SubTree},
-    expr,
+    expr::{self, StringInterpolationComponent},
     regroup_match_prop::regroup_match_prop,
     scope,
     unify_props::UnifyProps,
@@ -232,20 +232,49 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     })
                 }
             },
-            (expr::Kind::BuildString(binder), scope::Kind::Const) => Ok(UnifiedNode {
-                typed_binder: None,
-                node: TypedHirNode(
-                    ontol_hir::Kind::Let(
-                        binder,
-                        Box::new(TypedHirNode(
-                            ontol_hir::Kind::String("".into()),
-                            expr_meta.hir_meta,
-                        )),
-                        vec![],
+            (expr::Kind::StringInterpolation(binder, components), scope::Kind::Const) => {
+                Ok(UnifiedNode {
+                    typed_binder: None,
+                    node: TypedHirNode(
+                        ontol_hir::Kind::Let(
+                            binder,
+                            Box::new(TypedHirNode(
+                                ontol_hir::Kind::String("".into()),
+                                expr_meta.hir_meta,
+                            )),
+                            components
+                                .into_iter()
+                                .map(|component| {
+                                    TypedHirNode(
+                                        ontol_hir::Kind::StringPush(
+                                            binder.var,
+                                            Box::new(match component {
+                                                StringInterpolationComponent::Const(string) => {
+                                                    TypedHirNode(
+                                                        ontol_hir::Kind::String(string),
+                                                        self.unit_meta(),
+                                                    )
+                                                }
+                                                StringInterpolationComponent::Var(var, span) => {
+                                                    TypedHirNode(
+                                                        ontol_hir::Kind::Var(var),
+                                                        Meta {
+                                                            ty: self.unit_meta().ty,
+                                                            span,
+                                                        },
+                                                    )
+                                                }
+                                            }),
+                                        ),
+                                        self.unit_meta(),
+                                    )
+                                })
+                                .collect(),
+                        ),
+                        expr_meta.hir_meta,
                     ),
-                    expr_meta.hir_meta,
-                ),
-            }),
+                })
+            }
             (expr::Kind::Prop(prop), scope::Kind::Escape(scope_kind)) => {
                 let expr::PropVariant::Singleton(attr) = prop.variant else {
                     panic!("expected gen scope");

@@ -4,6 +4,7 @@ use smartstring::alias::String;
 use crate::{
     hir_unify::VarSet,
     typed_hir::{self, TypedBinder},
+    SourceSpan,
 };
 
 #[derive(Debug)]
@@ -45,7 +46,7 @@ pub enum Kind<'m> {
     Const(DefId),
     Seq(ontol_hir::Label, Box<ontol_hir::Attribute<Expr<'m>>>),
     Push(ontol_hir::Var, Box<ontol_hir::Attribute<Expr<'m>>>),
-    BuildString(TypedBinder<'m>),
+    StringInterpolation(TypedBinder<'m>, Vec<StringInterpolationComponent>),
 }
 
 impl<'m> Kind<'m> {
@@ -68,7 +69,7 @@ impl<'m> Kind<'m> {
             Self::Const(const_def_id) => format!("Const({const_def_id:?})"),
             Self::Seq(label, _) => format!("Seq({label})"),
             Self::Push(var, _) => format!("Push({var})"),
-            Self::BuildString(binder) => format!("BuildString({})", binder.var),
+            Self::StringInterpolation(binder, _) => format!("StringInterpolation({})", binder.var),
         }
     }
 }
@@ -104,6 +105,12 @@ pub enum PropVariant<'m> {
 pub struct SeqPropElement<'m> {
     pub iter: bool,
     pub attribute: ontol_hir::Attribute<Expr<'m>>,
+}
+
+#[derive(Debug)]
+pub enum StringInterpolationComponent {
+    Const(String),
+    Var(ontol_hir::Var, SourceSpan),
 }
 
 #[derive(Debug)]

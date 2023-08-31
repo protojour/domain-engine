@@ -142,7 +142,7 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                 )
             }),
             ontol_hir::Kind::Regex(regex_def_id, capture_groups) => {
-                let _regex_meta = self
+                let regex_meta = self
                     .defs
                     .literal_regex_meta_table
                     .get(regex_def_id)
@@ -153,9 +153,18 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                     free_vars.insert(capture_group.binder.var);
                 }
 
+                let mut components = vec![];
+                let mut interpolator = regex::RegexStringInterpolator {
+                    capture_groups,
+                    current_constant: "".into(),
+                    components: &mut components,
+                };
+                interpolator.traverse_hir(&regex_meta.hir);
+                interpolator.commit_constant();
+
                 let var = self.var_allocator.alloc();
                 expr::Expr(
-                    expr::Kind::BuildString(TypedBinder { var, meta: *meta }),
+                    expr::Kind::StringInterpolation(TypedBinder { var, meta: *meta }, components),
                     expr::Meta {
                         hir_meta: *meta,
                         free_vars,
@@ -272,5 +281,75 @@ impl UnionBuilder {
     fn plus<'m>(&mut self, expr: expr::Expr<'m>) -> expr::Expr<'m> {
         self.vars.union_with(&expr.1.free_vars);
         expr
+    }
+}
+
+mod regex {
+    use regex_syntax::hir::{Class, Hir, HirKind, Literal};
+    use smartstring::alias::String;
+
+    use crate::{hir_unify::expr::StringInterpolationComponent, typed_hir::TypedHir};
+
+    pub struct RegexStringInterpolator<'g, 'c, 'm> {
+        pub capture_groups: &'g [ontol_hir::CaptureGroup<'m, TypedHir>],
+        pub current_constant: String,
+        pub components: &'c mut Vec<StringInterpolationComponent>,
+    }
+
+    impl<'g, 'c, 'm> RegexStringInterpolator<'g, 'c, 'm> {
+        pub fn commit_constant(&mut self) {
+            let constant = std::mem::take(&mut self.current_constant);
+            if !constant.is_empty() {
+                self.components
+                    .push(StringInterpolationComponent::Const(constant));
+            }
+        }
+
+        pub fn traverse_hir(&mut self, hir: &Hir) {
+            match hir.kind() {
+                HirKind::Empty => {}
+                HirKind::Literal(Literal(bytes)) => self
+                    .current_constant
+                    .push_str(std::str::from_utf8(bytes).unwrap()),
+                HirKind::Class(Class::Bytes(bytes)) => {
+                    let first = bytes.iter().next().unwrap();
+                    self.current_constant.push(first.start() as char);
+                }
+                HirKind::Class(Class::Unicode(bytes)) => {
+                    let first = bytes.iter().next().unwrap();
+                    self.current_constant.push(first.start());
+                }
+                HirKind::Look(_) => {}
+                HirKind::Repetition(_) => {}
+                HirKind::Capture(capture) => {
+                    if capture.name.is_some() {
+                        self.commit_constant();
+
+                        let capture_group = self
+                            .capture_groups
+                            .iter()
+                            .find(|capture_group| capture_group.index == capture.index)
+                            .unwrap();
+
+                        self.components.push(StringInterpolationComponent::Var(
+                            capture_group.binder.var,
+                            capture_group.binder.meta.span,
+                        ));
+                    } else {
+                        self.traverse_hir(&capture.sub);
+                    }
+                }
+                HirKind::Concat(hirs) => {
+                    for hir in hirs {
+                        self.traverse_hir(hir);
+                    }
+                }
+                HirKind::Alternation(alternation) => {
+                    if let Some(first) = alternation.first() {
+                        self.traverse_hir(first);
+                    }
+                }
+            }
+        }
     }
 }
