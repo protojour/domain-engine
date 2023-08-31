@@ -9,7 +9,7 @@ pub struct TestSystem;
 
 impl SystemAPI for TestSystem {
     fn current_time(&self) -> chrono::DateTime<chrono::Utc> {
-        DateTime::from_utc(
+        DateTime::from_naive_utc_and_offset(
             NaiveDateTime::new(
                 NaiveDate::from_ymd_opt(1970, 1, 1).unwrap(),
                 NaiveTime::from_hms_opt(0, 0, 0).unwrap(),
