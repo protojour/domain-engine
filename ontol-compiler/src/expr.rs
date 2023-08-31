@@ -78,6 +78,37 @@ pub enum ExprRegexCaptureNode {
     },
 }
 
+impl ExprRegexCaptureNode {
+    /// This method changes the input span to the sum of the named capture groups (if any found).
+    pub fn constrain_span(&self, mut full_span: SourceSpan) -> SourceSpan {
+        self.constrain_span_inner(&mut full_span);
+        full_span
+    }
+
+    fn constrain_span_inner(&self, output: &mut SourceSpan) {
+        match self {
+            Self::Capture { name_span, .. } => {
+                output.source_id = name_span.source_id;
+                output.start = std::cmp::min(output.start, name_span.start);
+                output.end = std::cmp::max(output.end, name_span.end);
+            }
+            Self::Concat { nodes } => {
+                for node in nodes {
+                    node.constrain_span_inner(output);
+                }
+            }
+            Self::Alternation { variants } => {
+                for variant in variants {
+                    variant.constrain_span_inner(output);
+                }
+            }
+            Self::Repetition { node, .. } => {
+                node.constrain_span_inner(output);
+            }
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct TypePath {
     pub def_id: DefId,

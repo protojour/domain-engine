@@ -316,6 +316,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
             ExprKind::Regex(expr_regex) => {
                 group_set.join(self.analyze_regex_capture_node(
                     &expr_regex.capture_node,
+                    &expr.span,
                     parent_aggr_group,
                     ctx,
                 )?);
@@ -329,6 +330,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
     fn analyze_regex_capture_node(
         &mut self,
         node: &ExprRegexCaptureNode,
+        full_span: &SourceSpan,
         parent_aggr_group: Option<CtrlFlowGroup>,
         ctx: &mut HirBuildCtx<'m>,
     ) -> Result<AggrGroupSet, AggrGroupError> {
@@ -341,13 +343,84 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                 for node in nodes {
                     group_set.join(self.analyze_regex_capture_node(
                         node,
+                        full_span,
                         parent_aggr_group,
                         ctx,
                     )?);
                 }
             }
             ExprRegexCaptureNode::Alternation { .. } => {}
-            ExprRegexCaptureNode::Repetition { .. } => {}
+            ExprRegexCaptureNode::Repetition {
+                expr_id,
+                node: inner_node,
+                ..
+            } => {
+                if ctx.arm.is_first() {
+                    group_set.add(parent_aggr_group);
+
+                    // Register aggregation body
+                    let label = Label(ctx.var_allocator.alloc().0);
+                    debug!("first arm regex repetition: expr_id={expr_id:?}");
+                    ctx.ctrl_flow_forest
+                        .insert(label, parent_aggr_group.map(|parent| parent.label));
+                    ctx.label_map.insert(*expr_id, label);
+
+                    ctx.enter_ctrl(|ctx| {
+                        self.analyze_regex_capture_node(
+                            inner_node,
+                            full_span,
+                            Some(CtrlFlowGroup {
+                                label,
+                                bind_depth: ctx.current_ctrl_flow_depth(),
+                            }),
+                            ctx,
+                        )
+                        .expect("repetition child failed");
+                    });
+                } else {
+                    let outer_bind_depth = ctx.current_ctrl_flow_depth();
+
+                    let mut inner_aggr_group = AggrGroupSet::new();
+                    ctx.enter_ctrl(|ctx| {
+                        let group = self
+                            .analyze_regex_capture_node(
+                                inner_node,
+                                full_span,
+                                parent_aggr_group,
+                                ctx,
+                            )
+                            .unwrap();
+                        inner_aggr_group.join(group);
+                    });
+
+                    ctx.enter_ctrl::<Result<(), AggrGroupError>>(|ctx| {
+                        match inner_aggr_group.disambiguate(ctx, ctx.current_ctrl_flow_depth()) {
+                            Ok(label) => {
+                                ctx.label_map.insert(*expr_id, label);
+
+                                group_set.add(ctx.ctrl_flow_forest.find_parent(label).map(
+                                    |label| CtrlFlowGroup {
+                                        label,
+                                        bind_depth: outer_bind_depth,
+                                    },
+                                ));
+                                Ok(())
+                            }
+                            Err(error) => {
+                                debug!("Failure: {error:?}");
+
+                                self.error(
+                                    CompileError::TODO(smart_format!(
+                                        "Incompatible aggregation group"
+                                    )),
+                                    &node.constrain_span(*full_span),
+                                );
+                                Err(error)
+                            }
+                        }
+                    })?
+                }
+            }
         }
 
         Ok(group_set)
