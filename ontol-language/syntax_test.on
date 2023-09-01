@@ -1,53 +1,74 @@
 // SYNTAX TEST "Packages/ONTOL/ONTOL.sublime-syntax"
 
-use some_domain.some_type
+use 'some_domain' as some
 // <- keyword.import.ontol
-//             ^ keyword.operator.ontol
-use 'some_domain'
-//  ^^^^^^^^^^^^^ string.quoted.single.ontol
-use "some_domain"
-//  ^^^^^^^^^^^^^ string.quoted.double.ontol
-
-use some_domain as another_domain
-//             *^^^ keyword.import.as.ontol
+//  ^^^^^^^^^^^^^ string.package.ontol
+//                ^^ keyword.import.as.ontol
+//                   ^^^^ variable.ontol
+use "some_domain" as some
+//  ^^^^^^^^^^^^^ string.package.ontol
 
 /// # This is a doc comment
-// ^^^^^^^^^^^^^^^^^^^^^^^^ comment.block.documentation.ontol
+// ^^^^^^^^^^^^^^^^^^^^^^^^^ comment.block.documentation.ontol
 /// It can span several lines, contain **Markdown**,
 /// and is connected to the statement below
-pub type test {
+pub def test {
 // <- storage.modifier.pub.ontol
-//  ^^^^ keyword.declaration.type.ontol
-    rel .'some_int' int
-//  ^^^ keyword.declaration.rel.ontol
+//  ^^^^ keyword.declaration.def.ontol
+//       ^^^^
+    rel .'id'|id: {
 //      ^ variable.language.ontol
-//                  ^^^ storage.type.ontol
-    rel .'some_string' string
-    rel .'some_regex' regex
+//  ^^^ keyword.declaration.rel.ontol
+//       ^^^^ string.quoted.single.ontol
+//           ^ keyword.operator.sigil.ontol
+//            ^^ variable.function.ontol
+//              ^ keyword.operator.sigil.ontol
+        fmt '' => 'test--' => uuid => .
+//      ^^^ keyword.declaration.fmt.ontol
+//             ^^ keyword.operator.fatarrow.ontol
+//                            ^^^^ storage.type.ontol
+//                                    ^ variable.language.ontol
+    }
+    rel .'some_i64': i64
+    rel .'some_string': string
+    rel .'some_regex': regex
+    rel .'some_unit': ()
+//                    ^^ constant.language.ontol
+    rel .'some_seq': []
+//                   ^^ constant.language.ontol
+    rel .'some.some_type': some.some_type
+//                             ^ keyword.operator.sigil.ontol
 }
 
-with test {
+def test {
 // <- keyword.context.block.with.ontol
-    rel .'three_oh_three' 303
-//                        *^^^ constant.numeric.ontol
-    rel .'p_value' 0.05
-//                 *^^^^ constant.numeric.ontol
-    rel .'infinity!' inf
-//                   *^^^ constant.language.ontol
-    rel .'ready?' true
-//                *^^^^ constant.language.ontol
-    rel .'regex' /test\b.*test/
-//               ^^^^^^^^^^^^^^ string.regexp.ontol
+//   ^^^^
+    rel .'three_oh_three': 303
+//                         ^^^ constant.numeric.ontol
+    rel .'p_value': 0.05
+//                  ^^^^ constant.numeric.ontol
+    rel .'infinity!': inf
+//                    ^^^ constant.language.ontol
+    rel .'ready?': true
+//                 ^^^^ constant.language.ontol
+    rel .'regex': /test\b.*test/
+//                ^^^^^^^^^^^^^^ string.regexp.ontol
 }
 
-type testtest {
-    fmt '' => 'test' => 'test' => .
-//  ^^^ keyword.declaration.fmt.ontol
-//         ^^ keyword.operator.fatarrow.ontol
+def testtest {
+// <- keyword.declaration.def.ontol
+//   ^^^^^^^^
 }
 
 map {
 // <- keyword.declaration.map.ontol
+    test {
+        'some': [thing]
+    }
+    test_2 {
+        'something': [..thing]
+//                    ^^ keyword.operator.spread.ontol
+    }
 }
 
 rel plays 'how_much': string
@@ -56,9 +77,5 @@ rel plays 'how_much': string
 rel artist ['plays']::['played_by'] instrument {
 //                  ^^ keyword.operator.ontol
     rel .is: plays
-}
-
-type position-ring {
-    rel ...4: position
-    rel .4..: position
+//       ^^ variable.function.ontol
 }

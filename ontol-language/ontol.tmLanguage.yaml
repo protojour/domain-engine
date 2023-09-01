@@ -18,13 +18,9 @@ patterns:
     name: storage.modifier.pub.ontol
     match: ^(pub)\s
 
-  - comment: type declaration
-    name: keyword.declaration.type.ontol
-    match: \b(type)\s
-
-  - comment: with context block
-    name: keyword.context.block.with.ontol
-    match: ^(with)\s
+  - comment: def declaration
+    name: keyword.declaration.def.ontol
+    match: \b(def)\s
 
   - comment: rel declaration
     name: keyword.declaration.rel.ontol
@@ -42,7 +38,7 @@ patterns:
     name: keyword.declaration.map.ontol
     match: ^(map)\s
 
-  - comment: built-in types
+  - comment: built-in defs
     name: storage.type.ontol
     match: \s(boolean|number|integer|i64|float|f64|string|datetime|date|time|uuid|regex|seq|dict|fn)\b
 
@@ -50,7 +46,7 @@ patterns:
     name: constant.language.ontol
     match: \s(true|false|inf|nan|\(\)|\[\])\b
 
-  - comment: built-in rel types and generators
+  - comment: built-in rel defs and generators
     name: variable.function.ontol
     match: \b(is|id|gen|default|example|auto|create_time|update_time)\b
 
@@ -58,12 +54,16 @@ patterns:
     name: constant.numeric.ontol
     match: \b\-?(\d+(\.?\d+)?)
 
+  - comment: spread operator
+    name: keyword.operator.spread.ontol
+    match: \.\.
+
   - comment: subject/self dot
     name: variable.language.ontol
-    match: \s\.
+    match: \s(\.)
 
   - comment: sigil
-    name: keyword.operator.ontol
+    name: keyword.operator.sigil.ontol
     match: '[.,:?+*=|]+'
 
   - comment: special case sigil
