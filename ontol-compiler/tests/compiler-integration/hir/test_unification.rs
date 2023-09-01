@@ -1164,3 +1164,51 @@ fn test_unify_regex_capture2() {
     };
     assert_eq!(expected, output);
 }
+
+#[test]
+#[should_panic = "regex-seq"]
+fn test_unify_regex_loop1() {
+    let output = test_unify(
+        // Contains a looping regex with two variations
+        "
+        (struct ($c)
+            (prop $c S:0:0
+                (#u
+                    (regex-seq (@a) def@0:0 ((1 $a)) ((2 $b)))
+                )
+            )
+        )
+        ",
+        "
+        (struct ($d)
+            (prop $e O:0:0 (seq (@a) (iter #u $a)))
+            (prop $e O:0:1 (seq (@a) (iter #u $b)))
+        )
+        ",
+    );
+
+    let expected = indoc! {"
+        |$c| (struct ($d)
+            (match-prop $c S:0:0
+                (($_ $e)
+                    (let ($f (sequence))
+                        (let ($g (sequence))
+                            (regex-for-each $e def@0:0
+                                (((1 $a))
+                                    (seq-push $f #u $a)
+                                )
+                                (((2 $b))
+                                    (seq-push $g #u $b)
+                                )
+                            )
+
+                            (prop $d O:0:0 (#u $f))
+                            (prop $d O:0:1 (#u $g))
+                        )
+                    )
+                )
+            )
+        )"
+    };
+    assert_eq!(expected, output);
+}
