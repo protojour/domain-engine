@@ -49,7 +49,7 @@ pub(super) trait UnifyProps<'m>: Sized {
                     .unwrap_or_else(|| unifier.types.unit_type());
 
                 (
-                    ontol_hir::MatchArm {
+                    ontol_hir::PropMatchArm {
                         pattern: ontol_hir::PropPattern::Attr(hir_rel_binding, hir_val_binding),
                         nodes,
                     },
@@ -77,7 +77,7 @@ pub(super) trait UnifyProps<'m>: Sized {
                     .unwrap_or_else(|| unifier.types.unit_type());
 
                 (
-                    ontol_hir::MatchArm {
+                    ontol_hir::PropMatchArm {
                         pattern: ontol_hir::PropPattern::Seq(
                             ontol_hir::Binding::Binder(TypedBinder {
                                 var: ontol_hir::Var(typed_label.label.0),
@@ -98,7 +98,7 @@ pub(super) trait UnifyProps<'m>: Sized {
         let mut match_arms = vec![match_arm];
 
         if scope_prop.optional.0 {
-            match_arms.push(ontol_hir::MatchArm {
+            match_arms.push(ontol_hir::PropMatchArm {
                 pattern: ontol_hir::PropPattern::Absent,
                 nodes: vec![],
             });

@@ -3,8 +3,8 @@ use std::fmt::{Debug, Display};
 use ontol_runtime::vm::proc::BuiltinProc;
 
 use crate::{
-    Binding, CaptureGroup, GetKind, GetLabel, GetVar, HasDefault, Kind, Label, Lang, MatchArm,
-    PropPattern, PropVariant, SeqPropertyElement, StructFlags, Var,
+    Binding, CaptureGroup, CaptureMatchArm, GetKind, GetLabel, GetVar, HasDefault, Kind, Label,
+    Lang, PropMatchArm, PropPattern, PropVariant, SeqPropertyElement, StructFlags, Var,
 };
 
 impl<'a, L: Lang> std::fmt::Display for Kind<'a, L> {
@@ -158,11 +158,9 @@ impl<'a, L: Lang> Print<Kind<'a, L>> for Printer<L> {
                 self.print_rparen(multi, f)?;
                 Ok(sep.multiline())
             }
-            Kind::MatchRegex(var, regex_def_id, captures, children) => {
-                write!(f, "{indent}(match-regex {var} {regex_def_id:?} (")?;
-                let multi = self.print_all(Sep::None, captures.iter(), f)?;
-                self.print_rparen(multi, f)?;
-                let multi = self.print_all(Sep::Space, children.iter().map(GetKind::kind), f)?;
+            Kind::MatchRegex(var, regex_def_id, arms) => {
+                write!(f, "{indent}(match-regex {var} {regex_def_id:?}")?;
+                let multi = self.print_all(Sep::Space, arms.iter(), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
@@ -231,11 +229,16 @@ impl<'a, L: Lang> Print<SeqPropertyElement<'a, L>> for Printer<L> {
     }
 }
 
-impl<'a, L: Lang> Print<MatchArm<'a, L>> for Printer<L> {
-    fn print(self, _sep: Sep, node: &MatchArm<'a, L>, f: &mut std::fmt::Formatter) -> PrintResult {
+impl<'a, L: Lang> Print<PropMatchArm<'a, L>> for Printer<L> {
+    fn print(
+        self,
+        _sep: Sep,
+        arm: &PropMatchArm<'a, L>,
+        f: &mut std::fmt::Formatter,
+    ) -> PrintResult {
         let indent = self.indent;
         write!(f, "{indent}(")?;
-        match &node.pattern {
+        match &arm.pattern {
             PropPattern::Attr(rel, val) => {
                 write!(f, "(")?;
                 self.print(Sep::None, rel, f)?;
@@ -256,7 +259,24 @@ impl<'a, L: Lang> Print<MatchArm<'a, L>> for Printer<L> {
                 write!(f, "()")?;
             }
         }
-        let multi = self.print_all(Sep::Space, node.nodes.iter().map(GetKind::kind), f)?;
+        let multi = self.print_all(Sep::Space, arm.nodes.iter().map(GetKind::kind), f)?;
+        self.print_rparen(multi, f)?;
+        Ok(Multiline(true))
+    }
+}
+
+impl<'a, L: Lang> Print<CaptureMatchArm<'a, L>> for Printer<L> {
+    fn print(
+        self,
+        _sep: Sep,
+        arm: &CaptureMatchArm<'a, L>,
+        f: &mut std::fmt::Formatter,
+    ) -> PrintResult {
+        let indent = self.indent;
+        write!(f, "{indent}((")?;
+        let multi = self.print_all(Sep::None, arm.capture_groups.iter(), f)?;
+        self.print_rparen(multi, f)?;
+        let multi = self.print_all(Sep::Space, arm.nodes.iter().map(GetKind::kind), f)?;
         self.print_rparen(multi, f)?;
         Ok(Multiline(true))
     }

@@ -197,17 +197,9 @@ impl<L: Lang> Parser<L> {
             ("match-regex", next) => {
                 let (string_var, next) = parse_dollar_var(next)?;
                 let (regex_def_id, next) = parse_def_id(next)?;
-                let (capture_groups, next) = parse_paren_delimited(next, |next| {
-                    self.parse_many(next, Self::parse_capture_group)
-                })?;
-                let (children, next) = self.parse_many(next, Self::parse)?;
+                let (match_arms, next) = self.parse_many(next, Self::parse_capture_match_arm)?;
                 Ok((
-                    self.make_node(Kind::MatchRegex(
-                        string_var,
-                        regex_def_id,
-                        capture_groups,
-                        children,
-                    )),
+                    self.make_node(Kind::MatchRegex(string_var, regex_def_id, match_arms)),
                     next,
                 ))
             }
@@ -321,7 +313,7 @@ impl<L: Lang> Parser<L> {
         })
     }
 
-    fn parse_prop_match_arm<'a, 's>(&self, next: &'s str) -> ParseResult<'s, MatchArm<'a, L>> {
+    fn parse_prop_match_arm<'a, 's>(&self, next: &'s str) -> ParseResult<'s, PropMatchArm<'a, L>> {
         parse_paren_delimited(next, |next| {
             let (_, next) = parse_lparen(next)?;
             let (seq_default, next) = match parse_symbol(next) {
@@ -359,7 +351,26 @@ impl<L: Lang> Parser<L> {
             };
             let (nodes, next) = self.parse_many(next, Self::parse)?;
 
-            Ok((MatchArm { pattern, nodes }, next))
+            Ok((PropMatchArm { pattern, nodes }, next))
+        })
+    }
+
+    fn parse_capture_match_arm<'a, 's>(
+        &self,
+        next: &'s str,
+    ) -> ParseResult<'s, CaptureMatchArm<'a, L>> {
+        parse_paren_delimited(next, |next| {
+            let (capture_groups, next) = parse_paren_delimited(next, |next| {
+                self.parse_many(next, Self::parse_capture_group)
+            })?;
+            let (nodes, next) = self.parse_many(next, Self::parse)?;
+            Ok((
+                CaptureMatchArm {
+                    capture_groups,
+                    nodes,
+                },
+                next,
+            ))
         })
     }
 

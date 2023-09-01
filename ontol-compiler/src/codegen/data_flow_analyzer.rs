@@ -207,7 +207,7 @@ where
                 var_set
             }
             ontol_hir::Kind::Regex(_, _captures) => VarSet::default(),
-            ontol_hir::Kind::MatchRegex(_, _string_var, _captures, _children) => VarSet::default(),
+            ontol_hir::Kind::MatchRegex(_, _string_var, _match_arms) => VarSet::default(),
         }
     }
 

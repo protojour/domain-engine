@@ -474,8 +474,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     pub(super) fn build_looping_regex_node(
         &mut self,
-        regex_pattern: &RegexPattern,
-        ctx: &mut HirBuildCtx<'m>,
+        _regex_pattern: &RegexPattern,
+        _ctx: &mut HirBuildCtx<'m>,
     ) -> TypedHirNode<'m> {
         todo!("looping regex")
     }

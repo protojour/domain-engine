@@ -35,8 +35,13 @@ macro_rules! visitor_trait_methods {
         }
 
         #[allow(unused_variables)]
-        fn visit_match_arm(&mut self, index: usize, match_arm: arg!($ref MatchArm<'l, L>)) {
-            self.traverse_match_arm(match_arm);
+        fn visit_prop_match_arm(&mut self, index: usize, match_arm: arg!($ref PropMatchArm<'l, L>)) {
+            self.traverse_prop_match_arm(match_arm);
+        }
+
+        #[allow(unused_variables)]
+        fn visit_capture_match_arm(&mut self, index: usize, match_arm: arg!($ref CaptureMatchArm<'l, L>)) {
+            self.traverse_capture_match_arm(match_arm);
         }
 
         #[allow(unused_variables)]
@@ -95,7 +100,7 @@ macro_rules! visitor_trait_methods {
                     self.visit_var(struct_var);
                     self.visit_property_id(prop_id);
                     for (index, arm) in arms.$iter().enumerate() {
-                        self.visit_match_arm(index, arm);
+                        self.visit_prop_match_arm(index, arm);
                     }
                 }
                 Kind::Sequence(binder, children) => {
@@ -126,13 +131,10 @@ macro_rules! visitor_trait_methods {
                         self.visit_binder(group.binder.$var());
                     }
                 }
-                Kind::MatchRegex(string_var, _regex_def_id, capture_groups, children) => {
+                Kind::MatchRegex(string_var, _regex_def_id, capture_match_arms) => {
                     self.visit_var(string_var);
-                    for group in capture_groups.$iter() {
-                        self.visit_binder(group.binder.$var());
-                    }
-                    for (index, child) in children.$iter().enumerate() {
-                        self.visit_node(index, child);
+                    for (index, arm) in capture_match_arms.$iter().enumerate() {
+                        self.visit_capture_match_arm(index, arm);
                     }
                 }
             }
@@ -173,7 +175,7 @@ macro_rules! visitor_trait_methods {
             self.visit_node(1, borrow!($ref element.attribute.val));
         }
 
-        fn traverse_match_arm(&mut self, match_arm: arg!($ref MatchArm<'l, L>)) {
+        fn traverse_prop_match_arm(&mut self, match_arm: arg!($ref PropMatchArm<'l, L>)) {
             match borrow!($ref match_arm.pattern) {
                 PropPattern::Attr(rel, val) => {
                     self.visit_pattern_binding(0, rel);
@@ -183,6 +185,15 @@ macro_rules! visitor_trait_methods {
                     self.visit_pattern_binding(0, val);
                 }
                 PropPattern::Absent => {}
+            }
+        }
+
+        fn traverse_capture_match_arm(&mut self, match_arm: arg!($ref CaptureMatchArm<'l, L>)) {
+            for group in match_arm.capture_groups.$iter() {
+                self.visit_binder(group.binder.$var());
+            }
+            for (index, child) in match_arm.nodes.$iter().enumerate() {
+                self.visit_node(index, child);
             }
         }
 

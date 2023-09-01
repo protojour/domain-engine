@@ -38,6 +38,7 @@ fn test_map_regex_duplex1() {
 
 // BUG: This should make an iteration group consisting of (one, two)
 #[test]
+#[should_panic = "looping regex"]
 fn test_map_regex_loop_pattern() {
     r#"
     pub def in {

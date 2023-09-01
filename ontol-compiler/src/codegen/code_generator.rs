@@ -486,10 +486,14 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     .append(block, Ir::AppendString(to_local), Delta(-1), span);
                 self.builder.append_pop_until(block, top, span);
             }
-            ontol_hir::Kind::MatchRegex(haystack_var, regex_def_id, capture_groups, nodes) => {
+            ontol_hir::Kind::MatchRegex(haystack_var, regex_def_id, match_arms) => {
                 let haystack_local = self.var_local(haystack_var);
 
-                let vm_capture_groups: Box<[_]> = capture_groups
+                // BUG: Handle all variations:
+                let first_arm = match_arms.into_iter().next().unwrap();
+
+                let vm_capture_groups: Box<[_]> = first_arm
+                    .capture_groups
                     .iter()
                     .map(|capture_group| PatternCaptureGroup {
                         group_index: capture_group.index,
@@ -507,7 +511,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 self.builder.append(
                     block,
                     Ir::RegexCapture(haystack_local, regex_def_id, vm_capture_groups),
-                    Delta((capture_groups.len() + 1) as i32),
+                    Delta((first_arm.capture_groups.len() + 1) as i32),
                     span,
                 );
                 // unconditional match (for now)
@@ -515,19 +519,19 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
                 {
                     // define scope for capture
-                    for (index, capture_group) in capture_groups.iter().enumerate() {
+                    for (index, capture_group) in first_arm.capture_groups.iter().enumerate() {
                         let local = Local(top.0 + index as u16 + 1);
                         if self.scope.insert(capture_group.binder.var, local).is_some() {
                             panic!("Variable {} already in scope", capture_group.binder.var);
                         }
                     }
 
-                    for node in nodes {
+                    for node in first_arm.nodes {
                         self.gen_node(node, block);
                     }
 
                     // pop scope
-                    for capture_group in capture_groups {
+                    for capture_group in first_arm.capture_groups {
                         self.scope.remove(&capture_group.binder.var);
                     }
                 }
@@ -540,7 +544,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
     fn gen_match_arm(
         &mut self,
-        arm: ontol_hir::MatchArm<'m, TypedHir>,
+        arm: ontol_hir::PropMatchArm<'m, TypedHir>,
         (rel_local, val_local): (Local, Local),
         block: &mut Block,
     ) {

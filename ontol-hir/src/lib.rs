@@ -87,7 +87,7 @@ pub enum Kind<'a, L: Lang> {
     /// A property definition associated with a struct var in scope
     Prop(Optional, Var, PropertyId, Vec<PropVariant<'a, L>>),
     /// A property matcher/unpacker associated with a struct var
-    MatchProp(Var, PropertyId, Vec<MatchArm<'a, L>>),
+    MatchProp(Var, PropertyId, Vec<PropMatchArm<'a, L>>),
     /// A sequence with associated binder. The value is the sequence.
     /// TODO: This can be done with Let!
     Sequence(L::Binder<'a>, Nodes<'a, L>),
@@ -100,7 +100,7 @@ pub enum Kind<'a, L: Lang> {
     /// Declarative regex w/captures
     Regex(DefId, Vec<CaptureGroup<'a, L>>),
     /// A regex matcher/unpacker
-    MatchRegex(Var, DefId, Vec<CaptureGroup<'a, L>>, Nodes<'a, L>),
+    MatchRegex(Var, DefId, Vec<CaptureMatchArm<'a, L>>),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -194,12 +194,12 @@ impl<T> Index<usize> for Attribute<T> {
     }
 }
 
-pub struct MatchArm<'a, L: Lang> {
+pub struct PropMatchArm<'a, L: Lang> {
     pub pattern: PropPattern<'a, L>,
     pub nodes: Vec<<L as Lang>::Node<'a>>,
 }
 
-impl<'a, L: Lang> Clone for MatchArm<'a, L>
+impl<'a, L: Lang> Clone for PropMatchArm<'a, L>
 where
     <L as Lang>::Binder<'a>: Clone,
     <L as Lang>::Node<'a>: Clone,
@@ -231,6 +231,24 @@ where
             Self::Attr(rel, val) => Self::Attr(rel.clone(), val.clone()),
             Self::Seq(b, has_default) => Self::Seq(b.clone(), *has_default),
             Self::Absent => Self::Absent,
+        }
+    }
+}
+
+pub struct CaptureMatchArm<'a, L: Lang> {
+    pub capture_groups: Vec<CaptureGroup<'a, L>>,
+    pub nodes: Vec<<L as Lang>::Node<'a>>,
+}
+
+impl<'a, L: Lang> Clone for CaptureMatchArm<'a, L>
+where
+    <L as Lang>::Binder<'a>: Clone,
+    <L as Lang>::Node<'a>: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            capture_groups: self.capture_groups.clone(),
+            nodes: self.nodes.clone(),
         }
     }
 }
