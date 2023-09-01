@@ -4,7 +4,7 @@ use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
     package::{GraphState, PackageGraphBuilder, PackageReference, ParsedPackage},
-    Compiler, SourceCodeRegistry, SourceSpan, Sources,
+    Compiler, SourceCodeRegistry, SourceId, SourceSpan, Sources,
 };
 use ontol_parser::{
     ast::{DefStatement, MapArm, Path, Statement, UseStatement},
@@ -25,6 +25,7 @@ use substring::Substring;
 pub struct State {
     pub docs: HashMap<String, Document>,
     pub roots: HashSet<String>,
+    pub sourcemap: HashMap<SourceId, String>,
 }
 
 /// A document and its various constituents
@@ -128,9 +129,7 @@ impl State {
                     package_graph_builder = builder;
 
                     for request in requests {
-                        let source_name = match &request.reference {
-                            PackageReference::Named(source_name) => source_name.as_str(),
-                        };
+                        let source_name = get_reference_name(&request.reference);
                         let package_config = PackageConfig::default();
                         let request_uri = build_uri(root_path, source_name);
 
@@ -155,17 +154,18 @@ impl State {
     }
 }
 
-/// Find filename and contents from base path and PackageReference
-pub fn find_referred_doc(
-    base_path: &str,
-    reference: &PackageReference,
-) -> Result<(String, String), Error> {
-    let source_name = match reference {
+/// Read file contents for URI
+pub fn read_file(uri: &str) -> Result<String, Error> {
+    let path = get_base_path(uri);
+    let text = std::fs::read_to_string(std::path::Path::new(&path))?;
+    Ok(text)
+}
+
+/// Get source name for a PackageReference
+pub fn get_reference_name(reference: &PackageReference) -> &str {
+    match reference {
         PackageReference::Named(source_name) => source_name.as_str(),
-    };
-    let filename = format!("{}/{}.on", base_path, source_name);
-    let text = std::fs::read_to_string(std::path::Path::new(&filename))?;
-    Ok((filename, text))
+    }
 }
 
 /// Split URI into schema/path and filename
@@ -177,10 +177,10 @@ pub fn get_path_and_name(uri: &str) -> (&str, &str) {
 }
 
 /// Strip `file://` prefix and return the base path
-pub fn get_base_path(filename: &str) -> &str {
-    match filename.strip_prefix("file://") {
+pub fn get_base_path(uri: &str) -> &str {
+    match uri.strip_prefix("file://") {
         Some(name) => name,
-        None => filename,
+        None => uri,
     }
 }
 
@@ -547,7 +547,7 @@ pub fn get_builtins() -> Vec<CompletionItem> {
             ..Default::default()
         },
         CompletionItem {
-            label: "int".to_string(),
+            label: "integer".to_string(),
             kind: Some(CompletionItemKind::UNIT),
             detail: Some("integer".to_string()),
             ..Default::default()
@@ -604,8 +604,8 @@ pub fn get_builtins() -> Vec<CompletionItem> {
 }
 
 /// A list of reserved words in ONTOL, to separate them from user-defined symbols
-const RESERVED_WORDS: [&str; 30] = [
-    "use", "as", "pub", "def", "with", "rel", "fmt", "map", "unify", "id", "is", "has", "gen",
-    "auto", "default", "example", "number", "boolean", "integer", "i64", "float", "f64", "string",
+const RESERVED_WORDS: [&str; 29] = [
+    "use", "as", "pub", "def", "rel", "fmt", "map", "unify", "id", "is", "has", "gen", "auto",
+    "default", "example", "number", "boolean", "integer", "i64", "float", "f64", "string",
     "datetime", "date", "time", "uuid", "regex", "seq", "dict",
 ];

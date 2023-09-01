@@ -1,8 +1,10 @@
 use core::panic;
 
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use state::{
-    find_referred_doc, get_base_path, get_builtins, get_domain_name, get_path_and_name,
-    get_span_range, Document, State,
+    build_uri, get_builtins, get_domain_name, get_path_and_name, get_reference_name,
+    get_span_range, read_file, Document, State,
 };
 use tokio::sync::RwLock;
 use tower_lsp::jsonrpc::Result;
@@ -19,6 +21,12 @@ pub const NAME: &str = env!("CARGO_PKG_NAME");
 pub struct Backend {
     pub client: Client,
     state: RwLock<State>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct OpenFileArgs {
+    ref_uri: String,
+    src_uri: String,
 }
 
 impl Backend {
@@ -46,28 +54,34 @@ impl Backend {
             Ok(_) => {}
             Err(err) => {
                 for err in err.errors {
+                    let mut data: Value = json!({});
+
                     if let ontol_compiler::CompileError::PackageNotFound(reference) = &err.error {
+                        let (path, _) = get_path_and_name(uri.as_str());
+                        let source_name = get_reference_name(reference);
+                        let ref_uri = build_uri(path, source_name);
+
                         if cfg!(feature = "wasm") {
-                            // ask client
-                        } else {
-                            let (path, _) = get_path_and_name(uri.as_str());
-                            let base_path = get_base_path(path);
-                            if let Ok((name, text)) = find_referred_doc(base_path, reference) {
-                                state.roots.insert(uri.to_string());
-                                state.docs.insert(
-                                    uri.to_string(),
-                                    Document {
-                                        uri: uri.to_string(),
-                                        path: path.to_string(),
-                                        name,
-                                        text,
-                                        ..Default::default()
-                                    },
-                                );
-                                continue;
-                            }
+                            data = json!(OpenFileArgs {
+                                ref_uri: ref_uri.clone(),
+                                src_uri: uri.to_string(),
+                            });
+                        } else if let Ok(text) = read_file(ref_uri.as_str()) {
+                            state.roots.insert(ref_uri.to_string());
+                            state.docs.insert(
+                                ref_uri.to_string(),
+                                Document {
+                                    uri: ref_uri.to_string(),
+                                    path: path.to_string(),
+                                    name: source_name.to_string(),
+                                    text,
+                                    ..Default::default()
+                                },
+                            );
+                            continue;
                         }
                     }
+
                     match state.docs.get(uri.as_str()) {
                         Some(doc) => {
                             diagnostics.push(Diagnostic {
@@ -87,6 +101,7 @@ impl Backend {
                                         })
                                         .collect(),
                                 ),
+                                data: Some(data),
                                 ..Default::default()
                             });
                         }
@@ -122,6 +137,11 @@ impl LanguageServer for Backend {
                     completion_item: Some(CompletionOptionsCompletionItem {
                         label_details_support: Some(true),
                     }),
+                    ..Default::default()
+                }),
+                code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
+                execute_command_provider: Some(ExecuteCommandOptions {
+                    commands: vec!["ontol-lsp/openFile".to_string()],
                     ..Default::default()
                 }),
                 ..Default::default()
@@ -245,5 +265,56 @@ impl LanguageServer for Backend {
             }
             None => Ok(None),
         }
+    }
+
+    async fn code_action(&self, params: CodeActionParams) -> Result<Option<CodeActionResponse>> {
+        if !cfg!(feature = "wasm") {
+            return Ok(None);
+        }
+        let mut actions: Vec<CodeActionOrCommand> = vec![];
+        for diag in params.context.diagnostics {
+            actions.push(CodeActionOrCommand::CodeAction(CodeAction {
+                title: "Open missing file...".to_string(),
+                kind: Some(CodeActionKind::QUICKFIX),
+                diagnostics: Some(vec![diag.clone()]),
+                command: Some(Command {
+                    title: "Open missing file...".to_string(),
+                    command: "ontol-lsp/openFile".to_string(),
+                    arguments: Some(vec![diag.data.clone().into()]),
+                }),
+                is_preferred: Some(true),
+                ..Default::default()
+            }));
+        }
+        Ok(Some(actions))
+    }
+
+    async fn execute_command(&self, params: ExecuteCommandParams) -> Result<Option<Value>> {
+        match params.command.as_str() {
+            "ontol-lsp/openFile" => {
+                // TODO: replace unwrap()
+                let val = params.arguments.get(0).unwrap();
+                let args: OpenFileArgs = serde_json::from_value(val.clone()).unwrap();
+                let uri = Url::parse(&args.ref_uri).unwrap();
+
+                let result = self
+                    .client
+                    .show_document(ShowDocumentParams {
+                        uri,
+                        external: None,
+                        take_focus: None,
+                        selection: None,
+                    })
+                    .await;
+
+                if result.is_ok() {
+                    let uri = Url::parse(&args.src_uri).unwrap();
+                    self.diagnose(&uri).await;
+                }
+            }
+            "ontol-lsp/..." => {}
+            _ => {}
+        }
+        Ok(None)
     }
 }

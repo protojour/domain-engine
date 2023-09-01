@@ -23,6 +23,7 @@ ontol-runtime.path = "../ontol-runtime"
 ontol-compiler.path = "../ontol-compiler"
 ontol-parser.path = "../ontol-parser"
 chumsky.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
 lsp-types = "0.94.0"

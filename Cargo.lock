@@ -1476,6 +1476,7 @@ dependencies = [
  "ontol-parser",
  "ontol-runtime",
  "regex",
+ "serde",
  "serde_json",
  "substring",
  "tokio",
