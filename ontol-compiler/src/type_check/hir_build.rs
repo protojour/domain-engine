@@ -12,11 +12,14 @@ use tracing::debug;
 use crate::{
     def::{Def, DefKind, LookupRelationshipMeta, RelParams},
     error::CompileError,
-    expr::{Expr, ExprId, ExprKind, ExprRegexCaptureNode, ExprStructAttr, ExprStructModifier},
     mem::Intern,
+    pattern::{
+        PatId, Pattern, PatternKind, RegexPatternCaptureNode, StructPatternAttr,
+        StructPatternModifier,
+    },
     primitive::PrimitiveKind,
     type_check::{
-        hir_build_ctx::{ExplicitVariableArm, ExpressionVariable},
+        hir_build_ctx::{ExplicitVariableArm, PatternVariable},
         inference::UnifyValue,
         repr::repr_model::ReprKind,
     },
@@ -35,22 +38,22 @@ pub(super) struct NodeInfo<'m> {
 struct StructInfo<'m> {
     struct_def_id: DefId,
     struct_ty: TypeRef<'m>,
-    modifier: Option<ExprStructModifier>,
+    modifier: Option<StructPatternModifier>,
     parent_struct_flags: ontol_hir::StructFlags,
 }
 
 /// This is the type check of map statements.
 /// The types that are used must be checked with `check_def_sealed`.
 impl<'c, 'm> TypeCheck<'c, 'm> {
-    pub(super) fn build_root_expr(
+    pub(super) fn build_root_pattern(
         &mut self,
-        expr_id: ExprId,
+        pat_id: PatId,
         ctx: &mut HirBuildCtx<'m>,
     ) -> TypedHirNode<'m> {
-        let expr = self.expressions.table.remove(&expr_id).unwrap();
+        let pattern = self.patterns.table.remove(&pat_id).unwrap();
 
         let node = self.build_node(
-            &expr,
+            &pattern,
             NodeInfo {
                 // Don't pass inference types as the expected type:
                 expected_ty: None,
@@ -63,8 +66,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         match node.ty() {
             Type::Error | Type::Infer(_) => {}
             _ => {
-                let type_var = ctx.inference.new_type_variable(expr_id);
-                debug!("Check expr(2) root type result: {:?}", node.ty());
+                let type_var = ctx.inference.new_type_variable(pat_id);
+                debug!("Check pat(2) root type result: {:?}", node.ty());
                 ctx.inference
                     .eq_relations
                     .unify_var_value(type_var, UnifyValue::Known(node.ty()))
@@ -77,12 +80,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     pub(super) fn build_node(
         &mut self,
-        expr: &Expr,
+        pattern: &Pattern,
         node_info: NodeInfo<'m>,
         ctx: &mut HirBuildCtx<'m>,
     ) -> TypedHirNode<'m> {
-        let node = match (&expr.kind, node_info.expected_ty) {
-            (ExprKind::Call(def_id, args), Some(_expected_output)) => {
+        let node = match (&pattern.kind, node_info.expected_ty) {
+            (PatternKind::Call(def_id, args), Some(_expected_output)) => {
                 match (
                     self.defs.table.get(def_id),
                     self.def_types.table.get(def_id),
@@ -100,7 +103,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     expected: u8::try_from(params.len()).unwrap(),
                                     actual: u8::try_from(args.len()).unwrap(),
                                 },
-                                &expr.span,
+                                &pattern.span,
                             );
                         }
 
@@ -121,15 +124,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             ontol_hir::Kind::Call(*proc, parameters),
                             Meta {
                                 ty: output,
-                                span: expr.span,
+                                span: pattern.span,
                             },
                         )
                     }
-                    _ => self.error_node(CompileError::NotCallable, &expr.span),
+                    _ => self.error_node(CompileError::NotCallable, &pattern.span),
                 }
             }
             (
-                ExprKind::Struct {
+                PatternKind::Struct {
                     type_path: Some(type_path),
                     modifier,
                     attributes,
@@ -151,7 +154,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         parent_struct_flags: node_info.parent_struct_flags,
                     },
                     attributes,
-                    expr.span,
+                    pattern.span,
                     ctx,
                 );
 
@@ -171,13 +174,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             actual: struct_node.meta().ty,
                             expected: expected_ty,
                         }),
-                        &expr.span,
+                        &pattern.span,
                     ),
                     _ => struct_node,
                 }
             }
             (
-                ExprKind::Struct {
+                PatternKind::Struct {
                     type_path: None,
                     modifier,
                     attributes,
@@ -191,7 +194,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             actual: actual_ty,
                             expected: expected_struct_ty,
                         }),
-                        &expr.span,
+                        &pattern.span,
                     );
                 }
 
@@ -203,28 +206,28 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         parent_struct_flags: node_info.parent_struct_flags,
                     },
                     attributes,
-                    expr.span,
+                    pattern.span,
                     ctx,
                 )
             }
             (
-                ExprKind::Struct {
+                PatternKind::Struct {
                     type_path: None, ..
                 },
                 _,
-            ) => self.type_error_node(TypeError::NoRelationParametersExpected, &expr.span),
-            (ExprKind::Seq(aggr_expr_id, inner), expected_ty) => {
+            ) => self.type_error_node(TypeError::NoRelationParametersExpected, &pattern.span),
+            (PatternKind::Seq(aggr_pat_id, inner), expected_ty) => {
                 let (rel_ty, val_ty) = match expected_ty {
                     Some(Type::Seq(rel_ty, val_ty)) => (*rel_ty, *val_ty),
                     Some(other_ty) => {
-                        self.type_error(TypeError::MustBeSequence(other_ty), &expr.span);
+                        self.type_error(TypeError::MustBeSequence(other_ty), &pattern.span);
                         (self.unit_type(), self.types.intern(Type::Error))
                     }
                     None => {
-                        let expr_id = self.expressions.alloc_expr_id();
+                        let pat_id = self.patterns.alloc_pat_id();
                         let val_ty = self
                             .types
-                            .intern(Type::Infer(ctx.inference.new_type_variable(expr_id)));
+                            .intern(Type::Infer(ctx.inference.new_type_variable(pat_id)));
 
                         debug!("Infer seq val type: {val_ty:?}");
                         (self.unit_type(), val_ty)
@@ -234,19 +237,19 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 if inner.len() != 1 {
                     return self.error_node(
                         CompileError::TODO(smart_format!("Standalone seq needs one element")),
-                        &expr.span,
+                        &pattern.span,
                     );
                 }
 
                 let inner_node = self.build_node(
-                    &inner.iter().next().unwrap().expr,
+                    &inner.iter().next().unwrap().pattern,
                     NodeInfo {
                         expected_ty: Some(val_ty),
                         parent_struct_flags: node_info.parent_struct_flags,
                     },
                     ctx,
                 );
-                let label = *ctx.label_map.get(aggr_expr_id).unwrap();
+                let label = *ctx.label_map.get(aggr_pat_id).unwrap();
                 let seq_ty = self.types.intern(Type::Seq(rel_ty, val_ty));
 
                 TypedHirNode(
@@ -259,16 +262,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ),
                     Meta {
                         ty: seq_ty,
-                        span: expr.span,
+                        span: pattern.span,
                     },
                 )
             }
-            (ExprKind::ConstI64(int), Some(expected_ty)) => match expected_ty {
+            (PatternKind::ConstI64(int), Some(expected_ty)) => match expected_ty {
                 Type::Primitive(PrimitiveKind::I64, _) => TypedHirNode(
                     ontol_hir::Kind::I64(*int),
                     Meta {
                         ty: expected_ty,
-                        span: expr.span,
+                        span: pattern.span,
                     },
                 ),
                 Type::Primitive(PrimitiveKind::F64, _) => {
@@ -278,20 +281,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             ontol_hir::Kind::F64(float),
                             Meta {
                                 ty: expected_ty,
-                                span: expr.span,
+                                span: pattern.span,
                             },
                         ),
-                        Err(_) => self.error_node(CompileError::IncompatibleLiteral, &expr.span),
+                        Err(_) => self.error_node(CompileError::IncompatibleLiteral, &pattern.span),
                     }
                 }
-                _ => self.error_node(CompileError::IncompatibleLiteral, &expr.span),
+                _ => self.error_node(CompileError::IncompatibleLiteral, &pattern.span),
             },
-            (ExprKind::ConstString(string), Some(expected_ty)) => match expected_ty {
+            (PatternKind::ConstString(string), Some(expected_ty)) => match expected_ty {
                 Type::Primitive(PrimitiveKind::String, _) => TypedHirNode(
                     ontol_hir::Kind::String(string.clone()),
                     Meta {
                         ty: expected_ty,
-                        span: expr.span,
+                        span: pattern.span,
                     },
                 ),
                 Type::StringConstant(def_id) => match self.defs.def_kind(*def_id) {
@@ -299,43 +302,45 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         ontol_hir::Kind::String(string.clone()),
                         Meta {
                             ty: expected_ty,
-                            span: expr.span,
+                            span: pattern.span,
                         },
                     ),
-                    _ => self.error_node(CompileError::IncompatibleLiteral, &expr.span),
+                    _ => self.error_node(CompileError::IncompatibleLiteral, &pattern.span),
                 },
-                _ => self.error_node(CompileError::IncompatibleLiteral, &expr.span),
+                _ => self.error_node(CompileError::IncompatibleLiteral, &pattern.span),
             },
-            (ExprKind::Variable(var), expected_ty) => {
+            (PatternKind::Variable(var), expected_ty) => {
                 let arm = ctx.arm;
-                let explicit_variable =
-                    ctx.expr_variables.get_mut(var).expect("variable not found");
+                let explicit_variable = ctx
+                    .pattern_variables
+                    .get_mut(var)
+                    .expect("variable not found");
 
-                let arm_expr_id = {
+                let arm_pat_id = {
                     let hir_arm = explicit_variable.hir_arms.entry(arm).or_insert_with(|| {
-                        let expr_id = self.expressions.alloc_expr_id();
+                        let pat_id = self.patterns.alloc_pat_id();
 
                         ExplicitVariableArm {
-                            expr_id,
-                            span: expr.span,
+                            pat_id,
+                            span: pattern.span,
                         }
                     });
-                    hir_arm.expr_id
+                    hir_arm.pat_id
                 };
 
-                let type_var = ctx.inference.new_type_variable(arm_expr_id);
+                let type_var = ctx.inference.new_type_variable(arm_pat_id);
 
                 match expected_ty {
                     Some(Type::Seq(_rel_ty, val_ty)) => self.type_error_node(
                         TypeError::VariableMustBeSequenceEnclosed(val_ty),
-                        &expr.span,
+                        &pattern.span,
                     ),
                     Some(expected_ty) => {
                         let variable_ref = TypedHirNode(
                             ontol_hir::Kind::Var(*var),
                             Meta {
                                 ty: expected_ty,
-                                span: expr.span,
+                                span: pattern.span,
                             },
                         );
 
@@ -353,7 +358,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         panic!("Should not happen anymore");
                                     }
 
-                                    _ => self.type_error_node(err, &expr.span),
+                                    _ => self.type_error_node(err, &pattern.span),
                                 }
                             }
                             Err(err) => todo!("Report unification error: {err:?}"),
@@ -364,31 +369,31 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
             }
-            (ExprKind::Regex(expr_regex), Some(expected_ty)) => match expected_ty {
+            (PatternKind::Regex(regex_pattern), Some(expected_ty)) => match expected_ty {
                 // TODO: Handle compile-time match of string constant?
                 Type::Primitive(PrimitiveKind::String, _) | Type::StringConstant(_) => {
                     let capture_groups = self.build_regex_capture_groups(
-                        &expr_regex.capture_node,
-                        &expr.span,
+                        &regex_pattern.capture_node,
+                        &pattern.span,
                         expected_ty,
                         ctx,
                     );
 
                     TypedHirNode(
-                        ontol_hir::Kind::Regex(expr_regex.regex_def_id, capture_groups),
+                        ontol_hir::Kind::Regex(regex_pattern.regex_def_id, capture_groups),
                         Meta {
                             ty: expected_ty,
-                            span: expr.span,
+                            span: pattern.span,
                         },
                     )
                 }
-                _ => self.error_node(CompileError::IncompatibleLiteral, &expr.span),
+                _ => self.error_node(CompileError::IncompatibleLiteral, &pattern.span),
             },
             (kind, ty) => self.error_node(
                 CompileError::TODO(smart_format!(
                     "Not enough type information for {kind:?}, expected_ty = {ty:?}"
                 )),
-                &expr.span,
+                &pattern.span,
             ),
         };
 
@@ -416,7 +421,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             modifier,
             parent_struct_flags,
         }: StructInfo<'m>,
-        attributes: &[ExprStructAttr],
+        attributes: &[StructPatternAttr],
         span: SourceSpan,
         ctx: &mut HirBuildCtx<'m>,
     ) -> TypedHirNode<'m> {
@@ -431,7 +436,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let properties = self.relations.properties_by_def_id(struct_def_id);
 
         let actual_struct_flags = match modifier {
-            Some(ExprStructModifier::Match) => ontol_hir::StructFlags::MATCH,
+            Some(StructPatternModifier::Match) => ontol_hir::StructFlags::MATCH,
             None => ontol_hir::StructFlags::empty(),
         } | parent_struct_flags;
 
@@ -483,7 +488,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                         let mut hir_props = vec![];
 
-                        for ExprStructAttr {
+                        for StructPatternAttr {
                             key: (def_id, prop_span),
                             rel,
                             bind_option,
@@ -573,12 +578,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     })
                                 }
                                 ValueCardinality::Many => match &value.kind {
-                                    ExprKind::Seq(aggr_expr_id, expr_elements) => {
+                                    PatternKind::Seq(aggr_pat_id, pat_elements) => {
                                         let mut hir_elements =
-                                            Vec::with_capacity(expr_elements.len());
-                                        for element in expr_elements {
+                                            Vec::with_capacity(pat_elements.len());
+                                        for element in pat_elements {
                                             let val_node = self.build_node(
-                                                &element.expr,
+                                                &element.pattern,
                                                 NodeInfo {
                                                     expected_ty: Some(value_ty),
                                                     parent_struct_flags: actual_struct_flags,
@@ -594,7 +599,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                             });
                                         }
 
-                                        let label = *ctx.label_map.get(aggr_expr_id).unwrap();
+                                        let label = *ctx.label_map.get(aggr_pat_id).unwrap();
                                         let seq_ty =
                                             self.types.intern(Type::Seq(rel_params_ty, value_ty));
 
@@ -770,7 +775,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     _ => {
                         let mut attributes = attributes.iter();
                         match attributes.next() {
-                            Some(ExprStructAttr {
+                            Some(StructPatternAttr {
                                 key: (def_id, _),
                                 rel: _,
                                 bind_option: _,
@@ -790,7 +795,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             }
                             _ => {
                                 return self
-                                    .error_node(CompileError::ExpectedExpressionAttribute, &span);
+                                    .error_node(CompileError::ExpectedPatternAttribute, &span);
                             }
                         }
                     }
@@ -804,7 +809,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 let mut attributes = attributes.iter();
                 match attributes.next() {
-                    Some(ExprStructAttr {
+                    Some(StructPatternAttr {
                         key: (def_id, _),
                         rel: _,
                         bind_option: _,
@@ -823,7 +828,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         inner_node.into_kind()
                     }
                     _ => {
-                        return self.error_node(CompileError::ExpectedExpressionAttribute, &span);
+                        return self.error_node(CompileError::ExpectedPatternAttribute, &span);
                     }
                 }
             }
@@ -847,21 +852,21 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn build_implicit_rel_node(
         &mut self,
         ty: TypeRef<'m>,
-        object: &Expr,
+        object: &Pattern,
         prop_span: SourceSpan,
         ctx: &mut HirBuildCtx<'m>,
     ) -> TypedHirNode<'m> {
         match &object.kind {
-            ExprKind::Variable(object_var) => {
+            PatternKind::Variable(object_var) => {
                 // implicit mapping; for now the object needs to be a variable
                 let edge_var = ctx
                     .object_to_edge_var_table
                     .entry(*object_var)
                     .or_insert_with(|| {
                         let edge_var = ctx.var_allocator.alloc();
-                        ctx.expr_variables.insert(
+                        ctx.pattern_variables.insert(
                             edge_var,
-                            ExpressionVariable {
+                            PatternVariable {
                                 ctrl_group: None,
                                 hir_arms: Default::default(),
                             },
@@ -869,12 +874,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         edge_var
                     });
 
-                let expr_id = self.expressions.alloc_expr_id();
+                let pat_id = self.patterns.alloc_pat_id();
 
                 self.build_node(
-                    &Expr {
-                        id: expr_id,
-                        kind: ExprKind::Variable(*edge_var),
+                    &Pattern {
+                        id: pat_id,
+                        kind: PatternKind::Variable(*edge_var),
                         span: prop_span,
                     },
                     NodeInfo {
@@ -884,10 +889,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ctx,
                 )
             }
-            ExprKind::Seq(_, elements) => {
+            PatternKind::Seq(_, elements) => {
                 // FIXME: Unsure how correct this is:
                 for element in elements {
-                    let node = self.build_implicit_rel_node(ty, &element.expr, prop_span, ctx);
+                    let node = self.build_implicit_rel_node(ty, &element.pattern, prop_span, ctx);
                     if !matches!(node.1.ty, Type::Error) {
                         return node;
                     }
@@ -901,7 +906,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn build_regex_capture_groups(
         &mut self,
-        node: &ExprRegexCaptureNode,
+        node: &RegexPatternCaptureNode,
         pattern_span: &SourceSpan,
         // BUG: We want type inference for the capture groups,
         // that falls back to string if both sides are unknown
@@ -909,28 +914,30 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         ctx: &mut HirBuildCtx<'m>,
     ) -> Vec<ontol_hir::CaptureGroup<'m, TypedHir>> {
         match node {
-            ExprRegexCaptureNode::Capture {
+            RegexPatternCaptureNode::Capture {
                 var,
                 capture_index,
                 name_span,
             } => {
                 let arm = ctx.arm;
-                let explicit_variable =
-                    ctx.expr_variables.get_mut(var).expect("variable not found");
+                let explicit_variable = ctx
+                    .pattern_variables
+                    .get_mut(var)
+                    .expect("variable not found");
 
-                let arm_expr_id = {
+                let arm_pat_id = {
                     let hir_arm = explicit_variable.hir_arms.entry(arm).or_insert_with(|| {
-                        let expr_id = self.expressions.alloc_expr_id();
+                        let pat_id = self.patterns.alloc_pat_id();
 
                         ExplicitVariableArm {
-                            expr_id,
+                            pat_id,
                             span: *pattern_span,
                         }
                     });
-                    hir_arm.expr_id
+                    hir_arm.pat_id
                 };
 
-                let _type_var = ctx.inference.new_type_variable(arm_expr_id);
+                let _type_var = ctx.inference.new_type_variable(arm_pat_id);
 
                 vec![ontol_hir::CaptureGroup::<'m, TypedHir> {
                     index: *capture_index,
@@ -943,16 +950,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     },
                 }]
             }
-            ExprRegexCaptureNode::Concat { nodes } => nodes
+            RegexPatternCaptureNode::Concat { nodes } => nodes
                 .iter()
                 .flat_map(|node| {
                     self.build_regex_capture_groups(node, pattern_span, expected_ty, ctx)
                 })
                 .collect(),
-            ExprRegexCaptureNode::Alternation { .. } => {
+            RegexPatternCaptureNode::Alternation { .. } => {
                 todo!()
             }
-            ExprRegexCaptureNode::Repetition { .. } => {
+            RegexPatternCaptureNode::Repetition { .. } => {
                 todo!()
             }
         }

@@ -46,7 +46,7 @@ pub enum CompileError {
     InvalidMixOfRelationshipTypeForSubject,
     CannotMixIndexedRelationIdentsAndEdgeTypes,
     NoPropertiesExpected,
-    ExpectedExpressionAttribute,
+    ExpectedPatternAttribute,
     NamedPropertyExpected,
     UnknownProperty,
     DuplicateProperty,
@@ -132,7 +132,7 @@ impl std::fmt::Display for CompileError {
                 write!(f, "cannot mix index relation identifiers and edge types")
             }
             Self::NoPropertiesExpected => write!(f, "no properties expected"),
-            Self::ExpectedExpressionAttribute => write!(f, "expected expression attribute"),
+            Self::ExpectedPatternAttribute => write!(f, "expected attribute"),
             Self::NamedPropertyExpected => write!(f, "expected named property"),
             Self::UnknownProperty => write!(f, "unknown property"),
             Self::DuplicateProperty => write!(f, "duplicate property"),

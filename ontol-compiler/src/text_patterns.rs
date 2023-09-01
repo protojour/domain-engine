@@ -167,7 +167,7 @@ impl TextPatternSegment {
     }
 }
 
-pub fn compile_all_patterns(compiler: &mut Compiler) {
+pub fn compile_all_text_patterns(compiler: &mut Compiler) {
     compile_regex_literals(compiler);
     compile_text_pattern_constructors(compiler);
 }
@@ -178,7 +178,7 @@ fn compile_regex_literals(compiler: &mut Compiler) {
     let literal_regex_asts = std::mem::take(&mut compiler.defs.literal_regex_meta_table);
 
     for (def_id, ast) in literal_regex_asts {
-        compiler.patterns.text_patterns.insert(
+        compiler.text_patterns.text_patterns.insert(
             def_id,
             TextPattern {
                 regex: compile_regex(ast.hir),
@@ -201,7 +201,7 @@ fn compile_text_pattern_constructors(compiler: &mut Compiler) {
             _ => panic!("{def_id:?} does not have a string pattern constructor"),
         };
 
-        store_text_pattern_segment(&mut compiler.patterns, def_id, segment);
+        store_text_pattern_segment(&mut compiler.text_patterns, def_id, segment);
     }
 }
 

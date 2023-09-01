@@ -3,8 +3,8 @@ use std::{fmt::Debug, marker::PhantomData};
 use fnv::FnvHashMap;
 
 use crate::{
-    expr::ExprId,
     mem::Intern,
+    pattern::PatId,
     types::{Type, TypeRef, Types},
 };
 
@@ -64,7 +64,7 @@ impl<'m> ena::unify::UnifyValue for UnifyValue<'m> {
 }
 
 pub struct Inference<'m> {
-    variables: FnvHashMap<ExprId, Vec<TypeVar<'m>>>,
+    variables: FnvHashMap<PatId, Vec<TypeVar<'m>>>,
     pub(super) eq_relations: ena::unify::InPlaceUnificationTable<TypeVar<'m>>,
 }
 
@@ -76,7 +76,7 @@ impl<'m> Inference<'m> {
         }
     }
 
-    pub fn new_type_variable(&mut self, variable_id: ExprId) -> TypeVar<'m> {
+    pub fn new_type_variable(&mut self, variable_id: PatId) -> TypeVar<'m> {
         let type_var = self.eq_relations.new_key(UnifyValue::Unknown);
         let var_equations = self.variables.entry(variable_id).or_default();
 

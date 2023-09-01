@@ -2,7 +2,6 @@ use codegen::task::{execute_codegen_tasks, CodegenTasks};
 use def::{DefKind, Defs, LookupRelationshipMeta, RelationshipMeta, TypeDef};
 
 pub use error::*;
-use expr::Expressions;
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use lowering::Lowering;
@@ -17,12 +16,13 @@ use ontol_runtime::{
 };
 use ontology_graph::OntologyGraph;
 use package::{PackageTopology, Packages, ParsedPackage};
+use pattern::Patterns;
 use primitive::Primitives;
 use relation::{Properties, Property, Relations};
 use serde_codegen::serde_generator::SerdeGenerator;
 pub use source::*;
 use strings::Strings;
-use text_patterns::{compile_all_patterns, TextPatterns};
+use text_patterns::{compile_all_text_patterns, TextPatterns};
 use tracing::debug;
 use type_check::seal::SealCtx;
 use types::{DefTypes, Types};
@@ -39,10 +39,10 @@ pub mod typed_hir;
 mod codegen;
 mod compiler_queries;
 mod def;
-mod expr;
 mod lowering;
 mod namespace;
 mod ontol_domain;
+mod pattern;
 mod primitive;
 mod regex_util;
 mod relation;
@@ -62,14 +62,14 @@ pub struct Compiler<'m> {
     pub(crate) defs: Defs<'m>,
     pub(crate) package_config_table: FnvHashMap<PackageId, PackageConfig>,
     pub(crate) primitives: Primitives,
-    pub(crate) expressions: Expressions,
+    pub(crate) patterns: Patterns,
 
     pub(crate) strings: Strings<'m>,
     pub(crate) types: Types<'m>,
     pub(crate) def_types: DefTypes<'m>,
     pub(crate) relations: Relations,
     pub(crate) seal_ctx: SealCtx,
-    pub(crate) patterns: TextPatterns,
+    pub(crate) text_patterns: TextPatterns,
 
     pub(crate) codegen_tasks: CodegenTasks<'m>,
 
@@ -88,13 +88,13 @@ impl<'m> Compiler<'m> {
             defs,
             package_config_table: Default::default(),
             primitives,
-            expressions: Default::default(),
+            patterns: Default::default(),
             strings: Strings::new(mem),
             types: Types::new(mem),
             def_types: Default::default(),
             relations: Relations::default(),
             seal_ctx: Default::default(),
-            patterns: TextPatterns::default(),
+            text_patterns: TextPatterns::default(),
             codegen_tasks: Default::default(),
             errors: Default::default(),
         }
@@ -126,7 +126,7 @@ impl<'m> Compiler<'m> {
         }
 
         execute_codegen_tasks(self);
-        compile_all_patterns(self);
+        compile_all_text_patterns(self);
         self.check_error()
     }
 
@@ -281,7 +281,7 @@ impl<'m> Compiler<'m> {
             .dynamic_sequence_operator_id(dynamic_sequence_operator_id)
             .property_flows(property_flows)
             .string_like_types(self.defs.string_like_types)
-            .text_patterns(self.patterns.text_patterns)
+            .text_patterns(self.text_patterns.text_patterns)
             .value_generators(self.relations.value_generators)
             .build()
     }

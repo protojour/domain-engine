@@ -68,16 +68,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
             }
-            DefKind::Constant(expr_id) => {
-                let expr = self.expressions.table.remove(expr_id).unwrap();
+            DefKind::Constant(pat_id) => {
+                let pattern = self.patterns.table.remove(pat_id).unwrap();
                 let ty = match self.expected_constant_types.remove(&def_id) {
                     None => self.types.intern(Type::Error),
                     Some(ty) => ty,
                 };
 
-                let mut ctx = HirBuildCtx::new(expr.span, VarAllocator::default());
+                let mut ctx = HirBuildCtx::new(pattern.span, VarAllocator::default());
                 let node = self.build_node(
-                    &expr,
+                    &pattern,
                     NodeInfo {
                         expected_ty: Some(ty),
                         parent_struct_flags: Default::default(),

@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
 use smartstring::alias::String;
 
-use crate::{expr::ExprId, types::TypeRef, SourceSpan};
+use crate::{pattern::PatId, types::TypeRef, SourceSpan};
 
 use super::inference::Inference;
 
@@ -11,8 +11,8 @@ pub struct CtrlFlowDepth(pub u16);
 pub struct HirBuildCtx<'m> {
     pub map_kw_span: SourceSpan,
     pub inference: Inference<'m>,
-    pub expr_variables: FnvHashMap<ontol_hir::Var, ExpressionVariable>,
-    pub label_map: FnvHashMap<ExprId, ontol_hir::Label>,
+    pub pattern_variables: FnvHashMap<ontol_hir::Var, PatternVariable>,
+    pub label_map: FnvHashMap<PatId, ontol_hir::Label>,
 
     pub ctrl_flow_forest: CtrlFlowForest,
 
@@ -39,7 +39,7 @@ impl<'m> HirBuildCtx<'m> {
         Self {
             map_kw_span,
             inference: Inference::new(),
-            expr_variables: Default::default(),
+            pattern_variables: Default::default(),
             label_map: Default::default(),
             ctrl_flow_forest: Default::default(),
             variable_mapping: Default::default(),
@@ -65,7 +65,7 @@ impl<'m> HirBuildCtx<'m> {
     }
 }
 
-pub struct ExpressionVariable {
+pub struct PatternVariable {
     pub ctrl_group: Option<CtrlFlowGroup>,
     pub hir_arms: FnvHashMap<Arm, ExplicitVariableArm>,
 }
@@ -76,8 +76,8 @@ pub struct VariableMapping<'m> {
 }
 
 pub struct ExplicitVariableArm {
-    // In hir, the variable has a different expr id depending on which arm it's in
-    pub expr_id: ExprId,
+    // In hir, the variable has a different pat id depending on which arm it's in
+    pub pat_id: PatId,
     pub span: SourceSpan,
 }
 

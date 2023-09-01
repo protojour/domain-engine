@@ -14,9 +14,12 @@ use tracing::debug;
 use crate::{
     def::{Def, DefKind, FmtFinalState, RelParams, Relationship, TypeDef},
     error::CompileError,
-    expr::{Expr, ExprId, ExprKind, ExprSeqElement, ExprStructAttr, ExprStructModifier, TypePath},
     namespace::Space,
     package::{PackageReference, ONTOL_PKG},
+    pattern::{
+        PatId, Pattern, PatternKind, SeqPatternElement, StructPatternAttr, StructPatternModifier,
+        TypePath,
+    },
     regex_util::RegexToExprLowerer,
     Compiler, Src,
 };
@@ -144,10 +147,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
             Some(ast::TypeOrPattern::Pattern(pattern)) => {
                 let mut var_table = ExprVarTable::default();
                 let expr = self.lower_pattern((pattern, object_span.clone()), &mut var_table)?;
-                let expr_id = self.compiler.expressions.alloc_expr_id();
-                self.compiler.expressions.table.insert(expr_id, expr);
+                let pat_id = self.compiler.patterns.alloc_pat_id();
+                self.compiler.patterns.table.insert(pat_id, expr);
 
-                self.define(DefKind::Constant(expr_id), &object_span)
+                self.define(DefKind::Constant(pat_id), &object_span)
             }
             None => self.resolve_contextual_type_reference(
                 None,
@@ -513,7 +516,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         &mut self,
         ((unit_or_seq, ast), span): ((ast::UnitOrSeq, ast::MapArm), Span),
         var_table: &mut ExprVarTable,
-    ) -> Res<ExprId> {
+    ) -> Res<PatId> {
         let unit_expr = match ast {
             ast::MapArm::Struct(ast) => {
                 self.lower_struct_pattern((ast, span.clone()), var_table)?
@@ -525,13 +528,13 @@ impl<'s, 'm> Lowering<'s, 'm> {
         let expr = match unit_or_seq {
             ast::UnitOrSeq::Unit => unit_expr,
             ast::UnitOrSeq::Seq => {
-                let seq_id = self.compiler.expressions.alloc_expr_id();
+                let seq_id = self.compiler.patterns.alloc_pat_id();
                 self.expr(
-                    ExprKind::Seq(
+                    PatternKind::Seq(
                         seq_id,
-                        vec![ExprSeqElement {
+                        vec![SeqPatternElement {
                             iter: true,
-                            expr: unit_expr,
+                            pattern: unit_expr,
                         }],
                     ),
                     &span,
@@ -539,10 +542,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }
         };
 
-        let expr_id = self.compiler.expressions.alloc_expr_id();
-        self.compiler.expressions.table.insert(expr_id, expr);
+        let pat_id = self.compiler.patterns.alloc_pat_id();
+        self.compiler.patterns.table.insert(pat_id, expr);
 
-        Ok(expr_id)
+        Ok(pat_id)
     }
 
     fn lower_map_binding(
@@ -551,20 +554,20 @@ impl<'s, 'm> Lowering<'s, 'm> {
         expr: (ast::ExprPattern, Span),
         span: Span,
         var_table: &mut ExprVarTable,
-    ) -> Res<Expr> {
+    ) -> Res<Pattern> {
         let type_def_id = self.lookup_path(&path.0, &path.1)?;
         let key = (DefId::unit(), self.src.span(&span));
         let expr = self.lower_expr_pattern((expr.0, expr.1), var_table)?;
 
         Ok(self.expr(
             // FIXME: This ExprKind shouldn't really be struct..
-            ExprKind::Struct {
+            PatternKind::Struct {
                 type_path: Some(TypePath {
                     def_id: type_def_id,
                     span: self.src.span(&path.1),
                 }),
                 modifier: None,
-                attributes: [ExprStructAttr {
+                attributes: [StructPatternAttr {
                     key,
                     rel: None,
                     bind_option: false,
@@ -580,18 +583,18 @@ impl<'s, 'm> Lowering<'s, 'm> {
         &mut self,
         (struct_pat, span): (ast::StructPattern, Span),
         var_table: &mut ExprVarTable,
-    ) -> Res<Expr> {
+    ) -> Res<Pattern> {
         let type_def_id = self.lookup_path(&struct_pat.path.0, &struct_pat.path.1)?;
         let attrs = self.lower_struct_pattern_attrs(struct_pat.attributes, var_table)?;
 
         Ok(self.expr(
-            ExprKind::Struct {
+            PatternKind::Struct {
                 type_path: Some(TypePath {
                     def_id: type_def_id,
                     span: self.src.span(&struct_pat.path.1),
                 }),
                 modifier: struct_pat.modifier.map(|(modifier, _span)| match modifier {
-                    ast::StructPatternModifier::Match => ExprStructModifier::Match,
+                    ast::StructPatternModifier::Match => StructPatternModifier::Match,
                 }),
                 attributes: attrs,
             },
@@ -603,7 +606,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         &mut self,
         attributes: Vec<(ast::StructPatternAttr, Range<usize>)>,
         var_table: &mut ExprVarTable,
-    ) -> Res<Box<[ExprStructAttr]>> {
+    ) -> Res<Box<[StructPatternAttr]>> {
         attributes
             .into_iter()
             .map(|(struct_attr, _span)| {
@@ -621,8 +624,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     Some((attrs, span)) => {
                         // Inherit modifier from object expr
                         let modifier = match &object_expr {
-                            Ok(Expr {
-                                kind: ExprKind::Struct { modifier, .. },
+                            Ok(Pattern {
+                                kind: PatternKind::Struct { modifier, .. },
                                 ..
                             }) => *modifier,
                             _ => None,
@@ -630,7 +633,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                         let attrs = self.lower_struct_pattern_attrs(attrs, var_table)?;
                         Some(self.expr(
-                            ExprKind::Struct {
+                            PatternKind::Struct {
                                 type_path: None,
                                 modifier,
                                 attributes: attrs,
@@ -641,7 +644,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     None => None,
                 };
 
-                object_expr.map(|object_expr| ExprStructAttr {
+                object_expr.map(|object_expr| StructPatternAttr {
                     key: (def, self.src.span(&relation.1)),
                     rel,
                     bind_option: option.is_some(),
@@ -655,7 +658,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         &mut self,
         (pattern, span): (ast::Pattern, Span),
         var_table: &mut ExprVarTable,
-    ) -> Res<Expr> {
+    ) -> Res<Pattern> {
         match pattern {
             ast::Pattern::Expr((expr_pat, _)) => {
                 self.lower_expr_pattern((expr_pat, span), var_table)
@@ -675,14 +678,14 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 for (element, _element_span) in elements {
                     let expr =
                         self.lower_pattern((element.pattern.0, element.pattern.1), var_table)?;
-                    expr_elements.push(ExprSeqElement {
+                    expr_elements.push(SeqPatternElement {
                         iter: element.spread.is_some(),
-                        expr,
+                        pattern: expr,
                     })
                 }
 
-                let seq_id = self.compiler.expressions.alloc_expr_id();
-                Ok(self.expr(ExprKind::Seq(seq_id, expr_elements), &span))
+                let seq_id = self.compiler.patterns.alloc_pat_id();
+                Ok(self.expr(PatternKind::Seq(seq_id, expr_elements), &span))
             }
         }
     }
@@ -691,16 +694,16 @@ impl<'s, 'm> Lowering<'s, 'm> {
         &mut self,
         (expr_pat, span): (ast::ExprPattern, Span),
         var_table: &mut ExprVarTable,
-    ) -> Res<Expr> {
+    ) -> Res<Pattern> {
         match expr_pat {
             ast::ExprPattern::NumberLiteral(int) => {
                 let int = int
                     .parse()
                     .map_err(|_| (CompileError::InvalidInteger, span.clone()))?;
-                Ok(self.expr(ExprKind::ConstI64(int), &span))
+                Ok(self.expr(PatternKind::ConstI64(int), &span))
             }
             ast::ExprPattern::StringLiteral(string) => {
-                Ok(self.expr(ExprKind::ConstString(string), &span))
+                Ok(self.expr(PatternKind::ConstString(string), &span))
             }
             ast::ExprPattern::RegexLiteral(regex_literal) => {
                 let regex_def_id = self
@@ -722,7 +725,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     &span,
                     self.src,
                     var_table,
-                    &mut self.compiler.expressions,
+                    &mut self.compiler.patterns,
                 );
 
                 regex_syntax::ast::visit(&regex_meta.ast, regex_lowerer.syntax_visitor()).unwrap();
@@ -730,7 +733,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                 let expr_regex = regex_lowerer.into_expr(regex_def_id);
 
-                Ok(self.expr(ExprKind::Regex(expr_regex), &span))
+                Ok(self.expr(PatternKind::Regex(expr_regex), &span))
             }
             ast::ExprPattern::Binary(left, op, right) => {
                 let fn_ident = match op {
@@ -745,7 +748,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let left = self.lower_expr_pattern(*left, var_table)?;
                 let right = self.lower_expr_pattern(*right, var_table)?;
 
-                Ok(self.expr(ExprKind::Call(def_id, Box::new([left, right])), &span))
+                Ok(self.expr(PatternKind::Call(def_id, Box::new([left, right])), &span))
             }
             ast::ExprPattern::Variable(var_ident) => {
                 self.lower_expr_variable(var_ident, span, var_table)
@@ -758,9 +761,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
         var_ident: String,
         span: Span,
         var_table: &mut ExprVarTable,
-    ) -> Res<Expr> {
+    ) -> Res<Pattern> {
         let var = var_table.get_or_create_var(var_ident);
-        Ok(self.expr(ExprKind::Variable(var), &span))
+        Ok(self.expr(PatternKind::Variable(var), &span))
     }
 
     fn lookup_ident(&mut self, ident: &str, span: &Span) -> Result<DefId, LoweringError> {
@@ -946,9 +949,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
         );
     }
 
-    fn expr(&mut self, kind: ExprKind, span: &Span) -> Expr {
-        Expr {
-            id: self.compiler.expressions.alloc_expr_id(),
+    fn expr(&mut self, kind: PatternKind, span: &Span) -> Pattern {
+        Pattern {
+            id: self.compiler.patterns.alloc_pat_id(),
             kind,
             span: self.src.span(span),
         }

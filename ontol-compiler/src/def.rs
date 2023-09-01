@@ -8,10 +8,10 @@ use ontol_runtime::{
 use smartstring::alias::String;
 
 use crate::{
-    expr::ExprId,
     mem::{Intern, Mem},
     namespace::Space,
     package::ONTOL_PKG,
+    pattern::PatId,
     primitive::PrimitiveKind,
     regex_util::parse_literal_regex,
     source::SourceSpan,
@@ -47,8 +47,8 @@ pub enum DefKind<'m> {
     // we may find the _actual_ builtin proc to call during type check,
     // if there are different variants per type.
     Fn(BuiltinProc),
-    Constant(ExprId),
-    Mapping(ontol_hir::VarAllocator, ExprId, ExprId),
+    Constant(PatId),
+    Mapping(ontol_hir::VarAllocator, PatId, PatId),
 }
 
 impl<'m> DefKind<'m> {

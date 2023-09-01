@@ -12,8 +12,8 @@ use crate::{
     },
     def::Def,
     error::CompileError,
-    expr::{Expr, ExprId, ExprKind, ExprRegexCaptureNode, Expressions},
     mem::Intern,
+    pattern::{PatId, Pattern, PatternKind, Patterns, RegexPatternCaptureNode},
     type_check::hir_build_ctx::{Arm, VariableMapping},
     typed_hir::TypedHirNode,
     types::{Type, TypeRef, Types},
@@ -21,7 +21,7 @@ use crate::{
 };
 
 use super::{
-    hir_build_ctx::{CtrlFlowDepth, CtrlFlowGroup, ExpressionVariable, HirBuildCtx},
+    hir_build_ctx::{CtrlFlowDepth, CtrlFlowGroup, HirBuildCtx, PatternVariable},
     hir_type_inference::{HirArmTypeInference, HirVariableMapper},
     TypeCheck, TypeEquation, TypeError,
 };
@@ -31,8 +31,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &mut self,
         def: &Def,
         var_allocator: &VarAllocator,
-        first_id: ExprId,
-        second_id: ExprId,
+        first_id: PatId,
+        second_id: PatId,
     ) -> Result<TypeRef<'m>, AggrGroupError> {
         let mut ctx = HirBuildCtx::new(def.span, VarAllocator::from(*var_allocator.peek_next()));
 
@@ -40,19 +40,19 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             let mut map_check = MapCheck {
                 types: self.types,
                 errors: self.errors,
-                expressions: self.expressions,
+                patterns: self.patterns,
             };
             debug!("FIRST ARM START");
             ctx.arm = Arm::First;
             let _ = map_check.analyze_arm(
-                map_check.expressions.table.get(&first_id).unwrap(),
+                map_check.patterns.table.get(&first_id).unwrap(),
                 None,
                 &mut ctx,
             )?;
             debug!("SECOND ARM START");
             ctx.arm = Arm::Second;
             let _ = map_check.analyze_arm(
-                map_check.expressions.table.get(&second_id).unwrap(),
+                map_check.patterns.table.get(&second_id).unwrap(),
                 None,
                 &mut ctx,
             )?;
@@ -68,16 +68,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn build_arms(
         &mut self,
         def: &Def,
-        first_id: ExprId,
-        second_id: ExprId,
+        first_id: PatId,
+        second_id: PatId,
         ctx: &mut HirBuildCtx<'m>,
     ) -> Result<(), AggrGroupError> {
         ctx.arm = Arm::First;
-        let mut first = self.build_root_expr(first_id, ctx);
+        let mut first = self.build_root_pattern(first_id, ctx);
         self.infer_hir_arm_types(&mut first, ctx);
 
         ctx.arm = Arm::Second;
-        let mut second = self.build_root_expr(second_id, ctx);
+        let mut second = self.build_root_pattern(second_id, ctx);
         self.infer_hir_arm_types(&mut second, ctx);
 
         // unify the type of variables on either side:
@@ -124,13 +124,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         second: &mut TypedHirNode<'m>,
         ctx: &mut HirBuildCtx<'m>,
     ) {
-        for (var, explicit_var) in &mut ctx.expr_variables {
+        for (var, explicit_var) in &mut ctx.pattern_variables {
             let first_arm = explicit_var.hir_arms.get(&Arm::First);
             let second_arm = explicit_var.hir_arms.get(&Arm::Second);
 
             if let (Some(first_arm), Some(second_arm)) = (first_arm, second_arm) {
-                let first_type_var = ctx.inference.new_type_variable(first_arm.expr_id);
-                let second_type_var = ctx.inference.new_type_variable(second_arm.expr_id);
+                let first_type_var = ctx.inference.new_type_variable(first_arm.pat_id);
+                let second_type_var = ctx.inference.new_type_variable(second_arm.pat_id);
 
                 match ctx
                     .inference
@@ -201,47 +201,47 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 pub struct MapCheck<'c, 'm> {
     types: &'c mut Types<'m>,
     errors: &'c mut CompileErrors,
-    expressions: &'c Expressions,
+    patterns: &'c Patterns,
 }
 
 impl<'c, 'm> MapCheck<'c, 'm> {
     fn analyze_arm(
         &mut self,
-        expr: &Expr,
+        expr: &Pattern,
         parent_aggr_group: Option<CtrlFlowGroup>,
         ctx: &mut HirBuildCtx<'m>,
     ) -> Result<AggrGroupSet, AggrGroupError> {
         let mut group_set = AggrGroupSet::new();
 
         match &expr.kind {
-            ExprKind::Call(_, args) => {
+            PatternKind::Call(_, args) => {
                 for arg in args.iter() {
                     group_set.join(self.analyze_arm(arg, parent_aggr_group, ctx)?);
                 }
             }
-            ExprKind::Struct {
+            PatternKind::Struct {
                 attributes: attrs, ..
             } => {
                 for attr in attrs.iter() {
                     group_set.join(self.analyze_arm(&attr.value, parent_aggr_group, ctx)?);
                 }
             }
-            ExprKind::Seq(expr_id, elements) => {
+            PatternKind::Seq(pat_id, elements) => {
                 if ctx.arm.is_first() {
                     group_set.add(parent_aggr_group);
 
                     // Register aggregation body
                     let label = Label(ctx.var_allocator.alloc().0);
-                    debug!("first arm seq: expr_id={expr_id:?}");
+                    debug!("first arm seq: pat_id={pat_id:?}");
                     ctx.ctrl_flow_forest
                         .insert(label, parent_aggr_group.map(|parent| parent.label));
-                    ctx.label_map.insert(*expr_id, label);
+                    ctx.label_map.insert(*pat_id, label);
 
                     ctx.enter_ctrl(|ctx| {
                         for element in elements {
                             // TODO: Skip non-iter?
                             let result = self.analyze_arm(
-                                &element.expr,
+                                &element.pattern,
                                 Some(CtrlFlowGroup {
                                     label,
                                     bind_depth: ctx.current_ctrl_flow_depth(),
@@ -262,7 +262,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                         if element.iter {
                             iter_element_count += 1;
                             ctx.enter_ctrl(|ctx| {
-                                let group = self.analyze_arm(&element.expr, None, ctx).unwrap();
+                                let group = self.analyze_arm(&element.pattern, None, ctx).unwrap();
                                 inner_aggr_group.join(group);
                             });
                         }
@@ -271,7 +271,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                     ctx.enter_ctrl::<Result<(), AggrGroupError>>(|ctx| {
                         match inner_aggr_group.disambiguate(ctx, ctx.current_ctrl_flow_depth()) {
                             Ok(label) => {
-                                ctx.label_map.insert(*expr_id, label);
+                                ctx.label_map.insert(*pat_id, label);
 
                                 group_set.add(ctx.ctrl_flow_forest.find_parent(label).map(
                                     |label| CtrlFlowGroup {
@@ -296,12 +296,12 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                                     // Since there's no iteration this is considered OK
 
                                     let label = Label(ctx.var_allocator.alloc().0);
-                                    debug!("first arm seq: expr_id={expr_id:?}");
+                                    debug!("first arm seq: pat_id={pat_id:?}");
                                     ctx.ctrl_flow_forest.insert(
                                         label,
                                         parent_aggr_group.map(|parent| parent.label),
                                     );
-                                    ctx.label_map.insert(*expr_id, label);
+                                    ctx.label_map.insert(*pat_id, label);
 
                                     Ok(())
                                 }
@@ -310,10 +310,10 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                     })?
                 }
             }
-            ExprKind::Variable(var) => {
+            PatternKind::Variable(var) => {
                 self.register_variable(*var, &expr.span, parent_aggr_group, &mut group_set, ctx);
             }
-            ExprKind::Regex(expr_regex) => {
+            PatternKind::Regex(expr_regex) => {
                 group_set.join(self.analyze_regex_capture_node(
                     &expr_regex.capture_node,
                     &expr.span,
@@ -321,7 +321,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                     ctx,
                 )?);
             }
-            ExprKind::ConstI64(_) | ExprKind::ConstString(_) => {}
+            PatternKind::ConstI64(_) | PatternKind::ConstString(_) => {}
         };
 
         Ok(group_set)
@@ -329,17 +329,17 @@ impl<'c, 'm> MapCheck<'c, 'm> {
 
     fn analyze_regex_capture_node(
         &mut self,
-        node: &ExprRegexCaptureNode,
+        node: &RegexPatternCaptureNode,
         full_span: &SourceSpan,
         parent_aggr_group: Option<CtrlFlowGroup>,
         ctx: &mut HirBuildCtx<'m>,
     ) -> Result<AggrGroupSet, AggrGroupError> {
         let mut group_set = AggrGroupSet::new();
         match node {
-            ExprRegexCaptureNode::Capture { var, name_span, .. } => {
+            RegexPatternCaptureNode::Capture { var, name_span, .. } => {
                 self.register_variable(*var, name_span, parent_aggr_group, &mut group_set, ctx);
             }
-            ExprRegexCaptureNode::Concat { nodes } => {
+            RegexPatternCaptureNode::Concat { nodes } => {
                 for node in nodes {
                     group_set.join(self.analyze_regex_capture_node(
                         node,
@@ -349,9 +349,9 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                     )?);
                 }
             }
-            ExprRegexCaptureNode::Alternation { .. } => {}
-            ExprRegexCaptureNode::Repetition {
-                expr_id,
+            RegexPatternCaptureNode::Alternation { .. } => {}
+            RegexPatternCaptureNode::Repetition {
+                pat_id,
                 node: inner_node,
                 ..
             } => {
@@ -360,10 +360,10 @@ impl<'c, 'm> MapCheck<'c, 'm> {
 
                     // Register aggregation body
                     let label = Label(ctx.var_allocator.alloc().0);
-                    debug!("first arm regex repetition: expr_id={expr_id:?}");
+                    debug!("first arm regex repetition: pat_id={pat_id:?}");
                     ctx.ctrl_flow_forest
                         .insert(label, parent_aggr_group.map(|parent| parent.label));
-                    ctx.label_map.insert(*expr_id, label);
+                    ctx.label_map.insert(*pat_id, label);
 
                     ctx.enter_ctrl(|ctx| {
                         self.analyze_regex_capture_node(
@@ -396,7 +396,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                     ctx.enter_ctrl::<Result<(), AggrGroupError>>(|ctx| {
                         match inner_aggr_group.disambiguate(ctx, ctx.current_ctrl_flow_depth()) {
                             Ok(label) => {
-                                ctx.label_map.insert(*expr_id, label);
+                                ctx.label_map.insert(*pat_id, label);
 
                                 group_set.add(ctx.ctrl_flow_forest.find_parent(label).map(
                                     |label| CtrlFlowGroup {
@@ -434,7 +434,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
         group_set: &mut AggrGroupSet,
         ctx: &mut HirBuildCtx<'m>,
     ) {
-        if let Some(explicit_variable) = ctx.expr_variables.get(&var) {
+        if let Some(explicit_variable) = ctx.pattern_variables.get(&var) {
             // Variable is used more than once
             if ctx.arm.is_first() && explicit_variable.ctrl_group != parent_aggr_group {
                 self.error(
@@ -447,9 +447,9 @@ impl<'c, 'm> MapCheck<'c, 'm> {
 
             group_set.add(explicit_variable.ctrl_group);
         } else if ctx.arm.is_first() {
-            ctx.expr_variables.insert(
+            ctx.pattern_variables.insert(
                 var,
-                ExpressionVariable {
+                PatternVariable {
                     ctrl_group: parent_aggr_group,
                     hir_arms: Default::default(),
                 },
@@ -457,12 +457,12 @@ impl<'c, 'm> MapCheck<'c, 'm> {
 
             group_set.add(parent_aggr_group);
         } else {
-            match ctx.expr_variables.entry(var) {
+            match ctx.pattern_variables.entry(var) {
                 Entry::Occupied(_occ) => {
                     todo!();
                 }
                 Entry::Vacant(vac) => {
-                    vac.insert(ExpressionVariable {
+                    vac.insert(PatternVariable {
                         ctrl_group: parent_aggr_group,
                         hir_arms: Default::default(),
                     });

@@ -15,7 +15,7 @@ impl<'m> Compiler<'m> {
             def_types: &self.def_types,
             relations: &self.relations,
             seal_ctx: &self.seal_ctx,
-            patterns: &self.patterns,
+            patterns: &self.text_patterns,
             codegen_tasks: &self.codegen_tasks,
             operators_by_id: Default::default(),
             operators_by_key: Default::default(),

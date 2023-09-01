@@ -193,7 +193,7 @@ impl<'m> Compiler<'m> {
             Type::StringLike(def_id, StringLikeType::Uuid)
         });
         let segment = TextPatternSegment::Regex(regex_util::uuid());
-        store_text_pattern_segment(&mut self.patterns, uuid, &segment);
+        store_text_pattern_segment(&mut self.text_patterns, uuid, &segment);
         self.relations.properties_by_def_id_mut(uuid).constructor = Constructor::StringFmt(segment);
         self.defs
             .string_like_types
@@ -205,7 +205,7 @@ impl<'m> Compiler<'m> {
             Type::StringLike(def_id, StringLikeType::DateTime)
         });
         let segment = TextPatternSegment::Regex(regex_util::datetime_rfc3339());
-        store_text_pattern_segment(&mut self.patterns, datetime, &segment);
+        store_text_pattern_segment(&mut self.text_patterns, datetime, &segment);
         self.relations
             .properties_by_def_id_mut(datetime)
             .constructor = Constructor::StringFmt(segment.clone());

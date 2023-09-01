@@ -5,62 +5,62 @@ use smartstring::alias::String;
 use crate::{source::SourceSpan, Compiler};
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
-pub struct ExprId(pub u32);
+pub struct PatId(pub u32);
 
 #[derive(Debug)]
-pub struct Expr {
-    pub id: ExprId,
-    pub kind: ExprKind,
+pub struct Pattern {
+    pub id: PatId,
+    pub kind: PatternKind,
     pub span: SourceSpan,
 }
 
 type PropertyKey = (DefId, SourceSpan);
 
 #[derive(Debug)]
-pub enum ExprKind {
+pub enum PatternKind {
     /// Function call
-    Call(DefId, Box<[Expr]>),
+    Call(DefId, Box<[Pattern]>),
     Struct {
         /// The user-supplied type of the struct, None means anonymous
         type_path: Option<TypePath>,
-        modifier: Option<ExprStructModifier>,
-        attributes: Box<[ExprStructAttr]>,
+        modifier: Option<StructPatternModifier>,
+        attributes: Box<[StructPatternAttr]>,
     },
     /// Expression enclosed in sequence brackets: `[expr]`
-    Seq(ExprId, Vec<ExprSeqElement>),
+    Seq(PatId, Vec<SeqPatternElement>),
     Variable(ontol_hir::Var),
     ConstI64(i64),
     ConstString(String),
-    Regex(ExprRegex),
+    Regex(RegexPattern),
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum ExprStructModifier {
+pub enum StructPatternModifier {
     Match,
 }
 
 #[derive(Debug)]
-pub struct ExprStructAttr {
+pub struct StructPatternAttr {
     pub key: PropertyKey,
-    pub rel: Option<Expr>,
+    pub rel: Option<Pattern>,
     pub bind_option: bool,
-    pub value: Expr,
+    pub value: Pattern,
 }
 
 #[derive(Debug)]
-pub struct ExprSeqElement {
+pub struct SeqPatternElement {
     pub iter: bool,
-    pub expr: Expr,
+    pub pattern: Pattern,
 }
 
 #[derive(Debug)]
-pub struct ExprRegex {
+pub struct RegexPattern {
     pub regex_def_id: DefId,
-    pub capture_node: ExprRegexCaptureNode,
+    pub capture_node: RegexPatternCaptureNode,
 }
 
 #[derive(Debug)]
-pub enum ExprRegexCaptureNode {
+pub enum RegexPatternCaptureNode {
     // Capture: Leaf node
     Capture {
         var: ontol_hir::Var,
@@ -68,17 +68,19 @@ pub enum ExprRegexCaptureNode {
         name_span: SourceSpan,
     },
     /// "AND"
-    Concat { nodes: Vec<ExprRegexCaptureNode> },
+    Concat { nodes: Vec<RegexPatternCaptureNode> },
     /// "OR"
-    Alternation { variants: Vec<ExprRegexCaptureNode> },
+    Alternation {
+        variants: Vec<RegexPatternCaptureNode>,
+    },
     /// "QUANTIFY"
     Repetition {
-        expr_id: ExprId,
-        node: Box<ExprRegexCaptureNode>,
+        pat_id: PatId,
+        node: Box<RegexPatternCaptureNode>,
     },
 }
 
-impl ExprRegexCaptureNode {
+impl RegexPatternCaptureNode {
     /// This method changes the input span to the sum of the named capture groups (if any found).
     pub fn constrain_span(&self, mut full_span: SourceSpan) -> SourceSpan {
         self.constrain_span_inner(&mut full_span);
@@ -116,9 +118,9 @@ pub struct TypePath {
 }
 
 impl<'m> Compiler<'m> {
-    pub fn expr(&mut self, kind: ExprKind, span: SourceSpan) -> Expr {
-        Expr {
-            id: self.expressions.alloc_expr_id(),
+    pub fn expr(&mut self, kind: PatternKind, span: SourceSpan) -> Pattern {
+        Pattern {
+            id: self.patterns.alloc_pat_id(),
             kind,
             span,
         }
@@ -126,24 +128,24 @@ impl<'m> Compiler<'m> {
 }
 
 #[derive(Debug)]
-pub struct Expressions {
-    next_expr_id: ExprId,
-    pub table: FnvHashMap<ExprId, Expr>,
+pub struct Patterns {
+    next_pat_id: PatId,
+    pub table: FnvHashMap<PatId, Pattern>,
 }
 
-impl Default for Expressions {
+impl Default for Patterns {
     fn default() -> Self {
         Self {
-            next_expr_id: ExprId(0),
+            next_pat_id: PatId(0),
             table: Default::default(),
         }
     }
 }
 
-impl Expressions {
-    pub fn alloc_expr_id(&mut self) -> ExprId {
-        let id = self.next_expr_id;
-        self.next_expr_id.0 += 1;
+impl Patterns {
+    pub fn alloc_pat_id(&mut self) -> PatId {
+        let id = self.next_pat_id;
+        self.next_pat_id.0 += 1;
         id
     }
 }
