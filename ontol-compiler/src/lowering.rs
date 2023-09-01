@@ -80,7 +80,12 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     .packages
                     .loaded_packages
                     .get(&reference)
-                    .ok_or_else(|| (CompileError::PackageNotFound, use_stmt.reference.1))?;
+                    .ok_or_else(|| {
+                        (
+                            CompileError::PackageNotFound(reference),
+                            use_stmt.reference.1,
+                        )
+                    })?;
 
                 let type_namespace = self
                     .compiler

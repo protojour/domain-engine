@@ -1,6 +1,9 @@
 use core::panic;
 
-use state::{get_builtins, get_domain_name, get_path_and_name, get_span_range, Document, State};
+use state::{
+    find_referred_doc, get_base_path, get_builtins, get_domain_name, get_path_and_name,
+    get_span_range, Document, State,
+};
 use tokio::sync::RwLock;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
@@ -36,13 +39,35 @@ impl Backend {
 
     /// Compile code and convert errors to Diagnostics
     async fn get_diagnostics(&self, uri: &Url) -> Vec<Diagnostic> {
-        let state = self.state.read().await;
+        let mut state = self.state.write().await;
         let mut diagnostics = vec![];
 
         match state.compile(uri.as_str()) {
             Ok(_) => {}
             Err(err) => {
                 for err in err.errors {
+                    if let ontol_compiler::CompileError::PackageNotFound(reference) = &err.error {
+                        if cfg!(feature = "wasm") {
+                            // ask client
+                        } else {
+                            let (path, _) = get_path_and_name(uri.as_str());
+                            let base_path = get_base_path(path);
+                            if let Ok((name, text)) = find_referred_doc(base_path, reference) {
+                                state.roots.insert(uri.to_string());
+                                state.docs.insert(
+                                    uri.to_string(),
+                                    Document {
+                                        uri: uri.to_string(),
+                                        path: path.to_string(),
+                                        name,
+                                        text,
+                                        ..Default::default()
+                                    },
+                                );
+                                continue;
+                            }
+                        }
+                    }
                     match state.docs.get(uri.as_str()) {
                         Some(doc) => {
                             diagnostics.push(Diagnostic {

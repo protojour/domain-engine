@@ -6,7 +6,7 @@ use ontol_runtime::format_utils::{Backticks, CommaSeparated, FmtMap, LogicOp, Mi
 use smartstring::alias::String;
 use thiserror::Error;
 
-use crate::source::SourceSpan;
+use crate::{package::PackageReference, source::SourceSpan};
 
 #[derive(Debug, Error)]
 #[error("oops")]
@@ -26,7 +26,7 @@ pub struct SpannedCompileError {
 pub enum CompileError {
     Lex(LexError),
     Parse(ParseError),
-    PackageNotFound,
+    PackageNotFound(PackageReference),
     WildcardNeedsContextualBlock,
     InvalidExpression,
     IncorrectNumberOfArguments { expected: u8, actual: u8 },
@@ -98,7 +98,7 @@ impl std::fmt::Display for CompileError {
             Self::Parse(err) => {
                 write!(f, "parse error: {err}")
             }
-            Self::PackageNotFound => write!(f, "package not found"),
+            Self::PackageNotFound(_) => write!(f, "package not found"),
             Self::WildcardNeedsContextualBlock => {
                 write!(f, "using `.` requires a contextual block")
             }

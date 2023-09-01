@@ -169,7 +169,7 @@ impl PackageGraphBuilder {
             if !requested_package.found {
                 if requested_package.requested_at_generation < self.generation {
                     load_errors.push(SpannedCompileError {
-                        error: CompileError::PackageNotFound,
+                        error: CompileError::PackageNotFound(reference.clone()),
                         span: requested_package.use_source_span,
                         notes: vec![],
                     });

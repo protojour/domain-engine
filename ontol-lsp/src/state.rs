@@ -1,10 +1,10 @@
 use chumsky::prelude::*;
 use lsp_types::{CompletionItem, CompletionItemKind, Position, Range};
 use ontol_compiler::{
-    error::{CompileError, UnifiedCompileError},
+    error::UnifiedCompileError,
     mem::Mem,
     package::{GraphState, PackageGraphBuilder, PackageReference, ParsedPackage},
-    Compiler, SourceCodeRegistry, SourceId, SourceSpan, Sources, SpannedCompileError,
+    Compiler, SourceCodeRegistry, SourceSpan, Sources,
 };
 use ontol_parser::{
     ast::{DefStatement, MapArm, Path, Statement, UseStatement},
@@ -16,6 +16,7 @@ use regex::Regex;
 use std::{
     collections::{HashMap, HashSet},
     format,
+    io::Error,
 };
 use substring::Substring;
 
@@ -100,35 +101,15 @@ impl State {
             }
 
             doc.imports.clear();
-            doc.types.clear();
+            doc.defs.clear();
 
             let (mut statements, _) = parse_statements(doc.text.as_str());
             let mut nested: Vec<Spanned<Statement>> = vec![];
 
-            explore(
-                &statements,
-                &mut nested,
-                &mut doc.imports,
-                &mut doc.types,
-                0,
-            );
+            explore(&statements, &mut nested, &mut doc.imports, &mut doc.defs, 0);
 
             statements.append(&mut nested);
             doc.statements = statements;
-        }
-    }
-
-    /// Iterate over all docs and their parsed use statements to find root domains.
-    /// Produces the set of documents that are not imported by anything else.
-    /// This is only useful if you want to do full source tree compilations
-    /// with minimal overlap.
-    pub fn _find_roots(&self) {
-        let mut roots: HashSet<String> = self.docs.keys().map(|key| key.to_string()).collect();
-        for doc in self.docs.values() {
-            for import in &doc.imports {
-                let uri = build_uri(&doc.path, &import.reference.0);
-                roots.remove(&uri);
-            }
         }
     }
 
@@ -141,13 +122,8 @@ impl State {
         let mut source_code_registry = SourceCodeRegistry::default();
         let mut package_graph_builder = PackageGraphBuilder::new(root_name.into());
 
-        let mut requesting_doc = match self.docs.get(root_url) {
-            Some(doc) => doc,
-            None => panic!("Cannot find document {root_url}"),
-        };
-
         let topology = loop {
-            match package_graph_builder.transition().unwrap() {
+            match package_graph_builder.transition()? {
                 GraphState::RequestPackages { builder, requests } => {
                     package_graph_builder = builder;
 
@@ -158,35 +134,14 @@ impl State {
                         let package_config = PackageConfig::default();
                         let request_uri = build_uri(root_path, source_name);
 
-                        match self.docs.get(&request_uri) {
-                            Some(doc) => {
-                                requesting_doc = doc;
-                                package_graph_builder.provide_package(ParsedPackage::parse(
-                                    request,
-                                    &doc.text,
-                                    package_config,
-                                    &mut ontol_sources,
-                                    &mut source_code_registry,
-                                ));
-                            }
-                            None => {
-                                let mut errors: Vec<SpannedCompileError> = vec![];
-                                for import in &requesting_doc.imports {
-                                    let uri = build_uri(root_path, &import.reference.0);
-                                    if !self.docs.contains_key(&uri) {
-                                        errors.push(SpannedCompileError {
-                                            error: CompileError::PackageNotFound,
-                                            span: SourceSpan {
-                                                source_id: SourceId(1), // not used
-                                                start: import.kw.start() as u32,
-                                                end: import.reference.end() as u32,
-                                            },
-                                            notes: vec![],
-                                        })
-                                    }
-                                }
-                                return Err(UnifiedCompileError { errors });
-                            }
+                        if let Some(doc) = self.docs.get(&request_uri) {
+                            package_graph_builder.provide_package(ParsedPackage::parse(
+                                request,
+                                &doc.text,
+                                package_config,
+                                &mut ontol_sources,
+                                &mut source_code_registry,
+                            ));
                         }
                     }
                 }
@@ -200,9 +155,17 @@ impl State {
     }
 }
 
-/// Rebuild URI from full schema/path and domain name
-pub fn build_uri(path: &str, name: &str) -> String {
-    format!("{}/{}.on", path, name)
+/// Find filename and contents from base path and PackageReference
+pub fn find_referred_doc(
+    base_path: &str,
+    reference: &PackageReference,
+) -> Result<(String, String), Error> {
+    let source_name = match reference {
+        PackageReference::Named(source_name) => source_name.as_str(),
+    };
+    let filename = format!("{}/{}.on", base_path, source_name);
+    let text = std::fs::read_to_string(std::path::Path::new(&filename))?;
+    Ok((filename, text))
 }
 
 /// Split URI into schema/path and filename
@@ -213,12 +176,25 @@ pub fn get_path_and_name(uri: &str) -> (&str, &str) {
     }
 }
 
+/// Strip `file://` prefix and return the base path
+pub fn get_base_path(filename: &str) -> &str {
+    match filename.strip_prefix("file://") {
+        Some(name) => name,
+        None => filename,
+    }
+}
+
 /// Strip `.on` suffix and return the base domain name
 pub fn get_domain_name(filename: &str) -> &str {
     match filename.strip_suffix(".on") {
         Some(name) => name,
         None => filename,
     }
+}
+
+/// Rebuild URI from full schema/path and domain name
+pub fn build_uri(path: &str, name: &str) -> String {
+    format!("{}/{}.on", path, name)
 }
 
 /// Convert a byte index SourceSpan to a zero-based line/char Range
