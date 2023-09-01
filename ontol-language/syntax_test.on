@@ -36,7 +36,7 @@ pub def test {
 //                    ^^ constant.language.ontol
     rel .'some_seq': []
 //                   ^^ constant.language.ontol
-    rel .'some.some_type': some.some_type
+    rel .'some.some_def': some.some_def
 //                             ^ keyword.operator.sigil.ontol
 }
 
@@ -55,18 +55,13 @@ def test {
 //                ^^^^^^^^^^^^^^ string.regexp.ontol
 }
 
-def testtest {
-// <- keyword.declaration.def.ontol
-//   ^^^^^^^^
-}
-
 map {
 // <- keyword.declaration.map.ontol
     test {
         'some': [thing]
     }
     test_2 {
-        'something': [..thing]
+        'something': ..[..thing]
 //                    ^^ keyword.operator.spread.ontol
     }
 }
@@ -77,5 +72,9 @@ rel plays 'how_much': string
 rel artist ['plays']::['played_by'] instrument {
 //                  ^^ keyword.operator.ontol
     rel .is: plays
-//       ^^ variable.function.ontol
+}
+
+def position-ring {
+    rel ...4: position
+    rel .4..: position
 }
