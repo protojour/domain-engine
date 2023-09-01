@@ -8,10 +8,10 @@ use crate::{
     def::{BuiltinRelationKind, DefKind, FmtFinalState, Relationship, TypeDef},
     error::CompileError,
     mem::Intern,
-    patterns::StringPatternSegment,
     primitive::PrimitiveKind,
     relation::{Constructor, Is, Properties, Property, TypeParam, TypeRelation},
     sequence::Sequence,
+    text_patterns::TextPatternSegment,
     types::{Type, TypeRef},
     SourceSpan,
 };
@@ -379,12 +379,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             Type::StringConstant(subject_def_id)
                 if *subject_def_id == self.primitives.empty_string =>
             {
-                if let Err(err) = self.extend_string_pattern_fmt_constructor(
+                if let Err(err) = self.extend_text_pattern_fmt_constructor(
                     relation_def_id,
                     (relationship_id, relationship),
                     object.0,
                     object_ty,
-                    StringPatternSegment::EmptyString,
+                    TextPatternSegment::EmptyString,
                     *final_state,
                     span,
                 ) {
@@ -402,7 +402,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     return self.error(CompileError::ConstructorMismatch, span);
                 };
 
-                if let Err(err) = self.extend_string_pattern_fmt_constructor(
+                if let Err(err) = self.extend_text_pattern_fmt_constructor(
                     relation_def_id,
                     (relationship_id, relationship),
                     object.0,
@@ -471,20 +471,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn extend_string_pattern_fmt_constructor(
+    fn extend_text_pattern_fmt_constructor(
         &mut self,
         relation_def_id: DefId,
         relationship: (RelationshipId, &Relationship),
         object_def: DefId,
         object_ty: TypeRef<'m>,
-        origin: StringPatternSegment,
+        origin: TextPatternSegment,
         final_state: FmtFinalState,
         span: &SourceSpan,
     ) -> Result<(), TypeRef<'m>> {
         let appendee = match self.defs.def_kind(relation_def_id) {
-            DefKind::Primitive(PrimitiveKind::String, _) => StringPatternSegment::AllStrings,
-            DefKind::StringLiteral(str) => StringPatternSegment::new_literal(str),
-            DefKind::Regex(_) => StringPatternSegment::Regex(
+            DefKind::Primitive(PrimitiveKind::String, _) => TextPatternSegment::AllStrings,
+            DefKind::StringLiteral(str) => TextPatternSegment::new_literal(str),
+            DefKind::Regex(_) => TextPatternSegment::Regex(
                 self.defs
                     .literal_regex_meta_table
                     .get(&relation_def_id)
@@ -501,7 +501,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     return Err(self.error(CompileError::CannotConcatenateStringPattern, span));
                 };
 
-                StringPatternSegment::Property {
+                TextPatternSegment::Property {
                     property_id: PropertyId::subject(relationship.0),
                     type_def_id: relation_def_id,
                     segment: Box::new(rel_segment.clone()),
@@ -516,14 +516,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
 
         object_properties.constructor =
-            Constructor::StringFmt(StringPatternSegment::concat([origin, appendee]));
+            Constructor::StringFmt(TextPatternSegment::concat([origin, appendee]));
 
         if final_state.0 || !object_ty.is_anonymous() {
             // constructors of unnamable types do not need to be processed..
             // Register pattern processing for later:
-            self.relations
-                .string_pattern_constructors
-                .insert(object_def);
+            self.relations.text_pattern_constructors.insert(object_def);
         }
 
         Ok(())

@@ -20,7 +20,7 @@ use tracing::{debug, error};
 use uuid::Uuid;
 
 use crate::{
-    entity_id_utils::{analyze_string_pattern, find_inherent_entity_id},
+    entity_id_utils::{analyze_text_pattern, find_inherent_entity_id},
     DomainEngine, DomainError, DomainResult,
 };
 
@@ -515,7 +515,7 @@ impl InMemoryStore {
                 let string = smart_format!("{}", Uuid::new_v4());
                 Ok(Value::new(Data::String(string), *def_id))
             }
-            (SerdeOperator::StringPattern(def_id), _) => {
+            (SerdeOperator::TextPattern(def_id), _) => {
                 match (ontology.get_string_like_type(*def_id), value_generator) {
                     (Some(StringLikeType::Uuid), ValueGenerator::UuidV4) => {
                         Ok(Value::new(Data::Uuid(Uuid::new_v4()), *def_id))
@@ -523,9 +523,9 @@ impl InMemoryStore {
                     _ => Err(DomainError::TypeCannotBeUsedForIdGeneration),
                 }
             }
-            (SerdeOperator::CapturingStringPattern(def_id), _) => {
+            (SerdeOperator::CapturingTextPattern(def_id), _) => {
                 if let Some(property) =
-                    analyze_string_pattern(ontology.get_string_pattern(*def_id).unwrap())
+                    analyze_text_pattern(ontology.get_text_pattern(*def_id).unwrap())
                 {
                     let type_info = ontology.get_type_info(property.type_def_id);
                     let id = self.generate_entity_id(

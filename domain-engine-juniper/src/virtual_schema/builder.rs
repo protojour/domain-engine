@@ -340,8 +340,8 @@ impl<'a> VirtualSchemaBuilder<'a> {
             SerdeOperator::F64(def_id, _) => NativeScalarKind::Number(*def_id),
             SerdeOperator::String(_)
             | SerdeOperator::StringConstant(..)
-            | SerdeOperator::StringPattern(_)
-            | SerdeOperator::CapturingStringPattern(_) => NativeScalarKind::String,
+            | SerdeOperator::TextPattern(_)
+            | SerdeOperator::CapturingTextPattern(_) => NativeScalarKind::String,
             SerdeOperator::PrimaryId(..) => panic!("Id should not appear in GraphQL"),
             SerdeOperator::Alias(alias_op) => self.get_native_scalar_kind(
                 self.ontology.get_serde_operator(alias_op.inner_operator_id),

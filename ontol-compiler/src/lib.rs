@@ -17,12 +17,12 @@ use ontol_runtime::{
 };
 use ontology_graph::OntologyGraph;
 use package::{PackageTopology, Packages, ParsedPackage};
-use patterns::{compile_all_patterns, Patterns};
 use primitive::Primitives;
 use relation::{Properties, Property, Relations};
 use serde_codegen::serde_generator::SerdeGenerator;
 pub use source::*;
 use strings::Strings;
+use text_patterns::{compile_all_patterns, TextPatterns};
 use tracing::debug;
 use type_check::seal::SealCtx;
 use types::{DefTypes, Types};
@@ -43,12 +43,12 @@ mod expr;
 mod lowering;
 mod namespace;
 mod ontol_domain;
-mod patterns;
 mod primitive;
 mod regex_util;
 mod relation;
 mod sequence;
 mod strings;
+mod text_patterns;
 mod type_check;
 mod types;
 
@@ -69,7 +69,7 @@ pub struct Compiler<'m> {
     pub(crate) def_types: DefTypes<'m>,
     pub(crate) relations: Relations,
     pub(crate) seal_ctx: SealCtx,
-    pub(crate) patterns: Patterns,
+    pub(crate) patterns: TextPatterns,
 
     pub(crate) codegen_tasks: CodegenTasks<'m>,
 
@@ -94,7 +94,7 @@ impl<'m> Compiler<'m> {
             def_types: Default::default(),
             relations: Relations::default(),
             seal_ctx: Default::default(),
-            patterns: Patterns::default(),
+            patterns: TextPatterns::default(),
             codegen_tasks: Default::default(),
             errors: Default::default(),
         }
@@ -281,7 +281,7 @@ impl<'m> Compiler<'m> {
             .dynamic_sequence_operator_id(dynamic_sequence_operator_id)
             .property_flows(property_flows)
             .string_like_types(self.defs.string_like_types)
-            .string_patterns(self.patterns.string_patterns)
+            .text_patterns(self.patterns.text_patterns)
             .value_generators(self.relations.value_generators)
             .build()
     }

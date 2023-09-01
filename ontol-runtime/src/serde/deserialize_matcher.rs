@@ -4,8 +4,8 @@ use crate::{
     discriminator::Discriminant,
     format_utils::{Backticks, LogicOp, Missing},
     ontology::Ontology,
-    string_pattern::StringPattern,
     string_types::ParseError,
+    text_pattern::TextPattern,
     value::{Data, Value},
     DefId,
 };
@@ -195,13 +195,13 @@ impl<'e> ValueMatcher for ConstantStringMatcher<'e> {
     }
 }
 
-pub struct StringPatternMatcher<'e> {
-    pub pattern: &'e StringPattern,
+pub struct TextPatternMatcher<'e> {
+    pub pattern: &'e TextPattern,
     pub def_id: DefId,
     pub ontology: &'e Ontology,
 }
 
-impl<'e> ValueMatcher for StringPatternMatcher<'e> {
+impl<'e> ValueMatcher for TextPatternMatcher<'e> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         expecting_custom_string(self.ontology, self.def_id, f)
             .unwrap_or_else(|| write!(f, "string matching /{}/", self.pattern.regex))
@@ -219,13 +219,13 @@ impl<'e> ValueMatcher for StringPatternMatcher<'e> {
 /// This is a matcher that doesn't necessarily
 /// deserialize to a string, but can use capture groups
 /// extract various data.
-pub struct CapturingStringPatternMatcher<'e> {
-    pub pattern: &'e StringPattern,
+pub struct CapturingTextPatternMatcher<'e> {
+    pub pattern: &'e TextPattern,
     pub def_id: DefId,
     pub ontology: &'e Ontology,
 }
 
-impl<'e> ValueMatcher for CapturingStringPatternMatcher<'e> {
+impl<'e> ValueMatcher for CapturingTextPatternMatcher<'e> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "string matching /{}/", self.pattern.regex)
     }
@@ -405,7 +405,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
                 }
                 Discriminant::MatchesCapturingStringPattern(def_id) => {
                     let result_type = variant.discriminator.def_variant.def_id;
-                    let pattern = self.ontology.string_patterns.get(def_id).unwrap();
+                    let pattern = self.ontology.text_patterns.get(def_id).unwrap();
 
                     if let Ok(data) = pattern.try_capturing_match(str, self.ontology) {
                         return Ok(Value::new(data, result_type));
@@ -522,7 +522,7 @@ impl<'e> MapMatcher<'e> {
                     serde_value::Value::String(value),
                 ) => {
                     if property == match_name {
-                        let pattern = self.ontology.string_patterns.get(def_id).unwrap();
+                        let pattern = self.ontology.text_patterns.get(def_id).unwrap();
                         pattern.regex.is_match(value)
                     } else {
                         false

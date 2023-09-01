@@ -12,9 +12,9 @@ use tracing::{debug, instrument, trace};
 use crate::{
     def::{Def, LookupRelationshipMeta},
     error::CompileError,
-    patterns::StringPatternSegment,
     primitive::PrimitiveKind,
     relation::{Constructor, Property, TypeRelation},
+    text_patterns::TextPatternSegment,
     types::{FormatType, Type},
     SourceSpan,
 };
@@ -308,7 +308,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Some(Type::StringLike(_, StringLikeType::Uuid)) => Ok(ValueGenerator::UuidV4),
                     _ => match properties.map(|p| &p.constructor) {
                         Some(Constructor::StringFmt(segment)) => {
-                            self.auto_generator_for_string_pattern_segment(segment)
+                            self.auto_generator_for_text_pattern_segment(segment)
                         }
                         _ => Err(()),
                     },
@@ -334,17 +334,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
     }
 
-    fn auto_generator_for_string_pattern_segment(
+    fn auto_generator_for_text_pattern_segment(
         &self,
-        segment: &StringPatternSegment,
+        segment: &TextPatternSegment,
     ) -> Result<ValueGenerator, ()> {
         match segment {
-            StringPatternSegment::AllStrings => Ok(ValueGenerator::UuidV4),
-            StringPatternSegment::Concat(segments) => {
+            TextPatternSegment::AllStrings => Ok(ValueGenerator::UuidV4),
+            TextPatternSegment::Concat(segments) => {
                 let mut output_generator = None;
                 for concat_segment in segments {
                     if let Ok(generator) =
-                        self.auto_generator_for_string_pattern_segment(concat_segment)
+                        self.auto_generator_for_text_pattern_segment(concat_segment)
                     {
                         if output_generator.is_some() {
                             return Err(());
@@ -355,7 +355,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 output_generator.ok_or(())
             }
-            StringPatternSegment::Property { type_def_id, .. } => {
+            TextPatternSegment::Property { type_def_id, .. } => {
                 self.determine_value_generator(self.primitives.generators.auto, *type_def_id)
             }
             _ => Err(()),

@@ -6,7 +6,7 @@ use tracing::{debug, trace, Level};
 use crate::{
     cast::Cast,
     ontology::Ontology,
-    string_pattern::StringPattern,
+    text_pattern::TextPattern,
     value::{Attribute, Data, PropertyId, Value, ValueDebug},
     vm::abstract_vm::{AbstractVm, Processor, VmDebug},
     vm::proc::{BuiltinProc, Local, Procedure},
@@ -219,13 +219,13 @@ impl Processor for OntolProcessor {
     fn regex_capture(
         &mut self,
         local: Local,
-        string_pattern: &StringPattern,
+        text_pattern: &TextPattern,
         groups: &[PatternCaptureGroup],
     ) {
         let Data::String(haystack) = &self.local(local).data else {
             panic!("Not a string");
         };
-        match string_pattern.regex.captures(haystack) {
+        match text_pattern.regex.captures(haystack) {
             Some(captures) => {
                 let tmp_stack: Vec<Value> = groups
                     .iter()

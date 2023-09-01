@@ -218,8 +218,8 @@ impl<'e> Display for SerdeProcessor<'e> {
             SerdeOperator::F64(..) => write!(f, "`float`"),
             SerdeOperator::String(_) => write!(f, "`string`"),
             SerdeOperator::StringConstant(lit, _) => DoubleQuote(lit).fmt(f),
-            SerdeOperator::StringPattern(_) | SerdeOperator::CapturingStringPattern(_) => {
-                write!(f, "`string_pattern`")
+            SerdeOperator::TextPattern(_) | SerdeOperator::CapturingTextPattern(_) => {
+                write!(f, "`text_pattern`")
             }
             SerdeOperator::DynamicSequence => {
                 write!(f, "[?..]")

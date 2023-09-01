@@ -19,8 +19,8 @@ use crate::{
 
 use super::{
     deserialize_matcher::{
-        BooleanMatcher, CapturingStringPatternMatcher, ConstantStringMatcher, ExpectingMatching,
-        MapMatchKind, NumberMatcher, SequenceMatcher, StringMatcher, StringPatternMatcher,
+        BooleanMatcher, CapturingTextPatternMatcher, ConstantStringMatcher, ExpectingMatching,
+        MapMatchKind, NumberMatcher, SequenceMatcher, StringMatcher, TextPatternMatcher,
         UnionMatcher, UnitMatcher, ValueMatcher,
     },
     operator::{FilteredVariants, SerdeOperator, SerdeProperty},
@@ -159,17 +159,17 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
                 }
                 .into_visitor_no_params(self),
             ),
-            SerdeOperator::StringPattern(def_id) => deserializer.deserialize_str(
-                StringPatternMatcher {
-                    pattern: self.ontology.string_patterns.get(def_id).unwrap(),
+            SerdeOperator::TextPattern(def_id) => deserializer.deserialize_str(
+                TextPatternMatcher {
+                    pattern: self.ontology.text_patterns.get(def_id).unwrap(),
                     def_id: *def_id,
                     ontology: self.ontology,
                 }
                 .into_visitor_no_params(self),
             ),
-            SerdeOperator::CapturingStringPattern(def_id) => deserializer.deserialize_str(
-                CapturingStringPatternMatcher {
-                    pattern: self.ontology.string_patterns.get(def_id).unwrap(),
+            SerdeOperator::CapturingTextPattern(def_id) => deserializer.deserialize_str(
+                CapturingTextPatternMatcher {
+                    pattern: self.ontology.text_patterns.get(def_id).unwrap(),
                     def_id: *def_id,
                     ontology: self.ontology,
                 }

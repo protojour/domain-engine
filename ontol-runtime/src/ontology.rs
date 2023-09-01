@@ -12,8 +12,8 @@ use crate::{
         processor::{ProcessorLevel, ProcessorMode, SerdeProcessor},
         SerdeKey,
     },
-    string_pattern::StringPattern,
     string_types::StringLikeType,
+    text_pattern::TextPattern,
     value::PropertyId,
     value_generator::ValueGenerator,
     vm::{
@@ -30,7 +30,7 @@ pub struct Ontology {
     pub(crate) const_proc_table: FnvHashMap<DefId, Procedure>,
     pub(crate) map_meta_table: FnvHashMap<(MapKey, MapKey), MapMeta>,
     pub(crate) string_like_types: FnvHashMap<DefId, StringLikeType>,
-    pub(crate) string_patterns: FnvHashMap<DefId, StringPattern>,
+    pub(crate) text_patterns: FnvHashMap<DefId, TextPattern>,
     pub(crate) lib: Lib,
 
     domain_table: FnvHashMap<PackageId, Domain>,
@@ -50,7 +50,7 @@ impl Ontology {
                 const_proc_table: Default::default(),
                 map_meta_table: Default::default(),
                 string_like_types: Default::default(),
-                string_patterns: Default::default(),
+                text_patterns: Default::default(),
                 domain_table: Default::default(),
                 package_config_table: Default::default(),
                 docs: Default::default(),
@@ -86,8 +86,8 @@ impl Ontology {
         }
     }
 
-    pub fn get_string_pattern(&self, def_id: DefId) -> Option<&StringPattern> {
-        self.string_patterns.get(&def_id)
+    pub fn get_text_pattern(&self, def_id: DefId) -> Option<&TextPattern> {
+        self.text_patterns.get(&def_id)
     }
 
     pub fn get_string_like_type(&self, def_id: DefId) -> Option<StringLikeType> {
@@ -311,8 +311,8 @@ impl OntologyBuilder {
         self
     }
 
-    pub fn string_patterns(mut self, patterns: FnvHashMap<DefId, StringPattern>) -> Self {
-        self.ontology.string_patterns = patterns;
+    pub fn text_patterns(mut self, patterns: FnvHashMap<DefId, TextPattern>) -> Self {
+        self.ontology.text_patterns = patterns;
         self
     }
 

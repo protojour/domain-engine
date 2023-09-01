@@ -7,8 +7,8 @@ use ontol_runtime::{
         operator::{FilteredVariants, SerdeOperator},
         processor::{ProcessorLevel, ProcessorMode, SerdeProcessor},
     },
-    string_pattern::StringPattern,
     string_types::StringLikeType,
+    text_pattern::TextPattern,
     value::{Attribute, Data, Value},
     DefId,
 };
@@ -115,7 +115,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
             SerdeOperator::StringConstant(s, def_id) => {
                 Value::new(Data::String(s.clone()), *def_id)
             }
-            SerdeOperator::StringPattern(def_id) => {
+            SerdeOperator::TextPattern(def_id) => {
                 if let Some(string_like_type) = self.ontology.get_string_like_type(*def_id) {
                     match string_like_type {
                         StringLikeType::Uuid => {
@@ -126,15 +126,15 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                         }
                     }
                 } else {
-                    let string_pattern = self.ontology.get_string_pattern(*def_id).unwrap();
-                    let text = rand_text_matching_pattern(string_pattern, &mut self.rng);
+                    let text_pattern = self.ontology.get_text_pattern(*def_id).unwrap();
+                    let text = rand_text_matching_pattern(text_pattern, &mut self.rng);
                     Value::new(Data::String(text.into()), *def_id)
                 }
             }
-            SerdeOperator::CapturingStringPattern(def_id) => {
-                let string_pattern = self.ontology.get_string_pattern(*def_id).unwrap();
-                let text = rand_text_matching_pattern(string_pattern, &mut self.rng);
-                let data = string_pattern
+            SerdeOperator::CapturingTextPattern(def_id) => {
+                let text_pattern = self.ontology.get_text_pattern(*def_id).unwrap();
+                let text = rand_text_matching_pattern(text_pattern, &mut self.rng);
+                let data = text_pattern
                     .try_capturing_match(&text, self.ontology)
                     .unwrap();
 
@@ -209,8 +209,8 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
     }
 }
 
-fn rand_text_matching_pattern(string_pattern: &StringPattern, rng: &mut impl Rng) -> String {
-    let mut gen = Generator::new(string_pattern.regex.as_str(), rng, MAX_REPEAT).unwrap();
+fn rand_text_matching_pattern(text_pattern: &TextPattern, rng: &mut impl Rng) -> String {
+    let mut gen = Generator::new(text_pattern.regex.as_str(), rng, MAX_REPEAT).unwrap();
     let mut bytes = vec![];
     gen.generate(&mut bytes).unwrap();
     String::from_utf8(bytes).unwrap()

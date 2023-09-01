@@ -15,10 +15,10 @@ use tracing::debug;
 use crate::{
     def::{Def, DefKind, LookupRelationshipMeta},
     error::CompileError,
-    patterns::StringPatternSegment,
     primitive::PrimitiveKind,
     relation::{Constructor, Property},
     sequence::Sequence,
+    text_patterns::TextPatternSegment,
     types::{FormatType, Type},
     SourceSpan, SpannedCompileError,
 };
@@ -78,14 +78,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             &mut inherent_builder,
             &mut error_set,
         );
-        self.verify_disjoint_string_patterns(
+        self.verify_disjoint_text_patterns(
             value_union_def_id,
             union_def,
             &mut inherent_builder,
             UnionCheckError::SharedPrefixInPatternUnion,
             &mut error_set,
         );
-        self.verify_disjoint_string_patterns(
+        self.verify_disjoint_text_patterns(
             value_union_def_id,
             union_def,
             &mut entity_id_builder,
@@ -157,7 +157,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
                 Ok(DomainTypeMatchData::ConstructorStringPattern(segment)) => {
-                    builder.add_string_pattern(segment, variant_def);
+                    builder.add_text_pattern(segment, variant_def);
                 }
                 Err(error) => {
                     error_set.report(variant_def, error, span);
@@ -304,7 +304,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     }
 
     /// For now, patterns must have a unique constant prefix.
-    fn verify_disjoint_string_patterns(
+    fn verify_disjoint_text_patterns(
         &self,
         union_def_id: DefId,
         union_def: &Def,
@@ -485,7 +485,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 enum DomainTypeMatchData<'a> {
     Struct(&'a IndexMap<PropertyId, Property>),
     Sequence(&'a Sequence),
-    ConstructorStringPattern(&'a StringPatternSegment),
+    ConstructorStringPattern(&'a TextPatternSegment),
 }
 
 #[derive(Default)]
@@ -495,7 +495,7 @@ struct DiscriminatorBuilder<'a> {
     any_string: Vec<DefId>,
     string: StringDiscriminator,
     sequence: Option<DefId>,
-    pattern_candidates: IndexMap<DefId, &'a StringPatternSegment>,
+    pattern_candidates: IndexMap<DefId, &'a TextPatternSegment>,
     map_discriminator_candidates: Vec<MapDiscriminatorCandidate>,
 }
 
@@ -512,7 +512,7 @@ impl<'a> DiscriminatorBuilder<'a> {
         }
     }
 
-    fn add_string_pattern(&mut self, segment: &'a StringPatternSegment, variant_def_id: DefId) {
+    fn add_text_pattern(&mut self, segment: &'a TextPatternSegment, variant_def_id: DefId) {
         self.pattern_candidates.insert(variant_def_id, segment);
     }
 }

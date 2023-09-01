@@ -5,7 +5,7 @@ use serde_json::json;
 use test_log::test;
 
 #[test]
-fn constant_string_pattern() {
+fn constant_text_pattern() {
     "
     pub def foo {
         fmt '' => 'foo' => .
@@ -65,7 +65,7 @@ fn uuid_in_string_constructor_pattern() {
 }
 
 #[test]
-fn test_string_pattern_constructor_union() {
+fn test_text_pattern_constructor_union() {
     "
     def foo {
         fmt '' => 'foo/' => uuid => .
@@ -88,11 +88,11 @@ fn test_string_pattern_constructor_union() {
         assert_json_io_matches!(foobar, Create, "bar/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8");
         assert_error_msg!(
             create_de(&foobar).data(json!("foo/invalid-uuid")),
-            r#"invalid type: string "foo/invalid-uuid", expected `foobar` (`string_pattern` or `string_pattern`) at line 1 column 18"#
+            r#"invalid type: string "foo/invalid-uuid", expected `foobar` (`text_pattern` or `text_pattern`) at line 1 column 18"#
         );
         assert_error_msg!(
             create_de(&foobar).data(json!("baz/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
-            r#"invalid type: string "baz/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8", expected `foobar` (`string_pattern` or `string_pattern`) at line 1 column 42"#
+            r#"invalid type: string "baz/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8", expected `foobar` (`text_pattern` or `text_pattern`) at line 1 column 42"#
         );
     });
 }
@@ -137,7 +137,7 @@ fn test_simple_regex_pattern_constructor() {
 
 #[test]
 #[ignore = "figure out index relations"]
-fn test_string_patterns() {
+fn test_text_patterns() {
     "
     def hex
     rel '' /a-zA-Z0-9/: hex

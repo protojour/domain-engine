@@ -56,7 +56,7 @@ impl UnionBuilder {
                     // (there might be only one singleton property)
                     let operator = generator.gen_operator(SerdeKey::no_modifier(result_type));
 
-                    if let Some(SerdeOperator::CapturingStringPattern(def_id)) = operator {
+                    if let Some(SerdeOperator::CapturingTextPattern(def_id)) = operator {
                         // convert this
                         candidate.discriminator.discriminant =
                             Discriminant::HasAttributeMatchingStringPattern(

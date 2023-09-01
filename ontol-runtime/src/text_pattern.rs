@@ -16,13 +16,13 @@ use crate::{
 };
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct StringPattern {
+pub struct TextPattern {
     #[serde(with = "serde_regex")]
     pub regex: Regex,
-    pub constant_parts: Vec<StringPatternConstantPart>,
+    pub constant_parts: Vec<TextPatternConstantPart>,
 }
 
-impl StringPattern {
+impl TextPattern {
     pub fn try_capturing_match(
         &self,
         input: &str,
@@ -44,9 +44,9 @@ impl StringPattern {
 
             for part in &self.constant_parts {
                 match part {
-                    StringPatternConstantPart::AllStrings => {}
-                    StringPatternConstantPart::Literal(_) => {}
-                    StringPatternConstantPart::Property(property) => {
+                    TextPatternConstantPart::AllStrings => {}
+                    TextPatternConstantPart::Literal(_) => {}
+                    TextPatternConstantPart::Property(property) => {
                         let capture_group = property.capture_group;
                         debug!("fetching capture group {}", capture_group);
 
@@ -83,21 +83,21 @@ impl StringPattern {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum StringPatternConstantPart {
+pub enum TextPatternConstantPart {
     AllStrings,
     Literal(String),
-    Property(StringPatternProperty),
+    Property(TextPatternProperty),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct StringPatternProperty {
+pub struct TextPatternProperty {
     pub property_id: PropertyId,
     pub type_def_id: DefId,
     pub capture_group: usize,
 }
 
 pub struct FormatPattern<'a> {
-    pub pattern: &'a StringPattern,
+    pub pattern: &'a TextPattern,
     pub data: &'a Data,
 }
 
@@ -106,15 +106,13 @@ impl<'a> Display for FormatPattern<'a> {
         for constant_part in &self.pattern.constant_parts {
             match (constant_part, self.data) {
                 (
-                    StringPatternConstantPart::Property(StringPatternProperty {
-                        property_id, ..
-                    }),
+                    TextPatternConstantPart::Property(TextPatternProperty { property_id, .. }),
                     Data::Struct(attrs),
                 ) => {
                     let attribute = attrs.get(property_id).unwrap();
                     write!(f, "{}", FormatStringData(&attribute.value.data))?;
                 }
-                (StringPatternConstantPart::Literal(string), _) => write!(f, "{string}")?,
+                (TextPatternConstantPart::Literal(string), _) => write!(f, "{string}")?,
                 (part, data) => {
                     panic!("unable to format pattern - mismatch between {part:?} and {data:?}")
                 }

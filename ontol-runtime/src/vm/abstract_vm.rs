@@ -1,6 +1,6 @@
 use crate::{
     ontology::Ontology,
-    string_pattern::StringPattern,
+    text_pattern::TextPattern,
     value::PropertyId,
     vm::proc::{BuiltinProc, Local, OpCode, Predicate, Procedure},
     DefId,
@@ -61,7 +61,7 @@ pub trait Processor {
     fn regex_capture(
         &mut self,
         local: Local,
-        string_pattern: &StringPattern,
+        text_pattern: &TextPattern,
         capture_indexes: &[PatternCaptureGroup],
     );
     fn assert_true(&mut self);
@@ -189,8 +189,8 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                     self.program_counter += 1;
                 }
                 OpCode::RegexCapture(local, def_id, groups) => {
-                    let string_pattern = self.ontology.get_string_pattern(*def_id).unwrap();
-                    processor.regex_capture(*local, string_pattern, groups);
+                    let text_pattern = self.ontology.get_text_pattern(*def_id).unwrap();
+                    processor.regex_capture(*local, text_pattern, groups);
                     self.program_counter += 1;
                 }
                 OpCode::AssertTrue => {

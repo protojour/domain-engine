@@ -35,10 +35,10 @@ pub enum SerdeOperator {
     StringConstant(String, DefId),
 
     /// Always deserializes into a string, ignores capture groups:
-    StringPattern(DefId),
+    TextPattern(DefId),
 
     /// Deserializes into a Struct if there are capture groups:
-    CapturingStringPattern(DefId),
+    CapturingTextPattern(DefId),
 
     /// Special operator for serialization, can serialize a sequence of anything,
     /// by using dynamic lookup.

@@ -19,10 +19,10 @@ use crate::{
     codegen::task::CodegenTasks,
     compiler_queries::GetDefType,
     def::{DefKind, Defs, LookupRelationshipMeta, RelParams, TypeDef},
-    patterns::{Patterns, StringPatternSegment},
     primitive::{PrimitiveKind, Primitives},
     relation::{Constructor, Properties, Relations},
     serde_codegen::sequence_range_builder::SequenceRangeBuilder,
+    text_patterns::{TextPatternSegment, TextPatterns},
     type_check::{
         repr::repr_model::{ReprKind, ReprScalarKind},
         seal::SealCtx,
@@ -39,7 +39,7 @@ pub struct SerdeGenerator<'c, 'm> {
     pub(super) def_types: &'c DefTypes<'m>,
     pub(super) relations: &'c Relations,
     pub(super) seal_ctx: &'c SealCtx,
-    pub(super) patterns: &'c Patterns,
+    pub(super) patterns: &'c TextPatterns,
     pub(super) codegen_tasks: &'c CodegenTasks<'m>,
     pub(super) operators_by_id: Vec<SerdeOperator>,
     pub(super) operators_by_key: HashMap<SerdeKey, SerdeOperatorId>,
@@ -331,17 +331,17 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 assert_eq!(def_variant.def_id, *def_id);
                 assert!(self
                     .patterns
-                    .string_patterns
+                    .text_patterns
                     .contains_key(&def_variant.def_id));
 
                 Some(OperatorAllocation::Allocated(
                     self.alloc_operator_id(&def_variant),
-                    SerdeOperator::StringPattern(*def_id),
+                    SerdeOperator::TextPattern(*def_id),
                 ))
             }
             Type::StringLike(_, _) => Some(OperatorAllocation::Allocated(
                 self.alloc_operator_id(&def_variant),
-                SerdeOperator::StringPattern(def_variant.def_id),
+                SerdeOperator::TextPattern(def_variant.def_id),
             )),
             Type::EmptySequence(_) => {
                 todo!("not sure if this should be handled here")
@@ -715,16 +715,16 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     fn alloc_string_fmt_operator(
         &mut self,
         def_variant: DefVariant,
-        segment: &StringPatternSegment,
+        segment: &TextPatternSegment,
     ) -> Option<OperatorAllocation> {
         assert!(self
             .patterns
-            .string_patterns
+            .text_patterns
             .contains_key(&def_variant.def_id));
 
         let operator = match segment {
-            StringPatternSegment::AllStrings => SerdeOperator::String(def_variant.def_id),
-            _ => SerdeOperator::CapturingStringPattern(def_variant.def_id),
+            TextPatternSegment::AllStrings => SerdeOperator::String(def_variant.def_id),
+            _ => SerdeOperator::CapturingTextPattern(def_variant.def_id),
         };
 
         Some(OperatorAllocation::Allocated(

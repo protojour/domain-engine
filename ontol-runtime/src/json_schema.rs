@@ -354,8 +354,8 @@ fn serialize_schema_inline<S: Serializer>(
                 map.serialize_entry("description", docs)?;
             }
         }
-        SerdeOperator::StringPattern(def_id) | SerdeOperator::CapturingStringPattern(def_id) => {
-            let pattern = ctx.ontology.string_patterns.get(def_id).unwrap();
+        SerdeOperator::TextPattern(def_id) | SerdeOperator::CapturingTextPattern(def_id) => {
+            let pattern = ctx.ontology.text_patterns.get(def_id).unwrap();
             map.serialize_entry("type", "string")?;
             map.serialize_entry("pattern", pattern.regex.as_str())?;
             if let Some(docs) = ctx.docs {
@@ -485,8 +485,8 @@ impl<'d, 'e> Serialize for SchemaReference<'d, 'e> {
             | SerdeOperator::F64(..)
             | SerdeOperator::String(_)
             | SerdeOperator::StringConstant(..)
-            | SerdeOperator::StringPattern(_)
-            | SerdeOperator::CapturingStringPattern(_)
+            | SerdeOperator::TextPattern(_)
+            | SerdeOperator::CapturingTextPattern(_)
             | SerdeOperator::DynamicSequence => {
                 // These are inline schemas
                 let mut map = serializer.serialize_map(None)?;
@@ -766,8 +766,8 @@ impl SchemaGraphBuilder {
             | SerdeOperator::F64(..)
             | SerdeOperator::String(_)
             | SerdeOperator::StringConstant(..)
-            | SerdeOperator::StringPattern(_)
-            | SerdeOperator::CapturingStringPattern(_)
+            | SerdeOperator::TextPattern(_)
+            | SerdeOperator::CapturingTextPattern(_)
             | SerdeOperator::DynamicSequence => {}
             SerdeOperator::ConstructorSequence(seq_op) => {
                 self.add_to_graph(seq_op.def_variant, operator_id);

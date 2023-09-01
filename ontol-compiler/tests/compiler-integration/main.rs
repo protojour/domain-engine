@@ -12,7 +12,7 @@ mod test_json_schema;
 mod test_multi_package;
 mod test_repr;
 mod test_stix_lite;
-mod test_string_patterns;
+mod test_text_patterns;
 mod unify;
 
 fn main() {}

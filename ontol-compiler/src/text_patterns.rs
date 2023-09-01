@@ -1,6 +1,6 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    string_pattern::{StringPattern, StringPatternConstantPart, StringPatternProperty},
+    text_pattern::{TextPattern, TextPatternConstantPart, TextPatternProperty},
     value::PropertyId,
     DefId,
 };
@@ -13,12 +13,12 @@ use tracing::debug;
 use crate::{regex_util, relation::Constructor, Compiler};
 
 #[derive(Default, Debug)]
-pub struct Patterns {
-    pub string_patterns: FnvHashMap<DefId, StringPattern>,
+pub struct TextPatterns {
+    pub text_patterns: FnvHashMap<DefId, TextPattern>,
 }
 
 #[derive(Clone, Default, Debug)]
-pub enum StringPatternSegment {
+pub enum TextPatternSegment {
     /// Matches only the empty string:
     #[default]
     EmptyString,
@@ -28,13 +28,13 @@ pub enum StringPatternSegment {
     Property {
         property_id: PropertyId,
         type_def_id: DefId,
-        segment: Box<StringPatternSegment>,
+        segment: Box<TextPatternSegment>,
     },
-    Concat(Vec<StringPatternSegment>),
-    Alternation(Vec<StringPatternSegment>),
+    Concat(Vec<TextPatternSegment>),
+    Alternation(Vec<TextPatternSegment>),
 }
 
-impl StringPatternSegment {
+impl TextPatternSegment {
     pub fn new_literal(string: &str) -> Self {
         Self::Literal(string.into())
     }
@@ -79,7 +79,7 @@ impl StringPatternSegment {
         if output.len() == 1 {
             output.into_iter().next().unwrap()
         } else {
-            StringPatternSegment::Concat(output)
+            TextPatternSegment::Concat(output)
         }
     }
 
@@ -127,22 +127,22 @@ impl StringPatternSegment {
 
     pub fn collect_constant_parts(
         &self,
-        parts: &mut Vec<StringPatternConstantPart>,
+        parts: &mut Vec<TextPatternConstantPart>,
         capture_cursor: &mut CaptureCursor,
     ) {
         match self {
             Self::EmptyString => {}
             Self::AllStrings => {
-                // parts.push(StringPatternConstantPart::AllStrings);
+                // parts.push(TextPatternConstantPart::AllStrings);
             }
             Self::Literal(string) => {
-                parts.push(StringPatternConstantPart::Literal(string.clone()));
+                parts.push(TextPatternConstantPart::Literal(string.clone()));
             }
             Self::Regex(hir) => {
                 let mut string = String::new();
                 regex_util::collect_hir_constant_parts(hir, &mut string);
                 if !string.is_empty() {
-                    parts.push(StringPatternConstantPart::Literal(string));
+                    parts.push(TextPatternConstantPart::Literal(string));
                 }
             }
             Self::Property {
@@ -151,7 +151,7 @@ impl StringPatternSegment {
                 ..
             } => {
                 let index = capture_cursor.increment();
-                parts.push(StringPatternConstantPart::Property(StringPatternProperty {
+                parts.push(TextPatternConstantPart::Property(TextPatternProperty {
                     property_id: *property_id,
                     type_def_id: *type_def_id,
                     capture_group: index as usize,
@@ -169,7 +169,7 @@ impl StringPatternSegment {
 
 pub fn compile_all_patterns(compiler: &mut Compiler) {
     compile_regex_literals(compiler);
-    compile_string_pattern_constructors(compiler);
+    compile_text_pattern_constructors(compiler);
 }
 
 /// note: This processes all regex literals even if not "needed"
@@ -178,9 +178,9 @@ fn compile_regex_literals(compiler: &mut Compiler) {
     let literal_regex_asts = std::mem::take(&mut compiler.defs.literal_regex_meta_table);
 
     for (def_id, ast) in literal_regex_asts {
-        compiler.patterns.string_patterns.insert(
+        compiler.patterns.text_patterns.insert(
             def_id,
-            StringPattern {
+            TextPattern {
                 regex: compile_regex(ast.hir),
                 constant_parts: vec![],
             },
@@ -188,10 +188,10 @@ fn compile_regex_literals(compiler: &mut Compiler) {
     }
 }
 
-fn compile_string_pattern_constructors(compiler: &mut Compiler) {
-    let string_patterns = std::mem::take(&mut compiler.relations.string_pattern_constructors);
+fn compile_text_pattern_constructors(compiler: &mut Compiler) {
+    let text_patterns = std::mem::take(&mut compiler.relations.text_pattern_constructors);
 
-    for def_id in string_patterns {
+    for def_id in text_patterns {
         let segment = match compiler
             .relations
             .properties_by_def_id(def_id)
@@ -201,14 +201,14 @@ fn compile_string_pattern_constructors(compiler: &mut Compiler) {
             _ => panic!("{def_id:?} does not have a string pattern constructor"),
         };
 
-        store_string_pattern_segment(&mut compiler.patterns, def_id, segment);
+        store_text_pattern_segment(&mut compiler.patterns, def_id, segment);
     }
 }
 
-pub fn store_string_pattern_segment(
-    patterns: &mut Patterns,
+pub fn store_text_pattern_segment(
+    patterns: &mut TextPatterns,
     def_id: DefId,
-    segment: &StringPatternSegment,
+    segment: &TextPatternSegment,
 ) {
     let anchored_hir = Hir::concat(vec![
         Hir::look(Look::Start),
@@ -219,9 +219,9 @@ pub fn store_string_pattern_segment(
     let mut constant_parts = vec![];
     segment.collect_constant_parts(&mut constant_parts, &mut CaptureCursor(1));
 
-    patterns.string_patterns.insert(
+    patterns.text_patterns.insert(
         def_id,
-        StringPattern {
+        TextPattern {
             regex: compile_regex(anchored_hir),
             constant_parts,
         },

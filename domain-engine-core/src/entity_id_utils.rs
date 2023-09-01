@@ -1,6 +1,6 @@
 use ontol_runtime::{
     ontology::Ontology,
-    string_pattern::{StringPattern, StringPatternConstantPart, StringPatternProperty},
+    text_pattern::{TextPattern, TextPatternConstantPart, TextPatternProperty},
     value::{Data, PropertyId, Value},
 };
 
@@ -28,11 +28,11 @@ pub fn find_inherent_entity_id(
     }
 }
 
-pub fn analyze_string_pattern(pattern: &StringPattern) -> Option<&StringPatternProperty> {
+pub fn analyze_text_pattern(pattern: &TextPattern) -> Option<&TextPatternProperty> {
     let mut out_property = None;
 
     for part in &pattern.constant_parts {
-        if let StringPatternConstantPart::Property(property) = part {
+        if let TextPatternConstantPart::Property(property) = part {
             if out_property.is_some() {
                 return None;
             }

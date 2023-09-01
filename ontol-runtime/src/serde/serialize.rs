@@ -9,7 +9,7 @@ use tracing::debug;
 use crate::{
     cast::Cast,
     serde::processor::RecursionLimitError,
-    string_pattern::FormatPattern,
+    text_pattern::FormatPattern,
     value::{Attribute, Data, FormatStringData, Value},
 };
 
@@ -48,7 +48,7 @@ impl<'e> SerdeProcessor<'e> {
             }
             SerdeOperator::String(_)
             | SerdeOperator::StringConstant(_, _)
-            | SerdeOperator::StringPattern(_) => match &value.data {
+            | SerdeOperator::TextPattern(_) => match &value.data {
                 Data::String(s) => serializer.serialize_str(s),
                 data => {
                     let mut buf = String::new();
@@ -56,8 +56,8 @@ impl<'e> SerdeProcessor<'e> {
                     serializer.serialize_str(&buf)
                 }
             },
-            SerdeOperator::CapturingStringPattern(def_id) => {
-                let pattern = &self.ontology.string_patterns.get(def_id).unwrap();
+            SerdeOperator::CapturingTextPattern(def_id) => {
+                let pattern = &self.ontology.text_patterns.get(def_id).unwrap();
                 let mut buf = String::new();
                 write!(
                     &mut buf,

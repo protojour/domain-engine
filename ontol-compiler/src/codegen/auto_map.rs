@@ -5,9 +5,9 @@ use ontol_runtime::DefId;
 
 use crate::{
     mem::Intern,
-    patterns::StringPatternSegment,
     primitive::PrimitiveKind,
     relation::Constructor,
+    text_patterns::TextPatternSegment,
     typed_hir::{Meta, TypedBinder, TypedHirNode},
     types::{Type, TypeRef},
     Compiler, NO_SPAN,
@@ -48,8 +48,8 @@ pub fn autogenerate_mapping<'m>(
 fn autogenerate_fmt_to_fmt<'m>(
     compiler: &Compiler<'m>,
     unit_type: TypeRef<'m>,
-    first: (DefId, &StringPatternSegment),
-    second: (DefId, &StringPatternSegment),
+    first: (DefId, &TextPatternSegment),
+    second: (DefId, &TextPatternSegment),
 ) -> Option<ExplicitMapCodegenTask<'m>> {
     let mut var_allocator = VarAllocator::default();
     let first_var = var_allocator.alloc();
@@ -92,14 +92,14 @@ fn autogenerate_fmt_hir_struct<'m>(
     mut var_allocator: Option<&mut VarAllocator>,
     def_id: DefId,
     binder_var: ontol_hir::Var,
-    segment: &StringPatternSegment,
+    segment: &TextPatternSegment,
     var_map: &mut HashMap<DefId, ontol_hir::Var>,
     unit_type: TypeRef<'m>,
     compiler: &Compiler<'m>,
 ) -> Option<TypedHirNode<'m>> {
     let mut nodes: Vec<TypedHirNode<'m>> = vec![];
 
-    if let StringPatternSegment::Concat(segments) = segment {
+    if let TextPatternSegment::Concat(segments) = segment {
         for child_segment in segments {
             if let Some(node) = autogenerate_fmt_segment_property(
                 &mut var_allocator,
@@ -135,12 +135,12 @@ fn autogenerate_fmt_hir_struct<'m>(
 fn autogenerate_fmt_segment_property<'m>(
     mut var_allocator: &mut Option<&mut VarAllocator>,
     binder_var: ontol_hir::Var,
-    segment: &StringPatternSegment,
+    segment: &TextPatternSegment,
     var_map: &mut HashMap<DefId, ontol_hir::Var>,
     unit_type: TypeRef<'m>,
     compiler: &Compiler<'m>,
 ) -> Option<TypedHirNode<'m>> {
-    if let StringPatternSegment::Property {
+    if let TextPatternSegment::Property {
         property_id,
         type_def_id,
         segment: _,

@@ -7,7 +7,7 @@ use ontol_runtime::{
     value_generator::ValueGenerator, DefId, PackageId, RelationshipId,
 };
 
-use crate::{patterns::StringPatternSegment, sequence::Sequence, SourceSpan};
+use crate::{sequence::Sequence, text_patterns::TextPatternSegment, SourceSpan};
 
 #[derive(Default, Debug)]
 pub struct Relations {
@@ -15,7 +15,7 @@ pub struct Relations {
     /// A map from "idenfities" relationship to named relationship:
     pub inherent_id_map: FnvHashMap<RelationshipId, RelationshipId>,
 
-    pub string_pattern_constructors: FnvHashSet<DefId>,
+    pub text_pattern_constructors: FnvHashSet<DefId>,
     pub union_discriminators: FnvHashMap<DefId, UnionDiscriminator>,
 
     /// `default` relationships:
@@ -111,7 +111,7 @@ pub enum Constructor {
     /// The type is a tuple-like sequence of other types
     Sequence(Sequence),
     /// The type is a string pattern
-    StringFmt(StringPatternSegment),
+    StringFmt(TextPatternSegment),
 }
 
 #[derive(Default, Debug)]

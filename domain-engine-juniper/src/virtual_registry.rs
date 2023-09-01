@@ -175,8 +175,8 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
             SerdeOperator::StringConstant(_, _) => {
                 self.get_native_argument::<String>(name, modifier)
             }
-            SerdeOperator::StringPattern(_) => self.get_native_argument::<String>(name, modifier),
-            SerdeOperator::CapturingStringPattern(_) => {
+            SerdeOperator::TextPattern(_) => self.get_native_argument::<String>(name, modifier),
+            SerdeOperator::CapturingTextPattern(_) => {
                 self.get_native_argument::<String>(name, modifier)
             }
             SerdeOperator::DynamicSequence => panic!("No dynamic sequence expected here"),
