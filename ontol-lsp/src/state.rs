@@ -25,7 +25,7 @@ use substring::Substring;
 pub struct State {
     pub docs: HashMap<String, Document>,
     pub roots: HashSet<String>,
-    pub sourcemap: HashMap<SourceId, String>,
+    pub source_map: HashMap<SourceId, String>,
 }
 
 /// A document and its various constituents
@@ -115,7 +115,7 @@ impl State {
     }
 
     /// Build package graph from the given root and compile topology
-    pub fn compile(&self, root_url: &str) -> Result<(), UnifiedCompileError> {
+    pub fn compile(&mut self, root_url: &str) -> Result<(), UnifiedCompileError> {
         let (root_path, filename) = get_path_and_name(root_url);
         let root_name = get_domain_name(filename);
 
@@ -134,13 +134,15 @@ impl State {
                         let request_uri = build_uri(root_path, source_name);
 
                         if let Some(doc) = self.docs.get(&request_uri) {
-                            package_graph_builder.provide_package(ParsedPackage::parse(
+                            let package = ParsedPackage::parse(
                                 request,
                                 &doc.text,
                                 package_config,
                                 &mut ontol_sources,
                                 &mut source_code_registry,
-                            ));
+                            );
+                            self.source_map.insert(package.src.id, request_uri);
+                            package_graph_builder.provide_package(package);
                         }
                     }
                 }
@@ -151,6 +153,22 @@ impl State {
         let mem = Mem::default();
         let mut compiler = Compiler::new(&mem, ontol_sources.clone()).with_ontol();
         compiler.compile_package_topology(topology)
+    }
+
+    pub fn get_doc_by_sourceid(&self, source_id: &SourceId) -> Option<&Document> {
+        match self.source_map.get(source_id) {
+            Some(uri) => self.docs.get(uri),
+            None => None,
+        }
+    }
+
+    pub fn get_sourceid_by_uri(&self, uri: &str) -> Option<SourceId> {
+        for (key, val) in self.source_map.iter() {
+            if val.as_str() == uri {
+                return Some(*key);
+            }
+        }
+        None
     }
 }
 

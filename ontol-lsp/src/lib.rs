@@ -1,5 +1,3 @@
-use core::panic;
-
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use state::{
@@ -48,42 +46,49 @@ impl Backend {
     /// Compile code and convert errors to Diagnostics
     async fn get_diagnostics(&self, uri: &Url) -> Vec<Diagnostic> {
         let mut state = self.state.write().await;
+        let mut restart = true;
         let mut diagnostics = vec![];
 
-        match state.compile(uri.as_str()) {
-            Ok(_) => {}
-            Err(err) => {
-                for err in err.errors {
-                    let mut data: Value = json!({});
+        while restart {
+            diagnostics.clear();
+            match state.compile(uri.as_str()) {
+                Ok(_) => break,
+                Err(err) => {
+                    restart = false;
+                    for err in err.errors {
+                        let mut data: Value = json!({});
+                        if let ontol_compiler::CompileError::PackageNotFound(reference) = &err.error
+                        {
+                            let (path, _) = get_path_and_name(uri.as_str());
+                            let source_name = get_reference_name(reference);
+                            let ref_uri = build_uri(path, source_name);
 
-                    if let ontol_compiler::CompileError::PackageNotFound(reference) = &err.error {
-                        let (path, _) = get_path_and_name(uri.as_str());
-                        let source_name = get_reference_name(reference);
-                        let ref_uri = build_uri(path, source_name);
+                            if cfg!(feature = "wasm") {
+                                data = json!(OpenFileArgs {
+                                    ref_uri: ref_uri.clone(),
+                                    src_uri: uri.to_string(),
+                                });
+                            } else if let Ok(text) = read_file(ref_uri.as_str()) {
+                                state.roots.insert(ref_uri.to_string());
+                                state.docs.insert(
+                                    ref_uri.to_string(),
+                                    Document {
+                                        uri: ref_uri.to_string(),
+                                        path: path.to_string(),
+                                        name: source_name.to_string(),
+                                        text,
+                                        ..Default::default()
+                                    },
+                                );
+                                restart = true;
+                            }
+                        }
 
-                        if cfg!(feature = "wasm") {
-                            data = json!(OpenFileArgs {
-                                ref_uri: ref_uri.clone(),
-                                src_uri: uri.to_string(),
-                            });
-                        } else if let Ok(text) = read_file(ref_uri.as_str()) {
-                            state.roots.insert(ref_uri.to_string());
-                            state.docs.insert(
-                                ref_uri.to_string(),
-                                Document {
-                                    uri: ref_uri.to_string(),
-                                    path: path.to_string(),
-                                    name: source_name.to_string(),
-                                    text,
-                                    ..Default::default()
-                                },
-                            );
+                        if restart {
                             continue;
                         }
-                    }
 
-                    match state.docs.get(uri.as_str()) {
-                        Some(doc) => {
+                        if let Some(doc) = state.get_doc_by_sourceid(&err.span.source_id) {
                             diagnostics.push(Diagnostic {
                                 range: get_span_range(&doc.text, &err.span),
                                 severity: Some(DiagnosticSeverity::ERROR),
@@ -105,7 +110,6 @@ impl Backend {
                                 ..Default::default()
                             });
                         }
-                        None => panic!("Cannot find document {uri}"),
                     }
                 }
             }
@@ -189,15 +193,12 @@ impl LanguageServer for Backend {
         {
             let uri = params.text_document.uri.as_str();
             let mut state = self.state.write().await;
-            match state.docs.get_mut(uri) {
-                Some(doc) => {
-                    for change in params.content_changes {
-                        doc.text = change.text;
-                    }
+            if let Some(doc) = state.docs.get_mut(uri) {
+                for change in params.content_changes {
+                    doc.text = change.text;
                 }
-                None => todo!(), // unlikely, but could happen
+                state.parse_statements(uri);
             }
-            state.parse_statements(uri);
         }
         self.diagnose(&params.text_document.uri).await;
     }
@@ -216,6 +217,9 @@ impl LanguageServer for Backend {
         let mut state = self.state.write().await;
         state.docs.remove(uri);
         state.roots.remove(uri);
+        if let Some(src_id) = state.get_sourceid_by_uri(uri) {
+            state.source_map.remove(&src_id);
+        }
     }
 
     async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
