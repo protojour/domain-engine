@@ -20,7 +20,7 @@ use crate::{
         PatId, Pattern, PatternKind, SeqPatternElement, StructPatternAttr, StructPatternModifier,
         TypePath,
     },
-    regex_util::RegexToExprLowerer,
+    regex_util::RegexToPatternLowerer,
     Compiler, Src,
 };
 
@@ -106,7 +106,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 first,
                 second,
             }) => {
-                let mut var_table = ExprVarTable::default();
+                let mut var_table = MapVarTable::default();
                 let first = self.lower_map_arm(first, &mut var_table)?;
                 let second = self.lower_map_arm(second, &mut var_table)?;
                 let var_allocator = var_table.into_allocator();
@@ -144,11 +144,12 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 &block_context,
                 Some(&mut root_defs),
             )?,
-            Some(ast::TypeOrPattern::Pattern(pattern)) => {
-                let mut var_table = ExprVarTable::default();
-                let expr = self.lower_pattern((pattern, object_span.clone()), &mut var_table)?;
+            Some(ast::TypeOrPattern::Pattern(ast_pattern)) => {
+                let mut var_table = MapVarTable::default();
+                let pattern =
+                    self.lower_pattern((ast_pattern, object_span.clone()), &mut var_table)?;
                 let pat_id = self.compiler.patterns.alloc_pat_id();
-                self.compiler.patterns.table.insert(pat_id, expr);
+                self.compiler.patterns.table.insert(pat_id, pattern);
 
                 self.define(DefKind::Constant(pat_id), &object_span)
             }
@@ -515,26 +516,26 @@ impl<'s, 'm> Lowering<'s, 'm> {
     fn lower_map_arm(
         &mut self,
         ((unit_or_seq, ast), span): ((ast::UnitOrSeq, ast::MapArm), Span),
-        var_table: &mut ExprVarTable,
+        var_table: &mut MapVarTable,
     ) -> Res<PatId> {
-        let unit_expr = match ast {
+        let unit_pattern = match ast {
             ast::MapArm::Struct(ast) => {
                 self.lower_struct_pattern((ast, span.clone()), var_table)?
             }
-            ast::MapArm::Binding { path, expr } => {
-                self.lower_map_binding(path, expr, span.clone(), var_table)?
+            ast::MapArm::Binding { path, expr: ast } => {
+                self.lower_map_binding(path, ast, span.clone(), var_table)?
             }
         };
-        let expr = match unit_or_seq {
-            ast::UnitOrSeq::Unit => unit_expr,
+        let pattern = match unit_or_seq {
+            ast::UnitOrSeq::Unit => unit_pattern,
             ast::UnitOrSeq::Seq => {
                 let seq_id = self.compiler.patterns.alloc_pat_id();
-                self.expr(
+                self.mk_pattern(
                     PatternKind::Seq(
                         seq_id,
                         vec![SeqPatternElement {
                             iter: true,
-                            pattern: unit_expr,
+                            pattern: unit_pattern,
                         }],
                     ),
                     &span,
@@ -543,7 +544,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         };
 
         let pat_id = self.compiler.patterns.alloc_pat_id();
-        self.compiler.patterns.table.insert(pat_id, expr);
+        self.compiler.patterns.table.insert(pat_id, pattern);
 
         Ok(pat_id)
     }
@@ -551,16 +552,16 @@ impl<'s, 'm> Lowering<'s, 'm> {
     fn lower_map_binding(
         &mut self,
         path: (ast::Path, Span),
-        expr: (ast::ExprPattern, Span),
+        (ast, expr_span): (ast::ExprPattern, Span),
         span: Span,
-        var_table: &mut ExprVarTable,
+        var_table: &mut MapVarTable,
     ) -> Res<Pattern> {
         let type_def_id = self.lookup_path(&path.0, &path.1)?;
         let key = (DefId::unit(), self.src.span(&span));
-        let expr = self.lower_expr_pattern((expr.0, expr.1), var_table)?;
+        let pattern = self.lower_expr_pattern((ast, expr_span), var_table)?;
 
-        Ok(self.expr(
-            // FIXME: This ExprKind shouldn't really be struct..
+        Ok(self.mk_pattern(
+            // FIXME: This PatternKind shouldn't really be struct..
             PatternKind::Struct {
                 type_path: Some(TypePath {
                     def_id: type_def_id,
@@ -571,7 +572,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     key,
                     rel: None,
                     bind_option: false,
-                    value: expr,
+                    value: pattern,
                 }]
                 .into(),
             },
@@ -581,19 +582,19 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
     fn lower_struct_pattern(
         &mut self,
-        (struct_pat, span): (ast::StructPattern, Span),
-        var_table: &mut ExprVarTable,
+        (ast, span): (ast::StructPattern, Span),
+        var_table: &mut MapVarTable,
     ) -> Res<Pattern> {
-        let type_def_id = self.lookup_path(&struct_pat.path.0, &struct_pat.path.1)?;
-        let attrs = self.lower_struct_pattern_attrs(struct_pat.attributes, var_table)?;
+        let type_def_id = self.lookup_path(&ast.path.0, &ast.path.1)?;
+        let attrs = self.lower_struct_pattern_attrs(ast.attributes, var_table)?;
 
-        Ok(self.expr(
+        Ok(self.mk_pattern(
             PatternKind::Struct {
                 type_path: Some(TypePath {
                     def_id: type_def_id,
-                    span: self.src.span(&struct_pat.path.1),
+                    span: self.src.span(&ast.path.1),
                 }),
-                modifier: struct_pat.modifier.map(|(modifier, _span)| match modifier {
+                modifier: ast.modifier.map(|(modifier, _span)| match modifier {
                     ast::StructPatternModifier::Match => StructPatternModifier::Match,
                 }),
                 attributes: attrs,
@@ -605,7 +606,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
     fn lower_struct_pattern_attrs(
         &mut self,
         attributes: Vec<(ast::StructPatternAttr, Range<usize>)>,
-        var_table: &mut ExprVarTable,
+        var_table: &mut MapVarTable,
     ) -> Res<Box<[StructPatternAttr]>> {
         attributes
             .into_iter()
@@ -619,11 +620,11 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                 let def = self.resolve_type_reference(relation.0, &relation.1, None)?;
 
-                let object_expr = self.lower_pattern((object, object_span), var_table);
+                let object_pattern = self.lower_pattern((object, object_span), var_table);
                 let rel = match relation_attrs {
                     Some((attrs, span)) => {
-                        // Inherit modifier from object expr
-                        let modifier = match &object_expr {
+                        // Inherit modifier from object pattern
+                        let modifier = match &object_pattern {
                             Ok(Pattern {
                                 kind: PatternKind::Struct { modifier, .. },
                                 ..
@@ -632,7 +633,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                         };
 
                         let attrs = self.lower_struct_pattern_attrs(attrs, var_table)?;
-                        Some(self.expr(
+                        Some(self.mk_pattern(
                             PatternKind::Struct {
                                 type_path: None,
                                 modifier,
@@ -644,11 +645,11 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     None => None,
                 };
 
-                object_expr.map(|object_expr| StructPatternAttr {
+                object_pattern.map(|object_pattern| StructPatternAttr {
                     key: (def, self.src.span(&relation.1)),
                     rel,
                     bind_option: option.is_some(),
-                    value: object_expr,
+                    value: object_pattern,
                 })
             })
             .collect()
@@ -656,54 +657,50 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
     fn lower_pattern(
         &mut self,
-        (pattern, span): (ast::Pattern, Span),
-        var_table: &mut ExprVarTable,
+        (ast, span): (ast::Pattern, Span),
+        var_table: &mut MapVarTable,
     ) -> Res<Pattern> {
-        match pattern {
-            ast::Pattern::Expr((expr_pat, _)) => {
-                self.lower_expr_pattern((expr_pat, span), var_table)
-            }
-            ast::Pattern::Struct((struct_pat, span)) => {
-                self.lower_struct_pattern((struct_pat, span), var_table)
-            }
-            ast::Pattern::Seq(elements) => {
-                if elements.is_empty() {
+        match ast {
+            ast::Pattern::Expr((ast, _)) => self.lower_expr_pattern((ast, span), var_table),
+            ast::Pattern::Struct((ast, span)) => self.lower_struct_pattern((ast, span), var_table),
+            ast::Pattern::Seq(ast_elements) => {
+                if ast_elements.is_empty() {
                     return Err((
                         CompileError::TODO(smart_format!("requires at least one element")),
                         span.clone(),
                     ));
                 }
 
-                let mut expr_elements = Vec::with_capacity(elements.len());
-                for (element, _element_span) in elements {
-                    let expr =
-                        self.lower_pattern((element.pattern.0, element.pattern.1), var_table)?;
-                    expr_elements.push(SeqPatternElement {
-                        iter: element.spread.is_some(),
-                        pattern: expr,
+                let mut pattern_elements = Vec::with_capacity(ast_elements.len());
+                for (ast_element, _element_span) in ast_elements {
+                    let pattern = self
+                        .lower_pattern((ast_element.pattern.0, ast_element.pattern.1), var_table)?;
+                    pattern_elements.push(SeqPatternElement {
+                        iter: ast_element.spread.is_some(),
+                        pattern,
                     })
                 }
 
                 let seq_id = self.compiler.patterns.alloc_pat_id();
-                Ok(self.expr(PatternKind::Seq(seq_id, expr_elements), &span))
+                Ok(self.mk_pattern(PatternKind::Seq(seq_id, pattern_elements), &span))
             }
         }
     }
 
     fn lower_expr_pattern(
         &mut self,
-        (expr_pat, span): (ast::ExprPattern, Span),
-        var_table: &mut ExprVarTable,
+        (ast, span): (ast::ExprPattern, Span),
+        var_table: &mut MapVarTable,
     ) -> Res<Pattern> {
-        match expr_pat {
+        match ast {
             ast::ExprPattern::NumberLiteral(int) => {
                 let int = int
                     .parse()
                     .map_err(|_| (CompileError::InvalidInteger, span.clone()))?;
-                Ok(self.expr(PatternKind::ConstI64(int), &span))
+                Ok(self.mk_pattern(PatternKind::ConstI64(int), &span))
             }
             ast::ExprPattern::StringLiteral(string) => {
-                Ok(self.expr(PatternKind::ConstString(string), &span))
+                Ok(self.mk_pattern(PatternKind::ConstString(string), &span))
             }
             ast::ExprPattern::RegexLiteral(regex_literal) => {
                 let regex_def_id = self
@@ -720,7 +717,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     .get(&regex_def_id)
                     .unwrap();
 
-                let mut regex_lowerer = RegexToExprLowerer::new(
+                let mut regex_lowerer = RegexToPatternLowerer::new(
                     regex_meta.pattern,
                     &span,
                     self.src,
@@ -733,7 +730,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                 let expr_regex = regex_lowerer.into_expr(regex_def_id);
 
-                Ok(self.expr(PatternKind::Regex(expr_regex), &span))
+                Ok(self.mk_pattern(PatternKind::Regex(expr_regex), &span))
             }
             ast::ExprPattern::Binary(left, op, right) => {
                 let fn_ident = match op {
@@ -748,22 +745,22 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let left = self.lower_expr_pattern(*left, var_table)?;
                 let right = self.lower_expr_pattern(*right, var_table)?;
 
-                Ok(self.expr(PatternKind::Call(def_id, Box::new([left, right])), &span))
+                Ok(self.mk_pattern(PatternKind::Call(def_id, Box::new([left, right])), &span))
             }
             ast::ExprPattern::Variable(var_ident) => {
-                self.lower_expr_variable(var_ident, span, var_table)
+                self.lower_map_variable(var_ident, span, var_table)
             }
         }
     }
 
-    fn lower_expr_variable(
+    fn lower_map_variable(
         &mut self,
         var_ident: String,
         span: Span,
-        var_table: &mut ExprVarTable,
+        var_table: &mut MapVarTable,
     ) -> Res<Pattern> {
         let var = var_table.get_or_create_var(var_ident);
-        Ok(self.expr(PatternKind::Variable(var), &span))
+        Ok(self.mk_pattern(PatternKind::Variable(var), &span))
     }
 
     fn lookup_ident(&mut self, ident: &str, span: &Span) -> Result<DefId, LoweringError> {
@@ -949,7 +946,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         );
     }
 
-    fn expr(&mut self, kind: PatternKind, span: &Span) -> Pattern {
+    fn mk_pattern(&mut self, kind: PatternKind, span: &Span) -> Pattern {
         Pattern {
             id: self.compiler.patterns.alloc_pat_id(),
             kind,
@@ -977,11 +974,11 @@ enum BlockContext<'a> {
 }
 
 #[derive(Default)]
-pub struct ExprVarTable {
+pub struct MapVarTable {
     variables: HashMap<String, ontol_hir::Var>,
 }
 
-impl ExprVarTable {
+impl MapVarTable {
     pub fn get_or_create_var(&mut self, ident: String) -> ontol_hir::Var {
         let length = self.variables.len();
 

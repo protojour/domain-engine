@@ -11,7 +11,7 @@ use smartstring::alias::String;
 
 use crate::{
     def::RegexMeta,
-    lowering::ExprVarTable,
+    lowering::MapVarTable,
     pattern::{Patterns, RegexPattern, RegexPatternCaptureNode},
     SourceSpan, Src,
 };
@@ -137,7 +137,7 @@ pub fn parse_literal_regex<'m>(
     Ok(RegexMeta { pattern, ast, hir })
 }
 
-pub struct RegexToExprLowerer<'a> {
+pub struct RegexToPatternLowerer<'a> {
     named_capture_spans: HashMap<String, SourceSpan>,
     current_nodes: Vec<RegexPatternCaptureNode>,
     pushback: Vec<StackNode>,
@@ -145,16 +145,16 @@ pub struct RegexToExprLowerer<'a> {
     pattern_literal: &'a str,
     pattern_span: &'a Span,
     src: &'a Src,
-    var_table: &'a mut ExprVarTable,
+    var_table: &'a mut MapVarTable,
     patterns: &'a mut Patterns,
 }
 
-impl<'a> RegexToExprLowerer<'a> {
+impl<'a> RegexToPatternLowerer<'a> {
     pub fn new(
         pattern_literal: &'a str,
         pattern_span: &'a Span,
         src: &'a Src,
-        var_table: &'a mut ExprVarTable,
+        var_table: &'a mut MapVarTable,
         patterns: &'a mut Patterns,
     ) -> Self {
         Self {
@@ -232,7 +232,7 @@ enum RegexCombinator {
     Rep,
 }
 
-pub struct RegexSyntaxVisitor<'l, 'a>(pub &'l mut RegexToExprLowerer<'a>);
+pub struct RegexSyntaxVisitor<'l, 'a>(pub &'l mut RegexToPatternLowerer<'a>);
 
 /// This is the first pass of regex for pattern/expr analysis.
 /// The AST visitor figures out variable spans of named capture groups.
