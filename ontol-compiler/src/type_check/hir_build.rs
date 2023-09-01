@@ -7,7 +7,7 @@ use crate::{
     def::{Def, DefKind},
     error::CompileError,
     mem::Intern,
-    pattern::{PatId, Pattern, PatternKind, RegexPatternCaptureNode},
+    pattern::{PatId, Pattern, PatternKind, RegexPattern, RegexPatternCaptureNode},
     primitive::PrimitiveKind,
     type_check::{
         hir_build_ctx::{ExplicitVariableArm, PatternVariable},
@@ -200,10 +200,30 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 },
                 _,
             ) => self.type_error_node(TypeError::NoRelationParametersExpected, &pattern.span),
-            (PatternKind::Seq(aggr_pat_id, inner), expected_ty) => {
+            (PatternKind::Seq(aggr_pat_id, pat_elements), expected_ty) => {
                 let (rel_ty, val_ty) = match expected_ty {
                     Some(Type::Seq(rel_ty, val_ty)) => (*rel_ty, *val_ty),
                     Some(other_ty) => {
+                        // Handle looping regular expressions
+                        if let Type::Primitive(PrimitiveKind::String, _) | Type::StringLike(..) =
+                            other_ty
+                        {
+                            if pat_elements.len() == 1 {
+                                let pat_element = pat_elements.iter().next().unwrap();
+                                if let PatternKind::Regex(regex_pattern) = &pat_element.pattern.kind
+                                {
+                                    if pat_element.iter {
+                                        return self.build_looping_regex_node(regex_pattern, ctx);
+                                    } else {
+                                        return self.error_node(
+                                            CompileError::RequiresSpreading,
+                                            &pat_element.pattern.span,
+                                        );
+                                    }
+                                }
+                            }
+                        }
+
                         self.type_error(TypeError::MustBeSequence(other_ty), &pattern.span);
                         (self.unit_type(), self.types.intern(Type::Error))
                     }
@@ -218,7 +238,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 };
 
-                if inner.len() != 1 {
+                if pat_elements.len() != 1 {
                     return self.error_node(
                         CompileError::TODO(smart_format!("Standalone seq needs one element")),
                         &pattern.span,
@@ -226,7 +246,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
 
                 let inner_node = self.build_node(
-                    &inner.iter().next().unwrap().pattern,
+                    &pat_elements.iter().next().unwrap().pattern,
                     NodeInfo {
                         expected_ty: Some(val_ty),
                         parent_struct_flags: node_info.parent_struct_flags,
@@ -450,6 +470,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             _ => self.error_node(CompileError::TODO(smart_format!("")), &prop_span),
         }
+    }
+
+    pub(super) fn build_looping_regex_node(
+        &mut self,
+        regex_pattern: &RegexPattern,
+        ctx: &mut HirBuildCtx<'m>,
+    ) -> TypedHirNode<'m> {
+        todo!("looping regex")
     }
 
     fn build_regex_capture_groups(

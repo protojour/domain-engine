@@ -84,6 +84,7 @@ pub enum CompileError {
     CircularSubtypingRelation,
     AmbiguousNumberResolution,
     DuplicateTypeParam(String),
+    RequiresSpreading,
     TODO(String),
 }
 
@@ -210,6 +211,7 @@ impl std::fmt::Display for CompileError {
             Self::CircularSubtypingRelation => write!(f, "Circular subtyping relation"),
             Self::AmbiguousNumberResolution => write!(f, "ambiguous number resolution"),
             Self::DuplicateTypeParam(ident) => write!(f, "duplicate type param `{ident}`"),
+            Self::RequiresSpreading => write!(f, "requires spreading (`..`)"),
             Self::TODO(msg) => write!(f, "TODO: {msg}"),
         }
     }
