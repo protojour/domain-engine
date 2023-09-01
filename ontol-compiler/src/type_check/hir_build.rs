@@ -422,7 +422,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             modifier,
             parent_struct_flags,
         }: StructInfo<'m>,
-        attributes: &[StructPatternAttr],
+        pattern_attrs: &[StructPatternAttr],
         span: SourceSpan,
         ctx: &mut HirBuildCtx<'m>,
     ) -> TypedHirNode<'m> {
@@ -445,7 +445,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             },
                         };
 
-                        let mut match_properties = property_set
+                        // The written attribute patterns should match against
+                        // the relations defined on the type. Compute `MatchAttributes`:
+                        let mut match_attributes = property_set
                             .iter()
                             .filter_map(|(property_id, _cardinality)| {
                                 let meta = self.defs.relationship_meta(property_id.relationship_id);
@@ -464,7 +466,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 property_name.map(|property_name| {
                                     (
                                         property_name,
-                                        MatchProperty {
+                                        MatchAttribute {
                                             property_id: *property_id,
                                             cardinality: owner_cardinality,
                                             rel_params_def: match &meta.relationship.rel_params {
@@ -472,20 +474,21 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                                 _ => None,
                                             },
                                             value_def: value_def_id,
-                                            used: false,
+                                            mentioned: false,
                                         },
                                     )
                                 })
                             })
                             .collect::<IndexMap<_, _>>();
 
-                        let mut hir_props = Vec::with_capacity(attributes.len());
+                        let mut hir_props = Vec::with_capacity(pattern_attrs.len());
 
-                        for struct_pattern_attr in attributes {
+                        // Actually match the written attributes to the match attributes:
+                        for pattern_attr in pattern_attrs {
                             let prop_node = self.build_struct_property_node(
                                 struct_binder.var,
-                                struct_pattern_attr,
-                                &mut match_properties,
+                                pattern_attr,
+                                &mut match_attributes,
                                 actual_struct_flags,
                                 ctx,
                             );
@@ -494,81 +497,24 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             }
                         }
 
+                        // MatchAttributes that are not `mentioned` should be reported or auto-generated,
+                        // Unless the pattern is a `match` pattern.
+                        // A `match` pattern is only used for data extraction, so it doesn't
+                        // matter if there are unmentioned properties.
                         if !actual_struct_flags.contains(ontol_hir::StructFlags::MATCH) {
-                            for (name, match_property) in match_properties {
-                                if match_property.used {
-                                    continue;
-                                }
-                                if matches!(match_property.property_id.role, Role::Object) {
-                                    continue;
-                                }
-                                if matches!(
-                                    match_property.cardinality.0,
-                                    PropertyCardinality::Optional
-                                ) {
-                                    continue;
-                                }
-
-                                let relationship_id = match_property.property_id.relationship_id;
-
-                                if let Some(const_def_id) = self
-                                    .relations
-                                    .default_const_objects
-                                    .get(&relationship_id)
-                                    .cloned()
-                                {
-                                    // Generate code for default value.
-                                    let value_ty = self.check_def_sealed(const_def_id);
-                                    hir_props.push(TypedHirNode(
-                                        ontol_hir::Kind::Prop(
-                                            ontol_hir::Optional(false),
-                                            struct_binder.var,
-                                            match_property.property_id,
-                                            vec![ontol_hir::PropVariant::Singleton(
-                                                ontol_hir::Attribute {
-                                                    rel: Box::new(self.unit_node_no_span()),
-                                                    val: Box::new(TypedHirNode(
-                                                        ontol_hir::Kind::Const(const_def_id),
-                                                        Meta {
-                                                            ty: value_ty,
-                                                            span: NO_SPAN,
-                                                        },
-                                                    )),
-                                                },
-                                            )],
-                                        ),
-                                        Meta {
-                                            ty: self.unit_type(),
-                                            span: NO_SPAN,
-                                        },
-                                    ));
-                                    continue;
-                                }
-
-                                if self
-                                    .relations
-                                    .value_generators
-                                    .get(&relationship_id)
-                                    .is_some()
-                                {
-                                    // Value generators should be handled in data storage,
-                                    // so leave these fields out when not mentioned.
-                                    continue;
-                                }
-
-                                ctx.missing_properties
-                                    .entry(ctx.arm)
-                                    .or_default()
-                                    .entry(span)
-                                    .or_default()
-                                    .push(name.into());
-                            }
+                            self.handle_missing_struct_attributes(
+                                struct_binder.var,
+                                span,
+                                match_attributes,
+                                &mut hir_props,
+                                ctx,
+                            );
                         }
 
                         ontol_hir::Kind::Struct(struct_binder, actual_struct_flags, hir_props)
                     }
                     None => {
-                        if !attributes.is_empty() {
+                        if !pattern_attrs.is_empty() {
                             return self.error_node(CompileError::NoPropertiesExpected, &span);
                         }
                         ontol_hir::Kind::Unit
@@ -599,13 +545,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 modifier,
                                 parent_struct_flags,
                             },
-                            attributes,
+                            pattern_attrs,
                             span,
                             ctx,
                         );
                     }
                     _ => {
-                        let mut attributes = attributes.iter();
+                        let mut attributes = pattern_attrs.iter();
                         match attributes.next() {
                             Some(StructPatternAttr {
                                 key: (def_id, _),
@@ -639,7 +585,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let scalar_object_ty = self.check_def_sealed(scalar_def_id);
                 debug!("scalar_object_ty: {struct_def_id:?}: {scalar_object_ty:?}");
 
-                let mut attributes = attributes.iter();
+                let mut attributes = pattern_attrs.iter();
                 match attributes.next() {
                     Some(StructPatternAttr {
                         key: (def_id, _),
@@ -685,7 +631,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &mut self,
         struct_binder_var: ontol_hir::Var,
         attr: &StructPatternAttr,
-        match_properties: &mut IndexMap<&'m str, MatchProperty>,
+        match_attributes: &mut IndexMap<&'m str, MatchAttribute>,
         actual_struct_flags: StructFlags,
         ctx: &mut HirBuildCtx<'m>,
     ) -> Option<TypedHirNode<'m>> {
@@ -700,15 +646,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             self.error(CompileError::NamedPropertyExpected, prop_span);
             return None;
         };
-        let Some(match_property) = match_properties.get_mut(attr_prop) else {
+        let Some(match_property) = match_attributes.get_mut(attr_prop) else {
             self.error(CompileError::UnknownProperty, prop_span);
             return None;
         };
-        if match_property.used {
+        if match_property.mentioned {
             self.error(CompileError::DuplicateProperty, prop_span);
             return None;
         }
-        match_property.used = true;
+        match_property.mentioned = true;
 
         let rel_params_ty = match match_property.rel_params_def {
             Some(rel_def_id) => self.check_def_sealed(rel_def_id),
@@ -848,6 +794,79 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 span: *prop_span,
             },
         ))
+    }
+
+    fn handle_missing_struct_attributes(
+        &mut self,
+        struct_binder_var: ontol_hir::Var,
+        struct_span: SourceSpan,
+        match_attributes: IndexMap<&'m str, MatchAttribute>,
+        hir_props: &mut Vec<TypedHirNode<'m>>,
+        ctx: &mut HirBuildCtx<'m>,
+    ) {
+        for (name, match_property) in match_attributes {
+            if match_property.mentioned {
+                continue;
+            }
+            if matches!(match_property.property_id.role, Role::Object) {
+                continue;
+            }
+            if matches!(match_property.cardinality.0, PropertyCardinality::Optional) {
+                continue;
+            }
+
+            let relationship_id = match_property.property_id.relationship_id;
+
+            if let Some(const_def_id) = self
+                .relations
+                .default_const_objects
+                .get(&relationship_id)
+                .cloned()
+            {
+                // Generate code for default value.
+                let value_ty = self.check_def_sealed(const_def_id);
+                hir_props.push(TypedHirNode(
+                    ontol_hir::Kind::Prop(
+                        ontol_hir::Optional(false),
+                        struct_binder_var,
+                        match_property.property_id,
+                        vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
+                            rel: Box::new(self.unit_node_no_span()),
+                            val: Box::new(TypedHirNode(
+                                ontol_hir::Kind::Const(const_def_id),
+                                Meta {
+                                    ty: value_ty,
+                                    span: NO_SPAN,
+                                },
+                            )),
+                        })],
+                    ),
+                    Meta {
+                        ty: self.unit_type(),
+                        span: NO_SPAN,
+                    },
+                ));
+                continue;
+            }
+
+            if self
+                .relations
+                .value_generators
+                .get(&relationship_id)
+                .is_some()
+            {
+                // Value generators should be handled in data storage,
+                // so leave these fields out when not mentioned.
+                continue;
+            }
+
+            ctx.missing_properties
+                .entry(ctx.arm)
+                .or_default()
+                .entry(struct_span)
+                .or_default()
+                .push(name.into());
+        }
     }
 
     fn build_implicit_rel_node(
@@ -1002,10 +1021,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     }
 }
 
-struct MatchProperty {
+struct MatchAttribute {
     property_id: PropertyId,
     cardinality: Cardinality,
     rel_params_def: Option<DefId>,
     value_def: DefId,
-    used: bool,
+    mentioned: bool,
 }
