@@ -35,7 +35,7 @@ pub struct Document {
     pub text: String,
     pub tokens: Vec<Spanned<Token>>,
     pub symbols: HashSet<String>,
-    pub types: HashMap<String, Spanned<DefStatement>>,
+    pub defs: HashMap<String, Spanned<DefStatement>>,
     pub statements: Vec<Spanned<Statement>>,
     pub imports: Vec<UseStatement>,
 }
@@ -67,12 +67,12 @@ impl State {
                 }
             }
 
-            /// Recursively explore the AST, collecting types and other statements
+            /// Recursively explore the AST, collecting defs and other statements
             fn explore(
                 statements: &Vec<Spanned<Statement>>,
                 nested: &mut Vec<Spanned<Statement>>,
                 imports: &mut Vec<UseStatement>,
-                types: &mut HashMap<String, Spanned<DefStatement>>,
+                defs: &mut HashMap<String, Spanned<DefStatement>>,
                 level: u8,
             ) {
                 for (statement, range) in statements {
@@ -83,13 +83,13 @@ impl State {
                         Statement::Use(stmt) => imports.push(stmt.clone()),
                         Statement::Def(stmt) => {
                             let name = stmt.ident.0.to_string();
-                            types.insert(name, (stmt.clone(), range.clone()));
-                            explore(&stmt.block.0, nested, imports, types, level + 1)
+                            defs.insert(name, (stmt.clone(), range.clone()));
+                            explore(&stmt.block.0, nested, imports, defs, level + 1)
                         }
                         Statement::Rel(stmt) => {
                             for rel in &stmt.relations {
                                 if let Some((ctx_block, _)) = &rel.ctx_block {
-                                    explore(ctx_block, nested, imports, types, level + 1)
+                                    explore(ctx_block, nested, imports, defs, level + 1)
                                 }
                             }
                         }
@@ -356,7 +356,7 @@ impl Document {
                     Token::StringLiteral(_) => (),
                     Token::Regex(_) => (),
                     Token::Sym(val) => {
-                        if let Some((stmt, range)) = self.types.get(val.as_str()) {
+                        if let Some((stmt, range)) = self.defs.get(val.as_str()) {
                             dp.path = format!("{}.{}", basepath, stmt.ident.0);
                             dp.signature = self.get_signature(range);
                             dp.docs = stmt.docs.join("\n");
@@ -379,7 +379,7 @@ impl Document {
                                         end: range.end(),
                                     });
                                     dp.docs =
-                                        "### Relation prop\nBinds a type to a union".to_string();
+                                        "### Relation prop\nBinds a def to a union".to_string();
                                 }
                                 "gen" => {
                                     dp.path = "ontol.gen".to_string();
@@ -483,13 +483,13 @@ impl Document {
     }
 }
 
-/// Completions for built-in keywords and types
+/// Completions for built-in keywords and defs
 pub fn get_builtins() -> Vec<CompletionItem> {
     vec![
         CompletionItem {
-            label: "type".to_string(),
+            label: "def".to_string(),
             kind: Some(CompletionItemKind::KEYWORD),
-            detail: Some("type …".to_string()),
+            detail: Some("def …".to_string()),
             ..Default::default()
         },
         CompletionItem {
@@ -519,19 +519,13 @@ pub fn get_builtins() -> Vec<CompletionItem> {
         CompletionItem {
             label: "pub".to_string(),
             kind: Some(CompletionItemKind::KEYWORD),
-            detail: Some("pub type …".to_string()),
+            detail: Some("pub def …".to_string()),
             ..Default::default()
         },
         CompletionItem {
             label: "fmt".to_string(),
             kind: Some(CompletionItemKind::KEYWORD),
             detail: Some("fmt … => …".to_string()),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "with".to_string(),
-            kind: Some(CompletionItemKind::KEYWORD),
-            detail: Some("with … { … }".to_string()),
             ..Default::default()
         },
         CompletionItem {
@@ -635,7 +629,7 @@ pub fn get_builtins() -> Vec<CompletionItem> {
 
 /// A list of reserved words in ONTOL, to separate them from user-defined symbols
 const RESERVED_WORDS: [&str; 30] = [
-    "use", "as", "pub", "type", "with", "rel", "fmt", "map", "unify", "id", "is", "has", "gen",
+    "use", "as", "pub", "def", "with", "rel", "fmt", "map", "unify", "id", "is", "has", "gen",
     "auto", "default", "example", "number", "boolean", "integer", "i64", "float", "f64", "string",
     "datetime", "date", "time", "uuid", "regex", "seq", "dict",
 ];

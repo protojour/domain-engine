@@ -207,8 +207,8 @@ impl LanguageServer for Backend {
                     .map(|s| CompletionItem {
                         label: s.to_string(),
                         kind: Some(CompletionItemKind::VARIABLE),
-                        detail: Some(match doc.types.contains_key(s) {
-                            true => format!("type {}", s),
+                        detail: Some(match doc.defs.contains_key(s) {
+                            true => format!("def {}", s),
                             false => s.to_string(),
                         }),
                         ..Default::default()
