@@ -38,35 +38,33 @@ fn test_map_regex_duplex1() {
 
 // BUG: This should make an iteration group consisting of (one, two)
 #[test]
-fn test_map_regex_repetition1() {
+fn test_map_regex_loop_pattern() {
     r#"
-    pub def foo {
+    pub def in {
         rel .'input': string
     }
-    pub def bar {
+    def capture {
         rel .'first': string
         rel .'second': string
     }
+    pub def out {
+        rel .'captures': [capture]
+    }
     map {
-        foo {
-            'input': /((?<one>\w+) (?<two>\w+),)*!/
+        in {
+            'input': [ // ERROR type mismatch: expected `[string]`, found `string`
+                ../(?<one>\w+) (?<two>\w+),/ // ERROR Incompatible literal
+            ]
         }
-        bar {
-            'first': one
-            'second': two
+        out {
+            'captures': [
+                ..capture {
+                    'first': one
+                    'second': two
+                }
+            ]
         }
     }
     "#
-    .compile_ok(|test| {
-        test.assert_domain_map(
-            ("foo", "bar"),
-            json!({ "input": "Hello world!"}),
-            json!({ "first": "Hello", "second": "world"}),
-        );
-        test.assert_domain_map(
-            ("bar", "foo"),
-            json!({ "first": "Get", "second": "outtahere"}),
-            json!({ "input": "Get outtahere!"}),
-        );
-    });
+    .compile_fail();
 }

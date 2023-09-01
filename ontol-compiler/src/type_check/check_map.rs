@@ -337,7 +337,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
         let mut group_set = AggrGroupSet::new();
         match node {
             ExprRegexCaptureNode::Capture { var, name_span, .. } => {
-                self.register_variable(*var, &name_span, parent_aggr_group, &mut group_set, ctx);
+                self.register_variable(*var, name_span, parent_aggr_group, &mut group_set, ctx);
             }
             ExprRegexCaptureNode::Concat { nodes } => {
                 for node in nodes {
