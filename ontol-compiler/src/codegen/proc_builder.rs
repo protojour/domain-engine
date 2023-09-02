@@ -55,6 +55,14 @@ impl ProcBuilder {
         }
     }
 
+    /// Make a split of the given block, so that the block reference points
+    /// at the continuation block, returning a block pointing _before_ the split.
+    pub fn split_block(&mut self, block: &mut Block) -> Block {
+        let mut block2 = self.new_block(Delta(0), block.terminator_span());
+        std::mem::swap(block, &mut block2);
+        block2
+    }
+
     pub fn top(&self) -> Local {
         Local(self.stack_size as u16 - 1)
     }
@@ -76,7 +84,7 @@ impl ProcBuilder {
     }
 
     /// Generate one instruction in the given block
-    pub fn append(
+    pub fn append_ir(
         &mut self,
         block: &mut Block,
         ir: Ir,
@@ -89,15 +97,25 @@ impl ProcBuilder {
         local
     }
 
+    pub fn append_op(
+        &mut self,
+        block: &mut Block,
+        opcode: OpCode,
+        stack_delta: Delta,
+        span: SourceSpan,
+    ) -> Local {
+        self.append_ir(block, Ir::Op(opcode), stack_delta, span)
+    }
+
     pub fn append_pop_until(&mut self, block: &mut Block, local: Local, span: SourceSpan) {
         let stack_delta = Delta(local.0 as i32 - self.top().0 as i32);
         if stack_delta.0 != 0 {
-            if let Some((Ir::PopUntil(last_local), _)) = block.ir.last_mut() {
+            if let Some((Ir::Op(OpCode::PopUntil(last_local)), _)) = block.ir.last_mut() {
                 // peephole optimization: No need for consecutive PopUntil
                 self.stack_size += stack_delta.0;
                 *last_local = local;
             } else {
-                self.append(block, Ir::PopUntil(local), stack_delta, span);
+                self.append_op(block, OpCode::PopUntil(local), stack_delta, span);
             }
         }
     }
@@ -107,18 +125,29 @@ impl ProcBuilder {
 
         // compute addresses
         let mut block_addr = 0;
-        for block in &mut self.blocks {
-            // Peephole: No need for PopUntil right before return
-            if let Some(Terminator::Return(_)) = &block.terminator {
-                if let Some((Ir::PopUntil(_), _)) = block.ir.last() {
-                    block.ir.pop();
+        for (block_index, block) in self.blocks.iter_mut().enumerate() {
+            let mut terminator_size = 1;
+            match &block.terminator {
+                // Peephole: No need for PopUntil right before return
+                Some(Terminator::Return(_)) => {
+                    if let Some((Ir::Op(OpCode::PopUntil(_)), _)) = block.ir.last() {
+                        block.ir.pop();
+                    }
                 }
+                Some(Terminator::Goto(dest_index, offset)) => {
+                    // If it's just entering the next block, an instruction is not needed:
+                    if dest_index.0 as usize == block_index + 1 && offset.0 == 0 {
+                        block.terminator = Some(Terminator::GotoNext);
+                        terminator_size = 0;
+                    }
+                }
+                _ => {}
             }
 
             block_addresses.push(block_addr);
 
             // account for the terminator:
-            block_addr += block.ir.len() as u32 + 1;
+            block_addr += block.ir.len() as u32 + terminator_size;
         }
 
         if tracing::enabled!(Level::DEBUG) {
@@ -132,36 +161,16 @@ impl ProcBuilder {
         for block in self.blocks {
             for (ir, span) in block.ir {
                 let opcode = match ir {
-                    Ir::Call(proc) => OpCode::Call(proc),
-                    Ir::CallBuiltin(proc, def_id) => OpCode::CallBuiltin(proc, def_id),
-                    Ir::PopUntil(local) => OpCode::PopUntil(local),
-                    Ir::Clone(local) => OpCode::Clone(local),
-                    Ir::Bump(local) => OpCode::Bump(local),
                     Ir::Iter(seq, counter, block_index) => OpCode::Iter(
                         seq,
                         counter,
                         AddressOffset(block_addresses[block_index.0 as usize]),
                     ),
-                    Ir::TakeAttr2(local, property_id) => OpCode::TakeAttr2(local, property_id),
-                    Ir::TryTakeAttr2(local, property_id) => {
-                        OpCode::TryTakeAttr2(local, property_id)
-                    }
-                    Ir::PutAttr1(local, property_id) => OpCode::PutAttr1(local, property_id),
-                    Ir::PutAttr2(local, property_id) => OpCode::PutAttr2(local, property_id),
-                    Ir::AppendAttr2(local) => OpCode::AppendAttr2(local),
-                    Ir::AppendString(local) => OpCode::AppendString(local),
-                    Ir::I64(value, def_id) => OpCode::I64(value, def_id),
-                    Ir::F64(value, def_id) => OpCode::F64(value, def_id),
-                    Ir::String(value, def_id) => OpCode::String(value, def_id),
                     Ir::Cond(predicate, block_index) => OpCode::Cond(
                         predicate,
                         AddressOffset(block_addresses[block_index.0 as usize]),
                     ),
-                    Ir::TypePun(local, def_id) => OpCode::TypePun(local, def_id),
-                    Ir::RegexCapture(local, def_id, groups) => {
-                        OpCode::RegexCapture(local, def_id, groups)
-                    }
-                    Ir::AssertTrue => OpCode::AssertTrue,
+                    Ir::Op(opcode) => opcode,
                 };
                 output.push((opcode, span));
             }
@@ -170,12 +179,17 @@ impl ProcBuilder {
             match block.terminator {
                 Some(Terminator::Return(Local(0))) => output.push((OpCode::Return0, span)),
                 Some(Terminator::Return(local)) => output.push((OpCode::Return(local), span)),
-                Some(Terminator::PopGoto(block_index, offset)) => output.push((
+                Some(
+                    Terminator::PopGoto(block_index, offset)
+                    | Terminator::Goto(block_index, offset),
+                ) => output.push((
                     OpCode::Goto(AddressOffset(
                         block_addresses[block_index.0 as usize] + offset.0,
                     )),
                     span,
                 )),
+                Some(Terminator::GotoNext) => {}
+                Some(Terminator::Panic(message)) => output.push((OpCode::Panic(message), span)),
                 None => panic!("Block has no terminator!"),
             }
         }
@@ -213,7 +227,6 @@ fn debug_output(n_params: NParams, output: &SpannedOpCodes) {
     );
 }
 
-#[allow(unused)]
 pub struct Block {
     index: BlockIndex,
     stack_start: u32,
@@ -241,6 +254,10 @@ impl Block {
 
     pub fn terminator(&self) -> Option<&Terminator> {
         self.terminator.as_ref()
+    }
+
+    pub fn terminator_span(&self) -> SourceSpan {
+        self.terminator_span
     }
 }
 

@@ -1,4 +1,5 @@
 use fnv::FnvHashSet;
+use ontol_runtime::vm::proc::OpCode;
 
 use super::{
     ir::{BlockIndex, Ir, Terminator},
@@ -50,7 +51,7 @@ impl CloneToBumpOptimizer {
 
         for (ir, _) in block.ir_mut() {
             match ir {
-                Ir::Clone(local) => {
+                Ir::Op(OpCode::Clone(local)) => {
                     if (local.0 as u32) < stack_start {
                         match block_kind {
                             BlockKind::Linear => {
@@ -80,10 +81,10 @@ impl CloneToBumpOptimizer {
 
         // optimize (Clone => Take):
         for (ir, _) in block.ir_mut() {
-            if let Ir::Clone(local) = ir {
+            if let Ir::Op(OpCode::Clone(local)) = ir {
                 let usage = self.usage_mut(local.0 as usize);
                 if matches!(usage, LocalUsage::Once) {
-                    *ir = Ir::Bump(*local);
+                    *ir = Ir::Op(OpCode::Bump(*local));
                 }
             }
         }

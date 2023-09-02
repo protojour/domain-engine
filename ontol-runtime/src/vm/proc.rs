@@ -1,4 +1,5 @@
 use ::serde::{Deserialize, Serialize};
+use bit_vec::BitVec;
 use derive_debug_extras::DebugExtras;
 use smartstring::alias::String;
 
@@ -97,11 +98,16 @@ pub enum OpCode {
     /// Overwrite runtime type info with a new type
     TypePun(Local, DefId),
     /// Run a regex search on the first match of string at Local.
+    /// The next instruction must be a `RegexCaptureIndexes`.
+    /// RegexCaptureIndexes contains a bit vector of the capture groups to save, and push on the stack.
     /// If successful, pushes n values on the stack: [I64(1), ..captures]
     /// If unsuccessful, pushes one value on the stakc: [I64(0)]
-    RegexCapture(Local, DefId, Box<[PatternCaptureGroup]>),
+    RegexCapture(Local, DefId),
+    /// Required parameter to RegexCapture
+    RegexCaptureIndexes(BitVec),
     /// Yanks True from the stack and crashes unless true
     AssertTrue,
+    Panic(String),
 }
 
 /// A reference to a local on the value stack during procedure execution.
@@ -124,14 +130,9 @@ pub enum BuiltinProc {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Predicate {
     MatchesDiscriminant(Local, DefId),
+    IsUnit(Local),
     /// Test if true. NB: Yanks from stack.
     YankTrue(Local),
     /// Test if not true. NB: Yanks from stack.
     YankFalse(Local),
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct PatternCaptureGroup {
-    pub group_index: u32,
-    pub type_def_id: DefId,
 }

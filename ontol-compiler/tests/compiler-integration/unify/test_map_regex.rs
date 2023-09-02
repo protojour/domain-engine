@@ -36,6 +36,45 @@ fn test_map_regex_duplex1() {
     });
 }
 
+#[test]
+// BUG: Have to treat regexes as property sets in dependency tree, and flatten things
+#[should_panic = "Regex did not match"]
+fn test_map_regex_alternation1() {
+    r#"
+    pub def foo {
+        rel .'input': string
+    }
+    def capture {
+        rel .'value': string
+    }
+    pub def bar {
+        rel .'first'?: string
+        rel .'second'?: string
+    }
+    map {
+        foo match {
+            'input': /(first=(?<first>\w+))|(second=(?<second>\w+))!/
+        }
+        bar {
+            'first'?: first
+            'second'?: second
+        }
+    }
+    "#
+    .compile_ok(|test| {
+        test.assert_domain_map(
+            ("foo", "bar"),
+            json!({ "input": "first=FOO!"}),
+            json!({ "first": "FOO" }),
+        );
+        test.assert_domain_map(
+            ("foo", "bar"),
+            json!({ "input": "second=FOO!"}),
+            json!({ "second": "BAR" }),
+        );
+    });
+}
+
 // BUG: This should make an iteration group consisting of (one, two)
 #[test]
 #[should_panic = "looping regex"]

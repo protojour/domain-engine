@@ -25,6 +25,7 @@ derive-debug-extras = { version = "0.2", features = ["auto-debug-single-tuple-in
 time = { version = "0.3", features = ["serde-well-known"] }
 regex = "1"
 urlencoding = "2"
+bit-vec = { version = "0.6", features = ["serde"] }
 
 [dev-dependencies]
 tracing-subscriber.workspace = true

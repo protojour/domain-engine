@@ -1,8 +1,4 @@
-use ontol_runtime::{
-    value::PropertyId,
-    vm::proc::{BuiltinProc, Local, PatternCaptureGroup, Predicate, Procedure},
-    DefId,
-};
+use ontol_runtime::vm::proc::{Local, OpCode, Predicate};
 use smartstring::alias::String;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
@@ -17,37 +13,31 @@ impl BlockOffset {
     }
 }
 
+/// "Intermediate representation" of opcodes.
+/// Some opcodes that involve branching use addresses,
+/// but these are not computed until the whole procedure is computed.
 #[derive(Debug)]
 #[allow(unused)]
 pub enum Ir {
-    Call(Procedure),
-    CallBuiltin(BuiltinProc, DefId),
-    PopUntil(Local),
-    /// Clone a local and put top of stack
-    Clone(Local),
-    /// Bump some local to top, leaving Unit behind
-    Bump(Local),
-    Iter(Local, Local, BlockIndex),
+    /// Raw OpCode.
+    /// Ir should not contain raw opcodes that refer to raw addresses.
+    /// For these, there are special Ir versions.
+    Op(OpCode),
     /// Take attribute and push two values on the stack: value(top), rel_params
-    TakeAttr2(Local, PropertyId),
-    TryTakeAttr2(Local, PropertyId),
-    PutAttr1(Local, PropertyId),
-    PutAttr2(Local, PropertyId),
-    AppendAttr2(Local),
-    AppendString(Local),
-    I64(i64, DefId),
-    F64(f64, DefId),
-    String(String, DefId),
     Cond(Predicate, BlockIndex),
-    TypePun(Local, DefId),
-    RegexCapture(Local, DefId, Box<[PatternCaptureGroup]>),
-    AssertTrue,
+    /// Iterate sequence using param(1) as counter. Call block for each iteration.
+    Iter(Local, Local, BlockIndex),
 }
 
 #[derive(Clone, Debug)]
 pub enum Terminator {
     /// The procedure returns a specific local
     Return(Local),
+    /// Just a "goto", nothing is popped
+    Goto(BlockIndex, BlockOffset),
+    /// Just enter the next block. No instruction needed.
+    GotoNext,
     /// All the block locals are popped and control resumes at the parent block
     PopGoto(BlockIndex, BlockOffset),
+    Panic(String),
 }

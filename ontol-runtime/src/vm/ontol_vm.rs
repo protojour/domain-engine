@@ -1,5 +1,7 @@
 use std::{array, collections::BTreeMap};
 
+use bit_vec::BitVec;
+use regex::Captures;
 use smartstring::alias::String;
 use tracing::{debug, trace, Level};
 
@@ -13,7 +15,7 @@ use crate::{
     DefId,
 };
 
-use super::proc::{PatternCaptureGroup, Predicate};
+use super::proc::Predicate;
 
 /// Virtual machine for executing ONTOL procedures
 pub struct OntolVm<'l> {
@@ -202,6 +204,7 @@ impl Processor for OntolProcessor {
     #[inline(always)]
     fn cond_predicate(&mut self, predicate: &Predicate) -> bool {
         match predicate {
+            Predicate::IsUnit(local) => matches!(self.local(*local).data, Data::Unit),
             Predicate::MatchesDiscriminant(local, def_id) => {
                 let value = self.local(*local);
                 value.type_def_id == *def_id
@@ -216,32 +219,15 @@ impl Processor for OntolProcessor {
         self.local_mut(local).type_def_id = def_id;
     }
 
-    fn regex_capture(
-        &mut self,
-        local: Local,
-        text_pattern: &TextPattern,
-        groups: &[PatternCaptureGroup],
-    ) {
+    fn regex_capture(&mut self, local: Local, text_pattern: &TextPattern, group_filter: &BitVec) {
         let Data::String(haystack) = &self.local(local).data else {
             panic!("Not a string");
         };
+
         match text_pattern.regex.captures(haystack) {
             Some(captures) => {
-                let tmp_stack: Vec<Value> = groups
-                    .iter()
-                    .map(|group| {
-                        let capture_match = captures
-                            .get(group.group_index as usize)
-                            .expect("Capture group undefined");
-
-                        Value::new(
-                            Data::String(capture_match.as_str().into()),
-                            group.type_def_id,
-                        )
-                    })
-                    .collect();
-
-                self.stack.extend(tmp_stack);
+                let values = extract_regex_captures(&captures, group_filter);
+                self.stack.extend(values);
                 self.push_true();
             }
             None => {
@@ -374,6 +360,22 @@ impl VmDebug<OntolProcessor> for Tracer {
         }
         trace!("{:?}", vm.pending_opcode());
     }
+}
+
+fn extract_regex_captures(captures: &Captures, group_filter: &BitVec) -> Vec<Value> {
+    group_filter
+        .iter()
+        .enumerate()
+        .filter_map(|(index, value)| if value { Some(index) } else { None })
+        .map(|index| {
+            if let Some(capture_match) = captures.get(index) {
+                // BUG: These should all have the `ontol.string` DefId:
+                Value::new(Data::String(capture_match.as_str().into()), DefId::unit())
+            } else {
+                Value::unit()
+            }
+        })
+        .collect()
 }
 
 #[cfg(test)]

@@ -58,12 +58,7 @@ pub trait Processor {
     fn append_string(&mut self, to: Local);
     fn cond_predicate(&mut self, predicate: &Predicate) -> bool;
     fn type_pun(&mut self, local: Local, def_id: DefId);
-    fn regex_capture(
-        &mut self,
-        local: Local,
-        text_pattern: &TextPattern,
-        capture_indexes: &[PatternCaptureGroup],
-    );
+    fn regex_capture(&mut self, local: Local, text_pattern: &TextPattern, index_filter: &BitVec);
     fn assert_true(&mut self);
 }
 
@@ -188,14 +183,23 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                     processor.type_pun(*local, *def_id);
                     self.program_counter += 1;
                 }
-                OpCode::RegexCapture(local, def_id, groups) => {
+                OpCode::RegexCapture(local, def_id) => {
                     let text_pattern = self.ontology.get_text_pattern(*def_id).unwrap();
-                    processor.regex_capture(*local, text_pattern, groups);
+                    self.program_counter += 1;
+                    let OpCode::RegexCaptureIndexes(index_filter) = &opcodes[self.program_counter]
+                    else {
+                        panic!("Expected capture indexes");
+                    };
+                    processor.regex_capture(*local, text_pattern, index_filter);
                     self.program_counter += 1;
                 }
+                OpCode::RegexCaptureIndexes(_) => unreachable!(),
                 OpCode::AssertTrue => {
                     processor.assert_true();
                     self.program_counter += 1;
+                }
+                OpCode::Panic(message) => {
+                    panic!("{message}");
                 }
             }
         }
@@ -231,9 +235,8 @@ macro_rules! return0 {
     };
 }
 
+use bit_vec::BitVec;
 pub(crate) use return0;
-
-use super::proc::PatternCaptureGroup;
 
 pub trait VmDebug<P: Processor> {
     fn tick(&mut self, vm: &AbstractVm<P>, processor: &P);

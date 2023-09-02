@@ -1,6 +1,6 @@
 use fnv::FnvHashMap;
 use indexmap::IndexSet;
-use tracing::debug;
+use tracing::{debug, trace};
 
 use crate::{
     hir_unify::{UnifierError, UnifierResult, VarSet},
@@ -17,6 +17,8 @@ use super::{
     scope,
     unify_props::UnifyProps,
 };
+
+const UNIFIER_DEBUG: bool = false;
 
 pub struct Unifier<'a, 'm> {
     pub(super) types: &'a mut Types<'m>,
@@ -44,11 +46,13 @@ impl<'a, 'm> Unifier<'a, 'm> {
         // FIXME: This can be a loop instead of forced recursion,
         // for simple cases where the unified node is returned as-is from the layer below.
 
-        // debug!(
-        //     "unify expr::{} / scope::{}",
-        //     expr_kind.debug_short(),
-        //     scope_kind.debug_short()
-        // );
+        if UNIFIER_DEBUG {
+            debug!(
+                "unify expr::{} / scope::{}",
+                expr_kind.debug_short(),
+                scope_kind.debug_short()
+            );
+        }
 
         match (expr_kind, scope_kind) {
             // ### need to return scope binder
@@ -523,6 +527,9 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 scope::Kind::PropSet(scope::PropSet(scope_binder, scope_props)),
             ) => {
                 let dep_tree = DepTreeBuilder::new(scope_props)?.build(props);
+                if UNIFIER_DEBUG {
+                    trace!("dep_tree: {dep_tree:#?}");
+                }
                 let mut nodes = Vec::with_capacity(dep_tree.trees.len() + dep_tree.constants.len());
 
                 for (prop_scope, sub_tree) in dep_tree.trees {
