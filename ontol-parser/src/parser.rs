@@ -52,7 +52,7 @@ fn use_statement() -> impl AstParser<UseStatement> {
 
 fn domain_statement() -> impl AstParser<Spanned<Statement>> {
     recursive(|stmt_parser| {
-        let def_stmt = spanned(type_statement(stmt_parser.clone())).map(span_map(Statement::Def));
+        let def_stmt = spanned(def_statement(stmt_parser.clone())).map(span_map(Statement::Def));
         let rel_stmt = spanned(rel_statement(stmt_parser)).map(span_map(Statement::Rel));
         let fmt_stmt = spanned(fmt_statement()).map(span_map(Statement::Fmt));
         let map_stmt = spanned(map_statement()).map(span_map(Statement::Map));
@@ -61,7 +61,7 @@ fn domain_statement() -> impl AstParser<Spanned<Statement>> {
     })
 }
 
-fn type_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstParser<DefStatement> {
+fn def_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstParser<DefStatement> {
     doc_comments()
         .then(keyword(Token::Pub).or_not())
         .then(keyword(Token::Def))
