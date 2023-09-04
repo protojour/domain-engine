@@ -225,24 +225,19 @@ impl LanguageServer for Backend {
             .uri
             .as_str();
         let pos = params.text_document_position_params.position;
-        match self.state.read().await.docs.get(uri) {
-            Some(doc) => {
-                let hd = doc.get_hover_docs(uri, pos.line as usize, pos.character as usize);
-                Ok(Some(Hover {
-                    contents: HoverContents::Array(vec![
-                        MarkedString::from_language_code("ontol".to_string(), hd.path),
-                        MarkedString::from_language_code("ontol".to_string(), hd.signature),
-                        MarkedString::from_markdown(hd.docs),
-                    ]),
-                    range: None,
-                }))
-            }
+        let state = self.state.read().await;
+        match state.get_hover_docs(uri, pos.line as usize, pos.character as usize) {
+            Some(doc_panel) => Ok(Some(Hover {
+                contents: HoverContents::Array(doc_panel.to_markdown_vec()),
+                range: None,
+            })),
             None => Ok(None),
         }
     }
 
     async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
         let uri = params.text_document_position.text_document.uri.as_str();
+        // let pos = params.text_document_position.position;
         match self.state.read().await.docs.get(uri) {
             Some(doc) => {
                 let mut builtin = get_builtins();
