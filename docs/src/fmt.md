@@ -20,7 +20,7 @@ fmt [] => string => string => string
 
 ## usage
 
-`fmt` statements are not very useful with context, it should refer to something. We do this by adding a final arrow `=>` operator and an identifier. A common pattern would be using the `fmt` statement as part of a [`def`](def.md):
+A `fmt` statement is not very useful without context, it should refer to something. We do this by adding a final arrow `=>` operator and an identifier. A common pattern would be using the `fmt` statement as part of a [`def`](def.md):
 
 ```ontol
 def some_def {
