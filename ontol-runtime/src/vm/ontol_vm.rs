@@ -25,22 +25,30 @@ pub struct OntolVm<'l> {
 
 impl<'o> OntolVm<'o> {
     pub fn new(ontology: &'o Ontology) -> Self {
-        let mut string_def_id = DefId::unit();
+        let ontol_domain = ontology.find_domain(PackageId(0)).unwrap();
 
-        // For tests, need to support running domainless
-        if let Some(ontol_domain) = ontology.find_domain(PackageId(0)) {
-            // TODO: In the future, information about primitive types could be cached inside Ontology:
-            string_def_id = ontol_domain
-                .type_info_by_identifier("string")
-                .unwrap()
-                .def_id;
-        }
+        // TODO: In the future, information about primitive types could be cached inside Ontology:
+        let string_def_id = ontol_domain
+            .type_info_by_identifier("string")
+            .unwrap()
+            .def_id;
 
         Self {
             abstract_vm: AbstractVm::new(ontology),
             processor: OntolProcessor {
                 stack: Default::default(),
                 string_def_id,
+            },
+        }
+    }
+
+    #[cfg(test)]
+    pub fn new_domainless(ontology: &'o Ontology) -> Self {
+        Self {
+            abstract_vm: AbstractVm::new(ontology),
+            processor: OntolProcessor {
+                stack: Default::default(),
+                string_def_id: DefId::unit(),
             },
         }
     }
@@ -429,7 +437,7 @@ mod tests {
         );
 
         let ontology = Ontology::builder().lib(lib).build();
-        let mut vm = ontology.new_vm();
+        let mut vm = OntolVm::new_domainless(&ontology);
         let output = vm.eval(
             proc,
             [Value::new(
@@ -500,7 +508,7 @@ mod tests {
         );
 
         let ontology = Ontology::builder().lib(lib).build();
-        let mut vm = ontology.new_vm();
+        let mut vm = OntolVm::new_domainless(&ontology);
         let output = vm.eval(
             mapping_proc,
             [Value::new(
@@ -564,7 +572,7 @@ mod tests {
         );
 
         let ontology = Ontology::builder().lib(lib).build();
-        let mut vm = ontology.new_vm();
+        let mut vm = OntolVm::new_domainless(&ontology);
         let output = vm.eval(
             proc,
             [Value::new(
@@ -622,7 +630,7 @@ mod tests {
         );
 
         let ontology = Ontology::builder().lib(lib).build();
-        let mut vm = ontology.new_vm();
+        let mut vm = OntolVm::new_domainless(&ontology);
         let output = vm.eval(
             proc,
             [Value::new(
@@ -685,7 +693,7 @@ mod tests {
         );
 
         let ontology = Ontology::builder().lib(lib).build();
-        let mut vm = ontology.new_vm();
+        let mut vm = OntolVm::new_domainless(&ontology);
 
         assert_eq!(
             "{}",
