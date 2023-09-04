@@ -24,7 +24,6 @@ use substring::Substring;
 #[derive(Clone, Eq, PartialEq, Debug, Default)]
 pub struct State {
     pub docs: HashMap<String, Document>,
-    pub roots: HashSet<String>,
     pub source_map: HashMap<SourceId, String>,
 }
 

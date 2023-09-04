@@ -69,7 +69,6 @@ impl Backend {
                                     src_uri: uri.to_string(),
                                 });
                             } else if let Ok(text) = read_file(ref_uri.as_str()) {
-                                state.roots.insert(ref_uri.to_string());
                                 state.docs.insert(
                                     ref_uri.to_string(),
                                     Document {
@@ -172,8 +171,6 @@ impl LanguageServer for Backend {
             let mut state = self.state.write().await;
             let (path, filename) = get_path_and_name(uri.as_str());
             let name = get_domain_name(filename);
-
-            state.roots.insert(uri.to_string());
             state.docs.insert(
                 uri.to_string(),
                 Document {
@@ -216,7 +213,6 @@ impl LanguageServer for Backend {
         let uri = params.text_document.uri.as_str();
         let mut state = self.state.write().await;
         state.docs.remove(uri);
-        state.roots.remove(uri);
         if let Some(src_id) = state.get_sourceid_by_uri(uri) {
             state.source_map.remove(&src_id);
         }
