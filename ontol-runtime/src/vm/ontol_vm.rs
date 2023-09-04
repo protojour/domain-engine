@@ -12,7 +12,7 @@ use crate::{
     value::{Attribute, Data, PropertyId, Value, ValueDebug},
     vm::abstract_vm::{AbstractVm, Processor, VmDebug},
     vm::proc::{BuiltinProc, Local, Procedure},
-    DefId,
+    DefId, PackageId,
 };
 
 use super::proc::Predicate;
@@ -25,9 +25,23 @@ pub struct OntolVm<'l> {
 
 impl<'o> OntolVm<'o> {
     pub fn new(ontology: &'o Ontology) -> Self {
+        let mut string_def_id = DefId::unit();
+
+        // For tests, need to support running domainless
+        if let Some(ontol_domain) = ontology.find_domain(PackageId(0)) {
+            // TODO: In the future, information about primitive types could be cached inside Ontology:
+            string_def_id = ontol_domain
+                .type_info_by_identifier("string")
+                .unwrap()
+                .def_id;
+        }
+
         Self {
             abstract_vm: AbstractVm::new(ontology),
-            processor: OntolProcessor::default(),
+            processor: OntolProcessor {
+                stack: Default::default(),
+                string_def_id,
+            },
         }
     }
 
@@ -52,14 +66,14 @@ impl<'o> OntolVm<'o> {
         self.abstract_vm
             .execute(procedure, &mut self.processor, debug);
 
-        let value_stack = std::mem::take(&mut self.processor);
-        value_stack.stack.into_iter().next().unwrap()
+        let stack = std::mem::take(&mut self.processor.stack);
+        stack.into_iter().next().unwrap()
     }
 }
 
-#[derive(Default)]
 pub struct OntolProcessor {
     stack: Vec<Value>,
+    string_def_id: DefId,
 }
 
 impl Processor for OntolProcessor {
@@ -226,7 +240,7 @@ impl Processor for OntolProcessor {
 
         match text_pattern.regex.captures(haystack) {
             Some(captures) => {
-                let values = extract_regex_captures(&captures, group_filter);
+                let values = extract_regex_captures(&captures, group_filter, self.string_def_id);
                 self.stack.extend(values);
                 self.push_true();
             }
@@ -362,15 +376,18 @@ impl VmDebug<OntolProcessor> for Tracer {
     }
 }
 
-fn extract_regex_captures(captures: &Captures, group_filter: &BitVec) -> Vec<Value> {
+fn extract_regex_captures(
+    captures: &Captures,
+    group_filter: &BitVec,
+    string_def_id: DefId,
+) -> Vec<Value> {
     group_filter
         .iter()
         .enumerate()
         .filter_map(|(index, value)| if value { Some(index) } else { None })
         .map(|index| {
             if let Some(capture_match) = captures.get(index) {
-                // BUG: These should all have the `ontol.string` DefId:
-                Value::new(Data::String(capture_match.as_str().into()), DefId::unit())
+                Value::new(Data::String(capture_match.as_str().into()), string_def_id)
             } else {
                 Value::unit()
             }

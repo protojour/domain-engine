@@ -171,6 +171,11 @@ impl Domain {
         &self.info[def_id.1 as usize]
     }
 
+    pub fn type_info_by_identifier(&self, identifier: &str) -> Option<&TypeInfo> {
+        let def_id = self.type_names.get(identifier)?;
+        Some(self.type_info(*def_id))
+    }
+
     pub fn type_infos(&self) -> impl Iterator<Item = &TypeInfo> {
         self.info.iter()
     }
