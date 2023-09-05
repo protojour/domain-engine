@@ -15,7 +15,7 @@ fn test_flat_basic_struct1() {
     let expected = indoc! {
         "
         $a: {} - Struct {$a, $b}
-        $c: {$a} - PropVariant(Var(a), S:0:0) {$b}
+        $c: {$a} - PropVariant(opt=f, Var(a), S:0:0) {$b}
         $d: {$c} - PropValue {$b}
         $b: {$d} - Var {$b}
         "
@@ -35,7 +35,7 @@ fn test_flat_arithmetic_prop() {
     let expected = indoc! {
         "
         $a: {} - Struct {$a, $b}
-        $c: {$a} - PropVariant(Var(a), S:0:0) {$b}
+        $c: {$a} - PropVariant(opt=f, Var(a), S:0:0) {$b}
         $d: {$c} - PropValue {$b}
         $e: {$d} - Call(Sub) {$b}
         $b: {$e} - Var {$b}
@@ -58,9 +58,9 @@ fn test_flat_arithmetic_prop_dependency() {
     let expected = indoc! {
         "
         $a: {} - Struct {$a, $b, $c}
-        $d: {$a} - PropVariant(Var(a), O:0:0) {$b, $c}
+        $d: {$a} - PropVariant(opt=f, Var(a), O:0:0) {$b, $c}
         $e: {$d} - PropValue {$b, $c}
-        $f: {$a} - PropVariant(Var(a), O:0:1) {$b}
+        $f: {$a} - PropVariant(opt=f, Var(a), O:0:1) {$b}
         $g: {$f} - PropValue {$b}
         $h: {$e} - Call(Add) {$b, $c}
         $i: {$g} - Call(Add) {$b}
@@ -89,7 +89,7 @@ fn test_flat_regex() {
     let expected = indoc! {
         "
         $a: {} - Struct {$a, $b}
-        $c: {$a} - PropVariant(Var(a), S:0:0) {$b}
+        $c: {$a} - PropVariant(opt=f, Var(a), S:0:0) {$b}
         $d: {$c} - PropValue {$b}
         $e: {$d} - Regex(def@0:0) {$b}
         $f: {$e} - RegexAlternation {$b}
@@ -123,11 +123,11 @@ fn test_flat_seq() {
     let expected = indoc! {
         "
         $b: {} - Struct {$b, $f}
-        $f: {$b} - SeqPropVariant(Var(b), S:0:0) {$f}
+        $f: {$b} - SeqPropVariant(opt=f, Var(b), S:0:0) {$f}
         $h: {$f} - IterElement {}
         $i: {$h} - PropValue {$c, $g}
         $c: {$i} - Struct {$c, $g}
-        $g: {$c} - SeqPropVariant(Var(c), S:1:1) {$g}
+        $g: {$c} - SeqPropVariant(opt=f, Var(c), S:1:1) {$g}
         $j: {$g} - IterElement {}
         $k: {$j} - PropValue {$a}
         $a: {$k} - Var {$a}

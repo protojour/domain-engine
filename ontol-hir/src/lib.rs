@@ -103,8 +103,18 @@ pub enum Kind<'a, L: Lang> {
     MatchRegex(Var, DefId, Vec<CaptureMatchArm<'a, L>>),
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Default, Clone, Copy)]
 pub struct Optional(pub bool);
+
+impl Debug for Optional {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.0 {
+            write!(f, "opt=t")
+        } else {
+            write!(f, "opt=f")
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct HasDefault(pub bool);

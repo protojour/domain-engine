@@ -126,10 +126,10 @@ fn test_unify_struct_in_struct_scope() {
         |$c| (struct ($d)
             (match-prop $c S:0:0
                 (($_ $d)
-                    (prop $d O:0:0
-                        (#u
-                            (match-prop $d S:1:0
-                                (($_ $a) $a)
+                    (match-prop $d S:1:0
+                        (($_ $a)
+                            (prop $d O:0:0
+                                (#u $a)
                             )
                         )
                     )

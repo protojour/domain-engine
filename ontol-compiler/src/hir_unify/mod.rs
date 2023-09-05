@@ -4,6 +4,7 @@ use bit_set::BitSet;
 use ontol_hir::visitor::HirVisitor;
 use ontol_runtime::{format_utils::DebugViaDisplay, DefId};
 use smartstring::alias::String;
+use tracing::{info, warn};
 
 use crate::{
     hir_unify::{expr_builder::ExprBuilder, scope_builder::ScopeBuilder, unifier::Unifier},
@@ -23,6 +24,7 @@ mod expr_builder;
 mod flat_scope;
 mod flat_scope_builder;
 mod flat_unifier;
+mod flat_unifier_table;
 mod regroup_match_prop;
 mod scope;
 mod scope_builder;
@@ -52,15 +54,19 @@ pub fn unify_to_function<'m>(
     var_tracker.visit_node(0, expr);
 
     let (unified, mut var_allocator) =
-        match unify_flat_scope(scope, expr, var_tracker.var_allocator(), compiler) {
+        match unify_flat(scope, expr, var_tracker.var_allocator(), compiler) {
             Err(err) => {
                 if !CLASSIC_UNIFIER_FALLBACK {
                     return Err(err);
                 }
 
+                info!("Using classic unifier output");
                 unify_classic(scope, expr, var_tracker.var_allocator(), compiler)?
             }
-            Ok(value) => value,
+            Ok(value) => {
+                warn!("Using output from flat unifier, which is experimental");
+                value
+            }
         };
 
     let scope_ty = scope.ty();
@@ -122,7 +128,7 @@ fn unify_classic<'m>(
     Ok((unified, unifier.var_allocator))
 }
 
-fn unify_flat_scope<'m>(
+fn unify_flat<'m>(
     scope: &TypedHirNode<'m>,
     expr: &TypedHirNode<'m>,
     var_allocator: ontol_hir::VarAllocator,
@@ -308,9 +314,7 @@ pub mod test_api {
         let mut builder = FlatScopeBuilder::new(var_tracker.var_allocator(), unit_type);
         let flat_scope = builder.build_flat_scope(&hir_node).unwrap();
         let mut output = String::new();
-        for node in flat_scope.scope_nodes {
-            writeln!(&mut output, "{:?}", node).unwrap();
-        }
+        write!(&mut output, "{flat_scope}").unwrap();
 
         output
     }

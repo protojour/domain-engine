@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc, DefId};
 
@@ -10,20 +10,32 @@ pub struct FlatScope<'m> {
     pub scope_nodes: Vec<ScopeNode<'m>>,
 }
 
+impl<'m> Display for FlatScope<'m> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for node in &self.scope_nodes {
+            writeln!(f, "{node}")?;
+        }
+
+        Ok(())
+    }
+}
+
 #[derive(Clone)]
 pub struct ScopeNode<'m>(pub Kind<'m>, pub Meta<'m>);
 
 impl<'m> ScopeNode<'m> {
+    #[inline]
     pub fn kind(&self) -> &Kind<'m> {
         &self.0
     }
 
+    #[inline]
     pub fn meta(&self) -> &Meta<'m> {
         &self.1
     }
 }
 
-impl<'m> Debug for ScopeNode<'m> {
+impl<'m> Display for ScopeNode<'m> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -50,10 +62,10 @@ pub enum Kind<'m> {
     Var,
     Const(Const<'m>),
     Struct,
-    PropVariant(ontol_hir::Var, PropertyId),
+    PropVariant(ontol_hir::Optional, ontol_hir::Var, PropertyId),
     PropRelParam,
     PropValue,
-    SeqPropVariant(ontol_hir::Var, PropertyId),
+    SeqPropVariant(ontol_hir::Optional, ontol_hir::Var, PropertyId),
     IterElement,
     Call(BuiltinProc),
     Regex(DefId),

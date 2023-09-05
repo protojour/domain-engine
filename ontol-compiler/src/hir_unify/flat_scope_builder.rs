@@ -112,7 +112,7 @@ impl<'m> FlatScopeBuilder<'m> {
                     });
                 }
             }
-            ontol_hir::Kind::Prop(_optional, struct_var, property_id, variants) => {
+            ontol_hir::Kind::Prop(optional, struct_var, property_id, variants) => {
                 deps.insert(*struct_var);
 
                 for variant in variants {
@@ -120,7 +120,7 @@ impl<'m> FlatScopeBuilder<'m> {
                         ontol_hir::PropVariant::Singleton(attr) => {
                             let variant_var = self.var_allocator.alloc();
                             self.scope_nodes.push(ScopeNode(
-                                flat_scope::Kind::PropVariant(*struct_var, *property_id),
+                                flat_scope::Kind::PropVariant(*optional, *struct_var, *property_id),
                                 flat_scope::Meta {
                                     var: variant_var,
                                     pub_vars: Default::default(),
@@ -142,7 +142,11 @@ impl<'m> FlatScopeBuilder<'m> {
                         }) => {
                             let label_var = ontol_hir::Var(label.label.0);
                             self.scope_nodes.push(ScopeNode(
-                                flat_scope::Kind::SeqPropVariant(*struct_var, *property_id),
+                                flat_scope::Kind::SeqPropVariant(
+                                    *optional,
+                                    *struct_var,
+                                    *property_id,
+                                ),
                                 flat_scope::Meta {
                                     var: label_var,
                                     pub_vars: [label_var].into(),

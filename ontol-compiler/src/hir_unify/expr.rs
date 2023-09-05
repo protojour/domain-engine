@@ -12,6 +12,11 @@ pub struct Expr<'m>(pub Kind<'m>, pub Meta<'m>);
 
 impl<'m> Expr<'m> {
     #[inline]
+    pub fn kind(&self) -> &Kind<'m> {
+        &self.0
+    }
+
+    #[inline]
     pub fn meta(&self) -> &Meta<'m> {
         &self.1
     }

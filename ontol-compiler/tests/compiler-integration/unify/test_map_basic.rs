@@ -160,7 +160,7 @@ fn test_nested_optional_attribute() {
 }
 
 #[test]
-fn test_map_value_to_map_no_func() {
+fn test_map_value_to_struct_no_func() {
     "
     pub def one {
         rel .is: string
@@ -182,7 +182,7 @@ fn test_map_value_to_map_no_func() {
 }
 
 #[test]
-fn test_map_value_to_map_func() {
+fn test_map_value_to_struct_func() {
     "
     pub def one {
         rel .is: i64
