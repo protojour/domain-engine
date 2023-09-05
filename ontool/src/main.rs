@@ -97,7 +97,10 @@ enum OntoolError {
 
 #[tokio::main]
 async fn main() -> Result<(), OntoolError> {
-    tracing_subscriber::fmt().with_target(false).init();
+    tracing_subscriber::fmt()
+        .with_writer(std::io::stderr)
+        .with_target(false)
+        .init();
 
     let cli = Cli::parse();
 
