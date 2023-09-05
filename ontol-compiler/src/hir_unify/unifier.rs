@@ -18,7 +18,7 @@ use super::{
     unify_props::UnifyProps,
 };
 
-const UNIFIER_DEBUG: bool = false;
+const UNIFIER_DEBUG: bool = true;
 
 pub struct Unifier<'a, 'm> {
     pub(super) types: &'a mut Types<'m>,
@@ -529,6 +529,12 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 let dep_tree = DepTreeBuilder::new(scope_props)?.build(props);
                 if UNIFIER_DEBUG {
                     trace!("dep_tree: {dep_tree:#?}");
+                }
+                for tree in &dep_tree.trees {
+                    let subtree = &tree.1;
+                    if !subtree.sub_trees.is_empty() {
+                        // panic!("Using subtree");
+                    }
                 }
                 let mut nodes = Vec::with_capacity(dep_tree.trees.len() + dep_tree.constants.len());
 

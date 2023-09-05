@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use bit_set::BitSet;
 use ontol_hir::visitor::HirVisitor;
-use ontol_runtime::DefId;
+use ontol_runtime::{format_utils::DebugViaDisplay, DefId};
 
 use crate::{
     hir_unify::{expr_builder::ExprBuilder, scope_builder::ScopeBuilder, unifier::Unifier},
@@ -13,10 +13,14 @@ use crate::{
     Compiler, SourceSpan,
 };
 
+use self::flat_scope_builder::FlatScopeBuilder;
+
 mod dep_tree;
 mod dependent_scope_analyzer;
 mod expr;
 mod expr_builder;
+mod flat_scope;
+mod flat_scope_builder;
 mod regroup_match_prop;
 mod scope;
 mod scope_builder;
@@ -33,11 +37,20 @@ pub enum UnifierError {
 
 pub type UnifierResult<T> = Result<T, UnifierError>;
 
+const TEST_FLAT_SCOPE: bool = true;
+
 pub fn unify_to_function<'m>(
     scope: &TypedHirNode<'m>,
     expr: &TypedHirNode<'m>,
     compiler: &mut Compiler<'m>,
 ) -> UnifierResult<HirFunc<'m>> {
+    if TEST_FLAT_SCOPE {
+        match unify_to_function_flat_scope(scope, expr, compiler) {
+            Err(_) => {}
+            Ok(func) => return Ok(func),
+        }
+    }
+
     let mut var_tracker = VariableTracker::default();
     var_tracker.visit_node(0, scope);
     var_tracker.visit_node(0, expr);
@@ -93,6 +106,31 @@ pub fn unify_to_function<'m>(
     }
 }
 
+fn unify_to_function_flat_scope<'m>(
+    scope: &TypedHirNode<'m>,
+    expr: &TypedHirNode<'m>,
+    compiler: &mut Compiler<'m>,
+) -> UnifierResult<HirFunc<'m>> {
+    let mut var_tracker = VariableTracker::default();
+    var_tracker.visit_node(0, scope);
+    var_tracker.visit_node(0, expr);
+
+    let _scope_ty = scope.ty();
+    let _expr_ty = expr.ty();
+
+    let unit_type = compiler
+        .types
+        .intern(Type::Primitive(PrimitiveKind::Unit, DefId::unit()));
+
+    let (_flat_scope, _var_allocator) = {
+        let mut scope_builder = FlatScopeBuilder::new(var_tracker.var_allocator(), unit_type);
+        let flat_scope = scope_builder.build_flat_scope(scope)?;
+        (flat_scope, scope_builder.var_allocator())
+    };
+
+    Err(UnifierError::NoInputBinder)
+}
+
 struct VariableTracker {
     largest: ontol_hir::Var,
 }
@@ -141,6 +179,11 @@ impl VarSet {
     }
 
     #[inline]
+    pub fn contains(&self, var: ontol_hir::Var) -> bool {
+        self.0.contains(var.0 as usize)
+    }
+
+    #[inline]
     pub fn insert(&mut self, var: ontol_hir::Var) -> bool {
         self.0.insert(var.0 as usize)
     }
@@ -166,7 +209,7 @@ impl Debug for VarSet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut set = f.debug_set();
         for bit in &self.0 {
-            set.entry(&ontol_hir::Var(bit as u32));
+            set.entry(&DebugViaDisplay(&ontol_hir::Var(bit as u32)));
         }
 
         set.finish()
@@ -199,5 +242,57 @@ impl<'b> Iterator for VarSetIter<'b> {
     fn next(&mut self) -> Option<Self::Item> {
         let next = self.0.next()?;
         Some(ontol_hir::Var(next.try_into().unwrap()))
+    }
+}
+
+pub mod test_api {
+    use std::fmt::Write;
+
+    use ontol_hir::visitor::HirVisitor;
+    use ontol_runtime::DefId;
+
+    use crate::{
+        hir_unify::unify_to_function,
+        mem::Mem,
+        primitive::PrimitiveKind,
+        typed_hir::{TypedHir, TypedHirNode},
+        types::Type,
+        Compiler,
+    };
+
+    use super::{flat_scope_builder::FlatScopeBuilder, VariableTracker};
+
+    fn parse_typed<'m>(src: &str) -> TypedHirNode<'m> {
+        ontol_hir::parse::Parser::new(TypedHir)
+            .parse(src)
+            .unwrap()
+            .0
+    }
+
+    pub fn test_unify(scope: &str, expr: &str) -> String {
+        let mem = Mem::default();
+        let mut compiler = Compiler::new(&mem, Default::default());
+        let func =
+            unify_to_function(&parse_typed(scope), &parse_typed(expr), &mut compiler).unwrap();
+        let mut output = String::new();
+        write!(&mut output, "{func}").unwrap();
+        output
+    }
+
+    pub fn mk_flat_scope(hir: &str) -> std::string::String {
+        let hir_node = parse_typed(hir);
+
+        let mut var_tracker = VariableTracker::default();
+        var_tracker.visit_node(0, &hir_node);
+
+        let unit_type = &Type::Primitive(PrimitiveKind::Unit, DefId::unit());
+        let mut builder = FlatScopeBuilder::new(var_tracker.var_allocator(), unit_type);
+        let flat_scope = builder.build_flat_scope(&hir_node).unwrap();
+        let mut output = String::new();
+        for node in flat_scope.scope_nodes {
+            writeln!(&mut output, "{:?}", node).unwrap();
+        }
+
+        output
     }
 }

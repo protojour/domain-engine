@@ -184,9 +184,9 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 }
                 self.scope.remove(&binder.var);
             }
-            ontol_hir::Kind::Call(proc, params) => {
-                let stack_delta = Delta(-(params.len() as i32) + 1);
-                for param in params {
+            ontol_hir::Kind::Call(proc, args) => {
+                let stack_delta = Delta(-(args.len() as i32) + 1);
+                for param in args {
                     self.gen_node(param, block);
                 }
                 let return_def_id = ty.get_single_def_id().unwrap();

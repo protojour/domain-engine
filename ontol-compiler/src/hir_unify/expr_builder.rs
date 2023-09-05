@@ -76,15 +76,15 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                 },
             ),
             ontol_hir::Kind::Let(..) => panic!(),
-            ontol_hir::Kind::Call(proc, params) => {
-                let params: Vec<_> = params.iter().map(|param| self.hir_to_expr(param)).collect();
+            ontol_hir::Kind::Call(proc, args) => {
+                let args: Vec<_> = args.iter().map(|arg| self.hir_to_expr(arg)).collect();
                 let mut free_vars = VarSet::default();
-                for param in &params {
+                for param in &args {
                     free_vars.union_with(&param.1.free_vars);
                 }
 
                 expr::Expr(
-                    expr::Kind::Call(expr::Call(*proc, params)),
+                    expr::Kind::Call(expr::Call(*proc, args)),
                     expr::Meta {
                         hir_meta: *meta,
                         free_vars,

@@ -101,7 +101,7 @@ impl<'m> ScopeBuilder<'m> {
                 ),
             }),
             ontol_hir::Kind::Let(..) => todo!(),
-            ontol_hir::Kind::Call(proc, params) => {
+            ontol_hir::Kind::Call(proc, args) => {
                 let (defined_var, dependencies) = match &self.current_prop_analysis_map {
                     Some(map) => {
                         let Some(prop_analysis) = map.get(&self.current_prop_path) else {
@@ -126,7 +126,7 @@ impl<'m> ScopeBuilder<'m> {
                         let binder_var = self.var_allocator.alloc();
                         self.invert_expr(
                             *proc,
-                            params,
+                            args,
                             analysis,
                             TypedBinder {
                                 var: binder_var,
@@ -316,19 +316,19 @@ impl<'m> ScopeBuilder<'m> {
     fn invert_expr(
         &mut self,
         proc: BuiltinProc,
-        params: &[TypedHirNode<'m>],
+        args: &[TypedHirNode<'m>],
         analysis: ExprAnalysis<'m>,
         outer_binder: TypedBinder<'m>,
         let_def: TypedHirNode<'m>,
         dependencies: VarSet,
     ) -> UnifierResult<ScopeBinder<'m>> {
-        let (var_param_index, next_analysis) = match analysis.kind {
+        let (var_arg_index, next_analysis) = match analysis.kind {
             ExprAnalysisKind::Const | ExprAnalysisKind::Var(_) => unreachable!(),
             ExprAnalysisKind::FnCall {
-                var_param_index,
+                var_arg_index,
                 child,
                 ..
-            } => (var_param_index, child),
+            } => (var_arg_index, child),
         };
         let next_analysis = *next_analysis;
 
@@ -341,22 +341,22 @@ impl<'m> ScopeBuilder<'m> {
             _ => panic!("Unsupported procedure; cannot invert {proc:?}"),
         };
 
-        let mut inverted_params = Vec::with_capacity(params.len());
+        let mut inverted_args = Vec::with_capacity(args.len());
 
-        for (param_index, param) in params.iter().enumerate() {
-            if param_index != var_param_index {
-                inverted_params.push(param.clone());
+        for (arg_index, arg) in args.iter().enumerate() {
+            if arg_index != var_arg_index {
+                inverted_args.push(arg.clone());
             }
         }
-        inverted_params.insert(var_param_index, let_def);
+        inverted_args.insert(var_arg_index, let_def);
 
         let next_let_def = TypedHirNode(
-            ontol_hir::Kind::Call(inverted_proc, inverted_params),
+            ontol_hir::Kind::Call(inverted_proc, inverted_args),
             // Is this correct?
             analysis.hir_meta,
         );
 
-        match (params[var_param_index].kind(), next_analysis) {
+        match (args[var_arg_index].kind(), next_analysis) {
             (
                 ontol_hir::Kind::Var(_),
                 ExprAnalysis {
@@ -388,15 +388,15 @@ impl<'m> ScopeBuilder<'m> {
                 };
                 Ok(scope_binder)
             }
-            (ontol_hir::Kind::Call(next_proc, next_params), child_analysis) => self.invert_expr(
+            (ontol_hir::Kind::Call(next_proc, next_args), child_analysis) => self.invert_expr(
                 *next_proc,
-                next_params,
+                next_args,
                 child_analysis,
                 outer_binder,
                 next_let_def,
                 dependencies,
             ),
-            _ => panic!("invalid: {}", &params[var_param_index]),
+            _ => panic!("invalid: {}", &args[var_arg_index]),
         }
     }
 
@@ -462,7 +462,7 @@ enum ExprAnalysisKind<'m> {
     Const,
     Var(ontol_hir::Var),
     FnCall {
-        var_param_index: usize,
+        var_arg_index: usize,
         defining_var: ontol_hir::Var,
         child: Box<ExprAnalysis<'m>>,
     },
@@ -476,14 +476,14 @@ fn analyze_expr<'m>(
         ontol_hir::Kind::Call(_, args) => {
             let mut kind = ExprAnalysisKind::Const;
             let mut defining_var = None;
-            for (index, param) in args.iter().enumerate() {
-                let child_analysis = analyze_expr(param, defining_var_hint)?;
+            for (index, arg) in args.iter().enumerate() {
+                let child_analysis = analyze_expr(arg, defining_var_hint)?;
                 let (child_var, new_kind) = match &child_analysis.kind {
                     ExprAnalysisKind::Const => (None, ExprAnalysisKind::Const),
                     ExprAnalysisKind::Var(child_var) => (
                         Some(*child_var),
                         ExprAnalysisKind::FnCall {
-                            var_param_index: index,
+                            var_arg_index: index,
                             defining_var: *child_var,
                             child: Box::new(child_analysis),
                         },
@@ -494,7 +494,7 @@ fn analyze_expr<'m>(
                     } => (
                         Some(*child_var),
                         ExprAnalysisKind::FnCall {
-                            var_param_index: index,
+                            var_arg_index: index,
                             defining_var: *child_var,
                             child: Box::new(child_analysis),
                         },

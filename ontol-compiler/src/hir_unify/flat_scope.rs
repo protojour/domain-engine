@@ -1,0 +1,71 @@
+use std::fmt::Debug;
+
+use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc, DefId};
+
+use crate::typed_hir::{self, TypedHirKind};
+
+use super::VarSet;
+
+pub struct FlatScope<'m> {
+    pub scope_nodes: Vec<ScopeNode<'m>>,
+}
+
+#[derive(Clone)]
+pub struct ScopeNode<'m>(pub Kind<'m>, pub Meta<'m>);
+
+impl<'m> ScopeNode<'m> {
+    pub fn kind(&self) -> &Kind<'m> {
+        &self.0
+    }
+
+    pub fn meta(&self) -> &Meta<'m> {
+        &self.1
+    }
+}
+
+impl<'m> Debug for ScopeNode<'m> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}: {:?} - {:?} {:?}",
+            self.1.var, self.1.deps, self.0, self.1.pub_vars,
+        )
+    }
+}
+
+#[derive(Clone)]
+pub struct Meta<'m> {
+    /// The specific variable introduced by the node
+    pub var: ontol_hir::Var,
+    /// All _visible_ variables dominated by this node
+    pub pub_vars: VarSet,
+    /// Variables that are dependencies of this node
+    pub deps: VarSet,
+
+    pub hir_meta: typed_hir::Meta<'m>,
+}
+
+#[derive(Clone, Debug)]
+pub enum Kind<'m> {
+    Var,
+    Const(Const<'m>),
+    Struct,
+    PropVariant(ontol_hir::Var, PropertyId),
+    PropRelParam,
+    PropValue,
+    SeqPropVariant(ontol_hir::Var, PropertyId),
+    IterElement,
+    Call(BuiltinProc),
+    Regex(DefId),
+    RegexAlternation,
+    RegexCapture(u32),
+}
+
+#[derive(Clone)]
+pub struct Const<'m>(pub TypedHirKind<'m>);
+
+impl<'m> Debug for Const<'m> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}

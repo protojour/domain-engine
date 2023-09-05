@@ -1,29 +1,7 @@
 use indoc::indoc;
-use ontol_compiler::{
-    hir_unify::unify_to_function,
-    mem::Mem,
-    typed_hir::{TypedHir, TypedHirNode},
-    Compiler,
-};
+use ontol_compiler::hir_unify::test_api::test_unify;
 use pretty_assertions::assert_eq;
 use test_log::test;
-
-fn parse_typed<'m>(src: &str) -> TypedHirNode<'m> {
-    ontol_hir::parse::Parser::new(TypedHir)
-        .parse(src)
-        .unwrap()
-        .0
-}
-
-fn test_unify(scope: &str, expr: &str) -> String {
-    let mem = Mem::default();
-    let mut compiler = Compiler::new(&mem, Default::default());
-    let func = unify_to_function(&parse_typed(scope), &parse_typed(expr), &mut compiler).unwrap();
-    let mut output = String::new();
-    use std::fmt::Write;
-    write!(&mut output, "{func}").unwrap();
-    output
-}
 
 #[test]
 fn test_unify_no_op() {

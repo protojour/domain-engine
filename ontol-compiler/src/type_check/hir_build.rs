@@ -91,7 +91,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             );
                         }
 
-                        let mut parameters = vec![];
+                        let mut hir_args = vec![];
                         for (arg, param_ty) in args.iter().zip(*params) {
                             let node = self.build_node(
                                 arg,
@@ -101,11 +101,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 },
                                 ctx,
                             );
-                            parameters.push(node);
+                            hir_args.push(node);
                         }
 
                         TypedHirNode(
-                            ontol_hir::Kind::Call(*proc, parameters),
+                            ontol_hir::Kind::Call(*proc, hir_args),
                             Meta {
                                 ty: output,
                                 span: pattern.span,
