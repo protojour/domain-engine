@@ -3,6 +3,7 @@ use std::fmt::Debug;
 use bit_set::BitSet;
 use ontol_hir::visitor::HirVisitor;
 use ontol_runtime::{format_utils::DebugViaDisplay, DefId};
+use smartstring::alias::String;
 
 use crate::{
     hir_unify::{expr_builder::ExprBuilder, scope_builder::ScopeBuilder, unifier::Unifier},
@@ -13,7 +14,7 @@ use crate::{
     Compiler, SourceSpan,
 };
 
-use self::flat_scope_builder::FlatScopeBuilder;
+use self::{flat_scope_builder::FlatScopeBuilder, flat_unifier::FlatUnifier, unifier::UnifiedNode};
 
 mod dep_tree;
 mod dependent_scope_analyzer;
@@ -21,6 +22,7 @@ mod expr;
 mod expr_builder;
 mod flat_scope;
 mod flat_scope_builder;
+mod flat_unifier;
 mod regroup_match_prop;
 mod scope;
 mod scope_builder;
@@ -33,50 +35,36 @@ pub enum UnifierError {
     NoInputBinder,
     SequenceInputNotSupported,
     MultipleVariablesInExpression(SourceSpan),
+    TODO(String),
 }
 
 pub type UnifierResult<T> = Result<T, UnifierError>;
 
-const TEST_FLAT_SCOPE: bool = true;
+const CLASSIC_UNIFIER_FALLBACK: bool = true;
 
 pub fn unify_to_function<'m>(
     scope: &TypedHirNode<'m>,
     expr: &TypedHirNode<'m>,
     compiler: &mut Compiler<'m>,
 ) -> UnifierResult<HirFunc<'m>> {
-    if TEST_FLAT_SCOPE {
-        match unify_to_function_flat_scope(scope, expr, compiler) {
-            Err(_) => {}
-            Ok(func) => return Ok(func),
-        }
-    }
-
     let mut var_tracker = VariableTracker::default();
     var_tracker.visit_node(0, scope);
     var_tracker.visit_node(0, expr);
 
+    let (unified, mut var_allocator) =
+        match unify_flat_scope(scope, expr, var_tracker.var_allocator(), compiler) {
+            Err(err) => {
+                if !CLASSIC_UNIFIER_FALLBACK {
+                    return Err(err);
+                }
+
+                unify_classic(scope, expr, var_tracker.var_allocator(), compiler)?
+            }
+            Ok(value) => value,
+        };
+
     let scope_ty = scope.ty();
     let expr_ty = expr.ty();
-
-    let unit_type = compiler
-        .types
-        .intern(Type::Primitive(PrimitiveKind::Unit, DefId::unit()));
-
-    let (scope_binder, var_allocator) = {
-        let mut scope_builder = ScopeBuilder::new(var_tracker.var_allocator(), unit_type);
-        let scope_binder = scope_builder.build_scope_binder(scope)?;
-        (scope_binder, scope_builder.var_allocator())
-    };
-
-    let (expr, var_allocator) = {
-        let mut expr_builder = ExprBuilder::new(var_allocator, &compiler.defs);
-        let expr = expr_builder.hir_to_expr(expr);
-        (expr, expr_builder.var_allocator())
-    };
-
-    let mut unifier = Unifier::new(&mut compiler.types, var_allocator);
-    let unified = unifier.unify(scope_binder.scope, expr)?;
-    let mut var_allocator = unifier.var_allocator;
 
     match unified.typed_binder {
         Some(arg) => {
@@ -106,29 +94,60 @@ pub fn unify_to_function<'m>(
     }
 }
 
-fn unify_to_function_flat_scope<'m>(
+fn unify_classic<'m>(
     scope: &TypedHirNode<'m>,
     expr: &TypedHirNode<'m>,
+    var_allocator: ontol_hir::VarAllocator,
     compiler: &mut Compiler<'m>,
-) -> UnifierResult<HirFunc<'m>> {
-    let mut var_tracker = VariableTracker::default();
-    var_tracker.visit_node(0, scope);
-    var_tracker.visit_node(0, expr);
-
-    let _scope_ty = scope.ty();
-    let _expr_ty = expr.ty();
-
+) -> UnifierResult<(UnifiedNode<'m>, ontol_hir::VarAllocator)> {
     let unit_type = compiler
         .types
         .intern(Type::Primitive(PrimitiveKind::Unit, DefId::unit()));
 
-    let (_flat_scope, _var_allocator) = {
-        let mut scope_builder = FlatScopeBuilder::new(var_tracker.var_allocator(), unit_type);
+    let (scope_binder, var_allocator) = {
+        let mut scope_builder = ScopeBuilder::new(var_allocator, unit_type);
+        let scope_binder = scope_builder.build_scope_binder(scope)?;
+        (scope_binder, scope_builder.var_allocator())
+    };
+
+    let (expr, var_allocator) = {
+        let mut expr_builder = ExprBuilder::new(var_allocator, &compiler.defs);
+        let expr = expr_builder.hir_to_expr(expr);
+        (expr, expr_builder.var_allocator())
+    };
+
+    let mut unifier = Unifier::new(&mut compiler.types, var_allocator);
+    let unified = unifier.unify(scope_binder.scope, expr)?;
+
+    Ok((unified, unifier.var_allocator))
+}
+
+fn unify_flat_scope<'m>(
+    scope: &TypedHirNode<'m>,
+    expr: &TypedHirNode<'m>,
+    var_allocator: ontol_hir::VarAllocator,
+    compiler: &mut Compiler<'m>,
+) -> UnifierResult<(UnifiedNode<'m>, ontol_hir::VarAllocator)> {
+    let unit_type = compiler
+        .types
+        .intern(Type::Primitive(PrimitiveKind::Unit, DefId::unit()));
+
+    let (flat_scope, var_allocator) = {
+        let mut scope_builder = FlatScopeBuilder::new(var_allocator, unit_type);
         let flat_scope = scope_builder.build_flat_scope(scope)?;
         (flat_scope, scope_builder.var_allocator())
     };
 
-    Err(UnifierError::NoInputBinder)
+    let (expr, var_allocator) = {
+        let mut expr_builder = ExprBuilder::new(var_allocator, &compiler.defs);
+        let expr = expr_builder.hir_to_expr(expr);
+        (expr, expr_builder.var_allocator())
+    };
+
+    let mut unifier = FlatUnifier::new(&mut compiler.types, var_allocator);
+    let unified = unifier.unify(flat_scope, expr)?;
+
+    Ok((unified, unifier.var_allocator))
 }
 
 struct VariableTracker {

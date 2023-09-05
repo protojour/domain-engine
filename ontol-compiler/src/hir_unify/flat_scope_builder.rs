@@ -7,7 +7,7 @@ use crate::{
 
 use super::{
     flat_scope::{self, FlatScope, ScopeNode},
-    UnifierError, VarSet,
+    UnifierError, UnifierResult, VarSet,
 };
 
 struct NextNode<'a, 'm> {
@@ -38,10 +38,7 @@ impl<'m> FlatScopeBuilder<'m> {
         self.var_allocator
     }
 
-    pub fn build_flat_scope(
-        &mut self,
-        node: &TypedHirNode<'m>,
-    ) -> Result<FlatScope<'m>, UnifierError> {
+    pub fn build_flat_scope(&mut self, node: &TypedHirNode<'m>) -> UnifierResult<FlatScope<'m>> {
         let mut node_set = vec![NextNode {
             node,
             deps: Default::default(),
