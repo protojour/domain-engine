@@ -381,6 +381,41 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                     meta.hir_meta,
                 ))
             }
+            expr::Kind::Struct {
+                binder,
+                flags,
+                props,
+            } => {
+                let mut hir_props = Vec::with_capacity(props.len());
+                for prop in props {
+                    match prop.variant {
+                        expr::PropVariant::Singleton(attr) => {
+                            let rel = Box::new(self.leaf_expr_to_node(attr.rel)?);
+                            let val = Box::new(self.leaf_expr_to_node(attr.val)?);
+                            let unit_meta = self.unit_meta();
+                            hir_props.push(TypedHirNode(
+                                ontol_hir::Kind::Prop(
+                                    ontol_hir::Optional(false),
+                                    prop.struct_var,
+                                    prop.prop_id,
+                                    vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
+                                        rel,
+                                        val,
+                                    })],
+                                ),
+                                unit_meta,
+                            ));
+                        }
+                        expr::PropVariant::Seq { .. } => {
+                            return Err(unifier_todo(smart_format!("seq prop")))
+                        }
+                    }
+                }
+                Ok(TypedHirNode(
+                    ontol_hir::Kind::Struct(binder, flags, hir_props),
+                    meta.hir_meta,
+                ))
+            }
             other => Err(unifier_todo(smart_format!("leaf expr to node: {other:?}"))),
         }
     }
