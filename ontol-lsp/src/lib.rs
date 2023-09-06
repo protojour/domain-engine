@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use state::{
-    build_uri, get_builtins, get_domain_name, get_path_and_name, get_reference_name,
+    build_uri, get_core_completions, get_domain_name, get_path_and_name, get_reference_name,
     get_span_range, read_file, Document, State,
 };
 use tokio::sync::RwLock;
@@ -68,7 +68,7 @@ impl Backend {
                                     ref_uri: ref_uri.clone(),
                                     src_uri: uri.to_string(),
                                 });
-                            } else if let Ok(text) = read_file(ref_uri.as_str()) {
+                            } else if let Ok(text) = read_file(&ref_uri) {
                                 state.docs.insert(
                                     ref_uri.to_string(),
                                     Document {
@@ -79,6 +79,7 @@ impl Backend {
                                         ..Default::default()
                                     },
                                 );
+                                state.parse_statements(&ref_uri);
                                 restart = true;
                             }
                         }
@@ -168,9 +169,9 @@ impl LanguageServer for Backend {
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
         {
             let uri = params.text_document.uri.to_string();
-            let mut state = self.state.write().await;
             let (path, filename) = get_path_and_name(uri.as_str());
             let name = get_domain_name(filename);
+            let mut state = self.state.write().await;
             state.docs.insert(
                 uri.to_string(),
                 Document {
@@ -237,10 +238,9 @@ impl LanguageServer for Backend {
 
     async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
         let uri = params.text_document_position.text_document.uri.as_str();
-        // let pos = params.text_document_position.position;
         match self.state.read().await.docs.get(uri) {
             Some(doc) => {
-                let mut builtin = get_builtins();
+                let mut builtin = get_core_completions();
                 let mut symbols = doc
                     .symbols
                     .iter()
@@ -274,7 +274,7 @@ impl LanguageServer for Backend {
                 diagnostics: Some(vec![diag.clone()]),
                 command: Some(Command {
                     title: "Open missing file...".to_string(),
-                    command: "ontol-lsp/openFile".to_string(),
+                    command: "ontol-lsp.openFile".to_string(),
                     arguments: Some(vec![diag.data.clone().into()]),
                 }),
                 is_preferred: Some(true),
@@ -286,7 +286,7 @@ impl LanguageServer for Backend {
 
     async fn execute_command(&self, params: ExecuteCommandParams) -> Result<Option<Value>> {
         match params.command.as_str() {
-            "ontol-lsp/openFile" => {
+            "ontol-lsp.openFile" => {
                 // TODO: replace unwrap()
                 let val = params.arguments.get(0).unwrap();
                 let args: OpenFileArgs = serde_json::from_value(val.clone()).unwrap();

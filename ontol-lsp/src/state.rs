@@ -105,7 +105,7 @@ impl State {
                 }
             }
 
-            let (mut statements, _) = parse_statements(doc.text.as_str());
+            let (mut statements, _) = parse_statements(&doc.text);
             let mut nested: Vec<Spanned<Statement>> = vec![];
 
             explore(&statements, &mut nested, &mut doc.imports, &mut doc.defs, 0);
@@ -198,11 +198,30 @@ impl State {
                     }
                 }
 
+                fn parse_path(path: &Path) -> String {
+                    match path {
+                        Path::Ident(id) => id.to_string(),
+                        Path::Path(p) => p
+                            .iter()
+                            .map(|(s, _)| s.to_string())
+                            .collect::<Vec<String>>()
+                            .join("."),
+                    }
+                }
+                fn parse_map_arm(arm: &MapArm) -> String {
+                    match arm {
+                        MapArm::Struct(s) => parse_path(&s.path.0),
+                        MapArm::Binding { path, expr: _ } => parse_path(&path.0),
+                    }
+                }
+
                 // check statements, may overlap
                 let mut hover = HoverDoc::default();
                 for (statement, range) in doc.statements.iter() {
-                    if cursor > range.start() && cursor < range.end() {
-                        hover.path = doc.name.to_owned();
+                    if cursor >= range.start() && cursor < range.end() {
+                        if hover.path.is_empty() {
+                            hover.path = doc.name.to_string();
+                        }
                         hover.signature = get_signature(&doc.text, range);
 
                         match statement {
@@ -211,7 +230,7 @@ impl State {
                                 break;
                             }
                             Statement::Def(stmt) => {
-                                hover.path += &stmt.ident.0;
+                                hover.path += &format!(".{}", stmt.ident.0);
                                 hover.docs = stmt.docs.join("\n");
                             }
                             Statement::Rel(stmt) => {
@@ -219,23 +238,10 @@ impl State {
                             }
                             Statement::Fmt(stmt) => {
                                 hover.docs = stmt.docs.join("\n");
-                                break;
                             }
                             Statement::Map(stmt) => {
-                                let first = match &stmt.first.0 .1 {
-                                    MapArm::Binding { .. } => "",
-                                    MapArm::Struct(s) => match &s.path.0 {
-                                        Path::Ident(id) => id.as_str(),
-                                        Path::Path(_) => "",
-                                    },
-                                };
-                                let second = match &stmt.second.0 .1 {
-                                    MapArm::Binding { .. } => "",
-                                    MapArm::Struct(s) => match &s.path.0 {
-                                        Path::Ident(id) => id.as_str(),
-                                        Path::Path(_) => "",
-                                    },
-                                };
+                                let first = parse_map_arm(&stmt.first.0 .1);
+                                let second = parse_map_arm(&stmt.second.0 .1);
                                 hover.path = format!("map {} {}", first, second);
                                 hover.docs.clear();
                                 break;
@@ -245,69 +251,39 @@ impl State {
                 }
 
                 // check tokens, may replace hover
-                let mut prev_ident: Option<&str> = None;
                 for (token, range) in doc.tokens.iter() {
-                    if cursor > range.start() && cursor < range.end() {
+                    if cursor >= range.start() && cursor < range.end() {
                         match token {
+                            Token::Sigil(sigil) => {
+                                if *sigil == '?' {
+                                    hover = get_ontol_docs("?").unwrap()
+                                }
+                            }
+                            Token::Use => hover = get_ontol_docs("use").unwrap(),
+                            Token::Def => hover = get_ontol_docs("def").unwrap(),
+                            Token::Rel => hover = get_ontol_docs("rel").unwrap(),
+                            Token::Fmt => hover = get_ontol_docs("fmt").unwrap(),
+                            Token::Map => hover = get_ontol_docs("map").unwrap(),
+                            Token::Pub => hover = get_ontol_docs("pub").unwrap(),
                             Token::Sym(ident) => {
                                 match doc.defs.get(ident.as_str()) {
                                     // local defs
                                     Some((stmt, range)) => {
-                                        hover.path = format!("{}.{}", doc.path, stmt.ident.0);
+                                        hover.path = format!("{}.{}", doc.name, stmt.ident.0);
                                         hover.signature = get_signature(&doc.text, range);
                                         hover.docs = stmt.docs.join("\n");
                                     }
                                     // nonlocal defs
                                     None => {
-                                        match get_ontol_core_documentation(ident.as_str()) {
-                                            Some(doc_panel) => hover = doc_panel,
-                                            None => {
-                                                // imported defs
-                                                if let Some(name) = prev_ident {
-                                                    let uri = build_uri(&doc.path, name);
-                                                    if let Some(doc) = self.docs.get(uri.as_str()) {
-                                                        if let Some((stmt, range)) =
-                                                            &doc.defs.get(name)
-                                                        {
-                                                            hover.signature =
-                                                                get_signature(&doc.text, range);
-                                                            hover.path = format!(
-                                                                "{}.{}",
-                                                                &doc.name, stmt.ident.0
-                                                            );
-                                                            hover.docs = stmt.docs.join("\n");
-                                                        }
-                                                    }
-                                                }
-                                            }
+                                        match get_ontol_docs(ident.as_str()) {
+                                            Some(doc) => hover = doc,
+                                            None => hover = HoverDoc::from(
+                                                ident.as_str(),
+                                                "#### Map variable\nLocal map variable or type reference"
+                                            ),
                                         }
                                     }
                                 }
-                                prev_ident = Some(ident)
-                            }
-                            Token::Use => hover = get_ontol_core_documentation("use").unwrap(),
-                            Token::Def => hover = get_ontol_core_documentation("def").unwrap(),
-                            Token::Rel => hover = get_ontol_core_documentation("rel").unwrap(),
-                            Token::Fmt => hover = get_ontol_core_documentation("fmt").unwrap(),
-                            Token::Map => hover = get_ontol_core_documentation("map").unwrap(),
-                            Token::Pub => hover = get_ontol_core_documentation("pub").unwrap(),
-                            Token::Number(number) => {
-                                hover =
-                                    HoverDoc::from(number.as_str(), "### Value\nNumeric literal")
-                            }
-                            Token::StringLiteral(string) => {
-                                if !hover.signature.starts_with("use") {
-                                    hover = HoverDoc::from(
-                                        &format!("'{}'", string),
-                                        "#### Value\nString literal",
-                                    )
-                                }
-                            }
-                            Token::Regex(regex) => {
-                                hover = HoverDoc::from(
-                                    &format!("/{}/", regex),
-                                    "#### Value\nRegular expression",
-                                )
                             }
                             _ => {}
                         }
@@ -434,17 +410,12 @@ pub fn get_signature(text: &str, range: &std::ops::Range<usize>) -> String {
     }
 }
 
-/// Get a HoverDoc for ONTOL core
-pub fn get_ontol_core_documentation(ident: &str) -> Option<HoverDoc> {
-    // TODO: collect hard-coded docs below from `ontol_domain.rs`
+/// Get a HoverDoc for ONTOL core keywords, values and types
+pub fn get_ontol_docs(ident: &str) -> Option<HoverDoc> {
     match ident {
         "use" => Some(HoverDoc::from(
             "use",
             "#### Use statement\nImports the domain following `use` and provides a local namespace alias after `as`.",
-        )),
-        "pub" => Some(HoverDoc::from(
-            "pub",
-            "#### Public modifier\nMarks a `def` as public and importable from other domains.",
         )),
         "def" => Some(HoverDoc::from(
             "def",
@@ -452,7 +423,7 @@ pub fn get_ontol_core_documentation(ident: &str) -> Option<HoverDoc> {
         )),
         "rel" => Some(HoverDoc::from(
             "rel",
-            "#### Relation statement\nDefines a relation between types, either for properties or ."
+            "#### Relation statement\nDefines properties related to a type, or relations between types."
         )),
         "fmt" => Some(HoverDoc::from(
             "fmt",
@@ -460,23 +431,35 @@ pub fn get_ontol_core_documentation(ident: &str) -> Option<HoverDoc> {
         )),
         "map" => Some(HoverDoc::from(
             "map",
-            "#### Map statement\nMaps one `def` to another"
+            "#### Map statement\nMapping between two types."
+        )),
+        "pub" => Some(HoverDoc::from(
+            "pub",
+            "#### Public modifier\nMarks a type as public and importable from other domains.",
         )),
         "match" => Some(HoverDoc::from(
             "match",
-            "#### Pattern modifier\nPartial matching for `map` arm."
+            "#### Partial modifier\nPartial matching for `map` arm."
         )),
         "id" => Some(HoverDoc::from(
             "ontol.id",
-            "#### Relation prop\nBinds an id to an entity.",
+            "#### Relation prop\nBinds an identifier to a type, making it an entity.",
         )),
         "is" => Some(HoverDoc::from(
             "ontol.is",
-            "#### Relation prop\nBinds a def to a union.",
+            "#### Relation prop\nThe subject type takes on all properties of another type, or binds the subject type to a union.",
+        )),
+        "min" => Some(HoverDoc::from(
+            "ontol.min",
+            "#### Relation prop\nMinimum value for the subject type.",
+        )),
+        "max" => Some(HoverDoc::from(
+            "ontol.max",
+            "#### Relation prop\nMaximum value for the subject type.",
         )),
         "default" => Some(HoverDoc::from(
             "ontol.default",
-            "#### Relation prop\nAssigns a default value to a property if none is given.",
+            "#### Relation prop\nAssigns a default value to a type or property if none is given.",
         )),
         "example" => Some(HoverDoc::from(
             "ontol.example",
@@ -500,240 +483,242 @@ pub fn get_ontol_core_documentation(ident: &str) -> Option<HoverDoc> {
         )),
         "boolean" => Some(HoverDoc::from(
             "ontol.boolean",
-            "#### Scalar\nBoolean type."
+            "#### Primitive\nBoolean type."
         )),
         "true" => Some(HoverDoc::from(
-            "true",
-            "#### Value\nBoolean `true` value."
+            "ontol.true",
+            "#### Primitive\nBoolean `true` value."
         )),
         "false" => Some(HoverDoc::from(
-            "false",
-            "#### Value\nBoolean `false` value."
+            "ontol.false",
+            "#### Primitive\nBoolean `false` value."
         )),
         "number" => Some(HoverDoc::from(
             "ontol.number",
-            "#### Scalar\nAbstract number type.",
+            "#### Primitive\nAbstract number type.",
         )),
         "integer" => Some(HoverDoc::from(
             "ontol.integer",
-            "#### Scalar\nAbstract integer type.",
+            "#### Primitive\nAbstract integer type.",
         )),
         "i64" => Some(HoverDoc::from(
             "ontol.i64",
-            "#### Scalar\n64 bit signed integer.",
+            "#### Primitive\n64-bit signed integer.",
         )),
         "float" => Some(HoverDoc::from(
             "ontol.float",
-            "#### Scalar\nAbstract floating point number type.",
+            "#### Primitive\nAbstract floating point number type.",
         )),
         "f64" => Some(HoverDoc::from(
             "ontol.f64",
-            "#### Scalar\n64 bit floating point number.",
+            "#### Primitive\n64-bit floating point number.",
         )),
         "string" => Some(HoverDoc::from(
             "ontol.string",
-            "#### Scalar\nAny UTF-8 string.",
+            "#### Primitive\nAny UTF-8 string.",
         )),
         "datetime" => Some(HoverDoc::from(
             "ontol.datetime",
-            "#### Scalar\nRFC 3339-formatted datetime string.",
+            "#### Primitive\nRFC 3339-formatted datetime string.",
         )),
         "date" => Some(HoverDoc::from(
             "ontol.date",
-            "#### Scalar\nRFC 3339-formatted date string.",
+            "#### Primitive\nRFC 3339-formatted date string.",
         )),
         "time" => Some(HoverDoc::from(
             "ontol.time",
-            "#### Scalar\nRFC 3339-formatted time string.",
+            "#### Primitive\nRFC 3339-formatted time string.",
         )),
         "uuid" => Some(HoverDoc::from(
             "ontol.uuid",
-            "#### Scalar\nUUID v4 string."
+            "#### Primitive\nUUID v4 string."
         )),
         "regex" => Some(HoverDoc::from(
-            "ontol.regex",
-            "#### Scalar\nRegular expression.",
+            "regex",
+            "#### Primitive\nRegular expression.",
+        )),
+        "?" => Some(HoverDoc::from(
+            "?",
+            "#### Optional modifier\nMakes the property optional.",
         )),
         _ => None,
     }
 }
 
 /// Completions for built-in keywords and defs
-pub fn get_builtins() -> Vec<CompletionItem> {
+pub fn get_core_completions() -> Vec<CompletionItem> {
     vec![
+        CompletionItem {
+            label: "ontol".to_string(),
+            kind: Some(CompletionItemKind::KEYWORD),
+            ..Default::default()
+        },
         CompletionItem {
             label: "def".to_string(),
             kind: Some(CompletionItemKind::KEYWORD),
-            detail: Some("def …".to_string()),
             ..Default::default()
         },
         CompletionItem {
             label: "rel".to_string(),
             kind: Some(CompletionItemKind::KEYWORD),
-            detail: Some("rel … … …".to_string()),
             ..Default::default()
         },
         CompletionItem {
             label: "map".to_string(),
             kind: Some(CompletionItemKind::KEYWORD),
-            detail: Some("map { … … }".to_string()),
             ..Default::default()
         },
         CompletionItem {
             label: "use".to_string(),
             kind: Some(CompletionItemKind::KEYWORD),
-            detail: Some("use … as …".to_string()),
             ..Default::default()
         },
         CompletionItem {
             label: "as".to_string(),
             kind: Some(CompletionItemKind::KEYWORD),
-            detail: Some("… as …".to_string()),
             ..Default::default()
         },
         CompletionItem {
             label: "pub".to_string(),
             kind: Some(CompletionItemKind::KEYWORD),
-            detail: Some("pub def …".to_string()),
             ..Default::default()
         },
         CompletionItem {
             label: "fmt".to_string(),
             kind: Some(CompletionItemKind::KEYWORD),
-            detail: Some("fmt …".to_string()),
             ..Default::default()
         },
         CompletionItem {
             label: "match".to_string(),
             kind: Some(CompletionItemKind::KEYWORD),
-            detail: Some("match".to_string()),
             ..Default::default()
         },
         CompletionItem {
             label: "id".to_string(),
             kind: Some(CompletionItemKind::PROPERTY),
-            detail: Some("…|id: …".to_string()),
             ..Default::default()
         },
         CompletionItem {
             label: "is".to_string(),
             kind: Some(CompletionItemKind::PROPERTY),
-            detail: Some("is: …".to_string()),
+            ..Default::default()
+        },
+        CompletionItem {
+            label: "min".to_string(),
+            kind: Some(CompletionItemKind::PROPERTY),
+            ..Default::default()
+        },
+        CompletionItem {
+            label: "max".to_string(),
+            kind: Some(CompletionItemKind::PROPERTY),
             ..Default::default()
         },
         CompletionItem {
             label: "gen".to_string(),
             kind: Some(CompletionItemKind::PROPERTY),
-            detail: Some("gen: …".to_string()),
             ..Default::default()
         },
         CompletionItem {
             label: "auto".to_string(),
             kind: Some(CompletionItemKind::PROPERTY),
-            detail: Some("gen: auto".to_string()),
             ..Default::default()
         },
         CompletionItem {
             label: "create_time".to_string(),
             kind: Some(CompletionItemKind::PROPERTY),
-            detail: Some("gen: create_time".to_string()),
             ..Default::default()
         },
         CompletionItem {
             label: "update_time".to_string(),
             kind: Some(CompletionItemKind::PROPERTY),
-            detail: Some("gen: update_time".to_string()),
             ..Default::default()
         },
         CompletionItem {
             label: "default".to_string(),
             kind: Some(CompletionItemKind::PROPERTY),
-            detail: Some("default := …".to_string()),
             ..Default::default()
         },
         CompletionItem {
-            label: "default".to_string(),
+            label: "example".to_string(),
             kind: Some(CompletionItemKind::PROPERTY),
-            detail: Some("default := …".to_string()),
             ..Default::default()
         },
         CompletionItem {
             label: "boolean".to_string(),
             kind: Some(CompletionItemKind::UNIT),
-            detail: Some("boolean".to_string()),
+            ..Default::default()
+        },
+        CompletionItem {
+            label: "true".to_string(),
+            kind: Some(CompletionItemKind::UNIT),
+            ..Default::default()
+        },
+        CompletionItem {
+            label: "false".to_string(),
+            kind: Some(CompletionItemKind::UNIT),
             ..Default::default()
         },
         CompletionItem {
             label: "number".to_string(),
             kind: Some(CompletionItemKind::UNIT),
-            detail: Some("number".to_string()),
             ..Default::default()
         },
         CompletionItem {
             label: "integer".to_string(),
             kind: Some(CompletionItemKind::UNIT),
-            detail: Some("integer".to_string()),
             ..Default::default()
         },
         CompletionItem {
             label: "float".to_string(),
             kind: Some(CompletionItemKind::UNIT),
-            detail: Some("floating point number".to_string()),
             ..Default::default()
         },
         CompletionItem {
             label: "i64".to_string(),
             kind: Some(CompletionItemKind::UNIT),
-            detail: Some("i64".to_string()),
             ..Default::default()
         },
         CompletionItem {
             label: "f64".to_string(),
             kind: Some(CompletionItemKind::UNIT),
-            detail: Some("f64".to_string()),
             ..Default::default()
         },
         CompletionItem {
             label: "string".to_string(),
             kind: Some(CompletionItemKind::UNIT),
-            detail: Some("utf-8 string".to_string()),
             ..Default::default()
         },
         CompletionItem {
             label: "datetime".to_string(),
             kind: Some(CompletionItemKind::UNIT),
-            detail: Some("iso datetime string".to_string()),
             ..Default::default()
         },
         CompletionItem {
             label: "date".to_string(),
             kind: Some(CompletionItemKind::UNIT),
-            detail: Some("iso date string".to_string()),
             ..Default::default()
         },
         CompletionItem {
             label: "time".to_string(),
             kind: Some(CompletionItemKind::UNIT),
-            detail: Some("iso time string".to_string()),
             ..Default::default()
         },
         CompletionItem {
             label: "uuid".to_string(),
             kind: Some(CompletionItemKind::UNIT),
-            detail: Some("uuid v4 string".to_string()),
             ..Default::default()
         },
         CompletionItem {
             label: "regex".to_string(),
             kind: Some(CompletionItemKind::UNIT),
-            detail: Some("regular expression".to_string()),
             ..Default::default()
         },
     ]
 }
 
 /// A list of reserved words in ONTOL, to separate them from user-defined symbols
-const RESERVED_WORDS: [&str; 32] = [
+const RESERVED_WORDS: [&str; 34] = [
+    "ontol",
     "use",
     "as",
     "pub",
@@ -745,7 +730,8 @@ const RESERVED_WORDS: [&str; 32] = [
     "match",
     "id",
     "is",
-    "has",
+    "min",
+    "max",
     "default",
     "example",
     "gen",
@@ -754,6 +740,8 @@ const RESERVED_WORDS: [&str; 32] = [
     "update_time",
     "number",
     "boolean",
+    "true",
+    "false",
     "integer",
     "i64",
     "float",
@@ -764,6 +752,4 @@ const RESERVED_WORDS: [&str; 32] = [
     "time",
     "uuid",
     "regex",
-    "seq",
-    "dict",
 ];
