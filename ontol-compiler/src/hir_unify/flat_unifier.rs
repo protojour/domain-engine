@@ -15,6 +15,7 @@ use crate::{
 };
 
 use super::{
+    dep_tree::Expression,
     expr, flat_scope,
     flat_unifier_table::{Assignment, Table},
     unifier::UnifiedNode,
@@ -250,11 +251,12 @@ fn unify_scope_structural<'m>(
             | flat_scope::Kind::PropValue
             | flat_scope::Kind::Struct
             | flat_scope::Kind::Var => {
-                for assignment in std::mem::take(&mut scope_map.assignments) {
-                    builder
-                        .output
-                        .push(leaf_expr_to_node(assignment.expr, types)?);
-                }
+                builder.output.extend(apply_lateral_scope(
+                    std::mem::take(&mut scope_map.assignments),
+                    || in_scope.clone(),
+                    table,
+                    types,
+                )?);
 
                 let nodes =
                     unify_scope_structural(scope_var, in_scope.union_one(scope_var), table, types)?;
@@ -262,16 +264,19 @@ fn unify_scope_structural<'m>(
             }
             flat_scope::Kind::PropVariant(optional, struct_var, property_id) => {
                 let prop_key = (*optional, *struct_var, *property_id);
-
-                // TODO: Maybe use loop instead of recursion?
                 let mut body = vec![];
+                let inner_scope = in_scope.union(&scope_map.scope.meta().pub_vars);
 
-                for assignment in std::mem::take(&mut scope_map.assignments) {
-                    body.push(leaf_expr_to_node(assignment.expr, types)?);
-                }
+                body.extend(apply_lateral_scope(
+                    std::mem::take(&mut scope_map.assignments),
+                    || inner_scope.clone(),
+                    table,
+                    types,
+                )?);
+
                 body.extend(unify_scope_structural(
                     scope_var,
-                    in_scope.union(&scope_map.scope.meta().pub_vars),
+                    inner_scope,
                     table,
                     types,
                 )?);
@@ -283,6 +288,39 @@ fn unify_scope_structural<'m>(
     }
 
     Ok(builder.build(types))
+}
+
+fn apply_lateral_scope<'m>(
+    assignments: Vec<Assignment<'m>>,
+    in_scope_fn: impl FnOnce() -> VarSet,
+    table: &mut Table<'m>,
+    types: &mut Types<'m>,
+) -> UnifierResult<Vec<TypedHirNode<'m>>> {
+    if assignments.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let in_scope = in_scope_fn();
+
+    for assignment in &assignments {
+        debug!(
+            "assignment free_vars: {:?} in_scope: {:?}",
+            assignment.expr.meta().free_vars,
+            in_scope
+        );
+
+        if !assignment.expr.free_vars().0.is_subset(&in_scope.0) {
+            panic!("Not in scope: {}", assignment.expr.kind().debug_short());
+        }
+    }
+
+    let mut nodes = Vec::with_capacity(assignments.len());
+
+    for assignment in assignments {
+        nodes.push(leaf_expr_to_node(assignment.expr, types)?);
+    }
+
+    Ok(nodes)
 }
 
 fn leaf_expr_to_node<'m>(
