@@ -226,6 +226,18 @@ impl VarSet {
     pub fn union_with(&mut self, other: &Self) {
         self.0.union_with(&other.0);
     }
+
+    #[inline]
+    pub fn union(&self, other: &Self) -> Self {
+        Self(self.0.union(&other.0).collect())
+    }
+
+    #[inline]
+    pub fn union_one(&self, var: ontol_hir::Var) -> Self {
+        let mut clone = self.clone();
+        clone.insert(var);
+        clone
+    }
 }
 
 impl FromIterator<ontol_hir::Var> for VarSet {

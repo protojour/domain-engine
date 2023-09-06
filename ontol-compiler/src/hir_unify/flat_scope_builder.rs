@@ -357,12 +357,18 @@ fn propagate_pub_vars(scope_nodes: &mut Vec<ScopeNode>) {
                     }
                 }
 
-                let meta = scope_node.meta();
-                next_propagations.push(Propagation {
-                    pub_vars: meta.pub_vars.clone(),
-                    target: meta.deps.clone(),
-                });
-                next_target_union.union_with(&meta.deps);
+                // Don't propagate variables across data points such as prop variants
+                if !matches!(
+                    scope_node.kind(),
+                    flat_scope::Kind::PropVariant(..) | flat_scope::Kind::SeqPropVariant(..)
+                ) {
+                    let meta = scope_node.meta();
+                    next_propagations.push(Propagation {
+                        pub_vars: meta.pub_vars.clone(),
+                        target: meta.deps.clone(),
+                    });
+                    next_target_union.union_with(&meta.deps);
+                }
             } else {
                 next_candidates.push(index);
             }

@@ -14,7 +14,7 @@ fn test_flat_basic_struct1() {
     );
     let expected = indoc! {
         "
-        $a: {} - Struct {$b}
+        $a: {} - Struct {}
         $c: {$a} - PropVariant(opt=f, Var(a), S:0:0) {$b}
         $d: {$c} - PropValue {$b}
         $b: {$d} - Var {$b}
@@ -34,7 +34,7 @@ fn test_flat_arithmetic_prop() {
     );
     let expected = indoc! {
         "
-        $a: {} - Struct {$b}
+        $a: {} - Struct {}
         $c: {$a} - PropVariant(opt=f, Var(a), S:0:0) {$b}
         $d: {$c} - PropValue {$b}
         $e: {$d} - Call(Sub) {$b}
@@ -55,9 +55,12 @@ fn test_flat_arithmetic_prop_dependency() {
         )
         ",
     );
+    // BUG: Here the algorithm should distribute $b and $c to each PropVariant,
+    // and not do a union in the first arm.
+    // In the unifier it needs this behaviour to be able to place an assignment/seed.
     let expected = indoc! {
         "
-        $a: {} - Struct {$b, $c}
+        $a: {} - Struct {}
         $d: {$a} - PropVariant(opt=f, Var(a), O:0:0) {$b, $c}
         $e: {$d} - PropValue {$b, $c}
         $f: {$a} - PropVariant(opt=f, Var(a), O:0:1) {$b}
@@ -88,7 +91,7 @@ fn test_flat_regex() {
     );
     let expected = indoc! {
         "
-        $a: {} - Struct {$b}
+        $a: {} - Struct {}
         $c: {$a} - PropVariant(opt=f, Var(a), S:0:0) {$b}
         $d: {$c} - PropValue {$b}
         $e: {$d} - Regex(def@0:0) {$b}
@@ -122,11 +125,11 @@ fn test_flat_seq() {
     );
     let expected = indoc! {
         "
-        $b: {} - Struct {$f}
+        $b: {} - Struct {}
         $f: {$b} - SeqPropVariant(opt=f, Var(b), S:0:0) {$f}
         $h: {$f} - IterElement {}
-        $i: {$h} - PropValue {$g}
-        $c: {$i} - Struct {$g}
+        $i: {$h} - PropValue {}
+        $c: {$i} - Struct {}
         $g: {$c} - SeqPropVariant(opt=f, Var(c), S:1:1) {$g}
         $j: {$g} - IterElement {}
         $k: {$j} - PropValue {$a}

@@ -37,6 +37,13 @@ impl<'m> Table<'m> {
 
         // Note: Reverse search.
         for (index, scope_map) in self.table.iter().enumerate().rev() {
+            let scope_pub_vars = &scope_map.scope.meta().pub_vars;
+
+            // quick early check
+            if scope_pub_vars.0.is_empty() {
+                continue;
+            }
+
             // only consider proper scope-introducing nodes
             if !matches!(
                 scope_map.scope.kind(),
@@ -45,10 +52,8 @@ impl<'m> Table<'m> {
                 continue;
             }
 
-            let scope_pub_vars = &scope_map.scope.meta().pub_vars;
-
             // Only consider candidates that introduces the scope
-            if !scope_pub_vars.0.is_subset(&free_vars.0) {
+            if scope_pub_vars.0.intersection(&free_vars.0).next().is_none() {
                 continue;
             }
 
@@ -203,24 +208,4 @@ pub(super) struct Assignment<'m> {
 pub(super) struct AssignmentSlot<'a, 'm> {
     pub scope_map: &'a mut ScopeMap<'m>,
     pub lateral_deps: VarSet,
-}
-
-#[derive(Default)]
-pub(super) struct ScopeTracker {
-    pub in_scope: VarSet,
-}
-
-impl ScopeTracker {
-    pub fn with<T>(&mut self, scope_vars: &VarSet, mut f: impl FnMut(&mut Self) -> T) -> T {
-        let diff = VarSet(scope_vars.0.difference(&self.in_scope.0).collect());
-        self.in_scope.0.union_with(&scope_vars.0);
-
-        let ret = f(self);
-
-        for var in &diff {
-            self.in_scope.remove(var);
-        }
-
-        ret
-    }
 }

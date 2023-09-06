@@ -16,9 +16,9 @@ use crate::{
 
 use super::{
     expr, flat_scope,
-    flat_unifier_table::{Assignment, ScopeTracker, Table},
+    flat_unifier_table::{Assignment, Table},
     unifier::UnifiedNode,
-    UnifierError, UnifierResult,
+    UnifierError, UnifierResult, VarSet,
 };
 
 pub struct FlatUnifier<'a, 'm> {
@@ -62,9 +62,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
 
         result?;
 
-        let mut scope_tracker = ScopeTracker::default();
-
-        unify_single(None, &mut scope_tracker, &mut table, self.types)
+        unify_single(None, Default::default(), &mut table, self.types)
     }
 
     fn assign_to_scope(
@@ -158,7 +156,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
 
 fn unify_single<'m>(
     parent_scope_var: Option<ontol_hir::Var>,
-    scope_tracker: &mut ScopeTracker,
+    in_scope: VarSet,
     table: &mut Table<'m>,
     types: &mut Types<'m>,
 ) -> UnifierResult<UnifiedNode<'m>> {
@@ -170,7 +168,7 @@ fn unify_single<'m>(
     }
 
     if let Some(var) = parent_scope_var {
-        if scope_tracker.in_scope.contains(var) {
+        if in_scope.contains(var) {
             panic!("Variable is already in scope");
         }
     }
@@ -216,9 +214,8 @@ fn unify_single<'m>(
             }),
             flat_scope::Kind::Struct,
         ) => {
-            let body = scope_tracker.with(&[scope_meta.var].into(), |scope_tracker| {
-                unify_scope_structural(scope_meta.var, scope_tracker, table, types)
-            })?;
+            let next_in_scope = in_scope.union_one(scope_meta.var);
+            let body = unify_scope_structural(scope_meta.var, next_in_scope, table, types)?;
 
             let node = UnifiedNode {
                 typed_binder: Some(TypedBinder {
@@ -236,7 +233,7 @@ fn unify_single<'m>(
 
 fn unify_scope_structural<'m>(
     parent_scope_var: ontol_hir::Var,
-    scope_tracker: &mut ScopeTracker,
+    in_scope: VarSet,
     table: &mut Table<'m>,
     types: &mut Types<'m>,
 ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
@@ -259,7 +256,8 @@ fn unify_scope_structural<'m>(
                         .push(leaf_expr_to_node(assignment.expr, types)?);
                 }
 
-                let nodes = unify_scope_structural(scope_var, scope_tracker, table, types)?;
+                let nodes =
+                    unify_scope_structural(scope_var, in_scope.union_one(scope_var), table, types)?;
                 builder.output.extend(nodes);
             }
             flat_scope::Kind::PropVariant(optional, struct_var, property_id) => {
@@ -273,7 +271,7 @@ fn unify_scope_structural<'m>(
                 }
                 body.extend(unify_scope_structural(
                     scope_var,
-                    scope_tracker,
+                    in_scope.union(&scope_map.scope.meta().pub_vars),
                     table,
                     types,
                 )?);
