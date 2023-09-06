@@ -204,3 +204,23 @@ pub(super) struct AssignmentSlot<'a, 'm> {
     pub scope_map: &'a mut ScopeMap<'m>,
     pub lateral_deps: VarSet,
 }
+
+#[derive(Default)]
+pub(super) struct ScopeTracker {
+    pub in_scope: VarSet,
+}
+
+impl ScopeTracker {
+    pub fn with<T>(&mut self, scope_vars: &VarSet, mut f: impl FnMut(&mut Self) -> T) -> T {
+        let diff = VarSet(scope_vars.0.difference(&self.in_scope.0).collect());
+        self.in_scope.0.union_with(&scope_vars.0);
+
+        let ret = f(self);
+
+        for var in &diff {
+            self.in_scope.remove(var);
+        }
+
+        ret
+    }
+}

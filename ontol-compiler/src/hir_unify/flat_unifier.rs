@@ -6,7 +6,7 @@ use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
-    hir_unify::{VarSet, CLASSIC_UNIFIER_FALLBACK},
+    hir_unify::CLASSIC_UNIFIER_FALLBACK,
     mem::Intern,
     primitive::PrimitiveKind,
     typed_hir::{self, TypedBinder, TypedHir, TypedHirNode},
@@ -16,7 +16,7 @@ use crate::{
 
 use super::{
     expr, flat_scope,
-    flat_unifier_table::{Assignment, Table},
+    flat_unifier_table::{Assignment, ScopeTracker, Table},
     unifier::UnifiedNode,
     UnifierError, UnifierResult,
 };
@@ -62,9 +62,9 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
 
         result?;
 
-        let mut in_scope = VarSet::default();
+        let mut scope_tracker = ScopeTracker::default();
 
-        unify_single(None, &mut in_scope, &mut table, self.types)
+        unify_single(None, &mut scope_tracker, &mut table, self.types)
     }
 
     fn assign_to_scope(
@@ -158,7 +158,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
 
 fn unify_single<'m>(
     parent_scope_var: Option<ontol_hir::Var>,
-    in_scope: &mut VarSet,
+    scope_tracker: &mut ScopeTracker,
     table: &mut Table<'m>,
     types: &mut Types<'m>,
 ) -> UnifierResult<UnifiedNode<'m>> {
@@ -170,7 +170,7 @@ fn unify_single<'m>(
     }
 
     if let Some(var) = parent_scope_var {
-        if in_scope.contains(var) {
+        if scope_tracker.in_scope.contains(var) {
             panic!("Variable is already in scope");
         }
     }
@@ -216,9 +216,9 @@ fn unify_single<'m>(
             }),
             flat_scope::Kind::Struct,
         ) => {
-            in_scope.insert(scope_meta.var);
-            let body = unify_scope_children(scope_meta.var, in_scope, table, types)?;
-            in_scope.remove(scope_meta.var);
+            let body = scope_tracker.with(&[scope_meta.var].into(), |scope_tracker| {
+                unify_scope_structural(scope_meta.var, scope_tracker, table, types)
+            })?;
 
             let node = UnifiedNode {
                 typed_binder: Some(TypedBinder {
@@ -234,9 +234,9 @@ fn unify_single<'m>(
     }
 }
 
-fn unify_scope_children<'m>(
+fn unify_scope_structural<'m>(
     parent_scope_var: ontol_hir::Var,
-    in_scope: &mut VarSet,
+    scope_tracker: &mut ScopeTracker,
     table: &mut Table<'m>,
     types: &mut Types<'m>,
 ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
@@ -259,7 +259,7 @@ fn unify_scope_children<'m>(
                         .push(leaf_expr_to_node(assignment.expr, types)?);
                 }
 
-                let nodes = unify_scope_children(scope_var, in_scope, table, types)?;
+                let nodes = unify_scope_structural(scope_var, scope_tracker, table, types)?;
                 builder.output.extend(nodes);
             }
             flat_scope::Kind::PropVariant(optional, struct_var, property_id) => {
@@ -271,7 +271,12 @@ fn unify_scope_children<'m>(
                 for assignment in std::mem::take(&mut scope_map.assignments) {
                     body.push(leaf_expr_to_node(assignment.expr, types)?);
                 }
-                body.extend(unify_scope_children(scope_var, in_scope, table, types)?);
+                body.extend(unify_scope_structural(
+                    scope_var,
+                    scope_tracker,
+                    table,
+                    types,
+                )?);
 
                 builder.add_prop_variant_scope(scope_var, prop_key, body, table);
             }
