@@ -15,7 +15,10 @@ use crate::{
 };
 
 use super::{
-    expr, flat_scope, flat_unifier_table::Table, unifier::UnifiedNode, UnifierError, UnifierResult,
+    expr, flat_scope,
+    flat_unifier_table::{Assignment, Table},
+    unifier::UnifiedNode,
+    UnifierError, UnifierResult,
 };
 
 pub struct FlatUnifier<'a, 'm> {
@@ -43,19 +46,22 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
 
         let mut table = Table::new(flat_scope);
 
-        self.assign_to_scope(expr, &mut table)?;
+        let result = self.assign_to_scope(expr, &mut table);
 
+        // Debug even if assign_to_scope failed
         for scope_map in table.table_mut() {
             debug!("{}", scope_map.scope);
-            if !scope_map.exprs.is_empty() {
+            if !scope_map.assignments.is_empty() {
                 let expr_debug: Vec<_> = scope_map
-                    .exprs
+                    .assignments
                     .iter()
-                    .map(|expr| expr.kind().debug_short())
+                    .map(|assignment| assignment.expr.kind().debug_short())
                     .collect();
                 debug!("    exprs: {expr_debug:?}");
             }
         }
+
+        result?;
 
         let mut in_scope = VarSet::default();
 
@@ -70,10 +76,9 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
         match kind {
             expr::Kind::Var(var) => {
                 if let Some(index) = table.find_var_index(var) {
-                    table
-                        .scope_map_mut(index)
-                        .exprs
-                        .push(expr::Expr(kind, meta));
+                    table.scope_map_mut(index).assignments.push(Assignment {
+                        expr: expr::Expr(kind, meta),
+                    });
                 } else {
                     table.const_expr = Some(expr::Expr(kind, meta));
                 }
@@ -84,14 +89,16 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                 props,
             } => {
                 // FIXME: Insert according to required scope, instead of scope 0.
-                table.scope_map_mut(0).exprs.push(expr::Expr(
-                    expr::Kind::Struct {
-                        binder,
-                        flags,
-                        props: vec![],
-                    },
-                    meta.clone(),
-                ));
+                table.scope_map_mut(0).assignments.push(Assignment {
+                    expr: expr::Expr(
+                        expr::Kind::Struct {
+                            binder,
+                            flags,
+                            props: vec![],
+                        },
+                        meta.clone(),
+                    ),
+                });
 
                 for prop in props {
                     let free_vars = prop.free_vars.clone();
@@ -114,15 +121,19 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                 }
             }
             expr::Kind::Prop(prop) => {
+                debug!(
+                    "assigning prop {:?}, free_vars={:?}",
+                    prop.prop_id, prop.free_vars
+                );
                 let scope_map = table.assign_free_vars(&prop.free_vars)?;
-                let expressions = &mut scope_map.exprs;
+                let assignments = &mut scope_map.assignments;
 
                 let struct_var = prop.struct_var;
                 let mut prop = Some(*prop);
 
                 // Check just adding back to the original struct that owned this property:
-                for expression in expressions.iter_mut() {
-                    if let expr::Kind::Struct { binder, props, .. } = &mut expression.0 {
+                for assignment in assignments.iter_mut() {
+                    if let expr::Kind::Struct { binder, props, .. } = &mut assignment.expr.0 {
                         if binder.var == struct_var {
                             props.push(prop.take().unwrap());
                             break;
@@ -131,7 +142,9 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                 }
 
                 if let Some(prop) = prop {
-                    expressions.push(expr::Expr(expr::Kind::Prop(Box::new(prop)), meta));
+                    assignments.push(Assignment {
+                        expr: expr::Expr(expr::Kind::Prop(Box::new(prop)), meta),
+                    });
                 }
             }
             e => return Err(unifier_todo(smart_format!("expr kind: {e:?}"))),
@@ -167,8 +180,13 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
         let scope_map = &mut table.scope_map_mut(index);
         let scope_meta = scope_map.scope.meta().clone();
 
-        match (scope_map.take_single_expr(), scope_map.scope.kind()) {
-            (Some(expr::Expr(kind, meta)), flat_scope::Kind::Var) => {
+        match (scope_map.take_single_assignment(), scope_map.scope.kind()) {
+            (
+                Some(Assignment {
+                    expr: expr::Expr(kind, meta),
+                }),
+                flat_scope::Kind::Var,
+            ) => {
                 let inner_node = self.leaf_expr_to_node(expr::Expr(kind, meta))?;
 
                 Ok(UnifiedNode {
@@ -180,14 +198,17 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                 })
             }
             (
-                Some(expr::Expr(
-                    expr::Kind::Struct {
-                        binder,
-                        flags,
-                        props: _,
-                    },
-                    meta,
-                )),
+                Some(Assignment {
+                    expr:
+                        expr::Expr(
+                            expr::Kind::Struct {
+                                binder,
+                                flags,
+                                props: _,
+                            },
+                            meta,
+                        ),
+                }),
                 flat_scope::Kind::Struct,
             ) => {
                 in_scope.insert(scope_meta.var);
@@ -232,8 +253,8 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                 | flat_scope::Kind::PropValue
                 | flat_scope::Kind::Struct
                 | flat_scope::Kind::Var => {
-                    for expression in std::mem::take(&mut scope_map.exprs) {
-                        output.push(self.leaf_expr_to_node(expression)?);
+                    for assignment in std::mem::take(&mut scope_map.assignments) {
+                        output.push(self.leaf_expr_to_node(assignment.expr)?);
                     }
 
                     let nodes = self.unify_scope_children(scope_var, table, in_scope)?;
@@ -243,7 +264,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                     let optional = *optional;
                     let struct_var = *struct_var;
                     let property_id = *property_id;
-                    let exprs = std::mem::take(&mut scope_map.exprs);
+                    let assignments = std::mem::take(&mut scope_map.assignments);
 
                     let var_attribute =
                         self.scope_prop_variant_bindings(scope_map.scope.meta().var, table);
@@ -274,8 +295,8 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                     // TODO: Maybe use loop instead of recursion?
                     let mut body = vec![];
 
-                    for expr in exprs {
-                        body.push(self.leaf_expr_to_node(expr)?);
+                    for assignment in assignments {
+                        body.push(self.leaf_expr_to_node(assignment.expr)?);
                     }
                     body.extend(self.unify_scope_children(scope_var, table, in_scope)?);
 

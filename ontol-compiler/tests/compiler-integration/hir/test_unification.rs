@@ -640,19 +640,19 @@ fn test_unify_opt_props2() {
         |$b| (struct ($d)
             (match-prop $b S:0:0
                 (($_ $c)
-                    (prop $d O:0:0
-                        (#u
-                            (struct ($e)
-                                (match-prop $c S:1:1
-                                    (($_ $a)
+                    (match-prop $c S:1:1
+                        (($_ $a)
+                            (prop $d O:0:0
+                                (#u
+                                    (struct ($e)
                                         (prop $e O:1:1
                                             (#u $a)
                                         )
                                     )
-                                    (())
                                 )
                             )
                         )
+                        (())
                     )
                 )
                 (())

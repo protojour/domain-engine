@@ -42,7 +42,8 @@ pub enum UnifierError {
 
 pub type UnifierResult<T> = Result<T, UnifierError>;
 
-const CLASSIC_UNIFIER_FALLBACK: bool = true;
+const USE_FLAT_UNIFIER: bool = true;
+const CLASSIC_UNIFIER_FALLBACK: bool = false;
 
 pub fn unify_to_function<'m>(
     scope: &TypedHirNode<'m>,
@@ -53,7 +54,9 @@ pub fn unify_to_function<'m>(
     var_tracker.visit_node(0, scope);
     var_tracker.visit_node(0, expr);
 
-    let (unified, mut var_allocator) =
+    let (unified, mut var_allocator) = if !USE_FLAT_UNIFIER {
+        unify_classic(scope, expr, var_tracker.var_allocator(), compiler)?
+    } else {
         match unify_flat(scope, expr, var_tracker.var_allocator(), compiler) {
             Err(err) => {
                 if !CLASSIC_UNIFIER_FALLBACK {
@@ -67,7 +70,8 @@ pub fn unify_to_function<'m>(
                 warn!("Using output from flat unifier, which is experimental");
                 value
             }
-        };
+        }
+    };
 
     let scope_ty = scope.ty();
     let expr_ty = expr.ty();

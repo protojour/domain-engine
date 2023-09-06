@@ -1,8 +1,7 @@
-use ontol_runtime::smart_format;
-
-use crate::hir_unify::flat_unifier::unifier_todo;
-
 use super::{expr, flat_scope, UnifierResult, VarSet};
+
+#[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash)]
+pub struct ExprIdx(pub usize);
 
 pub(super) struct Table<'m> {
     table: Vec<ScopeMap<'m>>,
@@ -17,7 +16,7 @@ impl<'m> Table<'m> {
                 .into_iter()
                 .map(|scope_node| ScopeMap {
                     scope: scope_node,
-                    exprs: vec![],
+                    assignments: vec![],
                 })
                 .collect(),
             const_expr: None,
@@ -33,15 +32,50 @@ impl<'m> Table<'m> {
     }
 
     pub fn assign_free_vars(&mut self, free_vars: &VarSet) -> UnifierResult<&mut ScopeMap<'m>> {
-        for scope_map in self.table.iter_mut().rev() {
-            if scope_map.scope.meta().pub_vars.0.is_superset(&free_vars.0) {
-                return Ok(scope_map);
+        let mut tmp_candidate: Option<usize> = None;
+        let mut observed_variables = VarSet::default();
+
+        // Note: Reverse search.
+        for (index, scope_map) in self.table.iter().enumerate().rev() {
+            // only consider proper scope-introducing nodes
+            if !matches!(
+                scope_map.scope.kind(),
+                flat_scope::Kind::PropVariant(..) | flat_scope::Kind::SeqPropVariant(..)
+            ) {
+                continue;
             }
+
+            let scope_pub_vars = &scope_map.scope.meta().pub_vars;
+
+            // Only consider candidates that introduces the scope
+            if !scope_pub_vars.0.is_subset(&free_vars.0) {
+                continue;
+            }
+
+            // If the candidate is only introducing variables that we've
+            // already seen, this is not specific enough. The search is over..
+            if !observed_variables.0.is_empty()
+                && scope_pub_vars.0.is_superset(&observed_variables.0)
+            {
+                break;
+            }
+
+            observed_variables.union_with(&scope_pub_vars);
+
+            // Note that we choose the _last_ (in iteration order, really the _first_) candidate
+            // that introduces at least one variable in free_vars.
+            tmp_candidate = Some(index);
         }
 
-        Err(unifier_todo(smart_format!(
-            "Not able to locate scope map for {free_vars:?}"
-        )))
+        if let Some(index) = tmp_candidate {
+            let scope_map = self.scope_map_mut(index);
+            Ok(scope_map)
+        } else {
+            // instead of crashing, we should just add this at index 0 ("const scope")
+            // If there's a real scoping error, this will show up as "unbound variable"
+            // errors during codegen instead.
+            Ok(self.scope_map_mut(0))
+        }
     }
 
     pub fn find_var_index(&self, var: ontol_hir::Var) -> Option<usize> {
@@ -109,15 +143,20 @@ impl<'m> Table<'m> {
 
 pub(super) struct ScopeMap<'m> {
     pub scope: flat_scope::ScopeNode<'m>,
-    pub exprs: Vec<expr::Expr<'m>>,
+    pub assignments: Vec<Assignment<'m>>,
 }
 
 impl<'m> ScopeMap<'m> {
-    pub fn take_single_expr(&mut self) -> Option<expr::Expr<'m>> {
-        let expressions = std::mem::take(&mut self.exprs);
+    pub fn take_single_assignment(&mut self) -> Option<Assignment<'m>> {
+        let expressions = std::mem::take(&mut self.assignments);
         if expressions.len() > 1 {
-            panic!("Multiple expressions");
+            panic!("Multiple assignments");
         }
         expressions.into_iter().next()
     }
+}
+
+#[derive(Debug)]
+pub(super) struct Assignment<'m> {
+    pub expr: expr::Expr<'m>,
 }

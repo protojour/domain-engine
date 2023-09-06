@@ -100,7 +100,7 @@ impl<'m> FlatScopeBuilder<'m> {
                     flat_scope::Kind::Struct,
                     flat_scope::Meta {
                         var: binder.var,
-                        pub_vars: [binder.var].into(),
+                        pub_vars: Default::default(),
                         deps,
                         hir_meta: *node.meta(),
                     },
