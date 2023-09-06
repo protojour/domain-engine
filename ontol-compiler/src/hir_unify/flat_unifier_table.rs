@@ -1,4 +1,4 @@
-use super::{expr, flat_scope, UnifierResult, VarSet};
+use super::{expr, flat_scope, VarSet};
 
 #[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub struct ExprIdx(pub usize);
@@ -31,7 +31,7 @@ impl<'m> Table<'m> {
         &mut self.table
     }
 
-    pub fn assign_free_vars(&mut self, free_vars: &VarSet) -> UnifierResult<&mut ScopeMap<'m>> {
+    pub fn find_assignment_slot(&mut self, free_vars: &VarSet) -> AssignmentSlot<'_, 'm> {
         let mut tmp_candidate: Option<usize> = None;
         let mut observed_variables = VarSet::default();
 
@@ -69,12 +69,25 @@ impl<'m> Table<'m> {
 
         if let Some(index) = tmp_candidate {
             let scope_map = self.scope_map_mut(index);
-            Ok(scope_map)
+            let extra_deps = VarSet(
+                free_vars
+                    .0
+                    .difference(&scope_map.scope.1.pub_vars.0)
+                    .collect(),
+            );
+
+            AssignmentSlot {
+                scope_map,
+                lateral_deps: extra_deps,
+            }
         } else {
             // instead of crashing, we should just add this at index 0 ("const scope")
             // If there's a real scoping error, this will show up as "unbound variable"
             // errors during codegen instead.
-            Ok(self.scope_map_mut(0))
+            AssignmentSlot {
+                scope_map: self.scope_map_mut(0),
+                lateral_deps: Default::default(),
+            }
         }
     }
 
@@ -139,6 +152,31 @@ impl<'m> Table<'m> {
                 .collect()
         }
     }
+
+    pub fn scope_prop_variant_bindings(
+        &mut self,
+        variant_var: ontol_hir::Var,
+    ) -> ontol_hir::Attribute<Option<ontol_hir::Var>> {
+        let mut attribute = ontol_hir::Attribute {
+            rel: None,
+            val: None,
+        };
+
+        for index in self.dependees(Some(variant_var)) {
+            let scope_map = &self.scope_map_mut(index);
+            match scope_map.scope.kind() {
+                flat_scope::Kind::PropRelParam => {
+                    attribute.rel = Some(scope_map.scope.meta().var);
+                }
+                flat_scope::Kind::PropValue => {
+                    attribute.val = Some(scope_map.scope.meta().var);
+                }
+                _ => {}
+            }
+        }
+
+        attribute
+    }
 }
 
 pub(super) struct ScopeMap<'m> {
@@ -159,4 +197,10 @@ impl<'m> ScopeMap<'m> {
 #[derive(Debug)]
 pub(super) struct Assignment<'m> {
     pub expr: expr::Expr<'m>,
+    pub lateral_deps: VarSet,
+}
+
+pub(super) struct AssignmentSlot<'a, 'm> {
+    pub scope_map: &'a mut ScopeMap<'m>,
+    pub lateral_deps: VarSet,
 }
