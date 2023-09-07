@@ -65,7 +65,7 @@ impl<'m> Table<'m> {
                 break;
             }
 
-            observed_variables.union_with(&scope_pub_vars);
+            observed_variables.union_with(scope_pub_vars);
 
             // Note that we choose the _last_ (in iteration order, really the _first_) candidate
             // that introduces at least one variable in free_vars.

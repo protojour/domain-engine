@@ -701,6 +701,9 @@ impl<'a, 'm> Unifier<'a, 'm> {
             (expr::Kind::Seq(_label, _attr), _) => {
                 panic!("Seq without gen scope")
             }
+            (expr::Kind::SeqItem(..), _) => {
+                panic!("Only used in flat unifier")
+            }
             (expr_kind, scope::Kind::Gen(_)) => {
                 todo!("{expr_kind:#?} with gen scope")
             }

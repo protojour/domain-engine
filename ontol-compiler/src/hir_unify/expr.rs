@@ -50,6 +50,12 @@ pub enum Kind<'m> {
     String(String),
     Const(DefId),
     Seq(ontol_hir::Label, Box<ontol_hir::Attribute<Expr<'m>>>),
+    SeqItem(
+        ontol_hir::Label,
+        usize,
+        Iter,
+        Box<ontol_hir::Attribute<Expr<'m>>>,
+    ),
     Push(ontol_hir::Var, Box<ontol_hir::Attribute<Expr<'m>>>),
     StringInterpolation(TypedBinder<'m>, Vec<StringInterpolationComponent>),
 }
@@ -73,6 +79,11 @@ impl<'m> Kind<'m> {
             Self::String(string) => format!("String({string})"),
             Self::Const(const_def_id) => format!("Const({const_def_id:?})"),
             Self::Seq(label, _) => format!("Seq({label})"),
+            Self::SeqItem(label, index, _iter, attr) => format!(
+                "SeqItem({label}, {index}, ({}, {}))",
+                attr.rel.kind().debug_short(),
+                attr.val.kind().debug_short()
+            ),
             Self::Push(var, _) => format!("Push({var})"),
             Self::StringInterpolation(binder, _) => format!("StringInterpolation({})", binder.var),
         }
@@ -111,6 +122,9 @@ pub struct SeqPropElement<'m> {
     pub iter: bool,
     pub attribute: ontol_hir::Attribute<Expr<'m>>,
 }
+
+#[derive(Debug)]
+pub struct Iter(pub bool);
 
 #[derive(Debug)]
 pub enum StringInterpolationComponent {

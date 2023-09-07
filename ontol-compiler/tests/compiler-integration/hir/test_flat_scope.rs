@@ -138,3 +138,30 @@ fn test_flat_seq() {
     };
     assert_eq!(expected, output);
 }
+
+#[test]
+fn test_flat_seq_mix() {
+    let output = mk_flat_scope(
+        "
+        (struct ($c)
+            (prop $c S:1:1
+                (seq (@d) (#u $a) (iter #u $b) (#u $c))
+            )
+        )",
+    );
+    // BUG: I think $a and $c should be grouped under ItemElement or something like that.
+    let expected = indoc! {
+        "
+        $c: {} - Struct {}
+        $d: {$c} - SeqPropVariant(TypedLabel { label: Label(d), ty: Error }, opt=f, Var(c), S:1:1) {$a, $c, $d}
+        $e: {$d} - PropValue {$a}
+        $f: {$d} - IterElement {}
+        $g: {$f} - PropValue {$b}
+        $h: {$d} - PropValue {$c}
+        $a: {$e} - Var {$a}
+        $b: {$g} - Var {$b}
+        $c: {$h} - Var {$c}
+        "
+    };
+    assert_eq!(expected, output);
+}

@@ -84,24 +84,148 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                     table.const_expr = Some(expr::Expr(kind, meta));
                 }
             }
+            kind @ expr::Kind::Struct { .. } => {
+                let expr = self.destructure_expr(expr::Expr(kind, meta), table)?;
+                table.scope_map_mut(0).assignments.push(Assignment {
+                    expr,
+                    lateral_deps: Default::default(),
+                });
+            }
+            expr::Kind::Prop(prop) => {
+                debug!(
+                    "assigning prop {:?}, free_vars={:?}",
+                    prop.prop_id, prop.free_vars
+                );
+                debug!("prop: {prop:?}");
+                let struct_var = prop.struct_var;
+
+                let prop = {
+                    let expr::Prop {
+                        optional,
+                        struct_var,
+                        prop_id,
+                        seq,
+                        variant,
+                        free_vars,
+                    } = *prop;
+                    let variant = match variant {
+                        expr::PropVariant::Seq { label, elements } => {
+                            // recursively assign seq elements
+                            for (index, element) in elements.into_iter().enumerate() {
+                                let mut free_vars = VarSet::default();
+                                free_vars.union_with(&element.attribute.rel.meta().free_vars);
+                                free_vars.union_with(&element.attribute.val.meta().free_vars);
+
+                                let element_expr = expr::Expr(
+                                    expr::Kind::SeqItem(
+                                        label,
+                                        index,
+                                        expr::Iter(element.iter),
+                                        Box::new(element.attribute),
+                                    ),
+                                    expr::Meta {
+                                        free_vars,
+                                        hir_meta: self.unit_meta(),
+                                    },
+                                );
+
+                                self.assign_to_scope(element_expr, table)?;
+
+                                if element.iter {}
+
+                                // element.attribute
+                            }
+                            expr::PropVariant::Seq {
+                                label,
+                                elements: vec![],
+                            }
+                        }
+                        singleton => singleton,
+                    };
+                    expr::Prop {
+                        optional,
+                        struct_var,
+                        prop_id,
+                        variant,
+                        seq,
+                        free_vars,
+                    }
+                };
+
+                let assignment_slot = table.find_assignment_slot(&prop.free_vars);
+                let assignments = &mut assignment_slot.scope_map.assignments;
+
+                let mut prop = Some(prop);
+
+                // Check just adding back to the original struct that owned this property:
+                for assignment in assignments.iter_mut() {
+                    if let expr::Kind::Struct { binder, props, .. } = &mut assignment.expr.0 {
+                        if binder.var == struct_var {
+                            props.push(prop.take().unwrap());
+                            break;
+                        }
+                    }
+                }
+
+                if let Some(prop) = prop {
+                    assignments.push(Assignment {
+                        expr: expr::Expr(expr::Kind::Prop(Box::new(prop)), meta),
+                        lateral_deps: assignment_slot.lateral_deps,
+                    });
+                }
+            }
+            expr::Kind::SeqItem(label, index, iter, attr) => {
+                if iter.0 {
+                    let iter_scope_map_idx = table
+                        .dependees(Some(ontol_hir::Var(label.0)))
+                        .into_iter()
+                        .find(|idx| {
+                            let scope_map = &table.table_mut()[*idx];
+                            matches!(scope_map.scope.kind(), flat_scope::Kind::IterElement)
+                        });
+
+                    if let Some(iter_scope_map_idx) = iter_scope_map_idx {
+                        let rel = self.destructure_expr(attr.rel, table)?;
+                        let val = self.destructure_expr(attr.val, table)?;
+
+                        let iter_scope_map = &mut table.table_mut()[iter_scope_map_idx];
+
+                        iter_scope_map.assignments.push(Assignment {
+                            expr: expr::Expr(
+                                expr::Kind::SeqItem(
+                                    label,
+                                    index,
+                                    iter,
+                                    Box::new(ontol_hir::Attribute { rel, val }),
+                                ),
+                                meta,
+                            ),
+                            lateral_deps: VarSet::default(),
+                        });
+                    } else {
+                        return Err(unifier_todo(smart_format!("Not able to find iter scope")));
+                    }
+                } else {
+                    return Err(unifier_todo(smart_format!("Handle non-iter seq element")));
+                }
+            }
+            e => return Err(unifier_todo(smart_format!("expr kind: {e:?}"))),
+        }
+
+        Ok(())
+    }
+
+    fn destructure_expr(
+        &mut self,
+        expr::Expr(kind, meta): expr::Expr<'m>,
+        table: &mut Table<'m>,
+    ) -> UnifierResult<expr::Expr<'m>> {
+        match kind {
             expr::Kind::Struct {
                 binder,
                 flags,
                 props,
             } => {
-                // FIXME: Insert according to required scope, instead of scope 0.
-                table.scope_map_mut(0).assignments.push(Assignment {
-                    expr: expr::Expr(
-                        expr::Kind::Struct {
-                            binder,
-                            flags,
-                            props: vec![],
-                        },
-                        meta.clone(),
-                    ),
-                    lateral_deps: Default::default(),
-                });
-
                 for prop in props {
                     let free_vars = prop.free_vars.clone();
                     let unit_ty = self
@@ -121,39 +245,18 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                         table,
                     )?;
                 }
+
+                Ok(expr::Expr(
+                    expr::Kind::Struct {
+                        binder,
+                        flags,
+                        props: vec![],
+                    },
+                    meta,
+                ))
             }
-            expr::Kind::Prop(prop) => {
-                debug!(
-                    "assigning prop {:?}, free_vars={:?}",
-                    prop.prop_id, prop.free_vars
-                );
-                let assignment_slot = table.find_assignment_slot(&prop.free_vars);
-                let assignments = &mut assignment_slot.scope_map.assignments;
-
-                let struct_var = prop.struct_var;
-                let mut prop = Some(*prop);
-
-                // Check just adding back to the original struct that owned this property:
-                for assignment in assignments.iter_mut() {
-                    if let expr::Kind::Struct { binder, props, .. } = &mut assignment.expr.0 {
-                        if binder.var == struct_var {
-                            props.push(prop.take().unwrap());
-                            break;
-                        }
-                    }
-                }
-
-                if let Some(prop) = prop {
-                    assignments.push(Assignment {
-                        expr: expr::Expr(expr::Kind::Prop(Box::new(prop)), meta),
-                        lateral_deps: assignment_slot.lateral_deps,
-                    });
-                }
-            }
-            e => return Err(unifier_todo(smart_format!("expr kind: {e:?}"))),
+            kind => Ok(expr::Expr(kind, meta)),
         }
-
-        Ok(())
     }
 
     pub fn unit_meta(&mut self) -> typed_hir::Meta<'m> {
@@ -164,11 +267,11 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
     }
 }
 
-fn unify_single<'a, 'm>(
+fn unify_single<'m>(
     parent_scope_var: Option<ontol_hir::Var>,
     in_scope: VarSet,
     table: &mut Table<'m>,
-    unifier: &mut FlatUnifier<'a, 'm>,
+    unifier: &mut FlatUnifier<'_, 'm>,
 ) -> UnifierResult<UnifiedNode<'m>> {
     if let Some(const_expr) = table.const_expr.take() {
         return Ok(UnifiedNode {
@@ -243,11 +346,11 @@ fn unify_single<'a, 'm>(
     }
 }
 
-fn unify_scope_structural<'a, 'm>(
+fn unify_scope_structural<'m>(
     parent_scope_var: ontol_hir::Var,
     in_scope: VarSet,
     table: &mut Table<'m>,
-    unifier: &mut FlatUnifier<'a, 'm>,
+    unifier: &mut FlatUnifier<'_, 'm>,
 ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
     let indexes = table.dependees(Some(parent_scope_var));
 
@@ -327,11 +430,11 @@ fn unify_scope_structural<'a, 'm>(
     Ok(builder.build(unifier))
 }
 
-fn apply_lateral_scope<'a, 'm>(
+fn apply_lateral_scope<'m>(
     assignments: Vec<Assignment<'m>>,
     in_scope_fn: &dyn Fn() -> VarSet,
     table: &mut Table<'m>,
-    unifier: &mut FlatUnifier<'a, 'm>,
+    unifier: &mut FlatUnifier<'_, 'm>,
 ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
     if assignments.is_empty() {
         return Ok(vec![]);
@@ -405,10 +508,10 @@ fn apply_lateral_scope<'a, 'm>(
     Ok(nodes)
 }
 
-fn leaf_expr_to_node<'a, 'm>(
+fn leaf_expr_to_node<'m>(
     expr::Expr(kind, meta): expr::Expr<'m>,
     table: &mut Table<'m>,
-    unifier: &mut FlatUnifier<'a, 'm>,
+    unifier: &mut FlatUnifier<'_, 'm>,
 ) -> UnifierResult<TypedHirNode<'m>> {
     match kind {
         expr::Kind::Var(var) => Ok(TypedHirNode(ontol_hir::Kind::Var(var), meta.hir_meta)),
