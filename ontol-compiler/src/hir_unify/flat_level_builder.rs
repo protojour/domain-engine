@@ -4,10 +4,9 @@ use ontol_runtime::value::PropertyId;
 use crate::{
     hir_unify::flat_scope,
     typed_hir::{self, TypedBinder, TypedHir, TypedHirNode},
-    types::Types,
 };
 
-use super::{flat_unifier::unit_meta, flat_unifier_table::Table};
+use super::{flat_unifier::FlatUnifier, flat_unifier_table::Table};
 
 #[derive(Default)]
 pub(super) struct MergedMatchArms<'m> {
@@ -22,7 +21,7 @@ pub(super) struct LevelBuilder<'m> {
 }
 
 impl<'m> LevelBuilder<'m> {
-    pub fn build(mut self, types: &mut Types<'m>) -> Vec<TypedHirNode<'m>> {
+    pub fn build<'a>(mut self, unifier: &mut FlatUnifier<'a, 'm>) -> Vec<TypedHirNode<'m>> {
         for ((struct_var, property_id), mut merged_match_arms) in self.merged_match_arms_table {
             if merged_match_arms.optional.0 {
                 merged_match_arms.match_arms.push(ontol_hir::PropMatchArm {
@@ -31,10 +30,9 @@ impl<'m> LevelBuilder<'m> {
                 });
             }
 
-            let meta = unit_meta(types);
             self.output.push(TypedHirNode(
                 ontol_hir::Kind::MatchProp(struct_var, property_id, merged_match_arms.match_arms),
-                meta,
+                unifier.unit_meta(),
             ));
         }
 
