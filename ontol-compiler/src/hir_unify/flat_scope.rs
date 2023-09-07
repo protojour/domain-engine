@@ -2,7 +2,7 @@ use std::fmt::{Debug, Display};
 
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc, DefId};
 
-use crate::typed_hir::{self, TypedHirKind};
+use crate::typed_hir::{self, TypedHirKind, TypedLabel};
 
 use super::VarSet;
 
@@ -65,7 +65,12 @@ pub enum Kind<'m> {
     PropVariant(ontol_hir::Optional, ontol_hir::Var, PropertyId),
     PropRelParam,
     PropValue,
-    SeqPropVariant(ontol_hir::Optional, ontol_hir::Var, PropertyId),
+    SeqPropVariant(
+        TypedLabel<'m>,
+        ontol_hir::Optional,
+        ontol_hir::Var,
+        PropertyId,
+    ),
     IterElement,
     Call(BuiltinProc),
     Regex(DefId),

@@ -143,6 +143,7 @@ impl<'m> FlatScopeBuilder<'m> {
                             let label_var = ontol_hir::Var(label.label.0);
                             self.scope_nodes.push(ScopeNode(
                                 flat_scope::Kind::SeqPropVariant(
+                                    *label,
                                     *optional,
                                     *struct_var,
                                     *property_id,

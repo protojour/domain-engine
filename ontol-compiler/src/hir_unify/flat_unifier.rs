@@ -1,8 +1,7 @@
 #![allow(clippy::only_used_in_recursion)]
 
 use fnv::FnvHashMap;
-use indexmap::IndexMap;
-use ontol_runtime::{smart_format, value::PropertyId, DefId};
+use ontol_runtime::{smart_format, DefId};
 use smartstring::alias::String;
 use tracing::debug;
 
@@ -10,14 +9,16 @@ use crate::{
     hir_unify::CLASSIC_UNIFIER_FALLBACK,
     mem::Intern,
     primitive::PrimitiveKind,
-    typed_hir::{self, TypedBinder, TypedHir, TypedHirNode},
+    typed_hir::{self, TypedBinder, TypedHirNode},
     types::{Type, Types},
     NO_SPAN,
 };
 
 use super::{
     dep_tree::Expression,
-    expr, flat_scope,
+    expr,
+    flat_level_builder::LevelBuilder,
+    flat_scope,
     flat_unifier_table::{Assignment, Table},
     unifier::UnifiedNode,
     UnifierError, UnifierResult, VarSet,
@@ -251,7 +252,8 @@ fn unify_scope_structural<'m>(
             flat_scope::Kind::PropRelParam
             | flat_scope::Kind::PropValue
             | flat_scope::Kind::Struct
-            | flat_scope::Kind::Var => {
+            | flat_scope::Kind::Var
+            | flat_scope::Kind::IterElement => {
                 builder.output.extend(apply_lateral_scope(
                     std::mem::take(&mut scope_map.assignments),
                     &|| in_scope.clone(),
@@ -283,6 +285,27 @@ fn unify_scope_structural<'m>(
                 )?);
 
                 builder.add_prop_variant_scope(scope_var, prop_key, body, table);
+            }
+            flat_scope::Kind::SeqPropVariant(_label, optional, struct_var, property_id) => {
+                let prop_key = (*optional, *struct_var, *property_id);
+                let mut body = vec![];
+                let inner_scope = in_scope.union(&scope_map.scope.meta().pub_vars);
+
+                body.extend(apply_lateral_scope(
+                    std::mem::take(&mut scope_map.assignments),
+                    &|| inner_scope.clone(),
+                    table,
+                    types,
+                )?);
+
+                body.extend(unify_scope_structural(
+                    scope_var,
+                    inner_scope,
+                    table,
+                    types,
+                )?);
+
+                builder.add_seq_prop_variant_scope(scope_var, prop_key, body, table);
             }
             other => return Err(unifier_todo(smart_format!("structural scope: {other:?}"))),
         }
@@ -390,8 +413,82 @@ fn leaf_expr_to_node<'m>(
                             val: Box::new(leaf_expr_to_node(attr.val, types)?),
                         })]
                     }
-                    expr::PropVariant::Seq { .. } => {
-                        return Err(unifier_todo(smart_format!("seq expr")))
+                    expr::PropVariant::Seq { label, elements } => {
+                        if elements.is_empty() {
+                            panic!("No elements in seq prop");
+                        }
+
+                        let first_element = elements.first().unwrap();
+
+                        // FIXME: This is _probably_ incorrect.
+                        // The type of the elements in the sequence must be the common supertype of all the elements.
+                        // So the type needs to be carried over from somewhere else.
+                        let seq_ty = types.intern(Type::Seq(
+                            first_element.attribute.rel.hir_meta().ty,
+                            first_element.attribute.val.hir_meta().ty,
+                        ));
+
+                        // let scope_map = table
+                        //     .table_mut()
+                        //     .iter()
+                        //     .find(|scope_map| scope_map.scope.meta().var == scope_var)
+                        //     .unwrap();
+
+                        let mut sequence_body = Vec::with_capacity(elements.len());
+
+                        for element in elements {
+                            let rel = leaf_expr_to_node(element.attribute.rel, types)?;
+                            let val = leaf_expr_to_node(element.attribute.val, types)?;
+
+                            let push_node = TypedHirNode(
+                                ontol_hir::Kind::SeqPush(
+                                    ontol_hir::Var(label.0),
+                                    ontol_hir::Attribute {
+                                        rel: Box::new(rel),
+                                        val: Box::new(val),
+                                    },
+                                ),
+                                unit_meta(types),
+                            );
+
+                            if element.iter {
+                                sequence_body.push(TypedHirNode(
+                                    ontol_hir::Kind::ForEach(
+                                        ontol_hir::Var(42),
+                                        (
+                                            ontol_hir::Binding::Wildcard,
+                                            ontol_hir::Binding::Wildcard,
+                                        ),
+                                        vec![push_node],
+                                    ),
+                                    unit_meta(types),
+                                ));
+                            } else {
+                                sequence_body.push(push_node);
+                            }
+                        }
+
+                        let sequence_node = TypedHirNode(
+                            ontol_hir::Kind::Sequence(
+                                TypedBinder {
+                                    var: ontol_hir::Var(label.0),
+                                    meta: typed_hir::Meta {
+                                        ty: seq_ty,
+                                        span: NO_SPAN,
+                                    },
+                                },
+                                sequence_body,
+                            ),
+                            typed_hir::Meta {
+                                ty: seq_ty,
+                                span: NO_SPAN,
+                            },
+                        );
+
+                        vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
+                            rel: Box::new(TypedHirNode(ontol_hir::Kind::Unit, unit_meta(types))),
+                            val: Box::new(sequence_node),
+                        })]
                     }
                 },
             ),
@@ -453,87 +550,7 @@ fn leaf_expr_to_node<'m>(
     }
 }
 
-#[derive(Default)]
-struct MergedMatchArms<'m> {
-    optional: ontol_hir::Optional,
-    match_arms: Vec<ontol_hir::PropMatchArm<'m, TypedHir>>,
-}
-
-#[derive(Default)]
-struct LevelBuilder<'m> {
-    output: Vec<TypedHirNode<'m>>,
-    merged_match_arms_table: IndexMap<(ontol_hir::Var, PropertyId), MergedMatchArms<'m>>,
-}
-
-impl<'m> LevelBuilder<'m> {
-    fn build(mut self, types: &mut Types<'m>) -> Vec<TypedHirNode<'m>> {
-        for ((struct_var, property_id), mut merged_match_arms) in self.merged_match_arms_table {
-            if merged_match_arms.optional.0 {
-                merged_match_arms.match_arms.push(ontol_hir::PropMatchArm {
-                    pattern: ontol_hir::PropPattern::Absent,
-                    nodes: vec![],
-                });
-            }
-
-            let meta = unit_meta(types);
-            self.output.push(TypedHirNode(
-                ontol_hir::Kind::MatchProp(struct_var, property_id, merged_match_arms.match_arms),
-                meta,
-            ));
-        }
-
-        self.output
-    }
-
-    fn add_prop_variant_scope(
-        &mut self,
-        scope_var: ontol_hir::Var,
-        (optional, struct_var, property_id): (ontol_hir::Optional, ontol_hir::Var, PropertyId),
-        body: Vec<TypedHirNode<'m>>,
-        table: &mut Table<'m>,
-    ) {
-        let var_attribute = table.scope_prop_variant_bindings(scope_var);
-
-        fn make_binding<'m>(
-            scope_node: Option<&flat_scope::ScopeNode<'m>>,
-        ) -> ontol_hir::Binding<'m, TypedHir> {
-            match scope_node {
-                Some(scope_node) => ontol_hir::Binding::Binder(TypedBinder {
-                    var: scope_node.meta().var,
-                    meta: scope_node.meta().hir_meta,
-                }),
-                None => ontol_hir::Binding::Wildcard,
-            }
-        }
-
-        let rel_binding = make_binding(
-            var_attribute
-                .rel
-                .and_then(|var| table.find_scope_var_child(var)),
-        );
-        let val_binding = make_binding(
-            var_attribute
-                .val
-                .and_then(|var| table.find_scope_var_child(var)),
-        );
-
-        let merged_match_arms = self
-            .merged_match_arms_table
-            .entry((struct_var, property_id))
-            .or_default();
-
-        if optional.0 {
-            merged_match_arms.optional.0 = true;
-        }
-
-        merged_match_arms.match_arms.push(ontol_hir::PropMatchArm {
-            pattern: ontol_hir::PropPattern::Attr(rel_binding, val_binding),
-            nodes: body,
-        });
-    }
-}
-
-fn unit_meta<'m>(types: &mut Types<'m>) -> typed_hir::Meta<'m> {
+pub(super) fn unit_meta<'m>(types: &mut Types<'m>) -> typed_hir::Meta<'m> {
     typed_hir::Meta {
         ty: types.unit_type(),
         span: NO_SPAN,

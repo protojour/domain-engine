@@ -21,6 +21,7 @@ mod dep_tree;
 mod dependent_scope_analyzer;
 mod expr;
 mod expr_builder;
+mod flat_level_builder;
 mod flat_scope;
 mod flat_scope_builder;
 mod flat_unifier;
