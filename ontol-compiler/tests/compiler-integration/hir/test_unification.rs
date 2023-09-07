@@ -720,16 +720,19 @@ fn test_unify_opt_rel_and_val_struct_merge1() {
         |$c| (struct ($f)
             (match-prop $c S:0:0
                 (($d $e)
-                    (prop $f O:0:0
-                        (#u
+                    (match-prop $d S:1:0
+                        (($_ $a)
                             (match-prop $e S:1:1
                                 (($_ $b)
-                                    (match-prop $d S:1:0
-                                        (($_ $a) (+ $a $b))
+                                    (prop $f O:0:0
+                                        (#u (+ $a $b))
                                     )
                                 )
                             )
                         )
+                    )
+                    (match-prop $e S:1:1
+                        (($_ $b))
                     )
                 )
                 (())

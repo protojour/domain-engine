@@ -118,6 +118,23 @@ impl<'m> Table<'m> {
             })
     }
 
+    pub fn find_data_point(&self, var: ontol_hir::Var) -> Option<usize> {
+        self.table
+            .iter()
+            .enumerate()
+            .find_map(|(index, assignment)| {
+                if matches!(assignment.scope.kind(), flat_scope::Kind::PropVariant(..)) {
+                    if assignment.scope.meta().pub_vars.contains(var) {
+                        Some(index)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+    }
+
     pub fn find_scope_var_child(&self, var: ontol_hir::Var) -> Option<&flat_scope::ScopeNode<'m>> {
         let indexes = self.dependees(Some(var));
         if indexes.len() > 1 {

@@ -1,5 +1,6 @@
 #![allow(clippy::only_used_in_recursion)]
 
+use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{smart_format, value::PropertyId, DefId};
 use smartstring::alias::String;
@@ -253,7 +254,7 @@ fn unify_scope_structural<'m>(
             | flat_scope::Kind::Var => {
                 builder.output.extend(apply_lateral_scope(
                     std::mem::take(&mut scope_map.assignments),
-                    || in_scope.clone(),
+                    &|| in_scope.clone(),
                     table,
                     types,
                 )?);
@@ -269,7 +270,7 @@ fn unify_scope_structural<'m>(
 
                 body.extend(apply_lateral_scope(
                     std::mem::take(&mut scope_map.assignments),
-                    || inner_scope.clone(),
+                    &|| inner_scope.clone(),
                     table,
                     types,
                 )?);
@@ -292,7 +293,7 @@ fn unify_scope_structural<'m>(
 
 fn apply_lateral_scope<'m>(
     assignments: Vec<Assignment<'m>>,
-    in_scope_fn: impl FnOnce() -> VarSet,
+    in_scope_fn: &dyn Fn() -> VarSet,
     table: &mut Table<'m>,
     types: &mut Types<'m>,
 ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
@@ -302,22 +303,67 @@ fn apply_lateral_scope<'m>(
 
     let in_scope = in_scope_fn();
 
-    for assignment in &assignments {
+    let mut scope_groups: FnvHashMap<ontol_hir::Var, Vec<Assignment<'m>>> = Default::default();
+    let mut nodes = Vec::with_capacity(assignments.len());
+
+    for assignment in assignments {
         debug!(
             "assignment free_vars: {:?} in_scope: {:?}",
             assignment.expr.meta().free_vars,
             in_scope
         );
 
-        if !assignment.expr.free_vars().0.is_subset(&in_scope.0) {
-            panic!("Not in scope: {}", assignment.expr.kind().debug_short());
+        if assignment.expr.free_vars().0.is_subset(&in_scope.0) {
+            nodes.push(leaf_expr_to_node(assignment.expr, types)?);
+        } else {
+            let introduced_var = ontol_hir::Var(
+                assignment
+                    .expr
+                    .free_vars()
+                    .0
+                    .difference(&in_scope.0)
+                    .next()
+                    .unwrap() as u32,
+            );
+
+            scope_groups
+                .entry(introduced_var)
+                .or_default()
+                .push(assignment);
         }
     }
 
-    let mut nodes = Vec::with_capacity(assignments.len());
+    for (introduced_var, assignments) in scope_groups {
+        // let new_scope = in_scope.union_one(introduced_var);
+        if let Some(data_point_index) = table.find_data_point(introduced_var) {
+            let scope_map = &mut table.scope_map_mut(data_point_index);
+            let scope_var = scope_map.scope.meta().var;
 
-    for assignment in assignments {
-        nodes.push(leaf_expr_to_node(assignment.expr, types)?);
+            let mut builder = LevelBuilder::default();
+
+            match scope_map.scope.kind() {
+                flat_scope::Kind::PropVariant(optional, struct_var, property_id) => {
+                    let prop_key = (*optional, *struct_var, *property_id);
+                    let mut body = vec![];
+
+                    body.extend(apply_lateral_scope(
+                        assignments,
+                        &|| in_scope.union_one(introduced_var),
+                        table,
+                        types,
+                    )?);
+
+                    builder.add_prop_variant_scope(scope_var, prop_key, body, table);
+                }
+                other => return Err(unifier_todo(smart_format!("{other:?}"))),
+            }
+
+            nodes.extend(builder.build(types));
+        } else {
+            for assignment in assignments {
+                nodes.push(leaf_expr_to_node(assignment.expr, types)?);
+            }
+        }
     }
 
     Ok(nodes)
