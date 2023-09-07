@@ -72,7 +72,7 @@ pub enum Kind<'m> {
         ontol_hir::Var,
         PropertyId,
     ),
-    IterElement(OutputVar),
+    IterElement(ontol_hir::Label, OutputVar),
     Call(BuiltinProc),
     Regex(DefId),
     RegexAlternation,

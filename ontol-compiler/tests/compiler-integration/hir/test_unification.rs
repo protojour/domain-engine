@@ -471,6 +471,73 @@ fn test_unify_seq_prop_deep() {
 }
 
 #[test]
+fn test_unify_seq_prop_merge_rel_and_val_zwizzle() {
+    let output = test_unify(
+        "
+        (struct ($e)
+            (prop $e S:0:0
+                (seq (@f)
+                    (iter
+                        (struct ($g)
+                            (prop $c S:1:0 (#u $a))
+                            (prop $c S:1:0 (#u $b))
+                        )
+                        (struct ($h)
+                            (prop $d S:1:1 (#u $c))
+                            (prop $d S:1:1 (#u $d))
+                        )
+                    )
+                )
+            )
+        )",
+        "
+        (struct ($i)
+            (prop $i O:0:0
+                (seq (@f)
+                    (iter
+                        (struct ($j)
+                            (prop $j O:1:0 (#u $a))
+                            (prop $j O:1:0 (#u $c))
+                        )
+                        (struct ($k)
+                            (prop $k O:1:1 (#u $b))
+                            (prop $k O:1:1 (#u $d))
+                        )
+                    )
+                )
+            )
+        )",
+    );
+    let expected = indoc! {"
+        |$e| (struct ($i)
+            (match-prop $e S:0:0
+                ((seq $f)
+                    (prop $i O:0:0
+                        (#u
+                            (sequence ($l)
+                                (for-each $f ($g $h)
+                                    (seq-push $h
+                                        (struct ($j)
+                                            (prop $j O:1:0 (#u $a))
+                                            (prop $j O:1:0 (#u $c))
+                                        )
+                                        (struct ($g)
+                                            (prop $g O:1:0 (#u $a))
+                                            (prop $g O:1:1 (#u $b))
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )"
+    };
+    assert_eq!(expected, output);
+}
+
+#[test]
 fn test_unify_basic_seq_prop_default_value() {
     let output = test_unify(
         "

@@ -161,7 +161,7 @@ impl<'m> FlatScopeBuilder<'m> {
                                 let attr_deps: VarSet = if element.iter {
                                     let iter_var = self.var_allocator.alloc();
                                     self.scope_nodes.push(ScopeNode(
-                                        flat_scope::Kind::IterElement(output_var),
+                                        flat_scope::Kind::IterElement(label.label, output_var),
                                         flat_scope::Meta {
                                             var: iter_var,
                                             pub_vars: Default::default(),
@@ -354,7 +354,7 @@ fn propagate_pub_vars(scope_nodes: &mut Vec<ScopeNode>) {
             if target_union.contains(scope_node.meta().var) {
                 for propagation in &propagations {
                     if propagation.target.contains(scope_node.meta().var)
-                        && !matches!(scope_node.kind(), flat_scope::Kind::IterElement(_))
+                        && !matches!(scope_node.kind(), flat_scope::Kind::IterElement(..))
                     {
                         scope_node.1.pub_vars.union_with(&propagation.pub_vars);
                     }
