@@ -21,14 +21,15 @@ use std::{
 use substring::Substring;
 
 /// Language server state
-#[derive(Clone, Eq, PartialEq, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct State {
     pub docs: HashMap<String, Document>,
     pub source_map: HashMap<SourceId, String>,
+    pub regex: CompiledRegex,
 }
 
 /// A document and its various constituents
-#[derive(Clone, Eq, PartialEq, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Document {
     pub uri: String,
     pub path: String,
@@ -43,11 +44,19 @@ pub struct Document {
 }
 
 /// Helper struct for building hover documentation
-#[derive(Clone, Eq, PartialEq, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct HoverDoc {
     pub path: String,
     pub signature: String,
     pub docs: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct CompiledRegex {
+    pub comments: Regex,
+    pub leading_whitespace: Regex,
+    pub rel_parens: Regex,
+    pub rel_subject: Regex,
 }
 
 impl State {
@@ -198,23 +207,6 @@ impl State {
                     }
                 }
 
-                fn parse_path(path: &Path) -> String {
-                    match path {
-                        Path::Ident(id) => id.to_string(),
-                        Path::Path(p) => p
-                            .iter()
-                            .map(|(s, _)| s.to_string())
-                            .collect::<Vec<String>>()
-                            .join("."),
-                    }
-                }
-                fn parse_map_arm(arm: &MapArm) -> String {
-                    match arm {
-                        MapArm::Struct(s) => parse_path(&s.path.0),
-                        MapArm::Binding { path, expr: _ } => parse_path(&path.0),
-                    }
-                }
-
                 // check statements, may overlap
                 let mut hover = HoverDoc::default();
                 for (statement, range) in doc.statements.iter() {
@@ -222,7 +214,7 @@ impl State {
                         if hover.path.is_empty() {
                             hover.path = doc.name.to_string();
                         }
-                        hover.signature = get_signature(&doc.text, range);
+                        hover.signature = get_signature(&doc.text, range, &self.regex);
 
                         match statement {
                             Statement::Use(stmt) => {
@@ -270,7 +262,7 @@ impl State {
                                     // local defs
                                     Some((stmt, range)) => {
                                         hover.path = format!("{}.{}", doc.name, stmt.ident.0);
-                                        hover.signature = get_signature(&doc.text, range);
+                                        hover.signature = get_signature(&doc.text, range, &self.regex);
                                         hover.docs = stmt.docs.join("\n");
                                     }
                                     // nonlocal defs
@@ -323,6 +315,23 @@ impl HoverDoc {
     }
 }
 
+impl CompiledRegex {
+    pub fn new() -> Self {
+        Self {
+            comments: Regex::new(r"(?m-s)^\s*?\/\/.*\n?").unwrap(),
+            leading_whitespace: Regex::new(r"(?m)^\s*").unwrap(),
+            rel_parens: Regex::new(r"\(.*?\)").unwrap(),
+            rel_subject: Regex::new(r":.*").unwrap(),
+        }
+    }
+}
+
+impl Default for CompiledRegex {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Read file contents for URI
 pub fn read_file(uri: &str) -> Result<String, Error> {
     let path = get_base_path(uri);
@@ -368,45 +377,66 @@ pub fn build_uri(path: &str, name: &str) -> String {
 
 /// Convert a byte index SourceSpan to a zero-based line/char Range
 pub fn get_span_range(text: &str, span: &SourceSpan) -> Range {
-    let mut range = Range::new(Position::new(0, 0), Position::new(0, 0));
+    let range = span.start as usize..span.end as usize;
+    get_range(text, &range)
+}
+
+/// Convert a byte index Range to a zero-based line/char Range
+pub fn get_range(text: &str, range: &std::ops::Range<usize>) -> Range {
+    let mut lsp_range = Range::new(Position::new(0, 0), Position::new(0, 0));
     let mut start_set = false;
     let mut cursor = 0;
 
     for (line_index, line) in text.lines().enumerate() {
         if !start_set {
-            if cursor + line.len() < span.start as usize {
+            if cursor + line.len() < range.start {
                 cursor += line.len() + 1;
             } else {
-                range.start.line = line_index as u32;
-                range.start.character = span.start - cursor as u32;
+                lsp_range.start.line = line_index as u32;
+                lsp_range.start.character = (range.start - cursor) as u32;
                 start_set = true
             }
         }
         if start_set {
-            if cursor + line.len() < span.end as usize {
+            if cursor + line.len() < range.end {
                 cursor += line.len() + 1;
             } else {
-                range.end.line = line_index as u32;
-                range.end.character = span.end - cursor as u32;
+                lsp_range.end.line = line_index as u32;
+                lsp_range.end.character = (range.end - cursor) as u32;
                 break;
             }
         }
     }
-    range
+    lsp_range
 }
 
 /// Get a stripped-down rendition of a statement
-pub fn get_signature(text: &str, range: &std::ops::Range<usize>) -> String {
+pub fn get_signature(text: &str, range: &std::ops::Range<usize>, regex: &CompiledRegex) -> String {
     let sig = text.substring(range.start(), range.end());
+    let stripped = &regex.comments.replace_all(sig, "");
+    regex
+        .leading_whitespace
+        .replace_all(stripped, "")
+        .to_string()
+}
 
-    let comments_rx = Regex::new(r"(?m-s)^\s*?\/\/.*\n?").unwrap();
-    let stripped = &comments_rx.replace_all(sig, "");
+/// Parse the identifier or path for a map arm to String
+pub fn parse_map_arm(arm: &MapArm) -> String {
+    match arm {
+        MapArm::Struct(s) => parse_path(&s.path.0),
+        MapArm::Binding { path, expr: _ } => parse_path(&path.0),
+    }
+}
 
-    if stripped.starts_with(' ') {
-        let wspace_rx = Regex::new(r"(?m)^\s*").unwrap();
-        wspace_rx.replace_all(stripped, "").to_string()
-    } else {
-        stripped.to_string()
+/// Parse a map path to String
+pub fn parse_path(path: &Path) -> String {
+    match path {
+        Path::Ident(id) => id.to_string(),
+        Path::Path(p) => p
+            .iter()
+            .map(|(s, _)| s.to_string())
+            .collect::<Vec<String>>()
+            .join("."),
     }
 }
 

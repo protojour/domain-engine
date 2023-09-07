@@ -1,8 +1,9 @@
+use ontol_parser::ast::{Statement, Visibility};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use state::{
-    build_uri, get_core_completions, get_domain_name, get_path_and_name, get_reference_name,
-    get_span_range, read_file, Document, State,
+    build_uri, get_core_completions, get_domain_name, get_path_and_name, get_range,
+    get_reference_name, get_signature, get_span_range, parse_map_arm, read_file, Document, State,
 };
 use tokio::sync::RwLock;
 use tower_lsp::jsonrpc::Result;
@@ -143,6 +144,7 @@ impl LanguageServer for Backend {
                     }),
                     ..Default::default()
                 }),
+                document_symbol_provider: Some(OneOf::Left(true)),
                 code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
                 execute_command_provider: Some(ExecuteCommandOptions {
                     commands: vec!["ontol-lsp/openFile".to_string()],
@@ -257,6 +259,67 @@ impl LanguageServer for Backend {
 
                 symbols.append(&mut builtin);
                 Ok(Some(CompletionResponse::Array(symbols)))
+            }
+            None => Ok(None),
+        }
+    }
+
+    async fn document_symbol(
+        &self,
+        params: DocumentSymbolParams,
+    ) -> Result<Option<DocumentSymbolResponse>> {
+        let uri = params.text_document.uri.as_str();
+        let state = self.state.read().await;
+        match state.docs.get(uri) {
+            #![allow(deprecated)]
+            Some(doc) => {
+                let mut symbols = Vec::<SymbolInformation>::with_capacity(doc.statements.len());
+                for (stmt, range) in doc.statements.iter() {
+                    let name = match stmt {
+                        Statement::Use(stmt) => {
+                            format!("use '{}' as {}", stmt.reference.0, stmt.as_ident.0)
+                        }
+                        Statement::Def(stmt) => match stmt.visibility.0 {
+                            Visibility::Private => format!("def {}", stmt.ident.0),
+                            Visibility::Public => format!("pub def {}", stmt.ident.0),
+                        },
+                        Statement::Rel(_) => {
+                            let sig = get_signature(&doc.text, range, &state.regex);
+                            let parens_stripped = state.regex.rel_parens.replace(&sig, "");
+                            state
+                                .regex
+                                .rel_subject
+                                .replace(&parens_stripped, "")
+                                .to_string()
+                        }
+                        Statement::Fmt(_) => get_signature(&doc.text, range, &state.regex),
+                        Statement::Map(stmt) => {
+                            let first = parse_map_arm(&stmt.first.0 .1);
+                            let second = parse_map_arm(&stmt.second.0 .1);
+                            format!("map {} {}", first, second)
+                        }
+                    };
+                    let kind = match stmt {
+                        Statement::Use(_) => SymbolKind::NAMESPACE,
+                        Statement::Def(_) => SymbolKind::STRUCT,
+                        Statement::Rel(_) => SymbolKind::FIELD,
+                        Statement::Fmt(_) => SymbolKind::CONSTRUCTOR,
+                        Statement::Map(_) => SymbolKind::INTERFACE,
+                    };
+                    let symbol = SymbolInformation {
+                        name,
+                        kind,
+                        tags: None,
+                        deprecated: None,
+                        location: Location {
+                            uri: params.text_document.uri.clone(),
+                            range: get_range(&doc.text, range),
+                        },
+                        container_name: None,
+                    };
+                    symbols.push(symbol);
+                }
+                Ok(Some(DocumentSymbolResponse::Flat(symbols)))
             }
             None => Ok(None),
         }
