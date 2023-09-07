@@ -67,11 +67,12 @@ pub enum Kind<'m> {
     PropValue,
     SeqPropVariant(
         TypedLabel<'m>,
+        OutputVar,
         ontol_hir::Optional,
         ontol_hir::Var,
         PropertyId,
     ),
-    IterElement,
+    IterElement(OutputVar),
     Call(BuiltinProc),
     Regex(DefId),
     RegexAlternation,
@@ -80,6 +81,9 @@ pub enum Kind<'m> {
 
 #[derive(Clone)]
 pub struct Const<'m>(pub TypedHirKind<'m>);
+
+#[derive(Clone, Copy, Debug)]
+pub struct OutputVar(pub ontol_hir::Var);
 
 impl<'m> Debug for Const<'m> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

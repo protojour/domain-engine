@@ -1,3 +1,5 @@
+use crate::typed_hir::{TypedBinder, TypedHir};
+
 use super::{expr, flat_scope, VarSet};
 
 #[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash)]
@@ -96,6 +98,12 @@ impl<'m> Table<'m> {
         }
     }
 
+    pub fn find_scope_map_by_scope_var(&self, var: ontol_hir::Var) -> Option<&ScopeMap<'m>> {
+        self.table
+            .iter()
+            .find(|scope_map| scope_map.scope.meta().var == var)
+    }
+
     pub fn find_var_index(&self, var: ontol_hir::Var) -> Option<usize> {
         self.table
             .iter()
@@ -176,7 +184,7 @@ impl<'m> Table<'m> {
     }
 
     pub fn scope_prop_variant_bindings(
-        &mut self,
+        &self,
         variant_var: ontol_hir::Var,
     ) -> ontol_hir::Attribute<Option<ontol_hir::Var>> {
         let mut attribute = ontol_hir::Attribute {
@@ -185,7 +193,7 @@ impl<'m> Table<'m> {
         };
 
         for index in self.dependees(Some(variant_var)) {
-            let scope_map = &self.scope_map_mut(index);
+            let scope_map = &self.table[index];
             match scope_map.scope.kind() {
                 flat_scope::Kind::PropRelParam => {
                     attribute.rel = Some(scope_map.scope.meta().var);
@@ -198,6 +206,41 @@ impl<'m> Table<'m> {
         }
 
         attribute
+    }
+
+    pub fn rel_val_bindings(
+        &self,
+        scope_var: ontol_hir::Var,
+    ) -> (
+        ontol_hir::Binding<'m, TypedHir>,
+        ontol_hir::Binding<'m, TypedHir>,
+    ) {
+        let var_attribute = self.scope_prop_variant_bindings(scope_var);
+
+        fn make_binding<'m>(
+            scope_node: Option<&flat_scope::ScopeNode<'m>>,
+        ) -> ontol_hir::Binding<'m, TypedHir> {
+            match scope_node {
+                Some(scope_node) => ontol_hir::Binding::Binder(TypedBinder {
+                    var: scope_node.meta().var,
+                    meta: scope_node.meta().hir_meta,
+                }),
+                None => ontol_hir::Binding::Wildcard,
+            }
+        }
+
+        let rel_binding = make_binding(
+            var_attribute
+                .rel
+                .and_then(|var| self.find_scope_var_child(var)),
+        );
+        let val_binding = make_binding(
+            var_attribute
+                .val
+                .and_then(|var| self.find_scope_var_child(var)),
+        );
+
+        (rel_binding, val_binding)
     }
 }
 

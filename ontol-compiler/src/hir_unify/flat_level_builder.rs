@@ -46,31 +46,7 @@ impl<'m> LevelBuilder<'m> {
         body: Vec<TypedHirNode<'m>>,
         table: &mut Table<'m>,
     ) {
-        let var_attribute = table.scope_prop_variant_bindings(scope_var);
-
-        fn make_binding<'m>(
-            scope_node: Option<&flat_scope::ScopeNode<'m>>,
-        ) -> ontol_hir::Binding<'m, TypedHir> {
-            match scope_node {
-                Some(scope_node) => ontol_hir::Binding::Binder(TypedBinder {
-                    var: scope_node.meta().var,
-                    meta: scope_node.meta().hir_meta,
-                }),
-                None => ontol_hir::Binding::Wildcard,
-            }
-        }
-
-        let rel_binding = make_binding(
-            var_attribute
-                .rel
-                .and_then(|var| table.find_scope_var_child(var)),
-        );
-        let val_binding = make_binding(
-            var_attribute
-                .val
-                .and_then(|var| table.find_scope_var_child(var)),
-        );
-
+        let (rel_binding, val_binding) = table.rel_val_bindings(scope_var);
         let merged_match_arms = self
             .merged_match_arms_table
             .entry((struct_var, property_id))
