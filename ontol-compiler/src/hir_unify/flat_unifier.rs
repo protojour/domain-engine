@@ -284,7 +284,7 @@ fn unify_scope_structural<'m>(
 
                 builder.add_prop_variant_scope(scope_var, prop_key, body, table);
             }
-            other => return Err(unifier_todo(smart_format!("{other:?}"))),
+            other => return Err(unifier_todo(smart_format!("structural scope: {other:?}"))),
         }
     }
 
@@ -374,8 +374,10 @@ fn leaf_expr_to_node<'m>(
     types: &mut Types<'m>,
 ) -> UnifierResult<TypedHirNode<'m>> {
     match kind {
-        expr::Kind::Unit => Ok(TypedHirNode(ontol_hir::Kind::Unit, meta.hir_meta)),
         expr::Kind::Var(var) => Ok(TypedHirNode(ontol_hir::Kind::Var(var), meta.hir_meta)),
+        expr::Kind::Unit => Ok(TypedHirNode(ontol_hir::Kind::Unit, meta.hir_meta)),
+        expr::Kind::I64(int) => Ok(TypedHirNode(ontol_hir::Kind::I64(int), meta.hir_meta)),
+        expr::Kind::F64(float) => Ok(TypedHirNode(ontol_hir::Kind::F64(float), meta.hir_meta)),
         expr::Kind::Prop(prop) => Ok(TypedHirNode(
             ontol_hir::Kind::Prop(
                 ontol_hir::Optional(false),
@@ -388,7 +390,9 @@ fn leaf_expr_to_node<'m>(
                             val: Box::new(leaf_expr_to_node(attr.val, types)?),
                         })]
                     }
-                    expr::PropVariant::Seq { .. } => todo!("seq"),
+                    expr::PropVariant::Seq { .. } => {
+                        return Err(unifier_todo(smart_format!("seq expr")))
+                    }
                 },
             ),
             meta.hir_meta,
