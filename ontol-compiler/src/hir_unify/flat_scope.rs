@@ -72,6 +72,7 @@ pub enum Kind<'m> {
         TypedLabel<'m>,
         OutputVar,
         ontol_hir::Optional,
+        ontol_hir::HasDefault,
         ontol_hir::Var,
         PropertyId,
     ),

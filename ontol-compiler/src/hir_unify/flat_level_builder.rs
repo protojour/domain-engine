@@ -94,7 +94,12 @@ impl<'m> LevelBuilder<'m> {
     pub fn add_seq_prop_variant_scope(
         &mut self,
         scope_var: ScopeVar,
-        (optional, struct_var, property_id): (ontol_hir::Optional, ontol_hir::Var, PropertyId),
+        (optional, has_default, struct_var, property_id): (
+            ontol_hir::Optional,
+            ontol_hir::HasDefault,
+            ontol_hir::Var,
+            PropertyId,
+        ),
         body: Vec<TypedHirNode<'m>>,
         table: &mut Table<'m>,
     ) {
@@ -127,7 +132,7 @@ impl<'m> LevelBuilder<'m> {
             });
 
             merged_match_arms.match_arms.push(ontol_hir::PropMatchArm {
-                pattern: ontol_hir::PropPattern::Seq(label_binding, ontol_hir::HasDefault(false)),
+                pattern: ontol_hir::PropPattern::Seq(label_binding, has_default),
                 nodes: body,
             });
         }

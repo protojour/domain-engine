@@ -137,7 +137,7 @@ impl<'m> FlatScopeBuilder<'m> {
                         }
                         ontol_hir::PropVariant::Seq(SeqPropertyVariant {
                             label,
-                            has_default: _,
+                            has_default,
                             elements,
                         }) => {
                             let label_var = ontol_hir::Var(label.label.0);
@@ -147,6 +147,7 @@ impl<'m> FlatScopeBuilder<'m> {
                                     *label,
                                     output_var,
                                     *optional,
+                                    *has_default,
                                     *struct_var,
                                     *property_id,
                                 ),

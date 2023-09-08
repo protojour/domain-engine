@@ -475,10 +475,11 @@ fn unify_scope_structural<'m>(
                 _label,
                 _output_var,
                 optional,
+                has_default,
                 prop_struct_var,
                 property_id,
             ) => {
-                let prop_key = (*optional, *prop_struct_var, *property_id);
+                let prop_key = (*optional, *has_default, *prop_struct_var, *property_id);
                 let mut body = vec![];
                 let inner_scope = in_scope.union(&scope_map.scope.meta().pub_vars);
 
@@ -820,7 +821,7 @@ fn find_and_unify_sequence<'m>(
     let output_seq_var = table
         .find_scope_map_by_scope_var(ScopeVar(ontol_hir::Var(label.0)))
         .and_then(|scope_map| match scope_map.scope.kind() {
-            flat_scope::Kind::SeqPropVariant(_, output_var, _, _, _) => Some(*output_var),
+            flat_scope::Kind::SeqPropVariant(_, output_var, _, _, _, _) => Some(*output_var),
             _ => None,
         })
         .unwrap();
