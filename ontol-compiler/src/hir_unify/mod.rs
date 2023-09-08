@@ -44,7 +44,7 @@ pub enum UnifierError {
 pub type UnifierResult<T> = Result<T, UnifierError>;
 
 const USE_FLAT_UNIFIER: bool = true;
-const CLASSIC_UNIFIER_FALLBACK: bool = false;
+const CLASSIC_UNIFIER_FALLBACK: bool = true;
 
 pub fn unify_to_function<'m>(
     scope: &TypedHirNode<'m>,

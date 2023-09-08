@@ -526,12 +526,20 @@ fn test_unify_seq_prop_merge_rel_and_val_zwizzle() {
                                                                 (($_ $d)
                                                                     (seq-push $l
                                                                         (struct ($j)
-                                                                            (prop $j O:1:0 (#u $a))
-                                                                            (prop $j O:1:1 (#u $c))
+                                                                            (prop $j O:1:0
+                                                                                (#u $a)
+                                                                            )
+                                                                            (prop $j O:1:1
+                                                                                (#u $c)
+                                                                            )
                                                                         )
                                                                         (struct ($k)
-                                                                            (prop $k O:2:0 (#u $b))
-                                                                            (prop $k O:2:1 (#u $d))
+                                                                            (prop $k O:2:0
+                                                                                (#u $b)
+                                                                            )
+                                                                            (prop $k O:2:1
+                                                                                (#u $d)
+                                                                            )
                                                                         )
                                                                     )
                                                                 )

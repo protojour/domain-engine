@@ -469,7 +469,7 @@ fn unify_scope_structural<'m>(
                     unifier,
                 )?);
 
-                builder.add_prop_variant_scope(scope_var, prop_key, body, table);
+                builder.add_prop_variant_scope(scope_var, prop_key, body, &in_scope, table);
             }
             flat_scope::Kind::SeqPropVariant(
                 _label,
@@ -624,7 +624,7 @@ fn apply_lateral_scope<'m>(
                         unifier,
                     )?);
 
-                    builder.add_prop_variant_scope(scope_var, prop_key, body, table);
+                    builder.add_prop_variant_scope(scope_var, prop_key, body, &in_scope, table);
                 }
                 other => return Err(unifier_todo(smart_format!("{other:?}"))),
             }

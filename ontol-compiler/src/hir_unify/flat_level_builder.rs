@@ -6,7 +6,7 @@ use crate::{
     typed_hir::{self, TypedBinder, TypedHir, TypedHirNode},
 };
 
-use super::{flat_scope::ScopeVar, flat_unifier::FlatUnifier, flat_unifier_table::Table};
+use super::{flat_scope::ScopeVar, flat_unifier::FlatUnifier, flat_unifier_table::Table, VarSet};
 
 #[derive(Default)]
 pub(super) struct LevelBuilder<'m> {
@@ -50,6 +50,7 @@ impl<'m> LevelBuilder<'m> {
         scope_var: ScopeVar,
         (optional, struct_var, property_id): (ontol_hir::Optional, ontol_hir::Var, PropertyId),
         body: Vec<TypedHirNode<'m>>,
+        in_scope: &VarSet,
         table: &mut Table<'m>,
     ) {
         let merged_match_arms = self
@@ -61,12 +62,32 @@ impl<'m> LevelBuilder<'m> {
             merged_match_arms.optional.0 = true;
         }
 
+        fn compute_needs_scope(
+            binding: ontol_hir::Binding<'_, TypedHir>,
+            in_scope: &VarSet,
+            output: &mut bool,
+        ) {
+            if let ontol_hir::Binding::Binder(binder) = binding {
+                if !in_scope.contains(binder.var) {
+                    *output = true;
+                }
+            }
+        }
+
         if !body.is_empty() {
+            let mut needs_scope = false;
             let (rel_binding, val_binding) = table.rel_val_bindings(scope_var);
-            merged_match_arms.match_arms.push(ontol_hir::PropMatchArm {
-                pattern: ontol_hir::PropPattern::Attr(rel_binding, val_binding),
-                nodes: body,
-            });
+            compute_needs_scope(rel_binding, in_scope, &mut needs_scope);
+            compute_needs_scope(val_binding, in_scope, &mut needs_scope);
+
+            if needs_scope {
+                merged_match_arms.match_arms.push(ontol_hir::PropMatchArm {
+                    pattern: ontol_hir::PropPattern::Attr(rel_binding, val_binding),
+                    nodes: body,
+                });
+            } else {
+                self.output.extend(body);
+            }
         }
     }
 
