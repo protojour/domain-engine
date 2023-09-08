@@ -1,5 +1,7 @@
 #![allow(clippy::only_used_in_recursion)]
 
+use std::fmt::Display;
+
 use fnv::FnvHashMap;
 use ontol_runtime::{smart_format, DefId};
 use smartstring::alias::String;
@@ -40,6 +42,24 @@ enum MainScope {
     Const,
     Value(ScopeVar),
     Sequence(ScopeVar, OutputVar),
+}
+
+#[derive(Clone, Copy)]
+struct Level(pub u32);
+
+impl Level {
+    fn next(self) -> Self {
+        Self(self.0 + 1)
+    }
+}
+
+impl Display for Level {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for _ in 0..self.0 {
+            write!(f, "  ")?;
+        }
+        Ok(())
+    }
 }
 
 impl<'a, 'm> FlatUnifier<'a, 'm> {
@@ -100,7 +120,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
             kind @ expr::Kind::Struct { .. } => {
                 let expr = self.destructure_expr(expr::Expr(kind, meta), table)?;
 
-                // BUG: Not 0
+                // BUG: Not 0?
                 table.scope_map_mut(0).assignments.push(Assignment {
                     expr,
                     lateral_deps: Default::default(),
@@ -303,6 +323,7 @@ fn unify_single<'m>(
                 table,
                 unifier,
                 scope_var: None,
+                level: Level(0),
             }
             .scoped_expr_to_node(const_expr, &in_scope, MainScope::Const)?,
         });
@@ -340,6 +361,7 @@ fn unify_single<'m>(
                 table,
                 unifier,
                 scope_var: Some(scope_var),
+                level: Level(0),
             }
             .scoped_expr_to_node(
                 expr::Expr(kind, meta),
@@ -376,6 +398,7 @@ fn unify_single<'m>(
                 next_in_scope.clone(),
                 table,
                 unifier,
+                Level(0),
             )?;
 
             for prop in props {
@@ -385,6 +408,7 @@ fn unify_single<'m>(
                     table,
                     unifier,
                     scope_var: Some(scope_var),
+                    level: Level(0),
                 }
                 .scoped_expr_to_node(
                     expr::Expr(
@@ -428,6 +452,7 @@ fn unify_scope_structural<'m>(
     in_scope: VarSet,
     table: &mut Table<'m>,
     unifier: &mut FlatUnifier<'_, 'm>,
+    level: Level,
 ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
     let mut indexes = match origin {
         StructuralOrigin::DependeesOf(parent_scope_var) => table.dependees(Some(parent_scope_var)),
@@ -436,12 +461,12 @@ fn unify_scope_structural<'m>(
 
     let mut builder = LevelBuilder::default();
 
-    debug!("USS main_scope={main_scope:?} {selector:?} origin={origin:?}");
+    debug!("{level}USS main_scope={main_scope:?} {selector:?} origin={origin:?}");
 
     while !indexes.is_empty() {
         let mut next_indexes = vec![];
 
-        debug!("    indexes={indexes:?}");
+        debug!("{level}  indexes={indexes:?}");
 
         for index in indexes {
             let scope_map = &mut table.scope_map_mut(index);
@@ -458,12 +483,14 @@ fn unify_scope_structural<'m>(
                         &|| in_scope.clone(),
                         table,
                         unifier,
+                        level,
                     )?);
 
                     next_indexes.extend(table.dependees(Some(scope_var)));
                 }
                 flat_scope::Kind::PropVariant(optional, prop_struct_var, property_id) => {
-                    let prop_key = (*optional, *prop_struct_var, *property_id);
+                    let property_id = *property_id;
+                    let prop_key = (*optional, *prop_struct_var, property_id);
                     let mut body = vec![];
                     let inner_scope = in_scope.union(&scope_map.scope.meta().pub_vars);
 
@@ -476,11 +503,12 @@ fn unify_scope_structural<'m>(
                         &|| inner_scope.clone(),
                         table,
                         unifier,
+                        level,
                     )?);
 
                     let bindings = table.rel_val_bindings(scope_var);
                     if !bindings.is_in_scope(&in_scope) {
-                        debug!("bindings {bindings:?} were not in scope");
+                        debug!("{level}{property_id:?}: bindings {bindings:?} were not in scope");
                         body.extend(unify_scope_structural(
                             main_scope,
                             selector,
@@ -488,11 +516,12 @@ fn unify_scope_structural<'m>(
                             inner_scope.union(&bindings.var_set()),
                             table,
                             unifier,
+                            level.next(),
                         )?);
 
                         builder.add_prop_variant_scope(prop_key, bindings, body);
                     } else {
-                        debug!("bindings {bindings:?} were in scope. Assignments len = {assignments_len}");
+                        debug!("{level}{property_id:?}: bindings {bindings:?} were in scope. Assignments len = {assignments_len}");
                         builder.output.extend(body);
                         next_indexes.extend(table.dependees(Some(scope_var)));
                     }
@@ -516,6 +545,7 @@ fn unify_scope_structural<'m>(
                         &|| inner_scope.clone(),
                         table,
                         unifier,
+                        level,
                     )?);
 
                     if !in_scope.contains(ontol_hir::Var(label.label.0)) {
@@ -526,6 +556,7 @@ fn unify_scope_structural<'m>(
                             inner_scope,
                             table,
                             unifier,
+                            level.next(),
                         )?);
 
                         builder.add_seq_prop_variant_scope(scope_var, prop_key, body, table);
@@ -559,6 +590,7 @@ fn unify_scope_structural<'m>(
                             },
                             table,
                             unifier,
+                            level,
                         )?;
 
                         if !push_nodes.is_empty() {
@@ -589,6 +621,7 @@ fn apply_lateral_scope<'m>(
     in_scope_fn: &dyn Fn() -> VarSet,
     table: &mut Table<'m>,
     unifier: &mut FlatUnifier<'_, 'm>,
+    level: Level,
 ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
     if assignments.is_empty() {
         return Ok(vec![]);
@@ -602,7 +635,7 @@ fn apply_lateral_scope<'m>(
 
     for assignment in assignments {
         // debug!(
-        //     "assignment free_vars: {:?} in_scope: {:?}",
+        //     "{level}assignment free_vars: {:?} in_scope: {:?}",
         //     assignment.expr.meta().free_vars,
         //     in_scope
         // );
@@ -613,6 +646,7 @@ fn apply_lateral_scope<'m>(
                     table,
                     unifier,
                     scope_var: Some(assignment.scope_var),
+                    level,
                 }
                 .scoped_expr_to_node(assignment.expr, &in_scope, main_scope)?,
             );
@@ -644,15 +678,20 @@ fn apply_lateral_scope<'m>(
             match scope_map.scope.kind() {
                 flat_scope::Kind::PropVariant(optional, struct_var, property_id) => {
                     let prop_key = (*optional, *struct_var, *property_id);
-                    let mut body = vec![];
+                    debug!("{level}lateral introducing {introduced_var}");
 
-                    body.extend(apply_lateral_scope(
+                    if !in_scope.contains(*struct_var) {
+                        panic!("Lateral struct var not in scope");
+                    }
+
+                    let body = apply_lateral_scope(
                         main_scope,
                         assignments,
                         &|| in_scope.union_one(introduced_var),
                         table,
                         unifier,
-                    )?);
+                        level.next(),
+                    )?;
 
                     let bindings = table.rel_val_bindings(scope_var);
                     builder.add_prop_variant_scope(prop_key, bindings, body);
@@ -668,6 +707,7 @@ fn apply_lateral_scope<'m>(
                         table,
                         unifier,
                         scope_var: Some(assignment.scope_var),
+                        level,
                     }
                     .scoped_expr_to_node(
                         assignment.expr,
@@ -686,6 +726,7 @@ struct ScopedExprToNode<'t, 'u, 'a, 'm> {
     table: &'t mut Table<'m>,
     unifier: &'u mut FlatUnifier<'a, 'm>,
     scope_var: Option<ScopeVar>,
+    level: Level,
 }
 
 impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
@@ -736,6 +777,7 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                                 in_scope,
                                 self.table,
                                 self.unifier,
+                                self.level.next(),
                             )?;
 
                             vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
@@ -772,11 +814,12 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                 flags,
                 props,
             } => {
+                let level = self.level;
                 let next_in_scope = in_scope.union_one(binder.var);
                 let mut body = vec![];
 
                 debug!(
-                    "Make struct {} scope_var={:?} in_scope={:?}",
+                    "{level}Make struct {} scope_var={:?} in_scope={:?}",
                     binder.var, self.scope_var, in_scope
                 );
 
@@ -800,6 +843,7 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                         next_in_scope.clone(),
                         self.table,
                         self.unifier,
+                        self.level.next(),
                     )?);
                 }
 
@@ -867,6 +911,7 @@ fn find_and_unify_sequence<'m>(
     in_scope: &VarSet,
     table: &mut Table<'m>,
     unifier: &mut FlatUnifier<'_, 'm>,
+    level: Level,
 ) -> UnifierResult<TypedHirNode<'m>> {
     let output_seq_var = table
         .find_scope_map_by_scope_var(ScopeVar(ontol_hir::Var(label.0)))
@@ -887,6 +932,7 @@ fn find_and_unify_sequence<'m>(
         next_in_scope,
         table,
         unifier,
+        level.next(),
     )?;
 
     let unit_ty = unifier.unit_meta().ty;
