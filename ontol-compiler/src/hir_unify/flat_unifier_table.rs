@@ -1,6 +1,12 @@
+use tracing::debug;
+
 use crate::typed_hir::{TypedBinder, TypedHir};
 
-use super::{expr, flat_scope, VarSet};
+use super::{
+    expr,
+    flat_scope::{self, ScopeVar},
+    VarSet,
+};
 
 #[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub struct ExprIdx(pub usize);
@@ -8,6 +14,20 @@ pub struct ExprIdx(pub usize);
 pub(super) struct Table<'m> {
     table: Vec<ScopeMap<'m>>,
     pub const_expr: Option<expr::Expr<'m>>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum ExprSelector {
+    Struct(ontol_hir::Var),
+}
+
+impl ExprSelector {
+    pub fn is_struct(&self, struct_var: ontol_hir::Var) -> bool {
+        match self {
+            Self::Struct(var) if *var == struct_var => true,
+            _ => false,
+        }
+    }
 }
 
 impl<'m> Table<'m> {
@@ -33,7 +53,11 @@ impl<'m> Table<'m> {
         &mut self.table
     }
 
-    pub fn find_assignment_slot(&mut self, free_vars: &VarSet) -> AssignmentSlot<'_, 'm> {
+    pub fn find_assignment_slot(
+        &mut self,
+        free_vars: &VarSet,
+        is_seq: bool,
+    ) -> Option<AssignmentSlot<'_, 'm>> {
         let mut tmp_candidate: Option<usize> = None;
         let mut observed_variables = VarSet::default();
 
@@ -47,11 +71,14 @@ impl<'m> Table<'m> {
             }
 
             // only consider proper scope-introducing nodes
-            if !matches!(
-                scope_map.scope.kind(),
-                flat_scope::Kind::PropVariant(..) | flat_scope::Kind::SeqPropVariant(..)
-            ) {
-                continue;
+            match scope_map.scope.kind() {
+                flat_scope::Kind::PropVariant(..) => {}
+                flat_scope::Kind::SeqPropVariant(..) => {
+                    if !is_seq {
+                        continue;
+                    }
+                }
+                _ => continue,
             }
 
             // Only consider candidates that introduces the scope
@@ -83,28 +110,70 @@ impl<'m> Table<'m> {
                     .collect(),
             );
 
-            AssignmentSlot {
+            Some(AssignmentSlot {
                 scope_map,
                 lateral_deps: extra_deps,
-            }
+            })
         } else {
             // instead of crashing, we should just add this at index 0 ("const scope")
             // If there's a real scoping error, this will show up as "unbound variable"
             // errors during codegen instead.
-            AssignmentSlot {
-                scope_map: self.scope_map_mut(0),
-                lateral_deps: Default::default(),
-            }
+            None
+            // AssignmentSlot {
+            //     scope_map: self.scope_map_mut(0),
+            //     lateral_deps: Default::default(),
+            // }
         }
     }
 
-    pub fn find_scope_map_by_scope_var(&self, var: ontol_hir::Var) -> Option<&ScopeMap<'m>> {
-        self.table
-            .iter()
-            .find(|scope_map| scope_map.scope.meta().var == var)
+    pub fn find_scope_map_containing_expr_struct(
+        &self,
+        struct_var: ontol_hir::Var,
+    ) -> Option<&ScopeMap<'m>> {
+        fn contains_struct(expr: &expr::Expr, struct_var: ontol_hir::Var) -> bool {
+            match expr.kind() {
+                expr::Kind::Struct { binder, props, .. } => {
+                    debug!("searching struct {:?}", binder.var);
+                    if binder.var == struct_var {
+                        return true;
+                    }
+                    for prop in props {
+                        match &prop.variant {
+                            expr::PropVariant::Singleton(attr) => {
+                                if contains_struct(&attr.rel, struct_var) {
+                                    return true;
+                                }
+                                if contains_struct(&attr.val, struct_var) {
+                                    return true;
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    false
+                }
+                _ => false,
+            }
+        }
+
+        for scope_map in &self.table {
+            for assignment in &scope_map.assignments {
+                if contains_struct(&assignment.expr, struct_var) {
+                    return Some(scope_map);
+                }
+            }
+        }
+
+        None
     }
 
-    pub fn find_var_index(&self, var: ontol_hir::Var) -> Option<usize> {
+    pub fn find_scope_map_by_scope_var(&self, scope_var: ScopeVar) -> Option<&ScopeMap<'m>> {
+        self.table
+            .iter()
+            .find(|scope_map| scope_map.scope.meta().scope_var == scope_var)
+    }
+
+    pub fn find_var_index(&self, scope_var: ScopeVar) -> Option<usize> {
         self.table
             .iter()
             .enumerate()
@@ -115,7 +184,7 @@ impl<'m> Table<'m> {
                         | flat_scope::Kind::SeqPropVariant(..)
                         | flat_scope::Kind::RegexCapture(_)
                 ) {
-                    if assignment.scope.meta().var == var {
+                    if assignment.scope.meta().scope_var == scope_var {
                         Some(index)
                     } else {
                         None
@@ -143,8 +212,8 @@ impl<'m> Table<'m> {
             })
     }
 
-    pub fn find_scope_var_child(&self, var: ontol_hir::Var) -> Option<&flat_scope::ScopeNode<'m>> {
-        let indexes = self.dependees(Some(var));
+    pub fn find_scope_var_child(&self, scope_var: ScopeVar) -> Option<&flat_scope::ScopeNode<'m>> {
+        let indexes = self.dependees(Some(scope_var));
         if indexes.len() > 1 {
             todo!("Too many indexes here?");
         }
@@ -155,13 +224,13 @@ impl<'m> Table<'m> {
             .map(|index| &self.table[index].scope)
     }
 
-    pub fn dependees(&self, var: Option<ontol_hir::Var>) -> Vec<usize> {
-        if let Some(var) = var {
+    pub fn dependees(&self, scope_var: Option<ScopeVar>) -> Vec<usize> {
+        if let Some(scope_var) = scope_var {
             self.table
                 .iter()
                 .enumerate()
                 .filter_map(|(index, assignment)| {
-                    if assignment.scope.meta().deps.contains(var) {
+                    if assignment.scope.meta().deps.contains(scope_var.0) {
                         Some(index)
                     } else {
                         None
@@ -185,8 +254,8 @@ impl<'m> Table<'m> {
 
     pub fn scope_prop_variant_bindings(
         &self,
-        variant_var: ontol_hir::Var,
-    ) -> ontol_hir::Attribute<Option<ontol_hir::Var>> {
+        variant_var: ScopeVar,
+    ) -> ontol_hir::Attribute<Option<ScopeVar>> {
         let mut attribute = ontol_hir::Attribute {
             rel: None,
             val: None,
@@ -196,10 +265,10 @@ impl<'m> Table<'m> {
             let scope_map = &self.table[index];
             match scope_map.scope.kind() {
                 flat_scope::Kind::PropRelParam => {
-                    attribute.rel = Some(scope_map.scope.meta().var);
+                    attribute.rel = Some(scope_map.scope.meta().scope_var);
                 }
                 flat_scope::Kind::PropValue => {
-                    attribute.val = Some(scope_map.scope.meta().var);
+                    attribute.val = Some(scope_map.scope.meta().scope_var);
                 }
                 _ => {}
             }
@@ -210,7 +279,7 @@ impl<'m> Table<'m> {
 
     pub fn rel_val_bindings(
         &self,
-        scope_var: ontol_hir::Var,
+        scope_var: ScopeVar,
     ) -> (
         ontol_hir::Binding<'m, TypedHir>,
         ontol_hir::Binding<'m, TypedHir>,
@@ -222,7 +291,7 @@ impl<'m> Table<'m> {
         ) -> ontol_hir::Binding<'m, TypedHir> {
             match scope_node {
                 Some(scope_node) => ontol_hir::Binding::Binder(TypedBinder {
-                    var: scope_node.meta().var,
+                    var: scope_node.meta().scope_var.0,
                     meta: scope_node.meta().hir_meta,
                 }),
                 None => ontol_hir::Binding::Wildcard,
@@ -256,6 +325,20 @@ impl<'m> ScopeMap<'m> {
             panic!("Multiple assignments");
         }
         expressions.into_iter().next()
+    }
+
+    pub fn select_assignments(&mut self, selector: ExprSelector) -> Vec<Assignment<'m>> {
+        let (filtered, retained) =
+            std::mem::take(&mut self.assignments)
+                .into_iter()
+                .partition(|assignment| match (assignment.expr.kind(), selector) {
+                    (expr::Kind::Prop(prop), ExprSelector::Struct(struct_var)) => {
+                        prop.struct_var == struct_var
+                    }
+                    _ => true,
+                });
+        self.assignments = retained;
+        filtered
     }
 }
 

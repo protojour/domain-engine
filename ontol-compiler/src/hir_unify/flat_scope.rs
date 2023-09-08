@@ -40,15 +40,18 @@ impl<'m> Display for ScopeNode<'m> {
         write!(
             f,
             "{}: {:?} - {:?} {:?}",
-            self.1.var, self.1.deps, self.0, self.1.pub_vars,
+            self.1.scope_var.0, self.1.deps, self.0, self.1.pub_vars,
         )
     }
 }
 
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
+pub struct ScopeVar(pub ontol_hir::Var);
+
 #[derive(Clone)]
 pub struct Meta<'m> {
     /// The specific variable introduced by the node
-    pub var: ontol_hir::Var,
+    pub scope_var: ScopeVar,
     /// All _visible_ variables dominated by this node
     pub pub_vars: VarSet,
     /// Variables that are dependencies of this node

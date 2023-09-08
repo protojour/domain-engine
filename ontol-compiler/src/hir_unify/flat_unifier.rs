@@ -18,8 +18,8 @@ use super::{
     dep_tree::Expression,
     expr,
     flat_level_builder::LevelBuilder,
-    flat_scope::{self, OutputVar},
-    flat_unifier_table::{Assignment, Table},
+    flat_scope::{self, OutputVar, ScopeVar},
+    flat_unifier_table::{Assignment, ExprSelector, Table},
     unifier::UnifiedNode,
     UnifierError, UnifierResult, VarSet,
 };
@@ -28,6 +28,11 @@ pub struct FlatUnifier<'a, 'm> {
     #[allow(unused)]
     pub(super) types: &'a mut Types<'m>,
     pub(super) var_allocator: ontol_hir::VarAllocator,
+}
+
+enum AssignResult<'m> {
+    Success,
+    Unassigned(expr::Expr<'m>),
 }
 
 impl<'a, 'm> FlatUnifier<'a, 'm> {
@@ -43,7 +48,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
         flat_scope: flat_scope::FlatScope<'m>,
         expr: expr::Expr<'m>,
     ) -> UnifierResult<UnifiedNode<'m>> {
-        if true {
+        if false {
             debug!("flat_scope:\n{flat_scope}");
         }
 
@@ -72,10 +77,10 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
         &mut self,
         expr::Expr(kind, meta): expr::Expr<'m>,
         table: &mut Table<'m>,
-    ) -> UnifierResult<()> {
+    ) -> UnifierResult<AssignResult<'m>> {
         match kind {
             expr::Kind::Var(var) => {
-                if let Some(index) = table.find_var_index(var) {
+                if let Some(index) = table.find_var_index(ScopeVar(var)) {
                     table.scope_map_mut(index).assignments.push(Assignment {
                         expr: expr::Expr(kind, meta),
                         lateral_deps: Default::default(),
@@ -83,13 +88,18 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                 } else {
                     table.const_expr = Some(expr::Expr(kind, meta));
                 }
+                Ok(AssignResult::Success)
             }
             kind @ expr::Kind::Struct { .. } => {
                 let expr = self.destructure_expr(expr::Expr(kind, meta), table)?;
+
+                // BUG: Not 0
                 table.scope_map_mut(0).assignments.push(Assignment {
                     expr,
                     lateral_deps: Default::default(),
                 });
+
+                Ok(AssignResult::Success)
             }
             expr::Kind::Prop(prop) => {
                 // debug!(
@@ -97,7 +107,6 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                 //     prop.prop_id, prop.free_vars
                 // );
                 // debug!("prop: {prop:?}");
-                let struct_var = prop.struct_var;
 
                 let prop = {
                     let expr::Prop {
@@ -140,7 +149,13 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                                 elements: vec![],
                             }
                         }
-                        singleton => singleton,
+                        expr::PropVariant::Singleton(attr) => {
+                            let rel = self.destructure_expr(attr.rel, table)?;
+                            let val = self.destructure_expr(attr.val, table)?;
+                            // let rel = attr.rel;
+                            // let val = attr.val;
+                            expr::PropVariant::Singleton(ontol_hir::Attribute { rel, val })
+                        }
                     };
                     expr::Prop {
                         optional,
@@ -152,32 +167,26 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                     }
                 };
 
-                let assignment_slot = table.find_assignment_slot(&prop.free_vars);
-                let assignments = &mut assignment_slot.scope_map.assignments;
+                let is_seq = matches!(&prop.variant, expr::PropVariant::Seq { .. });
 
-                let mut prop = Some(prop);
-
-                // Check just adding back to the original struct that owned this property:
-                for assignment in assignments.iter_mut() {
-                    if let expr::Kind::Struct { binder, props, .. } = &mut assignment.expr.0 {
-                        if binder.var == struct_var {
-                            props.push(prop.take().unwrap());
-                            break;
-                        }
+                match table.find_assignment_slot(&prop.free_vars, is_seq) {
+                    Some(assignment_slot) => {
+                        assignment_slot.scope_map.assignments.push(Assignment {
+                            expr: expr::Expr(expr::Kind::Prop(Box::new(prop)), meta),
+                            lateral_deps: assignment_slot.lateral_deps,
+                        });
+                        Ok(AssignResult::Success)
                     }
-                }
-
-                if let Some(prop) = prop {
-                    assignments.push(Assignment {
-                        expr: expr::Expr(expr::Kind::Prop(Box::new(prop)), meta),
-                        lateral_deps: assignment_slot.lateral_deps,
-                    });
+                    None => Ok(AssignResult::Unassigned(expr::Expr(
+                        expr::Kind::Prop(Box::new(prop)),
+                        meta,
+                    ))),
                 }
             }
             expr::Kind::SeqItem(label, index, iter, attr) => {
                 if iter.0 {
                     let iter_scope_map_idx = table
-                        .dependees(Some(ontol_hir::Var(label.0)))
+                        .dependees(Some(ScopeVar(ontol_hir::Var(label.0))))
                         .into_iter()
                         .find(|idx| {
                             let scope_map = &table.table_mut()[*idx];
@@ -202,17 +211,17 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                             ),
                             lateral_deps: VarSet::default(),
                         });
+
+                        Ok(AssignResult::Success)
                     } else {
-                        return Err(unifier_todo(smart_format!("Not able to find iter scope")));
+                        Err(unifier_todo(smart_format!("Not able to find iter scope")))
                     }
                 } else {
-                    return Err(unifier_todo(smart_format!("Handle non-iter seq element")));
+                    Err(unifier_todo(smart_format!("Handle non-iter seq element")))
                 }
             }
-            e => return Err(unifier_todo(smart_format!("expr kind: {e:?}"))),
+            e => Err(unifier_todo(smart_format!("expr kind: {e:?}"))),
         }
-
-        Ok(())
     }
 
     fn destructure_expr(
@@ -226,12 +235,13 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                 flags,
                 props,
             } => {
+                let mut retained_props: Vec<expr::Prop> = vec![];
                 for prop in props {
                     let free_vars = prop.free_vars.clone();
                     let unit_ty = self
                         .types
                         .intern(Type::Primitive(PrimitiveKind::Unit, DefId::unit()));
-                    self.assign_to_scope(
+                    let assign_result = self.assign_to_scope(
                         expr::Expr(
                             expr::Kind::Prop(Box::new(prop)),
                             expr::Meta {
@@ -244,13 +254,19 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                         ),
                         table,
                     )?;
+                    if let AssignResult::Unassigned(expr::Expr(kind, _)) = assign_result {
+                        let expr::Kind::Prop(prop) = kind else {
+                            panic!();
+                        };
+                        retained_props.push(*prop);
+                    }
                 }
 
                 Ok(expr::Expr(
                     expr::Kind::Struct {
                         binder,
                         flags,
-                        props: vec![],
+                        props: retained_props,
                     },
                     meta,
                 ))
@@ -268,7 +284,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
 }
 
 fn unify_single<'m>(
-    parent_scope_var: Option<ontol_hir::Var>,
+    parent_scope_var: Option<ScopeVar>,
     in_scope: VarSet,
     table: &mut Table<'m>,
     unifier: &mut FlatUnifier<'_, 'm>,
@@ -276,12 +292,17 @@ fn unify_single<'m>(
     if let Some(const_expr) = table.const_expr.take() {
         return Ok(UnifiedNode {
             typed_binder: None,
-            node: scoped_expr_to_node(const_expr, &in_scope, ExprContext::Value, table, unifier)?,
+            node: ScopedExprToNode {
+                table,
+                unifier,
+                scope_var: None,
+            }
+            .scoped_expr_to_node(const_expr, &in_scope, ExprContext::Value)?,
         });
     }
 
     if let Some(var) = parent_scope_var {
-        if in_scope.contains(var) {
+        if in_scope.contains(var.0) {
             panic!("Variable is already in scope");
         }
     }
@@ -293,6 +314,7 @@ fn unify_single<'m>(
 
     let scope_map = &mut table.scope_map_mut(index);
     let scope_meta = scope_map.scope.meta().clone();
+    let scope_var = scope_meta.scope_var;
 
     match (scope_map.take_single_assignment(), scope_map.scope.kind()) {
         (
@@ -303,16 +325,19 @@ fn unify_single<'m>(
             flat_scope::Kind::Var,
         ) => {
             let typed_binder = Some(TypedBinder {
-                var: scope_map.scope.meta().var,
+                var: scope_map.scope.meta().scope_var.0,
                 meta: scope_map.scope.meta().hir_meta,
             });
 
-            let inner_node = scoped_expr_to_node(
+            let inner_node = ScopedExprToNode {
+                table,
+                unifier,
+                scope_var: Some(scope_var),
+            }
+            .scoped_expr_to_node(
                 expr::Expr(kind, meta),
                 &in_scope,
                 ExprContext::Value,
-                table,
-                unifier,
             )?;
 
             Ok(UnifiedNode {
@@ -327,7 +352,7 @@ fn unify_single<'m>(
                         expr::Kind::Struct {
                             binder,
                             flags,
-                            props: _,
+                            props,
                         },
                         meta,
                     ),
@@ -335,12 +360,42 @@ fn unify_single<'m>(
             }),
             flat_scope::Kind::Struct,
         ) => {
-            let next_in_scope = in_scope.union_one(scope_meta.var);
-            let body = unify_scope_structural(scope_meta.var, next_in_scope, table, unifier)?;
+            // FIXME/DRY: This looks a lot like the expr code
+            let next_in_scope = in_scope.union_one(scope_meta.scope_var.0);
+            let mut body = unify_scope_structural(
+                ExprSelector::Struct(binder.var),
+                scope_meta.scope_var,
+                next_in_scope.clone(),
+                table,
+                unifier,
+            )?;
+
+            for prop in props {
+                let free_vars = prop.free_vars.clone();
+                let unit_meta = unifier.unit_meta();
+                let prop_node = ScopedExprToNode {
+                    table,
+                    unifier,
+                    scope_var: Some(scope_var),
+                }
+                .scoped_expr_to_node(
+                    expr::Expr(
+                        expr::Kind::Prop(Box::new(prop)),
+                        expr::Meta {
+                            free_vars,
+                            hir_meta: unit_meta,
+                        },
+                    ),
+                    &next_in_scope,
+                    ExprContext::Value,
+                )?;
+
+                body.push(prop_node);
+            }
 
             let node = UnifiedNode {
                 typed_binder: Some(TypedBinder {
-                    var: scope_meta.var,
+                    var: scope_meta.scope_var.0,
                     meta: scope_meta.hir_meta,
                 }),
                 node: TypedHirNode(ontol_hir::Kind::Struct(binder, flags, body), meta.hir_meta),
@@ -353,18 +408,21 @@ fn unify_single<'m>(
 }
 
 fn unify_scope_structural<'m>(
-    parent_scope_var: ontol_hir::Var,
+    selector: ExprSelector,
+    parent_scope_var: ScopeVar,
     in_scope: VarSet,
     table: &mut Table<'m>,
     unifier: &mut FlatUnifier<'_, 'm>,
 ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
+    debug!("unify scope structural {selector:?}");
+
     let indexes = table.dependees(Some(parent_scope_var));
 
     let mut builder = LevelBuilder::default();
 
     for index in indexes {
         let scope_map = &mut table.scope_map_mut(index);
-        let scope_var = scope_map.scope.meta().var;
+        let scope_var = scope_map.scope.meta().scope_var;
 
         match scope_map.scope.kind() {
             flat_scope::Kind::PropRelParam
@@ -380,19 +438,21 @@ fn unify_scope_structural<'m>(
                 )?);
 
                 let nodes = unify_scope_structural(
+                    selector,
                     scope_var,
-                    in_scope.union_one(scope_var),
+                    in_scope.union_one(scope_var.0),
                     table,
                     unifier,
                 )?;
                 builder.output.extend(nodes);
             }
-            flat_scope::Kind::PropVariant(optional, struct_var, property_id) => {
-                let prop_key = (*optional, *struct_var, *property_id);
+            flat_scope::Kind::PropVariant(optional, prop_struct_var, property_id) => {
+                let prop_key = (*optional, *prop_struct_var, *property_id);
                 let mut body = vec![];
                 let inner_scope = in_scope.union(&scope_map.scope.meta().pub_vars);
 
                 body.extend(apply_lateral_scope(
+                    // scope_map.select_assignments(selector),
                     std::mem::take(&mut scope_map.assignments),
                     &|| inner_scope.clone(),
                     ExprContext::Value,
@@ -401,6 +461,7 @@ fn unify_scope_structural<'m>(
                 )?);
 
                 body.extend(unify_scope_structural(
+                    selector,
                     scope_var,
                     inner_scope,
                     table,
@@ -410,18 +471,19 @@ fn unify_scope_structural<'m>(
                 builder.add_prop_variant_scope(scope_var, prop_key, body, table);
             }
             flat_scope::Kind::SeqPropVariant(
-                _label,
+                label,
                 _output_var,
                 optional,
-                struct_var,
+                prop_struct_var,
                 property_id,
             ) => {
-                let prop_key = (*optional, *struct_var, *property_id);
+                let label = *label;
+                let prop_key = (*optional, *prop_struct_var, *property_id);
                 let mut body = vec![];
                 let inner_scope = in_scope.union(&scope_map.scope.meta().pub_vars);
 
                 body.extend(apply_lateral_scope(
-                    std::mem::take(&mut scope_map.assignments),
+                    scope_map.select_assignments(selector),
                     &|| inner_scope.clone(),
                     ExprContext::Value,
                     table,
@@ -429,6 +491,7 @@ fn unify_scope_structural<'m>(
                 )?);
 
                 body.extend(unify_scope_structural(
+                    selector,
                     scope_var,
                     inner_scope,
                     table,
@@ -438,24 +501,39 @@ fn unify_scope_structural<'m>(
                 builder.add_seq_prop_variant_scope(scope_var, prop_key, body, table);
             }
             flat_scope::Kind::IterElement(label, output_var) => {
-                let label = *label;
-                let push_nodes = apply_lateral_scope(
-                    std::mem::take(&mut scope_map.assignments),
-                    &|| in_scope.clone(),
-                    ExprContext::Sequence(*output_var),
-                    table,
-                    unifier,
-                )?;
+                if in_scope.contains(output_var.0) {
+                    let label = *label;
+                    let output_var = *output_var;
+                    let assignments = std::mem::take(&mut scope_map.assignments);
+                    let rel_val_bindings = table.rel_val_bindings(scope_var);
 
-                if !push_nodes.is_empty() {
-                    builder.output.push(TypedHirNode(
-                        ontol_hir::Kind::ForEach(
-                            ontol_hir::Var(label.0),
-                            table.rel_val_bindings(scope_var),
-                            push_nodes,
-                        ),
-                        unifier.unit_meta(),
-                    ));
+                    let push_nodes = apply_lateral_scope(
+                        assignments,
+                        &|| {
+                            let mut next_in_scope = in_scope.clone();
+                            if let ontol_hir::Binding::Binder(binder) = &rel_val_bindings.0 {
+                                next_in_scope.insert(binder.var);
+                            }
+                            if let ontol_hir::Binding::Binder(binder) = &rel_val_bindings.1 {
+                                next_in_scope.insert(binder.var);
+                            }
+                            next_in_scope
+                        },
+                        ExprContext::Sequence(output_var),
+                        table,
+                        unifier,
+                    )?;
+
+                    if !push_nodes.is_empty() {
+                        builder.output.push(TypedHirNode(
+                            ontol_hir::Kind::ForEach(
+                                ontol_hir::Var(label.0),
+                                rel_val_bindings,
+                                push_nodes,
+                            ),
+                            unifier.unit_meta(),
+                        ));
+                    }
                 }
             }
             other => return Err(unifier_todo(smart_format!("structural scope: {other:?}"))),
@@ -495,13 +573,14 @@ fn apply_lateral_scope<'m>(
         );
 
         if assignment.expr.free_vars().0.is_subset(&in_scope.0) {
-            nodes.push(scoped_expr_to_node(
-                assignment.expr,
-                &in_scope,
-                context,
-                table,
-                unifier,
-            )?);
+            nodes.push(
+                ScopedExprToNode {
+                    table,
+                    unifier,
+                    scope_var: Some(ScopeVar(ontol_hir::Var(0))),
+                }
+                .scoped_expr_to_node(assignment.expr, &in_scope, context)?,
+            );
         } else {
             let introduced_var = ontol_hir::Var(
                 assignment
@@ -523,7 +602,7 @@ fn apply_lateral_scope<'m>(
     for (introduced_var, assignments) in scope_groups {
         if let Some(data_point_index) = table.find_data_point(introduced_var) {
             let scope_map = &mut table.scope_map_mut(data_point_index);
-            let scope_var = scope_map.scope.meta().var;
+            let scope_var = scope_map.scope.meta().scope_var;
 
             let mut builder = LevelBuilder::default();
 
@@ -548,13 +627,18 @@ fn apply_lateral_scope<'m>(
             nodes.extend(builder.build(unifier));
         } else {
             for assignment in assignments {
-                nodes.push(scoped_expr_to_node(
-                    assignment.expr,
-                    &in_scope,
-                    context,
-                    table,
-                    unifier,
-                )?);
+                nodes.push(
+                    ScopedExprToNode {
+                        table,
+                        unifier,
+                        scope_var: Some(ScopeVar(ontol_hir::Var(0))),
+                    }
+                    .scoped_expr_to_node(
+                        assignment.expr,
+                        &in_scope,
+                        context,
+                    )?,
+                );
             }
         }
     }
@@ -562,147 +646,186 @@ fn apply_lateral_scope<'m>(
     Ok(nodes)
 }
 
-/// Convert an expression that has all its exposed free variables
-/// in scope, to a HIR node.
-fn scoped_expr_to_node<'m>(
-    expr::Expr(kind, meta): expr::Expr<'m>,
-    in_scope: &VarSet,
-    context: ExprContext,
-    table: &mut Table<'m>,
-    unifier: &mut FlatUnifier<'_, 'm>,
-) -> UnifierResult<TypedHirNode<'m>> {
-    let next_ctx = ExprContext::Value;
-    match kind {
-        expr::Kind::Var(var) => Ok(TypedHirNode(ontol_hir::Kind::Var(var), meta.hir_meta)),
-        expr::Kind::Unit => Ok(TypedHirNode(ontol_hir::Kind::Unit, meta.hir_meta)),
-        expr::Kind::I64(int) => Ok(TypedHirNode(ontol_hir::Kind::I64(int), meta.hir_meta)),
-        expr::Kind::F64(float) => Ok(TypedHirNode(ontol_hir::Kind::F64(float), meta.hir_meta)),
-        expr::Kind::Prop(prop) => Ok(TypedHirNode(
-            ontol_hir::Kind::Prop(
-                ontol_hir::Optional(false),
-                prop.struct_var,
-                prop.prop_id,
-                match prop.variant {
-                    expr::PropVariant::Singleton(attr) => {
-                        vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
-                            rel: Box::new(scoped_expr_to_node(
-                                attr.rel, in_scope, next_ctx, table, unifier,
-                            )?),
-                            val: Box::new(scoped_expr_to_node(
-                                attr.val, in_scope, next_ctx, table, unifier,
-                            )?),
-                        })]
-                    }
-                    expr::PropVariant::Seq { label, elements } => {
-                        assert!(elements.is_empty());
-                        let sequence_node =
-                            find_and_unify_sequence(label, in_scope, table, unifier)?;
+struct ScopedExprToNode<'t, 'u, 'a, 'm> {
+    table: &'t mut Table<'m>,
+    unifier: &'u mut FlatUnifier<'a, 'm>,
+    scope_var: Option<ScopeVar>,
+}
 
-                        vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
-                            rel: Box::new(TypedHirNode(ontol_hir::Kind::Unit, unifier.unit_meta())),
-                            val: Box::new(sequence_node),
-                        })]
-                    }
-                },
-            ),
-            meta.hir_meta,
-        )),
-        expr::Kind::Call(expr::Call(proc, args)) => {
-            let mut hir_args = Vec::with_capacity(args.len());
-            for arg in args {
-                hir_args.push(scoped_expr_to_node(
-                    arg, in_scope, next_ctx, table, unifier,
-                )?);
-            }
-            Ok(TypedHirNode(
-                ontol_hir::Kind::Call(proc, hir_args),
-                meta.hir_meta,
-            ))
-        }
-        expr::Kind::Map(arg) => {
-            let hir_arg = scoped_expr_to_node(*arg, in_scope, next_ctx, table, unifier)?;
-            Ok(TypedHirNode(
-                ontol_hir::Kind::Map(Box::new(hir_arg)),
-                meta.hir_meta,
-            ))
-        }
-        expr::Kind::Struct {
-            binder,
-            flags,
-            props,
-        } => {
-            let mut hir_props = Vec::with_capacity(props.len());
-            for prop in props {
-                // panic!("PROPS IN EXPR STRUCT");
-                match prop.variant {
-                    expr::PropVariant::Singleton(attr) => {
-                        let rel = Box::new(scoped_expr_to_node(
-                            attr.rel, in_scope, next_ctx, table, unifier,
-                        )?);
-                        let val = Box::new(scoped_expr_to_node(
-                            attr.val, in_scope, next_ctx, table, unifier,
-                        )?);
-                        let unit_meta = unifier.unit_meta();
-                        hir_props.push(TypedHirNode(
-                            ontol_hir::Kind::Prop(
-                                ontol_hir::Optional(false),
+impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
+    /// Convert an expression that has all its exposed free variables
+    /// in scope, to a HIR node.
+    fn scoped_expr_to_node(
+        &mut self,
+        expr::Expr(kind, meta): expr::Expr<'m>,
+        in_scope: &VarSet,
+        context: ExprContext,
+    ) -> UnifierResult<TypedHirNode<'m>> {
+        let next_ctx = ExprContext::Value;
+        match kind {
+            expr::Kind::Var(var) => Ok(TypedHirNode(ontol_hir::Kind::Var(var), meta.hir_meta)),
+            expr::Kind::Unit => Ok(TypedHirNode(ontol_hir::Kind::Unit, meta.hir_meta)),
+            expr::Kind::I64(int) => Ok(TypedHirNode(ontol_hir::Kind::I64(int), meta.hir_meta)),
+            expr::Kind::F64(float) => Ok(TypedHirNode(ontol_hir::Kind::F64(float), meta.hir_meta)),
+            expr::Kind::Prop(prop) => Ok(TypedHirNode(
+                ontol_hir::Kind::Prop(
+                    ontol_hir::Optional(false),
+                    prop.struct_var,
+                    prop.prop_id,
+                    match prop.variant {
+                        expr::PropVariant::Singleton(attr) => {
+                            vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
+                                rel: Box::new(
+                                    self.scoped_expr_to_node(attr.rel, in_scope, next_ctx)?,
+                                ),
+                                val: Box::new(
+                                    self.scoped_expr_to_node(attr.val, in_scope, next_ctx)?,
+                                ),
+                            })]
+                        }
+                        expr::PropVariant::Seq { label, elements } => {
+                            assert!(elements.is_empty());
+                            let sequence_node = find_and_unify_sequence(
                                 prop.struct_var,
-                                prop.prop_id,
-                                vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
-                                    rel,
-                                    val,
-                                })],
-                            ),
-                            unit_meta,
-                        ));
-                    }
-                    expr::PropVariant::Seq { .. } => {
-                        return Err(unifier_todo(smart_format!("seq prop")))
+                                label,
+                                in_scope,
+                                self.table,
+                                self.unifier,
+                            )?;
+
+                            vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
+                                rel: Box::new(TypedHirNode(
+                                    ontol_hir::Kind::Unit,
+                                    self.unifier.unit_meta(),
+                                )),
+                                val: Box::new(sequence_node),
+                            })]
+                        }
+                    },
+                ),
+                meta.hir_meta,
+            )),
+            expr::Kind::Call(expr::Call(proc, args)) => {
+                let mut hir_args = Vec::with_capacity(args.len());
+                for arg in args {
+                    hir_args.push(self.scoped_expr_to_node(arg, in_scope, next_ctx)?);
+                }
+                Ok(TypedHirNode(
+                    ontol_hir::Kind::Call(proc, hir_args),
+                    meta.hir_meta,
+                ))
+            }
+            expr::Kind::Map(arg) => {
+                let hir_arg = self.scoped_expr_to_node(*arg, in_scope, next_ctx)?;
+                Ok(TypedHirNode(
+                    ontol_hir::Kind::Map(Box::new(hir_arg)),
+                    meta.hir_meta,
+                ))
+            }
+            expr::Kind::Struct {
+                binder,
+                flags,
+                props,
+            } => {
+                let next_in_scope = in_scope.union_one(binder.var);
+                let mut body = vec![];
+
+                debug!("Make struct {:?} in_scope={:?}", binder.var, in_scope);
+
+                if let Some(scope_var) = self.scope_var {
+                    let scope_map = self
+                        .table
+                        .find_scope_map_by_scope_var(scope_var)
+                        // .find_scope_map_containing_expr_struct(binder.var)
+                        .unwrap_or_else(|| {
+                            panic!(
+                                "Did not find scope_map containing expr struct {}",
+                                binder.var
+                            );
+                        });
+                    body.extend(unify_scope_structural(
+                        ExprSelector::Struct(binder.var),
+                        scope_map.scope.meta().scope_var,
+                        next_in_scope.clone(),
+                        self.table,
+                        self.unifier,
+                    )?);
+                }
+
+                // let mut body = Vec::with_capacity(props.len());
+                for prop in props {
+                    match prop.variant {
+                        expr::PropVariant::Singleton(attr) => {
+                            let rel =
+                                Box::new(self.scoped_expr_to_node(attr.rel, in_scope, next_ctx)?);
+                            let val =
+                                Box::new(self.scoped_expr_to_node(attr.val, in_scope, next_ctx)?);
+                            let unit_meta = self.unifier.unit_meta();
+                            body.push(TypedHirNode(
+                                ontol_hir::Kind::Prop(
+                                    ontol_hir::Optional(false),
+                                    prop.struct_var,
+                                    prop.prop_id,
+                                    vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
+                                        rel,
+                                        val,
+                                    })],
+                                ),
+                                unit_meta,
+                            ));
+                        }
+                        expr::PropVariant::Seq { .. } => {
+                            return Err(unifier_todo(smart_format!("seq prop")))
+                        }
                     }
                 }
+                Ok(TypedHirNode(
+                    ontol_hir::Kind::Struct(binder, flags, body),
+                    meta.hir_meta,
+                ))
             }
-            Ok(TypedHirNode(
-                ontol_hir::Kind::Struct(binder, flags, hir_props),
-                meta.hir_meta,
-            ))
-        }
-        expr::Kind::SeqItem(_label, _index, _iter, attr) => {
-            let ExprContext::Sequence(output_var) = context else {
-                panic!("Unsupported context for seq-item");
-            };
+            expr::Kind::SeqItem(_label, _index, _iter, attr) => {
+                let ExprContext::Sequence(output_var) = context else {
+                    panic!("Unsupported context for seq-item");
+                };
 
-            let rel = Box::new(scoped_expr_to_node(
-                attr.rel, in_scope, next_ctx, table, unifier,
-            )?);
-            let val = Box::new(scoped_expr_to_node(
-                attr.val, in_scope, next_ctx, table, unifier,
-            )?);
+                let rel = Box::new(self.scoped_expr_to_node(attr.rel, in_scope, next_ctx)?);
+                let val = Box::new(self.scoped_expr_to_node(attr.val, in_scope, next_ctx)?);
 
-            Ok(TypedHirNode(
-                ontol_hir::Kind::SeqPush(output_var.0, ontol_hir::Attribute { rel, val }),
-                unifier.unit_meta(),
-            ))
+                Ok(TypedHirNode(
+                    ontol_hir::Kind::SeqPush(output_var.0, ontol_hir::Attribute { rel, val }),
+                    self.unifier.unit_meta(),
+                ))
+            }
+            other => Err(unifier_todo(smart_format!("leaf expr to node: {other:?}"))),
         }
-        other => Err(unifier_todo(smart_format!("leaf expr to node: {other:?}"))),
     }
 }
 
 fn find_and_unify_sequence<'m>(
+    struct_var: ontol_hir::Var,
     label: ontol_hir::Label,
     in_scope: &VarSet,
     table: &mut Table<'m>,
     unifier: &mut FlatUnifier<'_, 'm>,
 ) -> UnifierResult<TypedHirNode<'m>> {
-    let sequence_body =
-        unify_scope_structural(ontol_hir::Var(label.0), in_scope.clone(), table, unifier)?;
-
     let output_seq_var = table
-        .find_scope_map_by_scope_var(ontol_hir::Var(label.0))
+        .find_scope_map_by_scope_var(ScopeVar(ontol_hir::Var(label.0)))
         .and_then(|scope_map| match scope_map.scope.kind() {
             flat_scope::Kind::SeqPropVariant(_, output_var, _, _, _) => Some(*output_var),
             _ => None,
         })
         .unwrap();
+
+    let next_in_scope = in_scope.union_one(output_seq_var.0);
+
+    let sequence_body = unify_scope_structural(
+        ExprSelector::Struct(struct_var),
+        ScopeVar(ontol_hir::Var(label.0)),
+        next_in_scope,
+        table,
+        unifier,
+    )?;
 
     let unit_ty = unifier.unit_meta().ty;
 
