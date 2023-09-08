@@ -16,7 +16,7 @@ pub(super) struct Table<'m> {
 
 #[derive(Clone, Copy, Debug)]
 pub enum ExprSelector {
-    Struct(ontol_hir::Var),
+    Struct(ontol_hir::Var, ScopeVar),
 }
 
 impl<'m> Table<'m> {
@@ -291,7 +291,7 @@ impl<'m> ScopeMap<'m> {
             std::mem::take(&mut self.assignments)
                 .into_iter()
                 .partition(|assignment| match (assignment.expr.kind(), selector) {
-                    (expr::Kind::Prop(prop), ExprSelector::Struct(struct_var)) => {
+                    (expr::Kind::Prop(prop), ExprSelector::Struct(struct_var, _)) => {
                         prop.struct_var == struct_var
                     }
                     _ => true,

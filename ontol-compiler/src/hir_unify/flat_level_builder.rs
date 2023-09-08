@@ -101,6 +101,7 @@ impl<'m> LevelBuilder<'m> {
             PropertyId,
         ),
         body: Vec<TypedHirNode<'m>>,
+        in_scope: &VarSet,
         table: &mut Table<'m>,
     ) {
         let scope_map = table
@@ -123,18 +124,22 @@ impl<'m> LevelBuilder<'m> {
         }
 
         if !body.is_empty() {
-            let label_binding = ontol_hir::Binding::Binder(TypedBinder {
-                var: scope_var.0,
-                meta: typed_hir::Meta {
-                    ty: label.ty,
-                    span: scope_map.scope.meta().hir_meta.span,
-                },
-            });
+            if in_scope.contains(ontol_hir::Var(label.label.0)) {
+                self.output.extend(body)
+            } else {
+                let label_binding = ontol_hir::Binding::Binder(TypedBinder {
+                    var: scope_var.0,
+                    meta: typed_hir::Meta {
+                        ty: label.ty,
+                        span: scope_map.scope.meta().hir_meta.span,
+                    },
+                });
 
-            merged_match_arms.match_arms.push(ontol_hir::PropMatchArm {
-                pattern: ontol_hir::PropPattern::Seq(label_binding, has_default),
-                nodes: body,
-            });
+                merged_match_arms.match_arms.push(ontol_hir::PropMatchArm {
+                    pattern: ontol_hir::PropPattern::Seq(label_binding, has_default),
+                    nodes: body,
+                });
+            }
         }
     }
 }

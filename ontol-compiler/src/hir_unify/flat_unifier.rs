@@ -35,6 +35,13 @@ enum AssignResult<'m> {
     Unassigned(expr::Expr<'m>),
 }
 
+#[derive(Clone, Copy, Debug)]
+enum MainScope {
+    Const,
+    Value(ScopeVar),
+    Sequence(ScopeVar, OutputVar),
+}
+
 impl<'a, 'm> FlatUnifier<'a, 'm> {
     pub fn new(types: &'a mut Types<'m>, var_allocator: ontol_hir::VarAllocator) -> Self {
         Self {
@@ -297,7 +304,7 @@ fn unify_single<'m>(
                 unifier,
                 scope_var: None,
             }
-            .scoped_expr_to_node(const_expr, &in_scope, ExprContext::Value)?,
+            .scoped_expr_to_node(const_expr, &in_scope, MainScope::Const)?,
         });
     }
 
@@ -337,7 +344,7 @@ fn unify_single<'m>(
             .scoped_expr_to_node(
                 expr::Expr(kind, meta),
                 &in_scope,
-                ExprContext::Value,
+                MainScope::Value(scope_var),
             )?;
 
             Ok(UnifiedNode {
@@ -363,8 +370,9 @@ fn unify_single<'m>(
             // FIXME/DRY: This looks a lot like the expr code
             let next_in_scope = in_scope.union_one(scope_meta.scope_var.0);
             let mut body = unify_scope_structural(
-                ExprSelector::Struct(binder.var),
-                StructuralOrigin::DependeesOf(scope_meta.scope_var),
+                MainScope::Value(scope_meta.scope_var),
+                ExprSelector::Struct(binder.var, scope_var),
+                StructuralOrigin::DependeesOf(scope_var),
                 next_in_scope.clone(),
                 table,
                 unifier,
@@ -387,7 +395,7 @@ fn unify_single<'m>(
                         },
                     ),
                     &next_in_scope,
-                    ExprContext::Value,
+                    MainScope::Value(scope_var),
                 )?;
 
                 body.push(prop_node);
@@ -410,10 +418,11 @@ fn unify_single<'m>(
 #[derive(Clone, Copy, Debug)]
 enum StructuralOrigin {
     DependeesOf(ScopeVar),
-    Direct(ScopeVar),
+    Start,
 }
 
 fn unify_scope_structural<'m>(
+    main_scope: MainScope,
     selector: ExprSelector,
     origin: StructuralOrigin,
     in_scope: VarSet,
@@ -422,21 +431,10 @@ fn unify_scope_structural<'m>(
 ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
     let indexes = match origin {
         StructuralOrigin::DependeesOf(parent_scope_var) => table.dependees(Some(parent_scope_var)),
-        StructuralOrigin::Direct(scope_var) => table
-            .table_mut()
-            .iter()
-            .enumerate()
-            .filter_map(|(index, scope_map)| {
-                if scope_map.scope.meta().scope_var == scope_var {
-                    Some(index)
-                } else {
-                    None
-                }
-            })
-            .collect(),
+        StructuralOrigin::Start => vec![0],
     };
 
-    debug!("unify scope structural {selector:?} origin={origin:?} indexes={indexes:?}");
+    debug!("USS main_scope={main_scope:?} {selector:?} origin={origin:?} indexes={indexes:?}");
 
     let mut builder = LevelBuilder::default();
 
@@ -450,14 +448,15 @@ fn unify_scope_structural<'m>(
             | flat_scope::Kind::Struct
             | flat_scope::Kind::Var => {
                 builder.output.extend(apply_lateral_scope(
+                    main_scope,
                     scope_map.take_assignments(),
                     &|| in_scope.clone(),
-                    ExprContext::Value,
                     table,
                     unifier,
                 )?);
 
                 let nodes = unify_scope_structural(
+                    main_scope,
                     selector,
                     StructuralOrigin::DependeesOf(scope_var),
                     in_scope.union_one(scope_var.0),
@@ -472,14 +471,15 @@ fn unify_scope_structural<'m>(
                 let inner_scope = in_scope.union(&scope_map.scope.meta().pub_vars);
 
                 body.extend(apply_lateral_scope(
+                    main_scope,
                     scope_map.select_assignments(selector),
                     &|| inner_scope.clone(),
-                    ExprContext::Value,
                     table,
                     unifier,
                 )?);
 
                 body.extend(unify_scope_structural(
+                    main_scope,
                     selector,
                     StructuralOrigin::DependeesOf(scope_var),
                     inner_scope,
@@ -502,14 +502,15 @@ fn unify_scope_structural<'m>(
                 let inner_scope = in_scope.union(&scope_map.scope.meta().pub_vars);
 
                 body.extend(apply_lateral_scope(
+                    main_scope,
                     scope_map.select_assignments(selector),
                     &|| inner_scope.clone(),
-                    ExprContext::Value,
                     table,
                     unifier,
                 )?);
 
                 body.extend(unify_scope_structural(
+                    main_scope,
                     selector,
                     StructuralOrigin::DependeesOf(scope_var),
                     inner_scope,
@@ -517,21 +518,13 @@ fn unify_scope_structural<'m>(
                     unifier,
                 )?);
 
-                builder.add_seq_prop_variant_scope(scope_var, prop_key, body, table);
+                builder.add_seq_prop_variant_scope(scope_var, prop_key, body, &in_scope, table);
             }
             flat_scope::Kind::IterElement(label, output_var) => {
-                if matches!(origin, StructuralOrigin::Direct(_)) {
-                    // Treat this as just another node to traverse.
-                    // Structural origins never start with IterElement.
-                    builder.output.extend(apply_lateral_scope(
-                        scope_map.take_assignments(),
-                        &|| in_scope.clone(),
-                        ExprContext::Value,
-                        table,
-                        unifier,
-                    )?);
-
+                if scope_map.assignments.is_empty() {
+                    debug!("IterElement empty");
                     let nodes = unify_scope_structural(
+                        main_scope,
                         selector,
                         StructuralOrigin::DependeesOf(scope_var),
                         in_scope.union_one(scope_var.0),
@@ -546,6 +539,7 @@ fn unify_scope_structural<'m>(
                     let rel_val_bindings = table.rel_val_bindings(scope_var);
 
                     let push_nodes = apply_lateral_scope(
+                        MainScope::Sequence(scope_var, output_var),
                         assignments,
                         &|| {
                             let mut next_in_scope = in_scope.clone();
@@ -557,7 +551,6 @@ fn unify_scope_structural<'m>(
                             }
                             next_in_scope
                         },
-                        ExprContext::Sequence(output_var),
                         table,
                         unifier,
                     )?;
@@ -581,16 +574,10 @@ fn unify_scope_structural<'m>(
     Ok(builder.build(unifier))
 }
 
-#[derive(Clone, Copy)]
-enum ExprContext {
-    Value,
-    Sequence(OutputVar),
-}
-
 fn apply_lateral_scope<'m>(
+    main_scope: MainScope,
     assignments: Vec<ScopedAssignment<'m>>,
     in_scope_fn: &dyn Fn() -> VarSet,
-    context: ExprContext,
     table: &mut Table<'m>,
     unifier: &mut FlatUnifier<'_, 'm>,
 ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
@@ -618,7 +605,7 @@ fn apply_lateral_scope<'m>(
                     unifier,
                     scope_var: Some(assignment.scope_var),
                 }
-                .scoped_expr_to_node(assignment.expr, &in_scope, context)?,
+                .scoped_expr_to_node(assignment.expr, &in_scope, main_scope)?,
             );
         } else {
             let introduced_var = ontol_hir::Var(
@@ -651,9 +638,9 @@ fn apply_lateral_scope<'m>(
                     let mut body = vec![];
 
                     body.extend(apply_lateral_scope(
+                        main_scope,
                         assignments,
                         &|| in_scope.union_one(introduced_var),
-                        context,
                         table,
                         unifier,
                     )?);
@@ -675,7 +662,7 @@ fn apply_lateral_scope<'m>(
                     .scoped_expr_to_node(
                         assignment.expr,
                         &in_scope,
-                        context,
+                        main_scope,
                     )?,
                 );
             }
@@ -698,9 +685,14 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
         &mut self,
         expr::Expr(kind, meta): expr::Expr<'m>,
         in_scope: &VarSet,
-        context: ExprContext,
+        main_scope: MainScope,
     ) -> UnifierResult<TypedHirNode<'m>> {
-        let next_ctx = ExprContext::Value;
+        let next_main_scope = match main_scope {
+            MainScope::Const => MainScope::Const,
+            MainScope::Value(scope_var) => MainScope::Value(scope_var),
+            MainScope::Sequence(scope_var, _) => MainScope::Value(scope_var),
+        };
+
         match kind {
             expr::Kind::Var(var) => Ok(TypedHirNode(ontol_hir::Kind::Var(var), meta.hir_meta)),
             expr::Kind::Unit => Ok(TypedHirNode(ontol_hir::Kind::Unit, meta.hir_meta)),
@@ -714,12 +706,16 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                     match prop.variant {
                         expr::PropVariant::Singleton(attr) => {
                             vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
-                                rel: Box::new(
-                                    self.scoped_expr_to_node(attr.rel, in_scope, next_ctx)?,
-                                ),
-                                val: Box::new(
-                                    self.scoped_expr_to_node(attr.val, in_scope, next_ctx)?,
-                                ),
+                                rel: Box::new(self.scoped_expr_to_node(
+                                    attr.rel,
+                                    in_scope,
+                                    next_main_scope,
+                                )?),
+                                val: Box::new(self.scoped_expr_to_node(
+                                    attr.val,
+                                    in_scope,
+                                    next_main_scope,
+                                )?),
                             })]
                         }
                         expr::PropVariant::Seq { label, elements } => {
@@ -747,7 +743,7 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
             expr::Kind::Call(expr::Call(proc, args)) => {
                 let mut hir_args = Vec::with_capacity(args.len());
                 for arg in args {
-                    hir_args.push(self.scoped_expr_to_node(arg, in_scope, next_ctx)?);
+                    hir_args.push(self.scoped_expr_to_node(arg, in_scope, next_main_scope)?);
                 }
                 Ok(TypedHirNode(
                     ontol_hir::Kind::Call(proc, hir_args),
@@ -755,7 +751,7 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                 ))
             }
             expr::Kind::Map(arg) => {
-                let hir_arg = self.scoped_expr_to_node(*arg, in_scope, next_ctx)?;
+                let hir_arg = self.scoped_expr_to_node(*arg, in_scope, next_main_scope)?;
                 Ok(TypedHirNode(
                     ontol_hir::Kind::Map(Box::new(hir_arg)),
                     meta.hir_meta,
@@ -774,10 +770,23 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                     binder.var, self.scope_var, in_scope
                 );
 
-                if let Some(scope_var) = self.scope_var {
+                if let Some(_) = self.scope_var {
                     body.extend(unify_scope_structural(
-                        ExprSelector::Struct(binder.var),
-                        StructuralOrigin::Direct(scope_var),
+                        match main_scope {
+                            MainScope::Const => unreachable!(),
+                            MainScope::Value(scope_var) => MainScope::Value(scope_var),
+                            MainScope::Sequence(scope_var, _) => MainScope::Value(scope_var),
+                        },
+                        match main_scope {
+                            MainScope::Const => unreachable!(),
+                            MainScope::Value(scope_var) => {
+                                ExprSelector::Struct(binder.var, scope_var)
+                            }
+                            MainScope::Sequence(scope_var, _) => {
+                                ExprSelector::Struct(binder.var, scope_var)
+                            }
+                        },
+                        StructuralOrigin::Start,
                         next_in_scope.clone(),
                         self.table,
                         self.unifier,
@@ -788,10 +797,16 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                 for prop in props {
                     match prop.variant {
                         expr::PropVariant::Singleton(attr) => {
-                            let rel =
-                                Box::new(self.scoped_expr_to_node(attr.rel, in_scope, next_ctx)?);
-                            let val =
-                                Box::new(self.scoped_expr_to_node(attr.val, in_scope, next_ctx)?);
+                            let rel = Box::new(self.scoped_expr_to_node(
+                                attr.rel,
+                                in_scope,
+                                next_main_scope,
+                            )?);
+                            let val = Box::new(self.scoped_expr_to_node(
+                                attr.val,
+                                in_scope,
+                                next_main_scope,
+                            )?);
                             let unit_meta = self.unifier.unit_meta();
                             body.push(TypedHirNode(
                                 ontol_hir::Kind::Prop(
@@ -817,12 +832,14 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                 ))
             }
             expr::Kind::SeqItem(_label, _index, _iter, attr) => {
-                let ExprContext::Sequence(output_var) = context else {
+                let MainScope::Sequence(_, output_var) = main_scope else {
                     panic!("Unsupported context for seq-item");
                 };
 
-                let rel = Box::new(self.scoped_expr_to_node(attr.rel, in_scope, next_ctx)?);
-                let val = Box::new(self.scoped_expr_to_node(attr.val, in_scope, next_ctx)?);
+                let rel =
+                    Box::new(self.scoped_expr_to_node(attr.rel, in_scope, next_main_scope)?);
+                let val =
+                    Box::new(self.scoped_expr_to_node(attr.val, in_scope, next_main_scope)?);
 
                 Ok(TypedHirNode(
                     ontol_hir::Kind::SeqPush(output_var.0, ontol_hir::Attribute { rel, val }),
@@ -851,9 +868,12 @@ fn find_and_unify_sequence<'m>(
 
     let next_in_scope = in_scope.union_one(output_seq_var.0);
 
+    let scope_var = ScopeVar(ontol_hir::Var(label.0));
+
     let sequence_body = unify_scope_structural(
-        ExprSelector::Struct(struct_var),
-        StructuralOrigin::DependeesOf(ScopeVar(ontol_hir::Var(label.0))),
+        MainScope::Value(scope_var),
+        ExprSelector::Struct(struct_var, scope_var),
+        StructuralOrigin::DependeesOf(scope_var),
         next_in_scope,
         table,
         unifier,
