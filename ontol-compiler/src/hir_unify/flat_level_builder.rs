@@ -6,7 +6,11 @@ use crate::{
     typed_hir::{self, TypedBinder, TypedHir, TypedHirNode},
 };
 
-use super::{flat_scope::ScopeVar, flat_unifier::FlatUnifier, flat_unifier_table::Table, VarSet};
+use super::{
+    flat_scope::ScopeVar,
+    flat_unifier::FlatUnifier,
+    flat_unifier_table::{RelValBindings, Table},
+};
 
 #[derive(Default)]
 pub(super) struct LevelBuilder<'m> {
@@ -47,11 +51,9 @@ impl<'m> LevelBuilder<'m> {
 
     pub fn add_prop_variant_scope(
         &mut self,
-        scope_var: ScopeVar,
         (optional, struct_var, property_id): (ontol_hir::Optional, ontol_hir::Var, PropertyId),
+        bindings: RelValBindings<'m>,
         body: Vec<TypedHirNode<'m>>,
-        in_scope: &VarSet,
-        table: &mut Table<'m>,
     ) {
         let merged_match_arms = self
             .merged_match_arms_table
@@ -62,32 +64,11 @@ impl<'m> LevelBuilder<'m> {
             merged_match_arms.optional.0 = true;
         }
 
-        fn compute_needs_scope(
-            binding: ontol_hir::Binding<'_, TypedHir>,
-            in_scope: &VarSet,
-            output: &mut bool,
-        ) {
-            if let ontol_hir::Binding::Binder(binder) = binding {
-                if !in_scope.contains(binder.var) {
-                    *output = true;
-                }
-            }
-        }
-
         if !body.is_empty() {
-            let mut needs_scope = false;
-            let (rel_binding, val_binding) = table.rel_val_bindings(scope_var);
-            compute_needs_scope(rel_binding, in_scope, &mut needs_scope);
-            compute_needs_scope(val_binding, in_scope, &mut needs_scope);
-
-            if needs_scope {
-                merged_match_arms.match_arms.push(ontol_hir::PropMatchArm {
-                    pattern: ontol_hir::PropPattern::Attr(rel_binding, val_binding),
-                    nodes: body,
-                });
-            } else {
-                self.output.extend(body);
-            }
+            merged_match_arms.match_arms.push(ontol_hir::PropMatchArm {
+                pattern: ontol_hir::PropPattern::Attr(bindings.rel, bindings.val),
+                nodes: body,
+            });
         }
     }
 
@@ -101,7 +82,6 @@ impl<'m> LevelBuilder<'m> {
             PropertyId,
         ),
         body: Vec<TypedHirNode<'m>>,
-        in_scope: &VarSet,
         table: &mut Table<'m>,
     ) {
         let scope_map = table
@@ -124,22 +104,18 @@ impl<'m> LevelBuilder<'m> {
         }
 
         if !body.is_empty() {
-            if in_scope.contains(ontol_hir::Var(label.label.0)) {
-                self.output.extend(body)
-            } else {
-                let label_binding = ontol_hir::Binding::Binder(TypedBinder {
-                    var: scope_var.0,
-                    meta: typed_hir::Meta {
-                        ty: label.ty,
-                        span: scope_map.scope.meta().hir_meta.span,
-                    },
-                });
+            let label_binding = ontol_hir::Binding::Binder(TypedBinder {
+                var: scope_var.0,
+                meta: typed_hir::Meta {
+                    ty: label.ty,
+                    span: scope_map.scope.meta().hir_meta.span,
+                },
+            });
 
-                merged_match_arms.match_arms.push(ontol_hir::PropMatchArm {
-                    pattern: ontol_hir::PropPattern::Seq(label_binding, has_default),
-                    nodes: body,
-                });
-            }
+            merged_match_arms.match_arms.push(ontol_hir::PropMatchArm {
+                pattern: ontol_hir::PropPattern::Seq(label_binding, has_default),
+                nodes: body,
+            });
         }
     }
 }

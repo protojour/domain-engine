@@ -6,7 +6,7 @@ use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
-    hir_unify::CLASSIC_UNIFIER_FALLBACK,
+    hir_unify::{flat_unifier_table::IsInScope, CLASSIC_UNIFIER_FALLBACK},
     mem::Intern,
     primitive::PrimitiveKind,
     typed_hir::{self, TypedBinder, TypedHirNode},
@@ -429,146 +429,155 @@ fn unify_scope_structural<'m>(
     table: &mut Table<'m>,
     unifier: &mut FlatUnifier<'_, 'm>,
 ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
-    let indexes = match origin {
+    let mut indexes = match origin {
         StructuralOrigin::DependeesOf(parent_scope_var) => table.dependees(Some(parent_scope_var)),
         StructuralOrigin::Start => vec![0],
     };
 
-    debug!("USS main_scope={main_scope:?} {selector:?} origin={origin:?} indexes={indexes:?}");
-
     let mut builder = LevelBuilder::default();
 
-    for index in indexes {
-        let scope_map = &mut table.scope_map_mut(index);
-        let scope_var = scope_map.scope.meta().scope_var;
+    debug!("USS main_scope={main_scope:?} {selector:?} origin={origin:?}");
 
-        match scope_map.scope.kind() {
-            flat_scope::Kind::PropRelParam
-            | flat_scope::Kind::PropValue
-            | flat_scope::Kind::Struct
-            | flat_scope::Kind::Var => {
-                builder.output.extend(apply_lateral_scope(
-                    main_scope,
-                    scope_map.take_assignments(),
-                    &|| in_scope.clone(),
-                    table,
-                    unifier,
-                )?);
+    while !indexes.is_empty() {
+        let mut next_indexes = vec![];
 
-                let nodes = unify_scope_structural(
-                    main_scope,
-                    selector,
-                    StructuralOrigin::DependeesOf(scope_var),
-                    in_scope.union_one(scope_var.0),
-                    table,
-                    unifier,
-                )?;
-                builder.output.extend(nodes);
-            }
-            flat_scope::Kind::PropVariant(optional, prop_struct_var, property_id) => {
-                let prop_key = (*optional, *prop_struct_var, *property_id);
-                let mut body = vec![];
-                let inner_scope = in_scope.union(&scope_map.scope.meta().pub_vars);
+        debug!("    indexes={indexes:?}");
 
-                body.extend(apply_lateral_scope(
-                    main_scope,
-                    scope_map.select_assignments(selector),
-                    &|| inner_scope.clone(),
-                    table,
-                    unifier,
-                )?);
+        for index in indexes {
+            let scope_map = &mut table.scope_map_mut(index);
+            let scope_var = scope_map.scope.meta().scope_var;
 
-                body.extend(unify_scope_structural(
-                    main_scope,
-                    selector,
-                    StructuralOrigin::DependeesOf(scope_var),
-                    inner_scope,
-                    table,
-                    unifier,
-                )?);
-
-                builder.add_prop_variant_scope(scope_var, prop_key, body, &in_scope, table);
-            }
-            flat_scope::Kind::SeqPropVariant(
-                _label,
-                _output_var,
-                optional,
-                has_default,
-                prop_struct_var,
-                property_id,
-            ) => {
-                let prop_key = (*optional, *has_default, *prop_struct_var, *property_id);
-                let mut body = vec![];
-                let inner_scope = in_scope.union(&scope_map.scope.meta().pub_vars);
-
-                body.extend(apply_lateral_scope(
-                    main_scope,
-                    scope_map.select_assignments(selector),
-                    &|| inner_scope.clone(),
-                    table,
-                    unifier,
-                )?);
-
-                body.extend(unify_scope_structural(
-                    main_scope,
-                    selector,
-                    StructuralOrigin::DependeesOf(scope_var),
-                    inner_scope,
-                    table,
-                    unifier,
-                )?);
-
-                builder.add_seq_prop_variant_scope(scope_var, prop_key, body, &in_scope, table);
-            }
-            flat_scope::Kind::IterElement(label, output_var) => {
-                if scope_map.assignments.is_empty() {
-                    debug!("IterElement empty");
-                    let nodes = unify_scope_structural(
+            match scope_map.scope.kind() {
+                flat_scope::Kind::PropRelParam
+                | flat_scope::Kind::PropValue
+                | flat_scope::Kind::Struct
+                | flat_scope::Kind::Var => {
+                    builder.output.extend(apply_lateral_scope(
                         main_scope,
-                        selector,
-                        StructuralOrigin::DependeesOf(scope_var),
-                        in_scope.union_one(scope_var.0),
+                        scope_map.take_assignments(),
+                        &|| in_scope.clone(),
                         table,
                         unifier,
-                    )?;
-                    builder.output.extend(nodes);
-                } else if in_scope.contains(output_var.0) {
-                    let label = *label;
-                    let output_var = *output_var;
-                    let assignments = scope_map.take_assignments();
-                    let rel_val_bindings = table.rel_val_bindings(scope_var);
+                    )?);
 
-                    let push_nodes = apply_lateral_scope(
-                        MainScope::Sequence(scope_var, output_var),
+                    next_indexes.extend(table.dependees(Some(scope_var)));
+                }
+                flat_scope::Kind::PropVariant(optional, prop_struct_var, property_id) => {
+                    let prop_key = (*optional, *prop_struct_var, *property_id);
+                    let mut body = vec![];
+                    let inner_scope = in_scope.union(&scope_map.scope.meta().pub_vars);
+
+                    let assignments = scope_map.select_assignments(selector);
+                    let assignments_len = assignments.len();
+
+                    body.extend(apply_lateral_scope(
+                        main_scope,
                         assignments,
-                        &|| {
-                            let mut next_in_scope = in_scope.clone();
-                            if let ontol_hir::Binding::Binder(binder) = &rel_val_bindings.0 {
-                                next_in_scope.insert(binder.var);
-                            }
-                            if let ontol_hir::Binding::Binder(binder) = &rel_val_bindings.1 {
-                                next_in_scope.insert(binder.var);
-                            }
-                            next_in_scope
-                        },
+                        &|| inner_scope.clone(),
                         table,
                         unifier,
-                    )?;
+                    )?);
 
-                    if !push_nodes.is_empty() {
-                        builder.output.push(TypedHirNode(
-                            ontol_hir::Kind::ForEach(
-                                ontol_hir::Var(label.0),
-                                rel_val_bindings,
-                                push_nodes,
-                            ),
-                            unifier.unit_meta(),
-                        ));
+                    let bindings = table.rel_val_bindings(scope_var);
+                    if !bindings.is_in_scope(&in_scope) {
+                        debug!("bindings {bindings:?} were not in scope");
+                        body.extend(unify_scope_structural(
+                            main_scope,
+                            selector,
+                            StructuralOrigin::DependeesOf(scope_var),
+                            inner_scope.union(&bindings.var_set()),
+                            table,
+                            unifier,
+                        )?);
+
+                        builder.add_prop_variant_scope(prop_key, bindings, body);
+                    } else {
+                        debug!("bindings {bindings:?} were in scope. Assignments len = {assignments_len}");
+                        builder.output.extend(body);
+                        next_indexes.extend(table.dependees(Some(scope_var)));
                     }
                 }
+                flat_scope::Kind::SeqPropVariant(
+                    label,
+                    _output_var,
+                    optional,
+                    has_default,
+                    prop_struct_var,
+                    property_id,
+                ) => {
+                    let label = *label;
+                    let prop_key = (*optional, *has_default, *prop_struct_var, *property_id);
+                    let mut body = vec![];
+                    let inner_scope = in_scope.union(&scope_map.scope.meta().pub_vars);
+
+                    body.extend(apply_lateral_scope(
+                        main_scope,
+                        scope_map.select_assignments(selector),
+                        &|| inner_scope.clone(),
+                        table,
+                        unifier,
+                    )?);
+
+                    if !in_scope.contains(ontol_hir::Var(label.label.0)) {
+                        body.extend(unify_scope_structural(
+                            main_scope,
+                            selector,
+                            StructuralOrigin::DependeesOf(scope_var),
+                            inner_scope,
+                            table,
+                            unifier,
+                        )?);
+
+                        builder.add_seq_prop_variant_scope(scope_var, prop_key, body, table);
+                    } else {
+                        builder.output.extend(body);
+                        next_indexes.extend(table.dependees(Some(scope_var)));
+                    }
+                }
+                flat_scope::Kind::IterElement(label, output_var) => {
+                    if scope_map.assignments.is_empty() {
+                        debug!("IterElement empty");
+                        next_indexes.extend(table.dependees(Some(scope_var)));
+                    } else if in_scope.contains(output_var.0) {
+                        let label = *label;
+                        let output_var = *output_var;
+                        let assignments = scope_map.take_assignments();
+                        let bindings = table.rel_val_bindings(scope_var);
+
+                        let push_nodes = apply_lateral_scope(
+                            MainScope::Sequence(scope_var, output_var),
+                            assignments,
+                            &|| {
+                                let mut next_in_scope = in_scope.clone();
+                                if let ontol_hir::Binding::Binder(binder) = &bindings.rel {
+                                    next_in_scope.insert(binder.var);
+                                }
+                                if let ontol_hir::Binding::Binder(binder) = &bindings.val {
+                                    next_in_scope.insert(binder.var);
+                                }
+                                next_in_scope
+                            },
+                            table,
+                            unifier,
+                        )?;
+
+                        if !push_nodes.is_empty() {
+                            builder.output.push(TypedHirNode(
+                                ontol_hir::Kind::ForEach(
+                                    ontol_hir::Var(label.0),
+                                    (bindings.rel, bindings.val),
+                                    push_nodes,
+                                ),
+                                unifier.unit_meta(),
+                            ));
+                        }
+                    }
+                }
+                other => return Err(unifier_todo(smart_format!("structural scope: {other:?}"))),
             }
-            other => return Err(unifier_todo(smart_format!("structural scope: {other:?}"))),
         }
+
+        indexes = next_indexes;
     }
 
     Ok(builder.build(unifier))
@@ -645,7 +654,8 @@ fn apply_lateral_scope<'m>(
                         unifier,
                     )?);
 
-                    builder.add_prop_variant_scope(scope_var, prop_key, body, &in_scope, table);
+                    let bindings = table.rel_val_bindings(scope_var);
+                    builder.add_prop_variant_scope(prop_key, bindings, body);
                 }
                 other => return Err(unifier_todo(smart_format!("{other:?}"))),
             }

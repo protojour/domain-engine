@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use crate::typed_hir::{TypedBinder, TypedHir};
 
 use super::{
@@ -17,6 +19,11 @@ pub(super) struct Table<'m> {
 #[derive(Clone, Copy, Debug)]
 pub enum ExprSelector {
     Struct(ontol_hir::Var, ScopeVar),
+}
+
+pub trait IsInScope {
+    fn is_in_scope(&self, in_scope: &VarSet) -> bool;
+    fn var_set(&self) -> VarSet;
 }
 
 impl<'m> Table<'m> {
@@ -200,6 +207,35 @@ impl<'m> Table<'m> {
         }
     }
 
+    pub fn rel_val_bindings(&self, scope_var: ScopeVar) -> RelValBindings<'m> {
+        let var_attribute = self.scope_prop_variant_bindings(scope_var);
+
+        fn make_binding<'m>(
+            scope_node: Option<&flat_scope::ScopeNode<'m>>,
+        ) -> ontol_hir::Binding<'m, TypedHir> {
+            match scope_node {
+                Some(scope_node) => ontol_hir::Binding::Binder(TypedBinder {
+                    var: scope_node.meta().scope_var.0,
+                    meta: scope_node.meta().hir_meta,
+                }),
+                None => ontol_hir::Binding::Wildcard,
+            }
+        }
+
+        let rel = make_binding(
+            var_attribute
+                .rel
+                .and_then(|var| self.find_scope_var_child(var)),
+        );
+        let val = make_binding(
+            var_attribute
+                .val
+                .and_then(|var| self.find_scope_var_child(var)),
+        );
+
+        RelValBindings { rel, val }
+    }
+
     pub fn scope_prop_variant_bindings(
         &self,
         variant_var: ScopeVar,
@@ -223,41 +259,6 @@ impl<'m> Table<'m> {
         }
 
         attribute
-    }
-
-    pub fn rel_val_bindings(
-        &self,
-        scope_var: ScopeVar,
-    ) -> (
-        ontol_hir::Binding<'m, TypedHir>,
-        ontol_hir::Binding<'m, TypedHir>,
-    ) {
-        let var_attribute = self.scope_prop_variant_bindings(scope_var);
-
-        fn make_binding<'m>(
-            scope_node: Option<&flat_scope::ScopeNode<'m>>,
-        ) -> ontol_hir::Binding<'m, TypedHir> {
-            match scope_node {
-                Some(scope_node) => ontol_hir::Binding::Binder(TypedBinder {
-                    var: scope_node.meta().scope_var.0,
-                    meta: scope_node.meta().hir_meta,
-                }),
-                None => ontol_hir::Binding::Wildcard,
-            }
-        }
-
-        let rel_binding = make_binding(
-            var_attribute
-                .rel
-                .and_then(|var| self.find_scope_var_child(var)),
-        );
-        let val_binding = make_binding(
-            var_attribute
-                .val
-                .and_then(|var| self.find_scope_var_child(var)),
-        );
-
-        (rel_binding, val_binding)
     }
 }
 
@@ -325,4 +326,43 @@ pub(super) struct ScopedAssignment<'m> {
 pub(super) struct AssignmentSlot<'a, 'm> {
     pub scope_map: &'a mut ScopeMap<'m>,
     pub lateral_deps: VarSet,
+}
+
+pub(super) struct RelValBindings<'m> {
+    pub rel: ontol_hir::Binding<'m, TypedHir>,
+    pub val: ontol_hir::Binding<'m, TypedHir>,
+}
+
+impl<'m> Debug for RelValBindings<'m> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({} {})", self.rel, self.val)
+    }
+}
+
+impl<'m> IsInScope for ontol_hir::Binding<'m, TypedHir> {
+    fn is_in_scope(&self, in_scope: &VarSet) -> bool {
+        match self {
+            ontol_hir::Binding::Binder(binder) => in_scope.contains(binder.var),
+            ontol_hir::Binding::Wildcard => true,
+        }
+    }
+
+    fn var_set(&self) -> VarSet {
+        match self {
+            ontol_hir::Binding::Binder(binder) => [binder.var].into(),
+            ontol_hir::Binding::Wildcard => Default::default(),
+        }
+    }
+}
+
+impl<'m> IsInScope for RelValBindings<'m> {
+    fn is_in_scope(&self, in_scope: &VarSet) -> bool {
+        self.rel.is_in_scope(in_scope) && self.val.is_in_scope(in_scope)
+    }
+
+    fn var_set(&self) -> VarSet {
+        let mut var_set = self.rel.var_set();
+        var_set.union_with(&self.val.var_set());
+        var_set
+    }
 }
