@@ -64,7 +64,7 @@ pub fn unify_to_function<'m>(
                     return Err(err);
                 }
 
-                info!("Using classic unifier output");
+                info!("Using classic unifier output because {err:?}");
                 unify_classic(scope, expr, var_tracker.var_allocator(), compiler)?
             }
             Ok(value) => {

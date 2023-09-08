@@ -348,6 +348,36 @@ fn test_struct_arithmetic_property_dependency_within_struct() {
     );
     // FIXME: prop S:1:0 is extracted twice.
     // This will be fixed when scope properties get flattened and rebuilt.
+    let _expected_when_fixed = indoc! {"
+        |$c| (struct ($d)
+            (match-prop $c S:0:0
+                (($_ $f)
+                    (let ($a (+ $f 10))
+                        (prop $d O:0:1
+                            (#u (+ $a 20))
+                        )
+                        (match-prop $c S:0:1
+                            (($_ $e)
+                                (match-prop $e S:1:0
+                                    (($_ $g)
+                                        (let ($b (+ $g 10))
+                                            (prop $d O:0:0
+                                                (#u (+ $a $b))
+                                            )
+                                            (prop $d O:0:2
+                                                (#u (+ $b 20))
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )"
+    };
+
     let expected = indoc! {"
         |$c| (struct ($d)
             (match-prop $c S:0:0
