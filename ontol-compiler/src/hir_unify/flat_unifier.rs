@@ -3,16 +3,17 @@
 use std::fmt::Display;
 
 use fnv::FnvHashMap;
+use ontol_hir::{visitor::HirVisitor, GetKind};
 use ontol_runtime::{smart_format, DefId};
 use smartstring::alias::String;
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::{
     hir_unify::{flat_unifier_table::IsInScope, CLASSIC_UNIFIER_FALLBACK},
     mem::Intern,
     primitive::PrimitiveKind,
-    typed_hir::{self, TypedBinder, TypedHirNode},
-    types::{Type, Types},
+    typed_hir::{self, TypedBinder, TypedHir, TypedHirNode},
+    types::{Type, TypeRef, Types},
     NO_SPAN,
 };
 
@@ -1016,14 +1017,28 @@ fn find_and_unify_sequence<'m>(
         level.next(),
     )?;
 
-    let unit_ty = unifier.unit_meta().ty;
+    let mut seq_type_infer = SeqTypeInfer {
+        output_seq_var,
+        types: vec![],
+    };
 
-    let seq_ty = unifier.types.intern(Type::Seq(
-        unit_ty,
-        unit_ty,
-        // first_element.attribute.rel.hir_meta().ty,
-        // first_element.attribute.val.hir_meta().ty,
-    ));
+    for node in &sequence_body {
+        seq_type_infer.visit_node(0, node);
+    }
+
+    let seq_type_pair = match seq_type_infer.types.len() {
+        0 => panic!("Type of seq not inferrable"),
+        1 => seq_type_infer.types.into_iter().next().unwrap(),
+        _ => {
+            warn!("Multiple seq types, imprecise inference");
+            seq_type_infer.types.into_iter().next().unwrap()
+        }
+    };
+    let seq_ty = unifier
+        .types
+        .intern(Type::Seq(seq_type_pair.0, seq_type_pair.1));
+
+    debug!("seq_ty: {seq_ty:?}");
 
     let sequence_node = TypedHirNode(
         ontol_hir::Kind::Sequence(
@@ -1043,6 +1058,22 @@ fn find_and_unify_sequence<'m>(
     );
 
     Ok(sequence_node)
+}
+
+struct SeqTypeInfer<'m> {
+    output_seq_var: OutputVar,
+    types: Vec<(TypeRef<'m>, TypeRef<'m>)>,
+}
+
+impl<'s, 'm: 's> ontol_hir::visitor::HirVisitor<'s, 'm, TypedHir> for SeqTypeInfer<'m> {
+    fn visit_node(&mut self, _: usize, node: &TypedHirNode<'m>) {
+        if let ontol_hir::Kind::SeqPush(seq_var, attr) = node.kind() {
+            if seq_var == &self.output_seq_var.0 {
+                self.types.push((attr.rel.meta().ty, attr.val.meta().ty));
+            }
+        }
+        self.visit_kind(0, node.kind());
+    }
 }
 
 pub(super) fn unifier_todo(msg: String) -> UnifierError {

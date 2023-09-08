@@ -186,6 +186,9 @@ macro_rules! visitor_trait_methods {
                 }
                 PropPattern::Absent => {}
             }
+            for (index, child) in match_arm.nodes.$iter().enumerate() {
+                self.visit_node(index, child);
+            }
         }
 
         fn traverse_capture_match_arm(&mut self, match_arm: arg!($ref CaptureMatchArm<'l, L>)) {
