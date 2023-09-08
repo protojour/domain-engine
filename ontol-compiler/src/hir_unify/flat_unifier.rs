@@ -364,7 +364,7 @@ fn unify_single<'m>(
             let next_in_scope = in_scope.union_one(scope_meta.scope_var.0);
             let mut body = unify_scope_structural(
                 ExprSelector::Struct(binder.var),
-                scope_meta.scope_var,
+                StructuralOrigin::DependeesOf(scope_meta.scope_var),
                 next_in_scope.clone(),
                 table,
                 unifier,
@@ -407,16 +407,36 @@ fn unify_single<'m>(
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+enum StructuralOrigin {
+    DependeesOf(ScopeVar),
+    Direct(ScopeVar),
+}
+
 fn unify_scope_structural<'m>(
     selector: ExprSelector,
-    parent_scope_var: ScopeVar,
+    origin: StructuralOrigin,
     in_scope: VarSet,
     table: &mut Table<'m>,
     unifier: &mut FlatUnifier<'_, 'm>,
 ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
-    let indexes = table.dependees(Some(parent_scope_var));
+    let indexes = match origin {
+        StructuralOrigin::DependeesOf(parent_scope_var) => table.dependees(Some(parent_scope_var)),
+        StructuralOrigin::Direct(scope_var) => table
+            .table_mut()
+            .iter()
+            .enumerate()
+            .filter_map(|(index, scope_map)| {
+                if scope_map.scope.meta().scope_var == scope_var {
+                    Some(index)
+                } else {
+                    None
+                }
+            })
+            .collect(),
+    };
 
-    // debug!("unify scope structural {selector:?} parent={parent_scope_var:?} indexes={indexes:?}");
+    debug!("unify scope structural {selector:?} origin={origin:?} indexes={indexes:?}");
 
     let mut builder = LevelBuilder::default();
 
@@ -430,7 +450,6 @@ fn unify_scope_structural<'m>(
             | flat_scope::Kind::Struct
             | flat_scope::Kind::Var => {
                 builder.output.extend(apply_lateral_scope(
-                    parent_scope_var,
                     scope_map.take_assignments(),
                     &|| in_scope.clone(),
                     ExprContext::Value,
@@ -440,7 +459,7 @@ fn unify_scope_structural<'m>(
 
                 let nodes = unify_scope_structural(
                     selector,
-                    scope_var,
+                    StructuralOrigin::DependeesOf(scope_var),
                     in_scope.union_one(scope_var.0),
                     table,
                     unifier,
@@ -453,7 +472,6 @@ fn unify_scope_structural<'m>(
                 let inner_scope = in_scope.union(&scope_map.scope.meta().pub_vars);
 
                 body.extend(apply_lateral_scope(
-                    parent_scope_var,
                     scope_map.select_assignments(selector),
                     &|| inner_scope.clone(),
                     ExprContext::Value,
@@ -463,7 +481,7 @@ fn unify_scope_structural<'m>(
 
                 body.extend(unify_scope_structural(
                     selector,
-                    scope_var,
+                    StructuralOrigin::DependeesOf(scope_var),
                     inner_scope,
                     table,
                     unifier,
@@ -484,7 +502,6 @@ fn unify_scope_structural<'m>(
                 let inner_scope = in_scope.union(&scope_map.scope.meta().pub_vars);
 
                 body.extend(apply_lateral_scope(
-                    parent_scope_var,
                     scope_map.select_assignments(selector),
                     &|| inner_scope.clone(),
                     ExprContext::Value,
@@ -494,7 +511,7 @@ fn unify_scope_structural<'m>(
 
                 body.extend(unify_scope_structural(
                     selector,
-                    scope_var,
+                    StructuralOrigin::DependeesOf(scope_var),
                     inner_scope,
                     table,
                     unifier,
@@ -503,14 +520,32 @@ fn unify_scope_structural<'m>(
                 builder.add_seq_prop_variant_scope(scope_var, prop_key, body, table);
             }
             flat_scope::Kind::IterElement(label, output_var) => {
-                if in_scope.contains(output_var.0) {
+                if matches!(origin, StructuralOrigin::Direct(_)) {
+                    // Treat this as just another node to traverse.
+                    // Structural origins never start with IterElement.
+                    builder.output.extend(apply_lateral_scope(
+                        scope_map.take_assignments(),
+                        &|| in_scope.clone(),
+                        ExprContext::Value,
+                        table,
+                        unifier,
+                    )?);
+
+                    let nodes = unify_scope_structural(
+                        selector,
+                        StructuralOrigin::DependeesOf(scope_var),
+                        in_scope.union_one(scope_var.0),
+                        table,
+                        unifier,
+                    )?;
+                    builder.output.extend(nodes);
+                } else if in_scope.contains(output_var.0) {
                     let label = *label;
                     let output_var = *output_var;
                     let assignments = scope_map.take_assignments();
                     let rel_val_bindings = table.rel_val_bindings(scope_var);
 
                     let push_nodes = apply_lateral_scope(
-                        parent_scope_var,
                         assignments,
                         &|| {
                             let mut next_in_scope = in_scope.clone();
@@ -553,7 +588,6 @@ enum ExprContext {
 }
 
 fn apply_lateral_scope<'m>(
-    parent_scope_var: ScopeVar,
     assignments: Vec<ScopedAssignment<'m>>,
     in_scope_fn: &dyn Fn() -> VarSet,
     context: ExprContext,
@@ -617,7 +651,6 @@ fn apply_lateral_scope<'m>(
                     let mut body = vec![];
 
                     body.extend(apply_lateral_scope(
-                        parent_scope_var,
                         assignments,
                         &|| in_scope.union_one(introduced_var),
                         context,
@@ -742,19 +775,9 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                 );
 
                 if let Some(scope_var) = self.scope_var {
-                    let scope_map = self
-                        .table
-                        .find_scope_map_by_scope_var(scope_var)
-                        // .find_scope_map_containing_expr_struct(binder.var)
-                        .unwrap_or_else(|| {
-                            panic!(
-                                "Did not find scope_map containing expr struct {} scope_var={scope_var:?}",
-                                binder.var
-                            );
-                        });
                     body.extend(unify_scope_structural(
                         ExprSelector::Struct(binder.var),
-                        scope_map.scope.meta().scope_var,
+                        StructuralOrigin::Direct(scope_var),
                         next_in_scope.clone(),
                         self.table,
                         self.unifier,
@@ -830,7 +853,7 @@ fn find_and_unify_sequence<'m>(
 
     let sequence_body = unify_scope_structural(
         ExprSelector::Struct(struct_var),
-        ScopeVar(ontol_hir::Var(label.0)),
+        StructuralOrigin::DependeesOf(ScopeVar(ontol_hir::Var(label.0))),
         next_in_scope,
         table,
         unifier,
