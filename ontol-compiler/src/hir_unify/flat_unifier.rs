@@ -615,6 +615,13 @@ fn unify_scope_structural<'m>(
     Ok(builder.build(unifier))
 }
 
+#[derive(Default)]
+struct ScopeGroup<'m> {
+    assignments: Vec<ScopedAssignment<'m>>,
+    introducing: VarSet,
+    subgroups: FnvHashMap<ScopeVar, ScopeGroup<'m>>,
+}
+
 fn apply_lateral_scope<'m>(
     main_scope: MainScope,
     assignments: Vec<ScopedAssignment<'m>>,
@@ -629,17 +636,11 @@ fn apply_lateral_scope<'m>(
 
     let in_scope = in_scope_fn();
 
-    let mut scope_groups: FnvHashMap<ontol_hir::Var, Vec<ScopedAssignment<'m>>> =
-        Default::default();
-    let mut nodes = Vec::with_capacity(assignments.len());
+    let mut scope_groups: FnvHashMap<ScopeVar, ScopeGroup<'m>> = Default::default();
+    let mut ungrouped = vec![];
+    let mut nodes = vec![];
 
     for assignment in assignments {
-        // debug!(
-        //     "{level}assignment free_vars: {:?} in_scope: {:?}",
-        //     assignment.expr.meta().free_vars,
-        //     in_scope
-        // );
-
         if assignment.expr.free_vars().0.is_subset(&in_scope.0) {
             nodes.push(
                 ScopedExprToNode {
@@ -661,65 +662,145 @@ fn apply_lateral_scope<'m>(
                     .unwrap() as u32,
             );
 
-            scope_groups
-                .entry(introduced_var)
-                .or_default()
-                .push(assignment);
+            if let Some(data_point_index) = table.find_data_point(introduced_var) {
+                let scope_map = &mut table.scope_map_mut(data_point_index);
+                let scope_group = scope_groups
+                    .entry(scope_map.scope.meta().scope_var)
+                    .or_default();
+
+                scope_group.introducing.union_with(&[introduced_var].into());
+                scope_group.assignments.push(assignment);
+            } else {
+                debug!("{level} no data point");
+                ungrouped.push(assignment);
+            }
         }
     }
 
-    for (introduced_var, assignments) in scope_groups {
-        if let Some(data_point_index) = table.find_data_point(introduced_var) {
-            let scope_map = &mut table.scope_map_mut(data_point_index);
-            let scope_var = scope_map.scope.meta().scope_var;
+    let mut needs_regroup_check = true;
 
-            let mut builder = LevelBuilder::default();
+    while needs_regroup_check {
+        let mut new_scope_groups: FnvHashMap<ScopeVar, ScopeGroup<'m>> = FnvHashMap::default();
+        needs_regroup_check = false;
+
+        for (scope_var, scope_group) in scope_groups {
+            let scope_map = &mut table.find_scope_map_by_scope_var(scope_var).unwrap();
 
             match scope_map.scope.kind() {
-                flat_scope::Kind::PropVariant(optional, struct_var, property_id) => {
-                    let prop_key = (*optional, *struct_var, *property_id);
-                    debug!("{level}lateral introducing {introduced_var}");
+                flat_scope::Kind::PropVariant(_, struct_var, _) => {
+                    let struct_var = *struct_var;
+                    if in_scope.contains(struct_var) {
+                        new_scope_groups.insert(scope_var, scope_group);
+                    } else {
+                        if let Some(scope_map) = table.find_upstream_data_point(scope_var) {
+                            let supergroup = new_scope_groups
+                                .entry(scope_map.scope.meta().scope_var)
+                                .or_default();
 
-                    if !in_scope.contains(*struct_var) {
-                        panic!("Lateral struct var not in scope");
+                            supergroup.subgroups.insert(scope_var, scope_group);
+                            supergroup.introducing.union_with(&[struct_var].into());
+
+                            needs_regroup_check = true;
+                        } else {
+                            unreachable!()
+                        }
                     }
-
-                    let body = apply_lateral_scope(
-                        main_scope,
-                        assignments,
-                        &|| in_scope.union_one(introduced_var),
-                        table,
-                        unifier,
-                        level.next(),
-                    )?;
-
-                    let bindings = table.rel_val_bindings(scope_var);
-                    builder.add_prop_variant_scope(prop_key, bindings, body);
                 }
                 other => return Err(unifier_todo(smart_format!("{other:?}"))),
             }
-
-            nodes.extend(builder.build(unifier));
-        } else {
-            for assignment in assignments {
-                nodes.push(
-                    ScopedExprToNode {
-                        table,
-                        unifier,
-                        scope_var: Some(assignment.scope_var),
-                        level,
-                    }
-                    .scoped_expr_to_node(
-                        assignment.expr,
-                        &in_scope,
-                        main_scope,
-                    )?,
-                );
-            }
         }
+
+        scope_groups = new_scope_groups;
+    }
+
+    for (scope_var, scope_group) in scope_groups {
+        apply_scope_group(
+            main_scope,
+            scope_var,
+            scope_group,
+            &in_scope,
+            &mut nodes,
+            table,
+            unifier,
+            level,
+        )?;
+    }
+
+    for assignment in ungrouped {
+        nodes.push(
+            ScopedExprToNode {
+                table,
+                unifier,
+                scope_var: Some(assignment.scope_var),
+                level,
+            }
+            .scoped_expr_to_node(assignment.expr, &in_scope, main_scope)?,
+        );
     }
 
     Ok(nodes)
+}
+
+fn apply_scope_group<'m>(
+    main_scope: MainScope,
+    scope_var: ScopeVar,
+    scope_group: ScopeGroup<'m>,
+    in_scope: &VarSet,
+    output: &mut Vec<TypedHirNode<'m>>,
+    table: &mut Table<'m>,
+    unifier: &mut FlatUnifier<'_, 'm>,
+    level: Level,
+) -> UnifierResult<()> {
+    debug!(
+        "{level}apply scope group {scope_var:?} subgroups={}",
+        scope_group.subgroups.len()
+    );
+
+    let scope_map = table.find_scope_map_by_scope_var(scope_var).unwrap();
+    let scope_var = scope_map.scope.meta().scope_var;
+
+    let mut builder = LevelBuilder::default();
+
+    match scope_map.scope.kind() {
+        flat_scope::Kind::PropVariant(optional, struct_var, property_id) => {
+            let prop_key = (*optional, *struct_var, *property_id);
+            // debug!("{level}lateral introducing {introduced_var}");
+
+            let next_in_scope = &in_scope.union(&scope_group.introducing);
+
+            let mut body = vec![];
+
+            for (introduced_var, subgroup) in scope_group.subgroups {
+                apply_scope_group(
+                    main_scope,
+                    introduced_var,
+                    subgroup,
+                    next_in_scope,
+                    &mut body,
+                    table,
+                    unifier,
+                    level.next(),
+                )?;
+            }
+
+            body.extend(apply_lateral_scope(
+                main_scope,
+                scope_group.assignments,
+                &|| next_in_scope.clone(),
+                table,
+                unifier,
+                level.next(),
+            )?);
+
+            let bindings = table.rel_val_bindings(scope_var);
+            builder.add_prop_variant_scope(prop_key, bindings, body);
+        }
+        other => return Err(unifier_todo(smart_format!("{other:?}"))),
+    }
+
+    output.extend(builder.build(unifier));
+
+    Ok(())
 }
 
 struct ScopedExprToNode<'t, 'u, 'a, 'm> {

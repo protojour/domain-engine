@@ -66,6 +66,86 @@ fn test_unify_basic_struct() {
 }
 
 #[test]
+fn test_unify_deep_structural_map() {
+    let output = test_unify(
+        "
+        (struct ($f)
+            (prop $f S:1:9
+                (#u $a)
+            )
+            (prop $f S:1:10
+                (#u $b)
+            )
+            (prop $f S:1:11
+                (#u
+                    (struct ($g)
+                        (prop $g S:1:12
+                            (#u $c)
+                        )
+                    )
+                )
+            )
+        )
+        ",
+        "
+        (struct ($d)
+            (prop $d S:1:2
+                (#u $a)
+            )
+            (prop $d S:1:6
+                (#u
+                    (struct ($e)
+                        (prop $e S:1:4
+                            (#u $b)
+                        )
+                        (prop $e S:1:5
+                            (#u $c)
+                        )
+                    )
+                )
+            )
+        )
+        ",
+    );
+    let expected = indoc! {"
+        |$f| (struct ($d)
+            (match-prop $f S:1:9
+                (($_ $a)
+                    (prop $d S:1:2
+                        (#u $a)
+                    )
+                )
+            )
+            (match-prop $f S:1:10
+                (($_ $b)
+                    (match-prop $f S:1:11
+                        (($_ $g)
+                            (match-prop $g S:1:12
+                                (($_ $c)
+                                    (prop $d S:1:6
+                                        (#u
+                                            (struct ($e)
+                                                (prop $e S:1:4
+                                                    (#u $b)
+                                                )
+                                                (prop $e S:1:5
+                                                    (#u $c)
+                                                )
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )"
+    };
+    assert_eq!(expected, output);
+}
+
+#[test]
 fn test_unify_two_prop_struct() {
     let output = test_unify(
         "

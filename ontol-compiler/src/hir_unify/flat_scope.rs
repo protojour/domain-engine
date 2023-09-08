@@ -45,7 +45,7 @@ impl<'m> Display for ScopeNode<'m> {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub struct ScopeVar(pub ontol_hir::Var);
 
 #[derive(Clone)]

@@ -167,6 +167,27 @@ impl<'m> Table<'m> {
             })
     }
 
+    pub fn find_upstream_data_point(&self, scope_var: ScopeVar) -> Option<&ScopeMap<'m>> {
+        let mut scope_map = self.find_scope_map_by_scope_var(scope_var)?;
+
+        loop {
+            let Some(dep) = scope_map.scope.meta().deps.iter().next() else {
+                return None;
+            };
+
+            let next_scope_map = self.find_scope_map_by_scope_var(ScopeVar(dep))?;
+
+            match next_scope_map.scope.kind() {
+                flat_scope::Kind::PropVariant(..) => {
+                    return Some(next_scope_map);
+                }
+                _ => {}
+            }
+
+            scope_map = next_scope_map;
+        }
+    }
+
     pub fn find_scope_var_child(&self, scope_var: ScopeVar) -> Option<&flat_scope::ScopeNode<'m>> {
         let indexes = self.dependees(Some(scope_var));
         if indexes.len() > 1 {
