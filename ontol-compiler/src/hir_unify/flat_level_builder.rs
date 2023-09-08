@@ -9,15 +9,15 @@ use crate::{
 use super::{flat_scope::ScopeVar, flat_unifier::FlatUnifier, flat_unifier_table::Table};
 
 #[derive(Default)]
-pub(super) struct MergedMatchArms<'m> {
-    optional: ontol_hir::Optional,
-    match_arms: Vec<ontol_hir::PropMatchArm<'m, TypedHir>>,
-}
-
-#[derive(Default)]
 pub(super) struct LevelBuilder<'m> {
     pub output: Vec<TypedHirNode<'m>>,
     merged_match_arms_table: IndexMap<(ontol_hir::Var, PropertyId), MergedMatchArms<'m>>,
+}
+
+#[derive(Default)]
+pub(super) struct MergedMatchArms<'m> {
+    optional: ontol_hir::Optional,
+    match_arms: Vec<ontol_hir::PropMatchArm<'m, TypedHir>>,
 }
 
 impl<'m> LevelBuilder<'m> {

@@ -19,7 +19,7 @@ use super::{
     expr,
     flat_level_builder::LevelBuilder,
     flat_scope::{self, OutputVar, ScopeVar},
-    flat_unifier_table::{Assignment, ExprSelector, Table},
+    flat_unifier_table::{Assignment, ExprSelector, ScopedAssignment, Table},
     unifier::UnifiedNode,
     UnifierError, UnifierResult, VarSet,
 };
@@ -414,9 +414,9 @@ fn unify_scope_structural<'m>(
     table: &mut Table<'m>,
     unifier: &mut FlatUnifier<'_, 'm>,
 ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
-    debug!("unify scope structural {selector:?}");
-
     let indexes = table.dependees(Some(parent_scope_var));
+
+    // debug!("unify scope structural {selector:?} parent={parent_scope_var:?} indexes={indexes:?}");
 
     let mut builder = LevelBuilder::default();
 
@@ -430,7 +430,8 @@ fn unify_scope_structural<'m>(
             | flat_scope::Kind::Struct
             | flat_scope::Kind::Var => {
                 builder.output.extend(apply_lateral_scope(
-                    std::mem::take(&mut scope_map.assignments),
+                    parent_scope_var,
+                    scope_map.take_assignments(),
                     &|| in_scope.clone(),
                     ExprContext::Value,
                     table,
@@ -452,8 +453,8 @@ fn unify_scope_structural<'m>(
                 let inner_scope = in_scope.union(&scope_map.scope.meta().pub_vars);
 
                 body.extend(apply_lateral_scope(
-                    // scope_map.select_assignments(selector),
-                    std::mem::take(&mut scope_map.assignments),
+                    parent_scope_var,
+                    scope_map.select_assignments(selector),
                     &|| inner_scope.clone(),
                     ExprContext::Value,
                     table,
@@ -471,18 +472,18 @@ fn unify_scope_structural<'m>(
                 builder.add_prop_variant_scope(scope_var, prop_key, body, table);
             }
             flat_scope::Kind::SeqPropVariant(
-                label,
+                _label,
                 _output_var,
                 optional,
                 prop_struct_var,
                 property_id,
             ) => {
-                let label = *label;
                 let prop_key = (*optional, *prop_struct_var, *property_id);
                 let mut body = vec![];
                 let inner_scope = in_scope.union(&scope_map.scope.meta().pub_vars);
 
                 body.extend(apply_lateral_scope(
+                    parent_scope_var,
                     scope_map.select_assignments(selector),
                     &|| inner_scope.clone(),
                     ExprContext::Value,
@@ -504,10 +505,11 @@ fn unify_scope_structural<'m>(
                 if in_scope.contains(output_var.0) {
                     let label = *label;
                     let output_var = *output_var;
-                    let assignments = std::mem::take(&mut scope_map.assignments);
+                    let assignments = scope_map.take_assignments();
                     let rel_val_bindings = table.rel_val_bindings(scope_var);
 
                     let push_nodes = apply_lateral_scope(
+                        parent_scope_var,
                         assignments,
                         &|| {
                             let mut next_in_scope = in_scope.clone();
@@ -550,7 +552,8 @@ enum ExprContext {
 }
 
 fn apply_lateral_scope<'m>(
-    assignments: Vec<Assignment<'m>>,
+    parent_scope_var: ScopeVar,
+    assignments: Vec<ScopedAssignment<'m>>,
     in_scope_fn: &dyn Fn() -> VarSet,
     context: ExprContext,
     table: &mut Table<'m>,
@@ -562,22 +565,23 @@ fn apply_lateral_scope<'m>(
 
     let in_scope = in_scope_fn();
 
-    let mut scope_groups: FnvHashMap<ontol_hir::Var, Vec<Assignment<'m>>> = Default::default();
+    let mut scope_groups: FnvHashMap<ontol_hir::Var, Vec<ScopedAssignment<'m>>> =
+        Default::default();
     let mut nodes = Vec::with_capacity(assignments.len());
 
     for assignment in assignments {
-        debug!(
-            "assignment free_vars: {:?} in_scope: {:?}",
-            assignment.expr.meta().free_vars,
-            in_scope
-        );
+        // debug!(
+        //     "assignment free_vars: {:?} in_scope: {:?}",
+        //     assignment.expr.meta().free_vars,
+        //     in_scope
+        // );
 
         if assignment.expr.free_vars().0.is_subset(&in_scope.0) {
             nodes.push(
                 ScopedExprToNode {
                     table,
                     unifier,
-                    scope_var: Some(ScopeVar(ontol_hir::Var(0))),
+                    scope_var: Some(assignment.scope_var),
                 }
                 .scoped_expr_to_node(assignment.expr, &in_scope, context)?,
             );
@@ -612,6 +616,7 @@ fn apply_lateral_scope<'m>(
                     let mut body = vec![];
 
                     body.extend(apply_lateral_scope(
+                        parent_scope_var,
                         assignments,
                         &|| in_scope.union_one(introduced_var),
                         context,
@@ -631,7 +636,7 @@ fn apply_lateral_scope<'m>(
                     ScopedExprToNode {
                         table,
                         unifier,
-                        scope_var: Some(ScopeVar(ontol_hir::Var(0))),
+                        scope_var: Some(assignment.scope_var),
                     }
                     .scoped_expr_to_node(
                         assignment.expr,
@@ -730,7 +735,10 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                 let next_in_scope = in_scope.union_one(binder.var);
                 let mut body = vec![];
 
-                debug!("Make struct {:?} in_scope={:?}", binder.var, in_scope);
+                debug!(
+                    "Make struct {} scope_var={:?} in_scope={:?}",
+                    binder.var, self.scope_var, in_scope
+                );
 
                 if let Some(scope_var) = self.scope_var {
                     let scope_map = self
@@ -739,7 +747,7 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                         // .find_scope_map_containing_expr_struct(binder.var)
                         .unwrap_or_else(|| {
                             panic!(
-                                "Did not find scope_map containing expr struct {}",
+                                "Did not find scope_map containing expr struct {} scope_var={scope_var:?}",
                                 binder.var
                             );
                         });

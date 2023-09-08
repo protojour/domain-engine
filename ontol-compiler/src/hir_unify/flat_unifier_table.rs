@@ -1,5 +1,3 @@
-use tracing::debug;
-
 use crate::typed_hir::{TypedBinder, TypedHir};
 
 use super::{
@@ -19,15 +17,6 @@ pub(super) struct Table<'m> {
 #[derive(Clone, Copy, Debug)]
 pub enum ExprSelector {
     Struct(ontol_hir::Var),
-}
-
-impl ExprSelector {
-    pub fn is_struct(&self, struct_var: ontol_hir::Var) -> bool {
-        match self {
-            Self::Struct(var) if *var == struct_var => true,
-            _ => false,
-        }
-    }
 }
 
 impl<'m> Table<'m> {
@@ -124,47 +113,6 @@ impl<'m> Table<'m> {
             //     lateral_deps: Default::default(),
             // }
         }
-    }
-
-    pub fn find_scope_map_containing_expr_struct(
-        &self,
-        struct_var: ontol_hir::Var,
-    ) -> Option<&ScopeMap<'m>> {
-        fn contains_struct(expr: &expr::Expr, struct_var: ontol_hir::Var) -> bool {
-            match expr.kind() {
-                expr::Kind::Struct { binder, props, .. } => {
-                    debug!("searching struct {:?}", binder.var);
-                    if binder.var == struct_var {
-                        return true;
-                    }
-                    for prop in props {
-                        match &prop.variant {
-                            expr::PropVariant::Singleton(attr) => {
-                                if contains_struct(&attr.rel, struct_var) {
-                                    return true;
-                                }
-                                if contains_struct(&attr.val, struct_var) {
-                                    return true;
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-                    false
-                }
-                _ => false,
-            }
-        }
-
-        for scope_map in &self.table {
-            for assignment in &scope_map.assignments {
-                if contains_struct(&assignment.expr, struct_var) {
-                    return Some(scope_map);
-                }
-            }
-        }
-
-        None
     }
 
     pub fn find_scope_map_by_scope_var(&self, scope_var: ScopeVar) -> Option<&ScopeMap<'m>> {
@@ -327,7 +275,18 @@ impl<'m> ScopeMap<'m> {
         expressions.into_iter().next()
     }
 
-    pub fn select_assignments(&mut self, selector: ExprSelector) -> Vec<Assignment<'m>> {
+    pub fn take_assignments(&mut self) -> Vec<ScopedAssignment<'m>> {
+        std::mem::take(&mut self.assignments)
+            .into_iter()
+            .map(|assignment| ScopedAssignment {
+                scope_var: self.scope.meta().scope_var,
+                expr: assignment.expr,
+                lateral_deps: assignment.lateral_deps,
+            })
+            .collect()
+    }
+
+    pub fn select_assignments(&mut self, selector: ExprSelector) -> Vec<ScopedAssignment<'m>> {
         let (filtered, retained) =
             std::mem::take(&mut self.assignments)
                 .into_iter()
@@ -339,12 +298,27 @@ impl<'m> ScopeMap<'m> {
                 });
         self.assignments = retained;
         filtered
+            .into_iter()
+            .map(|assignment| ScopedAssignment {
+                scope_var: self.scope.meta().scope_var,
+                expr: assignment.expr,
+                lateral_deps: assignment.lateral_deps,
+            })
+            .collect()
     }
 }
 
 #[derive(Debug)]
 pub(super) struct Assignment<'m> {
     pub expr: expr::Expr<'m>,
+    pub lateral_deps: VarSet,
+}
+
+#[derive(Debug)]
+pub(super) struct ScopedAssignment<'m> {
+    pub scope_var: ScopeVar,
+    pub expr: expr::Expr<'m>,
+    #[allow(unused)]
     pub lateral_deps: VarSet,
 }
 

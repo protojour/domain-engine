@@ -448,9 +448,9 @@ fn test_unify_seq_prop_deep() {
                                                 ((seq $g)
                                                     (prop $e O:1:1
                                                         (#u
-                                                            (sequence ($i)
+                                                            (sequence ($k)
                                                                 (for-each $g ($_ $a)
-                                                                    (seq-push $i #u (map $a))
+                                                                    (seq-push $k #u (map $a))
                                                                 )
                                                             )
                                                         )
@@ -479,12 +479,12 @@ fn test_unify_seq_prop_merge_rel_and_val_zwizzle() {
                 (seq (@f)
                     (iter
                         (struct ($g)
-                            (prop $c S:1:0 (#u $a))
-                            (prop $c S:1:0 (#u $b))
+                            (prop $g S:1:0 (#u $a))
+                            (prop $g S:1:1 (#u $b))
                         )
                         (struct ($h)
-                            (prop $d S:1:1 (#u $c))
-                            (prop $d S:1:1 (#u $d))
+                            (prop $h S:2:0 (#u $c))
+                            (prop $h S:2:1 (#u $d))
                         )
                     )
                 )
@@ -497,11 +497,11 @@ fn test_unify_seq_prop_merge_rel_and_val_zwizzle() {
                     (iter
                         (struct ($j)
                             (prop $j O:1:0 (#u $a))
-                            (prop $j O:1:0 (#u $c))
+                            (prop $j O:1:1 (#u $c))
                         )
                         (struct ($k)
-                            (prop $k O:1:1 (#u $b))
-                            (prop $k O:1:1 (#u $d))
+                            (prop $k O:2:0 (#u $b))
+                            (prop $k O:2:1 (#u $d))
                         )
                     )
                 )
@@ -516,14 +516,30 @@ fn test_unify_seq_prop_merge_rel_and_val_zwizzle() {
                         (#u
                             (sequence ($l)
                                 (for-each $f ($g $h)
-                                    (seq-push $h
-                                        (struct ($j)
-                                            (prop $j O:1:0 (#u $a))
-                                            (prop $j O:1:0 (#u $c))
-                                        )
-                                        (struct ($g)
-                                            (prop $g O:1:0 (#u $a))
-                                            (prop $g O:1:1 (#u $b))
+                                    (match-prop $g S:1:0
+                                        (($_ $a)
+                                            (match-prop $g S:1:1
+                                                (($_ $b)
+                                                    (match-prop $h S:2:0
+                                                        (($_ $c)
+                                                            (match-prop $h S:2:1
+                                                                (($_ $d)
+                                                                    (seq-push $l
+                                                                        (struct ($j)
+                                                                            (prop $j O:1:0 (#u $a))
+                                                                            (prop $j O:1:1 (#u $c))
+                                                                        )
+                                                                        (struct ($k)
+                                                                            (prop $k O:2:0 (#u $b))
+                                                                            (prop $k O:2:1 (#u $d))
+                                                                        )
+                                                                    )
+                                                                )
+                                                            )
+                                                        )
+                                                    )
+                                                )
+                                            )
                                         )
                                     )
                                 )
@@ -798,9 +814,6 @@ fn test_unify_opt_rel_and_val_struct_merge1() {
                             )
                         )
                     )
-                    (match-prop $e S:1:1
-                        (($_ $b))
-                    )
                 )
                 (())
             )
@@ -975,9 +988,9 @@ mod unify_seq_scope_escape_1 {
                                 ((seq $a)
                                     (prop $e O:1:1
                                         (#u
-                                            (sequence ($f)
+                                            (sequence ($g)
                                                 (for-each $a ($_ $b)
-                                                    (seq-push $f #u $b)
+                                                    (seq-push $g #u $b)
                                                 )
                                             )
                                         )
@@ -996,10 +1009,6 @@ mod unify_seq_scope_escape_1 {
     }
 
     #[test]
-    // BUG: property scopes has to be refactored.
-    // Probably need to flatten cross-struct non-sequence properties before running `dep_tree`,
-    // then re-build hierarchy after.
-    #[should_panic = "not yet implemented"]
     fn backward() {
         let output = test_unify(ARMS.1, ARMS.0);
         let expected = indoc! {"
@@ -1010,9 +1019,9 @@ mod unify_seq_scope_escape_1 {
                             ((seq $a)
                                 (prop $c S:0:1
                                     (#u
-                                        (sequence ($f)
+                                        (sequence ($i)
                                             (for-each $a ($_ $b)
-                                                (seq-push $f #u $b)
+                                                (seq-push $i #u $b)
                                             )
                                         )
                                     )
@@ -1024,8 +1033,7 @@ mod unify_seq_scope_escape_1 {
                 (prop $c S:0:0
                     (#u #u)
                 )
-            )
-        "
+            )"
         };
         assert_eq!(expected, output);
     }
@@ -1088,27 +1096,27 @@ mod unify_seq_scope_escape_2 {
                                 ((seq $c)
                                     (prop $h O:1:1
                                         (#u
-                                            (sequence ($j)
+                                            (sequence ($l)
                                                 (for-each $c ($_ $d)
-                                                    (seq-push $j #u $d)
+                                                    (seq-push $l #u $d)
                                                 )
                                             )
                                         )
                                     )
                                 )
                             )
-                            (match-prop $e S:0:0
-                                (($_ $f)
-                                    (prop $h O:1:0
-                                        (#u
-                                            (struct ($i)
+                            (prop $h O:1:0
+                                (#u
+                                    (struct ($i)
+                                        (match-prop $e S:0:0
+                                            (($_ $f)
                                                 (match-prop $f S:1:0
                                                     ((seq $a)
                                                         (prop $i O:2:0
                                                             (#u
-                                                                (sequence ($k)
+                                                                (sequence ($o)
                                                                     (for-each $a ($_ $b)
-                                                                        (seq-push $k #u $b)
+                                                                        (seq-push $o #u $b)
                                                                     )
                                                                 )
                                                             )

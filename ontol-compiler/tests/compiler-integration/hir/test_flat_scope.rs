@@ -126,14 +126,14 @@ fn test_flat_seq() {
     let expected = indoc! {
         "
         $b: {} - Struct {}
-        $f: {$b} - SeqPropVariant(opt=f, Var(b), S:0:0) {$f}
-        $h: {$f} - IterElement {}
-        $i: {$h} - PropValue {}
-        $c: {$i} - Struct {}
-        $g: {$c} - SeqPropVariant(opt=f, Var(c), S:1:1) {$g}
-        $j: {$g} - IterElement {}
-        $k: {$j} - PropValue {$a}
-        $a: {$k} - Var {$a}
+        $f: {$b} - SeqPropVariant(TypedLabel { label: Label(f), ty: Error }, OutputVar(Var(h)), opt=f, Var(b), S:0:0) {$f}
+        $i: {$f} - IterElement(Label(f), OutputVar(Var(h))) {}
+        $j: {$i} - PropValue {}
+        $c: {$j} - Struct {}
+        $g: {$c} - SeqPropVariant(TypedLabel { label: Label(g), ty: Error }, OutputVar(Var(k)), opt=f, Var(c), S:1:1) {$g}
+        $l: {$g} - IterElement(Label(g), OutputVar(Var(k))) {}
+        $m: {$l} - PropValue {$a}
+        $a: {$m} - Var {$a}
         "
     };
     assert_eq!(expected, output);
@@ -153,14 +153,14 @@ fn test_flat_seq_mix() {
     let expected = indoc! {
         "
         $c: {} - Struct {}
-        $d: {$c} - SeqPropVariant(TypedLabel { label: Label(d), ty: Error }, opt=f, Var(c), S:1:1) {$a, $c, $d}
-        $e: {$d} - PropValue {$a}
-        $f: {$d} - IterElement {}
-        $g: {$f} - PropValue {$b}
-        $h: {$d} - PropValue {$c}
-        $a: {$e} - Var {$a}
-        $b: {$g} - Var {$b}
-        $c: {$h} - Var {$c}
+        $d: {$c} - SeqPropVariant(TypedLabel { label: Label(d), ty: Error }, OutputVar(Var(e)), opt=f, Var(c), S:1:1) {$a, $c, $d}
+        $f: {$d} - PropValue {$a}
+        $g: {$d} - IterElement(Label(d), OutputVar(Var(e))) {}
+        $h: {$g} - PropValue {$b}
+        $i: {$d} - PropValue {$c}
+        $a: {$f} - Var {$a}
+        $b: {$h} - Var {$b}
+        $c: {$i} - Var {$c}
         "
     };
     assert_eq!(expected, output);
