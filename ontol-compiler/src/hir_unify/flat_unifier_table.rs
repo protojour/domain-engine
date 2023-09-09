@@ -61,10 +61,10 @@ impl<'m> Table<'m> {
 
         // Note: Reverse search.
         for (index, scope_map) in self.table.iter().enumerate().rev() {
-            let scope_pub_vars = &scope_map.scope.meta().pub_vars;
+            let scope_defs = &scope_map.scope.meta().defs;
 
             // quick early check
-            if scope_pub_vars.0.is_empty() {
+            if scope_defs.0.is_empty() {
                 continue;
             }
 
@@ -80,20 +80,18 @@ impl<'m> Table<'m> {
             }
 
             // Only consider candidates that introduces the scope
-            if scope_pub_vars.0.intersection(&free_vars.0).next().is_none() {
+            if scope_defs.0.intersection(&free_vars.0).next().is_none() {
                 continue;
             }
 
             // If the candidate is only introducing variables that we've
             // already seen, this is not specific enough. The search is over..
-            if !observed_variables.0.is_empty()
-                && scope_pub_vars.0.is_superset(&observed_variables.0)
-            {
+            if !observed_variables.0.is_empty() && scope_defs.0.is_superset(&observed_variables.0) {
                 debug!("    END at {:?}", scope_map.scope.meta().scope_var);
                 break;
             }
 
-            observed_variables.union_with(scope_pub_vars);
+            observed_variables.union_with(scope_defs);
 
             debug!("    candidate: {:?}", scope_map.scope.meta().scope_var);
 
@@ -104,12 +102,7 @@ impl<'m> Table<'m> {
 
         if let Some(index) = tmp_candidate {
             let scope_map = self.scope_map_mut(index);
-            let extra_deps = VarSet(
-                free_vars
-                    .0
-                    .difference(&scope_map.scope.1.pub_vars.0)
-                    .collect(),
-            );
+            let extra_deps = VarSet(free_vars.0.difference(&scope_map.scope.1.defs.0).collect());
 
             Some(AssignmentSlot {
                 scope_map,
@@ -161,7 +154,7 @@ impl<'m> Table<'m> {
             .enumerate()
             .find_map(|(index, assignment)| {
                 if matches!(assignment.scope.kind(), flat_scope::Kind::PropVariant(..)) {
-                    if assignment.scope.meta().pub_vars.contains(var) {
+                    if assignment.scope.meta().defs.contains(var) {
                         Some(index)
                     } else {
                         None

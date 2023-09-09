@@ -15,7 +15,7 @@ fn test_flat_basic_struct1() {
     let expected = indoc! {
         "
         $a: {} - Struct {}
-        $c: {$a} - PropVariant(opt=f, Var(a), S:0:0) {$b}
+        $c: {$a} - PropVariant(d=0, opt=f, Var(a), S:0:0) {$b}
         $d: {$c} - PropValue {$b}
         $b: {$d} - Var {$b}
         "
@@ -35,7 +35,7 @@ fn test_flat_arithmetic_prop() {
     let expected = indoc! {
         "
         $a: {} - Struct {}
-        $c: {$a} - PropVariant(opt=f, Var(a), S:0:0) {$b}
+        $c: {$a} - PropVariant(d=0, opt=f, Var(a), S:0:0) {$b}
         $d: {$c} - PropValue {$b}
         $e: {$d} - Call(Sub) {$b}
         $b: {$e} - Var {$b}
@@ -61,9 +61,9 @@ fn test_flat_arithmetic_prop_dependency() {
     let expected = indoc! {
         "
         $a: {} - Struct {}
-        $d: {$a} - PropVariant(opt=f, Var(a), O:0:0) {$b, $c}
+        $d: {$a} - PropVariant(d=0, opt=f, Var(a), O:0:0) {$b, $c}
         $e: {$d} - PropValue {$b, $c}
-        $f: {$a} - PropVariant(opt=f, Var(a), O:0:1) {$b}
+        $f: {$a} - PropVariant(d=0, opt=f, Var(a), O:0:1) {$b}
         $g: {$f} - PropValue {$b}
         $h: {$e} - Call(Add) {$b, $c}
         $i: {$g} - Call(Add) {$b}
@@ -92,7 +92,7 @@ fn test_flat_regex() {
     let expected = indoc! {
         "
         $a: {} - Struct {}
-        $c: {$a} - PropVariant(opt=f, Var(a), S:0:0) {$b}
+        $c: {$a} - PropVariant(d=0, opt=f, Var(a), S:0:0) {$b}
         $d: {$c} - PropValue {$b}
         $e: {$d} - Regex(def@0:0) {$b}
         $f: {$e} - RegexAlternation {$b}

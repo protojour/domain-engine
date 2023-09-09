@@ -37,10 +37,11 @@ impl<'m> ScopeNode<'m> {
 
 impl<'m> Display for ScopeNode<'m> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let (kind, meta) = (self.kind(), self.meta());
         write!(
             f,
             "{}: {:?} - {:?} {:?}",
-            self.1.scope_var.0, self.1.deps, self.0, self.1.pub_vars,
+            meta.scope_var.0, meta.deps, kind, meta.defs,
         )
     }
 }
@@ -52,12 +53,29 @@ pub struct ScopeVar(pub ontol_hir::Var);
 pub struct Meta<'m> {
     /// The specific variable introduced by the node
     pub scope_var: ScopeVar,
-    /// All _visible_ variables dominated by this node
-    pub pub_vars: VarSet,
     /// Variables that are dependencies of this node
     pub deps: VarSet,
+    /// All free vars under this node
+    pub free_vars: VarSet,
+    /// Vars defined atomically by this node
+    pub defs: VarSet,
 
     pub hir_meta: typed_hir::Meta<'m>,
+}
+
+#[derive(Clone, Copy)]
+pub struct PropDepth(pub u32);
+
+impl PropDepth {
+    pub fn next(self) -> Self {
+        Self(self.0 + 1)
+    }
+}
+
+impl Debug for PropDepth {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "d={}", self.0)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -65,7 +83,7 @@ pub enum Kind<'m> {
     Var,
     Const(Const<'m>),
     Struct,
-    PropVariant(ontol_hir::Optional, ontol_hir::Var, PropertyId),
+    PropVariant(PropDepth, ontol_hir::Optional, ontol_hir::Var, PropertyId),
     PropRelParam,
     PropValue,
     SeqPropVariant(

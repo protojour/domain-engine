@@ -68,7 +68,8 @@ impl<'m> Kind<'m> {
             Self::Unit => "Unit".to_string(),
             Self::Struct { binder, .. } => format!("Struct({})", binder.var),
             Self::Prop(prop) => format!(
-                "Prop({}{}[{}])",
+                "Prop{}({}{}[{}])",
+                if prop.optional.0 { "?" } else { "" },
                 if prop.seq.is_some() { "seq " } else { "" },
                 prop.struct_var,
                 prop.prop_id

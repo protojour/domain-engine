@@ -6,12 +6,13 @@ use crate::{
 };
 
 use super::{
-    flat_scope::{self, FlatScope, OutputVar, ScopeNode, ScopeVar},
+    flat_scope::{self, FlatScope, OutputVar, PropDepth, ScopeNode, ScopeVar},
     UnifierError, UnifierResult, VarSet,
 };
 
 struct NextNode<'a, 'm> {
     node: &'a TypedHirNode<'m>,
+    prop_depth: PropDepth,
     deps: VarSet,
 }
 
@@ -41,6 +42,7 @@ impl<'m> FlatScopeBuilder<'m> {
     pub fn build_flat_scope(&mut self, node: &TypedHirNode<'m>) -> UnifierResult<FlatScope<'m>> {
         let mut node_set = vec![NextNode {
             node,
+            prop_depth: PropDepth(0),
             deps: Default::default(),
         }];
         let mut next_node_set = vec![];
@@ -54,7 +56,7 @@ impl<'m> FlatScopeBuilder<'m> {
             std::mem::swap(&mut node_set, &mut next_node_set);
         }
 
-        propagate_pub_vars(&mut self.scope_nodes);
+        propagate_vars(&mut self.scope_nodes);
 
         Ok(FlatScope {
             scope_nodes: std::mem::take(&mut self.scope_nodes),
@@ -63,7 +65,11 @@ impl<'m> FlatScopeBuilder<'m> {
 
     fn process<'a>(
         &mut self,
-        NextNode { node, mut deps }: NextNode<'a, 'm>,
+        NextNode {
+            node,
+            mut deps,
+            prop_depth,
+        }: NextNode<'a, 'm>,
         next_node_set: &mut Vec<NextNode<'a, 'm>>,
     ) -> Result<(), UnifierError> {
         match node.kind() {
@@ -77,7 +83,8 @@ impl<'m> FlatScopeBuilder<'m> {
                     flat_scope::Kind::Const(flat_scope::Const(node.kind().clone())),
                     flat_scope::Meta {
                         scope_var: const_var,
-                        pub_vars: Default::default(),
+                        free_vars: Default::default(),
+                        defs: Default::default(),
                         deps,
                         hir_meta: *node.meta(),
                     },
@@ -88,19 +95,25 @@ impl<'m> FlatScopeBuilder<'m> {
                     flat_scope::Kind::Var,
                     flat_scope::Meta {
                         scope_var: ScopeVar(*var),
-                        pub_vars: [*var].into(),
+                        free_vars: [*var].into(),
+                        defs: [*var].into(),
                         deps,
                         hir_meta: *node.meta(),
                     },
                 ));
             }
-            ontol_hir::Kind::Map(inner) => next_node_set.push(NextNode { node: inner, deps }),
+            ontol_hir::Kind::Map(inner) => next_node_set.push(NextNode {
+                node: inner,
+                deps,
+                prop_depth,
+            }),
             ontol_hir::Kind::Struct(binder, _flags, nodes) => {
                 self.scope_nodes.push(ScopeNode(
                     flat_scope::Kind::Struct,
                     flat_scope::Meta {
                         scope_var: ScopeVar(binder.var),
-                        pub_vars: Default::default(),
+                        free_vars: Default::default(),
+                        defs: Default::default(),
                         deps,
                         hir_meta: *node.meta(),
                     },
@@ -108,6 +121,7 @@ impl<'m> FlatScopeBuilder<'m> {
                 for node in nodes {
                     next_node_set.push(NextNode {
                         node,
+                        prop_depth,
                         deps: [].into(),
                     });
                 }
@@ -120,10 +134,16 @@ impl<'m> FlatScopeBuilder<'m> {
                         ontol_hir::PropVariant::Singleton(attr) => {
                             let variant_var = self.var_allocator.alloc();
                             self.scope_nodes.push(ScopeNode(
-                                flat_scope::Kind::PropVariant(*optional, *struct_var, *property_id),
+                                flat_scope::Kind::PropVariant(
+                                    prop_depth,
+                                    *optional,
+                                    *struct_var,
+                                    *property_id,
+                                ),
                                 flat_scope::Meta {
                                     scope_var: ScopeVar(variant_var),
-                                    pub_vars: Default::default(),
+                                    free_vars: Default::default(),
+                                    defs: Default::default(),
                                     deps: deps.clone(),
                                     hir_meta: *node.meta(),
                                 },
@@ -131,6 +151,7 @@ impl<'m> FlatScopeBuilder<'m> {
                             self.process_attribute(
                                 &attr.rel,
                                 &attr.val,
+                                prop_depth.next(),
                                 [variant_var].into(),
                                 next_node_set,
                             );
@@ -153,7 +174,8 @@ impl<'m> FlatScopeBuilder<'m> {
                                 ),
                                 flat_scope::Meta {
                                     scope_var: ScopeVar(label_var),
-                                    pub_vars: [label_var].into(),
+                                    free_vars: Default::default(),
+                                    defs: [label_var].into(),
                                     deps: deps.clone(),
                                     hir_meta: *node.meta(),
                                 },
@@ -165,7 +187,8 @@ impl<'m> FlatScopeBuilder<'m> {
                                         flat_scope::Kind::IterElement(label.label, output_var),
                                         flat_scope::Meta {
                                             scope_var: iter_var,
-                                            pub_vars: Default::default(),
+                                            free_vars: Default::default(),
+                                            defs: Default::default(),
                                             deps: [label_var].into(),
                                             hir_meta: *node.meta(),
                                         },
@@ -177,6 +200,7 @@ impl<'m> FlatScopeBuilder<'m> {
                                 self.process_attribute(
                                     &element.attribute.rel,
                                     &element.attribute.val,
+                                    prop_depth.next(),
                                     attr_deps,
                                     next_node_set,
                                 );
@@ -192,7 +216,8 @@ impl<'m> FlatScopeBuilder<'m> {
                         flat_scope::Kind::Const(flat_scope::Const(node.kind().clone())),
                         flat_scope::Meta {
                             scope_var: ScopeVar(call_var),
-                            pub_vars: Default::default(),
+                            free_vars: Default::default(),
+                            defs: Default::default(),
                             deps,
                             hir_meta: *node.meta(),
                         },
@@ -202,7 +227,8 @@ impl<'m> FlatScopeBuilder<'m> {
                         flat_scope::Kind::Call(*proc),
                         flat_scope::Meta {
                             scope_var: ScopeVar(call_var),
-                            pub_vars: Default::default(),
+                            free_vars: Default::default(),
+                            defs: Default::default(),
                             deps,
                             hir_meta: *node.meta(),
                         },
@@ -210,6 +236,7 @@ impl<'m> FlatScopeBuilder<'m> {
                     for arg in args {
                         next_node_set.push(NextNode {
                             node: arg,
+                            prop_depth,
                             deps: [call_var].into(),
                         });
                     }
@@ -221,7 +248,8 @@ impl<'m> FlatScopeBuilder<'m> {
                     flat_scope::Kind::Regex(*regex_def_id),
                     flat_scope::Meta {
                         scope_var: ScopeVar(regex_var),
-                        pub_vars: Default::default(),
+                        free_vars: Default::default(),
+                        defs: Default::default(),
                         deps,
                         hir_meta: *node.meta(),
                     },
@@ -231,7 +259,8 @@ impl<'m> FlatScopeBuilder<'m> {
                     flat_scope::Kind::RegexAlternation,
                     flat_scope::Meta {
                         scope_var: ScopeVar(alternation_var),
-                        pub_vars: Default::default(),
+                        free_vars: Default::default(),
+                        defs: Default::default(),
                         deps: [regex_var].into(),
                         hir_meta: *node.meta(),
                     },
@@ -241,7 +270,8 @@ impl<'m> FlatScopeBuilder<'m> {
                         flat_scope::Kind::RegexCapture(capture_group.index),
                         flat_scope::Meta {
                             scope_var: ScopeVar(capture_group.binder.var),
-                            pub_vars: [capture_group.binder.var].into(),
+                            free_vars: Default::default(),
+                            defs: [capture_group.binder.var].into(),
                             deps: [alternation_var].into(),
                             hir_meta: *node.meta(),
                         },
@@ -259,6 +289,7 @@ impl<'m> FlatScopeBuilder<'m> {
         &mut self,
         rel: &'a TypedHirNode<'m>,
         val: &'a TypedHirNode<'m>,
+        prop_depth: PropDepth,
         deps: VarSet,
         next_node_set: &mut Vec<NextNode<'a, 'm>>,
     ) {
@@ -268,13 +299,15 @@ impl<'m> FlatScopeBuilder<'m> {
                 flat_scope::Kind::PropRelParam,
                 flat_scope::Meta {
                     scope_var: ScopeVar(rel_var),
-                    pub_vars: Default::default(),
+                    free_vars: Default::default(),
+                    defs: Default::default(),
                     deps: deps.clone(),
                     hir_meta: *rel.meta(),
                 },
             ));
             next_node_set.push(NextNode {
                 node: rel,
+                prop_depth,
                 deps: [rel_var].into(),
             });
         }
@@ -284,13 +317,15 @@ impl<'m> FlatScopeBuilder<'m> {
                 flat_scope::Kind::PropValue,
                 flat_scope::Meta {
                     scope_var: ScopeVar(val_var),
-                    pub_vars: Default::default(),
+                    free_vars: Default::default(),
+                    defs: Default::default(),
                     deps,
                     hir_meta: *val.meta(),
                 },
             ));
             next_node_set.push(NextNode {
                 node: val,
+                prop_depth,
                 deps: [val_var].into(),
             });
         }
@@ -316,9 +351,10 @@ fn is_const(node: &TypedHirNode) -> bool {
     !checker.has_var
 }
 
-fn propagate_pub_vars(scope_nodes: &mut Vec<ScopeNode>) {
+fn propagate_vars(scope_nodes: &mut Vec<ScopeNode>) {
     struct Propagation {
-        pub_vars: VarSet,
+        free_vars: VarSet,
+        defs: VarSet,
         target: VarSet,
     }
 
@@ -330,7 +366,8 @@ fn propagate_pub_vars(scope_nodes: &mut Vec<ScopeNode>) {
         match node.kind() {
             flat_scope::Kind::Var | flat_scope::Kind::RegexCapture(_) => {
                 propagations.push(Propagation {
-                    pub_vars: node.meta().pub_vars.clone(),
+                    free_vars: node.meta().free_vars.clone(),
+                    defs: node.meta().defs.clone(),
                     target: node.meta().deps.clone(),
                 });
                 target_union.union_with(&node.meta().deps);
@@ -354,26 +391,49 @@ fn propagate_pub_vars(scope_nodes: &mut Vec<ScopeNode>) {
 
             if target_union.contains(scope_node.meta().scope_var.0) {
                 for propagation in &propagations {
+                    scope_node.1.free_vars.union_with(&propagation.free_vars);
+
                     if propagation.target.contains(scope_node.meta().scope_var.0)
                         && !matches!(scope_node.kind(), flat_scope::Kind::IterElement(..))
                     {
-                        scope_node.1.pub_vars.union_with(&propagation.pub_vars);
+                        scope_node.1.defs.union_with(&propagation.defs);
                     }
                 }
 
-                // Don't propagate variables across data points such as prop variants
-                if false
-                    || !matches!(
+                if true {
+                    let next_defs: VarSet = if matches!(
                         scope_node.kind(),
                         flat_scope::Kind::PropVariant(..) | flat_scope::Kind::SeqPropVariant(..)
-                    )
-                {
+                    ) {
+                        Default::default()
+                    } else {
+                        scope_node.meta().defs.clone()
+                    };
+
                     let meta = scope_node.meta();
                     next_propagations.push(Propagation {
-                        pub_vars: meta.pub_vars.clone(),
+                        free_vars: meta.free_vars.clone(),
+                        defs: next_defs,
                         target: meta.deps.clone(),
                     });
                     next_target_union.union_with(&meta.deps);
+                } else {
+                    // Don't propagate variables across data points such as prop variants
+                    if true
+                        || !matches!(
+                            scope_node.kind(),
+                            flat_scope::Kind::PropVariant(..)
+                                | flat_scope::Kind::SeqPropVariant(..)
+                        )
+                    {
+                        let meta = scope_node.meta();
+                        next_propagations.push(Propagation {
+                            free_vars: meta.free_vars.clone(),
+                            defs: meta.defs.clone(),
+                            target: meta.deps.clone(),
+                        });
+                        next_target_union.union_with(&meta.deps);
+                    }
                 }
             } else {
                 next_candidates.push(index);

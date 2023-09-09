@@ -495,11 +495,11 @@ fn unify_scope_structural<'m>(
 
                     next_indexes.extend(table.dependees(Some(scope_var)));
                 }
-                flat_scope::Kind::PropVariant(optional, prop_struct_var, property_id) => {
+                flat_scope::Kind::PropVariant(_, optional, prop_struct_var, property_id) => {
                     let property_id = *property_id;
                     let prop_key = (*optional, *prop_struct_var, property_id);
                     let mut body = vec![];
-                    let inner_scope = in_scope.union(&scope_map.scope.meta().pub_vars);
+                    let inner_scope = in_scope.union(&scope_map.scope.meta().defs);
 
                     let assignments = scope_map.select_assignments(selector);
                     let assignments_len = assignments.len();
@@ -544,7 +544,7 @@ fn unify_scope_structural<'m>(
                     let label = *label;
                     let prop_key = (*optional, *has_default, *prop_struct_var, *property_id);
                     let mut body = vec![];
-                    let inner_scope = in_scope.union(&scope_map.scope.meta().pub_vars);
+                    let inner_scope = in_scope.union(&scope_map.scope.meta().defs);
 
                     body.extend(apply_lateral_scope(
                         main_scope,
@@ -686,7 +686,7 @@ fn apply_lateral_scope<'m>(
             let scope_map = &mut table.find_scope_map_by_scope_var(scope_var).unwrap();
 
             match scope_map.scope.kind() {
-                flat_scope::Kind::PropVariant(_, struct_var, _) => {
+                flat_scope::Kind::PropVariant(_, _, struct_var, _) => {
                     let struct_var = *struct_var;
                     if in_scope.contains(struct_var) {
                         new_scope_groups.insert(scope_var, scope_group);
@@ -760,7 +760,7 @@ fn apply_scope_group<'m>(
     let mut builder = LevelBuilder::default();
 
     match scope_map.scope.kind() {
-        flat_scope::Kind::PropVariant(optional, struct_var, property_id) => {
+        flat_scope::Kind::PropVariant(_, optional, struct_var, property_id) => {
             let prop_key = (*optional, *struct_var, *property_id);
             // debug!("{level}lateral introducing {introduced_var}");
 
