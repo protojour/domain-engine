@@ -232,7 +232,7 @@ impl LanguageServer for Backend {
         let mut state = self.state.write().await;
         state.docs.remove(uri);
         if let Some(src_id) = state.get_sourceid_by_uri(uri) {
-            state.source_map.remove(&src_id);
+            state.srcref.remove(&src_id);
         }
     }
 

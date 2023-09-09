@@ -3,145 +3,146 @@ use lsp_types::{CompletionItem, CompletionItemKind};
 use crate::state::HoverDoc;
 
 /// Get a HoverDoc for ONTOL core keywords, values and types
-pub fn get_ontol_docs(ident: &str) -> HoverDoc {
+pub fn get_ontol_docs(ident: &str) -> Option<HoverDoc> {
     match ident {
-        "use" => HoverDoc::from(
+        "use" => Some(HoverDoc::from(
             "use",
             "#### Use statement\nImports a domain by name, and defines a local namespace.",
-        ),
-        "def" => HoverDoc::from(
+        )),
+        "def" => Some(HoverDoc::from(
             "def",
             "#### Def statement\nDefines a type.",
-        ),
-        "rel" => HoverDoc::from(
+        )),
+        "rel" => Some(HoverDoc::from(
             "rel",
             "#### Relation statement\nDefines relations between types, properties of a type, or properties of a relation."
-        ),
-        "fmt" => HoverDoc::from(
+        )),
+        "fmt" => Some(HoverDoc::from(
             "fmt",
             "#### Format statement\nDescribes a build/match pattern for strings or sequences."
-        ),
-        "map" => HoverDoc::from(
+        )),
+        "map" => Some(HoverDoc::from(
             "map",
             "#### Map statement\nDescribes a map between two types."
-        ),
-        "pub" => HoverDoc::from(
+        )),
+        "pub" => Some(HoverDoc::from(
             "pub",
             "#### Public modifier\nMarks a type as public and importable from other domains.",
-        ),
-        "match" => HoverDoc::from(
+        )),
+        "match" => Some(HoverDoc::from(
             "match",
             "#### Partial modifier\nPartial matching for `map` arm."
-        ),
-        "id" => HoverDoc::from(
+        )),
+        "id" => Some(HoverDoc::from(
             "ontol.id",
             "#### Relation prop\nBinds an identifier to a type, making instances of a type unique entities.",
-        ),
-        "is" => HoverDoc::from(
+        )),
+        "is" => Some(HoverDoc::from(
             "ontol.is",
             "#### Relation prop\nThe subject type takes on all properties of the object type, or binds the subject type to a union.",
-        ),
-        "min" => HoverDoc::from(
+        )),
+        "min" => Some(HoverDoc::from(
             "ontol.min",
             "#### Relation prop\nMinimum value for the subject type.",
-        ),
-        "max" => HoverDoc::from(
+        )),
+        "max" => Some(HoverDoc::from(
             "ontol.max",
             "#### Relation prop\nMaximum value for the subject type.",
-        ),
-        "default" => HoverDoc::from(
+        )),
+        "default" => Some(HoverDoc::from(
             "ontol.default",
             "#### Relation prop\nAssigns a default value to a type or property if none is given.",
-        ),
-        "example" => HoverDoc::from(
+        )),
+        "example" => Some(HoverDoc::from(
             "ontol.example",
             "#### Relation prop\nGives an example value for a type for documentation."
-        ),
-        "gen" => HoverDoc::from(
+        )),
+        "gen" => Some(HoverDoc::from(
             "ontol.gen",
             "#### Relation prop\nUse a generator function.",
-        ),
-        "auto" => HoverDoc::from(
+        )),
+        "auto" => Some(HoverDoc::from(
             "ontol.auto",
             "#### Generator\nAutogenerate value according to type.",
-        ),
-        "create_time" => HoverDoc::from(
+        )),
+        "create_time" => Some(HoverDoc::from(
             "ontol.create_time",
             "#### Generator\nAutogenerate a datetime when instance is created.",
-        ),
-        "update_time" => HoverDoc::from(
+        )),
+        "update_time" => Some(HoverDoc::from(
             "ontol.update_time",
             "#### Generator\nAutogenerate a datetime when instance is updated.",
-        ),
-        "boolean" => HoverDoc::from(
+        )),
+        "boolean" => Some(HoverDoc::from(
             "ontol.boolean",
             "#### Primitive\nBoolean type."
-        ),
-        "true" => HoverDoc::from(
+        )),
+        "true" => Some(HoverDoc::from(
             "ontol.true",
             "#### Primitive\nBoolean `true` value."
-        ),
-        "false" => HoverDoc::from(
+        )),
+        "false" => Some(HoverDoc::from(
             "ontol.false",
             "#### Primitive\nBoolean `false` value."
-        ),
-        "number" => HoverDoc::from(
+        )),
+        "number" => Some(HoverDoc::from(
             "ontol.number",
             "#### Primitive\nAbstract number type.",
-        ),
-        "integer" => HoverDoc::from(
+        )),
+        "integer" => Some(HoverDoc::from(
             "ontol.integer",
             "#### Primitive\nAbstract integer type.",
-        ),
-        "i64" => HoverDoc::from(
+        )),
+        "i64" => Some(HoverDoc::from(
             "ontol.i64",
             "#### Primitive\n64-bit signed integer.",
-        ),
-        "float" => HoverDoc::from(
+        )),
+        "float" => Some(HoverDoc::from(
             "ontol.float",
             "#### Primitive\nAbstract floating point number type.",
-        ),
-        "f64" => HoverDoc::from(
+        )),
+        "f64" => Some(HoverDoc::from(
             "ontol.f64",
             "#### Primitive\n64-bit floating point number.",
-        ),
-        "string" => HoverDoc::from(
+        )),
+        "string" => Some(HoverDoc::from(
             "ontol.string",
             "#### Primitive\nAny UTF-8 string.",
-        ),
-        "datetime" => HoverDoc::from(
+        )),
+        "datetime" => Some(HoverDoc::from(
             "ontol.datetime",
             "#### Primitive\nRFC 3339-formatted datetime string.",
-        ),
-        "date" => HoverDoc::from(
+        )),
+        "date" => Some(HoverDoc::from(
             "ontol.date",
             "#### Primitive\nRFC 3339-formatted date string.",
-        ),
-        "time" => HoverDoc::from(
+        )),
+        "time" => Some(HoverDoc::from(
             "ontol.time",
             "#### Primitive\nRFC 3339-formatted time string.",
-        ),
-        "uuid" => HoverDoc::from(
+        )),
+        "uuid" => Some(HoverDoc::from(
             "ontol.uuid",
             "#### Primitive\nUUID v4 string."
-        ),
-        "regex" => HoverDoc::from(
+        )),
+        "regex" => Some(HoverDoc::from(
             "ontol.regex",
             "#### Primitive\nRegular expression.",
-        ),
-        "." => HoverDoc::from(
+        )),
+        "." => Some(HoverDoc::from(
             ".",
             "#### Self reference\nRefers to the identity of the enclosing scope.",
-        ),
-        "?" => HoverDoc::from(
+        )),
+        "?" => Some(HoverDoc::from(
             "?",
             "#### Optional modifier\nMakes the property optional.",
-        ),
-        ident => HoverDoc::from(
-            ident,
-            "#### Variable\nLocal variable or type reference.",
-        ),
+        )),
+        _ => None,
     }
+}
+
+pub fn get_ontol_var(ident: &str) -> HoverDoc {
+    HoverDoc::from(ident, "#### Variable\nLocal variable or type reference.")
 }
 
 /// Completions for built-in keywords and defs

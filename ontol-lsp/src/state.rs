@@ -1,4 +1,4 @@
-use crate::docs::{get_ontol_docs, RESERVED_WORDS};
+use crate::docs::{get_ontol_docs, get_ontol_var, RESERVED_WORDS};
 use chumsky::prelude::*;
 use lsp_types::{Location, MarkedString, Position, Range, Url};
 use ontol_compiler::{
@@ -27,35 +27,67 @@ use substring::Substring;
 /// Language server state
 #[derive(Clone, Debug, Default)]
 pub struct State {
+    /// Current documents, by uri
     pub docs: HashMap<String, Document>,
-    pub source_map: HashMap<SourceId, String>,
+
+    /// Doc uris indexed by SourceId, as seen in UnifiedCompileErrors
+    pub srcref: HashMap<SourceId, String>,
+
+    /// Precompiled regex
     pub regex: CompiledRegex,
 }
 
 /// A document and its various constituents
 #[derive(Clone, Debug, Default)]
 pub struct Document {
+    /// Full uri as string
     pub uri: String,
+
+    /// Full uri path, no filename
     pub path: String,
+
+    /// Document name, no extension
     pub name: String,
+
+    /// Document text
     pub text: String,
+
+    /// Lexer tokens, low value
     pub tokens: Vec<Spanned<Token>>,
+
+    /// Unique symbols/names in this document
     pub symbols: HashSet<String>,
+
+    /// All AST Statements
     pub statements: Vec<Spanned<Statement>>,
+
+    /// Def Statements indexed by name
     pub defs: HashMap<String, Spanned<DefStatement>>,
+
+    /// Use Statements
     pub imports: Vec<UseStatement>,
+
+    /// Package names by local alias
     pub aliases: HashMap<String, String>,
 }
 
 /// Helper struct for building hover documentation
 #[derive(Clone, Debug, Default)]
 pub struct HoverDoc {
+    /// The "path" of the hovered item
     pub path: String,
+
+    /// A stripped-down definition of the item (use, def, rel and fmt)
     pub signature: String,
+
+    /// Markdown docs from doc comments, if any
     pub docs: String,
+
+    /// Debug output, ignore
     pub(crate) debug: String,
 }
 
+/// Precompiled regex used in building documentation
 #[derive(Clone, Debug)]
 pub struct CompiledRegex {
     pub comments: Regex,
@@ -163,7 +195,7 @@ impl State {
                                 &mut ontol_sources,
                                 &mut source_code_registry,
                             );
-                            self.source_map.insert(package.src.id, request_uri);
+                            self.srcref.insert(package.src.id, request_uri);
                             package_graph_builder.provide_package(package);
                         }
                     }
@@ -179,7 +211,7 @@ impl State {
 
     /// Get Document if given SourceId is known
     pub fn get_doc_by_sourceid(&self, source_id: &SourceId) -> Option<&Document> {
-        match self.source_map.get(source_id) {
+        match self.srcref.get(source_id) {
             Some(uri) => self.docs.get(uri),
             None => None,
         }
@@ -187,7 +219,7 @@ impl State {
 
     /// Get SourceId if source map points to the given uri
     pub fn get_sourceid_by_uri(&self, uri: &str) -> Option<SourceId> {
-        for (key, val) in self.source_map.iter() {
+        for (key, val) in self.srcref.iter() {
             if val.as_str() == uri {
                 return Some(*key);
             }
@@ -227,11 +259,14 @@ impl State {
                     Statement::Rel(stmt) => {
                         let mut rel_loc: Option<Location> = None;
                         if in_range(&stmt.subject.1, &cursor) {
-                            if let Some(Type::Path(path)) = &stmt.subject.0 {
-                                rel_loc = self.get_location_for_path(doc, path);
+                            match &stmt.subject.0 {
+                                Some(Type::Path(path)) => {
+                                    rel_loc = self.get_location_for_path(doc, path);
+                                }
+                                None => return loc,
+                                _ => {}
                             }
-                        }
-                        if in_range(&stmt.object.1, &cursor) {
+                        } else if in_range(&stmt.object.1, &cursor) {
                             if let Some(type_or_pattern) = &stmt.object.0 {
                                 match type_or_pattern {
                                     TypeOrPattern::Type(Type::Path(path)) => {
@@ -259,14 +294,18 @@ impl State {
                         } else {
                             for trans in &stmt.transitions {
                                 if in_range(&trans.1, &cursor) {
-                                    if let Some(Type::Path(path)) = &trans.0 {
-                                        fmt_loc = self.get_location_for_path(doc, path);
+                                    match &trans.0 {
+                                        Some(Type::Path(path)) => {
+                                            fmt_loc = self.get_location_for_path(doc, path);
+                                        }
+                                        None => return loc,
+                                        _ => {}
                                     }
                                 }
                             }
                         }
                         if fmt_loc.is_some() {
-                            return fmt_loc;
+                            loc = fmt_loc;
                         }
                     }
                     Statement::Map(stmt) => {
@@ -356,13 +395,10 @@ impl State {
                                 Some(Type::Path(path)) => {
                                     return self.get_hoverdoc_for_path(doc, path);
                                 }
-                                None => {
-                                    return Some(get_ontol_docs("."));
-                                }
+                                None => return get_ontol_docs("."),
                                 _ => {}
                             }
-                        }
-                        if stmt.object.1.contains(&cursor) {
+                        } else if stmt.object.1.contains(&cursor) {
                             if let Some(type_or_pattern) = &stmt.object.0 {
                                 match type_or_pattern {
                                     TypeOrPattern::Type(Type::Path(path)) => {
@@ -392,9 +428,7 @@ impl State {
                                         Some(Type::Path(path)) => {
                                             return self.get_hoverdoc_for_path(doc, path);
                                         }
-                                        None => {
-                                            return Some(get_ontol_docs("."));
-                                        }
+                                        None => return get_ontol_docs("."),
                                         _ => {}
                                     }
                                 }
@@ -417,8 +451,6 @@ impl State {
                         let first = parse_map_arm(&stmt.first.0 .1);
                         let second = parse_map_arm(&stmt.second.0 .1);
                         hover.path = format!("map {} {}", first, second);
-                        hover.signature.clear();
-                        hover.docs.clear();
                         break;
                     }
                 }
@@ -428,26 +460,31 @@ impl State {
             for (token, range) in doc.tokens.iter() {
                 if range.contains(&cursor) {
                     match token {
+                        Token::Use => return get_ontol_docs("use"),
+                        Token::Def => return get_ontol_docs("def"),
+                        Token::Rel => return get_ontol_docs("rel"),
+                        Token::Fmt => return get_ontol_docs("fmt"),
+                        Token::Map => return get_ontol_docs("map"),
+                        Token::Pub => return get_ontol_docs("pub"),
                         Token::Sigil(sigil) => {
                             if *sigil == '?' {
-                                return Some(get_ontol_docs("?"));
+                                return get_ontol_docs("?");
                             }
                         }
-                        Token::Use => return Some(get_ontol_docs("use")),
-                        Token::Def => return Some(get_ontol_docs("def")),
-                        Token::Rel => return Some(get_ontol_docs("rel")),
-                        Token::Fmt => return Some(get_ontol_docs("fmt")),
-                        Token::Map => return Some(get_ontol_docs("map")),
-                        Token::Pub => return Some(get_ontol_docs("pub")),
                         Token::Sym(ident) => {
-                            if hover.signature.is_empty() && ident != "." {
-                                return Some(get_ontol_docs(ident));
+                            let map = hover.path.starts_with("map");
+                            let sym = get_ontol_docs(ident);
+                            if !map || ident == "match" {
+                                return sym;
+                            } else if map {
+                                return Some(get_ontol_var(ident));
                             }
                         }
                         _ => {}
                     }
                 }
             }
+
             return Some(hover);
         }
         None
@@ -456,7 +493,7 @@ impl State {
     /// Get HoverDoc for Path
     fn get_hoverdoc_for_path(&self, doc: &Document, path: &Path) -> Option<HoverDoc> {
         match path {
-            Path::Ident(ident) => Some(self.get_hoverdoc_for_ident(doc, ident.as_str())),
+            Path::Ident(ident) => self.get_hoverdoc_for_ident(doc, ident.as_str()),
             Path::Path(path) => {
                 let path = path
                     .iter()
@@ -468,14 +505,14 @@ impl State {
     }
 
     /// Get HoverDoc given a local identifier
-    fn get_hoverdoc_for_ident(&self, doc: &Document, ident: &str) -> HoverDoc {
+    fn get_hoverdoc_for_ident(&self, doc: &Document, ident: &str) -> Option<HoverDoc> {
         match doc.defs.get(ident) {
-            Some((stmt, range)) => HoverDoc {
+            Some((stmt, range)) => Some(HoverDoc {
                 path: format!("{}.{}", doc.name, stmt.ident.0),
                 signature: get_signature(&doc.text, range, &self.regex),
                 docs: stmt.docs.join("\n"),
                 ..Default::default()
-            },
+            }),
             None => get_ontol_docs(ident),
         }
     }
@@ -487,7 +524,7 @@ impl State {
                 if let Some(root) = doc.aliases.get(root_alias) {
                     let uri = build_uri(&doc.path, root);
                     if let Some(doc) = self.docs.get(&uri) {
-                        return Some(self.get_hoverdoc_for_ident(doc, ident));
+                        return self.get_hoverdoc_for_ident(doc, ident);
                     }
                 }
             }
