@@ -362,10 +362,12 @@ fn propagate_pub_vars(scope_nodes: &mut Vec<ScopeNode>) {
                 }
 
                 // Don't propagate variables across data points such as prop variants
-                if !matches!(
-                    scope_node.kind(),
-                    flat_scope::Kind::PropVariant(..) | flat_scope::Kind::SeqPropVariant(..)
-                ) {
+                if false
+                    || !matches!(
+                        scope_node.kind(),
+                        flat_scope::Kind::PropVariant(..) | flat_scope::Kind::SeqPropVariant(..)
+                    )
+                {
                     let meta = scope_node.meta();
                     next_propagations.push(Propagation {
                         pub_vars: meta.pub_vars.clone(),

@@ -89,8 +89,9 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
             debug!("{}", scope_map.scope);
             for assignment in &scope_map.assignments {
                 debug!(
-                    "  - {} lateral={:?}",
+                    "  - {} free={:?} lateral={:?}",
                     assignment.expr.kind().debug_short(),
+                    assignment.expr.meta().free_vars,
                     assignment.lateral_deps
                 );
             }
@@ -196,6 +197,11 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                 };
 
                 let is_seq = matches!(&prop.variant, expr::PropVariant::Seq { .. });
+
+                debug!(
+                    "find assignment slot for {}[{}], fv={:?}",
+                    prop.struct_var, prop.prop_id, prop.free_vars
+                );
 
                 match table.find_assignment_slot(&prop.free_vars, is_seq) {
                     Some(assignment_slot) => {
@@ -504,7 +510,7 @@ fn unify_scope_structural<'m>(
                         &|| inner_scope.clone(),
                         table,
                         unifier,
-                        level,
+                        level.next(),
                     )?);
 
                     let bindings = table.rel_val_bindings(scope_var);
@@ -546,7 +552,7 @@ fn unify_scope_structural<'m>(
                         &|| inner_scope.clone(),
                         table,
                         unifier,
-                        level,
+                        level.next(),
                     )?);
 
                     if !in_scope.contains(ontol_hir::Var(label.label.0)) {
@@ -643,15 +649,7 @@ fn apply_lateral_scope<'m>(
 
     for assignment in assignments {
         if assignment.expr.free_vars().0.is_subset(&in_scope.0) {
-            nodes.push(
-                ScopedExprToNode {
-                    table,
-                    unifier,
-                    scope_var: Some(assignment.scope_var),
-                    level,
-                }
-                .scoped_expr_to_node(assignment.expr, &in_scope, main_scope)?,
-            );
+            ungrouped.push(assignment);
         } else {
             let introduced_var = ontol_hir::Var(
                 assignment

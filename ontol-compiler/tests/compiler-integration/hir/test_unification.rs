@@ -1052,9 +1052,6 @@ mod dependent_scoping {
             |$f| (struct ($c)
                 (match-prop $f O:0:0
                     (($_ $a)
-                        (prop $c S:2:2
-                            (#u $a)
-                        )
                         (match-prop $f O:1:1
                             (($_ $b)
                                 (prop $c S:1:1
@@ -1069,6 +1066,9 @@ mod dependent_scoping {
                                 )
                             )
                         )
+                        (prop $c S:2:2
+                            (#u $a)
+                        )
                     )
                 )
             )"
@@ -1079,15 +1079,15 @@ mod dependent_scoping {
             |$f| (struct ($c)
                 (match-prop $f O:0:0
                     (($_ $a)
-                        (prop $c S:2:2
-                            (#u $a)
-                        )
                         (match-prop $f O:1:1
                             (($_ $b)
                                 (prop $c S:1:1
                                     (#u (+ $a $b))
                                 )
                             )
+                        )
+                        (prop $c S:2:2
+                            (#u $a)
                         )
                     )
                 )

@@ -1,5 +1,7 @@
 use std::fmt::Debug;
 
+use tracing::debug;
+
 use crate::typed_hir::{TypedBinder, TypedHir};
 
 use super::{
@@ -87,10 +89,13 @@ impl<'m> Table<'m> {
             if !observed_variables.0.is_empty()
                 && scope_pub_vars.0.is_superset(&observed_variables.0)
             {
+                debug!("    END at {:?}", scope_map.scope.meta().scope_var);
                 break;
             }
 
             observed_variables.union_with(scope_pub_vars);
+
+            debug!("    candidate: {:?}", scope_map.scope.meta().scope_var);
 
             // Note that we choose the _last_ (in iteration order, really the _first_) candidate
             // that introduces at least one variable in free_vars.
