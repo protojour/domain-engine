@@ -199,34 +199,18 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
             }
             ontol_hir::Kind::Map(param) => {
                 let param_ty = param.ty();
+                self.gen_node(*param, block);
                 match (
                     self.type_mapper.find_domain_mapping_info(param_ty),
                     self.type_mapper.find_domain_mapping_info(ty),
                 ) {
-                    (Some(from), Some(to)) => {
-                        self.gen_node(*param, block);
-
-                        match (from.punned, to.punned) {
-                            (Some(from_pun), Some(to_pun)) if from.anonymous && to.anonymous => {
-                                if from_pun == to_pun {
-                                    self.gen_pun(block, to.key.def_id, span);
-                                } else {
-                                    let proc = Procedure {
-                                        address: self.proc_table.gen_mapping_addr(from_pun, to_pun),
-                                        n_params: NParams(1),
-                                    };
-
-                                    self.builder.append_op(
-                                        block,
-                                        OpCode::Call(proc),
-                                        Delta(0),
-                                        span,
-                                    );
-                                }
-                            }
-                            _ => {
+                    (Some(from), Some(to)) => match (from.punned, to.punned) {
+                        (Some(from_pun), Some(to_pun)) if from.anonymous && to.anonymous => {
+                            if from_pun == to_pun {
+                                self.gen_pun(block, to.key.def_id, span);
+                            } else {
                                 let proc = Procedure {
-                                    address: self.proc_table.gen_mapping_addr(from.key, to.key),
+                                    address: self.proc_table.gen_mapping_addr(from_pun, to_pun),
                                     n_params: NParams(1),
                                 };
 
@@ -234,7 +218,16 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                                     .append_op(block, OpCode::Call(proc), Delta(0), span);
                             }
                         }
-                    }
+                        _ => {
+                            let proc = Procedure {
+                                address: self.proc_table.gen_mapping_addr(from.key, to.key),
+                                n_params: NParams(1),
+                            };
+
+                            self.builder
+                                .append_op(block, OpCode::Call(proc), Delta(0), span);
+                        }
+                    },
                     (Some(from), None) => {
                         if from.punned.map(|key| key.def_id) == ty.get_single_def_id() {
                             self.gen_pun(block, ty.get_single_def_id().unwrap(), span);
