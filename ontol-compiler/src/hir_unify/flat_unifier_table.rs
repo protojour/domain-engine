@@ -177,11 +177,8 @@ impl<'m> Table<'m> {
 
             let next_scope_map = self.find_scope_map_by_scope_var(ScopeVar(dep))?;
 
-            match next_scope_map.scope.kind() {
-                flat_scope::Kind::PropVariant(..) => {
-                    return Some(next_scope_map);
-                }
-                _ => {}
+            if let flat_scope::Kind::PropVariant(..) = next_scope_map.scope.kind() {
+                return Some(next_scope_map);
             }
 
             scope_map = next_scope_map;

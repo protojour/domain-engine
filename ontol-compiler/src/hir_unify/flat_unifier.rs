@@ -692,19 +692,17 @@ fn apply_lateral_scope<'m>(
                     let struct_var = *struct_var;
                     if in_scope.contains(struct_var) {
                         new_scope_groups.insert(scope_var, scope_group);
+                    } else if let Some(scope_map) = table.find_upstream_data_point(scope_var) {
+                        let supergroup = new_scope_groups
+                            .entry(scope_map.scope.meta().scope_var)
+                            .or_default();
+
+                        supergroup.subgroups.insert(scope_var, scope_group);
+                        supergroup.introducing.union_with(&[struct_var].into());
+
+                        needs_regroup_check = true;
                     } else {
-                        if let Some(scope_map) = table.find_upstream_data_point(scope_var) {
-                            let supergroup = new_scope_groups
-                                .entry(scope_map.scope.meta().scope_var)
-                                .or_default();
-
-                            supergroup.subgroups.insert(scope_var, scope_group);
-                            supergroup.introducing.union_with(&[struct_var].into());
-
-                            needs_regroup_check = true;
-                        } else {
-                            unreachable!()
-                        }
+                        unreachable!()
                     }
                 }
                 other => return Err(unifier_todo(smart_format!("{other:?}"))),
@@ -742,6 +740,7 @@ fn apply_lateral_scope<'m>(
     Ok(nodes)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn apply_scope_group<'m>(
     main_scope: MainScope,
     scope_var: ScopeVar,
@@ -905,7 +904,7 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                     binder.var, self.scope_var, in_scope
                 );
 
-                if let Some(_) = self.scope_var {
+                if self.scope_var.is_some() {
                     body.extend(unify_scope_structural(
                         match main_scope {
                             MainScope::Const => unreachable!(),
