@@ -1,15 +1,17 @@
+use docs::get_core_completions;
 use ontol_parser::ast::{Statement, Visibility};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use state::{
-    build_uri, get_core_completions, get_domain_name, get_path_and_name, get_range,
-    get_reference_name, get_signature, get_span_range, parse_map_arm, read_file, Document, State,
+    build_uri, get_domain_name, get_path_and_name, get_range, get_reference_name, get_signature,
+    get_span_range, parse_map_arm, read_file, Document, State,
 };
 use tokio::sync::RwLock;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer};
 
+mod docs;
 mod state;
 #[cfg(feature = "wasm")]
 pub mod wasm;
@@ -20,9 +22,10 @@ pub const NAME: &str = env!("CARGO_PKG_NAME");
 pub struct Backend {
     pub client: Client,
     state: RwLock<State>,
+    params: RwLock<InitializeParams>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 struct OpenFileArgs {
     ref_uri: String,
     src_uri: String,
@@ -33,41 +36,49 @@ impl Backend {
         Self {
             client,
             state: RwLock::new(State::default()),
+            params: RwLock::new(InitializeParams::default()),
         }
     }
 
+    /// Initialize backend
+    async fn init(&self, params: InitializeParams) {
+        let mut p = self.params.write().await;
+        *p = params
+    }
+
     /// Diagnose from the given root document and publish findings to client
-    async fn diagnose(&self, uri: &Url) {
-        let diagnostics = self.get_diagnostics(uri).await;
+    async fn diagnose(&self, url: &Url) {
+        let diagnostics = self.get_diagnostics(url).await;
         self.client
-            .publish_diagnostics(uri.clone(), diagnostics, None)
+            .publish_diagnostics(url.clone(), diagnostics, None)
             .await;
     }
 
     /// Compile code and convert errors to Diagnostics
-    async fn get_diagnostics(&self, uri: &Url) -> Vec<Diagnostic> {
-        let mut state = self.state.write().await;
+    async fn get_diagnostics(&self, url: &Url) -> Vec<Diagnostic> {
         let mut restart = true;
         let mut diagnostics = vec![];
+        let mut state = self.state.write().await;
 
         while restart {
             diagnostics.clear();
-            match state.compile(uri.as_str()) {
+            match state.compile(url.as_str()) {
                 Ok(_) => break,
                 Err(err) => {
                     restart = false;
                     for err in err.errors {
+                        // handle missing packages if any
                         let mut data: Value = json!({});
                         if let ontol_compiler::CompileError::PackageNotFound(reference) = &err.error
                         {
-                            let (path, _) = get_path_and_name(uri.as_str());
+                            let (path, _) = get_path_and_name(url.as_str());
                             let source_name = get_reference_name(reference);
                             let ref_uri = build_uri(path, source_name);
 
                             if cfg!(feature = "wasm") {
                                 data = json!(OpenFileArgs {
                                     ref_uri: ref_uri.clone(),
-                                    src_uri: uri.to_string(),
+                                    src_uri: url.to_string(),
                                 });
                             } else if let Ok(text) = read_file(&ref_uri) {
                                 state.docs.insert(
@@ -85,6 +96,7 @@ impl Backend {
                             }
                         }
 
+                        // restart diagnostics if missing packages are resolved
                         if restart {
                             continue;
                         }
@@ -100,7 +112,7 @@ impl Backend {
                                         .iter()
                                         .map(|note| DiagnosticRelatedInformation {
                                             location: Location {
-                                                uri: uri.clone(),
+                                                uri: url.clone(),
                                                 range: get_span_range(&doc.text, &note.span),
                                             },
                                             message: note.note.to_string(),
@@ -121,7 +133,9 @@ impl Backend {
 
 #[tower_lsp::async_trait]
 impl LanguageServer for Backend {
-    async fn initialize(&self, _params: InitializeParams) -> Result<InitializeResult> {
+    async fn initialize(&self, params: InitializeParams) -> Result<InitializeResult> {
+        self.init(params).await;
+
         Ok(InitializeResult {
             server_info: Some(ServerInfo {
                 name: NAME.to_string(),
@@ -137,6 +151,7 @@ impl LanguageServer for Backend {
                         save: Some(TextDocumentSyncSaveOptions::Supported(true)),
                     },
                 )),
+                definition_provider: Some(OneOf::Left(true)),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 completion_provider: Some(CompletionOptions {
                     completion_item: Some(CompletionOptionsCompletionItem {
@@ -170,8 +185,8 @@ impl LanguageServer for Backend {
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
         {
-            let uri = params.text_document.uri.to_string();
-            let (path, filename) = get_path_and_name(uri.as_str());
+            let uri = params.text_document.uri.as_str();
+            let (path, filename) = get_path_and_name(uri);
             let name = get_domain_name(filename);
             let mut state = self.state.write().await;
             state.docs.insert(
@@ -184,7 +199,7 @@ impl LanguageServer for Backend {
                     ..Default::default()
                 },
             );
-            state.parse_statements(&uri);
+            state.parse_statements(uri);
         }
         self.diagnose(&params.text_document.uri).await;
     }
@@ -221,6 +236,23 @@ impl LanguageServer for Backend {
         }
     }
 
+    async fn goto_definition(
+        &self,
+        params: GotoDefinitionParams,
+    ) -> Result<Option<GotoDefinitionResponse>> {
+        let uri = params
+            .text_document_position_params
+            .text_document
+            .uri
+            .as_str();
+        let pos = params.text_document_position_params.position;
+        let state = self.state.read().await;
+        match state.get_definition(uri, &pos) {
+            Some(location) => Ok(Some(GotoDefinitionResponse::Scalar(location))),
+            None => Ok(None),
+        }
+    }
+
     async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
         let uri = params
             .text_document_position_params
@@ -229,7 +261,7 @@ impl LanguageServer for Backend {
             .as_str();
         let pos = params.text_document_position_params.position;
         let state = self.state.read().await;
-        match state.get_hover_docs(uri, pos.line as usize, pos.character as usize) {
+        match state.get_hoverdoc(uri, &pos) {
             Some(doc_panel) => Ok(Some(Hover {
                 contents: HoverContents::Array(doc_panel.to_markdown_vec()),
                 range: None,
@@ -348,11 +380,9 @@ impl LanguageServer for Backend {
     }
 
     async fn execute_command(&self, params: ExecuteCommandParams) -> Result<Option<Value>> {
-        match params.command.as_str() {
-            "ontol-lsp.openFile" => {
-                // TODO: replace unwrap()
-                let val = params.arguments.get(0).unwrap();
-                let args: OpenFileArgs = serde_json::from_value(val.clone()).unwrap();
+        if params.command.as_str() == "ontol-lsp.openFile" {
+            if let Some(val) = params.arguments.get(0) {
+                let args: OpenFileArgs = serde_json::from_value(val.clone()).unwrap_or_default();
                 let uri = Url::parse(&args.ref_uri).unwrap();
 
                 let result = self
@@ -370,8 +400,6 @@ impl LanguageServer for Backend {
                     self.diagnose(&uri).await;
                 }
             }
-            "ontol-lsp/..." => {}
-            _ => {}
         }
         Ok(None)
     }

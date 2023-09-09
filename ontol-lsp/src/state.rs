@@ -1,5 +1,6 @@
+use crate::docs::{get_ontol_docs, RESERVED_WORDS};
 use chumsky::prelude::*;
-use lsp_types::{CompletionItem, CompletionItemKind, MarkedString, Position, Range};
+use lsp_types::{Location, MarkedString, Position, Range, Url};
 use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
@@ -7,7 +8,10 @@ use ontol_compiler::{
     Compiler, SourceCodeRegistry, SourceId, SourceSpan, Sources,
 };
 use ontol_parser::{
-    ast::{DefStatement, MapArm, Path, Statement, UseStatement},
+    ast::{
+        DefStatement, MapArm, Path, Pattern, Statement, StructPattern, Type, TypeOrPattern,
+        UseStatement,
+    },
     lexer::lexer,
     parse_statements, Spanned, Token,
 };
@@ -49,12 +53,12 @@ pub struct HoverDoc {
     pub path: String,
     pub signature: String,
     pub docs: String,
+    pub(crate) debug: String,
 }
 
 #[derive(Clone, Debug)]
 pub struct CompiledRegex {
     pub comments: Regex,
-    pub leading_whitespace: Regex,
     pub rel_parens: Regex,
     pub rel_subject: Regex,
 }
@@ -191,106 +195,310 @@ impl State {
         None
     }
 
-    /// Build hover documentation for the targeted statement
-    pub fn get_hover_docs(&self, uri: &str, lineno: usize, col: usize) -> Option<HoverDoc> {
-        match self.docs.get(uri) {
-            None => None,
-            Some(doc) => {
-                // convert line/col position to byte position
-                let mut cursor = 0;
-                for (line_index, line) in doc.text.lines().enumerate() {
-                    if line_index == lineno {
-                        cursor += col;
-                        break;
-                    } else {
-                        cursor += line.len() + 1
-                    }
+    /// Get definition Location for the targeted statement
+    pub fn get_definition(&self, uri: &str, pos: &Position) -> Option<Location> {
+        if let Some(doc) = self.docs.get(uri) {
+            let cursor = get_byte_pos(&doc.text, pos);
+            let mut loc: Option<Location> = None;
+
+            for (statement, range) in doc.statements.iter() {
+                if !in_range(range, &cursor) {
+                    continue;
                 }
-
-                // check statements, may overlap
-                let mut hover = HoverDoc::default();
-                for (statement, range) in doc.statements.iter() {
-                    if cursor >= range.start() && cursor < range.end() {
-                        if hover.path.is_empty() {
-                            hover.path = doc.name.to_string();
-                        }
-                        hover.signature = get_signature(&doc.text, range, &self.regex);
-
-                        match statement {
-                            Statement::Use(stmt) => {
-                                hover.path = format!("{} as {}", stmt.reference.0, stmt.as_ident.0);
-                                break;
-                            }
-                            Statement::Def(stmt) => {
-                                hover.path += &format!(".{}", stmt.ident.0);
-                                hover.docs = stmt.docs.join("\n");
-                            }
-                            Statement::Rel(stmt) => {
-                                hover.docs = stmt.docs.join("\n");
-                            }
-                            Statement::Fmt(stmt) => {
-                                hover.docs = stmt.docs.join("\n");
-                            }
-                            Statement::Map(stmt) => {
-                                let first = parse_map_arm(&stmt.first.0 .1);
-                                let second = parse_map_arm(&stmt.second.0 .1);
-                                hover.path = format!("map {} {}", first, second);
-                                hover.docs.clear();
-                                break;
-                            }
+                match statement {
+                    Statement::Use(stmt) => {
+                        let (path, _) = get_path_and_name(uri);
+                        let ref_uri = build_uri(path, &stmt.reference.0);
+                        if self.docs.get(&ref_uri).is_some() {
+                            return Some(Location {
+                                uri: Url::parse(&ref_uri).unwrap(),
+                                range: Range::default(),
+                            });
                         }
                     }
-                }
-
-                // check tokens, may replace hover
-                for (token, range) in doc.tokens.iter() {
-                    if cursor >= range.start() && cursor < range.end() {
-                        match token {
-                            Token::Sigil(sigil) => {
-                                if *sigil == '?' {
-                                    hover = get_ontol_docs("?").unwrap()
-                                }
+                    Statement::Def(stmt) => {
+                        if let Some((_, range)) = doc.defs.get(stmt.ident.0.as_str()) {
+                            loc = Some(Location {
+                                uri: Url::parse(uri).unwrap(),
+                                range: get_range(&doc.text, range),
+                            });
+                        }
+                    }
+                    Statement::Rel(stmt) => {
+                        let mut rel_loc: Option<Location> = None;
+                        if in_range(&stmt.subject.1, &cursor) {
+                            if let Some(Type::Path(path)) = &stmt.subject.0 {
+                                rel_loc = self.get_location_for_path(doc, path);
                             }
-                            Token::Use => hover = get_ontol_docs("use").unwrap(),
-                            Token::Def => hover = get_ontol_docs("def").unwrap(),
-                            Token::Rel => hover = get_ontol_docs("rel").unwrap(),
-                            Token::Fmt => hover = get_ontol_docs("fmt").unwrap(),
-                            Token::Map => hover = get_ontol_docs("map").unwrap(),
-                            Token::Pub => hover = get_ontol_docs("pub").unwrap(),
-                            Token::Sym(ident) => {
-                                match doc.defs.get(ident.as_str()) {
-                                    // local defs
-                                    Some((stmt, range)) => {
-                                        hover.path = format!("{}.{}", doc.name, stmt.ident.0);
-                                        hover.signature = get_signature(&doc.text, range, &self.regex);
-                                        hover.docs = stmt.docs.join("\n");
+                        }
+                        if in_range(&stmt.object.1, &cursor) {
+                            if let Some(type_or_pattern) = &stmt.object.0 {
+                                match type_or_pattern {
+                                    TypeOrPattern::Type(Type::Path(path)) => {
+                                        rel_loc = self.get_location_for_path(doc, path);
                                     }
-                                    // nonlocal defs
-                                    None => {
-                                        match get_ontol_docs(ident.as_str()) {
-                                            Some(doc) => hover = doc,
-                                            None => hover = HoverDoc::from(
-                                                ident.as_str(),
-                                                "#### Map variable\nLocal map variable or type reference"
-                                            ),
+                                    TypeOrPattern::Pattern(pattern) => {
+                                        if let Some(path) = get_pattern_path(pattern, &cursor) {
+                                            rel_loc = self.get_location_for_path(doc, &path);
                                         }
                                     }
+                                    _ => {}
                                 }
                             }
-                            _ => {}
+                        }
+                        if rel_loc.is_some() {
+                            loc = rel_loc;
+                        }
+                    }
+                    Statement::Fmt(stmt) => {
+                        let mut fmt_loc: Option<Location> = None;
+                        if in_range(&stmt.origin.1, &cursor) {
+                            if let Type::Path(path) = &stmt.origin.0 {
+                                fmt_loc = self.get_location_for_path(doc, path);
+                            }
+                        } else {
+                            for trans in &stmt.transitions {
+                                if in_range(&trans.1, &cursor) {
+                                    if let Some(Type::Path(path)) = &trans.0 {
+                                        fmt_loc = self.get_location_for_path(doc, path);
+                                    }
+                                }
+                            }
+                        }
+                        if fmt_loc.is_some() {
+                            return fmt_loc;
+                        }
+                    }
+                    Statement::Map(stmt) => {
+                        if in_range(&stmt.first.1, &cursor) {
+                            if let Some(path) = get_map_arm_path(&stmt.first.0 .1, &cursor) {
+                                return self.get_location_for_path(doc, &path);
+                            }
+                        } else if in_range(&stmt.second.1, &cursor) {
+                            if let Some(path) = get_map_arm_path(&stmt.second.0 .1, &cursor) {
+                                return self.get_location_for_path(doc, &path);
+                            }
                         }
                     }
                 }
+            }
+            return loc;
+        }
+        None
+    }
 
-                Some(hover)
+    /// Get Location for Path
+    fn get_location_for_path(&self, doc: &Document, path: &Path) -> Option<Location> {
+        match path {
+            Path::Ident(ident) => self.get_location_for_ident(doc, ident.as_str()),
+            Path::Path(path) => {
+                let path = path
+                    .iter()
+                    .map(|(sstring, _)| sstring.to_string())
+                    .collect::<Vec<String>>();
+                self.get_location_for_ext_ident(doc, &path)
             }
         }
+    }
+
+    /// Get Location given a local identifier
+    fn get_location_for_ident(&self, doc: &Document, ident: &str) -> Option<Location> {
+        if let Some((_, range)) = doc.defs.get(ident) {
+            return Some(Location {
+                uri: Url::parse(&doc.uri).unwrap(),
+                range: get_range(&doc.text, range),
+            });
+        }
+        None
+    }
+
+    /// Get Location given an external identifier
+    fn get_location_for_ext_ident(&self, doc: &Document, path: &[String]) -> Option<Location> {
+        if let Some(root_alias) = path.get(0) {
+            if let Some(ident) = path.get(1) {
+                if let Some(root) = doc.aliases.get(root_alias) {
+                    let uri = build_uri(&doc.path, root);
+                    if let Some(doc) = self.docs.get(&uri) {
+                        return self.get_location_for_ident(doc, ident);
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Build hover documentation for the targeted statement
+    pub fn get_hoverdoc(&self, uri: &str, pos: &Position) -> Option<HoverDoc> {
+        if let Some(doc) = self.docs.get(uri) {
+            let cursor = get_byte_pos(&doc.text, pos);
+            let mut hover = HoverDoc::from(&doc.name, "");
+
+            // check statements, may overlap
+            for (statement, range) in doc.statements.iter() {
+                if !range.contains(&cursor) {
+                    continue;
+                }
+
+                match statement {
+                    Statement::Use(stmt) => {
+                        hover.path = format!("{} as {}", &stmt.reference.0, &stmt.as_ident.0);
+                        hover.signature = get_signature(&doc.text, range, &self.regex);
+                        break;
+                    }
+                    Statement::Def(stmt) => {
+                        hover.path = format!("{}.{}", &doc.name, &stmt.ident.0);
+                        hover.signature = get_signature(&doc.text, range, &self.regex);
+                        hover.docs = stmt.docs.join("\n");
+                    }
+                    Statement::Rel(stmt) => {
+                        if stmt.subject.1.contains(&cursor) {
+                            match &stmt.subject.0 {
+                                Some(Type::Path(path)) => {
+                                    return self.get_hoverdoc_for_path(doc, path);
+                                }
+                                None => {
+                                    return Some(get_ontol_docs("."));
+                                }
+                                _ => {}
+                            }
+                        }
+                        if stmt.object.1.contains(&cursor) {
+                            if let Some(type_or_pattern) = &stmt.object.0 {
+                                match type_or_pattern {
+                                    TypeOrPattern::Type(Type::Path(path)) => {
+                                        return self.get_hoverdoc_for_path(doc, path);
+                                    }
+                                    TypeOrPattern::Pattern(pattern) => {
+                                        if let Some(path) = get_pattern_path(pattern, &cursor) {
+                                            return self.get_hoverdoc_for_path(doc, &path);
+                                        }
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+                        hover.signature = get_signature(&doc.text, range, &self.regex);
+                        hover.docs = stmt.docs.join("\n");
+                    }
+                    Statement::Fmt(stmt) => {
+                        if stmt.origin.1.contains(&cursor) {
+                            if let Type::Path(path) = &stmt.origin.0 {
+                                return self.get_hoverdoc_for_path(doc, path);
+                            }
+                        } else {
+                            for trans in &stmt.transitions {
+                                if trans.1.contains(&cursor) {
+                                    match &trans.0 {
+                                        Some(Type::Path(path)) => {
+                                            return self.get_hoverdoc_for_path(doc, path);
+                                        }
+                                        None => {
+                                            return Some(get_ontol_docs("."));
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                        }
+                        hover.signature = get_signature(&doc.text, range, &self.regex);
+                        hover.docs = stmt.docs.join("\n");
+                        break;
+                    }
+                    Statement::Map(stmt) => {
+                        if stmt.first.1.contains(&cursor) {
+                            if let Some(path) = get_map_arm_path(&stmt.first.0 .1, &cursor) {
+                                return self.get_hoverdoc_for_path(doc, &path);
+                            }
+                        } else if stmt.second.1.contains(&cursor) {
+                            if let Some(path) = get_map_arm_path(&stmt.second.0 .1, &cursor) {
+                                return self.get_hoverdoc_for_path(doc, &path);
+                            }
+                        }
+                        let first = parse_map_arm(&stmt.first.0 .1);
+                        let second = parse_map_arm(&stmt.second.0 .1);
+                        hover.path = format!("map {} {}", first, second);
+                        hover.signature.clear();
+                        hover.docs.clear();
+                        break;
+                    }
+                }
+            }
+
+            // check tokens, may replace hover
+            for (token, range) in doc.tokens.iter() {
+                if range.contains(&cursor) {
+                    match token {
+                        Token::Sigil(sigil) => {
+                            if *sigil == '?' {
+                                return Some(get_ontol_docs("?"));
+                            }
+                        }
+                        Token::Use => return Some(get_ontol_docs("use")),
+                        Token::Def => return Some(get_ontol_docs("def")),
+                        Token::Rel => return Some(get_ontol_docs("rel")),
+                        Token::Fmt => return Some(get_ontol_docs("fmt")),
+                        Token::Map => return Some(get_ontol_docs("map")),
+                        Token::Pub => return Some(get_ontol_docs("pub")),
+                        Token::Sym(ident) => {
+                            if hover.signature.is_empty() && ident != "." {
+                                return Some(get_ontol_docs(ident));
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            return Some(hover);
+        }
+        None
+    }
+
+    /// Get HoverDoc for Path
+    fn get_hoverdoc_for_path(&self, doc: &Document, path: &Path) -> Option<HoverDoc> {
+        match path {
+            Path::Ident(ident) => Some(self.get_hoverdoc_for_ident(doc, ident.as_str())),
+            Path::Path(path) => {
+                let path = path
+                    .iter()
+                    .map(|(sstring, _)| sstring.to_string())
+                    .collect::<Vec<String>>();
+                self.get_hoverdoc_for_ext_ident(doc, &path)
+            }
+        }
+    }
+
+    /// Get HoverDoc given a local identifier
+    fn get_hoverdoc_for_ident(&self, doc: &Document, ident: &str) -> HoverDoc {
+        match doc.defs.get(ident) {
+            Some((stmt, range)) => HoverDoc {
+                path: format!("{}.{}", doc.name, stmt.ident.0),
+                signature: get_signature(&doc.text, range, &self.regex),
+                docs: stmt.docs.join("\n"),
+                ..Default::default()
+            },
+            None => get_ontol_docs(ident),
+        }
+    }
+
+    /// Get HoverDoc given an external identifier
+    fn get_hoverdoc_for_ext_ident(&self, doc: &Document, path: &[String]) -> Option<HoverDoc> {
+        if let Some(root_alias) = path.get(0) {
+            if let Some(ident) = path.get(1) {
+                if let Some(root) = doc.aliases.get(root_alias) {
+                    let uri = build_uri(&doc.path, root);
+                    if let Some(doc) = self.docs.get(&uri) {
+                        return Some(self.get_hoverdoc_for_ident(doc, ident));
+                    }
+                }
+            }
+        }
+        None
     }
 }
 
 impl HoverDoc {
     /// Build a HoverDoc from just path and docs, ignoring signature
-    fn from(path: &str, docs: &str) -> Self {
+    pub fn from(path: &str, docs: &str) -> Self {
         Self {
             path: path.to_string(),
             docs: docs.to_string(),
@@ -308,20 +516,21 @@ impl HoverDoc {
             vec.push(MarkedString::from_language_code(
                 "ontol".to_string(),
                 self.signature.clone(),
-            ))
+            ));
         }
         vec.push(MarkedString::from_markdown(self.docs.clone()));
+        vec.push(MarkedString::from_markdown(self.debug.clone()));
         vec
     }
 }
 
 impl CompiledRegex {
-    pub fn new() -> Self {
+    /// Precompile regexes used in documentation
+    fn new() -> Self {
         Self {
             comments: Regex::new(r"(?m-s)^\s*?\/\/.*\n?").unwrap(),
-            leading_whitespace: Regex::new(r"(?m)^\s*").unwrap(),
-            rel_parens: Regex::new(r"\(.*?\)").unwrap(),
-            rel_subject: Regex::new(r":.*").unwrap(),
+            rel_parens: Regex::new(r"(?ms)\(.*?\)").unwrap(),
+            rel_subject: Regex::new(r"(?ms):.*").unwrap(),
         }
     }
 }
@@ -383,14 +592,16 @@ pub fn get_span_range(text: &str, span: &SourceSpan) -> Range {
 
 /// Convert a byte index Range to a zero-based line/char Range
 pub fn get_range(text: &str, range: &std::ops::Range<usize>) -> Range {
-    let mut lsp_range = Range::new(Position::new(0, 0), Position::new(0, 0));
+    let mut lsp_range = Range::default();
     let mut start_set = false;
     let mut cursor = 0;
 
     for (line_index, line) in text.lines().enumerate() {
+        // utf-16 is LSP standard encoding
+        let len = line.encode_utf16().count();
         if !start_set {
-            if cursor + line.len() < range.start {
-                cursor += line.len() + 1;
+            if cursor + len < range.start {
+                cursor += len + 1;
             } else {
                 lsp_range.start.line = line_index as u32;
                 lsp_range.start.character = (range.start - cursor) as u32;
@@ -398,8 +609,8 @@ pub fn get_range(text: &str, range: &std::ops::Range<usize>) -> Range {
             }
         }
         if start_set {
-            if cursor + line.len() < range.end {
-                cursor += line.len() + 1;
+            if cursor + len < range.end {
+                cursor += len + 1;
             } else {
                 lsp_range.end.line = line_index as u32;
                 lsp_range.end.character = (range.end - cursor) as u32;
@@ -410,14 +621,31 @@ pub fn get_range(text: &str, range: &std::ops::Range<usize>) -> Range {
     lsp_range
 }
 
+/// Convert line/col Position to byte index
+fn get_byte_pos(text: &str, pos: &Position) -> usize {
+    let mut cursor: usize = 0;
+    for (line_index, line) in text.lines().enumerate() {
+        if line_index == pos.line as usize {
+            cursor += pos.character as usize;
+            break;
+        } else {
+            // utf-16 is LSP standard encoding
+            cursor += line.encode_utf16().count() + 1;
+        }
+    }
+    cursor
+}
+
+/// Check if index is in Range, inclusive
+fn in_range(range: &std::ops::Range<usize>, cursor: &usize) -> bool {
+    cursor >= &range.start && cursor <= &range.end
+}
+
 /// Get a stripped-down rendition of a statement
 pub fn get_signature(text: &str, range: &std::ops::Range<usize>, regex: &CompiledRegex) -> String {
     let sig = text.substring(range.start(), range.end());
     let stripped = &regex.comments.replace_all(sig, "");
-    regex
-        .leading_whitespace
-        .replace_all(stripped, "")
-        .to_string()
+    stripped.trim().replace("\n\n", "\n").to_string()
 }
 
 /// Parse the identifier or path for a map arm to String
@@ -429,7 +657,7 @@ pub fn parse_map_arm(arm: &MapArm) -> String {
 }
 
 /// Parse a map path to String
-pub fn parse_path(path: &Path) -> String {
+fn parse_path(path: &Path) -> String {
     match path {
         Path::Ident(id) => id.to_string(),
         Path::Path(p) => p
@@ -440,346 +668,45 @@ pub fn parse_path(path: &Path) -> String {
     }
 }
 
-/// Get a HoverDoc for ONTOL core keywords, values and types
-pub fn get_ontol_docs(ident: &str) -> Option<HoverDoc> {
-    match ident {
-        "use" => Some(HoverDoc::from(
-            "use",
-            "#### Use statement\nImports the domain following `use` and provides a local namespace alias after `as`.",
-        )),
-        "def" => Some(HoverDoc::from(
-            "def",
-            "#### Def statement\nDefines a type.",
-        )),
-        "rel" => Some(HoverDoc::from(
-            "rel",
-            "#### Relation statement\nDefines properties related to a type, or relations between types."
-        )),
-        "fmt" => Some(HoverDoc::from(
-            "fmt",
-            "#### Format statement\nPattern building and -matching for string or sequence."
-        )),
-        "map" => Some(HoverDoc::from(
-            "map",
-            "#### Map statement\nMapping between two types."
-        )),
-        "pub" => Some(HoverDoc::from(
-            "pub",
-            "#### Public modifier\nMarks a type as public and importable from other domains.",
-        )),
-        "match" => Some(HoverDoc::from(
-            "match",
-            "#### Partial modifier\nPartial matching for `map` arm."
-        )),
-        "id" => Some(HoverDoc::from(
-            "ontol.id",
-            "#### Relation prop\nBinds an identifier to a type, making it an entity.",
-        )),
-        "is" => Some(HoverDoc::from(
-            "ontol.is",
-            "#### Relation prop\nThe subject type takes on all properties of another type, or binds the subject type to a union.",
-        )),
-        "min" => Some(HoverDoc::from(
-            "ontol.min",
-            "#### Relation prop\nMinimum value for the subject type.",
-        )),
-        "max" => Some(HoverDoc::from(
-            "ontol.max",
-            "#### Relation prop\nMaximum value for the subject type.",
-        )),
-        "default" => Some(HoverDoc::from(
-            "ontol.default",
-            "#### Relation prop\nAssigns a default value to a type or property if none is given.",
-        )),
-        "example" => Some(HoverDoc::from(
-            "ontol.example",
-            "#### Relation prop\nGives an example value for documentation."
-        )),
-        "gen" => Some(HoverDoc::from(
-            "ontol.gen",
-            "#### Relation prop\nUse a generator.",
-        )),
-        "auto" => Some(HoverDoc::from(
-            "ontol.auto",
-            "#### Generator\nAutogenerate value.",
-        )),
-        "create_time" => Some(HoverDoc::from(
-            "ontol.create_time",
-            "#### Generator\nAutogenerate create datetime.",
-        )),
-        "update_time" => Some(HoverDoc::from(
-            "ontol.update_time",
-            "#### Generator\nAutogenerate update datetime.",
-        )),
-        "boolean" => Some(HoverDoc::from(
-            "ontol.boolean",
-            "#### Primitive\nBoolean type."
-        )),
-        "true" => Some(HoverDoc::from(
-            "ontol.true",
-            "#### Primitive\nBoolean `true` value."
-        )),
-        "false" => Some(HoverDoc::from(
-            "ontol.false",
-            "#### Primitive\nBoolean `false` value."
-        )),
-        "number" => Some(HoverDoc::from(
-            "ontol.number",
-            "#### Primitive\nAbstract number type.",
-        )),
-        "integer" => Some(HoverDoc::from(
-            "ontol.integer",
-            "#### Primitive\nAbstract integer type.",
-        )),
-        "i64" => Some(HoverDoc::from(
-            "ontol.i64",
-            "#### Primitive\n64-bit signed integer.",
-        )),
-        "float" => Some(HoverDoc::from(
-            "ontol.float",
-            "#### Primitive\nAbstract floating point number type.",
-        )),
-        "f64" => Some(HoverDoc::from(
-            "ontol.f64",
-            "#### Primitive\n64-bit floating point number.",
-        )),
-        "string" => Some(HoverDoc::from(
-            "ontol.string",
-            "#### Primitive\nAny UTF-8 string.",
-        )),
-        "datetime" => Some(HoverDoc::from(
-            "ontol.datetime",
-            "#### Primitive\nRFC 3339-formatted datetime string.",
-        )),
-        "date" => Some(HoverDoc::from(
-            "ontol.date",
-            "#### Primitive\nRFC 3339-formatted date string.",
-        )),
-        "time" => Some(HoverDoc::from(
-            "ontol.time",
-            "#### Primitive\nRFC 3339-formatted time string.",
-        )),
-        "uuid" => Some(HoverDoc::from(
-            "ontol.uuid",
-            "#### Primitive\nUUID v4 string."
-        )),
-        "regex" => Some(HoverDoc::from(
-            "regex",
-            "#### Primitive\nRegular expression.",
-        )),
-        "?" => Some(HoverDoc::from(
-            "?",
-            "#### Optional modifier\nMakes the property optional.",
-        )),
-        _ => None,
+/// Try to find a Path in a MapArm
+fn get_map_arm_path(arm: &MapArm, cursor: &usize) -> Option<Path> {
+    match arm {
+        MapArm::Struct(s) => return get_struct_pattern_path(s, cursor),
+        MapArm::Binding { path, expr: _ } => {
+            if in_range(&path.1, cursor) {
+                return Some(path.0.to_owned());
+            }
+        }
+    }
+    None
+}
+
+/// Try to find a Path in a StructPattern
+fn get_struct_pattern_path(s: &StructPattern, cursor: &usize) -> Option<Path> {
+    let range = &s.path.1;
+    if in_range(range, cursor) {
+        return Some(s.path.0.to_owned());
+    }
+    for (attr, range) in &s.attributes {
+        if in_range(range, cursor) {
+            return get_pattern_path(&attr.object.0, cursor);
+        }
+    }
+    None
+}
+
+/// Try to find a Path in a Pattern
+fn get_pattern_path(pattern: &Pattern, cursor: &usize) -> Option<Path> {
+    match pattern {
+        Pattern::Struct((s, _)) => get_struct_pattern_path(s, cursor),
+        Pattern::Seq(seq) => {
+            for (elem, range) in seq {
+                if in_range(range, cursor) {
+                    return get_pattern_path(&elem.pattern.0, cursor);
+                }
+            }
+            None
+        }
+        Pattern::Expr(_) => None,
     }
 }
-
-/// Completions for built-in keywords and defs
-pub fn get_core_completions() -> Vec<CompletionItem> {
-    vec![
-        CompletionItem {
-            label: "ontol".to_string(),
-            kind: Some(CompletionItemKind::KEYWORD),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "def".to_string(),
-            kind: Some(CompletionItemKind::KEYWORD),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "rel".to_string(),
-            kind: Some(CompletionItemKind::KEYWORD),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "map".to_string(),
-            kind: Some(CompletionItemKind::KEYWORD),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "use".to_string(),
-            kind: Some(CompletionItemKind::KEYWORD),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "as".to_string(),
-            kind: Some(CompletionItemKind::KEYWORD),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "pub".to_string(),
-            kind: Some(CompletionItemKind::KEYWORD),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "fmt".to_string(),
-            kind: Some(CompletionItemKind::KEYWORD),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "match".to_string(),
-            kind: Some(CompletionItemKind::KEYWORD),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "id".to_string(),
-            kind: Some(CompletionItemKind::PROPERTY),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "is".to_string(),
-            kind: Some(CompletionItemKind::PROPERTY),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "min".to_string(),
-            kind: Some(CompletionItemKind::PROPERTY),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "max".to_string(),
-            kind: Some(CompletionItemKind::PROPERTY),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "gen".to_string(),
-            kind: Some(CompletionItemKind::PROPERTY),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "auto".to_string(),
-            kind: Some(CompletionItemKind::PROPERTY),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "create_time".to_string(),
-            kind: Some(CompletionItemKind::PROPERTY),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "update_time".to_string(),
-            kind: Some(CompletionItemKind::PROPERTY),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "default".to_string(),
-            kind: Some(CompletionItemKind::PROPERTY),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "example".to_string(),
-            kind: Some(CompletionItemKind::PROPERTY),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "boolean".to_string(),
-            kind: Some(CompletionItemKind::UNIT),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "true".to_string(),
-            kind: Some(CompletionItemKind::UNIT),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "false".to_string(),
-            kind: Some(CompletionItemKind::UNIT),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "number".to_string(),
-            kind: Some(CompletionItemKind::UNIT),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "integer".to_string(),
-            kind: Some(CompletionItemKind::UNIT),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "float".to_string(),
-            kind: Some(CompletionItemKind::UNIT),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "i64".to_string(),
-            kind: Some(CompletionItemKind::UNIT),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "f64".to_string(),
-            kind: Some(CompletionItemKind::UNIT),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "string".to_string(),
-            kind: Some(CompletionItemKind::UNIT),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "datetime".to_string(),
-            kind: Some(CompletionItemKind::UNIT),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "date".to_string(),
-            kind: Some(CompletionItemKind::UNIT),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "time".to_string(),
-            kind: Some(CompletionItemKind::UNIT),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "uuid".to_string(),
-            kind: Some(CompletionItemKind::UNIT),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "regex".to_string(),
-            kind: Some(CompletionItemKind::UNIT),
-            ..Default::default()
-        },
-    ]
-}
-
-/// A list of reserved words in ONTOL, to separate them from user-defined symbols
-const RESERVED_WORDS: [&str; 34] = [
-    "ontol",
-    "use",
-    "as",
-    "pub",
-    "def",
-    "rel",
-    "fmt",
-    "map",
-    "unify",
-    "match",
-    "id",
-    "is",
-    "min",
-    "max",
-    "default",
-    "example",
-    "gen",
-    "auto",
-    "create_time",
-    "update_time",
-    "number",
-    "boolean",
-    "true",
-    "false",
-    "integer",
-    "i64",
-    "float",
-    "f64",
-    "string",
-    "datetime",
-    "date",
-    "time",
-    "uuid",
-    "regex",
-];

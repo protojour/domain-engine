@@ -2,7 +2,7 @@
   "name": "ontol",
   "displayName": "ONTOL",
   "description": "ONTOL language support for VS Code",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "publisher": "Protojour",
   "license": "MIT",
   "private": true,
@@ -11,7 +11,7 @@
     "url": "https://gitlab.com/protojour/memoriam/domain-engine.git"
   },
   "engines": {
-    "vscode": "^1.79.0"
+    "vscode": "^1.81.0"
   },
   "main": "./dist/extension.js",
   "scripts": {
@@ -66,11 +66,10 @@
     "vscode-languageclient": "^8.1.0"
   },
   "devDependencies": {
-    "@types/node": "^20.4.2",
-    "@types/vscode": "^1.79.0",
-    "@vscode/vsce": "^2.19.0",
-    "esbuild": "^0.18.13",
-    "typescript": "^5.1.6",
-    "vsce": "^2.15.0"
+    "@types/node": "^20.6.0",
+    "@types/vscode": "^1.81.0",
+    "@vscode/vsce": "^2.21.0",
+    "esbuild": "^0.19.2",
+    "typescript": "^5.2.2"
   }
 }
