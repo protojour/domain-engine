@@ -864,6 +864,181 @@ fn test_unify_opt_props2() {
 }
 
 #[test]
+fn test_unify_opt_props3() {
+    let output = test_unify(
+        "
+        (struct ($c)
+            (prop? $c S:0:0
+                (#u
+                    (struct ($d)
+                        (prop? $d S:1:0
+                            (#u $a)
+                        )
+                    )
+                )
+            )
+            (prop? $c S:0:1
+                (#u
+                    (struct ($e)
+                        (prop? $e S:1:1
+                            (#u $b)
+                        )
+                    )
+                )
+            )
+        )
+        ",
+        // We should get "O:0:0" if either of "S:0:0" or "S:0:1" are defined(?)
+        // Then its optional child props should be defined respectively based on free vars
+        "
+        (struct ($f)
+            (prop? $f O:0:0
+                (#u
+                    (struct ($g)
+                        (prop? $g O:1:0
+                            (#u $a)
+                        )
+                        (prop? $g O:1:1
+                            (#u $b)
+                        )
+                    )
+                )
+            )
+        )
+        ",
+    );
+    let expected = indoc! {"
+        |$c| (struct ($f)
+            (prop $f O:0:0
+                (#u
+                    (struct ($g)
+                        (match-prop $c S:0:0
+                            (($_ $d)
+                                (match-prop $d S:1:0
+                                    (($_ $a)
+                                        (prop $g O:1:0
+                                            (#u $a)
+                                        )
+                                    )
+                                    (())
+                                )
+                            )
+                            (())
+                        )
+                        (match-prop $c S:0:1
+                            (($_ $e)
+                                (match-prop $e S:1:1
+                                    (($_ $b)
+                                        (prop $g O:1:1
+                                            (#u $b)
+                                        )
+                                    )
+                                    (())
+                                )
+                            )
+                            (())
+                        )
+                    )
+                )
+            )
+        )"
+    };
+    assert_eq!(expected, output);
+}
+
+#[test]
+fn test_unify_opt_props4() {
+    let output = test_unify(
+        "
+        (struct ($c)
+            (prop? $c S:0:0
+                (#u
+                    (struct ($d)
+                        (prop? $d S:1:0
+                            (#u $a)
+                        )
+                    )
+                )
+            )
+            (prop? $c S:0:1
+                (#u
+                    (struct ($e)
+                        (prop? $e S:1:1
+                            (#u $b)
+                        )
+                    )
+                )
+            )
+            (prop $c S:0:2 (#u $h))
+        )
+        ",
+        "
+        (struct ($f)
+            (prop? $f O:0:0
+                (#u
+                    (struct ($g)
+                        (prop? $g O:1:0
+                            (#u $a)
+                        )
+                        (prop? $g O:1:1
+                            (#u $b)
+                        )
+                        (prop $g O:1:2
+                            (#u $h)
+                        )
+                    )
+                )
+            )
+        )
+        ",
+    );
+    let expected = indoc! {"
+        |$c| (struct ($f)
+            (prop $f O:0:0
+                (#u
+                    (struct ($g)
+                        (match-prop $c S:0:0
+                            (($_ $d)
+                                (match-prop $d S:1:0
+                                    (($_ $a)
+                                        (prop $g O:1:0
+                                            (#u $a)
+                                        )
+                                    )
+                                    (())
+                                )
+                            )
+                            (())
+                        )
+                        (match-prop $c S:0:1
+                            (($_ $e)
+                                (match-prop $e S:1:1
+                                    (($_ $b)
+                                        (prop $g O:1:1
+                                            (#u $b)
+                                        )
+                                    )
+                                    (())
+                                )
+                            )
+                            (())
+                        )
+                        (match-prop $c S:0:2
+                            (($_ $h)
+                                (prop $g O:1:2
+                                    (#u $h)
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )"
+    };
+    assert_eq!(expected, output);
+}
+
+#[test]
 fn test_unify_opt_rel_and_val1() {
     let output = test_unify(
         "
