@@ -192,7 +192,7 @@ impl FreeVarVisitor {
                 self.visit_prop_variant(&prop.variant);
             }
             Kind::Map(inner) => {
-                self.visit(&inner);
+                self.visit(inner);
             }
             Kind::Call(call) => {
                 for arg in &call.1 {

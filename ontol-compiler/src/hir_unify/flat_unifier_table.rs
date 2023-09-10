@@ -78,7 +78,7 @@ impl<'m> Table<'m> {
 
         let mut lateral_deps = VarSet::default();
 
-        if true && optional.0 {
+        if optional.0 {
             let filter_req_len = filter.req_constraints.0.len();
 
             let pre_candidates: Vec<_> = self
