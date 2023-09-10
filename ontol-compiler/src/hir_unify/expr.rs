@@ -164,3 +164,76 @@ impl<'m> super::dep_tree::Expression for Prop<'m> {
         self.seq.is_some()
     }
 }
+
+pub fn collect_free_vars(expr: &Expr) -> VarSet {
+    let mut visitor = FreeVarVisitor::default();
+    visitor.visit(expr);
+    visitor.free_vars
+}
+
+#[derive(Default)]
+struct FreeVarVisitor {
+    pub free_vars: VarSet,
+}
+
+impl FreeVarVisitor {
+    pub fn visit(&mut self, expr: &Expr) {
+        match expr.kind() {
+            Kind::Var(var) => {
+                self.free_vars.insert(*var);
+            }
+            Kind::Unit | Kind::I64(_) | Kind::F64(_) | Kind::String(_) | Kind::Const(_) => {}
+            Kind::Struct { props, .. } => {
+                for prop in props {
+                    self.visit_prop_variant(&prop.variant);
+                }
+            }
+            Kind::Prop(prop) => {
+                self.visit_prop_variant(&prop.variant);
+            }
+            Kind::Map(inner) => {
+                self.visit(&inner);
+            }
+            Kind::Call(call) => {
+                for arg in &call.1 {
+                    self.visit(arg);
+                }
+            }
+            Kind::Seq(_, attr) => {
+                self.visit_attr(attr);
+            }
+            Kind::SeqItem(_, _, _, attr) => self.visit_attr(attr),
+            Kind::Push(_, attr) => {
+                self.visit_attr(attr);
+            }
+            Kind::StringInterpolation(_, components) => {
+                for component in components {
+                    match component {
+                        StringInterpolationComponent::Var(var, _) => {
+                            self.free_vars.insert(*var);
+                        }
+                        StringInterpolationComponent::Const(_) => {}
+                    }
+                }
+            }
+        }
+    }
+
+    fn visit_prop_variant(&mut self, variant: &PropVariant) {
+        match variant {
+            PropVariant::Singleton(attr) => {
+                self.visit_attr(attr);
+            }
+            PropVariant::Seq { elements, .. } => {
+                for element in elements {
+                    self.visit_attr(&element.attribute);
+                }
+            }
+        }
+    }
+
+    fn visit_attr(&mut self, attr: &ontol_hir::Attribute<Expr>) {
+        self.visit(&attr.rel);
+        self.visit(&attr.val);
+    }
+}

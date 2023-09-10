@@ -78,35 +78,45 @@ impl<'m> Table<'m> {
 
         let mut lateral_deps = VarSet::default();
 
-        if optional.0 {
+        if true && optional.0 {
             let filter_req_len = filter.req_constraints.0.len();
 
-            // Note: Reverse search.
-            for (index, scope_map) in self.table.iter().enumerate().rev() {
-                let scope_meta = &scope_map.scope.meta();
-                let scope_constraints_len = scope_meta.constraints.0.len();
+            let pre_candidates: Vec<_> = self
+                .table
+                .iter()
+                .enumerate()
+                .filter(|(_index, scope_map)| {
+                    let scope_meta = &scope_map.scope.meta();
+                    let scope_constraints_len = scope_meta.constraints.0.len();
 
-                // only consider proper scope-introducing nodes
-                match scope_map.scope.kind() {
-                    flat_scope::Kind::PropVariant(..) => {}
-                    flat_scope::Kind::SeqPropVariant(..) => {
-                        if !is_seq {
-                            continue;
+                    match scope_map.scope.kind() {
+                        flat_scope::Kind::PropVariant(..) => {}
+                        flat_scope::Kind::SeqPropVariant(..) => {
+                            if !is_seq {
+                                return false;
+                            }
                         }
+                        _ => return false,
                     }
-                    _ => continue,
-                }
 
-                if scope_constraints_len > filter_req_len + 1 {
+                    if scope_constraints_len > filter_req_len + 1 {
+                        return false;
+                    }
+
+                    if !scope_meta.free_vars.0.is_superset(&free_vars.0) {
+                        return false;
+                    }
+
+                    true
+                })
+                .collect();
+
+            for (index, scope_map) in pre_candidates {
+                let scope_meta = &scope_map.scope.meta();
+                let scope_free_vars = &scope_meta.free_vars;
+
+                if scope_free_vars.0.is_disjoint(&free_vars.0) {
                     continue;
-                }
-
-                if !scope_meta.free_vars.0.is_superset(&free_vars.0) {
-                    continue;
-                }
-
-                if candidate.is_some() && scope_constraints_len == filter_req_len {
-                    break;
                 }
 
                 candidate = Some(index);
@@ -162,38 +172,6 @@ impl<'m> Table<'m> {
                 VarSet::default()
             };
         }
-
-        // Apply filter successively
-        // if let Some(index) = candidate {
-        //     let scope_map = self.scope_map_mut(index);
-        //
-        //     if scope_map.scope.meta().constraints.as_ref() != &filter.req_constraints {
-        //         let mut deps = scope_map.scope.meta().deps.clone();
-        //         while !deps.0.is_empty() {
-        //             let mut next_deps = VarSet::default();
-        //
-        //             for dep in &deps {
-        //                 let (index, scope_map) =
-        //                     self.find_scope_map_by_scope_var(ScopeVar(dep)).unwrap();
-        //                 if scope_map.scope.meta().constraints.as_ref() == &filter.req_constraints {
-        //                     match scope_map.scope.kind() {
-        //                         flat_scope::Kind::PropVariant(..) => {}
-        //                         flat_scope::Kind::SeqPropVariant(..) => {
-        //                             candidate = Some(index);
-        //                             next_deps.0.clear();
-        //                             break;
-        //                         }
-        //                         _ => {}
-        //                     }
-        //                 }
-        //
-        //                 next_deps.union_with(&scope_map.scope.meta().deps);
-        //             }
-        //
-        //             deps = next_deps;
-        //         }
-        //     }
-        // }
 
         // apply new filter
         if let Some(index) = candidate {
@@ -431,6 +409,22 @@ impl<'m> ScopeMap<'m> {
 pub(super) struct Assignment<'m> {
     pub expr: expr::Expr<'m>,
     pub lateral_deps: VarSet,
+}
+
+impl<'m> Assignment<'m> {
+    pub fn new(expr: expr::Expr<'m>) -> Self {
+        Self {
+            expr,
+            lateral_deps: Default::default(),
+        }
+    }
+
+    pub fn with_lateral_deps(self, lateral_deps: VarSet) -> Self {
+        Self {
+            expr: self.expr,
+            lateral_deps,
+        }
+    }
 }
 
 #[derive(Debug)]

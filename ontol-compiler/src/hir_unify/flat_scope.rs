@@ -43,7 +43,7 @@ impl<'m> Display for ScopeNode<'m> {
         let (kind, meta) = (self.kind(), self.meta());
         write!(
             f,
-            "{}: {:?} - {:?} d={:?} c={:?}",
+            "{}: {:?} - {:?} def{:?} cns{:?}",
             meta.scope_var.0, meta.deps, kind, meta.defs, meta.constraints
         )
     }

@@ -130,7 +130,7 @@ impl<'m> FlatScopeBuilder<'m> {
                         scope_var: ScopeVar(binder.var),
                         free_vars: Default::default(),
                         constraints,
-                        defs: Default::default(),
+                        defs: [binder.var].into(),
                         deps,
                         hir_meta: *node.meta(),
                     },
@@ -428,50 +428,30 @@ fn propagate_vars(scope_nodes: &mut Vec<ScopeNode>) {
 
             if target_union.contains(scope_node.meta().scope_var.0) {
                 for propagation in &propagations {
-                    scope_node.1.free_vars.union_with(&propagation.free_vars);
-
-                    if propagation.target.contains(scope_node.meta().scope_var.0)
-                        && !matches!(scope_node.kind(), flat_scope::Kind::IterElement(..))
-                    {
-                        scope_node.1.defs.union_with(&propagation.defs);
+                    if propagation.target.contains(scope_node.meta().scope_var.0) {
+                        scope_node.1.free_vars.union_with(&propagation.free_vars);
+                        if !matches!(scope_node.kind(), flat_scope::Kind::IterElement(..)) {
+                            scope_node.1.defs.union_with(&propagation.defs);
+                        }
                     }
                 }
 
-                if true {
-                    let next_defs: VarSet = if matches!(
-                        scope_node.kind(),
-                        flat_scope::Kind::PropVariant(..) | flat_scope::Kind::SeqPropVariant(..)
-                    ) {
-                        Default::default()
-                    } else {
-                        scope_node.meta().defs.clone()
-                    };
-
-                    let meta = scope_node.meta();
-                    next_propagations.push(Propagation {
-                        free_vars: meta.free_vars.clone(),
-                        defs: next_defs,
-                        target: meta.deps.clone(),
-                    });
-                    next_target_union.union_with(&meta.deps);
+                let next_defs: VarSet = if matches!(
+                    scope_node.kind(),
+                    flat_scope::Kind::PropVariant(..) | flat_scope::Kind::SeqPropVariant(..)
+                ) {
+                    Default::default()
                 } else {
-                    // Don't propagate variables across data points such as prop variants
-                    if true
-                        || !matches!(
-                            scope_node.kind(),
-                            flat_scope::Kind::PropVariant(..)
-                                | flat_scope::Kind::SeqPropVariant(..)
-                        )
-                    {
-                        let meta = scope_node.meta();
-                        next_propagations.push(Propagation {
-                            free_vars: meta.free_vars.clone(),
-                            defs: meta.defs.clone(),
-                            target: meta.deps.clone(),
-                        });
-                        next_target_union.union_with(&meta.deps);
-                    }
-                }
+                    scope_node.meta().defs.clone()
+                };
+
+                let meta = scope_node.meta();
+                next_propagations.push(Propagation {
+                    free_vars: meta.free_vars.clone(),
+                    defs: next_defs,
+                    target: meta.deps.clone(),
+                });
+                next_target_union.union_with(&meta.deps);
             } else {
                 next_candidates.push(index);
             }

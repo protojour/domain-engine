@@ -89,16 +89,16 @@ fn test_unify_deep_structural_map() {
         ",
         "
         (struct ($d)
-            (prop $d S:1:2
+            (prop $d O:1:2
                 (#u $a)
             )
-            (prop $d S:1:6
+            (prop $d O:1:6
                 (#u
                     (struct ($e)
-                        (prop $e S:1:4
+                        (prop $e O:1:4
                             (#u $b)
                         )
-                        (prop $e S:1:5
+                        (prop $e O:1:5
                             (#u $c)
                         )
                     )
@@ -111,7 +111,7 @@ fn test_unify_deep_structural_map() {
         |$f| (struct ($d)
             (match-prop $f S:1:9
                 (($_ $a)
-                    (prop $d S:1:2
+                    (prop $d O:1:2
                         (#u $a)
                     )
                 )
@@ -122,13 +122,13 @@ fn test_unify_deep_structural_map() {
                         (($_ $g)
                             (match-prop $g S:1:12
                                 (($_ $c)
-                                    (prop $d S:1:6
+                                    (prop $d O:1:6
                                         (#u
                                             (struct ($e)
-                                                (prop $e S:1:4
+                                                (prop $e O:1:4
                                                     (#u $b)
                                                 )
-                                                (prop $e S:1:5
+                                                (prop $e O:1:5
                                                     (#u $c)
                                                 )
                                             )
@@ -841,19 +841,19 @@ fn test_unify_opt_props2() {
         |$b| (struct ($d)
             (match-prop $b S:0:0
                 (($_ $c)
-                    (match-prop $c S:1:1
-                        (($_ $a)
-                            (prop $d O:0:0
-                                (#u
-                                    (struct ($e)
+                    (prop $d O:0:0
+                        (#u
+                            (struct ($e)
+                                (match-prop $c S:1:1
+                                    (($_ $a)
                                         (prop $e O:1:1
                                             (#u $a)
                                         )
                                     )
+                                    (())
                                 )
                             )
                         )
-                        (())
                     )
                 )
                 (())

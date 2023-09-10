@@ -112,10 +112,10 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
         match kind {
             expr::Kind::Var(var) => {
                 if let Some(index) = table.find_var_index(ScopeVar(var)) {
-                    table.scope_map_mut(index).assignments.push(Assignment {
-                        expr: expr::Expr(kind, meta),
-                        lateral_deps: Default::default(),
-                    });
+                    table
+                        .scope_map_mut(index)
+                        .assignments
+                        .push(Assignment::new(expr::Expr(kind, meta)));
                 } else {
                     table.const_expr = Some(expr::Expr(kind, meta));
                 }
@@ -125,10 +125,10 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                 let expr = self.destructure_expr(expr::Expr(kind, meta), depth, &filter, table)?;
 
                 // BUG: Not 0?
-                table.scope_map_mut(0).assignments.push(Assignment {
-                    expr,
-                    lateral_deps: Default::default(),
-                });
+                table
+                    .scope_map_mut(0)
+                    .assignments
+                    .push(Assignment::new(expr));
 
                 Ok(AssignResult::Success)
             }
@@ -222,10 +222,10 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
 
                 if let Some(slot) = slot {
                     let scope_map = table.scope_map_mut(slot.index);
-                    scope_map.assignments.push(Assignment {
-                        expr: expr::Expr(expr::Kind::Prop(Box::new(prop)), meta),
-                        lateral_deps: slot.lateral_deps,
-                    });
+                    scope_map.assignments.push(
+                        Assignment::new(expr::Expr(expr::Kind::Prop(Box::new(prop)), meta))
+                            .with_lateral_deps(slot.lateral_deps),
+                    );
                     Ok(AssignResult::Success)
                 } else {
                     Ok(AssignResult::Unassigned(expr::Expr(
@@ -250,18 +250,15 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
 
                         let iter_scope_map = &mut table.table_mut()[iter_scope_map_idx];
 
-                        iter_scope_map.assignments.push(Assignment {
-                            expr: expr::Expr(
-                                expr::Kind::SeqItem(
-                                    label,
-                                    index,
-                                    iter,
-                                    Box::new(ontol_hir::Attribute { rel, val }),
-                                ),
-                                meta,
+                        iter_scope_map.assignments.push(Assignment::new(expr::Expr(
+                            expr::Kind::SeqItem(
+                                label,
+                                index,
+                                iter,
+                                Box::new(ontol_hir::Attribute { rel, val }),
                             ),
-                            lateral_deps: VarSet::default(),
-                        });
+                            meta,
+                        )));
 
                         Ok(AssignResult::Success)
                     } else {
@@ -494,7 +491,7 @@ fn unify_scope_structural<'m>(
     while !indexes.is_empty() {
         let mut next_indexes = vec![];
 
-        debug!("{level}  indexes={indexes:?}");
+        debug!("{level}indexes={indexes:?}");
 
         for index in indexes {
             let scope_map = &mut table.scope_map_mut(index);
@@ -517,13 +514,29 @@ fn unify_scope_structural<'m>(
                     next_indexes.extend(table.dependees(Some(scope_var)));
                 }
                 flat_scope::Kind::PropVariant(_, optional, prop_struct_var, property_id) => {
+                    let optional = *optional;
                     let property_id = *property_id;
-                    let prop_key = (*optional, *prop_struct_var, property_id);
+                    let prop_key = (optional, *prop_struct_var, property_id);
                     let mut body = vec![];
                     let inner_scope = in_scope.union(&scope_map.scope.meta().defs);
 
-                    let assignments = scope_map.select_assignments(selector);
+                    let mut assignments = scope_map.select_assignments(selector);
                     let assignments_len = assignments.len();
+
+                    if optional.0 {
+                        for assignment in &mut assignments {
+                            // FIXME: Did not remodel "expr" yet,
+                            // so re-traverse for free vars here.
+                            //
+                            // The point is that _structs_ do not contain the properties "inline" anymore,
+                            // the props are already scattered around the scope table.
+                            // This will move successive scope introductions to _inside_ the struct
+                            // rather than outside.
+                            let new_free_vars = expr::collect_free_vars(&assignment.expr);
+
+                            assignment.expr.1.free_vars = new_free_vars;
+                        }
+                    }
 
                     body.extend(apply_lateral_scope(
                         main_scope,
@@ -670,6 +683,10 @@ fn apply_lateral_scope<'m>(
 
     for assignment in assignments {
         if assignment.expr.free_vars().0.is_subset(&in_scope.0) {
+            debug!(
+                "{level}ungrouped assignment {}",
+                assignment.expr.kind().debug_short()
+            );
             ungrouped.push(assignment);
         } else {
             let introduced_var = ontol_hir::Var(
