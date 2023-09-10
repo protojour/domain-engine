@@ -21,8 +21,8 @@ use super::{
     dep_tree::Expression,
     expr,
     flat_level_builder::LevelBuilder,
-    flat_scope::{self, OutputVar, ScopeVar},
-    flat_unifier_table::{Assignment, ExprSelector, ScopedAssignment, Table},
+    flat_scope::{self, OutputVar, PropDepth, ScopeVar},
+    flat_unifier_table::{Assignment, ExprSelector, ScopeFilter, ScopedAssignment, Table},
     unifier::UnifiedNode,
     UnifierError, UnifierResult, VarSet,
 };
@@ -82,7 +82,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
 
         let mut table = Table::new(flat_scope);
 
-        let result = self.assign_to_scope(expr, &mut table);
+        let result = self.assign_to_scope(expr, PropDepth(0), ScopeFilter::default(), &mut table);
 
         // Debug even if assign_to_scope failed
         for scope_map in table.table_mut() {
@@ -105,6 +105,8 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
     fn assign_to_scope(
         &mut self,
         expr::Expr(kind, meta): expr::Expr<'m>,
+        depth: PropDepth,
+        mut filter: ScopeFilter,
         table: &mut Table<'m>,
     ) -> UnifierResult<AssignResult<'m>> {
         match kind {
@@ -120,7 +122,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                 Ok(AssignResult::Success)
             }
             kind @ expr::Kind::Struct { .. } => {
-                let expr = self.destructure_expr(expr::Expr(kind, meta), table)?;
+                let expr = self.destructure_expr(expr::Expr(kind, meta), depth, &filter, table)?;
 
                 // BUG: Not 0?
                 table.scope_map_mut(0).assignments.push(Assignment {
@@ -137,6 +139,15 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                 // );
                 // debug!("prop: {prop:?}");
 
+                debug!(
+                    "find assignment slot for {}[{}], fv={:?} filter={:?}",
+                    prop.struct_var, prop.prop_id, prop.free_vars, filter.req_constraints
+                );
+
+                let is_seq = matches!(&prop.variant, expr::PropVariant::Seq { .. });
+                let slot =
+                    table.find_assignment_slot(&prop.free_vars, is_seq, prop.optional, &mut filter);
+
                 let prop = {
                     let expr::Prop {
                         optional,
@@ -148,6 +159,8 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                     } = *prop;
                     let variant = match variant {
                         expr::PropVariant::Seq { label, elements } => {
+                            let label_filter = filter.constraint(ScopeVar(ontol_hir::Var(label.0)));
+
                             // recursively assign seq elements
                             for (index, element) in elements.into_iter().enumerate() {
                                 let mut free_vars = VarSet::default();
@@ -167,7 +180,12 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                                     },
                                 );
 
-                                self.assign_to_scope(element_expr, table)?;
+                                self.assign_to_scope(
+                                    element_expr,
+                                    depth.next(),
+                                    label_filter.clone(),
+                                    table,
+                                )?;
 
                                 if element.iter {}
 
@@ -179,8 +197,10 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                             }
                         }
                         expr::PropVariant::Singleton(attr) => {
-                            let rel = self.destructure_expr(attr.rel, table)?;
-                            let val = self.destructure_expr(attr.val, table)?;
+                            let rel =
+                                self.destructure_expr(attr.rel, depth.next(), &filter, table)?;
+                            let val =
+                                self.destructure_expr(attr.val, depth.next(), &filter, table)?;
                             // let rel = attr.rel;
                             // let val = attr.val;
                             expr::PropVariant::Singleton(ontol_hir::Attribute { rel, val })
@@ -196,25 +216,22 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                     }
                 };
 
-                let is_seq = matches!(&prop.variant, expr::PropVariant::Seq { .. });
+                // if prop.optional.0 {
+                //     return Ok(AssignResult::Success);
+                // }
 
-                debug!(
-                    "find assignment slot for {}[{}], fv={:?}",
-                    prop.struct_var, prop.prop_id, prop.free_vars
-                );
-
-                match table.find_assignment_slot(&prop.free_vars, is_seq) {
-                    Some(assignment_slot) => {
-                        assignment_slot.scope_map.assignments.push(Assignment {
-                            expr: expr::Expr(expr::Kind::Prop(Box::new(prop)), meta),
-                            lateral_deps: assignment_slot.lateral_deps,
-                        });
-                        Ok(AssignResult::Success)
-                    }
-                    None => Ok(AssignResult::Unassigned(expr::Expr(
+                if let Some(slot) = slot {
+                    let scope_map = table.scope_map_mut(slot.index);
+                    scope_map.assignments.push(Assignment {
+                        expr: expr::Expr(expr::Kind::Prop(Box::new(prop)), meta),
+                        lateral_deps: slot.lateral_deps,
+                    });
+                    Ok(AssignResult::Success)
+                } else {
+                    Ok(AssignResult::Unassigned(expr::Expr(
                         expr::Kind::Prop(Box::new(prop)),
                         meta,
-                    ))),
+                    )))
                 }
             }
             expr::Kind::SeqItem(label, index, iter, attr) => {
@@ -228,8 +245,8 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                         });
 
                     if let Some(iter_scope_map_idx) = iter_scope_map_idx {
-                        let rel = self.destructure_expr(attr.rel, table)?;
-                        let val = self.destructure_expr(attr.val, table)?;
+                        let rel = self.destructure_expr(attr.rel, depth, &filter, table)?;
+                        let val = self.destructure_expr(attr.val, depth, &filter, table)?;
 
                         let iter_scope_map = &mut table.table_mut()[iter_scope_map_idx];
 
@@ -261,6 +278,8 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
     fn destructure_expr(
         &mut self,
         expr::Expr(kind, meta): expr::Expr<'m>,
+        depth: PropDepth,
+        filter: &ScopeFilter,
         table: &mut Table<'m>,
     ) -> UnifierResult<expr::Expr<'m>> {
         match kind {
@@ -286,6 +305,8 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                                 },
                             },
                         ),
+                        depth.next(),
+                        filter.clone(),
                         table,
                     )?;
                     if let AssignResult::Unassigned(expr::Expr(kind, _)) = assign_result {
@@ -683,7 +704,7 @@ fn apply_lateral_scope<'m>(
         needs_regroup_check = false;
 
         for (scope_var, scope_group) in scope_groups {
-            let scope_map = &mut table.find_scope_map_by_scope_var(scope_var).unwrap();
+            let (_, scope_map) = table.find_scope_map_by_scope_var(scope_var).unwrap();
 
             match scope_map.scope.kind() {
                 flat_scope::Kind::PropVariant(_, _, struct_var, _) => {
@@ -754,7 +775,7 @@ fn apply_scope_group<'m>(
         scope_group.subgroups.len()
     );
 
-    let scope_map = table.find_scope_map_by_scope_var(scope_var).unwrap();
+    let (_, scope_map) = table.find_scope_map_by_scope_var(scope_var).unwrap();
     let scope_var = scope_map.scope.meta().scope_var;
 
     let mut builder = LevelBuilder::default();
@@ -994,7 +1015,7 @@ fn find_and_unify_sequence<'m>(
 ) -> UnifierResult<TypedHirNode<'m>> {
     let output_seq_var = table
         .find_scope_map_by_scope_var(ScopeVar(ontol_hir::Var(label.0)))
-        .and_then(|scope_map| match scope_map.scope.kind() {
+        .and_then(|(_, scope_map)| match scope_map.scope.kind() {
             flat_scope::Kind::SeqPropVariant(_, output_var, _, _, _, _) => Some(*output_var),
             _ => None,
         })

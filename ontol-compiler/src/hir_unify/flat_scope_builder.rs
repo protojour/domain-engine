@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use ontol_hir::{visitor::HirVisitor, GetKind, SeqPropertyVariant};
 
 use crate::{
@@ -13,6 +15,7 @@ use super::{
 struct NextNode<'a, 'm> {
     node: &'a TypedHirNode<'m>,
     prop_depth: PropDepth,
+    constraints: Rc<VarSet>,
     deps: VarSet,
 }
 
@@ -43,7 +46,8 @@ impl<'m> FlatScopeBuilder<'m> {
         let mut node_set = vec![NextNode {
             node,
             prop_depth: PropDepth(0),
-            deps: Default::default(),
+            deps: VarSet::default(),
+            constraints: Default::default(),
         }];
         let mut next_node_set = vec![];
 
@@ -69,6 +73,7 @@ impl<'m> FlatScopeBuilder<'m> {
             node,
             mut deps,
             prop_depth,
+            constraints,
         }: NextNode<'a, 'm>,
         next_node_set: &mut Vec<NextNode<'a, 'm>>,
     ) -> Result<(), UnifierError> {
@@ -84,6 +89,7 @@ impl<'m> FlatScopeBuilder<'m> {
                     flat_scope::Meta {
                         scope_var: const_var,
                         free_vars: Default::default(),
+                        constraints,
                         defs: Default::default(),
                         deps,
                         hir_meta: *node.meta(),
@@ -96,6 +102,7 @@ impl<'m> FlatScopeBuilder<'m> {
                     flat_scope::Meta {
                         scope_var: ScopeVar(*var),
                         free_vars: [*var].into(),
+                        constraints,
                         defs: [*var].into(),
                         deps,
                         hir_meta: *node.meta(),
@@ -105,26 +112,29 @@ impl<'m> FlatScopeBuilder<'m> {
             ontol_hir::Kind::Map(inner) => next_node_set.push(NextNode {
                 node: inner,
                 deps,
+                constraints,
                 prop_depth,
             }),
             ontol_hir::Kind::Struct(binder, _flags, nodes) => {
+                for node in nodes {
+                    next_node_set.push(NextNode {
+                        node,
+                        prop_depth,
+                        constraints: constraints.clone(),
+                        deps: [].into(),
+                    });
+                }
                 self.scope_nodes.push(ScopeNode(
                     flat_scope::Kind::Struct,
                     flat_scope::Meta {
                         scope_var: ScopeVar(binder.var),
                         free_vars: Default::default(),
+                        constraints,
                         defs: Default::default(),
                         deps,
                         hir_meta: *node.meta(),
                     },
                 ));
-                for node in nodes {
-                    next_node_set.push(NextNode {
-                        node,
-                        prop_depth,
-                        deps: [].into(),
-                    });
-                }
             }
             ontol_hir::Kind::Prop(optional, struct_var, property_id, variants) => {
                 deps.insert(*struct_var);
@@ -133,6 +143,13 @@ impl<'m> FlatScopeBuilder<'m> {
                     match variant {
                         ontol_hir::PropVariant::Singleton(attr) => {
                             let variant_var = self.var_allocator.alloc();
+
+                            let constraints = if optional.0 {
+                                Rc::new(constraints.union_one(variant_var))
+                            } else {
+                                constraints.clone()
+                            };
+
                             self.scope_nodes.push(ScopeNode(
                                 flat_scope::Kind::PropVariant(
                                     prop_depth,
@@ -143,16 +160,19 @@ impl<'m> FlatScopeBuilder<'m> {
                                 flat_scope::Meta {
                                     scope_var: ScopeVar(variant_var),
                                     free_vars: Default::default(),
+                                    constraints: constraints.clone(),
                                     defs: Default::default(),
                                     deps: deps.clone(),
                                     hir_meta: *node.meta(),
                                 },
                             ));
+
                             self.process_attribute(
                                 &attr.rel,
                                 &attr.val,
                                 prop_depth.next(),
                                 [variant_var].into(),
+                                constraints,
                                 next_node_set,
                             );
                         }
@@ -163,6 +183,7 @@ impl<'m> FlatScopeBuilder<'m> {
                         }) => {
                             let label_var = ontol_hir::Var(label.label.0);
                             let output_var = OutputVar(self.var_allocator.alloc());
+
                             self.scope_nodes.push(ScopeNode(
                                 flat_scope::Kind::SeqPropVariant(
                                     *label,
@@ -175,25 +196,28 @@ impl<'m> FlatScopeBuilder<'m> {
                                 flat_scope::Meta {
                                     scope_var: ScopeVar(label_var),
                                     free_vars: Default::default(),
+                                    constraints: constraints.clone(),
                                     defs: [label_var].into(),
                                     deps: deps.clone(),
                                     hir_meta: *node.meta(),
                                 },
                             ));
+
                             for element in elements {
                                 let attr_deps: VarSet = if element.iter {
-                                    let iter_var = ScopeVar(self.var_allocator.alloc());
+                                    let iter_var = self.var_allocator.alloc();
                                     self.scope_nodes.push(ScopeNode(
                                         flat_scope::Kind::IterElement(label.label, output_var),
                                         flat_scope::Meta {
-                                            scope_var: iter_var,
+                                            scope_var: ScopeVar(iter_var),
                                             free_vars: Default::default(),
+                                            constraints: constraints.clone(),
                                             defs: Default::default(),
                                             deps: [label_var].into(),
                                             hir_meta: *node.meta(),
                                         },
                                     ));
-                                    [iter_var.0].into()
+                                    [iter_var].into()
                                 } else {
                                     [label_var].into()
                                 };
@@ -202,6 +226,7 @@ impl<'m> FlatScopeBuilder<'m> {
                                     &element.attribute.val,
                                     prop_depth.next(),
                                     attr_deps,
+                                    constraints.clone(),
                                     next_node_set,
                                 );
                             }
@@ -217,51 +242,57 @@ impl<'m> FlatScopeBuilder<'m> {
                         flat_scope::Meta {
                             scope_var: ScopeVar(call_var),
                             free_vars: Default::default(),
+                            constraints,
                             defs: Default::default(),
                             deps,
                             hir_meta: *node.meta(),
                         },
                     ))
                 } else {
+                    for arg in args {
+                        next_node_set.push(NextNode {
+                            node: arg,
+                            prop_depth,
+                            constraints: constraints.clone(),
+                            deps: [call_var].into(),
+                        });
+                    }
                     self.scope_nodes.push(ScopeNode(
                         flat_scope::Kind::Call(*proc),
                         flat_scope::Meta {
                             scope_var: ScopeVar(call_var),
                             free_vars: Default::default(),
+                            constraints,
                             defs: Default::default(),
                             deps,
                             hir_meta: *node.meta(),
                         },
                     ));
-                    for arg in args {
-                        next_node_set.push(NextNode {
-                            node: arg,
-                            prop_depth,
-                            deps: [call_var].into(),
-                        });
-                    }
                 }
             }
             ontol_hir::Kind::Regex(regex_def_id, capture_groups) => {
-                let regex_var = self.var_allocator.alloc();
+                let scope_var = self.var_allocator.alloc();
                 self.scope_nodes.push(ScopeNode(
                     flat_scope::Kind::Regex(*regex_def_id),
                     flat_scope::Meta {
-                        scope_var: ScopeVar(regex_var),
+                        scope_var: ScopeVar(scope_var),
                         free_vars: Default::default(),
+                        constraints: constraints.clone(),
                         defs: Default::default(),
                         deps,
                         hir_meta: *node.meta(),
                     },
                 ));
-                let alternation_var = self.var_allocator.alloc();
+                let alt_scope_var = self.var_allocator.alloc();
+                let alternation_constraints = constraints.union_one(scope_var);
                 self.scope_nodes.push(ScopeNode(
                     flat_scope::Kind::RegexAlternation,
                     flat_scope::Meta {
-                        scope_var: ScopeVar(alternation_var),
+                        scope_var: ScopeVar(alt_scope_var),
                         free_vars: Default::default(),
+                        constraints: Rc::new(constraints.union_one(scope_var)),
                         defs: Default::default(),
-                        deps: [regex_var].into(),
+                        deps: [scope_var].into(),
                         hir_meta: *node.meta(),
                     },
                 ));
@@ -271,8 +302,9 @@ impl<'m> FlatScopeBuilder<'m> {
                         flat_scope::Meta {
                             scope_var: ScopeVar(capture_group.binder.var),
                             free_vars: Default::default(),
+                            constraints: Rc::new(alternation_constraints.union_one(alt_scope_var)),
                             defs: [capture_group.binder.var].into(),
-                            deps: [alternation_var].into(),
+                            deps: [alt_scope_var].into(),
                             hir_meta: *node.meta(),
                         },
                     ));
@@ -291,43 +323,48 @@ impl<'m> FlatScopeBuilder<'m> {
         val: &'a TypedHirNode<'m>,
         prop_depth: PropDepth,
         deps: VarSet,
+        constraints: Rc<VarSet>,
         next_node_set: &mut Vec<NextNode<'a, 'm>>,
     ) {
         if !is_unit(rel) {
             let rel_var = self.var_allocator.alloc();
+            next_node_set.push(NextNode {
+                node: rel,
+                prop_depth,
+                constraints: constraints.clone(),
+                deps: [rel_var].into(),
+            });
             self.scope_nodes.push(ScopeNode(
                 flat_scope::Kind::PropRelParam,
                 flat_scope::Meta {
                     scope_var: ScopeVar(rel_var),
                     free_vars: Default::default(),
+                    constraints: constraints.clone(),
                     defs: Default::default(),
                     deps: deps.clone(),
                     hir_meta: *rel.meta(),
                 },
             ));
-            next_node_set.push(NextNode {
-                node: rel,
-                prop_depth,
-                deps: [rel_var].into(),
-            });
         }
         if !is_unit(val) {
             let val_var = self.var_allocator.alloc();
+            next_node_set.push(NextNode {
+                node: val,
+                prop_depth,
+                constraints: constraints.clone(),
+                deps: [val_var].into(),
+            });
             self.scope_nodes.push(ScopeNode(
                 flat_scope::Kind::PropValue,
                 flat_scope::Meta {
                     scope_var: ScopeVar(val_var),
                     free_vars: Default::default(),
+                    constraints: constraints.clone(),
                     defs: Default::default(),
                     deps,
                     hir_meta: *val.meta(),
                 },
             ));
-            next_node_set.push(NextNode {
-                node: val,
-                prop_depth,
-                deps: [val_var].into(),
-            });
         }
     }
 }

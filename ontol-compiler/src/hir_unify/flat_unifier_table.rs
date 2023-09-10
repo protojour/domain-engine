@@ -28,6 +28,21 @@ pub trait IsInScope {
     fn var_set(&self) -> VarSet;
 }
 
+#[derive(Clone, Default)]
+pub struct ScopeFilter {
+    /// The set of scope branches that apply.
+    /// I.e. the allocated scope branch _needs_ these constraints
+    pub req_constraints: VarSet,
+}
+
+impl ScopeFilter {
+    pub fn constraint(&self, scope_var: ScopeVar) -> Self {
+        Self {
+            req_constraints: self.req_constraints.union_one(scope_var.0),
+        }
+    }
+}
+
 impl<'m> Table<'m> {
     pub fn new(flat_scope: flat_scope::FlatScope<'m>) -> Self {
         Self {
@@ -55,75 +70,162 @@ impl<'m> Table<'m> {
         &mut self,
         free_vars: &VarSet,
         is_seq: bool,
-    ) -> Option<AssignmentSlot<'_, 'm>> {
-        let mut tmp_candidate: Option<usize> = None;
+        optional: ontol_hir::Optional,
+        filter: &mut ScopeFilter,
+    ) -> Option<AssignmentSlot> {
+        let mut candidate: Option<usize> = None;
         let mut observed_variables = VarSet::default();
 
-        // Note: Reverse search.
-        for (index, scope_map) in self.table.iter().enumerate().rev() {
-            let scope_defs = &scope_map.scope.meta().defs;
+        let mut lateral_deps = VarSet::default();
 
-            // quick early check
-            if scope_defs.0.is_empty() {
-                continue;
+        if optional.0 {
+            let filter_req_len = filter.req_constraints.0.len();
+
+            // Note: Reverse search.
+            for (index, scope_map) in self.table.iter().enumerate().rev() {
+                let scope_meta = &scope_map.scope.meta();
+                let scope_constraints_len = scope_meta.constraints.0.len();
+
+                // only consider proper scope-introducing nodes
+                match scope_map.scope.kind() {
+                    flat_scope::Kind::PropVariant(..) => {}
+                    flat_scope::Kind::SeqPropVariant(..) => {
+                        if !is_seq {
+                            continue;
+                        }
+                    }
+                    _ => continue,
+                }
+
+                if scope_constraints_len > filter_req_len + 1 {
+                    continue;
+                }
+
+                if !scope_meta.free_vars.0.is_superset(&free_vars.0) {
+                    continue;
+                }
+
+                if candidate.is_some() && scope_constraints_len == filter_req_len {
+                    break;
+                }
+
+                candidate = Some(index);
+            }
+        } else {
+            // Note: Reverse search.
+            for (index, scope_map) in self.table.iter().enumerate().rev() {
+                let scope_defs = &scope_map.scope.meta().defs;
+
+                // quick early check
+                if scope_defs.0.is_empty() {
+                    continue;
+                }
+
+                // only consider proper scope-introducing nodes
+                match scope_map.scope.kind() {
+                    flat_scope::Kind::PropVariant(..) => {}
+                    flat_scope::Kind::SeqPropVariant(..) => {
+                        if !is_seq {
+                            continue;
+                        }
+                    }
+                    _ => continue,
+                }
+
+                // Only consider candidates that introduces the scope
+                if scope_defs.0.intersection(&free_vars.0).next().is_none() {
+                    continue;
+                }
+
+                // If the candidate is only introducing variables that we've
+                // already seen, this is not specific enough. The search is over..
+                if !observed_variables.0.is_empty()
+                    && scope_defs.0.is_superset(&observed_variables.0)
+                {
+                    debug!("    END at {:?}", scope_map.scope.meta().scope_var);
+                    break;
+                }
+
+                observed_variables.union_with(scope_defs);
+
+                debug!("    candidate: {:?}", scope_map.scope.meta().scope_var);
+
+                // Note that we choose the _last_ (in iteration order, really the _first_) candidate
+                // that introduces at least one variable in free_vars.
+                candidate = Some(index);
             }
 
-            // only consider proper scope-introducing nodes
+            lateral_deps = if let Some(index) = candidate {
+                let scope_map = self.scope_map_mut(index);
+                VarSet(free_vars.0.difference(&scope_map.scope.1.defs.0).collect())
+            } else {
+                VarSet::default()
+            };
+        }
+
+        // Apply filter successively
+        // if let Some(index) = candidate {
+        //     let scope_map = self.scope_map_mut(index);
+        //
+        //     if scope_map.scope.meta().constraints.as_ref() != &filter.req_constraints {
+        //         let mut deps = scope_map.scope.meta().deps.clone();
+        //         while !deps.0.is_empty() {
+        //             let mut next_deps = VarSet::default();
+        //
+        //             for dep in &deps {
+        //                 let (index, scope_map) =
+        //                     self.find_scope_map_by_scope_var(ScopeVar(dep)).unwrap();
+        //                 if scope_map.scope.meta().constraints.as_ref() == &filter.req_constraints {
+        //                     match scope_map.scope.kind() {
+        //                         flat_scope::Kind::PropVariant(..) => {}
+        //                         flat_scope::Kind::SeqPropVariant(..) => {
+        //                             candidate = Some(index);
+        //                             next_deps.0.clear();
+        //                             break;
+        //                         }
+        //                         _ => {}
+        //                     }
+        //                 }
+        //
+        //                 next_deps.union_with(&scope_map.scope.meta().deps);
+        //             }
+        //
+        //             deps = next_deps;
+        //         }
+        //     }
+        // }
+
+        // apply new filter
+        if let Some(index) = candidate {
+            let scope_map = self.scope_map_mut(index);
+            let scope_var = scope_map.scope.meta().scope_var;
             match scope_map.scope.kind() {
-                flat_scope::Kind::PropVariant(..) => {}
-                flat_scope::Kind::SeqPropVariant(..) => {
-                    if !is_seq {
-                        continue;
+                flat_scope::Kind::PropVariant(_, optional, ..) => {
+                    if optional.0 {
+                        filter.req_constraints.insert(scope_var.0);
                     }
                 }
-                _ => continue,
+                flat_scope::Kind::SeqPropVariant(..) => {
+                    filter.req_constraints.insert(scope_var.0);
+                }
+                _ => {}
             }
-
-            // Only consider candidates that introduces the scope
-            if scope_defs.0.intersection(&free_vars.0).next().is_none() {
-                continue;
-            }
-
-            // If the candidate is only introducing variables that we've
-            // already seen, this is not specific enough. The search is over..
-            if !observed_variables.0.is_empty() && scope_defs.0.is_superset(&observed_variables.0) {
-                debug!("    END at {:?}", scope_map.scope.meta().scope_var);
-                break;
-            }
-
-            observed_variables.union_with(scope_defs);
-
-            debug!("    candidate: {:?}", scope_map.scope.meta().scope_var);
-
-            // Note that we choose the _last_ (in iteration order, really the _first_) candidate
-            // that introduces at least one variable in free_vars.
-            tmp_candidate = Some(index);
         }
 
-        if let Some(index) = tmp_candidate {
-            let scope_map = self.scope_map_mut(index);
-            let extra_deps = VarSet(free_vars.0.difference(&scope_map.scope.1.defs.0).collect());
-
-            Some(AssignmentSlot {
-                scope_map,
-                lateral_deps: extra_deps,
-            })
-        } else {
-            // instead of crashing, we should just add this at index 0 ("const scope")
-            // If there's a real scoping error, this will show up as "unbound variable"
-            // errors during codegen instead.
-            None
-            // AssignmentSlot {
-            //     scope_map: self.scope_map_mut(0),
-            //     lateral_deps: Default::default(),
-            // }
-        }
+        candidate.map(|index| AssignmentSlot {
+            index,
+            lateral_deps,
+        })
     }
 
-    pub fn find_scope_map_by_scope_var(&self, scope_var: ScopeVar) -> Option<&ScopeMap<'m>> {
+    pub fn find_scope_map_by_scope_var(
+        &self,
+        scope_var: ScopeVar,
+    ) -> Option<(usize, &ScopeMap<'m>)> {
         self.table
             .iter()
-            .find(|scope_map| scope_map.scope.meta().scope_var == scope_var)
+            .enumerate()
+            .find(|(_index, scope_map)| scope_map.scope.meta().scope_var == scope_var)
     }
 
     pub fn find_var_index(&self, scope_var: ScopeVar) -> Option<usize> {
@@ -166,14 +268,14 @@ impl<'m> Table<'m> {
     }
 
     pub fn find_upstream_data_point(&self, scope_var: ScopeVar) -> Option<&ScopeMap<'m>> {
-        let mut scope_map = self.find_scope_map_by_scope_var(scope_var)?;
+        let (_, mut scope_map) = self.find_scope_map_by_scope_var(scope_var)?;
 
         loop {
             let Some(dep) = scope_map.scope.meta().deps.iter().next() else {
                 return None;
             };
 
-            let next_scope_map = self.find_scope_map_by_scope_var(ScopeVar(dep))?;
+            let (_, next_scope_map) = self.find_scope_map_by_scope_var(ScopeVar(dep))?;
 
             if let flat_scope::Kind::PropVariant(..) = next_scope_map.scope.kind() {
                 return Some(next_scope_map);
@@ -339,8 +441,8 @@ pub(super) struct ScopedAssignment<'m> {
     pub lateral_deps: VarSet,
 }
 
-pub(super) struct AssignmentSlot<'a, 'm> {
-    pub scope_map: &'a mut ScopeMap<'m>,
+pub(super) struct AssignmentSlot {
+    pub index: usize,
     pub lateral_deps: VarSet,
 }
 

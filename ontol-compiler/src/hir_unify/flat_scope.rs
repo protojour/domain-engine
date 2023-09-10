@@ -1,4 +1,7 @@
-use std::fmt::{Debug, Display};
+use std::{
+    fmt::{Debug, Display},
+    rc::Rc,
+};
 
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc, DefId};
 
@@ -40,8 +43,8 @@ impl<'m> Display for ScopeNode<'m> {
         let (kind, meta) = (self.kind(), self.meta());
         write!(
             f,
-            "{}: {:?} - {:?} {:?}",
-            meta.scope_var.0, meta.deps, kind, meta.defs,
+            "{}: {:?} - {:?} d={:?} c={:?}",
+            meta.scope_var.0, meta.deps, kind, meta.defs, meta.constraints
         )
     }
 }
@@ -54,7 +57,14 @@ pub struct Meta<'m> {
     /// The specific variable introduced by the node
     pub scope_var: ScopeVar,
     /// Variables that are dependencies of this node
+    /// TODO: This probably doesn't need to be a VarSet.
+    /// Let's see when dependent scoping is implemented.
+    /// It just needs to be some kind of reference to the parent.
     pub deps: VarSet,
+    /// The set of all ScopeVar parents.
+    /// TODO: Let's see if this needs to include all parents, or just the parents
+    /// that needs to be used for filtering (sequences/optionals)
+    pub constraints: Rc<VarSet>,
     /// All free vars under this node
     pub free_vars: VarSet,
     /// Vars defined atomically by this node

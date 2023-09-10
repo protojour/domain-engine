@@ -200,7 +200,7 @@ impl VariableTracker {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Eq, PartialEq)]
 pub struct VarSet(pub BitSet);
 
 impl VarSet {
