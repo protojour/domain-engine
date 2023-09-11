@@ -1,3 +1,5 @@
+//! TODO: Optimize so that we don't unnecessarily Clone struct attributes
+//!
 use fnv::FnvHashSet;
 use ontol_runtime::vm::proc::OpCode;
 
@@ -56,14 +58,14 @@ impl CloneToBumpOptimizer {
                         match block_kind {
                             BlockKind::Linear => {
                                 // A reference to a local in the parent block
-                                self.count_use(local.0 as usize);
+                                self.count_local_use(local.0 as usize);
                             }
                             BlockKind::Looping => {
-                                self.set_multi(local.0 as usize);
+                                self.set_local_multi(local.0 as usize);
                             }
                         }
                     } else {
-                        self.count_use(local.0 as usize);
+                        self.count_local_use(local.0 as usize);
                     }
                 }
                 Ir::Iter(_, _, block_index) => {
@@ -79,10 +81,10 @@ impl CloneToBumpOptimizer {
 
         let block = builder.blocks.get_mut(block_index.0 as usize).unwrap();
 
-        // optimize (Clone => Take):
+        // optimize (Clone => Bump):
         for (ir, _) in block.ir_mut() {
             if let Ir::Op(OpCode::Clone(local)) = ir {
-                let usage = self.usage_mut(local.0 as usize);
+                let usage = self.local_usage_mut(local.0 as usize);
                 if matches!(usage, LocalUsage::Once) {
                     *ir = Ir::Op(OpCode::Bump(*local));
                 }
@@ -98,8 +100,8 @@ impl CloneToBumpOptimizer {
         self.locals.truncate(size as usize);
     }
 
-    fn count_use(&mut self, local: usize) {
-        match self.usage_mut(local) {
+    fn count_local_use(&mut self, local: usize) {
+        match self.local_usage_mut(local) {
             usage @ LocalUsage::None => {
                 *usage = LocalUsage::Once;
             }
@@ -108,11 +110,11 @@ impl CloneToBumpOptimizer {
         }
     }
 
-    fn set_multi(&mut self, local: usize) {
-        *self.usage_mut(local) = LocalUsage::Multi;
+    fn set_local_multi(&mut self, local: usize) {
+        *self.local_usage_mut(local) = LocalUsage::Multi;
     }
 
-    fn usage_mut(&mut self, local: usize) -> &mut LocalUsage {
+    fn local_usage_mut(&mut self, local: usize) -> &mut LocalUsage {
         while self.locals.len() <= local {
             self.locals.push(LocalUsage::None)
         }

@@ -47,8 +47,7 @@ pub trait Processor {
     fn pop_until(&mut self, local: Local);
     fn swap(&mut self, a: Local, b: Local);
     fn iter_next(&mut self, seq: Local, index: Local) -> bool;
-    fn take_attr2(&mut self, source: Local, key: PropertyId);
-    fn try_take_attr2(&mut self, source: Local, key: PropertyId);
+    fn get_attr(&mut self, source: Local, key: PropertyId, flags: GetAttrFlags);
     fn put_attr1(&mut self, target: Local, key: PropertyId);
     fn put_attr2(&mut self, target: Local, key: PropertyId);
     fn push_i64(&mut self, k: i64, result_type: DefId);
@@ -129,12 +128,8 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                     processor.pop_until(*local);
                     self.program_counter += 1;
                 }
-                OpCode::TakeAttr2(source, property_id) => {
-                    processor.take_attr2(*source, *property_id);
-                    self.program_counter += 1;
-                }
-                OpCode::TryTakeAttr2(source, property_id) => {
-                    processor.try_take_attr2(*source, *property_id);
+                OpCode::GetAttr(local, property_id, flags) => {
+                    processor.get_attr(*local, *property_id, *flags);
                     self.program_counter += 1;
                 }
                 OpCode::PutAttr1(target, property_id) => {
@@ -237,6 +232,8 @@ macro_rules! return0 {
 
 use bit_vec::BitVec;
 pub(crate) use return0;
+
+use super::proc::GetAttrFlags;
 
 pub trait VmDebug<P: Processor> {
     fn tick(&mut self, vm: &AbstractVm<P>, processor: &P);

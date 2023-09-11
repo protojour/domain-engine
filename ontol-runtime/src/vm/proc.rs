@@ -72,13 +72,9 @@ pub enum OpCode {
     /// Iterate all items in #0, #1 is the counter.
     /// Pushes two items on the stack
     Iter(Local, Local, AddressOffset),
-    /// Take attribute and push two values on the stack: [value, rel_params].
-    /// The attribute _must_ be present.
-    TakeAttr2(Local, PropertyId),
-    /// Try to take attr, with two outcomes:
-    /// If present, pushes three values on the stack: [value, rel_params, I64(1)].
-    /// If absent, pushes one value on the stack: [I64(0)].
-    TryTakeAttr2(Local, PropertyId),
+    /// Get an attribute from a struct.
+    /// See GetAttrFlags for different semantic variations.
+    GetAttr(Local, PropertyId, GetAttrFlags),
     /// Pop 1 value from stack, and move it into the specified local struct. Sets the attribute parameter to unit.
     PutAttr1(Local, PropertyId),
     /// Pop 2 stack values, rel_params (top) then value, and move it into the specified local struct.
@@ -135,4 +131,29 @@ pub enum Predicate {
     YankTrue(Local),
     /// Test if not true. NB: Yanks from stack.
     YankFalse(Local),
+}
+
+bitflags::bitflags! {
+    ///
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug, Serialize, Deserialize)]
+    pub struct GetAttrFlags: u8 {
+        /// Push true/false on stack as status on whether the attr is present
+        const TRY   = 0b00000001;
+        /// If flag is set, take the attribute instead of cloning it
+        const TAKE  = 0b00000010;
+        /// Push attr rel param on top of stack, if present
+        const REL   = 0b00000100;
+        /// Push attr val on top of stack, if present
+        const VAL   = 0b00001000;
+    }
+}
+
+impl GetAttrFlags {
+    pub fn take2() -> Self {
+        Self::TAKE | Self::REL | Self::VAL
+    }
+
+    pub fn try_take2() -> Self {
+        Self::TRY | Self::TAKE | Self::REL | Self::VAL
+    }
 }

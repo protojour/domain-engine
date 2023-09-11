@@ -15,7 +15,7 @@ use crate::{
     DefId, PackageId,
 };
 
-use super::proc::Predicate;
+use super::proc::{GetAttrFlags, Predicate};
 
 /// Virtual machine for executing ONTOL procedures
 pub struct OntolVm<'l> {
@@ -147,30 +147,31 @@ impl Processor for OntolProcessor {
     }
 
     #[inline(always)]
-    fn take_attr2(&mut self, source: Local, key: PropertyId) {
-        let map = self.struct_local_mut(source);
-        match map.remove(&key) {
-            Some(attribute) => {
-                self.stack.push(attribute.rel_params);
-                self.stack.push(attribute.value);
+    fn get_attr(&mut self, source: Local, key: PropertyId, flags: super::proc::GetAttrFlags) {
+        let _struct = self.struct_local_mut(source);
+        let attr = if flags.contains(GetAttrFlags::TAKE) {
+            _struct.remove(&key)
+        } else {
+            _struct.get(&key).cloned()
+        };
+        match attr {
+            Some(attr) => {
+                if flags.contains(GetAttrFlags::TRY) {
+                    self.push_true();
+                }
+                if flags.contains(GetAttrFlags::REL) {
+                    self.stack.push(attr.rel_params);
+                }
+                if flags.contains(GetAttrFlags::VAL) {
+                    self.stack.push(attr.value);
+                }
             }
             None => {
-                panic!("Attribute {key} not present");
-            }
-        }
-    }
-
-    #[inline(always)]
-    fn try_take_attr2(&mut self, source: Local, key: PropertyId) {
-        let map = self.struct_local_mut(source);
-        match map.remove(&key) {
-            Some(attribute) => {
-                self.push_true();
-                self.stack.push(attribute.rel_params);
-                self.stack.push(attribute.value);
-            }
-            None => {
-                self.push_false();
+                if flags.contains(GetAttrFlags::TRY) {
+                    self.push_false();
+                } else {
+                    panic!("Attribute {key} not present");
+                }
             }
         }
     }
@@ -428,9 +429,9 @@ mod tests {
             NParams(1),
             [
                 OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id(42)),
-                OpCode::TakeAttr2(Local(0), "S:0:1".parse().unwrap()),
+                OpCode::GetAttr(Local(0), "S:0:1".parse().unwrap(), GetAttrFlags::take2()),
                 OpCode::PutAttr1(Local(1), "S:0:3".parse().unwrap()),
-                OpCode::TakeAttr2(Local(0), "S:0:2".parse().unwrap()),
+                OpCode::GetAttr(Local(0), "S:0:2".parse().unwrap(), GetAttrFlags::take2()),
                 OpCode::PutAttr1(Local(1), "S:0:4".parse().unwrap()),
                 OpCode::Return(Local(1)),
             ],
@@ -492,13 +493,13 @@ mod tests {
             [
                 OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id(0)),
                 // 2, 3:
-                OpCode::TakeAttr2(Local(0), "S:0:1".parse().unwrap()),
+                OpCode::GetAttr(Local(0), "S:0:1".parse().unwrap(), GetAttrFlags::take2()),
                 OpCode::Call(double),
                 OpCode::PutAttr1(Local(1), "S:0:4".parse().unwrap()),
                 // 3, 4:
-                OpCode::TakeAttr2(Local(0), "S:0:2".parse().unwrap()),
+                OpCode::GetAttr(Local(0), "S:0:2".parse().unwrap(), GetAttrFlags::take2()),
                 // 5, 6:
-                OpCode::TakeAttr2(Local(0), "S:0:3".parse().unwrap()),
+                OpCode::GetAttr(Local(0), "S:0:3".parse().unwrap(), GetAttrFlags::take2()),
                 OpCode::Clone(Local(4)),
                 // pop(6, 7):
                 OpCode::Call(add_then_double),
@@ -606,9 +607,9 @@ mod tests {
             NParams(1),
             [
                 // a -> Local(2):
-                OpCode::TakeAttr2(Local(0), prop_a),
+                OpCode::GetAttr(Local(0), prop_a, GetAttrFlags::take2()),
                 // [b] -> Local(4):
-                OpCode::TakeAttr2(Local(0), prop_b),
+                OpCode::GetAttr(Local(0), prop_b, GetAttrFlags::take2()),
                 // counter -> Local(5):
                 OpCode::I64(0, def_id(0)),
                 // output -> Local(6):
@@ -675,7 +676,7 @@ mod tests {
             NParams(1),
             [
                 OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id(7)),
-                OpCode::TryTakeAttr2(Local(0), prop),
+                OpCode::GetAttr(Local(0), prop, GetAttrFlags::try_take2()),
                 OpCode::Cond(Predicate::YankTrue(Local(2)), AddressOffset(4)),
                 // AddressOffset(3):
                 OpCode::Return(Local(1)),

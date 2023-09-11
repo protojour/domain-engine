@@ -6,7 +6,7 @@ use ontol_hir::{GetKind, HasDefault, PropPattern, PropVariant};
 use ontol_runtime::{
     smart_format,
     value::PropertyId,
-    vm::proc::{BuiltinProc, Local, NParams, OpCode, Predicate, Procedure},
+    vm::proc::{BuiltinProc, GetAttrFlags, Local, NParams, OpCode, Predicate, Procedure},
     DefId,
 };
 use tracing::debug;
@@ -292,7 +292,11 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     {
                         self.builder.append_op(
                             block,
-                            OpCode::TryTakeAttr2(struct_local, id),
+                            OpCode::GetAttr(
+                                struct_local,
+                                id,
+                                GetAttrFlags::TRY | GetAttrFlags::REL | GetAttrFlags::VAL,
+                            ),
                             // even if three locals are pushed, the `status` one
                             // is not kept track of here.
                             Delta(2),
@@ -342,7 +346,11 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                         PropPattern::Seq(ontol_hir::Binding::Binder(binder), HasDefault(true)) => {
                             self.builder.append_op(
                                 block,
-                                OpCode::TryTakeAttr2(struct_local, id),
+                                OpCode::GetAttr(
+                                    struct_local,
+                                    id,
+                                    GetAttrFlags::TRY | GetAttrFlags::REL | GetAttrFlags::VAL,
+                                ),
                                 Delta(2),
                                 span,
                             );
@@ -403,7 +411,12 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                         _ => {
                             self.builder.append_op(
                                 block,
-                                OpCode::TakeAttr2(struct_local, id),
+                                OpCode::GetAttr(
+                                    struct_local,
+                                    id,
+                                    // note: No TRY
+                                    GetAttrFlags::REL | GetAttrFlags::VAL,
+                                ),
                                 Delta(2),
                                 span,
                             );
