@@ -1549,7 +1549,7 @@ fn test_unify_regex_capture2() {
 }
 
 #[test]
-#[should_panic = "regex-seq"]
+#[should_panic = "This unifier does not handle looping regex"]
 fn test_unify_regex_loop1() {
     let output = test_unify(
         // Contains a looping regex with two variations
@@ -1557,15 +1557,15 @@ fn test_unify_regex_loop1() {
         (struct ($c)
             (prop $c S:0:0
                 (#u
-                    (regex-seq (@a) def@0:0 ((1 $a)) ((2 $b)))
+                    (regex-seq (@e) def@0:0 ((1 $a)) ((2 $b)))
                 )
             )
         )
         ",
         "
         (struct ($d)
-            (prop $e O:0:0 (seq (@a) (iter #u $a)))
-            (prop $e O:0:1 (seq (@a) (iter #u $b)))
+            (prop $e O:0:0 (seq (@e) (iter #u $a)))
+            (prop $e O:0:1 (seq (@e) (iter #u $b)))
         )
         ",
     );
@@ -1574,8 +1574,8 @@ fn test_unify_regex_loop1() {
         |$c| (struct ($d)
             (match-prop $c S:0:0
                 (($_ $e)
-                    (let ($f (sequence))
-                        (let ($g (sequence))
+                    (let ($f (sequence ($f)))
+                        (let ($g (sequence ($g)))
                             (regex-for-each $e def@0:0
                                 (((1 $a))
                                     (seq-push $f #u $a)

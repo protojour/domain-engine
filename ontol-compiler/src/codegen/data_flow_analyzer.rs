@@ -206,8 +206,19 @@ where
                 self.var_dependencies.insert(*to_var, var_set.clone());
                 var_set
             }
-            ontol_hir::Kind::Regex(_, _captures) => VarSet::default(),
-            ontol_hir::Kind::MatchRegex(_, _string_var, _match_arms) => VarSet::default(),
+            ontol_hir::Kind::MatchRegex(var, _, match_arms) => {
+                let mut var_set = VarSet::default();
+                for match_arm in match_arms {
+                    for group in &match_arm.capture_groups {
+                        self.add_dep(group.binder.var, *var);
+                    }
+                    for node in &match_arm.nodes {
+                        var_set.union_with(&self.analyze_node(node));
+                    }
+                }
+                var_set
+            }
+            ontol_hir::Kind::Regex(..) => VarSet::default(),
         }
     }
 
@@ -219,28 +230,25 @@ where
         &mut self,
         _struct_var: ontol_hir::Var,
         property_id: PropertyId,
-        var_dependencies: VarSet,
+        mut var_dependencies: VarSet,
     ) {
-        for var in &var_dependencies {
-            if let Some(deps) = self.var_to_property.get(&var) {
-                for dep in deps {
-                    self.property_flow.insert(PropertyFlow {
-                        id: property_id,
-                        data: PropertyFlowData::DependentOn(*dep),
-                    });
-                }
-            } else if let Some(parent_vars) = self.var_dependencies.get(&var) {
-                for parent_var in parent_vars {
-                    if let Some(deps) = self.var_to_property.get(&parent_var) {
-                        for dep in deps {
-                            self.property_flow.insert(PropertyFlow {
-                                id: property_id,
-                                data: PropertyFlowData::DependentOn(*dep),
-                            });
-                        }
+        while !var_dependencies.0.is_empty() {
+            let mut next_deps = VarSet::default();
+
+            for var in &var_dependencies {
+                if let Some(deps) = self.var_to_property.get(&var) {
+                    for dep in deps {
+                        self.property_flow.insert(PropertyFlow {
+                            id: property_id,
+                            data: PropertyFlowData::DependentOn(*dep),
+                        });
                     }
+                } else if let Some(parent_vars) = self.var_dependencies.get(&var) {
+                    next_deps.union_with(parent_vars);
                 }
             }
+
+            var_dependencies = next_deps;
         }
     }
 

@@ -8,7 +8,8 @@ impl FromStr for Var {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        try_alpha_to_u32(s).map(Var).map_err(|_| ())
+        let next = s.strip_prefix('$').ok_or(())?;
+        try_alpha_to_u32(next).map(Var).map_err(|_| ())
     }
 }
 
@@ -183,7 +184,13 @@ impl<L: Lang> Parser<L> {
                     next,
                 ))
             }
-            ("regex", next) => {
+            (sym @ ("regex" | "regex-seq"), next) => {
+                let (label, next) = if sym == "regex-seq" {
+                    let (label, next) = parse_paren_delimited(next, parse_at_label)?;
+                    (Some(self.make_label(label)), next)
+                } else {
+                    (None, next)
+                };
                 let (regex_def_id, next) = parse_def_id(next)?;
                 let (match_arms, next) = self.parse_many(next, |zelf, next| {
                     parse_paren_delimited(next, |next| {
@@ -191,7 +198,10 @@ impl<L: Lang> Parser<L> {
                     })
                 })?;
 
-                Ok((self.make_node(Kind::Regex(regex_def_id, match_arms)), next))
+                Ok((
+                    self.make_node(Kind::Regex(label, regex_def_id, match_arms)),
+                    next,
+                ))
             }
             ("match-regex", next) => {
                 let (string_var, next) = parse_dollar_var(next)?;

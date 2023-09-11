@@ -81,29 +81,29 @@ const fn default_type() -> PropertyFlowData {
 #[test]
 fn test_analyze1() {
     let data_flow = analyze(
-        "b",
+        "$b",
         "
-            (struct ($a)
-                (match-prop $b O:0:0
-                    (($_ $c)
-                        (prop $a S:0:0
-                            (#u (map $c))
-                        )
+        (struct ($a)
+            (match-prop $b O:0:0
+                (($_ $c)
+                    (prop $a S:0:0
+                        (#u (map $c))
                     )
                 )
-                (match-prop $b O:1:1
-                    (($_ $d)
-                        (prop $a S:1:1
-                            (#u
-                                (match-prop $d O:2:2
-                                    (($_ $e) $e)
-                                )
+            )
+            (match-prop $b O:1:1
+                (($_ $d)
+                    (prop $a S:1:1
+                        (#u
+                            (match-prop $d O:2:2
+                                (($_ $e) $e)
                             )
                         )
                     )
                 )
             )
-            ",
+        )
+        ",
     );
 
     expect_eq!(
@@ -125,7 +125,7 @@ fn test_analyze1() {
 #[test]
 fn test_analyze_seq1() {
     let data_flow = analyze(
-        "b",
+        "$b",
         "
         (struct ($a)
             (match-prop $b O:0:0
@@ -158,6 +158,43 @@ fn test_analyze_seq1() {
             prop_flow("O:1:1", default_type()),
             prop_flow("O:1:1", default_cardinality()),
             prop_flow("O:1:1", child_of("O:0:0")),
+        ]
+    );
+}
+
+#[test]
+fn test_analyze_regex_match1() {
+    let data_flow = analyze(
+        "$b",
+        "
+        (struct ($a)
+            (match-prop $b O:0:0
+                (($_ $c)
+                    (match-regex $c def@0:0
+                        (((1 $d))
+                            (prop $a S:0:0
+                                (#u $d)
+                            )
+                        )
+                        (((2 $e))
+                            (prop $a S:0:1
+                                (#u $e)
+                            )
+                        )
+                    )
+                )
+            )
+        )
+        ",
+    );
+
+    expect_eq!(
+        actual = data_flow,
+        expected = vec![
+            prop_flow("S:0:0", dependent_on("O:0:0")),
+            prop_flow("S:0:1", dependent_on("O:0:0")),
+            prop_flow("O:0:0", default_type()),
+            prop_flow("O:0:0", default_cardinality()),
         ]
     );
 }

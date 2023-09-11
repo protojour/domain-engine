@@ -126,7 +126,11 @@ macro_rules! visitor_trait_methods {
                     self.visit_var(to_var);
                     self.visit_node(0, node);
                 }
-                Kind::Regex(_, capture_groups_list) => {
+                Kind::Regex(label, _, capture_groups_list) => {
+                    if let Some(label) = label {
+                        self.visit_label(label.$label());
+                    }
+
                     for capture_groups in capture_groups_list.$iter() {
                         for capture_group in capture_groups.$iter() {
                             self.visit_binder(capture_group.binder.$var());

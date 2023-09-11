@@ -179,7 +179,11 @@ impl<'m> ScopeBuilder<'m> {
                     ),
                 })
             }),
-            ontol_hir::Kind::Regex(regex_def_id, capture_group_alternations) => {
+            ontol_hir::Kind::Regex(seq_label, regex_def_id, capture_group_alternations) => {
+                if seq_label.is_some() {
+                    panic!("This unifier does not handle looping regex");
+                }
+
                 let mut vars = VarSet::default();
                 let capture_groups = capture_group_alternations.first().unwrap();
                 let scope_capture_groups = capture_groups
@@ -211,15 +215,6 @@ impl<'m> ScopeBuilder<'m> {
                 })
             }
             ontol_hir::Kind::Prop(..) => panic!("standalone prop"),
-            ontol_hir::Kind::MatchProp(..) => {
-                unimplemented!("BUG: MatchProp is an output node")
-            }
-            ontol_hir::Kind::MatchRegex(..) => {
-                unimplemented!("BUG: MatchRegex is an output node")
-            }
-            ontol_hir::Kind::StringPush(..) => {
-                unimplemented!("BUG: StringPush is an output node")
-            }
             ontol_hir::Kind::Sequence(..) => {
                 todo!()
             }
@@ -228,6 +223,14 @@ impl<'m> ScopeBuilder<'m> {
             }
             ontol_hir::Kind::SeqPush(..) => {
                 todo!()
+            }
+            kind @ (ontol_hir::Kind::MatchProp(..)
+            | ontol_hir::Kind::MatchRegex(..)
+            | ontol_hir::Kind::StringPush(..)) => {
+                unimplemented!(
+                    "BUG: {} is an output node",
+                    TypedHirNode(kind.clone(), hir_meta)
+                )
             }
         }
     }

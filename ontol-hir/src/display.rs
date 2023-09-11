@@ -151,8 +151,12 @@ impl<'a, L: Lang> Print<Kind<'a, L>> for Printer<L> {
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
-            Kind::Regex(regex_def_id, captures) => {
-                write!(f, "{sep}(regex {regex_def_id:?}")?;
+            Kind::Regex(label, regex_def_id, captures) => {
+                if let Some(label) = label {
+                    write!(f, "{sep}(regex-seq ({}) {regex_def_id:?}", label.label())?;
+                } else {
+                    write!(f, "{sep}(regex {regex_def_id:?}")?;
+                }
                 let multi = self.print_all(Sep::Space, captures.iter(), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(sep.multiline())

@@ -384,7 +384,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     );
 
                     TypedHirNode(
-                        ontol_hir::Kind::Regex(regex_pattern.regex_def_id, capture_groups_list),
+                        ontol_hir::Kind::Regex(
+                            None,
+                            regex_pattern.regex_def_id,
+                            capture_groups_list,
+                        ),
                         Meta {
                             ty: expected_ty,
                             span: pattern.span,

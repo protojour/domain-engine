@@ -141,7 +141,7 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                     },
                 )
             }),
-            ontol_hir::Kind::Regex(regex_def_id, capture_group_alternation) => {
+            ontol_hir::Kind::Regex(_seq_label, regex_def_id, capture_group_alternation) => {
                 let regex_meta = self
                     .defs
                     .literal_regex_meta_table
@@ -176,23 +176,15 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                 )
             }
             ontol_hir::Kind::Prop(..) => panic!("standalone prop"),
-            ontol_hir::Kind::MatchProp(..) => {
-                unimplemented!("BUG: MatchProp is an output node")
-            }
-            ontol_hir::Kind::MatchRegex(..) => {
-                unimplemented!("BUG: MatchRegex is an output node")
-            }
-            ontol_hir::Kind::StringPush(..) => {
-                unimplemented!("BUG: StringPush is an output node")
-            }
             ontol_hir::Kind::Sequence(..) => {
                 todo!()
             }
-            ontol_hir::Kind::ForEach(..) => {
-                todo!()
-            }
-            ontol_hir::Kind::SeqPush(..) => {
-                todo!()
+            kind @ (ontol_hir::Kind::MatchProp(..)
+            | ontol_hir::Kind::MatchRegex(..)
+            | ontol_hir::Kind::ForEach(..)
+            | ontol_hir::Kind::StringPush(..)
+            | ontol_hir::Kind::SeqPush(..)) => {
+                unimplemented!("BUG: {kind} is an output node",)
             }
         }
     }

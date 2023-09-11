@@ -97,8 +97,9 @@ pub enum Kind<'a, L: Lang> {
     SeqPush(Var, Attribute<Box<L::Node<'a>>>),
     /// Push the second string at the end of the first string
     StringPush(Var, Box<L::Node<'a>>),
-    /// Declarative regex w/captures
-    Regex(DefId, Vec<Vec<CaptureGroup<'a, L>>>),
+    /// Declarative regex w/captures.
+    /// If the label is defined, it is a looping regex
+    Regex(Option<L::Label<'a>>, DefId, Vec<Vec<CaptureGroup<'a, L>>>),
     /// A regex matcher/unpacker
     MatchRegex(Var, DefId, Vec<CaptureMatchArm<'a, L>>),
 }
