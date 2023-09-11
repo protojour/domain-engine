@@ -126,9 +126,11 @@ macro_rules! visitor_trait_methods {
                     self.visit_var(to_var);
                     self.visit_node(0, node);
                 }
-                Kind::Regex(_, capture_groups) => {
-                    for group in capture_groups.$iter() {
-                        self.visit_binder(group.binder.$var());
+                Kind::Regex(_, capture_groups_list) => {
+                    for capture_groups in capture_groups_list.$iter() {
+                        for capture_group in capture_groups.$iter() {
+                            self.visit_binder(capture_group.binder.$var());
+                        }
                     }
                 }
                 Kind::MatchRegex(string_var, _regex_def_id, capture_match_arms) => {

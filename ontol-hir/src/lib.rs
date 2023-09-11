@@ -98,7 +98,7 @@ pub enum Kind<'a, L: Lang> {
     /// Push the second string at the end of the first string
     StringPush(Var, Box<L::Node<'a>>),
     /// Declarative regex w/captures
-    Regex(DefId, Vec<CaptureGroup<'a, L>>),
+    Regex(DefId, Vec<Vec<CaptureGroup<'a, L>>>),
     /// A regex matcher/unpacker
     MatchRegex(Var, DefId, Vec<CaptureMatchArm<'a, L>>),
 }

@@ -81,6 +81,23 @@ pub enum RegexPatternCaptureNode {
 }
 
 impl RegexPatternCaptureNode {
+    pub fn flatten(input: Vec<RegexPatternCaptureNode>) -> Vec<RegexPatternCaptureNode> {
+        if input.len() == 1 {
+            match input.into_iter().next().unwrap() {
+                RegexPatternCaptureNode::Concat { nodes } => {
+                    if nodes.len() == 1 {
+                        nodes
+                    } else {
+                        vec![RegexPatternCaptureNode::Concat { nodes }]
+                    }
+                }
+                other => vec![other],
+            }
+        } else {
+            input
+        }
+    }
+
     /// This method changes the input span to the sum of the named capture groups (if any found).
     pub fn constrain_span(&self, mut full_span: SourceSpan) -> SourceSpan {
         self.constrain_span_inner(&mut full_span);

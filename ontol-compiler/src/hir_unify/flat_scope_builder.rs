@@ -270,7 +270,7 @@ impl<'m> FlatScopeBuilder<'m> {
                     ));
                 }
             }
-            ontol_hir::Kind::Regex(regex_def_id, capture_groups) => {
+            ontol_hir::Kind::Regex(regex_def_id, capture_group_alternations) => {
                 let scope_var = self.var_allocator.alloc();
                 self.scope_nodes.push(ScopeNode(
                     flat_scope::Kind::Regex(*regex_def_id),
@@ -283,30 +283,33 @@ impl<'m> FlatScopeBuilder<'m> {
                         hir_meta: *node.meta(),
                     },
                 ));
-                let alt_scope_var = self.var_allocator.alloc();
-                self.scope_nodes.push(ScopeNode(
-                    flat_scope::Kind::RegexAlternation,
-                    flat_scope::Meta {
-                        scope_var: ScopeVar(alt_scope_var),
-                        free_vars: Default::default(),
-                        constraints: constraints.clone(),
-                        defs: Default::default(),
-                        deps: [scope_var].into(),
-                        hir_meta: *node.meta(),
-                    },
-                ));
-                for capture_group in capture_groups {
+                for alternation in capture_group_alternations {
+                    let alt_scope_var = self.var_allocator.alloc();
                     self.scope_nodes.push(ScopeNode(
-                        flat_scope::Kind::RegexCapture(capture_group.index),
+                        flat_scope::Kind::RegexAlternation,
                         flat_scope::Meta {
-                            scope_var: ScopeVar(capture_group.binder.var),
-                            free_vars: [capture_group.binder.var].into(),
+                            scope_var: ScopeVar(alt_scope_var),
+                            free_vars: Default::default(),
                             constraints: constraints.clone(),
-                            defs: [capture_group.binder.var].into(),
-                            deps: [alt_scope_var].into(),
+                            defs: Default::default(),
+                            deps: [scope_var].into(),
                             hir_meta: *node.meta(),
                         },
                     ));
+
+                    for capture_group in alternation {
+                        self.scope_nodes.push(ScopeNode(
+                            flat_scope::Kind::RegexCapture(capture_group.index),
+                            flat_scope::Meta {
+                                scope_var: ScopeVar(capture_group.binder.var),
+                                free_vars: [capture_group.binder.var].into(),
+                                constraints: constraints.clone(),
+                                defs: [capture_group.binder.var].into(),
+                                deps: [alt_scope_var].into(),
+                                hir_meta: *node.meta(),
+                            },
+                        ));
+                    }
                 }
             }
             ontol_hir::Kind::DeclSeq(..) => return Err(UnifierError::SequenceInputNotSupported),

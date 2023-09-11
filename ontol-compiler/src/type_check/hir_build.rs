@@ -376,7 +376,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             (PatternKind::Regex(regex_pattern), Some(expected_ty)) => match expected_ty {
                 // TODO: Handle compile-time match of string constant?
                 Type::Primitive(PrimitiveKind::String, _) | Type::StringConstant(_) => {
-                    let capture_groups = self.build_regex_capture_groups(
+                    let capture_groups_list = self.build_regex_capture_alternations(
                         &regex_pattern.capture_node,
                         &pattern.span,
                         expected_ty,
@@ -384,7 +384,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     );
 
                     TypedHirNode(
-                        ontol_hir::Kind::Regex(regex_pattern.regex_def_id, capture_groups),
+                        ontol_hir::Kind::Regex(regex_pattern.regex_def_id, capture_groups_list),
                         Meta {
                             ty: expected_ty,
                             span: pattern.span,
@@ -478,6 +478,28 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         _ctx: &mut HirBuildCtx<'m>,
     ) -> TypedHirNode<'m> {
         todo!("looping regex")
+    }
+
+    fn build_regex_capture_alternations(
+        &mut self,
+        node: &RegexPatternCaptureNode,
+        pattern_span: &SourceSpan,
+        // BUG: We want type inference for the capture groups,
+        // that falls back to string if both sides are unknown
+        expected_ty: TypeRef<'m>,
+        ctx: &mut HirBuildCtx<'m>,
+    ) -> Vec<Vec<ontol_hir::CaptureGroup<'m, TypedHir>>> {
+        match node {
+            RegexPatternCaptureNode::Alternation { variants } => variants
+                .iter()
+                .map(|variant| {
+                    self.build_regex_capture_groups(variant, pattern_span, expected_ty, ctx)
+                })
+                .collect(),
+            node => {
+                vec![self.build_regex_capture_groups(node, pattern_span, expected_ty, ctx)]
+            }
+        }
     }
 
     fn build_regex_capture_groups(

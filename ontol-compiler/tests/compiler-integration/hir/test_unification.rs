@@ -1512,7 +1512,7 @@ fn test_unify_regex_capture2() {
         (struct ($c)
             (prop $c S:0:0
                 (#u
-                    (regex def@0:0 ((1 $a) (2 $b)))
+                    (regex def@0:0 ((1 $a)) ((2 $b)))
                 )
             )
         )
@@ -1530,10 +1530,12 @@ fn test_unify_regex_capture2() {
             (match-prop $c S:0:0
                 (($_ $g)
                     (match-regex $g def@0:0
-                        (((1 $a) (2 $b))
+                        (((1 $a))
                             (prop $d O:0:0
                                 (#u $a)
                             )
+                        )
+                        (((2 $b))
                             (prop $d O:1:0
                                 (#u $b)
                             )

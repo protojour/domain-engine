@@ -141,7 +141,7 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                     },
                 )
             }),
-            ontol_hir::Kind::Regex(regex_def_id, capture_groups) => {
+            ontol_hir::Kind::Regex(regex_def_id, capture_group_alternation) => {
                 let regex_meta = self
                     .defs
                     .literal_regex_meta_table
@@ -149,13 +149,17 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                     .unwrap();
 
                 let mut free_vars = VarSet::default();
-                for capture_group in capture_groups {
-                    free_vars.insert(capture_group.binder.var);
+                for altneration in capture_group_alternation {
+                    for capture_group in altneration {
+                        free_vars.insert(capture_group.binder.var);
+                    }
                 }
+
+                let first_alternation = capture_group_alternation.first().unwrap();
 
                 let mut components = vec![];
                 let mut interpolator = regex::RegexStringInterpolator {
-                    capture_groups,
+                    capture_groups: first_alternation,
                     current_constant: "".into(),
                     components: &mut components,
                 };

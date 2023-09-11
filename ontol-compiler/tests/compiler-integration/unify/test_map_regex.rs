@@ -37,8 +37,6 @@ fn test_map_regex_duplex1() {
 }
 
 #[test]
-// BUG: Have to treat regexes as property sets in dependency tree, and flatten things
-#[should_panic = "Regex did not match"]
 fn test_map_regex_alternation1() {
     r#"
     pub def foo {
@@ -69,7 +67,7 @@ fn test_map_regex_alternation1() {
         );
         test.assert_domain_map(
             ("foo", "bar"),
-            json!({ "input": "second=FOO!"}),
+            json!({ "input": "second=BAR!"}),
             json!({ "second": "BAR" }),
         );
     });

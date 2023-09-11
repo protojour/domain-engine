@@ -206,8 +206,8 @@ impl<'a> RegexToPatternLowerer<'a> {
                     } => {
                         nodes = concat_nodes;
                     }
-                    RegexPatternCaptureNode::Alternation { variants } => {
-                        nodes = variants;
+                    alternation @ RegexPatternCaptureNode::Alternation { .. } => {
+                        return alternation;
                     }
                     node @ RegexPatternCaptureNode::Repetition { .. } => {
                         return node;
@@ -303,7 +303,7 @@ impl<'l, 'a> regex_syntax::hir::Visitor for RegexSyntaxVisitor<'l, 'a> {
     fn visit_post(&mut self, hir: &Hir) -> Result<(), Self::Err> {
         match hir.kind() {
             HirKind::Repetition(_) => {
-                let nodes = self.0.pop();
+                let nodes = RegexPatternCaptureNode::flatten(self.0.pop());
                 if !nodes.is_empty() {
                     let pat_id = self.0.patterns.alloc_pat_id();
                     if nodes.len() == 1 {
@@ -324,7 +324,7 @@ impl<'l, 'a> regex_syntax::hir::Visitor for RegexSyntaxVisitor<'l, 'a> {
                 }
             }
             HirKind::Concat(_) => {
-                let nodes = self.0.pop();
+                let nodes = RegexPatternCaptureNode::flatten(self.0.pop());
                 if !nodes.is_empty() {
                     if let Some(RegexCombinator::Concat) = self
                         .0

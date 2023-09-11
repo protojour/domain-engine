@@ -179,8 +179,9 @@ impl<'m> ScopeBuilder<'m> {
                     ),
                 })
             }),
-            ontol_hir::Kind::Regex(regex_def_id, capture_groups) => {
+            ontol_hir::Kind::Regex(regex_def_id, capture_group_alternations) => {
                 let mut vars = VarSet::default();
+                let capture_groups = capture_group_alternations.first().unwrap();
                 let scope_capture_groups = capture_groups
                     .iter()
                     .map(|capture_group| {

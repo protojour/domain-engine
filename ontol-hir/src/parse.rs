@@ -185,14 +185,13 @@ impl<L: Lang> Parser<L> {
             }
             ("regex", next) => {
                 let (regex_def_id, next) = parse_def_id(next)?;
-                let (capture_groups, next) = parse_paren_delimited(next, |next| {
-                    self.parse_many(next, Self::parse_capture_group)
+                let (match_arms, next) = self.parse_many(next, |zelf, next| {
+                    parse_paren_delimited(next, |next| {
+                        zelf.parse_many(next, Self::parse_capture_group)
+                    })
                 })?;
 
-                Ok((
-                    self.make_node(Kind::Regex(regex_def_id, capture_groups)),
-                    next,
-                ))
+                Ok((self.make_node(Kind::Regex(regex_def_id, match_arms)), next))
             }
             ("match-regex", next) => {
                 let (string_var, next) = parse_dollar_var(next)?;

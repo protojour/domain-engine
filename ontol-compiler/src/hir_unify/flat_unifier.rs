@@ -688,7 +688,7 @@ fn unify_scope_structural<'m>(
                         match_arm.nodes.extend(unify_scope_structural(
                             main_scope,
                             selector,
-                            StructuralOrigin::DependeesOf(scope_var),
+                            StructuralOrigin::DependeesOf(alt_scope_var),
                             captured_scope,
                             table,
                             unifier,

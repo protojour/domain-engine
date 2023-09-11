@@ -308,6 +308,18 @@ impl<'a, L: Lang> Print<CaptureGroup<'a, L>> for Printer<L> {
     }
 }
 
+impl<L: Lang, T> Print<Vec<T>> for Printer<L>
+where
+    Printer<L>: Print<T>,
+{
+    fn print(self, sep: Sep, node: &Vec<T>, f: &mut std::fmt::Formatter) -> PrintResult {
+        write!(f, "{sep}(")?;
+        let multi = self.print_all(sep, node.iter(), f)?;
+        self.print_rparen(multi, f)?;
+        Ok(multi)
+    }
+}
+
 impl<L: Lang> Default for Printer<L> {
     fn default() -> Self {
         Self {
