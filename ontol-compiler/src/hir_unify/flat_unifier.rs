@@ -501,7 +501,9 @@ fn unify_scope_structural<'m>(
                 flat_scope::Kind::PropRelParam
                 | flat_scope::Kind::PropValue
                 | flat_scope::Kind::Struct
-                | flat_scope::Kind::Var => {
+                | flat_scope::Kind::Var
+                | flat_scope::Kind::RegexAlternation
+                | flat_scope::Kind::RegexCapture(_) => {
                     builder.output.extend(apply_lateral_scope(
                         main_scope,
                         scope_map.take_assignments(),
@@ -645,6 +647,61 @@ fn unify_scope_structural<'m>(
                             ));
                         }
                     }
+                }
+                flat_scope::Kind::Regex(regex_def_id) => {
+                    let regex_def_id = *regex_def_id;
+                    let regex_hir_meta = scope_map.scope.meta().hir_meta;
+
+                    let mut match_arms: Vec<ontol_hir::CaptureMatchArm<'m, TypedHir>> = vec![];
+
+                    // alternations:
+                    for alt_idx in table.dependees(Some(scope_var)) {
+                        let alt_scope_map = table.scope_map_mut(alt_idx);
+                        let alt_scope_var = alt_scope_map.scope.meta().scope_var;
+
+                        let mut match_arm = ontol_hir::CaptureMatchArm {
+                            capture_groups: vec![],
+                            nodes: vec![],
+                        };
+                        let mut captured_scope = VarSet::default();
+
+                        for cap_scope_idx in table.dependees(Some(alt_scope_var)) {
+                            let cap_scope_map = &mut table.scope_map_mut(cap_scope_idx);
+                            let cap_scope_var = cap_scope_map.scope.meta().scope_var;
+
+                            let flat_scope::Kind::RegexCapture(cap_index) =
+                                cap_scope_map.scope.kind()
+                            else {
+                                panic!("Expected regex capture");
+                            };
+
+                            match_arm.capture_groups.push(ontol_hir::CaptureGroup {
+                                index: *cap_index,
+                                binder: TypedBinder {
+                                    var: cap_scope_var.0,
+                                    meta: cap_scope_map.scope.meta().hir_meta,
+                                },
+                            });
+                            captured_scope.insert(cap_scope_var.0);
+                        }
+
+                        match_arm.nodes.extend(unify_scope_structural(
+                            main_scope,
+                            selector,
+                            StructuralOrigin::DependeesOf(scope_var),
+                            captured_scope,
+                            table,
+                            unifier,
+                            level.next(),
+                        )?);
+
+                        match_arms.push(match_arm);
+                    }
+
+                    builder.output.push(TypedHirNode(
+                        ontol_hir::Kind::MatchRegex(scope_var.0, regex_def_id, match_arms),
+                        regex_hir_meta,
+                    ));
                 }
                 other => return Err(unifier_todo(smart_format!("structural scope: {other:?}"))),
             }

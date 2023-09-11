@@ -92,11 +92,11 @@ fn test_flat_regex() {
     let expected = indoc! {
         "
         $a: {} - Struct def{$a} cns{}
-        $c: {$a} - PropVariant(d=0, opt=f, Var(a), S:0:0) def{$b} cns{}
-        $d: {$c} - PropValue def{$b} cns{}
-        $e: {$d} - Regex(def@0:0) def{$b} cns{}
-        $f: {$e} - RegexAlternation def{$b} cns{$e}
-        $b: {$f} - RegexCapture(1) def{$b} cns{$e, $f}
+        $c: {$a} - PropVariant(d=0, opt=f, Var(a), S:0:0) def{} cns{}
+        $d: {$c} - PropValue def{} cns{}
+        $e: {$d} - Regex(def@0:0) def{} cns{}
+        $f: {$e} - RegexAlternation def{$b} cns{}
+        $b: {$f} - RegexCapture(1) def{$b} cns{}
         "
     };
     assert_eq!(expected, output);

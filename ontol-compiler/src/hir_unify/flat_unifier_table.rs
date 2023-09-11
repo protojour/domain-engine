@@ -96,6 +96,7 @@ impl<'m> Table<'m> {
                                 return false;
                             }
                         }
+                        flat_scope::Kind::RegexCapture(..) => {}
                         _ => return false,
                     }
 
@@ -139,6 +140,7 @@ impl<'m> Table<'m> {
                             continue;
                         }
                     }
+                    flat_scope::Kind::RegexCapture(..) => {}
                     _ => continue,
                 }
 

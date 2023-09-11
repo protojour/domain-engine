@@ -284,13 +284,12 @@ impl<'m> FlatScopeBuilder<'m> {
                     },
                 ));
                 let alt_scope_var = self.var_allocator.alloc();
-                let alternation_constraints = constraints.union_one(scope_var);
                 self.scope_nodes.push(ScopeNode(
                     flat_scope::Kind::RegexAlternation,
                     flat_scope::Meta {
                         scope_var: ScopeVar(alt_scope_var),
                         free_vars: Default::default(),
-                        constraints: Rc::new(constraints.union_one(scope_var)),
+                        constraints: constraints.clone(),
                         defs: Default::default(),
                         deps: [scope_var].into(),
                         hir_meta: *node.meta(),
@@ -301,8 +300,8 @@ impl<'m> FlatScopeBuilder<'m> {
                         flat_scope::Kind::RegexCapture(capture_group.index),
                         flat_scope::Meta {
                             scope_var: ScopeVar(capture_group.binder.var),
-                            free_vars: Default::default(),
-                            constraints: Rc::new(alternation_constraints.union_one(alt_scope_var)),
+                            free_vars: [capture_group.binder.var].into(),
+                            constraints: constraints.clone(),
                             defs: [capture_group.binder.var].into(),
                             deps: [alt_scope_var].into(),
                             hir_meta: *node.meta(),
@@ -438,7 +437,10 @@ fn propagate_vars(scope_nodes: &mut Vec<ScopeNode>) {
 
                 let next_defs: VarSet = if matches!(
                     scope_node.kind(),
-                    flat_scope::Kind::PropVariant(..) | flat_scope::Kind::SeqPropVariant(..)
+                    flat_scope::Kind::PropVariant(..)
+                        | flat_scope::Kind::SeqPropVariant(..)
+                        | flat_scope::Kind::Regex(..)
+                        | flat_scope::Kind::RegexAlternation
                 ) {
                     Default::default()
                 } else {

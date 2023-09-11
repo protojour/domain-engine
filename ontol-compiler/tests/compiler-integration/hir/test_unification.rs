@@ -1490,8 +1490,8 @@ fn test_unify_regex_capture1() {
     let expected = indoc! {"
         |$b| (struct ($c)
             (match-prop $b S:0:0
-                (($_ $d)
-                    (match-regex $d def@0:0
+                (($_ $f)
+                    (match-regex $f def@0:0
                         (((1 $a))
                             (prop $c O:0:0
                                 (#u $a)
@@ -1525,20 +1525,15 @@ fn test_unify_regex_capture2() {
         ",
     );
 
-    // BUG/FIXME: This generated code sucks!!
     let expected = indoc! {"
         |$c| (struct ($d)
             (match-prop $c S:0:0
-                (($_ $e)
-                    (match-regex $e def@0:0
+                (($_ $g)
+                    (match-regex $g def@0:0
                         (((1 $a) (2 $b))
                             (prop $d O:0:0
                                 (#u $a)
                             )
-                        )
-                    )
-                    (match-regex $e def@0:0
-                        (((1 $a) (2 $b))
                             (prop $d O:1:0
                                 (#u $b)
                             )
