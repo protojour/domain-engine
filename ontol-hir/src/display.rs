@@ -152,9 +152,8 @@ impl<'a, L: Lang> Print<Kind<'a, L>> for Printer<L> {
                 Ok(Multiline(true))
             }
             Kind::Regex(regex_def_id, captures) => {
-                write!(f, "{sep}(regex {regex_def_id:?} (")?;
-                let multi = self.print_all(Sep::None, captures.iter(), f)?;
-                self.print_rparen(multi, f)?;
+                write!(f, "{sep}(regex {regex_def_id:?}")?;
+                let multi = self.print_all(Sep::Space, captures.iter(), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(sep.multiline())
             }
@@ -314,7 +313,7 @@ where
 {
     fn print(self, sep: Sep, node: &Vec<T>, f: &mut std::fmt::Formatter) -> PrintResult {
         write!(f, "{sep}(")?;
-        let multi = self.print_all(sep, node.iter(), f)?;
+        let multi = self.print_all(Sep::None, node.iter(), f)?;
         self.print_rparen(multi, f)?;
         Ok(multi)
     }

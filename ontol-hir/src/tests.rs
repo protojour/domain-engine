@@ -171,7 +171,7 @@ fn test_let() {
 #[test]
 fn test_regex() {
     let src = indoc! {"
-        (regex def@0:0 ())"
+        (regex def@0:0 () ((1 $a)))"
     };
     assert_eq!(src, parse_print(src));
 }
