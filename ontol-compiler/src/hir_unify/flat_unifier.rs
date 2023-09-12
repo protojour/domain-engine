@@ -191,18 +191,13 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
 
                         // recursively assign seq elements
                         // The elements are consumed here and assigned to the scope table.
-                        for (index, element) in elements.into_iter().enumerate() {
+                        for (index, (iter, attr)) in elements.into_iter().enumerate() {
                             let mut free_vars = VarSet::default();
-                            free_vars.union_with(&element.attribute.rel.meta().free_vars);
-                            free_vars.union_with(&element.attribute.val.meta().free_vars);
+                            free_vars.union_with(&attr.rel.meta().free_vars);
+                            free_vars.union_with(&attr.val.meta().free_vars);
 
                             let element_expr = expr::Expr(
-                                expr::Kind::SeqItem(
-                                    label,
-                                    index,
-                                    expr::Iter(element.iter),
-                                    Box::new(element.attribute),
-                                ),
+                                expr::Kind::SeqItem(label, index, iter, Box::new(attr)),
                                 expr::Meta {
                                     free_vars,
                                     hir_meta: self.unit_meta(),

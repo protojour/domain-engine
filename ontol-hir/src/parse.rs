@@ -299,26 +299,20 @@ impl<L: Lang> Parser<L> {
     fn parse_seq_property_element<'a, 's>(
         &self,
         next: &'s str,
-    ) -> ParseResult<'s, SeqPropertyElement<'a, L>> {
+    ) -> ParseResult<'s, (Iter, Attribute<L::Node<'a>>)> {
         parse_paren_delimited(next, |next| {
             let (iter, next) = match parse_symbol(next) {
-                Ok(("iter", next)) => (true, next),
+                Ok(("iter", next)) => (Iter(true), next),
                 Ok((sym, _)) => {
                     return Err(Error::Expected(Class::Symbol, Found(Token::Symbol(sym))))
                 }
-                Err(_) => (false, next),
+                Err(_) => (Iter(false), next),
             };
 
             let (rel, next) = self.parse(next)?;
             let (val, next) = self.parse(next)?;
 
-            Ok((
-                SeqPropertyElement {
-                    iter,
-                    attribute: Attribute { rel, val },
-                },
-                next,
-            ))
+            Ok(((iter, Attribute { rel, val }), next))
         })
     }
 

@@ -3,8 +3,8 @@ use std::fmt::{Debug, Display};
 use ontol_runtime::vm::proc::BuiltinProc;
 
 use crate::{
-    Binding, CaptureGroup, CaptureMatchArm, GetKind, GetLabel, GetVar, HasDefault, Kind, Label,
-    Lang, PropMatchArm, PropPattern, PropVariant, SeqPropertyElement, StructFlags, Var,
+    Attribute, Binding, CaptureGroup, CaptureMatchArm, GetKind, GetLabel, GetVar, HasDefault, Iter,
+    Kind, Label, Lang, PropMatchArm, PropPattern, PropVariant, StructFlags, Var,
 };
 
 impl<'a, L: Lang> std::fmt::Display for Kind<'a, L> {
@@ -205,28 +205,24 @@ impl<'a, L: Lang> Print<PropVariant<'a, L>> for Printer<L> {
     }
 }
 
-impl<'a, L: Lang> Print<SeqPropertyElement<'a, L>> for Printer<L> {
+impl<'a, L: Lang> Print<(Iter, Attribute<L::Node<'a>>)> for Printer<L> {
     fn print(
         self,
         _sep: Sep,
-        element: &SeqPropertyElement<'a, L>,
+        (iter, attr): &(Iter, Attribute<L::Node<'a>>),
         f: &mut std::fmt::Formatter,
     ) -> PrintResult {
         let indent = self.indent;
         write!(f, "{indent}(")?;
 
-        let sep = if element.iter {
+        let sep = if iter.0 {
             write!(f, "iter")?;
             Sep::Space
         } else {
             Sep::None
         };
 
-        let multi = self.print_all(
-            sep,
-            [element.attribute.rel.kind(), element.attribute.val.kind()].into_iter(),
-            f,
-        )?;
+        let multi = self.print_all(sep, [attr.rel.kind(), attr.val.kind()].into_iter(), f)?;
 
         self.print_rparen(multi, f)?;
         Ok(Multiline(true))

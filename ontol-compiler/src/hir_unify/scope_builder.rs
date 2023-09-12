@@ -272,7 +272,7 @@ impl<'m> ScopeBuilder<'m> {
                             has_default,
                             elements,
                         }) => {
-                            let only_element = if elements.len() == 1 {
+                            let (_, only_element_attr) = if elements.len() == 1 {
                                 elements.iter().next().unwrap()
                             } else {
                                 todo!("More than one seq element");
@@ -280,12 +280,12 @@ impl<'m> ScopeBuilder<'m> {
 
                             let rel = zelf
                                 .enter_child(0, |zelf| {
-                                    zelf.build_scope_binder(&only_element.attribute.rel)
+                                    zelf.build_scope_binder(&only_element_attr.rel)
                                 })?
                                 .into_scope_pattern_binding();
                             let val = zelf
                                 .enter_child(1, |zelf| {
-                                    zelf.build_scope_binder(&only_element.attribute.val)
+                                    zelf.build_scope_binder(&only_element_attr.val)
                                 })?
                                 .into_scope_pattern_binding();
 

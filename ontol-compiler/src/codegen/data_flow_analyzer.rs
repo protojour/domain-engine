@@ -3,7 +3,7 @@
 use std::{collections::BTreeSet, fmt::Debug};
 
 use fnv::{FnvHashMap, FnvHashSet};
-use ontol_hir::{GetKind, PropVariant, SeqPropertyElement, SeqPropertyVariant};
+use ontol_hir::{GetKind, PropVariant, SeqPropertyVariant};
 use ontol_runtime::{
     ontology::{PropertyFlow, PropertyFlowData},
     value::PropertyId,
@@ -112,14 +112,14 @@ where
 
                 for variant in variants {
                     match variant {
-                        PropVariant::Singleton(attribute) => {
-                            var_set.union_with(&self.analyze_node(&attribute.rel));
-                            var_set.union_with(&self.analyze_node(&attribute.val));
+                        PropVariant::Singleton(attr) => {
+                            var_set.union_with(&self.analyze_node(&attr.rel));
+                            var_set.union_with(&self.analyze_node(&attr.val));
                         }
                         PropVariant::Seq(SeqPropertyVariant { elements, .. }) => {
-                            for SeqPropertyElement { attribute, .. } in elements {
-                                var_set.union_with(&self.analyze_node(&attribute.rel));
-                                var_set.union_with(&self.analyze_node(&attribute.val));
+                            for (_iter, attr) in elements {
+                                var_set.union_with(&self.analyze_node(&attr.rel));
+                                var_set.union_with(&self.analyze_node(&attr.val));
                             }
                         }
                     }

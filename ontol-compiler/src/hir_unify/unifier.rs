@@ -156,30 +156,26 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     if elements.is_empty() {
                         panic!("No elements in seq prop");
                     }
-                    let first_element = elements.first().unwrap();
+                    let (_, first_element_attr) = elements.first().unwrap();
 
                     // FIXME: This is _probably_ incorrect.
                     // The type of the elements in the sequence must be the common supertype of all the elements.
                     // So the type needs to be carried over from somewhere else.
                     let seq_ty = self.types.intern(Type::Seq(
-                        first_element.attribute.rel.hir_meta().ty,
-                        first_element.attribute.val.hir_meta().ty,
+                        first_element_attr.rel.hir_meta().ty,
+                        first_element_attr.val.hir_meta().ty,
                     ));
 
                     let mut sequence_body = Vec::with_capacity(elements.len());
 
-                    for element in elements {
-                        if element.iter {
+                    for (iter, attr) in elements {
+                        if iter.0 {
                             panic!("Iter element with const scope. Scope must be Gen");
                         }
 
                         let mut free_vars = VarSet::default();
-                        free_vars
-                            .0
-                            .union_with(&element.attribute.rel.meta().free_vars.0);
-                        free_vars
-                            .0
-                            .union_with(&element.attribute.val.meta().free_vars.0);
+                        free_vars.0.union_with(&attr.rel.meta().free_vars.0);
+                        free_vars.0.union_with(&attr.val.meta().free_vars.0);
 
                         let unit_meta = self.unit_meta();
 
@@ -187,10 +183,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         let push_unified = self.unify(
                             const_scope,
                             expr::Expr(
-                                expr::Kind::Push(
-                                    ontol_hir::Var(label.0),
-                                    Box::new(element.attribute),
-                                ),
+                                expr::Kind::Push(ontol_hir::Var(label.0), Box::new(attr)),
                                 expr::Meta {
                                     hir_meta: unit_meta,
                                     free_vars,
@@ -319,14 +312,14 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 if elements.is_empty() {
                     panic!("No elements in seq prop");
                 }
-                let first_element = elements.first().unwrap();
+                let (_, first_element_attr) = elements.first().unwrap();
 
                 // FIXME: This is _probably_ incorrect.
                 // The type of the elements in the sequence must be the common supertype of all the elements.
                 // So the type needs to be carried over from somewhere else.
                 let seq_ty = self.types.intern(Type::Seq(
-                    first_element.attribute.rel.hir_meta().ty,
-                    first_element.attribute.val.hir_meta().ty,
+                    first_element_attr.rel.hir_meta().ty,
+                    first_element_attr.val.hir_meta().ty,
                 ));
 
                 let (rel_binding, val_binding) = *gen_scope.bindings;
@@ -337,21 +330,17 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
                 let mut sequence_body = Vec::with_capacity(elements.len());
 
-                for element in elements {
+                for (iter, attr) in elements {
                     let mut free_vars = VarSet::default();
-                    free_vars
-                        .0
-                        .union_with(&element.attribute.rel.meta().free_vars.0);
-                    free_vars
-                        .0
-                        .union_with(&element.attribute.val.meta().free_vars.0);
+                    free_vars.0.union_with(&attr.rel.meta().free_vars.0);
+                    free_vars.0.union_with(&attr.val.meta().free_vars.0);
 
                     let unit_meta = self.unit_meta();
 
                     let push_unified = self.unify(
                         joined_scope.clone(),
                         expr::Expr(
-                            expr::Kind::Push(gen_scope.output_seq, Box::new(element.attribute)),
+                            expr::Kind::Push(gen_scope.output_seq, Box::new(attr)),
                             expr::Meta {
                                 hir_meta: unit_meta,
                                 free_vars,
@@ -359,7 +348,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         ),
                     )?;
 
-                    if element.iter {
+                    if iter.0 {
                         sequence_body.push(TypedHirNode(
                             ontol_hir::Kind::ForEach(
                                 gen_scope.input_seq,

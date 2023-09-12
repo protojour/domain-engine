@@ -140,7 +140,7 @@ where
 pub struct SeqPropertyVariant<'a, L: Lang> {
     pub label: L::Label<'a>,
     pub has_default: HasDefault,
-    pub elements: Vec<SeqPropertyElement<'a, L>>,
+    pub elements: Vec<(Iter, Attribute<L::Node<'a>>)>,
 }
 
 impl<'a, L: Lang> Clone for SeqPropertyVariant<'a, L>
@@ -152,24 +152,6 @@ where
             label: self.label.clone(),
             has_default: self.has_default,
             elements: self.elements.clone(),
-        }
-    }
-}
-
-pub struct SeqPropertyElement<'a, L: Lang> {
-    /// Is this an iterative binding (binds any number of elements)
-    pub iter: bool,
-    pub attribute: Attribute<L::Node<'a>>,
-}
-
-impl<'a, L: Lang> Clone for SeqPropertyElement<'a, L>
-where
-    L::Node<'a>: Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            iter: self.iter,
-            attribute: self.attribute.clone(),
         }
     }
 }
@@ -275,6 +257,9 @@ pub enum Binding<'a, L: Lang> {
     Wildcard,
     Binder(L::Binder<'a>),
 }
+
+#[derive(Clone, Copy, Debug)]
+pub struct Iter(pub bool);
 
 #[derive(Debug)]
 pub struct VarAllocator {

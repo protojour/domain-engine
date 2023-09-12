@@ -30,7 +30,7 @@ macro_rules! visitor_trait_methods {
         }
 
         #[allow(unused_variables)]
-        fn visit_seq_prop_element(&mut self, index: usize, element: arg!($ref SeqPropertyElement<'l, L>)) {
+        fn visit_seq_prop_element(&mut self, index: usize, element: arg!($ref (Iter, Attribute<L::Node<'l>>))) {
             self.traverse_seq_prop_element(index, element);
         }
 
@@ -176,9 +176,9 @@ macro_rules! visitor_trait_methods {
         }
 
         #[allow(unused_variables)]
-        fn traverse_seq_prop_element(&mut self, index: usize, element: arg!($ref SeqPropertyElement<'l, L>)) {
-            self.visit_node(0, borrow!($ref element.attribute.rel));
-            self.visit_node(1, borrow!($ref element.attribute.val));
+        fn traverse_seq_prop_element(&mut self, index: usize, element: arg!($ref (Iter, Attribute<L::Node<'l>>))) {
+            self.visit_node(0, borrow!($ref element.1.rel));
+            self.visit_node(1, borrow!($ref element.1.val));
         }
 
         fn traverse_prop_match_arm(&mut self, match_arm: arg!($ref PropMatchArm<'l, L>)) {

@@ -217,20 +217,17 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                         let mut union = UnionBuilder::default();
                         let prop_elements = elements
                             .iter()
-                            .map(|element| {
-                                let mut rel = self.hir_to_expr(&element.attribute.rel);
-                                let mut val = self.hir_to_expr(&element.attribute.val);
+                            .map(|(iter, attr)| {
+                                let mut rel = self.hir_to_expr(&attr.rel);
+                                let mut val = self.hir_to_expr(&attr.val);
 
-                                if !element.iter {
+                                if !iter.0 {
                                     // non-iter element variables may refer to outer scope
                                     rel = union.plus(rel);
                                     val = union.plus(val);
                                 }
 
-                                expr::SeqPropElement {
-                                    iter: element.iter,
-                                    attribute: ontol_hir::Attribute { rel, val },
-                                }
+                                (*iter, ontol_hir::Attribute { rel, val })
                             })
                             .collect();
 

@@ -268,14 +268,9 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                         PropVariant::Singleton(attr) => self
                             .gen_attribute(struct_var, prop_id, *attr.rel, *attr.val, span, block),
                         PropVariant::Seq(seq_variant) => {
-                            if let Some(element) = seq_variant.elements.into_iter().next() {
+                            if let Some((_iter, attr)) = seq_variant.elements.into_iter().next() {
                                 self.gen_attribute(
-                                    struct_var,
-                                    prop_id,
-                                    element.attribute.rel,
-                                    element.attribute.val,
-                                    span,
-                                    block,
+                                    struct_var, prop_id, attr.rel, attr.val, span, block,
                                 );
                             }
                         }

@@ -203,8 +203,8 @@ impl<'m> FlatScopeBuilder<'m> {
                                 },
                             ));
 
-                            for element in elements {
-                                let attr_deps: VarSet = if element.iter {
+                            for (iter, attr) in elements {
+                                let attr_deps: VarSet = if iter.0 {
                                     let iter_var = self.var_allocator.alloc();
                                     self.scope_nodes.push(ScopeNode(
                                         flat_scope::Kind::IterElement(label.label, output_var),
@@ -222,8 +222,8 @@ impl<'m> FlatScopeBuilder<'m> {
                                     [label_var].into()
                                 };
                                 self.process_attribute(
-                                    &element.attribute.rel,
-                                    &element.attribute.val,
+                                    &attr.rel,
+                                    &attr.val,
                                     prop_depth.next(),
                                     attr_deps,
                                     constraints.clone(),

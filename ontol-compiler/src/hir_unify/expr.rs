@@ -53,7 +53,7 @@ pub enum Kind<'m> {
     SeqItem(
         ontol_hir::Label,
         usize,
-        Iter,
+        ontol_hir::Iter,
         Box<ontol_hir::Attribute<Expr<'m>>>,
     ),
     Push(ontol_hir::Var, Box<ontol_hir::Attribute<Expr<'m>>>),
@@ -119,18 +119,9 @@ pub enum PropVariant<'m> {
     Singleton(ontol_hir::Attribute<Expr<'m>>),
     Seq {
         label: ontol_hir::Label,
-        elements: Vec<SeqPropElement<'m>>,
+        elements: Vec<(ontol_hir::Iter, ontol_hir::Attribute<Expr<'m>>)>,
     },
 }
-
-#[derive(Debug)]
-pub struct SeqPropElement<'m> {
-    pub iter: bool,
-    pub attribute: ontol_hir::Attribute<Expr<'m>>,
-}
-
-#[derive(Debug)]
-pub struct Iter(pub bool);
 
 #[derive(Debug)]
 pub enum StringInterpolationComponent {
@@ -229,8 +220,8 @@ impl FreeVarVisitor {
                 self.visit_attr(attr);
             }
             PropVariant::Seq { elements, .. } => {
-                for element in elements {
-                    self.visit_attr(&element.attribute);
+                for (_iter, attr) in elements {
+                    self.visit_attr(attr);
                 }
             }
         }

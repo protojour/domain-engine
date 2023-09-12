@@ -349,13 +349,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             },
                             ctx,
                         );
-                        hir_elements.push(ontol_hir::SeqPropertyElement {
-                            iter: element.iter,
-                            attribute: ontol_hir::Attribute {
+                        hir_elements.push((
+                            ontol_hir::Iter(element.iter),
+                            ontol_hir::Attribute {
                                 rel: rel_node.clone(),
                                 val: val_node,
                             },
-                        });
+                        ));
                     }
 
                     let label = *ctx.label_map.get(aggr_pat_id).unwrap();
