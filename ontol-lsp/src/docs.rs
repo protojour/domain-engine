@@ -63,7 +63,7 @@ pub fn get_ontol_docs(ident: &str) -> Option<HoverDoc> {
         )),
         "auto" => Some(HoverDoc::from(
             "ontol.auto",
-            "#### Generator\nAutogenerate value according to type.",
+            "#### Generator\nAutogenerate value according to type, e.g. autoincrement (integer) or randomization (uuid).",
         )),
         "create_time" => Some(HoverDoc::from(
             "ontol.create_time",
