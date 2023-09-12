@@ -505,7 +505,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     .append_op(block, OpCode::AppendString(to_local), Delta(-1), span);
                 self.builder.append_pop_until(block, top, span);
             }
-            ontol_hir::Kind::MatchRegex(_iter, haystack_var, regex_def_id, match_arms) => {
+            ontol_hir::Kind::MatchRegex(iter, haystack_var, regex_def_id, match_arms) => {
                 if match_arms.is_empty() {
                     return;
                 }
@@ -621,7 +621,12 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
                 self.builder.append_op(
                     &mut pre_branch_block,
-                    OpCode::RegexCapture(haystack_local, regex_def_id),
+                    if iter.0 {
+                        // BUG: Requires iterating
+                        OpCode::RegexCaptureIter(haystack_local, regex_def_id)
+                    } else {
+                        OpCode::RegexCapture(haystack_local, regex_def_id)
+                    },
                     Delta((capture_index_union.len() + 1) as i32),
                     span,
                 );

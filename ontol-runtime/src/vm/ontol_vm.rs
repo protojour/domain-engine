@@ -259,6 +259,36 @@ impl Processor for OntolProcessor {
         }
     }
 
+    fn regex_capture_iter(
+        &mut self,
+        local: Local,
+        text_pattern: &TextPattern,
+        group_filter: &BitVec,
+    ) {
+        let Data::String(haystack) = &self.local(local).data else {
+            panic!("Not a string");
+        };
+
+        let mut output_sequence: Vec<Attribute> = Vec::new();
+
+        for captures in text_pattern.regex.captures_iter(haystack) {
+            let value_attributes =
+                extract_regex_captures(&captures, group_filter, self.string_def_id)
+                    .into_iter()
+                    .map(|value| Attribute::from(value))
+                    .collect();
+            output_sequence.push(Attribute::from(Value::new(
+                Data::Sequence(value_attributes),
+                self.string_def_id,
+            )));
+        }
+
+        self.stack.push(Value::new(
+            Data::Sequence(output_sequence),
+            self.string_def_id,
+        ));
+    }
+
     #[inline(always)]
     fn assert_true(&mut self) {
         let [val]: [Value; 1] = self.pop_n();

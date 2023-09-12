@@ -99,7 +99,8 @@ pub enum OpCode {
     /// If successful, pushes n values on the stack: [I64(1), ..captures]
     /// If unsuccessful, pushes one value on the stakc: [I64(0)]
     RegexCapture(Local, DefId),
-    /// Required parameter to RegexCapture
+    RegexCaptureIter(Local, DefId),
+    /// Required parameter to RegexCapture and RegexCaptureIter
     RegexCaptureIndexes(BitVec),
     /// Yanks True from the stack and crashes unless true
     AssertTrue,

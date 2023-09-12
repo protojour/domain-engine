@@ -58,6 +58,12 @@ pub trait Processor {
     fn cond_predicate(&mut self, predicate: &Predicate) -> bool;
     fn type_pun(&mut self, local: Local, def_id: DefId);
     fn regex_capture(&mut self, local: Local, text_pattern: &TextPattern, index_filter: &BitVec);
+    fn regex_capture_iter(
+        &mut self,
+        local: Local,
+        text_pattern: &TextPattern,
+        index_filter: &BitVec,
+    );
     fn assert_true(&mut self);
 }
 
@@ -178,14 +184,19 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                     processor.type_pun(*local, *def_id);
                     self.program_counter += 1;
                 }
-                OpCode::RegexCapture(local, def_id) => {
+                opcode @ (OpCode::RegexCapture(local, def_id)
+                | OpCode::RegexCaptureIter(local, def_id)) => {
                     let text_pattern = self.ontology.get_text_pattern(*def_id).unwrap();
                     self.program_counter += 1;
                     let OpCode::RegexCaptureIndexes(index_filter) = &opcodes[self.program_counter]
                     else {
                         panic!("Expected capture indexes");
                     };
-                    processor.regex_capture(*local, text_pattern, index_filter);
+                    if matches!(opcode, OpCode::RegexCaptureIter(..)) {
+                        processor.regex_capture_iter(*local, text_pattern, index_filter);
+                    } else {
+                        processor.regex_capture(*local, text_pattern, index_filter);
+                    }
                     self.program_counter += 1;
                 }
                 OpCode::RegexCaptureIndexes(_) => unreachable!(),
