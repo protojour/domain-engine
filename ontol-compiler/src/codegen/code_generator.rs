@@ -359,7 +359,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                             let rel_local = self.builder.top_minus(1);
 
                             let Type::Seq(_, seq_item_ty) = binder.meta.ty else {
-                                panic!("Not a sequence");
+                                panic!("Not a sequence:");
                             };
 
                             // Code for generating the default values:
@@ -426,7 +426,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
             }
             ontol_hir::Kind::Sequence(binder, nodes) => {
                 let Type::Seq(_, val_ty) = ty else {
-                    panic!("Not a sequence");
+                    panic!("Not a sequence: {ty:?}");
                 };
                 let seq_local = self.builder.append_op(
                     block,

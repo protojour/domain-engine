@@ -43,14 +43,14 @@ enum AssignResult<'m> {
 }
 
 #[derive(Clone, Copy, Debug)]
-enum MainScope<'a> {
+enum MainScope<'a, 'm> {
     Const,
     Value(ScopeVar),
     Sequence(ScopeVar, OutputVar),
-    MultiSequence(&'a IndexMap<ScopeVar, OutputVar>),
+    MultiSequence(&'a IndexMap<ontol_hir::Label, SeqTypeInfer<'m>>),
 }
 
-impl<'a> MainScope<'a> {
+impl<'a, 'm> MainScope<'a, 'm> {
     fn next(self) -> Self {
         match self {
             Self::Const => Self::Const,
@@ -760,7 +760,7 @@ fn unify_scope_structural<'m>(
                         // looping regex
                         let mut match_arms: Vec<ontol_hir::CaptureMatchArm<'m, TypedHir>> = vec![];
 
-                        let mut multi_sequence_table: IndexMap<ScopeVar, OutputVar> =
+                        let mut seq_type_inferers: IndexMap<ontol_hir::Label, SeqTypeInfer<'m>> =
                             Default::default();
 
                         let mut hir_props: Vec<TypedHirNode<'m>> = vec![];
@@ -770,10 +770,11 @@ fn unify_scope_structural<'m>(
                         for assignment in std::mem::take(&mut scope_map.assignments) {
                             if let expr::Expr(expr::Kind::Prop(prop), meta) = assignment.expr {
                                 if let expr::PropVariant::Seq { label, .. } = &prop.variant {
-                                    let output_var = multi_sequence_table
-                                        .entry(ScopeVar(ontol_hir::Var(label.0)))
-                                        .or_insert_with(|| {
-                                            OutputVar(unifier.var_allocator.alloc())
+                                    let infererer =
+                                        seq_type_inferers.entry(*label).or_insert_with(|| {
+                                            SeqTypeInfer::new(OutputVar(
+                                                unifier.var_allocator.alloc(),
+                                            ))
                                         });
 
                                     hir_props.push(TypedHirNode(
@@ -788,7 +789,9 @@ fn unify_scope_structural<'m>(
                                                         unit_meta,
                                                     )),
                                                     val: Box::new(TypedHirNode(
-                                                        ontol_hir::Kind::Var(output_var.0),
+                                                        ontol_hir::Kind::Var(
+                                                            infererer.output_seq_var.0,
+                                                        ),
                                                         meta.hir_meta,
                                                     )),
                                                 },
@@ -796,6 +799,23 @@ fn unify_scope_structural<'m>(
                                         ),
                                         meta.hir_meta,
                                     ));
+                                }
+                            }
+                        }
+
+                        // Input for sequence type "inference"
+                        for scope_map in table.table_mut() {
+                            for assignment in &scope_map.assignments {
+                                match assignment.expr.kind() {
+                                    expr::Kind::SeqItem(label, _, _, attr) => {
+                                        if let Some(infer) = seq_type_inferers.get_mut(label) {
+                                            infer.types.push((
+                                                attr.rel.meta().hir_meta.ty,
+                                                attr.val.meta().hir_meta.ty,
+                                            ));
+                                        }
+                                    }
+                                    _ => {}
                                 }
                             }
                         }
@@ -831,7 +851,7 @@ fn unify_scope_structural<'m>(
                             }
 
                             match_arm.nodes.extend(apply_lateral_scope(
-                                MainScope::MultiSequence(&multi_sequence_table),
+                                MainScope::MultiSequence(&seq_type_inferers),
                                 table.scope_map_mut(alt_idx).take_assignments(),
                                 &|| next_in_scope.union(&captured_scope),
                                 table,
@@ -864,22 +884,30 @@ fn unify_scope_structural<'m>(
                         nodes.extend(hir_props);
 
                         // wrap everything in sequence binders
-                        for (scope_var, output_var) in multi_sequence_table {
+                        for (label, seq_type_infer) in seq_type_inferers {
+                            let output_seq_var = seq_type_infer.output_seq_var;
+                            let sequence_ty = seq_type_infer.infer(unifier.types);
+                            let sequence_meta = typed_hir::Meta {
+                                ty: sequence_ty,
+                                // FIXME: SPAN
+                                span: NO_SPAN,
+                            };
+
                             nodes = vec![TypedHirNode(
                                 ontol_hir::Kind::Let(
                                     TypedBinder {
-                                        var: output_var.0,
+                                        var: output_seq_var.0,
                                         meta: unit_meta,
                                     },
                                     Box::new(TypedHirNode(
                                         ontol_hir::Kind::Sequence(
                                             TypedBinder {
-                                                var: scope_var.0,
-                                                meta: unit_meta,
+                                                var: ontol_hir::Var(label.0),
+                                                meta: sequence_meta,
                                             },
                                             vec![],
                                         ),
-                                        unit_meta,
+                                        sequence_meta,
                                     )),
                                     nodes,
                                 ),
@@ -1304,7 +1332,7 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                     MainScope::Sequence(scope_var, output_var) => (scope_var, output_var),
                     MainScope::MultiSequence(table) => {
                         let scope_var = ScopeVar(ontol_hir::Var(label.0));
-                        (scope_var, table.get(&scope_var).cloned().unwrap())
+                        (scope_var, table.get(&label).unwrap().output_seq_var)
                     }
                     _ => panic!("Unsupported context for seq-item: {main_scope:?}"),
                 };
@@ -1355,26 +1383,13 @@ fn find_and_unify_sequence<'m>(
         level.next(),
     )?;
 
-    let mut seq_type_infer = SeqTypeInfer {
-        output_seq_var,
-        types: vec![],
-    };
+    let mut seq_type_infer = SeqTypeInfer::new(output_seq_var);
 
     for node in &sequence_body {
         seq_type_infer.visit_node(0, node);
     }
 
-    let seq_type_pair = match seq_type_infer.types.len() {
-        0 => panic!("Type of seq not inferrable"),
-        1 => seq_type_infer.types.into_iter().next().unwrap(),
-        _ => {
-            warn!("Multiple seq types, imprecise inference");
-            seq_type_infer.types.into_iter().next().unwrap()
-        }
-    };
-    let seq_ty = unifier
-        .types
-        .intern(Type::Seq(seq_type_pair.0, seq_type_pair.1));
+    let seq_ty = seq_type_infer.infer(unifier.types);
 
     debug!("seq_ty: {seq_ty:?}");
 
@@ -1398,9 +1413,31 @@ fn find_and_unify_sequence<'m>(
     Ok(sequence_node)
 }
 
+#[derive(Debug)]
 struct SeqTypeInfer<'m> {
     output_seq_var: OutputVar,
     types: Vec<(TypeRef<'m>, TypeRef<'m>)>,
+}
+
+impl<'m> SeqTypeInfer<'m> {
+    fn new(output_seq_var: OutputVar) -> Self {
+        Self {
+            output_seq_var,
+            types: vec![],
+        }
+    }
+
+    fn infer(self, types: &mut Types<'m>) -> TypeRef<'m> {
+        let seq_type_pair = match self.types.len() {
+            0 => panic!("Type of seq not inferrable"),
+            1 => self.types.into_iter().next().unwrap(),
+            _ => {
+                warn!("Multiple seq types, imprecise inference");
+                self.types.into_iter().next().unwrap()
+            }
+        };
+        types.intern(Type::Seq(seq_type_pair.0, seq_type_pair.1))
+    }
 }
 
 impl<'s, 'm: 's> ontol_hir::visitor::HirVisitor<'s, 'm, TypedHir> for SeqTypeInfer<'m> {
