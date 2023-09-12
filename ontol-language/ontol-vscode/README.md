@@ -4,6 +4,9 @@ Language server and grammar for [ONTOL](https://ontol.memoriam.net) (ONTOlogy La
 
 Features:
 - Syntax highlighting
+- Snippets for common patterns
 - Language server, including:
-  - Hover information on symbols and structures
-  - Code completion for symbols and keywords
+  - Compiler error diagnostics
+  - Goto definition
+  - Hover documentation on keywords, symbols and structures
+  - Code completion
