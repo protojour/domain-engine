@@ -73,8 +73,8 @@ fn test_map_regex_alternation1() {
     });
 }
 
+// BUG: Unreachable code in flat_unifier when removing `match`. Should show proper error.
 #[test]
-#[should_panic = "Not a sequence"]
 fn test_map_regex_loop_pattern() {
     r#"
     pub def in {
@@ -88,9 +88,9 @@ fn test_map_regex_loop_pattern() {
         rel .'captures': [capture]
     }
     map {
-        in {
+        in match {
             'input': [
-                ../(?<one>\w+) (?<two>\w+),/
+                ../(?<one>\w+) (?<two>\w+),?/
             ]
         }
         out {
@@ -103,5 +103,19 @@ fn test_map_regex_loop_pattern() {
         }
     }
     "#
-    .compile_fail();
+    .compile_ok(|test| {
+        test.assert_domain_map(
+            ("in", "out"),
+            json!({ "input": "" }),
+            json!({ "captures": [] }),
+        );
+        test.assert_domain_map(
+            ("in", "out"),
+            json!({ "input": "a b, c d"}),
+            json!({ "captures": [
+                { "first": "a", "second": "b" },
+                { "first": "c", "second": "d" },
+            ] }),
+        );
+    });
 }

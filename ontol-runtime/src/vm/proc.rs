@@ -91,6 +91,9 @@ pub enum OpCode {
     String(String, DefId),
     /// Evaluate a predicate. If true, jumps to AddressOffset.
     Cond(Predicate, AddressOffset),
+    /// Take the sequence stored at Local, replace it with unit, and push all its values onto the stack.
+    /// These sequences must have a size known in advance, typically temporary storage.
+    MoveSeqValsToStack(Local),
     /// Overwrite runtime type info with a new type
     TypePun(Local, DefId),
     /// Run a regex search on the first match of string at Local.

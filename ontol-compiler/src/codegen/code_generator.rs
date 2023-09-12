@@ -505,134 +505,39 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     .append_op(block, OpCode::AppendString(to_local), Delta(-1), span);
                 self.builder.append_pop_until(block, top, span);
             }
-            ontol_hir::Kind::MatchRegex(iter, haystack_var, regex_def_id, match_arms) => {
+            ontol_hir::Kind::MatchRegex(
+                ontol_hir::Iter(false),
+                haystack_var,
+                regex_def_id,
+                match_arms,
+            ) => {
                 if match_arms.is_empty() {
                     return;
                 }
                 let haystack_local = self.var_local(haystack_var);
                 let top = self.builder.top();
 
-                let mut capture_index_union: BitSet = BitSet::default();
-
-                for match_arm in &match_arms {
-                    for capture_group in &match_arm.capture_groups {
-                        capture_index_union.insert(capture_group.index as usize);
-                    }
-                }
-
-                let mut branch_blocks: HashMap<usize, Block> =
-                    HashMap::with_capacity(match_arms.len());
-                let mut branch_block_indexes: Vec<BlockIndex> =
-                    Vec::with_capacity(match_arms.len());
-
-                // Create branch blocks
-                for arm_index in 0..match_arms.len() {
-                    let branch_block = self.builder.new_block(Delta(0), span);
-                    branch_block_indexes.push(branch_block.index());
-                    branch_blocks.insert(arm_index, branch_block);
-                }
-
-                let fail_block_index = {
-                    let panic_block = self.builder.new_block(Delta(0), span);
-                    self.builder
-                        .commit(panic_block, Terminator::Panic("Regex did not match".into()))
-                };
-
                 let mut pre_branch_block = self.builder.split_block(block);
 
-                // Codegen for each branch block
-                for (arm_index, match_arm) in match_arms.into_iter().enumerate() {
-                    let mut branch_block = branch_blocks.remove(&arm_index).unwrap();
-
-                    struct ArmCapture {
-                        local: Local,
-                        var: ontol_hir::Var,
-                        def_id: DefId,
-                    }
-
-                    let mut arm_captures = Vec::with_capacity(match_arm.capture_groups.len());
-
-                    for capture_group in &match_arm.capture_groups {
-                        let (local_position, _) = capture_index_union
-                            .iter()
-                            .enumerate()
-                            .find(|(_, group_index)| *group_index == capture_group.index as usize)
-                            .unwrap();
-
-                        arm_captures.push(ArmCapture {
-                            local: Local(top.0 + 1 + local_position as u16),
-                            var: capture_group.binder.var,
-                            def_id: capture_group.binder.meta.ty.get_single_def_id().unwrap(),
-                        });
-                    }
-
-                    // guard - advance to the next arm (or panic block) if some condition is not true,
-                    // in this case that a required capture group was not defined (encoded as a unit value).
-                    // If there are no bound capture groups, this is a _catch all_ arm.
-                    if let Some(guard_capture) = arm_captures.first() {
-                        let else_block_index = if arm_index < branch_block_indexes.len() - 1 {
-                            *branch_block_indexes.get(arm_index + 1).unwrap()
-                        } else {
-                            fail_block_index
-                        };
-
-                        self.builder.append_ir(
-                            &mut branch_block,
-                            Ir::Cond(Predicate::IsUnit(guard_capture.local), else_block_index),
-                            Delta(0),
-                            span,
-                        );
-                    }
-
-                    // define scope for capture and type pun
-                    for arm_capture in &arm_captures {
-                        if self
-                            .scope
-                            .insert(arm_capture.var, arm_capture.local)
-                            .is_some()
-                        {
-                            panic!("Variable {} already in scope", arm_capture.var);
-                        }
-
-                        if arm_capture.def_id != self.primitives.string {
-                            self.builder.append_op(
-                                &mut branch_block,
-                                OpCode::TypePun(arm_capture.local, arm_capture.def_id),
-                                Delta(0),
-                                span,
-                            );
-                        }
-                    }
-
-                    for node in match_arm.nodes {
-                        self.gen_node(node, &mut branch_block);
-                    }
-
-                    // pop scope
-                    for arm_capture in arm_captures {
-                        self.scope.remove(&arm_capture.var);
-                    }
-
-                    self.builder.commit(
-                        branch_block,
-                        Terminator::Goto(block.index(), BlockOffset(0)),
-                    );
-                }
+                let mut arms_gen = CaptureMatchArmsGenerator::new(match_arms);
+                let branch_block_indexes = self.gen_capture_match_arms(
+                    &mut arms_gen,
+                    Local(top.0 + 1),
+                    Terminator::Goto(block.index(), BlockOffset(0)),
+                    span,
+                );
 
                 self.builder.append_op(
                     &mut pre_branch_block,
-                    if iter.0 {
-                        // BUG: Requires iterating
-                        OpCode::RegexCaptureIter(haystack_local, regex_def_id)
-                    } else {
-                        OpCode::RegexCapture(haystack_local, regex_def_id)
-                    },
-                    Delta((capture_index_union.len() + 1) as i32),
+                    OpCode::RegexCapture(haystack_local, regex_def_id),
+                    Delta((arms_gen.capture_index_union.len() + 1) as i32),
                     span,
                 );
                 self.builder.append_op(
                     &mut pre_branch_block,
-                    OpCode::RegexCaptureIndexes(capture_index_union.clone().into_bit_vec()),
+                    OpCode::RegexCaptureIndexes(
+                        arms_gen.capture_index_union.clone().into_bit_vec(),
+                    ),
                     Delta(0),
                     span,
                 );
@@ -641,9 +546,9 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     &mut pre_branch_block,
                     Ir::Cond(
                         Predicate::YankFalse(Local(
-                            top.0 + capture_index_union.iter().count() as u16 + 1,
+                            top.0 + arms_gen.capture_index_union.iter().count() as u16 + 1,
                         )),
-                        fail_block_index,
+                        arms_gen.fail_block_index,
                     ),
                     Delta(-1),
                     span,
@@ -651,6 +556,85 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 self.builder.commit(
                     pre_branch_block,
                     Terminator::Goto(branch_block_indexes[0], BlockOffset(0)),
+                );
+
+                self.builder.append_pop_until(block, top, span);
+            }
+            ontol_hir::Kind::MatchRegex(
+                ontol_hir::Iter(true),
+                haystack_var,
+                regex_def_id,
+                match_arms,
+            ) => {
+                if match_arms.is_empty() {
+                    return;
+                }
+                let haystack_local = self.var_local(haystack_var);
+                let top = self.builder.top();
+                let iter_offset = BlockOffset(block.current_offset().0 + 3);
+                let all_matches_seq_local = self.builder.top_plus(1);
+                let counter_local = self.builder.top_plus(2);
+                let current_matches_seq_local = self.builder.top_plus(4);
+
+                let mut arms_gen = CaptureMatchArmsGenerator::new(match_arms);
+
+                // compensating for the iterated list and the counter below
+                self.builder.prealloc_stack(Delta(2));
+
+                let for_each_body_index = {
+                    let mut pre_match_block = self.builder.new_block(Delta(2), span);
+                    let mut post_match_block = self.builder.new_block(Delta(0), span);
+
+                    self.builder.append_op(
+                        &mut pre_match_block,
+                        OpCode::MoveSeqValsToStack(current_matches_seq_local),
+                        Delta((arms_gen.capture_index_union.len()) as i32),
+                        span,
+                    );
+
+                    let branch_block_indexes = self.gen_capture_match_arms(
+                        &mut arms_gen,
+                        Local(current_matches_seq_local.0 + 1),
+                        Terminator::Goto(post_match_block.index(), BlockOffset(0)),
+                        span,
+                    );
+
+                    self.builder
+                        .append_pop_until(&mut post_match_block, counter_local, span);
+                    self.builder.commit(
+                        post_match_block,
+                        Terminator::PopGoto(block.index(), iter_offset),
+                    );
+
+                    self.builder.commit(
+                        pre_match_block,
+                        Terminator::Goto(branch_block_indexes[0], BlockOffset(0)),
+                    )
+                };
+
+                // Generate sequence
+                self.builder.append_op(
+                    block,
+                    OpCode::RegexCaptureIter(haystack_local, regex_def_id),
+                    Delta(0),
+                    span,
+                );
+                self.builder.append_op(
+                    block,
+                    OpCode::RegexCaptureIndexes(
+                        arms_gen.capture_index_union.clone().into_bit_vec(),
+                    ),
+                    Delta(0),
+                    span,
+                );
+                self.builder
+                    .append_op(block, OpCode::I64(0, DefId::unit()), Delta(0), span);
+
+                self.builder.append_ir(
+                    block,
+                    Ir::Iter(all_matches_seq_local, counter_local, for_each_body_index),
+                    Delta(0),
+                    span,
                 );
 
                 self.builder.append_pop_until(block, top, span);
@@ -754,6 +738,115 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
         }
     }
 
+    fn gen_capture_match_arms(
+        &mut self,
+        arms_gen: &mut CaptureMatchArmsGenerator<'m>,
+        first_capture_local: Local,
+        terminator: Terminator,
+        span: SourceSpan,
+    ) -> Vec<BlockIndex> {
+        let mut branch_blocks: HashMap<usize, Block> =
+            HashMap::with_capacity(arms_gen.match_arms.len());
+        let mut branch_block_indexes: Vec<BlockIndex> =
+            Vec::with_capacity(arms_gen.match_arms.len());
+
+        // Create branch blocks
+        for arm_index in 0..arms_gen.match_arms.len() {
+            let branch_block = self.builder.new_block(Delta(0), span);
+            branch_block_indexes.push(branch_block.index());
+            branch_blocks.insert(arm_index, branch_block);
+        }
+
+        arms_gen.fail_block_index = {
+            let panic_block = self.builder.new_block(Delta(0), span);
+            self.builder
+                .commit(panic_block, Terminator::Panic("Regex did not match".into()))
+        };
+
+        for (arm_index, match_arm) in std::mem::take(&mut arms_gen.match_arms)
+            .into_iter()
+            .enumerate()
+        {
+            let mut branch_block = branch_blocks.remove(&arm_index).unwrap();
+
+            struct ArmCapture {
+                local: Local,
+                var: ontol_hir::Var,
+                def_id: DefId,
+            }
+
+            let mut arm_captures = Vec::with_capacity(match_arm.capture_groups.len());
+
+            for capture_group in &match_arm.capture_groups {
+                let (local_position, _) = arms_gen
+                    .capture_index_union
+                    .iter()
+                    .enumerate()
+                    .find(|(_, group_index)| *group_index == capture_group.index as usize)
+                    .unwrap();
+
+                debug!("guard capture local pos {:?}", local_position);
+
+                arm_captures.push(ArmCapture {
+                    local: Local(first_capture_local.0 + local_position as u16),
+                    var: capture_group.binder.var,
+                    def_id: capture_group.binder.meta.ty.get_single_def_id().unwrap(),
+                });
+            }
+
+            // guard - advance to the next arm (or panic block) if some condition is not true,
+            // in this case that a required capture group was not defined (encoded as a unit value).
+            // If there are no bound capture groups, this is a _catch all_ arm.
+            if let Some(guard_capture) = arm_captures.first() {
+                let else_block_index = if arm_index < branch_block_indexes.len() - 1 {
+                    *branch_block_indexes.get(arm_index + 1).unwrap()
+                } else {
+                    arms_gen.fail_block_index
+                };
+
+                self.builder.append_ir(
+                    &mut branch_block,
+                    Ir::Cond(Predicate::IsUnit(guard_capture.local), else_block_index),
+                    Delta(0),
+                    span,
+                );
+            }
+
+            // define scope for capture and type pun
+            for arm_capture in &arm_captures {
+                if self
+                    .scope
+                    .insert(arm_capture.var, arm_capture.local)
+                    .is_some()
+                {
+                    panic!("Variable {} already in scope", arm_capture.var);
+                }
+
+                if arm_capture.def_id != self.primitives.string {
+                    self.builder.append_op(
+                        &mut branch_block,
+                        OpCode::TypePun(arm_capture.local, arm_capture.def_id),
+                        Delta(0),
+                        span,
+                    );
+                }
+            }
+
+            for node in match_arm.nodes {
+                self.gen_node(node, &mut branch_block);
+            }
+
+            // pop scope
+            for arm_capture in arm_captures {
+                self.scope.remove(&arm_capture.var);
+            }
+
+            self.builder.commit(branch_block, terminator.clone());
+        }
+
+        branch_block_indexes
+    }
+
     fn var_local(&self, var: ontol_hir::Var) -> Local {
         *self
             .scope
@@ -772,5 +865,28 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
             CompileError::TODO(smart_format!("type not mappable")),
             &span,
         );
+    }
+}
+
+struct CaptureMatchArmsGenerator<'m> {
+    match_arms: Vec<ontol_hir::CaptureMatchArm<'m, TypedHir>>,
+    capture_index_union: BitSet,
+    fail_block_index: BlockIndex,
+}
+
+impl<'m> CaptureMatchArmsGenerator<'m> {
+    fn new(match_arms: Vec<ontol_hir::CaptureMatchArm<'m, TypedHir>>) -> Self {
+        let mut capture_index_union: BitSet = BitSet::default();
+
+        for match_arm in &match_arms {
+            for capture_group in &match_arm.capture_groups {
+                capture_index_union.insert(capture_group.index as usize);
+            }
+        }
+        Self {
+            match_arms,
+            capture_index_union,
+            fail_block_index: BlockIndex(0),
+        }
     }
 }

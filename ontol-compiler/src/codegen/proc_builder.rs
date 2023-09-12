@@ -39,6 +39,7 @@ impl ProcBuilder {
         self.stack_size += stack_delta.0;
 
         let index = BlockIndex(self.blocks.len() as u32);
+
         self.blocks.push(Block {
             index,
             stack_start,
@@ -105,6 +106,10 @@ impl ProcBuilder {
         span: SourceSpan,
     ) -> Local {
         self.append_ir(block, Ir::Op(opcode), stack_delta, span)
+    }
+
+    pub fn prealloc_stack(&mut self, delta: Delta) {
+        self.stack_size += delta.0;
     }
 
     pub fn append_pop_until(&mut self, block: &mut Block, local: Local, span: SourceSpan) {

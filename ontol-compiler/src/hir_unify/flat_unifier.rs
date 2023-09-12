@@ -806,16 +806,15 @@ fn unify_scope_structural<'m>(
                         // Input for sequence type "inference"
                         for scope_map in table.table_mut() {
                             for assignment in &scope_map.assignments {
-                                match assignment.expr.kind() {
-                                    expr::Kind::SeqItem(label, _, _, attr) => {
-                                        if let Some(infer) = seq_type_inferers.get_mut(label) {
-                                            infer.types.push((
-                                                attr.rel.meta().hir_meta.ty,
-                                                attr.val.meta().hir_meta.ty,
-                                            ));
-                                        }
+                                if let expr::Kind::SeqItem(label, _, _, attr) =
+                                    assignment.expr.kind()
+                                {
+                                    if let Some(infer) = seq_type_inferers.get_mut(label) {
+                                        infer.types.push((
+                                            attr.rel.meta().hir_meta.ty,
+                                            attr.val.meta().hir_meta.ty,
+                                        ));
                                     }
-                                    _ => {}
                                 }
                             }
                         }

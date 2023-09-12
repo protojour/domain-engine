@@ -237,6 +237,12 @@ impl Processor for OntolProcessor {
         }
     }
 
+    fn move_seq_vals_to_stack(&mut self, source: Local) {
+        let sequence = std::mem::take(self.sequence_local_mut(source));
+        self.stack
+            .extend(sequence.into_iter().map(|attr| attr.value));
+    }
+
     #[inline(always)]
     fn type_pun(&mut self, local: Local, def_id: DefId) {
         self.local_mut(local).type_def_id = def_id;
@@ -275,7 +281,7 @@ impl Processor for OntolProcessor {
             let value_attributes =
                 extract_regex_captures(&captures, group_filter, self.string_def_id)
                     .into_iter()
-                    .map(|value| Attribute::from(value))
+                    .map(Attribute::from)
                     .collect();
             output_sequence.push(Attribute::from(Value::new(
                 Data::Sequence(value_attributes),
