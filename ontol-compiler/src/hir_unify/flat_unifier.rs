@@ -722,10 +722,41 @@ fn unify_scope_structural<'m>(
                     }
                 }
                 flat_scope::Kind::Regex(opt_seq_label, regex_def_id) => {
+                    let opt_seq_label = *opt_seq_label;
                     let regex_def_id = *regex_def_id;
                     let regex_hir_meta = scope_map.scope.meta().hir_meta;
 
-                    if let Some(_seq_label) = opt_seq_label {
+                    let next_in_scope = in_scope.union_one(scope_var.0);
+
+                    let capture_scope_union = {
+                        let mut union = VarSet::default();
+                        for alt_idx in table.dependees(Some(scope_var)) {
+                            let alt_scope_var = table.scope_map_mut(alt_idx).scope.meta().scope_var;
+
+                            for cap_scope_idx in table.dependees(Some(alt_scope_var)) {
+                                let cap_scope_map = &mut table.scope_map_mut(cap_scope_idx);
+                                let cap_scope_var = cap_scope_map.scope.meta().scope_var;
+
+                                union.insert(cap_scope_var.0);
+                            }
+                        }
+                        union
+                    };
+
+                    let scope_map = &mut table.scope_map_mut(index);
+
+                    if !in_scope.0.is_disjoint(&capture_scope_union.0) {
+                        builder.output.extend(apply_lateral_scope(
+                            main_scope,
+                            scope_map.select_assignments(selector),
+                            &|| in_scope.clone(),
+                            table,
+                            unifier,
+                            level.next(),
+                        )?);
+                        next_indexes.extend(table.dependees(Some(scope_var)));
+                    } else if let Some(_seq_label) = opt_seq_label {
+                        debug!("{level}looping regex");
                         // looping regex
                         let mut match_arms: Vec<ontol_hir::CaptureMatchArm<'m, TypedHir>> = vec![];
 
@@ -802,7 +833,7 @@ fn unify_scope_structural<'m>(
                             match_arm.nodes.extend(apply_lateral_scope(
                                 MainScope::MultiSequence(&multi_sequence_table),
                                 table.scope_map_mut(alt_idx).take_assignments(),
-                                &|| captured_scope.clone(),
+                                &|| next_in_scope.union(&captured_scope),
                                 table,
                                 unifier,
                                 level.next(),

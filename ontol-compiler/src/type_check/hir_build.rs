@@ -7,7 +7,7 @@ use crate::{
     def::{Def, DefKind},
     error::CompileError,
     mem::Intern,
-    pattern::{PatId, Pattern, PatternKind, RegexPattern, RegexPatternCaptureNode},
+    pattern::{PatId, Pattern, PatternKind, RegexPatternCaptureNode},
     primitive::PrimitiveKind,
     type_check::{
         hir_build_ctx::{ExplicitVariableArm, PatternVariable},
@@ -213,7 +213,27 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 if let PatternKind::Regex(regex_pattern) = &pat_element.pattern.kind
                                 {
                                     if pat_element.iter {
-                                        return self.build_looping_regex_node(regex_pattern, ctx);
+                                        let label = *ctx.label_map.get(aggr_pat_id).unwrap();
+
+                                        return TypedHirNode(
+                                            ontol_hir::Kind::Regex(
+                                                Some(TypedLabel {
+                                                    label,
+                                                    ty: other_ty,
+                                                }),
+                                                regex_pattern.regex_def_id,
+                                                self.build_regex_capture_alternations(
+                                                    &regex_pattern.capture_node,
+                                                    &pattern.span,
+                                                    other_ty,
+                                                    ctx,
+                                                ),
+                                            ),
+                                            Meta {
+                                                ty: other_ty,
+                                                span: pattern.span,
+                                            },
+                                        );
                                     } else {
                                         return self.error_node(
                                             CompileError::RequiresSpreading,
@@ -474,14 +494,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             _ => self.error_node(CompileError::TODO(smart_format!("")), &prop_span),
         }
-    }
-
-    pub(super) fn build_looping_regex_node(
-        &mut self,
-        _regex_pattern: &RegexPattern,
-        _ctx: &mut HirBuildCtx<'m>,
-    ) -> TypedHirNode<'m> {
-        todo!("looping regex")
     }
 
     fn build_regex_capture_alternations(

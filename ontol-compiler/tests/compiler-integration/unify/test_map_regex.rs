@@ -73,9 +73,8 @@ fn test_map_regex_alternation1() {
     });
 }
 
-// BUG: This should make an iteration group consisting of (one, two)
 #[test]
-#[should_panic = "looping regex"]
+#[should_panic = "Not a sequence"]
 fn test_map_regex_loop_pattern() {
     r#"
     pub def in {
@@ -90,8 +89,8 @@ fn test_map_regex_loop_pattern() {
     }
     map {
         in {
-            'input': [ // ERROR type mismatch: expected `[string]`, found `string`
-                ../(?<one>\w+) (?<two>\w+),/ // ERROR Incompatible literal
+            'input': [
+                ../(?<one>\w+) (?<two>\w+),/
             ]
         }
         out {
