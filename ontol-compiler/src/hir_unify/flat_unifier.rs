@@ -579,7 +579,7 @@ fn unify_scope_structural<'m>(
                 | flat_scope::Kind::RegexCapture(_) => {
                     builder.output.extend(apply_lateral_scope(
                         main_scope,
-                        scope_map.take_assignments(),
+                        scope_map.select_assignments(selector),
                         &|| in_scope.clone(),
                         table,
                         unifier,
@@ -860,7 +860,7 @@ fn unify_scope_structural<'m>(
 
                             match_arm.nodes.extend(unify_scope_structural(
                                 main_scope,
-                                selector,
+                                ExprSelector::SeqItem,
                                 StructuralOrigin::DependeesOf(alt_scope_var),
                                 captured_scope,
                                 table,
@@ -1258,18 +1258,13 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                 let mut body = vec![];
 
                 debug!(
-                    "{level}Make struct {} scope_var={:?} in_scope={:?}",
+                    "{level}Make struct {} scope_var={:?} in_scope={:?} main_scope={main_scope:?}",
                     binder.var, self.scope_var, in_scope
                 );
 
                 if self.scope_var.is_some() {
                     body.extend(unify_scope_structural(
-                        match main_scope {
-                            MainScope::Const => unreachable!(),
-                            MainScope::Value(scope_var) => MainScope::Value(scope_var),
-                            MainScope::Sequence(scope_var, _) => MainScope::Value(scope_var),
-                            MainScope::MultiSequence(_) => panic!(),
-                        },
+                        main_scope.next(),
                         match main_scope {
                             MainScope::Const => unreachable!(),
                             MainScope::Value(scope_var) => {
@@ -1333,7 +1328,7 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                         let scope_var = ScopeVar(ontol_hir::Var(label.0));
                         (scope_var, table.get(&label).unwrap().output_seq_var)
                     }
-                    _ => panic!("Unsupported context for seq-item: {main_scope:?}"),
+                    _ => (ScopeVar(ontol_hir::Var(0)), OutputVar(ontol_hir::Var(0))), // _ => panic!("Unsupported context for seq-item: {main_scope:?}"),
                 };
                 let next_main_scope = MainScope::Value(scope_var);
 

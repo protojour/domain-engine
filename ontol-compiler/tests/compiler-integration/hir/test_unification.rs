@@ -1657,3 +1657,82 @@ fn test_unify_regex_loop2() {
     };
     assert_eq!(expected, output);
 }
+
+#[test]
+fn test_unify_regex_loop3() {
+    let output = test_unify(
+        "
+        (match-struct ($d)
+            (prop $d S:1:2
+                (#u (regex-seq (@c) def@0:43 ((1 $a)) ((2 $b))))
+            )
+        )
+        ",
+        "
+        (struct ($e)
+            (prop $e S:1:6
+                (seq (@c)
+                    (iter #u
+                        (struct ($f)
+                            (prop $f S:1:4
+                                (#u $a)
+                            )
+                        )
+                    )
+                )
+            )
+            (prop $e S:1:7
+                (seq (@c)
+                    (iter #u
+                        (struct ($g)
+                            (prop $g S:1:4
+                                (#u $b)
+                            )
+                        )
+                    )
+                )
+            )
+        )
+        ",
+    );
+
+    let expected = indoc! {"
+        |$d| (struct ($e)
+            (match-prop $d S:1:2
+                (($_ $c)
+                    (let ($o (sequence ($m)))
+                        (let ($n (sequence ($l)))
+                            (match-regex-iter $c def@0:43
+                                (((1 $a))
+                                    (seq-push $n #u
+                                        (struct ($f)
+                                            (prop $f S:1:4
+                                                (#u $a)
+                                            )
+                                        )
+                                    )
+                                )
+                                (((2 $b))
+                                    (seq-push $o #u
+                                        (struct ($g)
+                                            (prop $g S:1:4
+                                                (#u $b)
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                            (prop $e S:1:6
+                                (#u $n)
+                            )
+                            (prop $e S:1:7
+                                (#u $o)
+                            )
+                        )
+                    )
+                )
+            )
+        )"
+    };
+    assert_eq!(expected, output);
+}

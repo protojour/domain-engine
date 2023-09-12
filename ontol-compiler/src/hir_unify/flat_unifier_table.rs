@@ -21,6 +21,7 @@ pub(super) struct Table<'m> {
 #[derive(Clone, Copy, Debug)]
 pub enum ExprSelector {
     Struct(ontol_hir::Var, ScopeVar),
+    SeqItem,
 }
 
 pub trait IsInScope {
@@ -388,6 +389,8 @@ impl<'m> ScopeMap<'m> {
                     (expr::Kind::Prop(prop), ExprSelector::Struct(struct_var, _)) => {
                         prop.struct_var == struct_var
                     }
+                    (expr::Kind::SeqItem(..), ExprSelector::SeqItem) => true,
+                    (expr::Kind::SeqItem(..), _) => false,
                     _ => true,
                 });
         self.assignments = retained;

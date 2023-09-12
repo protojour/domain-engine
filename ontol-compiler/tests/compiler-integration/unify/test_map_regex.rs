@@ -119,3 +119,50 @@ fn test_map_regex_loop_pattern() {
         );
     });
 }
+
+#[test]
+fn test_map_regex_loop_alternation() {
+    r#"
+    pub def in {
+        rel .'input': string
+    }
+    def capture {
+        rel .'value': string
+    }
+    pub def out {
+        rel .'foo': [capture]
+        rel .'bar': [capture]
+    }
+    map {
+        in match {
+            'input': [
+                ../FOO=(?<foo>\w+)|BAR=(?<bar>\w+)/
+            ]
+        }
+        out {
+            'foo': [..capture { 'value': foo }]
+            'bar': [..capture { 'value': bar }]
+        }
+    }
+    "#
+    .compile_ok(|test| {
+        test.assert_domain_map(
+            ("in", "out"),
+            json!({ "input": "" }),
+            json!({ "foo": [], "bar": [] }),
+        );
+        test.assert_domain_map(
+            ("in", "out"),
+            json!({ "input": "junkjunk FOO=1 BAR=2 FOO=3 junkjunkjunk" }),
+            json!({
+                "foo": [
+                    { "value": "1" },
+                    { "value": "3" },
+                ],
+                "bar": [
+                    { "value": "2" },
+                ]
+            }),
+        );
+    });
+}
