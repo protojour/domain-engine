@@ -349,7 +349,16 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                     )?);
                 }
             }
-            RegexPatternCaptureNode::Alternation { .. } => {}
+            RegexPatternCaptureNode::Alternation { variants } => {
+                for variant in variants {
+                    group_set.join(self.analyze_regex_capture_node(
+                        variant,
+                        full_span,
+                        parent_aggr_group,
+                        ctx,
+                    )?);
+                }
+            }
             RegexPatternCaptureNode::Repetition {
                 pat_id,
                 node: inner_node,
