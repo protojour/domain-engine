@@ -1569,14 +1569,13 @@ fn test_unify_regex_loop1() {
         ",
     );
 
-    // BUG: Uses match-regex. Need a separate ontol-hir node for expressing loop
     let expected = indoc! {"
         |$c| (struct ($d)
             (match-prop $c S:0:0
                 (($_ $e)
                     (let ($m (sequence ($k)))
                         (let ($l (sequence ($j)))
-                            (match-regex $e def@0:0
+                            (match-regex-iter $e def@0:0
                                 (((1 $a))
                                     (seq-push $l #u $a)
                                 )

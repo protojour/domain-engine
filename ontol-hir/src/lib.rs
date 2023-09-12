@@ -101,7 +101,7 @@ pub enum Kind<'a, L: Lang> {
     /// If the label is defined, it is a looping regex
     Regex(Option<L::Label<'a>>, DefId, Vec<Vec<CaptureGroup<'a, L>>>),
     /// A regex matcher/unpacker
-    MatchRegex(Var, DefId, Vec<CaptureMatchArm<'a, L>>),
+    MatchRegex(Iter, Var, DefId, Vec<CaptureMatchArm<'a, L>>),
 }
 
 #[derive(Default, Clone, Copy)]

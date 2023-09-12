@@ -162,8 +162,13 @@ impl<'a, L: Lang> Print<Kind<'a, L>> for Printer<L> {
                 self.print_rparen(multi, f)?;
                 Ok(sep.multiline())
             }
-            Kind::MatchRegex(var, regex_def_id, arms) => {
-                write!(f, "{indent}(match-regex {var} {regex_def_id:?}")?;
+            Kind::MatchRegex(iter, var, regex_def_id, arms) => {
+                if iter.0 {
+                    write!(f, "{indent}(match-regex-iter")?;
+                } else {
+                    write!(f, "{indent}(match-regex")?;
+                }
+                write!(f, " {var} {regex_def_id:?}")?;
                 let multi = self.print_all(Sep::Space, arms.iter(), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))

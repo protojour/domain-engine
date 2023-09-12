@@ -137,7 +137,7 @@ macro_rules! visitor_trait_methods {
                         }
                     }
                 }
-                Kind::MatchRegex(string_var, _regex_def_id, capture_match_arms) => {
+                Kind::MatchRegex(_iter, string_var, _regex_def_id, capture_match_arms) => {
                     self.visit_var(string_var);
                     for (index, arm) in capture_match_arms.$iter().enumerate() {
                         self.visit_capture_match_arm(index, arm);

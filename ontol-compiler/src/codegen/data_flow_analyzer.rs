@@ -206,7 +206,7 @@ where
                 self.var_dependencies.insert(*to_var, var_set.clone());
                 var_set
             }
-            ontol_hir::Kind::MatchRegex(var, _, match_arms) => {
+            ontol_hir::Kind::MatchRegex(_iter, var, _, match_arms) => {
                 let mut var_set = VarSet::default();
                 for match_arm in match_arms {
                     for group in &match_arm.capture_groups {

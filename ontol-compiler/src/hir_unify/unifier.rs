@@ -88,6 +88,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     }),
                     node: TypedHirNode(
                         ontol_hir::Kind::MatchRegex(
+                            ontol_hir::Iter(false),
                             string_var,
                             regex_def_id,
                             vec![ontol_hir::CaptureMatchArm {

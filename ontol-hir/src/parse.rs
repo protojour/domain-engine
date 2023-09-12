@@ -185,7 +185,7 @@ impl<L: Lang> Parser<L> {
                 ))
             }
             (sym @ ("regex" | "regex-seq"), next) => {
-                let (label, next) = if sym == "regex-seq" {
+                let (label, next) = if sym.contains("seq") {
                     let (label, next) = parse_paren_delimited(next, parse_at_label)?;
                     (Some(self.make_label(label)), next)
                 } else {
@@ -203,12 +203,13 @@ impl<L: Lang> Parser<L> {
                     next,
                 ))
             }
-            ("match-regex", next) => {
+            (sym @ ("match-regex" | "match-regex-iter"), next) => {
+                let iter = Iter(sym.contains("iter"));
                 let (string_var, next) = parse_dollar_var(next)?;
                 let (regex_def_id, next) = parse_def_id(next)?;
                 let (match_arms, next) = self.parse_many(next, Self::parse_capture_match_arm)?;
                 Ok((
-                    self.make_node(Kind::MatchRegex(string_var, regex_def_id, match_arms)),
+                    self.make_node(Kind::MatchRegex(iter, string_var, regex_def_id, match_arms)),
                     next,
                 ))
             }

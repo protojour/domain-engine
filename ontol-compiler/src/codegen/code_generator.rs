@@ -505,7 +505,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     .append_op(block, OpCode::AppendString(to_local), Delta(-1), span);
                 self.builder.append_pop_until(block, top, span);
             }
-            ontol_hir::Kind::MatchRegex(haystack_var, regex_def_id, match_arms) => {
+            ontol_hir::Kind::MatchRegex(_iter, haystack_var, regex_def_id, match_arms) => {
                 if match_arms.is_empty() {
                     return;
                 }

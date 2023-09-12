@@ -822,7 +822,12 @@ fn unify_scope_structural<'m>(
                         }
 
                         let mut nodes = vec![TypedHirNode(
-                            ontol_hir::Kind::MatchRegex(scope_var.0, regex_def_id, match_arms),
+                            ontol_hir::Kind::MatchRegex(
+                                ontol_hir::Iter(true),
+                                scope_var.0,
+                                regex_def_id,
+                                match_arms,
+                            ),
                             regex_hir_meta,
                         )];
                         nodes.extend(hir_props);
@@ -901,7 +906,12 @@ fn unify_scope_structural<'m>(
                         }
 
                         builder.output.push(TypedHirNode(
-                            ontol_hir::Kind::MatchRegex(scope_var.0, regex_def_id, match_arms),
+                            ontol_hir::Kind::MatchRegex(
+                                ontol_hir::Iter(false),
+                                scope_var.0,
+                                regex_def_id,
+                                match_arms,
+                            ),
                             regex_hir_meta,
                         ));
                     }
