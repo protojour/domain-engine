@@ -106,7 +106,7 @@ pub enum Kind<'m> {
     ),
     IterElement(ontol_hir::Label, OutputVar),
     Call(BuiltinProc),
-    Regex(DefId),
+    Regex(Option<ontol_hir::Label>, DefId),
     RegexAlternation,
     RegexCapture(u32),
 }

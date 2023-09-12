@@ -122,10 +122,11 @@ impl<'a, L: Lang> Print<Kind<'a, L>> for Printer<L> {
                 Ok(Multiline(true))
             }
             Kind::Sequence(binder, children) => {
+                let indent = if children.is_empty() { sep } else { indent };
                 write!(f, "{indent}(sequence ({})", binder.var())?;
                 let multi = self.print_all(Sep::Space, children.iter().map(GetKind::kind), f)?;
                 self.print_rparen(multi, f)?;
-                Ok(Multiline(true))
+                Ok(multi)
             }
             Kind::ForEach(var, (rel, val), children) => {
                 write!(f, "{indent}(for-each {var} ({rel} {val})")?;

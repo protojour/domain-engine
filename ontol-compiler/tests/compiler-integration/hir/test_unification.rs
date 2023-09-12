@@ -1549,7 +1549,6 @@ fn test_unify_regex_capture2() {
 }
 
 #[test]
-#[should_panic = "This unifier does not handle looping regex"]
 fn test_unify_regex_loop1() {
     let output = test_unify(
         // Contains a looping regex with two variations
@@ -1564,29 +1563,33 @@ fn test_unify_regex_loop1() {
         ",
         "
         (struct ($d)
-            (prop $e O:0:0 (seq (@e) (iter #u $a)))
-            (prop $e O:0:1 (seq (@e) (iter #u $b)))
+            (prop $d O:0:0 (seq (@e) (iter #u $a)))
+            (prop $d O:0:1 (seq (@e) (iter #u $b)))
         )
         ",
     );
 
+    // BUG: Uses match-regex. Need a separate ontol-hir node for expressing loop
     let expected = indoc! {"
         |$c| (struct ($d)
             (match-prop $c S:0:0
                 (($_ $e)
-                    (let ($f (sequence ($f)))
-                        (let ($g (sequence ($g)))
-                            (regex-for-each $e def@0:0
+                    (let ($m (sequence ($k)))
+                        (let ($l (sequence ($j)))
+                            (match-regex $e def@0:0
                                 (((1 $a))
-                                    (seq-push $f #u $a)
+                                    (seq-push $l #u $a)
                                 )
                                 (((2 $b))
-                                    (seq-push $g #u $b)
+                                    (seq-push $m #u $b)
                                 )
                             )
-
-                            (prop $d O:0:0 (#u $f))
-                            (prop $d O:0:1 (#u $g))
+                            (prop $d O:0:0
+                                (#u $l)
+                            )
+                            (prop $d O:0:1
+                                (#u $m)
+                            )
                         )
                     )
                 )

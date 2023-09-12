@@ -3,6 +3,7 @@
 use std::fmt::Display;
 
 use fnv::FnvHashMap;
+use indexmap::IndexMap;
 use ontol_hir::{visitor::HirVisitor, GetKind};
 use ontol_runtime::{smart_format, DefId};
 use smartstring::alias::String;
@@ -22,7 +23,9 @@ use super::{
     expr,
     flat_level_builder::LevelBuilder,
     flat_scope::{self, OutputVar, PropDepth, ScopeVar},
-    flat_unifier_table::{Assignment, ExprSelector, ScopeFilter, ScopedAssignment, Table},
+    flat_unifier_table::{
+        Assignment, AssignmentSlot, ExprSelector, ScopeFilter, ScopedAssignment, Table,
+    },
     unifier::UnifiedNode,
     UnifierError, UnifierResult, VarSet,
 };
@@ -35,14 +38,29 @@ pub struct FlatUnifier<'a, 'm> {
 
 enum AssignResult<'m> {
     Success,
+    SuccessWithLabel(ontol_hir::Label),
     Unassigned(expr::Expr<'m>),
 }
 
 #[derive(Clone, Copy, Debug)]
-enum MainScope {
+enum MainScope<'a> {
     Const,
     Value(ScopeVar),
     Sequence(ScopeVar, OutputVar),
+    MultiSequence(&'a IndexMap<ScopeVar, OutputVar>),
+}
+
+impl<'a> MainScope<'a> {
+    fn next(self) -> Self {
+        match self {
+            Self::Const => Self::Const,
+            Self::Value(scope_var) => Self::Value(scope_var),
+            Self::Sequence(scope_var, _) => Self::Value(scope_var),
+            Self::MultiSequence(_) => {
+                panic!("MultiSequence must be special cased")
+            }
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -133,6 +151,15 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                 Ok(AssignResult::Success)
             }
             expr::Kind::Prop(prop) => {
+                let expr::Prop {
+                    optional,
+                    struct_var,
+                    prop_id,
+                    seq,
+                    variant,
+                    free_vars,
+                } = *prop;
+
                 // debug!(
                 //     "assigning prop {:?}, free_vars={:?}",
                 //     prop.prop_id, prop.free_vars
@@ -141,132 +168,113 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
 
                 debug!(
                     "find assignment slot for {}[{}], fv={:?} filter={:?}",
-                    prop.struct_var, prop.prop_id, prop.free_vars, filter.req_constraints
+                    prop.struct_var, prop.prop_id, free_vars, filter.req_constraints
                 );
 
-                let is_seq = matches!(&prop.variant, expr::PropVariant::Seq { .. });
+                // Provide the sequence label to the assignment slot search
+                let seq_label = match &variant {
+                    expr::PropVariant::Seq { label, .. } => Some(ScopeVar(ontol_hir::Var(label.0))),
+                    expr::PropVariant::Singleton(..) => None,
+                };
+
                 let slot =
-                    table.find_assignment_slot(&prop.free_vars, is_seq, prop.optional, &mut filter);
+                    table.find_assignment_slot(&free_vars, seq_label, prop.optional, &mut filter);
 
-                let prop = {
-                    let expr::Prop {
-                        optional,
-                        struct_var,
-                        prop_id,
-                        seq,
-                        variant,
-                        free_vars,
-                    } = *prop;
-                    let variant = match variant {
-                        expr::PropVariant::Seq { label, elements } => {
-                            let label_filter = filter.constraint(ScopeVar(ontol_hir::Var(label.0)));
+                // Split off/assign individual property variants
+                let variant = match variant {
+                    expr::PropVariant::Seq {
+                        mut label,
+                        elements,
+                    } => {
+                        let label_filter =
+                            filter.with_constraint(ScopeVar(ontol_hir::Var(label.0)));
 
-                            // recursively assign seq elements
-                            for (index, element) in elements.into_iter().enumerate() {
-                                let mut free_vars = VarSet::default();
-                                free_vars.union_with(&element.attribute.rel.meta().free_vars);
-                                free_vars.union_with(&element.attribute.val.meta().free_vars);
+                        // recursively assign seq elements
+                        // The elements are consumed here and assigned to the scope table.
+                        for (index, element) in elements.into_iter().enumerate() {
+                            let mut free_vars = VarSet::default();
+                            free_vars.union_with(&element.attribute.rel.meta().free_vars);
+                            free_vars.union_with(&element.attribute.val.meta().free_vars);
 
-                                let element_expr = expr::Expr(
-                                    expr::Kind::SeqItem(
-                                        label,
-                                        index,
-                                        expr::Iter(element.iter),
-                                        Box::new(element.attribute),
-                                    ),
-                                    expr::Meta {
-                                        free_vars,
-                                        hir_meta: self.unit_meta(),
-                                    },
-                                );
+                            let element_expr = expr::Expr(
+                                expr::Kind::SeqItem(
+                                    label,
+                                    index,
+                                    expr::Iter(element.iter),
+                                    Box::new(element.attribute),
+                                ),
+                                expr::Meta {
+                                    free_vars,
+                                    hir_meta: self.unit_meta(),
+                                },
+                            );
 
-                                self.assign_to_scope(
-                                    element_expr,
-                                    depth.next(),
-                                    label_filter.clone(),
-                                    table,
-                                )?;
+                            let assign_result = self.assign_to_scope(
+                                element_expr,
+                                depth.next(),
+                                label_filter.clone(),
+                                table,
+                            )?;
 
-                                if element.iter {}
-
-                                // element.attribute
-                            }
-                            expr::PropVariant::Seq {
-                                label,
-                                elements: vec![],
+                            if let AssignResult::SuccessWithLabel(final_label) = assign_result {
+                                label = final_label;
                             }
                         }
-                        expr::PropVariant::Singleton(attr) => {
-                            let rel =
-                                self.destructure_expr(attr.rel, depth.next(), &filter, table)?;
-                            let val =
-                                self.destructure_expr(attr.val, depth.next(), &filter, table)?;
-                            // let rel = attr.rel;
-                            // let val = attr.val;
-                            expr::PropVariant::Singleton(ontol_hir::Attribute { rel, val })
+
+                        expr::PropVariant::Seq {
+                            label,
+                            elements: vec![],
                         }
-                    };
-                    expr::Prop {
-                        optional,
-                        struct_var,
-                        prop_id,
-                        variant,
-                        seq,
-                        free_vars,
+                    }
+                    expr::PropVariant::Singleton(attr) => {
+                        let rel = self.destructure_expr(attr.rel, depth.next(), &filter, table)?;
+                        let val = self.destructure_expr(attr.val, depth.next(), &filter, table)?;
+                        expr::PropVariant::Singleton(ontol_hir::Attribute { rel, val })
                     }
                 };
 
-                // if prop.optional.0 {
-                //     return Ok(AssignResult::Success);
-                // }
-
-                if let Some(slot) = slot {
-                    let scope_map = table.scope_map_mut(slot.index);
-                    scope_map.assignments.push(
-                        Assignment::new(expr::Expr(expr::Kind::Prop(Box::new(prop)), meta))
-                            .with_lateral_deps(slot.lateral_deps),
-                    );
-                    Ok(AssignResult::Success)
-                } else {
-                    Ok(AssignResult::Unassigned(expr::Expr(
-                        expr::Kind::Prop(Box::new(prop)),
+                Ok(Self::assign_to_assignment_slot(
+                    slot,
+                    expr::Expr(
+                        expr::Kind::Prop(Box::new(expr::Prop {
+                            optional,
+                            struct_var,
+                            prop_id,
+                            variant,
+                            seq,
+                            free_vars,
+                        })),
                         meta,
-                    )))
-                }
+                    ),
+                    table,
+                ))
             }
             expr::Kind::SeqItem(label, index, iter, attr) => {
-                if iter.0 {
-                    let iter_scope_map_idx = table
-                        .dependees(Some(ScopeVar(ontol_hir::Var(label.0))))
-                        .into_iter()
-                        .find(|idx| {
-                            let scope_map = &table.table_mut()[*idx];
-                            matches!(scope_map.scope.kind(), flat_scope::Kind::IterElement(..))
-                        });
-
-                    if let Some(iter_scope_map_idx) = iter_scope_map_idx {
-                        let rel = self.destructure_expr(attr.rel, depth, &filter, table)?;
-                        let val = self.destructure_expr(attr.val, depth, &filter, table)?;
-
-                        let iter_scope_map = &mut table.table_mut()[iter_scope_map_idx];
-
-                        iter_scope_map.assignments.push(Assignment::new(expr::Expr(
-                            expr::Kind::SeqItem(
-                                label,
-                                index,
-                                iter,
-                                Box::new(ontol_hir::Attribute { rel, val }),
-                            ),
-                            meta,
-                        )));
-
-                        Ok(AssignResult::Success)
-                    } else {
-                        Err(unifier_todo(smart_format!("Not able to find iter scope")))
-                    }
-                } else {
-                    Err(unifier_todo(smart_format!("Handle non-iter seq element")))
+                if !iter.0 {
+                    return Err(unifier_todo(smart_format!("Handle non-iter seq element")));
                 }
+
+                // Find the scope var that matches the label
+                let label_scope_var = ScopeVar(ontol_hir::Var(label.0));
+                let (assignment_idx, final_label) =
+                    self.find_iter_assignment_slot(label_scope_var, &meta.free_vars, table)?;
+
+                let rel = self.destructure_expr(attr.rel, depth, &filter, table)?;
+                let val = self.destructure_expr(attr.val, depth, &filter, table)?;
+
+                let iter_scope_map = &mut table.table_mut()[assignment_idx];
+
+                iter_scope_map.assignments.push(Assignment::new(expr::Expr(
+                    expr::Kind::SeqItem(
+                        final_label,
+                        index,
+                        iter,
+                        Box::new(ontol_hir::Attribute { rel, val }),
+                    ),
+                    meta,
+                )));
+
+                Ok(AssignResult::SuccessWithLabel(final_label))
             }
             e => Err(unifier_todo(smart_format!("expr kind: {e:?}"))),
         }
@@ -324,6 +332,76 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                 ))
             }
             kind => Ok(expr::Expr(kind, meta)),
+        }
+    }
+
+    // This function can also reassign the SeqItem label
+    fn find_iter_assignment_slot(
+        &mut self,
+        label_scope_var: ScopeVar,
+        expr_free_vars: &VarSet,
+        table: &mut Table<'m>,
+    ) -> UnifierResult<(usize, ontol_hir::Label)> {
+        let Some((_idx, scope_map)) = table.find_scope_map_by_scope_var(label_scope_var) else {
+            return Err(unifier_todo(smart_format!("Not able to find iter scope A")));
+        };
+
+        match scope_map.scope.kind() {
+            // For SeqPropVariant, find the scope child that iterates elements
+            flat_scope::Kind::SeqPropVariant(label, ..) => {
+                let label = *label;
+                table
+                    .dependees(Some(label_scope_var))
+                    .into_iter()
+                    .find(|idx| {
+                        let scope_map = &table.table_mut()[*idx];
+                        matches!(scope_map.scope.kind(), flat_scope::Kind::IterElement(..))
+                    })
+                    .map(|idx| (idx, label.label))
+                    .ok_or_else(|| {
+                        unifier_todo(smart_format!(
+                            "Unable to find IterElement scope under SeqPropVariant"
+                        ))
+                    })
+            }
+            flat_scope::Kind::Regex(Some(_label), _) => {
+                // looping regex. Need to assign to the RegexAlternation that matches..
+                table
+                    .dependees(Some(label_scope_var))
+                    .into_iter()
+                    .find(|idx| {
+                        let alternation_scope_map = &table.table_mut()[*idx];
+
+                        alternation_scope_map
+                            .scope
+                            .meta()
+                            .defs
+                            .0
+                            .is_subset(&expr_free_vars.0)
+                    })
+                    .map(|idx| {
+                        // allocate a new label so it can be used independently of other sequences
+                        (idx, ontol_hir::Label(self.var_allocator.alloc().0))
+                    })
+                    .ok_or_else(|| unifier_todo(smart_format!("Unable to locate loge")))
+            }
+            _ => Err(unifier_todo(smart_format!("Not able to find iter scope B"))),
+        }
+    }
+
+    fn assign_to_assignment_slot(
+        slot: Option<AssignmentSlot>,
+        expr: expr::Expr<'m>,
+        table: &mut Table<'m>,
+    ) -> AssignResult<'m> {
+        if let Some(slot) = slot {
+            let scope_map = table.scope_map_mut(slot.index);
+            scope_map
+                .assignments
+                .push(Assignment::new(expr).with_lateral_deps(slot.lateral_deps));
+            AssignResult::Success
+        } else {
+            AssignResult::Unassigned(expr)
         }
     }
 
@@ -648,60 +726,190 @@ fn unify_scope_structural<'m>(
                         }
                     }
                 }
-                flat_scope::Kind::Regex(regex_def_id) => {
+                flat_scope::Kind::Regex(opt_seq_label, regex_def_id) => {
                     let regex_def_id = *regex_def_id;
                     let regex_hir_meta = scope_map.scope.meta().hir_meta;
 
-                    let mut match_arms: Vec<ontol_hir::CaptureMatchArm<'m, TypedHir>> = vec![];
+                    if let Some(_seq_label) = opt_seq_label {
+                        // looping regex
+                        let mut match_arms: Vec<ontol_hir::CaptureMatchArm<'m, TypedHir>> = vec![];
 
-                    // alternations:
-                    for alt_idx in table.dependees(Some(scope_var)) {
-                        let alt_scope_map = table.scope_map_mut(alt_idx);
-                        let alt_scope_var = alt_scope_map.scope.meta().scope_var;
+                        let mut multi_sequence_table: IndexMap<ScopeVar, OutputVar> =
+                            Default::default();
 
-                        let mut match_arm = ontol_hir::CaptureMatchArm {
-                            capture_groups: vec![],
-                            nodes: vec![],
-                        };
-                        let mut captured_scope = VarSet::default();
+                        let mut hir_props: Vec<TypedHirNode<'m>> = vec![];
+                        let unit_meta = unifier.unit_meta();
 
-                        for cap_scope_idx in table.dependees(Some(alt_scope_var)) {
-                            let cap_scope_map = &mut table.scope_map_mut(cap_scope_idx);
-                            let cap_scope_var = cap_scope_map.scope.meta().scope_var;
+                        // Analyze which sequences are under scrutiny and allocate output variables
+                        for assignment in std::mem::take(&mut scope_map.assignments) {
+                            if let expr::Expr(expr::Kind::Prop(prop), meta) = assignment.expr {
+                                if let expr::PropVariant::Seq { label, .. } = &prop.variant {
+                                    let output_var = multi_sequence_table
+                                        .entry(ScopeVar(ontol_hir::Var(label.0)))
+                                        .or_insert_with(|| {
+                                            OutputVar(unifier.var_allocator.alloc())
+                                        });
 
-                            let flat_scope::Kind::RegexCapture(cap_index) =
-                                cap_scope_map.scope.kind()
-                            else {
-                                panic!("Expected regex capture");
-                            };
-
-                            match_arm.capture_groups.push(ontol_hir::CaptureGroup {
-                                index: *cap_index,
-                                binder: TypedBinder {
-                                    var: cap_scope_var.0,
-                                    meta: cap_scope_map.scope.meta().hir_meta,
-                                },
-                            });
-                            captured_scope.insert(cap_scope_var.0);
+                                    hir_props.push(TypedHirNode(
+                                        ontol_hir::Kind::Prop(
+                                            prop.optional,
+                                            prop.struct_var,
+                                            prop.prop_id,
+                                            vec![ontol_hir::PropVariant::Singleton(
+                                                ontol_hir::Attribute {
+                                                    rel: Box::new(TypedHirNode(
+                                                        ontol_hir::Kind::Unit,
+                                                        unit_meta,
+                                                    )),
+                                                    val: Box::new(TypedHirNode(
+                                                        ontol_hir::Kind::Var(output_var.0),
+                                                        meta.hir_meta,
+                                                    )),
+                                                },
+                                            )],
+                                        ),
+                                        meta.hir_meta,
+                                    ));
+                                }
+                            }
                         }
 
-                        match_arm.nodes.extend(unify_scope_structural(
-                            main_scope,
-                            selector,
-                            StructuralOrigin::DependeesOf(alt_scope_var),
-                            captured_scope,
-                            table,
-                            unifier,
-                            level.next(),
-                        )?);
+                        // alternations:
+                        for alt_idx in table.dependees(Some(scope_var)) {
+                            let alt_scope_var = table.scope_map_mut(alt_idx).scope.meta().scope_var;
 
-                        match_arms.push(match_arm);
+                            let mut match_arm = ontol_hir::CaptureMatchArm {
+                                capture_groups: vec![],
+                                nodes: vec![],
+                            };
+                            let mut captured_scope = VarSet::default();
+
+                            for cap_scope_idx in table.dependees(Some(alt_scope_var)) {
+                                let cap_scope_map = &mut table.scope_map_mut(cap_scope_idx);
+                                let cap_scope_var = cap_scope_map.scope.meta().scope_var;
+
+                                let flat_scope::Kind::RegexCapture(cap_index) =
+                                    cap_scope_map.scope.kind()
+                                else {
+                                    panic!("Expected regex capture");
+                                };
+
+                                match_arm.capture_groups.push(ontol_hir::CaptureGroup {
+                                    index: *cap_index,
+                                    binder: TypedBinder {
+                                        var: cap_scope_var.0,
+                                        meta: cap_scope_map.scope.meta().hir_meta,
+                                    },
+                                });
+                                captured_scope.insert(cap_scope_var.0);
+                            }
+
+                            match_arm.nodes.extend(apply_lateral_scope(
+                                MainScope::MultiSequence(&multi_sequence_table),
+                                table.scope_map_mut(alt_idx).take_assignments(),
+                                &|| captured_scope.clone(),
+                                table,
+                                unifier,
+                                level.next(),
+                            )?);
+
+                            match_arm.nodes.extend(unify_scope_structural(
+                                main_scope,
+                                selector,
+                                StructuralOrigin::DependeesOf(alt_scope_var),
+                                captured_scope,
+                                table,
+                                unifier,
+                                level.next(),
+                            )?);
+
+                            match_arms.push(match_arm);
+                        }
+
+                        let mut nodes = vec![TypedHirNode(
+                            ontol_hir::Kind::MatchRegex(scope_var.0, regex_def_id, match_arms),
+                            regex_hir_meta,
+                        )];
+                        nodes.extend(hir_props);
+
+                        // wrap everything in sequence binders
+                        for (scope_var, output_var) in multi_sequence_table {
+                            nodes = vec![TypedHirNode(
+                                ontol_hir::Kind::Let(
+                                    TypedBinder {
+                                        var: output_var.0,
+                                        meta: unit_meta,
+                                    },
+                                    Box::new(TypedHirNode(
+                                        ontol_hir::Kind::Sequence(
+                                            TypedBinder {
+                                                var: scope_var.0,
+                                                meta: unit_meta,
+                                            },
+                                            vec![],
+                                        ),
+                                        unit_meta,
+                                    )),
+                                    nodes,
+                                ),
+                                unifier.unit_meta(),
+                            )]
+                        }
+
+                        builder.output.extend(nodes);
+                    } else {
+                        // normal, one-shot regex
+                        let mut match_arms: Vec<ontol_hir::CaptureMatchArm<'m, TypedHir>> = vec![];
+
+                        // alternations:
+                        for alt_idx in table.dependees(Some(scope_var)) {
+                            let alt_scope_map = table.scope_map_mut(alt_idx);
+                            let alt_scope_var = alt_scope_map.scope.meta().scope_var;
+
+                            let mut match_arm = ontol_hir::CaptureMatchArm {
+                                capture_groups: vec![],
+                                nodes: vec![],
+                            };
+                            let mut captured_scope = VarSet::default();
+
+                            for cap_scope_idx in table.dependees(Some(alt_scope_var)) {
+                                let cap_scope_map = &mut table.scope_map_mut(cap_scope_idx);
+                                let cap_scope_var = cap_scope_map.scope.meta().scope_var;
+
+                                let flat_scope::Kind::RegexCapture(cap_index) =
+                                    cap_scope_map.scope.kind()
+                                else {
+                                    panic!("Expected regex capture");
+                                };
+
+                                match_arm.capture_groups.push(ontol_hir::CaptureGroup {
+                                    index: *cap_index,
+                                    binder: TypedBinder {
+                                        var: cap_scope_var.0,
+                                        meta: cap_scope_map.scope.meta().hir_meta,
+                                    },
+                                });
+                                captured_scope.insert(cap_scope_var.0);
+                            }
+
+                            match_arm.nodes.extend(unify_scope_structural(
+                                main_scope,
+                                selector,
+                                StructuralOrigin::DependeesOf(alt_scope_var),
+                                captured_scope,
+                                table,
+                                unifier,
+                                level.next(),
+                            )?);
+
+                            match_arms.push(match_arm);
+                        }
+
+                        builder.output.push(TypedHirNode(
+                            ontol_hir::Kind::MatchRegex(scope_var.0, regex_def_id, match_arms),
+                            regex_hir_meta,
+                        ));
                     }
-
-                    builder.output.push(TypedHirNode(
-                        ontol_hir::Kind::MatchRegex(scope_var.0, regex_def_id, match_arms),
-                        regex_hir_meta,
-                    ));
                 }
                 other => return Err(unifier_todo(smart_format!("structural scope: {other:?}"))),
             }
@@ -912,12 +1120,6 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
         in_scope: &VarSet,
         main_scope: MainScope,
     ) -> UnifierResult<TypedHirNode<'m>> {
-        let next_main_scope = match main_scope {
-            MainScope::Const => MainScope::Const,
-            MainScope::Value(scope_var) => MainScope::Value(scope_var),
-            MainScope::Sequence(scope_var, _) => MainScope::Value(scope_var),
-        };
-
         match kind {
             expr::Kind::Var(var) => Ok(TypedHirNode(ontol_hir::Kind::Var(var), meta.hir_meta)),
             expr::Kind::Unit => Ok(TypedHirNode(ontol_hir::Kind::Unit, meta.hir_meta)),
@@ -934,12 +1136,12 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                                 rel: Box::new(self.scoped_expr_to_node(
                                     attr.rel,
                                     in_scope,
-                                    next_main_scope,
+                                    main_scope.next(),
                                 )?),
                                 val: Box::new(self.scoped_expr_to_node(
                                     attr.val,
                                     in_scope,
-                                    next_main_scope,
+                                    main_scope.next(),
                                 )?),
                             })]
                         }
@@ -969,7 +1171,7 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
             expr::Kind::Call(expr::Call(proc, args)) => {
                 let mut hir_args = Vec::with_capacity(args.len());
                 for arg in args {
-                    hir_args.push(self.scoped_expr_to_node(arg, in_scope, next_main_scope)?);
+                    hir_args.push(self.scoped_expr_to_node(arg, in_scope, main_scope.next())?);
                 }
                 Ok(TypedHirNode(
                     ontol_hir::Kind::Call(proc, hir_args),
@@ -977,7 +1179,7 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                 ))
             }
             expr::Kind::Map(arg) => {
-                let hir_arg = self.scoped_expr_to_node(*arg, in_scope, next_main_scope)?;
+                let hir_arg = self.scoped_expr_to_node(*arg, in_scope, main_scope.next())?;
                 Ok(TypedHirNode(
                     ontol_hir::Kind::Map(Box::new(hir_arg)),
                     meta.hir_meta,
@@ -1003,6 +1205,7 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                             MainScope::Const => unreachable!(),
                             MainScope::Value(scope_var) => MainScope::Value(scope_var),
                             MainScope::Sequence(scope_var, _) => MainScope::Value(scope_var),
+                            MainScope::MultiSequence(_) => panic!(),
                         },
                         match main_scope {
                             MainScope::Const => unreachable!(),
@@ -1012,6 +1215,7 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                             MainScope::Sequence(scope_var, _) => {
                                 ExprSelector::Struct(binder.var, scope_var)
                             }
+                            MainScope::MultiSequence(_) => panic!(),
                         },
                         StructuralOrigin::Start,
                         next_in_scope.clone(),
@@ -1028,12 +1232,12 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                             let rel = Box::new(self.scoped_expr_to_node(
                                 attr.rel,
                                 in_scope,
-                                next_main_scope,
+                                main_scope.next(),
                             )?);
                             let val = Box::new(self.scoped_expr_to_node(
                                 attr.val,
                                 in_scope,
-                                next_main_scope,
+                                main_scope.next(),
                             )?);
                             let unit_meta = self.unifier.unit_meta();
                             body.push(TypedHirNode(
@@ -1059,10 +1263,16 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                     meta.hir_meta,
                 ))
             }
-            expr::Kind::SeqItem(_label, _index, _iter, attr) => {
-                let MainScope::Sequence(_, output_var) = main_scope else {
-                    panic!("Unsupported context for seq-item");
+            expr::Kind::SeqItem(label, _index, _iter, attr) => {
+                let (scope_var, output_var) = match main_scope {
+                    MainScope::Sequence(scope_var, output_var) => (scope_var, output_var),
+                    MainScope::MultiSequence(table) => {
+                        let scope_var = ScopeVar(ontol_hir::Var(label.0));
+                        (scope_var, table.get(&scope_var).cloned().unwrap())
+                    }
+                    _ => panic!("Unsupported context for seq-item: {main_scope:?}"),
                 };
+                let next_main_scope = MainScope::Value(scope_var);
 
                 let rel =
                     Box::new(self.scoped_expr_to_node(attr.rel, in_scope, next_main_scope)?);

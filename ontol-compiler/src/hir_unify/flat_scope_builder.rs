@@ -270,10 +270,14 @@ impl<'m> FlatScopeBuilder<'m> {
                     ));
                 }
             }
-            ontol_hir::Kind::Regex(_seq_label, regex_def_id, capture_group_alternations) => {
-                let scope_var = self.var_allocator.alloc();
+            ontol_hir::Kind::Regex(opt_seq_label, regex_def_id, capture_group_alternations) => {
+                let (scope_var, opt_label) = match opt_seq_label {
+                    Some(seq_label) => (ontol_hir::Var(seq_label.label.0), Some(seq_label.label)),
+                    None => (self.var_allocator.alloc(), None),
+                };
+
                 self.scope_nodes.push(ScopeNode(
-                    flat_scope::Kind::Regex(*regex_def_id),
+                    flat_scope::Kind::Regex(opt_label, *regex_def_id),
                     flat_scope::Meta {
                         scope_var: ScopeVar(scope_var),
                         free_vars: Default::default(),

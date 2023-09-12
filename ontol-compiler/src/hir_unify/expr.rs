@@ -1,4 +1,4 @@
-use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc, DefId};
+use ontol_runtime::{smart_format, value::PropertyId, vm::proc::BuiltinProc, DefId};
 use smartstring::alias::String;
 
 use crate::{
@@ -70,7 +70,11 @@ impl<'m> Kind<'m> {
             Self::Prop(prop) => format!(
                 "Prop{}({}{}[{}])",
                 if prop.optional.0 { "?" } else { "" },
-                if prop.seq.is_some() { "seq " } else { "" },
+                if let Some(label) = prop.seq {
+                    smart_format!("seq({label}) ")
+                } else {
+                    smart_format!("")
+                },
                 prop.struct_var,
                 prop.prop_id
             ),

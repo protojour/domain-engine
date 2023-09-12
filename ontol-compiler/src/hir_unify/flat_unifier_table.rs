@@ -36,7 +36,7 @@ pub struct ScopeFilter {
 }
 
 impl ScopeFilter {
-    pub fn constraint(&self, scope_var: ScopeVar) -> Self {
+    pub fn with_constraint(&self, scope_var: ScopeVar) -> Self {
         Self {
             req_constraints: self.req_constraints.union_one(scope_var.0),
         }
@@ -69,7 +69,7 @@ impl<'m> Table<'m> {
     pub fn find_assignment_slot(
         &mut self,
         free_vars: &VarSet,
-        is_seq: bool,
+        seq_label: Option<ScopeVar>,
         optional: ontol_hir::Optional,
         filter: &mut ScopeFilter,
     ) -> Option<AssignmentSlot> {
@@ -78,7 +78,13 @@ impl<'m> Table<'m> {
 
         let mut lateral_deps = VarSet::default();
 
-        if optional.0 {
+        if let Some(seq_label) = seq_label {
+            // Finding seq labels is the simplest search, this overrides every other strategy
+            if let Some((index, _)) = self.find_scope_map_by_scope_var(seq_label) {
+                candidate = Some(index);
+            }
+        } else if optional.0 {
+            // optional property strategy
             let filter_req_len = filter.req_constraints.0.len();
 
             let pre_candidates: Vec<_> = self
@@ -90,13 +96,7 @@ impl<'m> Table<'m> {
                     let scope_constraints_len = scope_meta.constraints.0.len();
 
                     match scope_map.scope.kind() {
-                        flat_scope::Kind::PropVariant(..) => {}
-                        flat_scope::Kind::SeqPropVariant(..) => {
-                            if !is_seq {
-                                return false;
-                            }
-                        }
-                        flat_scope::Kind::RegexCapture(..) => {}
+                        flat_scope::Kind::PropVariant(..) | flat_scope::Kind::RegexCapture(..) => {}
                         _ => return false,
                     }
 
@@ -123,6 +123,7 @@ impl<'m> Table<'m> {
                 candidate = Some(index);
             }
         } else {
+            // required property strategy
             // Note: Reverse search.
             for (index, scope_map) in self.table.iter().enumerate().rev() {
                 let scope_defs = &scope_map.scope.meta().defs;
@@ -134,13 +135,7 @@ impl<'m> Table<'m> {
 
                 // only consider proper scope-introducing nodes
                 match scope_map.scope.kind() {
-                    flat_scope::Kind::PropVariant(..) => {}
-                    flat_scope::Kind::SeqPropVariant(..) => {
-                        if !is_seq {
-                            continue;
-                        }
-                    }
-                    flat_scope::Kind::RegexCapture(..) => {}
+                    flat_scope::Kind::PropVariant(..) | flat_scope::Kind::RegexCapture(..) => {}
                     _ => continue,
                 }
 

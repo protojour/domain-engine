@@ -94,7 +94,7 @@ fn test_flat_regex() {
         $a: {} - Struct def{$a} cns{}
         $c: {$a} - PropVariant(d=0, opt=f, Var(a), S:0:0) def{} cns{}
         $d: {$c} - PropValue def{} cns{}
-        $e: {$d} - Regex(def@0:0) def{} cns{}
+        $e: {$d} - Regex(None, def@0:0) def{} cns{}
         $f: {$e} - RegexAlternation def{$b} cns{}
         $b: {$f} - RegexCapture(1) def{$b} cns{}
         "
