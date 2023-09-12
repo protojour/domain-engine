@@ -1,5 +1,6 @@
 use crate::docs::{get_ontol_docs, get_ontol_var, RESERVED_WORDS};
 use chumsky::prelude::*;
+use either::Either;
 use lsp_types::{Location, MarkedString, Position, Range, Url};
 use ontol_compiler::{
     error::UnifiedCompileError,
@@ -260,14 +261,14 @@ impl State {
                         let mut rel_loc: Option<Location> = None;
                         if in_range(&stmt.subject.1, &cursor) {
                             match &stmt.subject.0 {
-                                Some(Type::Path(path)) => {
+                                Either::Left(_) => return loc,
+                                Either::Right(Type::Path(path)) => {
                                     rel_loc = self.get_location_for_path(doc, path);
                                 }
-                                None => return loc,
                                 _ => {}
                             }
                         } else if in_range(&stmt.object.1, &cursor) {
-                            if let Some(type_or_pattern) = &stmt.object.0 {
+                            if let Either::Right(type_or_pattern) = &stmt.object.0 {
                                 match type_or_pattern {
                                     TypeOrPattern::Type(Type::Path(path)) => {
                                         rel_loc = self.get_location_for_path(doc, path);
@@ -295,10 +296,10 @@ impl State {
                             for trans in &stmt.transitions {
                                 if in_range(&trans.1, &cursor) {
                                     match &trans.0 {
-                                        Some(Type::Path(path)) => {
+                                        Either::Left(_) => return loc,
+                                        Either::Right(Type::Path(path)) => {
                                             fmt_loc = self.get_location_for_path(doc, path);
                                         }
-                                        None => return loc,
                                         _ => {}
                                     }
                                 }
@@ -392,14 +393,14 @@ impl State {
                     Statement::Rel(stmt) => {
                         if stmt.subject.1.contains(&cursor) {
                             match &stmt.subject.0 {
-                                Some(Type::Path(path)) => {
+                                Either::Left(_) => return get_ontol_docs("."),
+                                Either::Right(Type::Path(path)) => {
                                     return self.get_hoverdoc_for_path(doc, path);
                                 }
-                                None => return get_ontol_docs("."),
                                 _ => {}
                             }
                         } else if stmt.object.1.contains(&cursor) {
-                            if let Some(type_or_pattern) = &stmt.object.0 {
+                            if let Either::Right(type_or_pattern) = &stmt.object.0 {
                                 match type_or_pattern {
                                     TypeOrPattern::Type(Type::Path(path)) => {
                                         return self.get_hoverdoc_for_path(doc, path);
@@ -425,10 +426,10 @@ impl State {
                             for trans in &stmt.transitions {
                                 if trans.1.contains(&cursor) {
                                     match &trans.0 {
-                                        Some(Type::Path(path)) => {
+                                        Either::Left(_) => return get_ontol_docs("."),
+                                        Either::Right(Type::Path(path)) => {
                                             return self.get_hoverdoc_for_path(doc, path);
                                         }
-                                        None => return get_ontol_docs("."),
                                         _ => {}
                                     }
                                 }

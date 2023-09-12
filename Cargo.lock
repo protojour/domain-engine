@@ -1411,6 +1411,7 @@ dependencies = [
  "bumpalo",
  "chumsky",
  "derive-debug-extras",
+ "either",
  "ena",
  "fnv",
  "fraction",
@@ -1470,6 +1471,7 @@ dependencies = [
  "async-compat",
  "chumsky",
  "console_error_panic_hook",
+ "either",
  "futures-util",
  "js-sys",
  "lsp-types",
@@ -1494,6 +1496,7 @@ version = "0.1.0"
 dependencies = [
  "assert_matches",
  "chumsky",
+ "either",
  "ontol-runtime",
  "smartstring",
  "tracing",

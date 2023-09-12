@@ -1,5 +1,6 @@
 use std::{collections::HashMap, ops::Range};
 
+use either::Either;
 use indexmap::map::Entry;
 use ontol_parser::{ast, Span};
 use ontol_runtime::{
@@ -143,13 +144,19 @@ impl<'s, 'm> Lowering<'s, 'm> {
             Some(&mut root_defs),
         )?;
         let object_def_id = match object {
-            Some(ast::TypeOrPattern::Type(ty)) => self.resolve_contextual_type_reference(
-                Some(ty),
+            Either::Left(dot) => self.resolve_contextual_type_reference(
+                Either::Left(dot),
                 object_span.clone(),
                 &block_context,
                 Some(&mut root_defs),
             )?,
-            Some(ast::TypeOrPattern::Pattern(ast_pattern)) => {
+            Either::Right(ast::TypeOrPattern::Type(ty)) => self.resolve_contextual_type_reference(
+                Either::Right(ty),
+                object_span.clone(),
+                &block_context,
+                Some(&mut root_defs),
+            )?,
+            Either::Right(ast::TypeOrPattern::Pattern(ast_pattern)) => {
                 let mut var_table = MapVarTable::default();
                 let pattern =
                     self.lower_pattern((ast_pattern, object_span.clone()), &mut var_table)?;
@@ -158,12 +165,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                 self.define(DefKind::Constant(pat_id), &object_span)
             }
-            None => self.resolve_contextual_type_reference(
-                None,
-                object_span.clone(),
-                &block_context,
-                Some(&mut root_defs),
-            )?,
         };
 
         let mut relation_iter = relations.into_iter().peekable();
@@ -336,8 +337,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
         let mut iter = transitions.into_iter().peekable();
 
         let (mut transition, mut transition_span) = match iter.next() {
-            Some((Some(next), span)) => (next, span),
-            Some((None, _)) => return Err((CompileError::FmtMisplacedWildcard, span)),
+            Some((Either::Left(_), _)) => return Err((CompileError::FmtMisplacedWildcard, span)),
+            Some((Either::Right(next), span)) => (next, span),
             None => return Err((CompileError::FmtTooFewTransitions, span)),
         };
 
@@ -347,8 +348,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     // end of iterator, found the final target. Handle this outside the loop:
                     break item;
                 }
-                Some((Some(item), span)) => (item, span),
-                Some((None, _)) => return Err((CompileError::FmtMisplacedWildcard, span)),
+                Some((Either::Left(_), _)) => {
+                    return Err((CompileError::FmtMisplacedWildcard, span))
+                }
+                Some((Either::Right(item), span)) => (item, span),
                 _ => return Err((CompileError::FmtTooFewTransitions, span)),
             };
 
@@ -426,14 +429,14 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
     fn resolve_contextual_type_reference(
         &mut self,
-        ast_ty: Option<ast::Type>,
+        ast_ty: Either<ast::Dot, ast::Type>,
         span: Range<usize>,
         block_context: &BlockContext,
         root_defs: Option<&mut RootDefs>,
     ) -> Res<DefId> {
         match (ast_ty, block_context) {
-            (Some(ast_ty), _) => self.resolve_type_reference(ast_ty, &span, root_defs),
-            (None, BlockContext::Context(func)) => Ok(func()),
+            (Either::Left(_), BlockContext::Context(func)) => Ok(func()),
+            (Either::Right(ast_ty), _) => self.resolve_type_reference(ast_ty, &span, root_defs),
             _ => Err((CompileError::WildcardNeedsContextualBlock, span)),
         }
     }

@@ -1,10 +1,11 @@
 use std::ops::Range;
 
 use chumsky::prelude::*;
+use either::Either;
 use smartstring::alias::String;
 
 use crate::ast::{
-    ExprPattern, FmtStatement, MapArm, Path, Pattern, SeqPatternElement, StructPattern,
+    Dot, ExprPattern, FmtStatement, MapArm, Path, Pattern, SeqPatternElement, StructPattern,
     StructPatternAttr, StructPatternModifier, TypeOrPattern, UnitOrSeq, UseStatement, Visibility,
 };
 
@@ -87,13 +88,16 @@ fn rel_statement(
     let object_type_or_pattern =
         with_unit_or_seq(spanned_named_or_anonymous_type_or_dot(stmt_parser.clone()))
             .map(|(unit_or_seq, (opt_ty, span))| {
-                (unit_or_seq, (opt_ty.map(TypeOrPattern::Type), span))
+                (unit_or_seq, (opt_ty.map_right(TypeOrPattern::Type), span))
             })
-            .or(sigil('=').ignore_then(
-                spanned(pattern()).map(|(pat, span)| {
-                    (UnitOrSeq::Unit, (Some(TypeOrPattern::Pattern(pat)), span))
-                }),
-            ));
+            .or(
+                sigil('=').ignore_then(spanned(pattern()).map(|(pat, span)| {
+                    (
+                        UnitOrSeq::Unit,
+                        (Either::Right(TypeOrPattern::Pattern(pat)), span),
+                    )
+                })),
+            );
 
     doc_comments()
         .then(keyword(Token::Rel))
@@ -382,17 +386,21 @@ fn expr_pattern() -> impl AstParser<Spanned<ExprPattern>> {
     .labelled("expression pattern")
 }
 
-fn spanned_named_type_or_dot() -> impl AstParser<Spanned<Option<Type>>> {
-    spanned(named_type().map(Some).or(sigil('.').map(|_| None)))
+fn spanned_named_type_or_dot() -> impl AstParser<Spanned<Either<Dot, Type>>> {
+    spanned(
+        named_type()
+            .map(Either::Right)
+            .or(sigil('.').map(|_| Either::Left(Dot))),
+    )
 }
 
 fn spanned_named_or_anonymous_type_or_dot(
     stmt_parser: impl AstParser<Spanned<Statement>> + 'static,
-) -> impl AstParser<Spanned<Option<Type>>> {
+) -> impl AstParser<Spanned<Either<Dot, Type>>> {
     spanned(
         (named_type().or(anonymous_type(stmt_parser)))
-            .map(Some)
-            .or(sigil('.').map(|_| None)),
+            .map(Either::Right)
+            .or(sigil('.').map(|_| Either::Left(Dot))),
     )
 }
 

@@ -13,6 +13,7 @@ ontol-runtime.path = "../ontol-runtime"
 tracing.workspace = true
 smartstring.workspace = true
 chumsky.workspace = true
+either.workspace = true
 
 [dev-dependencies]
 assert_matches = "1"

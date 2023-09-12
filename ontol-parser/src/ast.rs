@@ -1,5 +1,6 @@
 use std::ops::Range;
 
+use either::Either;
 use smartstring::alias::String;
 
 use super::{Span, Spanned};
@@ -46,9 +47,9 @@ pub struct DefStatement {
 pub struct RelStatement {
     pub docs: Vec<String>,
     pub kw: Span,
-    pub subject: Spanned<Option<Type>>,
+    pub subject: Spanned<Either<Dot, Type>>,
     pub relations: Vec<Relation>,
-    pub object: Spanned<Option<TypeOrPattern>>,
+    pub object: Spanned<Either<Dot, TypeOrPattern>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -56,7 +57,7 @@ pub struct FmtStatement {
     pub docs: Vec<String>,
     pub kw: Span,
     pub origin: Spanned<Type>,
-    pub transitions: Vec<Spanned<Option<Type>>>,
+    pub transitions: Vec<Spanned<Either<Dot, Type>>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -67,6 +68,9 @@ pub struct Relation {
     pub ctx_block: Option<Spanned<Vec<Spanned<Statement>>>>,
     pub object_cardinality: Option<Cardinality>,
 }
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct Dot;
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum RelType {

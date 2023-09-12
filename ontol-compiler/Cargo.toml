@@ -20,6 +20,7 @@ smallvec.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 chumsky.workspace = true
+either.workspace = true
 fraction = "0.13"
 ena = "0.14"
 bumpalo = "3"
