@@ -49,6 +49,7 @@ pub(super) fn const_codegen<'m>(
         errors: &mut errors,
         primitives: &compiler.primitives,
         type_mapper,
+        bug_span: expr.span(),
     };
     generator.gen_node(expr, &mut block);
     block.commit(Terminator::Return(builder.top()), &mut builder);
@@ -83,6 +84,7 @@ pub(super) fn map_codegen<'m>(
         errors: &mut errors,
         primitives: &compiler.primitives,
         type_mapper,
+        bug_span: func.body.span(),
     };
     generator.scope.insert(func.arg.var, Local(0));
     generator.gen_node(func.body, &mut root_block);
@@ -117,6 +119,7 @@ pub(super) struct CodeGenerator<'a, 'm> {
     pub errors: &'a mut CompileErrors,
     pub primitives: &'a Primitives,
     pub type_mapper: TypeMapper<'a, 'm>,
+    bug_span: SourceSpan,
 
     scope: FnvHashMap<ontol_hir::Var, Local>,
 }
@@ -272,7 +275,9 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 }
             }
             ontol_hir::Kind::MatchProp(struct_var, id, arms) => {
-                let struct_local = self.var_local(struct_var);
+                let Ok(struct_local) = self.var_local(struct_var) else {
+                    return;
+                };
 
                 if arms.len() > 1 {
                     if arms
@@ -441,7 +446,9 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 block.pop_until(seq_local, span, self.builder);
             }
             ontol_hir::Kind::ForEach(seq_var, (rel_binding, val_binding), nodes) => {
-                let seq_local = self.var_local(seq_var);
+                let Ok(seq_local) = self.var_local(seq_var) else {
+                    return;
+                };
                 let counter = block.op(OpCode::I64(0, DefId::unit()), Delta(1), span, self.builder);
 
                 let iter_offset = block.current_offset();
@@ -474,7 +481,9 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
             }
             ontol_hir::Kind::SeqPush(seq_var, attr) => {
                 let top = self.builder.top();
-                let seq_local = self.var_local(seq_var);
+                let Ok(seq_local) = self.var_local(seq_var) else {
+                    return;
+                };
                 self.gen_node(*attr.rel, block);
                 let rel_local = self.builder.top();
 
@@ -491,7 +500,9 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
             }
             ontol_hir::Kind::StringPush(to_var, node) => {
                 let top = self.builder.top();
-                let to_local = self.var_local(to_var);
+                let Ok(to_local) = self.var_local(to_var) else {
+                    return;
+                };
                 self.gen_node(*node, block);
                 block.op(
                     OpCode::AppendString(to_local),
@@ -510,7 +521,9 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 if match_arms.is_empty() {
                     return;
                 }
-                let haystack_local = self.var_local(haystack_var);
+                let Ok(haystack_local) = self.var_local(haystack_var) else {
+                    return;
+                };
                 let top = self.builder.top();
 
                 let mut pre = self.builder.split_block(block);
@@ -566,7 +579,9 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 if match_arms.is_empty() {
                     return;
                 }
-                let haystack_local = self.var_local(haystack_var);
+                let Ok(haystack_local) = self.var_local(haystack_var) else {
+                    return;
+                };
                 let top = self.builder.top();
                 let iter_offset = BlockOffset(block.current_offset().0 + 3);
                 let all_matches_seq_local = self.builder.top_plus(1);
@@ -677,7 +692,9 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
         span: SourceSpan,
         block: &mut Block,
     ) {
-        let struct_local = self.var_local(struct_var);
+        let Ok(struct_local) = self.var_local(struct_var) else {
+            return;
+        };
 
         match rel.kind() {
             ontol_hir::Kind::Unit => {
@@ -830,11 +847,17 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
         }
     }
 
-    fn var_local(&self, var: ontol_hir::Var) -> Local {
-        *self
-            .scope
-            .get(&var)
-            .unwrap_or_else(|| panic!("Variable {var} not in scope"))
+    fn var_local(&mut self, var: ontol_hir::Var) -> Result<Local, ()> {
+        match self.scope.get(&var) {
+            Some(local) => Ok(*local),
+            None => {
+                self.errors.error(
+                    CompileError::BUG(smart_format!("Variable {var} not in scope")),
+                    &self.bug_span,
+                );
+                Err(())
+            }
+        }
     }
 
     fn gen_pun(&mut self, block: &mut Block, def_id: DefId, span: SourceSpan) {
