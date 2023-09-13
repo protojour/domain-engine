@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use bit_set::BitSet;
 use fnv::FnvHashMap;
 use ontol_hir::{GetKind, HasDefault, PropPattern, PropVariant};
@@ -519,8 +517,9 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
                 let mut pre_branch_block = self.builder.split_block(block);
 
-                let mut arms_gen = CaptureMatchArmsGenerator::new(match_arms);
-                let branch_block_indexes = self.gen_capture_match_arms(
+                let mut arms_gen =
+                    CaptureMatchArmsGenerator::new_with_blocks(match_arms, self.builder, span);
+                self.gen_capture_match_arms(
                     &mut arms_gen,
                     Local(top.0 + 1),
                     Terminator::Goto(block.index(), BlockOffset(0)),
@@ -555,7 +554,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 );
                 self.builder.commit(
                     pre_branch_block,
-                    Terminator::Goto(branch_block_indexes[0], BlockOffset(0)),
+                    Terminator::Goto(arms_gen.first_block_index, BlockOffset(0)),
                 );
 
                 self.builder.append_pop_until(block, top, span);
@@ -576,40 +575,39 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 let counter_local = self.builder.top_plus(2);
                 let current_matches_seq_local = self.builder.top_plus(4);
 
-                let mut arms_gen = CaptureMatchArmsGenerator::new(match_arms);
-
                 // compensating for the iterated list and the counter below
                 self.builder.prealloc_stack(Delta(2));
 
-                let for_each_body_index = {
-                    let mut pre_match_block = self.builder.new_block(Delta(2), span);
-                    let mut post_match_block = self.builder.new_block(Delta(0), span);
+                let (iter_block_index, arms_gen) = {
+                    let mut intro = self.builder.new_block(Delta(2), span);
+                    let mut arms_gen =
+                        CaptureMatchArmsGenerator::new_with_blocks(match_arms, self.builder, span);
+                    let mut outro = self.builder.new_block(Delta(0), span);
 
                     self.builder.append_op(
-                        &mut pre_match_block,
+                        &mut intro,
                         OpCode::MoveSeqValsToStack(current_matches_seq_local),
                         Delta((arms_gen.capture_index_union.len()) as i32),
                         span,
                     );
+                    let for_each_block_index = self.builder.commit(
+                        intro,
+                        Terminator::Goto(arms_gen.first_block_index, BlockOffset(0)),
+                    );
 
-                    let branch_block_indexes = self.gen_capture_match_arms(
+                    self.gen_capture_match_arms(
                         &mut arms_gen,
                         Local(current_matches_seq_local.0 + 1),
-                        Terminator::Goto(post_match_block.index(), BlockOffset(0)),
+                        Terminator::Goto(outro.index(), BlockOffset(0)),
                         span,
                     );
 
                     self.builder
-                        .append_pop_until(&mut post_match_block, counter_local, span);
-                    self.builder.commit(
-                        post_match_block,
-                        Terminator::PopGoto(block.index(), iter_offset),
-                    );
+                        .append_pop_until(&mut outro, counter_local, span);
+                    self.builder
+                        .commit(outro, Terminator::PopGoto(block.index(), iter_offset));
 
-                    self.builder.commit(
-                        pre_match_block,
-                        Terminator::Goto(branch_block_indexes[0], BlockOffset(0)),
-                    )
+                    (for_each_block_index, arms_gen)
                 };
 
                 // Generate sequence
@@ -632,7 +630,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
                 self.builder.append_ir(
                     block,
-                    Ir::Iter(all_matches_seq_local, counter_local, for_each_body_index),
+                    Ir::Iter(all_matches_seq_local, counter_local, iter_block_index),
                     Delta(0),
                     span,
                 );
@@ -744,18 +742,10 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
         first_capture_local: Local,
         terminator: Terminator,
         span: SourceSpan,
-    ) -> Vec<BlockIndex> {
-        let mut branch_blocks: HashMap<usize, Block> =
-            HashMap::with_capacity(arms_gen.match_arms.len());
-        let mut branch_block_indexes: Vec<BlockIndex> =
-            Vec::with_capacity(arms_gen.match_arms.len());
-
-        // Create branch blocks
-        for arm_index in 0..arms_gen.match_arms.len() {
-            let branch_block = self.builder.new_block(Delta(0), span);
-            branch_block_indexes.push(branch_block.index());
-            branch_blocks.insert(arm_index, branch_block);
-        }
+    ) {
+        let branch_block_indexes: Vec<BlockIndex> = (0..arms_gen.match_arms.len())
+            .map(|index| arms_gen.branch_blocks.get(&index).unwrap().index())
+            .collect();
 
         arms_gen.fail_block_index = {
             let panic_block = self.builder.new_block(Delta(0), span);
@@ -767,7 +757,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
             .into_iter()
             .enumerate()
         {
-            let mut branch_block = branch_blocks.remove(&arm_index).unwrap();
+            let mut branch_block = arms_gen.branch_blocks.remove(&arm_index).unwrap();
 
             struct ArmCapture {
                 local: Local,
@@ -843,8 +833,6 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
             self.builder.commit(branch_block, terminator.clone());
         }
-
-        branch_block_indexes
     }
 
     fn var_local(&self, var: ontol_hir::Var) -> Local {
@@ -870,22 +858,41 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
 struct CaptureMatchArmsGenerator<'m> {
     match_arms: Vec<ontol_hir::CaptureMatchArm<'m, TypedHir>>,
+    branch_blocks: FnvHashMap<usize, Block>,
     capture_index_union: BitSet,
+    first_block_index: BlockIndex,
     fail_block_index: BlockIndex,
 }
 
 impl<'m> CaptureMatchArmsGenerator<'m> {
-    fn new(match_arms: Vec<ontol_hir::CaptureMatchArm<'m, TypedHir>>) -> Self {
+    fn new_with_blocks(
+        match_arms: Vec<ontol_hir::CaptureMatchArm<'m, TypedHir>>,
+        builder: &mut ProcBuilder,
+        span: SourceSpan,
+    ) -> Self {
         let mut capture_index_union: BitSet = BitSet::default();
+        let mut branch_blocks: FnvHashMap<usize, Block> = Default::default();
+        let mut first_block_index = BlockIndex(0);
 
-        for match_arm in &match_arms {
+        for (arm_index, match_arm) in match_arms.iter().enumerate() {
             for capture_group in &match_arm.capture_groups {
                 capture_index_union.insert(capture_group.index as usize);
             }
+
+            let branch_block = builder.new_block(Delta(0), span);
+
+            if arm_index == 0 {
+                first_block_index = branch_block.index();
+            }
+
+            branch_blocks.insert(arm_index, branch_block);
         }
+
         Self {
             match_arms,
+            branch_blocks,
             capture_index_union,
+            first_block_index,
             fail_block_index: BlockIndex(0),
         }
     }
