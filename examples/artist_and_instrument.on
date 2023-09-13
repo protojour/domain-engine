@@ -1,10 +1,10 @@
 pub def artist {
     rel .'ID'(rel .gen: auto)|id: { fmt '' => 'artist/' => uuid => . }
-    rel .'name': string
+    rel .'name': text
 }
 
 pub def record {
-    rel .'name': string
+    rel .'name': text
 }
 
 pub def instrument-id {
@@ -13,11 +13,11 @@ pub def instrument-id {
 
 pub def instrument {
     rel .'ID'(rel .gen: auto)|id: instrument-id
-    rel .'name': string
+    rel .'name': text
 }
 
 pub def plays {
-    rel .'how_much': string
+    rel .'how_much': text
 }
 
 rel [artist] 'plays'(rel .is: plays)::'played_by' [instrument]

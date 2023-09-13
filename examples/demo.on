@@ -15,8 +15,8 @@ def archive_item {
     rel .'created': datetime
     rel .'updated': datetime
     rel .'archived': datetime
-    rel .'name': string
-    rel .'description': string
+    rel .'name': text
+    rel .'description': text
     rel .'asset_score': i64
     rel .'type': ItemType
 }
@@ -25,8 +25,8 @@ def archive_group {
     rel .'created': datetime
     rel .'updated': datetime
     rel .'archived': datetime
-    rel .'name': string
-    rel .'description': string
+    rel .'name': text
+    rel .'description': text
     rel .'start_date': datetime
     rel .'end_date': datetime
 }
@@ -52,9 +52,9 @@ pub def ArchiveObject {
     /// Relevant dates for the object
     rel .'dates': ArchiveDates
     /// Name of the object
-    rel .'name': string
+    rel .'name': text
     /// Description of the object
-    rel .'description': string
+    rel .'description': text
     /// Relative value of the object
     rel .'assetScoreTimesTen': i64
     /// Classification of the object
@@ -68,9 +68,9 @@ pub def ArchiveCollection {
     /// Relevant dates for the collection
     rel .'dates': ArchiveDates
     /// Name of the collection
-    rel .'name': string
+    rel .'name': text
     /// Description of the collection
-    rel .'description': string
+    rel .'description': text
     /// Start date; earliest (estimated)
     /// creation date of object in collection
     rel .'startDate': datetime

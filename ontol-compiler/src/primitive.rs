@@ -151,7 +151,7 @@ impl Primitives {
             float: defs.add_primitive(PrimitiveKind::Float, Some("float")),
             f32: defs.add_primitive(PrimitiveKind::F32, Some("f32")),
             f64: defs.add_primitive(PrimitiveKind::F64, Some("f64")),
-            text: defs.add_primitive(PrimitiveKind::Text, Some("string")),
+            text: defs.add_primitive(PrimitiveKind::Text, Some("text")),
             ontol_domain: defs.alloc_def_id(ONTOL_PKG),
 
             relations: OntolRelations {

@@ -28,16 +28,13 @@ impl<'o> OntolVm<'o> {
         let ontol_domain = ontology.find_domain(PackageId(0)).unwrap();
 
         // TODO: In the future, information about primitive types could be cached inside Ontology:
-        let string_def_id = ontol_domain
-            .type_info_by_identifier("string")
-            .unwrap()
-            .def_id;
+        let text_def_id = ontol_domain.type_info_by_identifier("text").unwrap().def_id;
 
         Self {
             abstract_vm: AbstractVm::new(ontology),
             processor: OntolProcessor {
                 stack: Default::default(),
-                text_def_id: string_def_id,
+                text_def_id,
             },
         }
     }

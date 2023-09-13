@@ -2,9 +2,9 @@ use 'conduit_db' as db
 
 pub def BlogPost {
     rel .'post_id'|id: { rel .is: uuid }
-    rel .'contents': string
-    rel .'written_by': string
-    rel .'tags': [string]
+    rel .'contents': text
+    rel .'written_by': text
+    rel .'tags': [text]
 }
 
 map {

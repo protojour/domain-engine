@@ -12,7 +12,7 @@ use test_log::test;
 fn test_fake_primitives() {
     "
     pub def foo {
-        rel .'s': string
+        rel .'s': text
         rel .'i': i64
     }
     "
@@ -29,7 +29,7 @@ fn test_fake_primitives() {
 }
 
 #[test]
-fn test_fake_string_like_types() {
+fn test_fake_text_like_types() {
     "
     pub def foo {
         rel .'id': uuid

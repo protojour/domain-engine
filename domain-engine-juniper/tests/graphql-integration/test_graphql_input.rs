@@ -6,7 +6,7 @@ use crate::{gql_ctx_mock_data_store, Exec, TestCompileSchema};
 #[test(tokio::test)]
 async fn test_graphql_input_deserialization_error() {
     let (test, [schema]) = "
-    pub def foo_id { fmt '' => string => . }
+    pub def foo_id { fmt '' => text => . }
     pub def foo {
         rel foo_id identifies: .
         rel .'prop': 'const'

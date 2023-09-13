@@ -50,7 +50,7 @@ fn error_underscore_not_allowed_at_start_of_identifier() {
 fn error_lex_recovery_works() {
     "
     def foo {
-        rel .'prop': string
+        rel .'prop': text
     }
     def bar {
         rel .'prop': integer
@@ -113,7 +113,7 @@ fn error_map_union_missing_discriminator() {
         rel .'a': 'constant'
     }
     def bar {
-        rel .'b': string
+        rel .'b': text
     }
     def u {
         rel .is?: foo
@@ -141,7 +141,7 @@ fn error_map_union_non_uniform_discriminators() {
 }
 
 #[test]
-fn error_non_disjoint_string_union() {
+fn error_non_disjoint_text_union() {
     "
     def u1 {
         rel .is?: 'a'
@@ -156,7 +156,7 @@ fn error_sequence_mix1() {
     "
     def u {
         rel .is?: i64 // ERROR invalid mix of relationship type for subject
-        rel .0: string
+        rel .0: text
     }
     "
     .compile_fail();
@@ -168,7 +168,7 @@ fn error_sequence_mix_abstract_object() {
     def u { // ERROR type not representable
         rel .'a':
             integer // NOTE Type of field is abstract
-        rel .0: string // ERROR invalid mix of relationship type for subject
+        rel .0: text // ERROR invalid mix of relationship type for subject
     }
     "
     .compile_fail();
@@ -179,7 +179,7 @@ fn sequence_overlapping_indices() {
     "
     def u {
         rel .0..3: i64
-        rel .2..4: string // ERROR overlapping indexes
+        rel .2..4: text // ERROR overlapping indexes
     }
     "
     .compile_fail();
@@ -190,7 +190,7 @@ fn error_sequence_ambiguous_infinite_tail() {
     r#"
     def u {
         rel .0..: i64
-        rel .1..: string // ERROR overlapping indexes
+        rel .1..: text // ERROR overlapping indexes
     }
     "#
     .compile_fail();
@@ -200,7 +200,7 @@ fn error_sequence_ambiguous_infinite_tail() {
 fn error_union_in_named_relationship() {
     "
     def foo {
-        rel .'a': string
+        rel .'a': text
         rel .'a': i64 // ERROR union in named relationship is not supported yet. Make a union instead.
     }
     "
@@ -211,19 +211,19 @@ fn error_union_in_named_relationship() {
 fn error_various_monadic_properties() {
     "
     def foo {
-        rel .'a': string
+        rel .'a': text
     }
     // default foo 'a': 'default'
 
     def bar {
-        // a is either a string or not present
-        rel .'maybe'?: string    
+        // a is either a text or not present
+        rel .'maybe'?: text
 
         // bar and string may be related via b many times
-        rel .'array': [string]
+        rel .'array': [text]
 
-        // a is either a string or null
-        rel bar 'nullable': string
+        // a is either a text or null
+        rel bar 'nullable': text
 
         // FIXME: Should this work?
         rel .'nullable': () // ERROR union in named relationship is not supported yet. Make a union instead.
@@ -238,7 +238,7 @@ fn error_mix_of_index_and_edge_type() {
     def foo {}
     def bar {}
 
-    rel foo 0(rel .is: bar): string // ERROR cannot mix index relation identifiers and edge types
+    rel foo 0(rel .is: bar): text // ERROR cannot mix index relation identifiers and edge types
     "#
     .compile_fail()
 }
@@ -248,7 +248,7 @@ fn error_invalid_subject_types() {
     "
     rel
         'a' // ERROR subject must be a domain type
-        'b': string
+        'b': text
     "
     .compile_fail()
 }
@@ -295,10 +295,10 @@ fn error_spans_are_correct_projected_from_regex_syntax_errors() {
 }
 
 #[test]
-fn error_complains_about_non_disambiguatable_string_id() {
+fn error_complains_about_non_disambiguatable_text_id() {
     "
-    def animal_id { fmt '' => string => . }
-    def plant_id { fmt '' => string => . }
+    def animal_id { fmt '' => text => . }
+    def plant_id { fmt '' => text => . }
     def animal {
         rel animal_id identifies: .
         rel .'class': 'animal'
@@ -442,7 +442,7 @@ fn error_value_generator_as_field_type() {
 #[test]
 fn error_nonsense_value_generator() {
     "
-    def bar { rel .'prop': string }
+    def bar { rel .'prop': text }
     def foo {
         rel .'bar'
             (rel .gen: auto) // ERROR Cannot generate a value of type bar
@@ -455,8 +455,8 @@ fn error_nonsense_value_generator() {
 #[test]
 fn error_test_lazy_seal_by_map() {
     "
-    def foo { rel .'prop': string }
-    def bar { rel .'prop': string }
+    def foo { rel .'prop': text }
+    def bar { rel .'prop': text }
 
     map {
         foo { 'prop': prop }
@@ -465,7 +465,7 @@ fn error_test_lazy_seal_by_map() {
 
     rel
         foo // ERROR definition is sealed and cannot be modified
-        'fail': string
+        'fail': text
     "
     .compile_fail();
 }

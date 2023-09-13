@@ -73,7 +73,7 @@ fn deserialize_is_maybe_i64() {
 fn deserialize_string() {
     "
     pub def foo {}
-    rel foo is?: string
+    rel foo is?: text
     "
     .compile_ok(|test| {
         let [foo] = test.bind(["foo"]);
@@ -93,7 +93,7 @@ fn deserialize_string() {
 fn deserialize_object_properties() {
     "
     pub def obj {}
-    rel obj 'a': string
+    rel obj 'a': text
     rel obj 'b': i64
     "
     .compile_ok(|test| {
@@ -142,7 +142,7 @@ fn deserialize_nested() {
     rel one 'x': two
     rel one 'y': three
     rel two 'y': three
-    rel three is?: string
+    rel three is?: text
     "
     .compile_ok(|test| {
         let [one] = test.bind(["one"]);
@@ -185,7 +185,7 @@ fn deserialize_recursive() {
 fn deserialize_union_of_primitives() {
     "
     pub def foo {}
-    rel foo is?: string
+    rel foo is?: text
     rel foo is?: i64
     "
     .compile_ok(|test| {

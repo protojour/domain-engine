@@ -15,7 +15,7 @@ fn test_serde_empty_type() {
 #[test]
 fn test_serde_value_type() {
     "
-    pub def foo { rel .is: string }
+    pub def foo { rel .is: text }
     "
     .compile_ok(|test| {
         let [foo] = test.bind(["foo"]);
@@ -52,7 +52,7 @@ fn test_serde_booleans() {
 #[test]
 fn test_serde_map_type() {
     "
-    pub def foo { rel .'a': string }
+    pub def foo { rel .'a': text }
     "
     .compile_ok(|test| {
         let [foo] = test.bind(["foo"]);
@@ -65,9 +65,9 @@ fn test_serde_complex_type() {
     "
     pub def foo {}
     def bar {}
-    rel foo 'a': string
+    rel foo 'a': text
     rel foo 'b': bar
-    rel bar 'c': string
+    rel bar 'c': text
     "
     .compile_ok(|test| {
         let [foo] = test.bind(["foo"]);
@@ -79,7 +79,7 @@ fn test_serde_complex_type() {
 fn test_serde_sequence() {
     "
     pub def t {
-        rel .0: string
+        rel .0: text
         rel .1: i64
     }
     "
@@ -106,13 +106,13 @@ fn test_serde_value_union1() {
 #[test]
 fn test_serde_string_or_unit() {
     "
-    def string-or-unit {
-        rel .is?: string
+    def text-or-unit {
+        rel .is?: text
         rel .is?: ()
     }
 
     pub def foo {
-        rel .'a': string-or-unit
+        rel .'a': text-or-unit
     }
     "
     .compile_ok(|test| {
@@ -163,7 +163,7 @@ fn test_serde_noop_intersection() {
 fn test_serde_many_cardinality() {
     "
     pub def foo {
-        rel .'s': [string]
+        rel .'s': [text]
     }
     "
     .compile_ok(|test| {
@@ -178,7 +178,7 @@ fn test_serde_infinite_sequence() {
     "
     pub def foo {
         rel .  ..2: i64
-        rel . 2..4: string
+        rel . 2..4: text
         rel . 5..6: i64
         rel . 6.. : i64
     }
@@ -338,7 +338,7 @@ fn test_float_default() {
 fn test_string_default() {
     "
     pub def foo {
-        rel .'bar'(rel .default := 'baz'): string
+        rel .'bar'(rel .default := 'baz'): text
     }
     "
     .compile_ok(|test| {
@@ -373,7 +373,7 @@ fn test_jsonml() {
 
     pub def element {
         rel .is?: tag
-        rel .is?: string
+        rel .is?: text
     }
 
     rel tag 0: tag_name
@@ -389,7 +389,7 @@ fn test_jsonml() {
     rel tag_name is?: 'strong'
 
     // BUG: should accept any string as key
-    rel attributes 'class'?: string
+    rel attributes 'class'?: text
     "
     .compile_ok(|test| {
         let [element] = test.bind(["element"]);

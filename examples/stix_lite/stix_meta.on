@@ -68,7 +68,7 @@ pub def labels_object {
     /// Where an object has a specific property defined in the specification for characterizing subtypes of that object, the labels property **MUST NOT** be used for that purpose.
     ///
     /// For example, the Malware SDO has a property **malware_types** that contains a list of Malware subtypes (dropper, RAT, etc.). In this example, the labels property cannot be used to describe these Malware subtypes.
-    rel .'labels'?: [string]
+    rel .'labels'?: [common.string]
 }
 
 /// Type providing the `lang` property

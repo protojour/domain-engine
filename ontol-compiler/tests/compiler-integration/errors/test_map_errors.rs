@@ -50,8 +50,8 @@ fn map_attribute_mismatch() {
 #[test]
 fn map_missing_attributes_in_match_is_ok() {
     "
-    def foo { rel .'a'|'b': string }
-    def bar { rel .'c'|'d': string }
+    def foo { rel .'a'|'b': text }
+    def bar { rel .'c'|'d': text }
     map {
         foo match { 'a': x }
         bar { 'c': x } // ERROR missing property `d`// NOTE Consider using `match {}`
@@ -83,7 +83,7 @@ fn map_type_mismatch_simple() {
     "
     def foo {}
     def bar {}
-    rel foo 'prop': string
+    rel foo 'prop': text
     rel bar 'prop': i64
     map {
         foo {
@@ -91,7 +91,7 @@ fn map_type_mismatch_simple() {
         }
         bar {
             'prop':
-                x // ERROR type mismatch: expected `i64`, found `string`
+                x // ERROR type mismatch: expected `i64`, found `text`
         }
     }
     "
@@ -105,7 +105,7 @@ fn map_type_mismatch_in_func() {
     "
     def foo {}
     def bar {}
-    rel foo 'prop': string
+    rel foo 'prop': text
     rel bar 'prop': i64
     map {
         foo {
@@ -113,7 +113,7 @@ fn map_type_mismatch_in_func() {
         }
         bar {
             'prop':
-                x // ERROR type mismatch: expected `i64`, found `string`
+                x // ERROR type mismatch: expected `i64`, found `text`
                 * 2
         }
     }
@@ -125,19 +125,19 @@ fn map_type_mismatch_in_func() {
 fn map_sequence_mismatch() {
     "
     def foo {
-        rel .'a': [string]
-        rel .'b': [string]
+        rel .'a': [text]
+        rel .'b': [text]
     }
 
     def bar {
-        rel .'a': string
+        rel .'a': text
         rel .'b': [i64]
     }
 
     map {
         foo {
-            'a': x // ERROR [string] variable must be enclosed in []
-            'b': y // ERROR [string] variable must be enclosed in []
+            'a': x // ERROR [text] variable must be enclosed in []
+            'b': y // ERROR [text] variable must be enclosed in []
         }
         bar {
             'a': x
@@ -151,15 +151,15 @@ fn map_sequence_mismatch() {
 #[test]
 fn array_map_without_brackets() {
     "
-    def foo { rel .'a': [string] }
-    def bar { rel .'b': [string] }
+    def foo { rel .'a': [text] }
+    def bar { rel .'b': [text] }
 
     map {
         foo {
-            'a': x // ERROR [string] variable must be enclosed in []
+            'a': x // ERROR [text] variable must be enclosed in []
         }
         bar {
-            'b': x // ERROR [string] variable must be enclosed in []
+            'b': x // ERROR [text] variable must be enclosed in []
         }
     }
     "
@@ -172,7 +172,7 @@ fn only_entities_may_have_reverse_relationship() {
     def foo {}
     def bar {}
     rel [foo] 'a'()::'aa' bar // ERROR only entities may have named reverse relationship
-    rel [foo] 'b'::'bb' string // ERROR only entities may have named reverse relationship
+    rel [foo] 'b'::'bb' text // ERROR only entities may have named reverse relationship
     "
     .compile_fail()
 }
@@ -225,8 +225,8 @@ fn map_union() {
 #[test]
 fn map_invalid_unit_rel_params() {
     "
-    def foo { rel .'foo': string }
-    def bar { rel .'bar': string }
+    def foo { rel .'foo': text }
+    def bar { rel .'bar': text }
 
     map {
         foo {
@@ -243,7 +243,7 @@ fn map_invalid_unit_rel_params() {
 #[test]
 fn map_duplicate_capture_groups_in_regex() {
     r"
-    def a { rel .'a': string }
+    def a { rel .'a': text }
     def b {}
     map {
         a {
@@ -261,7 +261,7 @@ fn map_duplicate_capture_groups_in_regex() {
 fn map_unbound_variable_in_regex_interpolation() {
     r"
     def a {}
-    def b { rel .'b': string }
+    def b { rel .'b': text }
     map {
         a {}
         b {

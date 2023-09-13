@@ -254,7 +254,7 @@ def granular-marking {
     /// The `marking-definition` referenced in the **marking_ref** property is applied to the content selected by the selectors in this list.
     ///
     /// The [[RFC5646](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#kix.1js008hntuzu)] language code specified by the lang property is applied to the content selected by the selectors in this list.
-    rel .'selectors': [string]
+    rel .'selectors': [common.string]
 }
 
 def stix_markings_object {
@@ -326,13 +326,13 @@ pub def attack-pattern {
     rel .'id'(rel .gen: auto)|id: attack-pattern-id
 
     /// A name used to identify the Attack Pattern.
-    rel .'name': string
+    rel .'name': common.string
 
     /// A description that provides more details and context about the Attack Pattern, potentially including its purpose and its key characteristics.
-    rel .'description'?: string
+    rel .'description'?: common.string
 
     /// Alternative names used to identify this Attack Pattern.
-    rel .'aliases'?: [string]
+    rel .'aliases'?: [common.string]
 
     /// The list of Kill Chain Phases for which this Attack Pattern is used.
     rel .'kill_chain_phases'?: [common.kill-chain-phase]
@@ -353,13 +353,13 @@ pub def campaign {
     rel .'id'(rel .gen: auto)|id: campaign-id
 
     /// A name used to identify the Campaign.
-    rel .'name': string
+    rel .'name': common.string
 
     /// A description that provides more details and context about the Campaign, potentially including its purpose and its key characteristics.
-    rel .'description'?: string
+    rel .'description'?: common.string
 
     /// Alternative names used to identify this Campaign
-    rel .'aliases'?: [string]
+    rel .'aliases'?: [common.string]
 
     /// The time that this Campaign was first seen.
     /// 
@@ -376,7 +376,7 @@ pub def campaign {
     rel .'last_seen'?: common.timestamp
 
     /// This property defines the Campaign’s primary goal, objective, desired outcome, or intended effect — what the Threat Actor or Intrusion Set hopes to accomplish with this Campaign.
-    rel .'objective'?: string
+    rel .'objective'?: common.string
 }
 
 /// A Course of Action (CoA) is a recommendation from a producer of intelligence to a consumer on the actions that they might take in response to that intelligence.
@@ -391,11 +391,11 @@ pub def course-of-action {
     rel .'id'(rel .gen: auto)|id: course-of-action-id
 
     /// A name used to identify the Course of Action.
-    rel .'name': string
+    rel .'name': common.string
 
     /// A description that provides more details and context about the Course of Action, potentially including its purpose and its key characteristics.
     /// In some cases, this property may contain the actual course of action in prose text.
-    rel .'description'?: string
+    rel .'description'?: common.string
 
     /// The type of action that is included in either the action_bin property or the dereferenced content from the action_reference property.
     ///
@@ -420,7 +420,7 @@ pub def course-of-action {
     /// ```
     ///
     /// This example means that any version of the Windows 10 operating system is able to process and use the course of action defined in the **action_bin** or **action_reference** properties.
-    rel .'os_execution_envs'?: [string]
+    rel .'os_execution_envs'?: [common.string]
 
     /// This property contains the base64 encoded "commands" that represent the action for this Course of Action.
     ///
@@ -445,10 +445,10 @@ pub def grouping {
     rel .'id'(rel .gen: auto)|id: grouping-id
 
     /// A name used to identify the Grouping.
-    rel .'name': string
+    rel .'name': common.string
 
     /// A description that provides more details and context about the Grouping, potentially including its purpose and its key characteristics.
-    rel .'description'?: string
+    rel .'description'?: common.string
 
     /// A short descriptor of the particular context shared by the content referenced by the Grouping.
     ///
@@ -468,14 +468,14 @@ pub def identity {
 
     /// The name of this Identity.
     /// When referring to a specific entity (e.g., an individual or organization), this property SHOULD contain the canonical name of the specific entity.
-    rel .'name': string
+    rel .'name': common.string
 
     /// A description that provides more details and context about the Identity, potentially including its purpose and its key characteristics.
-    rel .'description'?: string
+    rel .'description'?: common.string
 
     /// The list of roles that this Identity performs (e.g., CEO, Domain Administrators, Doctors, Hospital, or Retailer).
     /// No open vocabulary is yet defined for this property.
-    rel .'roles'?: [string]
+    rel .'roles'?: [common.string]
 
     /// The type of entity that this Identity describes, e.g., an individual or organization.
     /// This is an open vocabulary and the values SHOULD come from the `identity-class-ov` vocabulary.
@@ -487,7 +487,7 @@ pub def identity {
 
     /// The contact information (e-mail, phone number, etc.) for this Identity.
     /// No format for this information is currently defined by this specification.
-    rel .'contact_information'?: string
+    rel .'contact_information'?: common.string
 }
 
 pub def indicator {
@@ -498,12 +498,12 @@ pub def indicator {
     /// A name used to identify the Indicator.
     ///
     /// Producers SHOULD provide this property to help products and analysts understand what this Indicator actually does.
-    rel .'name'?: string
+    rel .'name'?: common.string
 
     /// A description that provides more details and context about the Indicator, potentially including its purpose and its key characteristics.
     ///
     /// Producers SHOULD provide this property to help products and analysts understand what this Indicator actually does.
-    rel .'description'?: string
+    rel .'description'?: common.string
 
     /// This property is an open vocabulary that specifies a set of categorizations for this indicator.
     ///
@@ -511,7 +511,7 @@ pub def indicator {
     rel .'indicator-types': [ov.indicator-type-ov]
 
     /// The detection pattern for this Indicator is a STIX Pattern as specified in section 9.
-    rel .'pattern': string
+    rel .'pattern': common.string
 
     /// The type of pattern used in this indicator.
     /// The property is an open vocabulary and currently has the values of `stix`, `snort`, and `yara`.
@@ -519,7 +519,7 @@ pub def indicator {
 
     /// The version of the pattern that is used.
     /// For patterns that do not have a formal specification, the build or code version that the pattern is known to work with SHOULD be used.
-    rel .'pattern_version'?: string
+    rel .'pattern_version'?: common.string
 
     /// The time from which this Indicator is considered a valid indicator of the behaviors it is related or represents.
     rel .'valid_from': common.timestamp
@@ -543,17 +543,17 @@ pub def infrastructure {
     rel .'id'(rel .gen: auto)|id: infrastructure-id
 
     /// A name or characterizing text used to identify the Infrastructure.
-    rel .'name': string
+    rel .'name': common.string
 
     /// A description that provides more details and context about the Infrastructure, potentially including its purpose, how it is being used, how it relates to other intelligence activities captured in related objects, and its key characteristics.
-    rel .'description'?: string
+    rel .'description'?: common.string
 
     /// The type of infrastructure being described.
     /// This is an open vocabulary and values SHOULD come from the `infrastructure-type-ov` vocabulary.
     rel .'infrastructure_types': [ov.infrastructure-type-ov]
 
     /// Alternative names used to identify this Infrastructure.
-    rel .'aliases'?: [string]
+    rel .'aliases'?: [common.string]
 
     /// The list of Kill Chain Phases for which this Infrastructure is used.
     rel .'kill_chain_phases'?: [common.kill-chain-phase]
@@ -582,13 +582,13 @@ pub def intrusion-set {
     rel .'id'(rel .gen: auto)|id: intrusion-set-id
 
     /// A name used to identify this Intrusion Set.
-    rel .'name': string
+    rel .'name': common.string
 
     /// A description that provides more details and context about the Intrusion Set, potentially including its purpose and its key characteristics.
-    rel .'description'?: string
+    rel .'description'?: common.string
 
     /// Alternative names used to identify this Intrusion Set.
-    rel .'aliases'?: [string]
+    rel .'aliases'?: [common.string]
 
     /// The time that this Intrusion Set was first seen.
     ///
@@ -609,7 +609,7 @@ pub def intrusion-set {
     /// To do this, they may execute specific Campaigns that have detailed objectives like compromising point of sale systems at a large retailer.
     ///
     /// Another example: to gain information about latest merger and IPO information from ACME Bank.
-    rel .'goals'?: [string]
+    rel .'goals'?: [common.string]
 
     /// This defines the organizational level at which this Intrusion Set typically works, which in turn determines the resources available to this Intrusion Set for use in an attack.
     /// This is an open vocabulary and values SHOULD come from the `attack-resource-level-ov` vocabulary.
@@ -660,10 +660,10 @@ pub def location {
     rel .'id'(rel .gen: auto)|id: location-id
 
     /// A name used to identify the Location.
-    rel .'name'?: string
+    rel .'name'?: common.string
 
     /// A textual description of the Location.
-    rel .'description'?: string
+    rel .'description'?: common.string
 
     /// The latitude of the Location in decimal degrees. Positive numbers describe latitudes north of the equator, and negative numbers describe latitudes south of the equator. The value of this property MUST be between -90.0 and 90.0, inclusive.
     /// If the longitude property is present, this property MUST be present.
@@ -691,21 +691,21 @@ pub def location {
 
     /// The country that this Location describes.
     /// This property SHOULD contain a valid ISO 3166-1 ALPHA-2 Code [ISO3166-1].
-    rel .'country'?: string
+    rel .'country'?: common.string
 
     /// The state, province, or other sub-national administrative area that this Location describes.
-    rel .'administrative_area'?: string
+    rel .'administrative_area'?: common.string
 
     /// The city that this Location describes.
-    rel .'city'?: string
+    rel .'city'?: common.string
 
     /// The street address that this Location describes.
     /// This property includes all aspects or parts of the street address.
     /// For example, some addresses may have multiple lines including a mailstop or apartment number.
-    rel .'street_address'?: string
+    rel .'street_address'?: common.string
 
     /// The postal code for this Location.
-    rel .'postal_code'?: string
+    rel .'postal_code'?: common.string
 }
 
 /// Malware is a type of TTP that represents malicious code. It generally refers to a program that is inserted into a system, usually covertly.
@@ -727,10 +727,10 @@ pub def malware {
 
     /// A name used to identify the malware instance or family, as specified by the producer of the SDO.
     /// For a malware family the name MUST be defined. If a name for a malware instance is not available, the SHA-256 hash value or sample’s filename MAY be used instead.
-    rel .'name'?: string
+    rel .'name'?: common.string
 
     /// A description that provides more details and context about the malware instance or family, potentially including its purpose and its key characteristics.
-    rel .'description'?: string
+    rel .'description'?: common.string
 
     /// This property is an open vocabulary that specifies a set of categorizations for the malware being described.
     ///
@@ -741,7 +741,7 @@ pub def malware {
     rel .'is_family': boolean
 
     /// Alternative names used to identify this malware or malware family.
-    rel .'aliases'?: [string]
+    rel .'aliases'?: [common.string]
 
     /// The list of Kill Chain Phases for which this malware can be used.
     rel .'kill_chain_phases'?: [common.kill-chain-phase]
@@ -764,7 +764,7 @@ pub def malware {
     ///
     /// Each string value for this property SHOULD be a CPE v2.3 entry from the official NVD CPE Dictionary [NVD].
     /// This property MAY include custom values including values taken from other standards such as SWID [SWID].
-    rel .'os_execution_envs'?: [string]
+    rel .'os_execution_envs'?: [common.string]
 
     /// The processor architectures (e.g., x86, ARM, etc.) that the malware instance or family is executable on.
     ///
@@ -798,10 +798,10 @@ pub def malware-analysis {
     /// Product names SHOULD be all lowercase with words separated by a dash `"-"`.
     /// 
     /// For cases where the name of a product cannot be specified, a value of `"anonymized"` MUST be used.
-    rel .'product': string
+    rel .'product': common.string
 
     /// The version of the analysis product that was used to perform the analysis. 
-    rel .'version'?: string
+    rel .'version'?: common.string
 
     rel .'host_vm_ref'?: software-id
 }
@@ -819,13 +819,13 @@ pub def note {
     rel .'id'(rel .gen: auto)|id: note-id
 
     /// A brief summary of the note content.
-    rel .'abstract'?: string
+    rel .'abstract'?: common.string
 
     /// The content of the note.
-    rel .'content': string
+    rel .'content': common.string
 
     /// The name of the author(s) of this note (e.g., the analyst(s) that created it).
-    rel .'authors'?: [string]
+    rel .'authors'?: [common.string]
 
     /// The STIX Objects that the note is being applied to.
     rel .'object_refs': [identifier]
@@ -899,10 +899,10 @@ pub def opinion {
 
     /// An explanation of why the producer has this Opinion.
     /// For example, if an Opinion of strongly-disagree is given, the explanation can contain an explanation of why the Opinion producer disagrees and what evidence they have for their disagreement.
-    rel .'explanation'?: string
+    rel .'explanation'?: common.string
 
     /// The name of the author(s) of this Opinion (e.g., the analyst(s) that created it).
-    rel .'authors'?: [string]
+    rel .'authors'?: [common.string]
 
     /// The opinion that the producer has about all of the STIX Object(s) listed in the `object_refs` property.
     ///
@@ -926,10 +926,10 @@ pub def report {
     rel .'id'(rel .gen: auto)|id: report-id
 
     /// A name used to identify the Report.
-    rel .'name': string
+    rel .'name': common.string
 
     /// A description that provides more details and context about the Report, potentially including its purpose and its key characteristics.
-    rel .'description'?: string
+    rel .'description'?: common.string
 
     /// This property is an open vocabulary that specifies the primary subject(s) of this report.
     ///
@@ -957,10 +957,10 @@ pub def threat-actor {
     rel .'id'(rel .gen: auto)|id: threat-actor-id
 
     /// A name used to identify this Threat Actor or Threat Actor group.
-    rel .'name': string
+    rel .'name': common.string
 
     /// A description that provides more details and context about the Threat Actor, potentially including its purpose and its key characteristics.
-    rel .'description'?: string
+    rel .'description'?: common.string
 
     /// This property specifies the type(s) of this threat actor.
     ///
@@ -968,7 +968,7 @@ pub def threat-actor {
     rel .'threat_actor_types': [ov.threat-actor-type-ov]
 
     /// A list of other names that this Threat Actor is believed to use.
-    rel .'aliases'?: [string]
+    rel .'aliases'?: [common.string]
 
     /// The time that this Threat Actor was first seen.
     ///
@@ -992,7 +992,7 @@ pub def threat-actor {
     /// The high-level goals of this Threat Actor, namely, what are they trying to do.
     /// For example, they may be motivated by personal gain, but their goal is to steal credit card numbers.
     /// To do this, they may execute specific Campaigns that have detailed objectives like compromising point of sale systems at a large retailer. 
-    rel .'goals'?: [string]
+    rel .'goals'?: [common.string]
 
     /// The skill, specific knowledge, special training, or expertise a Threat Actor must have to perform the attack.
     /// This is an open vocabulary and values SHOULD come from the `threat-actor-sophistication-ov` vocabulary.
@@ -1048,10 +1048,10 @@ pub def tool {
     rel .'id'(rel .gen: auto)|id: tool-id
 
     /// The name used to identify the Tool.
-    rel .'name': string
+    rel .'name': common.string
 
     /// A description that provides more details and context about the Tool, potentially including its purpose and its key characteristics.
-    rel .'description'?: string
+    rel .'description'?: common.string
 
     /// The kind(s) of tool(s) being described.
     ///
@@ -1059,13 +1059,13 @@ pub def tool {
     rel .'tool_types'?: [ov.tool-type-ov]
 
     /// Alternative names used to identify this Tool.
-    rel .'aliases'?: [string]
+    rel .'aliases'?: [common.string]
 
     /// The list of kill chain phases for which this Tool can be used. 
     rel .'kill_chain_phases'?: [common.kill-chain-phase]
 
     /// The version identifier associated with the Tool.
-    rel .'tool_version'?: string
+    rel .'tool_version'?: common.string
 }
 
 /// A Vulnerability is "a mistake in software that can be directly used by a hacker to gain access to a system or network".
@@ -1086,10 +1086,10 @@ pub def vulnerability {
     rel .'external_references'?: [common.external-reference]
 
     /// A name used to identify the Vulnerability.
-    rel .'name': string
+    rel .'name': common.string
 
     /// A description that provides more details and context about the Vulnerability, potentially including its purpose and its key characteristics.
-    rel .'description'?: string
+    rel .'description'?: common.string
 }
 
 /// The Artifact object permits capturing an array of bytes (8-bits), as a base64-encoded string, or linking to a file-like payload.
@@ -1102,7 +1102,7 @@ pub def artifact {
 
     /// Whenever feasible, this value SHOULD be one of the values defined in the Template column in the IANA media type registry [Media Types].
     /// Maintaining a comprehensive universal catalog of all extant file types is obviously not possible. When specifying a MIME Type not included in the IANA registry, implementers should use their best judgement so as to facilitate interoperability.
-    rel .'mime_type'?: string
+    rel .'mime_type'?: common.string
 
     /// Specifies the binary data contained in the artifact as a base64-encoded string.
     /// This property MUST NOT be present if url is provided.
@@ -1128,7 +1128,7 @@ pub def artifact {
     /// For example, this may be useful in cases of sharing malware samples, which are often encoded in an encrypted archive.
     ///
     /// This property MUST NOT be present when the encryption_algorithm property is absent.
-    rel .'decryption-key'?: string
+    rel .'decryption-key'?: common.string
 }
 
 /// The AS object represents the properties of an Autonomous System (AS).
@@ -1141,10 +1141,10 @@ pub def autonomous-system {
     rel .'number': common.integer
 
     /// Specifies the name of the AS.
-    rel .'name'?: string
+    rel .'name'?: common.string
 
     /// Specifies the name of the Regional Internet Registry (RIR) that assigned the number to the AS.
-    rel .'rir'?: string
+    rel .'rir'?: common.string
 }
 
 /// The Directory object represents the properties common to a file system directory. 
@@ -1154,13 +1154,13 @@ pub def directory {
     rel .'id'(rel .gen: auto)|id: directory-id
 
     /// Specifies the path, as originally observed, to the directory on the file system.
-    rel .'path': string
+    rel .'path': common.string
 
     /// Specifies the observed encoding for the path.
     /// The value MUST be specified if the path is stored in a non-Unicode encoding.
     /// This value MUST be specified using the corresponding name from the 2013-12-20 revision of the IANA character set registry [Character Sets].
     /// If the preferred MIME name for a character set is defined, this value MUST be used; if it is not defined, then the Name value from the registry MUST be used instead.
-    rel .'path_enc'?: string
+    rel .'path_enc'?: common.string
 
     /// Specifies the date/time the directory was created.
     rel .'ctime'?: common.timestamp
@@ -1188,7 +1188,7 @@ pub def domain-name {
 
     /// Specifies the value of the domain name.
     /// The value of this property MUST conform to [RFC1034], and each domain and sub-domain contained within the domain name MUST conform to [RFC5890].
-    rel .'value': string
+    rel .'value': common.string
 
     // Note: Deprecated
     // rel .'resolves_to_refs'?: [identifier]
@@ -1203,12 +1203,12 @@ pub def email-addr {
     /// Specifies the value of the email address. This MUST NOT include the display name.
     ///
     /// This property corresponds to the addr-spec construction in section 3.4 of [RFC5322], for example, `jane.smith@example.com`.
-    rel .'value': string
+    rel .'value': common.string
 
     /// Specifies a single email display name, i.e., the name that is displayed to the human user of a mail application.
     ///
     /// This property corresponds to the display-name construction in section 3.4 of [RFC5322], for example, Jane Smith.
-    rel .'display_name'?: string
+    rel .'display_name'?: common.string
 
     /// Specifies the user account that the email address belongs to, as a reference to a User Account object.
     ///
@@ -1230,7 +1230,7 @@ def mime-part-type {
     /// Specifies the contents of the MIME part if the content_type is not provided or starts with text/ (e.g., in the case of plain text or HTML email).
     ///
     /// For inclusion in this property, the contents MUST be decoded to Unicode. Note that the charset provided in content_type is for informational usage and not for decoding of this property. 
-    rel .'body'?: string
+    rel .'body'?: common.string
 
     /// Specifies the contents of non-textual MIME parts, that is those whose content_type does not start with text/, as a reference to an Artifact object or File object.
     ///
@@ -1248,10 +1248,10 @@ def mime-part-type {
     ///
     /// Example:
     /// `text/html; charset=UTF-8`
-    rel .'content_type'?: string
+    rel .'content_type'?: common.string
 
     /// Specifies the value of the “Content-Disposition” header field of the MIME part.
-    rel .'content_disposition'?: string
+    rel .'content_disposition'?: common.string
 }
 
 /// The Email Message object represents an instance of an email message, corresponding to the internet message format described in [RFC5322] and related RFCs.
@@ -1272,7 +1272,7 @@ pub def email-message {
     rel .'date'?: common.timestamp
 
     /// Specifies the value of the “Content-Type” header of the email message.
-    rel .'content_type'?: string
+    rel .'content_type'?: common.string
 
     /// Specifies the value of the “From:” header of the email message.
     /// The "From:" field specifies the author of the message, that is, the mailbox(es) of the person or system responsible for the writing of the message.
@@ -1304,15 +1304,15 @@ pub def email-message {
     rel .'bcc_refs'?: [email-addr-id]
 
     /// Specifies the Message-ID field of the email message.
-    rel .'message_id'?: string
+    rel .'message_id'?: common.string
 
     /// Specifies the subject of the email message.
-    rel .'subject'?: string
+    rel .'subject'?: common.string
 
     /// Specifies one or more "Received" header fields that may be included in the email headers.
     ///
     /// List values MUST appear in the same order as present in the email message.
-    rel .'received_lines'?: [string]
+    rel .'received_lines'?: [common.string]
 
     /// Specifies any other header fields (except for `date`, `received_lines`, `content_type`, `from_ref`, `sender_ref`, `to_refs`, `cc_refs`, `bcc_refs`, and `subject`) found in the email message, as a dictionary.
     ///
@@ -1322,7 +1322,7 @@ pub def email-message {
     rel .'additional_header_fields'?: common.dictionary
 
     /// Specifies a string containing the email body. This property MUST NOT be used if is_multipart is true.
-    rel .'body'?: string
+    rel .'body'?: common.string
 
     /// Specifies a list of the MIME parts that make up the email body. This property MUST NOT be used if is_multipart is false.
     rel .'body_multipart'?: [mime-part-type]
@@ -1362,14 +1362,14 @@ pub def file {
     rel .'size'?: common.integer
 
     /// Specifies the name of the file.
-    rel .'name'?: string
+    rel .'name'?: common.string
 
     /// Specifies the observed encoding for the name of the file.
     /// This value MUST be specified using the corresponding name from the 2013-12-20 revision of the IANA character set registry [Character Sets].
     /// If the value from the Preferred MIME Name column for a character set is defined, this value MUST be used; if it is not defined, then the value from the Name column in the registry MUST be used instead.
     /// 
     /// This property allows for the capture of the original text encoding for the file name, which may be forensically relevant; for example, a file on an NTFS volume whose name was created using the windows-1251 encoding, commonly used for languages based on Cyrillic script.
-    rel .'name_enc'?: string
+    rel .'name_enc'?: common.string
 
     /// Specifies the hexadecimal constant (“magic number”) associated with a specific file format that corresponds to the file, if applicable.
     rel .'magic_number_hex'?: common.hex
@@ -1379,7 +1379,7 @@ pub def file {
     /// Whenever feasible, this value SHOULD be one of the values defined in the Template column in the IANA media type registry [Media Types].
     /// 
     /// Maintaining a comprehensive universal catalog of all extant file types is obviously not possible. When specifying a MIME Type not included in the IANA registry, implementers should use their best judgement so as to facilitate interoperability.
-    rel .'mime_type'?: string
+    rel .'mime_type'?: common.string
 
     /// Specifies the date/time the file was created.
     rel .'ctime'?: common.timestamp
@@ -1415,7 +1415,7 @@ pub def ipv4-addr {
     ///
     /// If a given IPv4 Address object represents a single IPv4 address, the CIDR /32 suffix MAY be omitted.
     rel .'value': {
-        rel .is: string
+        rel .is: common.string
         rel .example: '10.2.4.5/24'
     }
 
@@ -1432,7 +1432,7 @@ pub def ipv6-addr {
     /// Specifies the values of one or more IPv6 addresses expressed using CIDR notation.
     ///
     /// If a given IPv6 Address object represents a single IPv6 address, the CIDR /128 suffix MAY be omitted.
-    rel .'value': string
+    rel .'value': common.string
 
     // FIXME: Deprecated field `resolves_to_refs` not modelled
     // FIXME: Deprecated field `belongs_to_refs` not modelled
@@ -1448,7 +1448,7 @@ pub def mac-addr {
     ///
     /// The MAC address value MUST be represented as a single colon-delimited, lowercase MAC-48 address, which MUST include leading zeros for each octet.
     rel .'value': {
-        rel .is: string
+        rel .is: common.string
         rel .example: '00:00:ab:cd:ef:01'
     }
 }
@@ -1460,7 +1460,7 @@ pub def mutex {
     rel .'id'(rel .gen: auto)|id: mutex-id
 
     /// Specifies the name of the mutex object.
-    rel .'name': string
+    rel .'name': common.string
 }
 
 /// The Network Traffic object represents arbitrary network traffic that originates from a source and is addressed to a destination.
@@ -1541,7 +1541,7 @@ pub def network-traffic {
     /// The protocol names SHOULD come from the service names defined in the Service Name column of the IANA Service Name and Port Number Registry [Port Numbers].
     /// In cases where there is variance in the name of a network protocol not included in the IANA Registry, content producers should exercise their best judgement, and it is recommended that lowercase names be used for consistency with the IANA registry.
     rel .'protocols'?: [{
-        rel .is: string
+        rel .is: common.string
         rel .example: 'ipv4'
         rel .example: 'tcp'
         rel .example: 'udp'
@@ -1623,10 +1623,10 @@ pub def process {
     rel .'created_time'?: common.timestamp
 
     /// Specifies the current working directory of the process.
-    rel .'cwd'?: string
+    rel .'cwd'?: common.string
 
     /// Specifies the full command line used in executing the process, including the process name (which may be specified individually via the image_ref.name property) and any arguments.
-    rel .'command_line'?: string
+    rel .'command_line'?: common.string
 
     /// Specifies the list of environment variables associated with the process as a dictionary.
     ///
@@ -1667,23 +1667,23 @@ pub def software {
     rel .'id'(rel .gen: auto)|id: software-id
 
     /// Specifies the name of the software.
-    rel .'name': string
+    rel .'name': common.string
 
     /// Specifies the Common Platform Enumeration (CPE) entry for the software, if available.
     /// The value for this property MUST be a CPE v2.3 entry from the official NVD CPE Dictionary [NVD].
     ///
     /// While the CPE dictionary does not contain entries for all software, whenever it does contain an identifier for a given instance of software, this property SHOULD be present.
-    rel .'cpe'?: string
+    rel .'cpe'?: common.string
 
     /// Specifies the languages supported by the software.
     /// The value of each list member MUST be an ISO 639-2 language code [ISO639-2].
-    rel .'languages'?: [string]
+    rel .'languages'?: [common.string]
 
     /// Specifies the name of the vendor of the software.
-    rel .'vendor'?: string
+    rel .'vendor'?: common.string
 
     /// Specifies the version of the software.
-    rel .'version'?: string
+    rel .'version'?: common.string
 }
 
 /// The URL object represents the properties of a uniform resource locator (URL).
@@ -1718,16 +1718,16 @@ pub def user-account {
     /// The format of the identifier depends on the system the user account is maintained in, and may be a numeric ID, a GUID, an account name, an email address, etc.
     /// The user_id property should be populated with whatever field is the unique identifier for the system the account is a member of.
     /// For example, on UNIX systems it would be populated with the UID.
-    rel .'user_id'?: string
+    rel .'user_id'?: common.string
 
     /// Specifies a cleartext credential.
     /// This is only intended to be used in capturing metadata from malware analysis (e.g., a hard-coded domain administrator password that the malware attempts to use for lateral movement) and SHOULD NOT be used for sharing of PII.
-    rel .'credential'?: string
+    rel .'credential'?: common.string
 
     /// Specifies the account login string, used in cases where the user_id property specifies something other than what a user would type when they login.
     ///
     /// For example, in the case of a Unix account with user_id 0, the account_login might be “root”. 
-    rel .'account_login'?: string
+    rel .'account_login'?: common.string
 
     /// Specifies the type of the account.
     ///
@@ -1737,7 +1737,7 @@ pub def user-account {
     /// Specifies the display name of the account, to be shown in user interfaces, if applicable.
     ///
     /// On Unix, this is equivalent to the GECOS field.
-    rel .'display_name'?: string
+    rel .'display_name'?: common.string
 
     /// Indicates that the account is associated with a network service or system process (daemon), not a specific individual.
     rel .'is_service_account'?: boolean
@@ -1767,10 +1767,10 @@ pub def user-account {
 /// The Windows Registry Value type captures the properties of a Windows Registry Key Value. As all properties of this type are optional, at least one of the properties defined below MUST be included when using this type.
 def windows-registry-value-type {
     /// Specifies the name of the registry value. For specifying the default value in a registry key, an empty string MUST be used.
-    rel .'name'?: string
+    rel .'name'?: common.string
 
     /// Specifies the data contained in the registry value.
-    rel .'data'?: string
+    rel .'data'?: common.string
 
     /// Specifies the registry (REG_*) data type used in the registry value.
     ///
@@ -1788,7 +1788,7 @@ pub def windows-registry-key {
     ///
     /// The value of the key, including the hive portion, SHOULD be case-preserved.
     /// The hive portion of the key MUST be fully expanded and not truncated; e.g., HKEY_LOCAL_MACHINE must be used instead of HKLM. 
-    rel .'key'?: string
+    rel .'key'?: common.string
 
     /// Specifies the values found under the registry key.
     rel .'values'?: [windows-registry-value-type]
@@ -1807,55 +1807,55 @@ pub def windows-registry-key {
 def x509-v3-extensions-type {
     /// Specifies a multi-valued extension which indicates whether a certificate is a CA certificate.
     /// The first (mandatory) name is CA followed by TRUE or FALSE. If CA is TRUE, then an optional pathlen name followed by a non-negative value can be included. Also equivalent to the object ID (OID) value of 2.5.29.19.
-    rel .'basic_constraints'?: string
+    rel .'basic_constraints'?: common.string
 
     /// Specifies a namespace within which all subject names in subsequent certificates in a certification path MUST be located. Also equivalent to the object ID (OID) value of 2.5.29.30.
-    rel .'name_constraints'?: string
+    rel .'name_constraints'?: common.string
 
     /// Specifies any constraints on path validation for certificates issued to CAs. Also equivalent to the object ID (OID) value of 2.5.29.36.
-    rel .'policy_constraints'?: string
+    rel .'policy_constraints'?: common.string
 
     /// Specifies a multi-valued extension consisting of a list of names of the permitted key usages. Also equivalent to the object ID (OID) value of 2.5.29.15.
-    rel .'key_usage'?: string
+    rel .'key_usage'?: common.string
 
     /// Specifies a list of usages indicating purposes for which the certificate public key can be used for. Also equivalent to the object ID (OID) value of 2.5.29.37
-    rel .'extended_key_usage'?: string
+    rel .'extended_key_usage'?: common.string
 
     /// Specifies the identifier that provides a means of identifying certificates that contain a particular public key. Also equivalent to the object ID (OID) value of 2.5.29.14.
-    rel .'subject_key_identifier'?: string
+    rel .'subject_key_identifier'?: common.string
 
     /// Specifies the identifier that provides a means of identifying the public key corresponding to the private key used to sign a certificate. Also equivalent to the object ID (OID) value of 2.5.29.35.
-    rel .'authority_key_identifier'?: string
+    rel .'authority_key_identifier'?: common.string
 
     /// Specifies the additional identities to be bound to the subject of the certificate. Also equivalent to the object ID (OID) value of 2.5.29.17.
-    rel .'subject_alternative_name'?: string
+    rel .'subject_alternative_name'?: common.string
 
     /// Specifies the additional identities to be bound to the issuer of the certificate. Also equivalent to the object ID (OID) value of 2.5.29.18.
-    rel .'issuer_alternative_name'?: string
+    rel .'issuer_alternative_name'?: common.string
 
     /// Specifies the identification attributes (e.g., nationality) of the subject. Also equivalent to the object ID (OID) value of 2.5.29.9.
-    rel .'subject_directory_attributes'?: string
+    rel .'subject_directory_attributes'?: common.string
 
     /// Specifies how CRL information is obtained. Also equivalent to the object ID (OID) value of 2.5.29.31.
-    rel .'crl_distribution_points'?: string
+    rel .'crl_distribution_points'?: common.string
 
     /// Specifies the number of additional certificates that may appear in the path before anyPolicy is no longer permitted. Also equivalent to the object ID (OID) value of 2.5.29.54.
-    rel .'inhibit_any_policy'?: string
+    rel .'inhibit_any_policy'?: common.string
 
     /// Specifies the date on which the validity period begins for the private key, if it is different from the validity period of the certificate. 
-    rel .'private_key_usage_period_not_before'?: string
+    rel .'private_key_usage_period_not_before'?: common.string
 
     /// Specifies the date on which the validity period ends for the private key, if it is different from the validity period of the certificate. 
-    rel .'private_key_usage_period_not_after'?: string
+    rel .'private_key_usage_period_not_after'?: common.string
 
     /// Specifies a sequence of one or more policy information terms, each of which consists of an object identifier (OID) and optional qualifiers.
     /// Also equivalent to the object ID (OID) value of 2.5.29.32.
-    rel .'certificate_policies': string
+    rel .'certificate_policies': common.string
 
     /// Specifies one or more pairs of OIDs; each pair includes an issuerDomainPolicy and a subjectDomainPolicy.
     /// The pairing indicates whether the issuing CA considers its issuerDomainPolicy equivalent to the subject CA's subjectDomainPolicy.
     /// Also equivalent to the object ID (OID) value of 2.5.29.33.
-    rel. 'policy_mappings': string
+    rel. 'policy_mappings': common.string
 }
 
 /// The X.509 Certificate object represents the properties of an X.509 certificate, as defined by ITU recommendation X.509 [X.509].
@@ -1874,16 +1874,16 @@ pub def x509-certificate {
     rel .'hashes': common.hashes
 
     /// Specifies the version of the encoded certificate.
-    rel .'version'?: string
+    rel .'version'?: common.string
 
     /// Specifies the unique identifier for the certificate, as issued by a specific Certificate Authority.
-    rel .'serial_number'?: string
+    rel .'serial_number'?: common.string
 
     /// Specifies the name of the algorithm used to sign the certificate.
-    rel .'signature_algorithm'?: string
+    rel .'signature_algorithm'?: common.string
 
     /// Specifies the name of the Certificate Authority that issued the certificate.
-    rel .'issuer'?: string
+    rel .'issuer'?: common.string
 
     /// Specifies the date on which the certificate validity period begins.
     rel .'validity_not_before'?: common.timestamp
@@ -1892,16 +1892,16 @@ pub def x509-certificate {
     rel .'validity_not_after'?: common.timestamp
 
     /// Specifies the name of the entity associated with the public key stored in the subject public key field of the certificate.
-    rel .'subject'?: string
+    rel .'subject'?: common.string
 
     /// Specifies the name of the algorithm with which to encrypt data being sent to the subject.
-    rel .'subject_public_key_algorithm'?: string
+    rel .'subject_public_key_algorithm'?: common.string
 
     /// Specifies the modulus portion of the subject’s public RSA key.
-    rel .'subject_public_key_modulus'?: string
+    rel .'subject_public_key_modulus'?: common.string
 
     /// Specifies the exponent portion of the subject’s public RSA key, as an integer.
-    rel .'subject_public_key_exponent'?: string
+    rel .'subject_public_key_exponent'?: common.string
 
     /// Specifies any standard X.509 v3 extensions that may be used in the certificate. 
     rel .'x509_v3_extensions'?: x509-v3-extensions-type

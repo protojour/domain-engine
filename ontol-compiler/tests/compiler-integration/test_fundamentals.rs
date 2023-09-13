@@ -12,7 +12,7 @@ fn test_relations_are_distinct_for_different_domains() {
             SourceName("other"),
             "
             pub def foo {
-                rel .'prop': string
+                rel .'prop': text
             }
             ",
         ),
@@ -22,7 +22,7 @@ fn test_relations_are_distinct_for_different_domains() {
             use 'other' as other
 
             pub def foo {
-                rel .'prop': string
+                rel .'prop': text
             }
             ",
         ),
@@ -63,11 +63,11 @@ fn ontol_domain_is_defined_in_the_namespace() {
     pub def i64 {
         rel .is: boolean
     }
-    pub def string {
+    pub def text {
         rel .is: ontol.i64
     }
     pub def integer {
-        rel .is: string
+        rel .is: text
     }
     "
     .compile_ok(|test| {

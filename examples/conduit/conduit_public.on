@@ -1,28 +1,28 @@
 
-def username { rel .is: string }
-def article_slug { rel .is: string }
+def username { rel .is: text }
+def article_slug { rel .is: text }
 
 pub def User {
-    rel .'email'|id: { rel .is: string }
-    rel .'username': string
-    rel .'bio': string
-    rel .'image'?: string
+    rel .'email'|id: { rel .is: text }
+    rel .'username': text
+    rel .'bio': text
+    rel .'image'?: text
 }
 
 pub def Profile {
     rel .'username'|id: username
-    rel .'bio': string
-    rel .'image'?: string
+    rel .'bio': text
+    rel .'image'?: text
     rel .'following': boolean
 }
 
 pub def Article {
     rel .'slug'|id: article_slug
-    rel .'title': string
-    rel .'description': string
-    rel .'body': string
-    rel .'createdAt': datetime
-    rel .'updatedAt': datetime
+    rel .'title': text
+    rel .'description': text
+    rel .'body': text
+    rel .'createdAt': text
+    rel .'updatedAt': text
     rel .'favorited': boolean
     rel .'favoritesCount': i64
     rel .'author': Profile
@@ -32,7 +32,7 @@ pub def Comment {
     rel .'id'|id: { rel .is: i64 }
     rel .'createdAt': datetime
     rel .'updatedAt': datetime
-    rel .'body': string
+    rel .'body': text
     rel .'author': Profile
 }
 
@@ -54,13 +54,13 @@ pub def MultipleComments {
 }
 
 pub def Tags {
-    rel .'tags': [string]
+    rel .'tags': [text]
 }
 
 def ArticleFilter {
     rel .'slug'?: article_slug
     // NB: These must be a sets, not lists:
-    rel .'tag'?: [string]
+    rel .'tag'?: [text]
     rel .'author'?: [username]
     rel .'favorited'?: [username]
     rel .'limit'?: i64

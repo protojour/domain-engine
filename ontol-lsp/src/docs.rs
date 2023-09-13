@@ -105,9 +105,9 @@ pub fn get_ontol_docs(ident: &str) -> Option<HoverDoc> {
             "ontol.f64",
             "#### Primitive\n64-bit floating point number.",
         )),
-        "string" => Some(HoverDoc::from(
-            "ontol.string",
-            "#### Primitive\nAny UTF-8 string.",
+        "text" => Some(HoverDoc::from(
+            "ontol.text",
+            "#### Primitive\nAny Unicode-encoded text.",
         )),
         "datetime" => Some(HoverDoc::from(
             "ontol.datetime",

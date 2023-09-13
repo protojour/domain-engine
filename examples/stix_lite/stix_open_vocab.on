@@ -1,6 +1,6 @@
 /// A value from a STIX open or suggested vocabulary.
 def open-vocab {
-    rel .is: string
+    rel .is: ontol.text
 }
 
 /// An open vocabulary of User Account types.

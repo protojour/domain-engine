@@ -39,16 +39,16 @@ fn test_extract_rel_params() {
 
     def a2 {
         rel a2_id identifies: .
-        rel .'foo': string
+        rel .'foo': text
     }
     def b2 {
         rel b2_id identifies: .
-        rel .'foo': string
-        rel .'bar': string
+        rel .'foo': text
+        rel .'bar': text
     }
 
     def a_edge {
-        rel .'bar': string
+        rel .'bar': text
     }
 
     pub def a1 {
@@ -123,15 +123,15 @@ fn test_rel_params_implicit_map() {
 
     def a_inner {
         rel a_inner_id identifies: .
-        rel .'a_prop': string
+        rel .'a_prop': text
     }
     def b_inner {
         rel b_inner_id identifies: .
-        rel .'b_prop': string
+        rel .'b_prop': text
     }
 
-    def a_edge { rel .'aa': string }
-    def b_edge { rel .'bb': string }
+    def a_edge { rel .'aa': text }
+    def b_edge { rel .'bb': text }
 
     pub def a {
         rel a_id identifies: .
@@ -181,13 +181,13 @@ fn test_rel_params_implicit_map() {
 #[test]
 fn test_map_relation_sequence_default_fallback() {
     "
-    pub def foo_inner { rel .'foo_id'|id: { rel .is: string } }
-    pub def bar_inner { rel .'bar_id'|id: { rel .is: string } }
+    pub def foo_inner { rel .'foo_id'|id: { rel .is: text } }
+    pub def bar_inner { rel .'bar_id'|id: { rel .is: text } }
     rel [foo_inner] 'bars'::'foos' [bar_inner]
 
     pub def bar {
-        rel .'id'|id: { rel .is: string }
-        rel .'foos': [string]
+        rel .'id'|id: { rel .is: text }
+        rel .'foos': [text]
     }
 
     map {
@@ -228,7 +228,7 @@ pub def technology {}
 def worker {
     rel .'ID': worker_id
     rel worker_id identifies: .
-    rel .'name': string
+    rel .'name': text
 
     rel .'technologies': [technology]
 }
@@ -236,7 +236,7 @@ def worker {
 def technology {
     rel .'ID': tech_id
     rel tech_id identifies: .
-    rel .'name': string
+    rel .'name': text
 }
 ";
 
@@ -251,14 +251,14 @@ def language {
     rel .'id': lang_id
     rel lang_id identifies: .
 
-    rel .'name': string
+    rel .'name': text
     rel .'developers': [developer]
 }
 
 def developer {
     rel .'id': dev_id
     rel dev_id identifies: .
-    rel .'name': string
+    rel .'name': text
 }
 ";
 

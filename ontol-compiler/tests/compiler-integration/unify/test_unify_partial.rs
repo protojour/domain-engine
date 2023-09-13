@@ -5,13 +5,13 @@ use test_log::test;
 fn test_unify_partial() {
     "
     def Filter {
-        rel .'foo'?: string
-        rel .'bar'?: string
+        rel .'foo'?: text
+        rel .'bar'?: text
     }
 
     def Foo {
-        rel .'foo': string
-        rel .'bar': string
+        rel .'foo': text
+        rel .'bar': text
     }
 
     unify {

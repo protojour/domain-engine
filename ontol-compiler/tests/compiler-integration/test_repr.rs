@@ -5,7 +5,7 @@ use test_log::test;
 fn test_repr_abstract_error1() {
     "
     def foo { // ERROR type not representable
-        rel .'id'|id: { rel .is: string }
+        rel .'id'|id: { rel .is: text }
         rel .'n':
             number // NOTE Type of field is abstract
     }
@@ -43,7 +43,7 @@ fn test_repr_error3() {
 
     def my_length { // ERROR Intersection of disjoint types
         rel .is: meters // NOTE Base type is number
-        rel .is: string // NOTE Base type is string
+        rel .is: text // NOTE Base type is text
     }
     "
     .compile_fail();
@@ -57,7 +57,7 @@ fn test_repr_error4() {
 
     def my_length { // ERROR Intersection of disjoint types
         rel .is: meters // NOTE Base type is number
-        rel .is: string // NOTE Base type is string
+        rel .is: text // NOTE Base type is text
     }
     "
     .compile_fail();
@@ -126,7 +126,7 @@ fn test_repr_valid_mesh1() {
             }
 
             def bar {
-                rel .id: { rel .is: string }
+                rel .id: { rel .is: text }
                 rel .'len': length
             }
             ",

@@ -6,10 +6,10 @@ use test_log::test;
 fn test_map_simple() {
     "
     pub def foo {
-        rel foo 'f': string
+        rel foo 'f': text
     }
     pub def bar {
-        rel bar 'b': string
+        rel bar 'b': text
     }
     map {
         foo { 'f': x }
@@ -33,9 +33,9 @@ fn test_map_simple() {
 #[test]
 fn test_map_value_to_primitive() {
     "
-    pub def my_string { rel.is: string }
-    pub def foo { rel .'a': my_string }
-    pub def bar { rel .'b': string }
+    pub def string { rel.is: text }
+    pub def foo { rel .'a': string }
+    pub def bar { rel .'b': text }
     map {
         foo { 'a': x }
         bar { 'b': x }
@@ -163,10 +163,10 @@ fn test_nested_optional_attribute() {
 fn test_map_value_to_struct_no_func() {
     "
     pub def one {
-        rel .is: string
+        rel .is: text
     }
     pub def two {
-        rel .'a': string
+        rel .'a': text
     }
     map {
         one: x
@@ -208,7 +208,7 @@ fn test_map_into_default_field_using_default_value() {
     "
     pub def empty {}
     pub def target {
-        rel .'field'(rel .default := 'Default!'): string
+        rel .'field'(rel .default := 'Default!'): text
     }
     map {
         empty {}
@@ -233,10 +233,10 @@ fn test_map_into_default_field_using_default_value() {
 fn test_map_into_default_field_using_provided_value() {
     "
     pub def required {
-        rel .'field': string
+        rel .'field': text
     }
     pub def target {
-        rel .'field'(rel .default := 'Default!'): string
+        rel .'field'(rel .default := 'Default!'): text
     }
     map {
         required { 'field': val }
@@ -262,7 +262,7 @@ fn test_map_into_default_field_using_map_provided() {
     "
     pub def empty {}
     pub def target {
-        rel .'field'(rel .default := 'Default!'): string
+        rel .'field'(rel .default := 'Default!'): text
     }
     map {
         empty {}
@@ -287,11 +287,11 @@ fn test_map_into_default_field_using_map_provided() {
 fn test_deep_structural_map() {
     "
     pub def foo {
-        rel .'a': string
+        rel .'a': text
     }
     def foo_inner {
-        rel .'b': string
-        rel .'c': string
+        rel .'b': text
+        rel .'c': text
     }
     def foo {
         rel .'inner': foo_inner
@@ -299,13 +299,13 @@ fn test_deep_structural_map() {
 
     def bar_inner {}
     pub def bar {
-        rel .'a': string
-        rel .'b': string
+        rel .'a': text
+        rel .'b': text
         rel .'inner': bar_inner
     }
 
     def bar_inner {
-        rel .'c': string
+        rel .'c': text
     }
 
     map {
@@ -365,8 +365,8 @@ fn test_map_matching_sequence() {
 
 // map call inside sequence
 const MAP_IN_SEQUENCE: &str = "
-def foo { rel .'f': string }
-def bar { rel .'b': string }
+def foo { rel .'f': text }
+def bar { rel .'b': text }
 pub def foos { rel .'foos': [foo] }
 pub def bars { rel .'bars': [bar] }
 
@@ -431,8 +431,8 @@ fn test_map_in_sequence_item_many() {
 #[test]
 fn test_sequence_cross_parallel() {
     "
-    def foo { rel .'f': string }
-    def bar { rel .'b': string }
+    def foo { rel .'f': text }
+    def bar { rel .'b': text }
     map {
         foo { 'f': x }
         bar { 'b': x }
@@ -469,8 +469,8 @@ fn test_sequence_cross_parallel() {
 #[test]
 fn test_sequence_inner_loop() {
     "
-    def foo { rel .'P': string }
-    def bar { rel .'Q': string }
+    def foo { rel .'P': text }
+    def bar { rel .'Q': text }
     map {
         foo { 'P': x }
         bar { 'Q': x }
@@ -528,16 +528,16 @@ fn test_sequence_inner_loop() {
 fn test_sequence_flat_map1() {
     "
     pub def foo {
-        rel .'a': string
+        rel .'a': text
 
         def foo_inner {
-            rel .'b': string
+            rel .'b': text
         }
         rel .'inner': [foo_inner]
     }
     pub def bar {
-        rel .'a': string
-        rel .'b': string
+        rel .'a': text
+        rel .'b': text
     }
 
     map {
@@ -642,14 +642,14 @@ fn test_map_complex_flow() {
     // For example, when two `:x`es flow into one property, we can choose the first one.
     "
     pub def one {
-        rel .'a': string
-        rel .'b': string
+        rel .'a': text
+        rel .'b': text
     }
     pub def two {
-        rel .'a': string
-        rel .'b': string
-        rel .'c': string
-        rel .'d': string
+        rel .'a': text
+        rel .'b': text
+        rel .'c': text
+        rel .'d': text
     }
 
     map {
@@ -842,12 +842,12 @@ fn test_seq_scope_escape1() {
 
     pub def bar {
         rel .'foo': foo
-        rel .'p1': [string]
+        rel .'p1': [text]
     }
 
     pub def baz {
         rel .'foo': foo
-        rel .'p1': [string]
+        rel .'p1': [text]
     }
 
     pub def qux {
@@ -880,17 +880,17 @@ fn test_seq_scope_escape1() {
 fn test_seq_scope_escape2() {
     "
     def foo {
-        rel .'p0': [string]
+        rel .'p0': [text]
     }
 
     pub def bar {
         rel .'foo': foo
-        rel .'p1': [string]
+        rel .'p1': [text]
     }
 
     pub def baz {
         rel .'foo': foo
-        rel .'p1': [string]
+        rel .'p1': [text]
     }
 
     pub def qux {

@@ -25,10 +25,10 @@ fn id_cannot_identify_two_things() {
 #[test]
 fn entity_without_inherent_id() {
     "
-    pub def some_id { fmt '' => string => . }
+    pub def some_id { fmt '' => text => . }
     pub def entity {
         rel .id: some_id
-        rel .'foo': string
+        rel .'foo': text
     }
     "
     .compile_ok(|test| {
@@ -40,7 +40,7 @@ fn entity_without_inherent_id() {
 #[test]
 fn inherent_id_no_autogen() {
     "
-    def foo_id { rel .is: string }
+    def foo_id { rel .is: text }
     pub def foo {
         rel .id: foo_id
         rel .'key': foo_id
@@ -62,7 +62,7 @@ fn inherent_id_no_autogen() {
 #[test]
 fn inherent_id_autogen() {
     "
-    def foo_id { rel .is: string }
+    def foo_id { rel .is: text }
     pub def foo {
         rel .'key'(rel .gen: auto)|id: foo_id
         rel .'children': [foo]
@@ -84,7 +84,7 @@ fn inherent_id_autogen() {
 fn id_and_inherent_property_inline_type() {
     "
     pub def foo {
-        rel .'key'|id: { rel . is: string }
+        rel .'key'|id: { rel . is: text }
         rel .'children': [foo]
     }
     "
@@ -247,10 +247,10 @@ fn artist_and_instrument_id_as_relation_object() {
 #[test]
 fn test_entity_self_relationship_optional_object() {
     "
-    pub def node_id { fmt '' => string => . }
+    pub def node_id { fmt '' => text => . }
     pub def node {
         rel node_id identifies: .
-        rel .'name': string
+        rel .'name': text
         rel .'children'::'parent'? [node]
     }
     "
@@ -285,7 +285,7 @@ fn test_entity_self_relationship_optional_object() {
 #[test]
 fn test_entity_self_relationship_mandatory_object() {
     "
-    pub def node_id { fmt '' => string => . }
+    pub def node_id { fmt '' => text => . }
     pub def node {
         rel node_id identifies: .
         rel .'children'::'parent' [.]
@@ -373,15 +373,15 @@ fn entity_union_in_relation_with_ids() {
 #[test]
 fn entity_relationship_without_reverse() {
     "
-    pub def lang_id { fmt '' => string => . }
-    pub def prog_id { fmt '' => string => . }
+    pub def lang_id { fmt '' => text => . }
+    pub def prog_id { fmt '' => text => . }
     pub def language {
         rel lang_id identifies: .
         rel .'lang-id': lang_id
     }
     pub def programmer {
         rel prog_id identifies: .
-        rel .'name': string
+        rel .'name': text
         rel .'favorite-language': language
     }
     "
@@ -397,9 +397,9 @@ fn entity_relationship_without_reverse() {
 #[test]
 fn recursive_entity_union() {
     "
-    pub def animal_id { fmt '' => 'animal/' => string => . }
-    pub def plant_id { fmt '' => 'plant/' => string => . }
-    pub def owner_id { fmt '' => string => . }
+    pub def animal_id { fmt '' => 'animal/' => text => . }
+    pub def plant_id { fmt '' => 'plant/' => text => . }
+    pub def owner_id { fmt '' => text => . }
 
     pub def lifeform {}
     pub def animal {
@@ -416,7 +416,7 @@ fn recursive_entity_union() {
 
     pub def owner {
         rel owner_id identifies: .
-        rel .'name': string
+        rel .'name': text
         rel .'owns': [lifeform]
     }
     "

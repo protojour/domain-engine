@@ -6,11 +6,11 @@ use test_log::test;
 fn test_map_regex_duplex1() {
     r#"
     pub def foo {
-        rel .'input': string
+        rel .'input': text
     }
     pub def bar {
-        rel .'first': string
-        rel .'second': string
+        rel .'first': text
+        rel .'second': text
     }
     map {
         foo {
@@ -40,14 +40,14 @@ fn test_map_regex_duplex1() {
 fn test_map_regex_alternation1() {
     r#"
     pub def foo {
-        rel .'input': string
+        rel .'input': text
     }
     def capture {
-        rel .'value': string
+        rel .'value': text
     }
     pub def bar {
-        rel .'first'?: string
-        rel .'second'?: string
+        rel .'first'?: text
+        rel .'second'?: text
     }
     map {
         foo match {
@@ -78,11 +78,11 @@ fn test_map_regex_alternation1() {
 fn test_map_regex_loop_pattern() {
     r#"
     pub def in {
-        rel .'input': string
+        rel .'input': text
     }
     def capture {
-        rel .'first': string
-        rel .'second': string
+        rel .'first': text
+        rel .'second': text
     }
     pub def out {
         rel .'captures': [capture]
@@ -124,10 +124,10 @@ fn test_map_regex_loop_pattern() {
 fn test_map_regex_loop_alternation() {
     r#"
     pub def in {
-        rel .'input': string
+        rel .'input': text
     }
     def capture {
-        rel .'value': string
+        rel .'value': text
     }
     pub def out {
         rel .'foo': [capture]

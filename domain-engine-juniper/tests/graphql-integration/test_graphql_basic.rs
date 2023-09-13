@@ -25,7 +25,7 @@ fn test_graphql_empty_schema() {
 #[test(tokio::test)]
 async fn test_graphql_basic_schema() {
     let (test, [schema]) = "
-    pub def foo_id { fmt '' => string => . }
+    pub def foo_id { fmt '' => text => . }
     pub def foo {
         rel foo_id identifies: .
         rel .'prop': i64
@@ -94,7 +94,7 @@ async fn test_graphql_basic_schema() {
 async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
     let (test, [schema]) = "
     pub def foo {
-        rel .'id'(rel .gen: auto)|id: { rel .is: string }
+        rel .'id'(rel .gen: auto)|id: { rel .is: text }
     }
     "
     .compile_schemas([ROOT]);
@@ -126,9 +126,9 @@ async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
 #[test(tokio::test)]
 async fn test_graphql_value_type_as_field() {
     "
-    def foo { rel .is: string }
+    def foo { rel .is: text }
     pub def bar {
-        rel .'id'(rel .gen: auto)|id: { rel .is: string }
+        rel .'id'(rel .gen: auto)|id: { rel .is: text }
         rel .'foo': foo
     }
     "
@@ -138,9 +138,9 @@ async fn test_graphql_value_type_as_field() {
 #[test(tokio::test)]
 async fn test_graphql_value_type_in_array() {
     "
-    def foo { rel .is: string }
+    def foo { rel .is: text }
     pub def bar {
-        rel .'id'(rel .gen: auto)|id: { rel .is: string }
+        rel .'id'(rel .gen: auto)|id: { rel .is: text }
         rel .'foo': [foo]
     }
     "
@@ -150,9 +150,9 @@ async fn test_graphql_value_type_in_array() {
 #[test(tokio::test)]
 async fn test_inner_struct() {
     let (test, [schema]) = "
-    pub def foo_id { fmt '' => string => . }
+    pub def foo_id { fmt '' => text => . }
     def inner {
-        rel .'prop': string
+        rel .'prop': text
     }
     pub def foo {
         rel foo_id identifies: .
@@ -229,14 +229,14 @@ async fn test_inner_struct() {
 async fn test_docs_introspection() {
     let (test, [schema]) = "
     def Key {
-        rel .is: string
+        rel .is: text
     }
 
     /// this is a type
     pub def PublicType {
         rel Key identifies: .
         /// this is a field
-        rel .'relation': string
+        rel .'relation': text
     }
     "
     .compile_schemas([ROOT]);

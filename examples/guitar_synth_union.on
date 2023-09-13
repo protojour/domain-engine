@@ -5,7 +5,7 @@ pub def synth_id {
     fmt '' => 'synth/' => uuid => .
 }
 pub def artist_id {
-    fmt '' => string => .
+    fmt '' => text => .
 }
 
 pub def guitar {
@@ -27,6 +27,6 @@ pub def instrument {
 pub def artist {
     rel artist_id identifies: .
     rel .'artist-id'(rel .gen: auto): artist_id
-    rel .'name': string
+    rel .'name': text
     rel [.] 'plays'::'played-by' [instrument]
 }

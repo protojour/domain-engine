@@ -1,20 +1,20 @@
 pub def user_id { rel .is: uuid }
-pub def slug { rel.is: string }
-pub def tag { rel.is: string }
+pub def slug { rel.is: text }
+pub def tag { rel.is: text }
 
 pub def User {
     // TODO: This must be an Authly user id
     rel .'user_id'(rel .gen: auto)|id: user_id
     // TODO: This is.. an authly user name? Maybe?
-    rel .'username': string
+    rel .'username': text
 
     // TODO: Should not store auth-related fields in memoriam,
     // this is the responsibility of Authly.
-    rel .'email': string
-    rel .'password_hash': string
+    rel .'email': text
+    rel .'password_hash': text
 
-    rel .'bio'(rel .default := ''): string
-    rel .'image'?: string
+    rel .'bio'(rel .default := ''): text
+    rel .'image'?: text
 
     // TODO(constraint): User cannot follow itself
     rel .'following'::'followed_by'? [User]
@@ -24,16 +24,16 @@ pub def Article {
     rel .'article_id'(rel .gen: auto)|id: { rel .is: uuid }
     // TODO(constraint): slug is unique
     rel .'slug': slug
-    rel .'title': string
-    rel .'description': string
-    rel .'body': string
+    rel .'title': text
+    rel .'description': text
+    rel .'body': text
     rel .'created_at'(rel .gen: create_time): datetime
     rel .'updated_at'(rel .gen: update_time): datetime
 }
 
 pub def Comment {
     rel .'id'(rel .gen: auto)|id: { rel .is: i64 }
-    rel .'body': string
+    rel .'body': text
     rel .'created_at'(rel .gen: create_time): datetime
     rel .'updated_at'(rel .gen: update_time): datetime
 }

@@ -1,7 +1,7 @@
 use 'geojson' as geojson
 
 pub def code {
-    fmt '' => string => .
+    fmt '' => text => .
 }
 
 pub def municipality {
