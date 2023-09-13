@@ -239,6 +239,7 @@ impl Processor for OntolProcessor {
 
     fn move_seq_vals_to_stack(&mut self, source: Local) {
         let sequence = std::mem::take(self.sequence_local_mut(source));
+        *self.local_mut(source) = Value::unit();
         self.stack
             .extend(sequence.into_iter().map(|attr| attr.value));
     }
