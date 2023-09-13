@@ -149,7 +149,7 @@ pub struct SeqPatternElement {
 pub enum ExprPattern {
     Variable(String),
     NumberLiteral(String),
-    StringLiteral(String),
+    TextLiteral(String),
     RegexLiteral(String),
     Binary(
         Box<Spanned<ExprPattern>>,
@@ -170,7 +170,7 @@ pub enum Type {
     Path(Path),
     AnonymousStruct(Spanned<Vec<Spanned<Statement>>>),
     NumberLiteral(String),
-    StringLiteral(String),
+    TextLiteral(String),
     Regex(String),
 }
 

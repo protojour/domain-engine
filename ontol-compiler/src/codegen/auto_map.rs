@@ -33,7 +33,7 @@ pub fn autogenerate_mapping<'m>(
         &first_properties.constructor,
         &second_properties.constructor,
     ) {
-        (Constructor::StringFmt(first_fmt), Constructor::StringFmt(second_fmt)) => {
+        (Constructor::TextFmt(first_fmt), Constructor::TextFmt(second_fmt)) => {
             autogenerate_fmt_to_fmt(
                 compiler,
                 unit_type,

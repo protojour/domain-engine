@@ -71,7 +71,7 @@ pub enum Kind<'a, L: Lang> {
     /// A 64 bit float
     F64(f64),
     /// A string
-    String(String),
+    Text(String),
     /// Const procedure
     Const(DefId),
     /// A let expression

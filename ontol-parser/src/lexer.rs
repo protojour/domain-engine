@@ -19,7 +19,7 @@ pub enum Token {
     Pub,
     FatArrow,
     Number(String),
-    StringLiteral(String),
+    TextLiteral(String),
     Regex(String),
     Sym(String),
     DocComment(String),
@@ -37,7 +37,7 @@ impl Display for Token {
             Self::Pub => write!(f, "`pub`"),
             Self::FatArrow => write!(f, "`=>`"),
             Self::Number(_) => write!(f, "`number`"),
-            Self::StringLiteral(_) => write!(f, "`string`"),
+            Self::TextLiteral(_) => write!(f, "`string`"),
             Self::Regex(_) => write!(f, "`regex`"),
             Self::Sym(sym) => write!(f, "`{sym}`"),
             Self::DocComment(_) => write!(f, "`doc_comment`"),
@@ -70,8 +70,8 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
         .or(one_of(")}]").map(Token::Close))
         .or(num().map(Token::Number))
         .or(just('-').map(Token::Sigil))
-        .or(double_quote_string_literal().map(Token::StringLiteral))
-        .or(single_quote_string_literal().map(Token::StringLiteral))
+        .or(double_quote_string_literal().map(Token::TextLiteral))
+        .or(single_quote_string_literal().map(Token::TextLiteral))
         .or(regex().map(Token::Regex))
         .or(just('/')
             .then_ignore(none_of("/").to(()).or(end()))

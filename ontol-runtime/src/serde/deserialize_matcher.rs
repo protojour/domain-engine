@@ -4,7 +4,7 @@ use crate::{
     discriminator::Discriminant,
     format_utils::{Backticks, LogicOp, Missing},
     ontology::Ontology,
-    string_types::ParseError,
+    text_like_types::ParseError,
     text_pattern::TextPattern,
     value::{Data, Value},
     DefId,
@@ -167,15 +167,16 @@ pub struct StringMatcher<'e> {
 
 impl<'e> ValueMatcher for StringMatcher<'e> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        // Even though it's called "text" in ONTOL, we can call it "string" in protocols
         write!(f, "string")
     }
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
-        Ok(Value::new(Data::String(str.into()), self.def_id))
+        Ok(Value::new(Data::Text(str.into()), self.def_id))
     }
 }
 
-/// match a constant string
+/// match a constant text
 pub struct ConstantStringMatcher<'e> {
     pub literal: &'e str,
     pub def_id: DefId,
@@ -188,7 +189,7 @@ impl<'e> ValueMatcher for ConstantStringMatcher<'e> {
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
         if str == self.literal {
-            Ok(Value::new(Data::String(str.into()), self.def_id))
+            Ok(Value::new(Data::Text(str.into()), self.def_id))
         } else {
             Err(())
         }
@@ -387,7 +388,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
     fn match_str(&self, str: &str) -> Result<Value, ()> {
         for variant in self.variants {
             match &variant.discriminator.discriminant {
-                Discriminant::IsString => {
+                Discriminant::IsText => {
                     return try_deserialize_custom_string(
                         self.ontology,
                         variant.discriminator.def_variant.def_id,
@@ -395,7 +396,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
                     )
                     .map_err(|_| ())
                 }
-                Discriminant::IsStringLiteral(lit) if lit == str => {
+                Discriminant::IsTextLiteral(lit) if lit == str => {
                     return try_deserialize_custom_string(
                         self.ontology,
                         variant.discriminator.def_variant.def_id,
@@ -450,7 +451,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
                 &variant.discriminator.discriminant,
                 Discriminant::MapFallback
                     | Discriminant::IsSingletonProperty(..)
-                    | Discriminant::HasStringAttribute(..)
+                    | Discriminant::HasTextAttribute(..)
                     | Discriminant::HasAttributeMatchingStringPattern(..)
             )
         }) {
@@ -513,7 +514,7 @@ impl<'e> MapMatcher<'e> {
         let match_fn = |discriminant: &Discriminant| -> bool {
             match (discriminant, value) {
                 (
-                    Discriminant::HasStringAttribute(_, match_name, match_value),
+                    Discriminant::HasTextAttribute(_, match_name, match_value),
                     serde_value::Value::String(value),
                 ) => property == match_name && value == match_value,
                 (Discriminant::IsSingletonProperty(_, match_name), _) => property == match_name,
@@ -609,7 +610,7 @@ fn try_deserialize_custom_string(
 ) -> Result<Value, ParseError> {
     match ontology.string_like_types.get(&def_id) {
         Some(custom_string_deserializer) => custom_string_deserializer.try_deserialize(def_id, str),
-        None => Ok(Value::new(Data::String(str.into()), def_id)),
+        None => Ok(Value::new(Data::Text(str.into()), def_id)),
     }
 }
 

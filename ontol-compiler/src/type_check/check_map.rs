@@ -321,7 +321,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
                     ctx,
                 )?);
             }
-            PatternKind::ConstI64(_) | PatternKind::ConstString(_) => {}
+            PatternKind::ConstI64(_) | PatternKind::ConstText(_) => {}
         };
 
         Ok(group_set)

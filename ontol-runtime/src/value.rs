@@ -100,7 +100,7 @@ pub enum Data {
     I64(i64),
     F64(f64),
     Rational(Box<num::rational::BigRational>),
-    String(String),
+    Text(String),
     Uuid(uuid::Uuid),
     ChronoDateTime(chrono::DateTime<chrono::Utc>),
     ChronoDate(chrono::NaiveDate),
@@ -133,7 +133,7 @@ pub struct FormatStringData<'d>(pub &'d Data);
 impl<'d> Display for FormatStringData<'d> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.0 {
-            Data::String(s) => write!(f, "{s}"),
+            Data::Text(s) => write!(f, "{s}"),
             Data::Uuid(uuid) => write!(f, "{uuid}"),
             Data::ChronoDateTime(datetime) => {
                 // FIXME: A way to not do this via String
@@ -250,7 +250,7 @@ impl<'v> Display for ValueDebug<'v> {
             Data::I64(i) => write!(f, "int({i})"),
             Data::F64(n) => write!(f, "flt({n})"),
             Data::Rational(r) => write!(f, "rat({r})"),
-            Data::String(s) => write!(f, "'{s}'"),
+            Data::Text(s) => write!(f, "'{s}'"),
             Data::Uuid(u) => write!(f, "uuid({u})"),
             Data::ChronoDateTime(dt) => write!(f, "datetime({dt})"),
             Data::ChronoDate(d) => write!(f, "date({d})"),

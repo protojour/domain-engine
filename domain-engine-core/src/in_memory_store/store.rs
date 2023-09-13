@@ -10,7 +10,7 @@ use ontol_runtime::{
         processor::{ProcessorLevel, ProcessorMode},
     },
     smart_format,
-    string_types::StringLikeType,
+    text_like_types::TextLikeType,
     value::{Attribute, Data, PropertyId, Value, ValueDebug},
     value_generator::ValueGenerator,
     DefId, RelationshipId, Role,
@@ -488,7 +488,7 @@ impl InMemoryStore {
                 let attribute = struct_map.iter().next().unwrap();
                 Self::extract_dynamic_key(&attribute.1.value.data)
             }
-            Data::String(string) => Ok(DynamicKey::String(string.clone())),
+            Data::Text(string) => Ok(DynamicKey::String(string.clone())),
             Data::Uuid(uuid) => Ok(DynamicKey::Uuid(*uuid)),
             Data::I64(int) => Ok(DynamicKey::Int(*int)),
             _ => Err(DomainError::IdNotFound),
@@ -513,11 +513,11 @@ impl InMemoryStore {
         match (ontology.get_serde_operator(id_operator_id), value_generator) {
             (SerdeOperator::String(def_id), ValueGenerator::UuidV4) => {
                 let string = smart_format!("{}", Uuid::new_v4());
-                Ok(Value::new(Data::String(string), *def_id))
+                Ok(Value::new(Data::Text(string), *def_id))
             }
             (SerdeOperator::TextPattern(def_id), _) => {
                 match (ontology.get_string_like_type(*def_id), value_generator) {
-                    (Some(StringLikeType::Uuid), ValueGenerator::UuidV4) => {
+                    (Some(TextLikeType::Uuid), ValueGenerator::UuidV4) => {
                         Ok(Value::new(Data::Uuid(Uuid::new_v4()), *def_id))
                     }
                     _ => Err(DomainError::TypeCannotBeUsedForIdGeneration),

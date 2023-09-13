@@ -175,7 +175,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                 let meta = self.defs.relationship_meta(property_id.relationship_id);
 
-                let DefKind::StringLiteral(property_name) = *meta.relation_def_kind.value else {
+                let DefKind::TextLiteral(property_name) = *meta.relation_def_kind.value else {
                     return None;
                 };
 
@@ -311,13 +311,13 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     self.alloc_operator_id(&def_variant),
                     SerdeOperator::F64(def_variant.def_id, None),
                 )),
-                PrimitiveKind::String => Some(OperatorAllocation::Allocated(
+                PrimitiveKind::Text => Some(OperatorAllocation::Allocated(
                     self.alloc_operator_id(&def_variant),
                     SerdeOperator::String(def_variant.def_id),
                 )),
             },
             Type::IntConstant(_) | Type::FloatConstant(_) => todo!(),
-            Type::StringConstant(def_id) => {
+            Type::TextConstant(def_id) => {
                 assert_eq!(def_variant.def_id, *def_id);
 
                 let literal = self.defs.get_string_representation(*def_id);
@@ -339,7 +339,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     SerdeOperator::TextPattern(*def_id),
                 ))
             }
-            Type::StringLike(_, _) => Some(OperatorAllocation::Allocated(
+            Type::TextLike(_, _) => Some(OperatorAllocation::Allocated(
                 self.alloc_operator_id(&def_variant),
                 SerdeOperator::TextPattern(def_variant.def_id),
             )),
@@ -425,7 +425,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     _ => {
                         if def_id == &def_variant.def_id {
                             // If it's a "self-scalar" it must be a string fmt (for now).
-                            if let Constructor::StringFmt(segment) = &properties.constructor {
+                            if let Constructor::TextFmt(segment) = &properties.constructor {
                                 return self.alloc_string_fmt_operator(def_variant, segment);
                             }
 
@@ -807,7 +807,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         let meta = self.defs.relationship_meta(property_id.relationship_id);
                         let object = meta.relationship.object.0;
 
-                        let DefKind::StringLiteral(prop_key) = meta.relation_def_kind.value else {
+                        let DefKind::TextLiteral(prop_key) = meta.relation_def_kind.value else {
                             panic!("Subject property is not a string literal");
                         };
 

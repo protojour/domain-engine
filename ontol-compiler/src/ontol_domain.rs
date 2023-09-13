@@ -2,7 +2,7 @@
 
 use std::ops::Range;
 
-use ontol_runtime::{string_types::StringLikeType, vm::proc::BuiltinProc, DefId};
+use ontol_runtime::{text_like_types::TextLikeType, vm::proc::BuiltinProc, DefId};
 
 use crate::{
     def::{BuiltinRelationKind, DefKind, TypeDef},
@@ -74,7 +74,7 @@ impl<'m> Compiler<'m> {
 
         let i64_i64_ty = self.types.intern([i64_ty, i64_ty]);
 
-        let string_ty = *self.def_types.table.get(&self.primitives.string).unwrap();
+        let string_ty = *self.def_types.table.get(&self.primitives.text).unwrap();
         let string_string_ty = self.types.intern([string_ty, string_ty]);
 
         let i64_i64_to_i64 = self.types.intern(Type::Function {
@@ -190,28 +190,26 @@ impl<'m> Compiler<'m> {
 
     fn def_uuid(&mut self) {
         let (uuid, _) = self.define_concrete_domain_type("uuid", |def_id| {
-            Type::StringLike(def_id, StringLikeType::Uuid)
+            Type::TextLike(def_id, TextLikeType::Uuid)
         });
         let segment = TextPatternSegment::Regex(regex_util::uuid());
         store_text_pattern_segment(&mut self.text_patterns, uuid, &segment);
-        self.relations.properties_by_def_id_mut(uuid).constructor = Constructor::StringFmt(segment);
-        self.defs
-            .string_like_types
-            .insert(uuid, StringLikeType::Uuid);
+        self.relations.properties_by_def_id_mut(uuid).constructor = Constructor::TextFmt(segment);
+        self.defs.string_like_types.insert(uuid, TextLikeType::Uuid);
     }
 
     fn def_datetime(&mut self) {
         let (datetime, _) = self.define_concrete_domain_type("datetime", |def_id| {
-            Type::StringLike(def_id, StringLikeType::DateTime)
+            Type::TextLike(def_id, TextLikeType::DateTime)
         });
         let segment = TextPatternSegment::Regex(regex_util::datetime_rfc3339());
         store_text_pattern_segment(&mut self.text_patterns, datetime, &segment);
         self.relations
             .properties_by_def_id_mut(datetime)
-            .constructor = Constructor::StringFmt(segment.clone());
+            .constructor = Constructor::TextFmt(segment.clone());
         self.defs
             .string_like_types
-            .insert(datetime, StringLikeType::DateTime);
+            .insert(datetime, TextLikeType::DateTime);
     }
 
     /// Define an ontol _domain_ type, i.e. not a primitive

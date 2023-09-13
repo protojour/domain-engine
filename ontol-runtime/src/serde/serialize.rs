@@ -49,7 +49,7 @@ impl<'e> SerdeProcessor<'e> {
             SerdeOperator::String(_)
             | SerdeOperator::StringConstant(_, _)
             | SerdeOperator::TextPattern(_) => match &value.data {
-                Data::String(s) => serializer.serialize_str(s),
+                Data::Text(s) => serializer.serialize_str(s),
                 data => {
                     let mut buf = String::new();
                     write!(&mut buf, "{}", FormatStringData(data)).unwrap();

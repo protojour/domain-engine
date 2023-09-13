@@ -28,8 +28,8 @@ pub enum PrimitiveKind {
     F32,
     /// 64-bit floating point
     F64,
-    /// Set of all strings
-    String,
+    /// Set of all possible texts
+    Text,
 }
 
 impl PrimitiveKind {
@@ -56,11 +56,11 @@ pub struct Primitives {
     /// The empty sequence type.
     pub empty_sequence: DefId,
 
-    /// The empty string type.
-    pub empty_string: DefId,
+    /// The empty text type.
+    pub empty_text: DefId,
 
-    /// The string type: All valid unicode strings.
-    pub string: DefId,
+    /// The text type: All valid unicode sequences.
+    pub text: DefId,
 
     /// The abstract type of a number. Supertype of integers and fractionals.
     pub number: DefId,
@@ -144,14 +144,14 @@ impl Primitives {
             bool: defs.add_primitive(PrimitiveKind::Boolean, Some("boolean")),
 
             empty_sequence: defs.add_def(DefKind::EmptySequence, ONTOL_PKG, NO_SPAN),
-            empty_string: defs.add_def(DefKind::StringLiteral(""), ONTOL_PKG, NO_SPAN),
+            empty_text: defs.add_def(DefKind::TextLiteral(""), ONTOL_PKG, NO_SPAN),
             number: defs.add_primitive(PrimitiveKind::Number, Some("number")),
             integer: defs.add_primitive(PrimitiveKind::Integer, Some("integer")),
             i64: defs.add_primitive(PrimitiveKind::I64, Some("i64")),
             float: defs.add_primitive(PrimitiveKind::Float, Some("float")),
             f32: defs.add_primitive(PrimitiveKind::F32, Some("f32")),
             f64: defs.add_primitive(PrimitiveKind::F64, Some("f64")),
-            string: defs.add_primitive(PrimitiveKind::String, Some("string")),
+            text: defs.add_primitive(PrimitiveKind::Text, Some("string")),
             ontol_domain: defs.alloc_def_id(ONTOL_PKG),
 
             relations: OntolRelations {

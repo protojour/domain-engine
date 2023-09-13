@@ -79,7 +79,7 @@ fn deserialize_string() {
         let [foo] = test.bind(["foo"]);
         assert_matches!(
             create_de(&foo).data_variant(json!("hei")),
-            Ok(Data::String(s)) if s == "hei"
+            Ok(Data::Text(s)) if s == "hei"
         );
 
         assert_error_msg!(
@@ -194,7 +194,7 @@ fn deserialize_union_of_primitives() {
             create_de(&foo).data_variant(json!(42)),
             Ok(Data::I64(42))
         );
-        assert_matches!(create_de(&foo).data_variant(json!("qux")), Ok(Data::String(s)) if s == "qux");
+        assert_matches!(create_de(&foo).data_variant(json!("qux")), Ok(Data::Text(s)) if s == "qux");
         assert_error_msg!(
             create_de(&foo).data(json!({})),
             "invalid type: map, expected `foo` (`int` or `string`) at line 1 column 2"
@@ -212,7 +212,7 @@ fn deserialize_string_constant() {
         let [foo] = test.bind(["foo"]);
         assert_matches!(
             create_de(&foo).data_variant(json!("my_value")),
-            Ok(Data::String(s)) if s == "my_value"
+            Ok(Data::Text(s)) if s == "my_value"
         );
         assert_error_msg!(
             create_de(&foo).data(json!("other value")),
@@ -291,7 +291,7 @@ fn deserialize_string_union() {
         let [foo] = test.bind(["foo"]);
         assert_matches!(
             create_de(&foo).data_variant(json!("a")),
-            Ok(Data::String(a)) if a == "a"
+            Ok(Data::Text(a)) if a == "a"
         );
         assert_error_msg!(
             create_de(&foo).data_variant(json!("junk")),
@@ -359,7 +359,7 @@ fn union_tree() {
         let [u3] = test.bind(["u3"]);
         assert_matches!(
             create_de(&u3).data_variant(json!("1a")),
-            Ok(Data::String(s)) if s == "1a"
+            Ok(Data::Text(s)) if s == "1a"
         );
         assert_error_msg!(
             create_de(&u3).data_variant(json!("ugh")),

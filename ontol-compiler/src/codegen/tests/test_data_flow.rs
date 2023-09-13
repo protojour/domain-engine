@@ -23,7 +23,7 @@ const MOCK_RELATIONSHIP: Relationship = Relationship {
     object_prop: None,
     rel_params: RelParams::Unit,
 };
-const MOCK_RELATION: DefKind = DefKind::StringLiteral("mock-relation");
+const MOCK_RELATION: DefKind = DefKind::TextLiteral("mock-relation");
 
 fn analyze<'a>(arg: &str, hir: &str) -> Vec<PropertyFlow> {
     let node = ontol_hir::parse::Parser::new(TypedHir)

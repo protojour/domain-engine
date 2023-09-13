@@ -71,14 +71,14 @@ impl Cast<String> for Value {
 
     fn cast_into(self) -> String {
         match self.data {
-            Data::String(s) => s,
+            Data::Text(s) => s,
             _ => panic!("not a string"),
         }
     }
 
     fn cast_ref(&self) -> &Self::Ref {
         match &self.data {
-            Data::String(s) => s.as_str(),
+            Data::Text(s) => s.as_str(),
             _ => panic!("not a string"),
         }
     }

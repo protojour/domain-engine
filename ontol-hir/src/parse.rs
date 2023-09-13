@@ -205,11 +205,11 @@ impl<L: Lang> Parser<L> {
             }
             (sym @ ("match-regex" | "match-regex-iter"), next) => {
                 let iter = Iter(sym.contains("iter"));
-                let (string_var, next) = parse_dollar_var(next)?;
+                let (text_var, next) = parse_dollar_var(next)?;
                 let (regex_def_id, next) = parse_def_id(next)?;
                 let (match_arms, next) = self.parse_many(next, Self::parse_capture_match_arm)?;
                 Ok((
-                    self.make_node(Kind::MatchRegex(iter, string_var, regex_def_id, match_arms)),
+                    self.make_node(Kind::MatchRegex(iter, text_var, regex_def_id, match_arms)),
                     next,
                 ))
             }

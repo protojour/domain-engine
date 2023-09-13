@@ -1,7 +1,7 @@
 use std::{collections::HashSet, fmt::Display};
 
 use fnv::{FnvHashMap, FnvHashSet};
-use ontol_runtime::{string_types::StringLikeType, DefId};
+use ontol_runtime::{text_like_types::TextLikeType, DefId};
 use ordered_float::NotNan;
 
 use crate::{
@@ -23,10 +23,9 @@ pub enum Type<'m> {
     EmptySequence(DefId),
     IntConstant(i64),
     FloatConstant(NotNan<f64>),
-    /// A specific string
-    StringConstant(DefId),
+    TextConstant(DefId),
     Regex(DefId),
-    StringLike(DefId, StringLikeType),
+    TextLike(DefId, TextLikeType),
     Seq(TypeRef<'m>, TypeRef<'m>),
     Option(TypeRef<'m>),
     // Maybe this is a macro instead of a function, because
@@ -53,9 +52,9 @@ impl<'m> Type<'m> {
             Self::Primitive(_, def_id) => Some(*def_id),
             Self::EmptySequence(def_id) => Some(*def_id),
             Self::IntConstant(_) | Self::FloatConstant(_) => todo!(),
-            Self::StringConstant(def_id) => Some(*def_id),
+            Self::TextConstant(def_id) => Some(*def_id),
             Self::Regex(def_id) => Some(*def_id),
-            Self::StringLike(def_id, _) => Some(*def_id),
+            Self::TextLike(def_id, _) => Some(*def_id),
             Self::Seq(_, _) => None,
             Self::Option(ty) => ty.get_single_def_id(),
             Self::Function { .. } => None,
@@ -170,8 +169,8 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
             Type::EmptySequence(_) => write!(f, "[]"),
             Type::IntConstant(val) => write!(f, "int({val})"),
             Type::FloatConstant(val) => write!(f, "float({val})"),
-            Type::StringConstant(def_id) => {
-                let DefKind::StringLiteral(lit) = defs.def_kind(*def_id) else {
+            Type::TextConstant(def_id) => {
+                let DefKind::TextLiteral(lit) = defs.def_kind(*def_id) else {
                     panic!();
                 };
 
@@ -184,8 +183,8 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
 
                 write!(f, "/{lit}/")
             }
-            Type::StringLike(_, StringLikeType::Uuid) => write!(f, "uuid"),
-            Type::StringLike(_, StringLikeType::DateTime) => write!(f, "datetime"),
+            Type::TextLike(_, TextLikeType::Uuid) => write!(f, "uuid"),
+            Type::TextLike(_, TextLikeType::DateTime) => write!(f, "datetime"),
             Type::Seq(rel, val) => {
                 write!(
                     f,

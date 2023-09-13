@@ -209,9 +209,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     let def_id = self.resolve_type_reference(ty, &span, Some(&mut root_defs))?;
 
                     match self.compiler.defs.def_kind(def_id) {
-                        DefKind::StringLiteral(_) => {
-                            (RelationKey::Named(def_id), span.clone(), None)
-                        }
+                        DefKind::TextLiteral(_) => (RelationKey::Named(def_id), span.clone(), None),
                         DefKind::BuiltinRelType(..) => {
                             (RelationKey::Builtin(def_id), span.clone(), None)
                         }
@@ -498,9 +496,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 );
                 Ok(def_id)
             }
-            ast::Type::StringLiteral(lit) => {
+            ast::Type::TextLiteral(lit) => {
                 let def_id = match lit.as_str() {
-                    "" => self.compiler.primitives.empty_string,
+                    "" => self.compiler.primitives.empty_text,
                     _ => self
                         .compiler
                         .defs
@@ -707,8 +705,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     .map_err(|_| (CompileError::InvalidInteger, span.clone()))?;
                 Ok(self.mk_pattern(PatternKind::ConstI64(int), &span))
             }
-            ast::ExprPattern::StringLiteral(string) => {
-                Ok(self.mk_pattern(PatternKind::ConstString(string), &span))
+            ast::ExprPattern::TextLiteral(string) => {
+                Ok(self.mk_pattern(PatternKind::ConstText(string), &span))
             }
             ast::ExprPattern::RegexLiteral(regex_literal) => {
                 let regex_def_id = self

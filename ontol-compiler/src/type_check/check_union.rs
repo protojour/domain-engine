@@ -127,13 +127,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             Type::Primitive(PrimitiveKind::I64, _) => {
                 builder.number = Some(IntDiscriminator(variant_def));
             }
-            Type::Primitive(PrimitiveKind::String, _) => {
-                builder.string = StringDiscriminator::Any(variant_def);
+            Type::Primitive(PrimitiveKind::Text, _) => {
+                builder.string = TextDiscriminator::Any(variant_def);
                 builder.any_string.push(variant_def);
             }
-            Type::StringConstant(def_id) => {
+            Type::TextConstant(def_id) => {
                 let string_literal = self.defs.get_string_representation(*def_id);
-                builder.add_string_literal(string_literal, *def_id);
+                builder.add_text_literal(string_literal, *def_id);
             }
             Type::Domain(domain_def_id) => match self.find_domain_type_match_data(*domain_def_id) {
                 Ok(DomainTypeMatchData::Struct(property_set)) => {
@@ -185,7 +185,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
                 Constructor::Sequence(sequence) => Ok(DomainTypeMatchData::Sequence(sequence)),
-                Constructor::StringFmt(segment) => {
+                Constructor::TextFmt(segment) => {
                     Ok(DomainTypeMatchData::ConstructorStringPattern(segment))
                 }
             },
@@ -215,7 +215,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 meta.relationship
                     .object_prop
                     .or(match meta.relation_def_kind.value {
-                        DefKind::StringLiteral(lit) => Some(lit),
+                        DefKind::TextLiteral(lit) => Some(lit),
                         _ => None,
                     })
             else {
@@ -231,12 +231,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 Type::IntConstant(_) => {
                     todo!("Cannot match against numeric constants yet");
                 }
-                Type::StringConstant(def_id) => {
+                Type::TextConstant(def_id) => {
                     let string_literal = self.defs.get_string_representation(*def_id);
                     map_discriminator_candidate.property_candidates.push(
                         PropertyDiscriminatorCandidate {
                             relation_def_id: meta.relationship.relation_def_id,
-                            discriminant: Discriminant::HasStringAttribute(
+                            discriminant: Discriminant::HasTextAttribute(
                                 property_id.relationship_id,
                                 property_name.into(),
                                 string_literal.into(),
@@ -344,7 +344,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
 
         // Also check for ambiguity with string literals
-        if let StringDiscriminator::Literals(literals) = &builder.string {
+        if let TextDiscriminator::Literals(literals) = &builder.string {
             for (literal, variant_def_id) in literals {
                 if let Some(set) = prefix_index.get_mut(literal) {
                     set.insert(*variant_def_id);
@@ -417,18 +417,18 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
 
         match builder.string {
-            StringDiscriminator::None => {}
-            StringDiscriminator::Any(def_id) => {
+            TextDiscriminator::None => {}
+            TextDiscriminator::Any(def_id) => {
                 union_discriminator.variants.push(VariantDiscriminator {
-                    discriminant: Discriminant::IsString,
+                    discriminant: Discriminant::IsText,
                     purpose: VariantPurpose::Data,
                     def_variant: DefVariant::new(def_id, DataModifier::NONE),
                 });
             }
-            StringDiscriminator::Literals(literals) => {
+            TextDiscriminator::Literals(literals) => {
                 for (literal, def_id) in literals {
                     union_discriminator.variants.push(VariantDiscriminator {
-                        discriminant: Discriminant::IsStringLiteral(literal),
+                        discriminant: Discriminant::IsTextLiteral(literal),
                         purpose: VariantPurpose::Data,
                         def_variant: DefVariant::new(def_id, DataModifier::NONE),
                     });
@@ -493,20 +493,20 @@ struct DiscriminatorBuilder<'a> {
     unit: Option<DefId>,
     number: Option<IntDiscriminator>,
     any_string: Vec<DefId>,
-    string: StringDiscriminator,
+    string: TextDiscriminator,
     sequence: Option<DefId>,
     pattern_candidates: IndexMap<DefId, &'a TextPatternSegment>,
     map_discriminator_candidates: Vec<MapDiscriminatorCandidate>,
 }
 
 impl<'a> DiscriminatorBuilder<'a> {
-    fn add_string_literal(&mut self, lit: &str, def_id: DefId) {
+    fn add_text_literal(&mut self, lit: &str, def_id: DefId) {
         match &mut self.string {
-            StringDiscriminator::None => {
-                self.string = StringDiscriminator::Literals([(lit.into(), def_id)].into());
+            TextDiscriminator::None => {
+                self.string = TextDiscriminator::Literals([(lit.into(), def_id)].into());
             }
-            StringDiscriminator::Any(_) => {}
-            StringDiscriminator::Literals(set) => {
+            TextDiscriminator::Any(_) => {}
+            TextDiscriminator::Literals(set) => {
                 set.insert((lit.into(), def_id));
             }
         }
@@ -520,7 +520,7 @@ impl<'a> DiscriminatorBuilder<'a> {
 struct IntDiscriminator(DefId);
 
 #[derive(Default)]
-enum StringDiscriminator {
+enum TextDiscriminator {
     #[default]
     None,
     Any(DefId),

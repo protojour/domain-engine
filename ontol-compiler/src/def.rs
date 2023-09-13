@@ -2,7 +2,7 @@ use std::{borrow::Cow, collections::HashMap, ops::Range};
 
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    ontology::Cardinality, string_types::StringLikeType, vm::proc::BuiltinProc, DefId, DefParamId,
+    ontology::Cardinality, text_like_types::TextLikeType, vm::proc::BuiltinProc, DefId, DefParamId,
     PackageId, RelationshipId, Role,
 };
 use smartstring::alias::String;
@@ -34,7 +34,7 @@ pub struct Def<'m> {
 pub enum DefKind<'m> {
     Package(PackageId),
     Primitive(PrimitiveKind, Option<&'static str>),
-    StringLiteral(&'m str),
+    TextLiteral(&'m str),
     NumberLiteral(&'m str),
     EmptySequence,
     Regex(&'m str),
@@ -56,7 +56,7 @@ impl<'m> DefKind<'m> {
         match self {
             Self::Package(_) => None,
             Self::Primitive(_, ident) => ident.map(|ident| ident.into()),
-            Self::StringLiteral(lit) => Some(format!("\"{lit}\"").into()),
+            Self::TextLiteral(lit) => Some(format!("\"{lit}\"").into()),
             Self::NumberLiteral(lit) => Some(format!("\"{lit}\"").into()),
             Self::Regex(_) => None,
             Self::EmptySequence => None,
@@ -154,7 +154,7 @@ pub struct Defs<'m> {
     pub(crate) string_literals: HashMap<&'m str, DefId>,
     pub(crate) regex_strings: HashMap<&'m str, DefId>,
     pub(crate) literal_regex_meta_table: FnvHashMap<DefId, RegexMeta<'m>>,
-    pub(crate) string_like_types: FnvHashMap<DefId, StringLikeType>,
+    pub(crate) string_like_types: FnvHashMap<DefId, TextLikeType>,
 }
 
 #[derive(Debug)]
@@ -245,7 +245,7 @@ impl<'m> Defs<'m> {
             Some(def_id) => *def_id,
             None => {
                 let lit = strings.intern(lit);
-                let def_id = self.add_def(DefKind::StringLiteral(lit), ONTOL_PKG, NO_SPAN);
+                let def_id = self.add_def(DefKind::TextLiteral(lit), ONTOL_PKG, NO_SPAN);
                 self.string_literals.insert(lit, def_id);
                 def_id
             }
@@ -274,7 +274,7 @@ impl<'m> Defs<'m> {
 
     pub fn get_string_representation(&self, def_id: DefId) -> &str {
         match self.def_kind(def_id) {
-            DefKind::StringLiteral(lit) => lit,
+            DefKind::TextLiteral(lit) => lit,
             DefKind::Regex(lit) => lit,
             kind => panic!("BUG: not a string literal: {kind:?}"),
         }

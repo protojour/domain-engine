@@ -7,7 +7,7 @@ use ontol_runtime::{
         operator::{FilteredVariants, SerdeOperator},
         processor::{ProcessorLevel, ProcessorMode, SerdeProcessor},
     },
-    string_types::StringLikeType,
+    text_like_types::TextLikeType,
     text_pattern::TextPattern,
     value::{Attribute, Data, Value},
     DefId,
@@ -110,25 +110,23 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                     fake::faker::lorem::en::Sentence(3..6).fake_with_rng(self.rng);
                 // Remove the last dot
                 string.pop();
-                Value::new(Data::String(string.into()), *def_id)
+                Value::new(Data::Text(string.into()), *def_id)
             }
-            SerdeOperator::StringConstant(s, def_id) => {
-                Value::new(Data::String(s.clone()), *def_id)
-            }
+            SerdeOperator::StringConstant(s, def_id) => Value::new(Data::Text(s.clone()), *def_id),
             SerdeOperator::TextPattern(def_id) => {
                 if let Some(string_like_type) = self.ontology.get_string_like_type(*def_id) {
                     match string_like_type {
-                        StringLikeType::Uuid => {
+                        TextLikeType::Uuid => {
                             Value::new(Data::Uuid(Faker.fake_with_rng(self.rng)), *def_id)
                         }
-                        StringLikeType::DateTime => {
+                        TextLikeType::DateTime => {
                             Value::new(Data::ChronoDateTime(Faker.fake_with_rng(self.rng)), *def_id)
                         }
                     }
                 } else {
                     let text_pattern = self.ontology.get_text_pattern(*def_id).unwrap();
                     let text = rand_text_matching_pattern(text_pattern, &mut self.rng);
-                    Value::new(Data::String(text.into()), *def_id)
+                    Value::new(Data::Text(text.into()), *def_id)
                 }
             }
             SerdeOperator::CapturingTextPattern(def_id) => {

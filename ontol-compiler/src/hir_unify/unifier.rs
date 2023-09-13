@@ -115,7 +115,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
             }),
             (expr::Kind::String(string), _) => Ok(UnifiedNode {
                 typed_binder: None,
-                node: TypedHirNode(ontol_hir::Kind::String(string), expr_meta.hir_meta),
+                node: TypedHirNode(ontol_hir::Kind::Text(string), expr_meta.hir_meta),
             }),
             (expr::Kind::Const(const_def_id), _) => Ok(UnifiedNode {
                 typed_binder: None,
@@ -239,7 +239,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         ontol_hir::Kind::Let(
                             binder,
                             Box::new(TypedHirNode(
-                                ontol_hir::Kind::String("".into()),
+                                ontol_hir::Kind::Text("".into()),
                                 expr_meta.hir_meta,
                             )),
                             components
@@ -251,7 +251,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                                             Box::new(match component {
                                                 StringInterpolationComponent::Const(string) => {
                                                     TypedHirNode(
-                                                        ontol_hir::Kind::String(string),
+                                                        ontol_hir::Kind::Text(string),
                                                         self.unit_meta(),
                                                     )
                                                 }

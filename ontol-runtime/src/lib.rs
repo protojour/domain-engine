@@ -12,7 +12,7 @@ pub mod json_schema;
 pub mod ontology;
 pub mod query;
 pub mod serde;
-pub mod string_types;
+pub mod text_like_types;
 pub mod text_pattern;
 pub mod value;
 pub mod value_generator;

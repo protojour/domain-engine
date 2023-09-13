@@ -81,7 +81,7 @@ impl<'m> FlatScopeBuilder<'m> {
             ontol_hir::Kind::Unit
             | ontol_hir::Kind::I64(_)
             | ontol_hir::Kind::F64(_)
-            | ontol_hir::Kind::String(_)
+            | ontol_hir::Kind::Text(_)
             | ontol_hir::Kind::Const(_) => {
                 let const_var = ScopeVar(self.var_allocator.alloc());
                 self.scope_nodes.push(ScopeNode(

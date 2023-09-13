@@ -88,7 +88,7 @@ impl<'m> ScopeBuilder<'m> {
             ontol_hir::Kind::Unit
             | ontol_hir::Kind::I64(_)
             | ontol_hir::Kind::F64(_)
-            | ontol_hir::Kind::String(_)
+            | ontol_hir::Kind::Text(_)
             | ontol_hir::Kind::Const(_) => Ok(ScopeBinder {
                 binder: None,
                 scope: scope::Scope(

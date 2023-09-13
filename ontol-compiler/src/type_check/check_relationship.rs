@@ -29,7 +29,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let relation_def_kind = &self.defs.def_kind(relationship.relation_def_id);
 
         match relation_def_kind {
-            DefKind::StringLiteral(_) => {
+            DefKind::TextLiteral(_) => {
                 self.check_string_literal_relation(relationship_id, relationship, span);
             }
             DefKind::BuiltinRelType(kind, _) => {
@@ -376,9 +376,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let object_ty = self.check_def_shallow(object.0);
 
         match subject_ty {
-            Type::StringConstant(subject_def_id)
-                if *subject_def_id == self.primitives.empty_string =>
-            {
+            Type::TextConstant(subject_def_id) if *subject_def_id == self.primitives.empty_text => {
                 if let Err(err) = self.extend_text_pattern_fmt_constructor(
                     relation_def_id,
                     (relationship_id, relationship),
@@ -398,7 +396,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .properties_by_def_id(subject.0)
                     .map(|props| &props.constructor);
 
-                let Some(Constructor::StringFmt(subject_pattern)) = subject_constructor else {
+                let Some(Constructor::TextFmt(subject_pattern)) = subject_constructor else {
                     return self.error(CompileError::ConstructorMismatch, span);
                 };
 
@@ -482,8 +480,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         span: &SourceSpan,
     ) -> Result<(), TypeRef<'m>> {
         let appendee = match self.defs.def_kind(relation_def_id) {
-            DefKind::Primitive(PrimitiveKind::String, _) => TextPatternSegment::AllStrings,
-            DefKind::StringLiteral(str) => TextPatternSegment::new_literal(str),
+            DefKind::Primitive(PrimitiveKind::Text, _) => TextPatternSegment::AllStrings,
+            DefKind::TextLiteral(str) => TextPatternSegment::new_literal(str),
             DefKind::Regex(_) => TextPatternSegment::Regex(
                 self.defs
                     .literal_regex_meta_table
@@ -493,7 +491,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .clone(),
             ),
             _ => {
-                let Some(Constructor::StringFmt(rel_segment)) = self
+                let Some(Constructor::TextFmt(rel_segment)) = self
                     .relations
                     .properties_by_def_id(relation_def_id)
                     .map(Properties::constructor)
@@ -516,7 +514,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
 
         object_properties.constructor =
-            Constructor::StringFmt(TextPatternSegment::concat([origin, appendee]));
+            Constructor::TextFmt(TextPatternSegment::concat([origin, appendee]));
 
         if final_state.0 || !object_ty.is_anonymous() {
             // constructors of unnamable types do not need to be processed..

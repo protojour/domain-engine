@@ -75,7 +75,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 let meta = self.defs.relationship_meta(property_id.relationship_id);
                                 let property_name = match property_id.role {
                                     Role::Subject => match meta.relation_def_kind.value {
-                                        DefKind::StringLiteral(lit) => Some(*lit),
+                                        DefKind::TextLiteral(lit) => Some(*lit),
                                         _ => panic!("BUG: Expected named subject property"),
                                     },
                                     Role::Object => meta.relationship.object_prop,
@@ -264,7 +264,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             value,
         } = attr;
 
-        let DefKind::StringLiteral(attr_prop) = self.defs.def_kind(*def_id) else {
+        let DefKind::TextLiteral(attr_prop) = self.defs.def_kind(*def_id) else {
             self.error(CompileError::NamedPropertyExpected, prop_span);
             return None;
         };

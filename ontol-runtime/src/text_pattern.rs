@@ -10,7 +10,7 @@ use crate::{
     ontology::Ontology,
     serde::processor::{ProcessorLevel, ProcessorMode},
     smart_format,
-    string_types::ParseError,
+    text_like_types::ParseError,
     value::{Data, FormatStringData, PropertyId},
     DefId,
 };
@@ -30,7 +30,7 @@ impl TextPattern {
     ) -> Result<Data, ParseError> {
         if self.constant_parts.is_empty() {
             if let Some(match_) = self.regex.find(input) {
-                Ok(Data::String(match_.as_str().into()))
+                Ok(Data::Text(match_.as_str().into()))
             } else {
                 Err(ParseError(smart_format!(
                     "regular expression did not match"

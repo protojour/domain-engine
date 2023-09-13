@@ -53,7 +53,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             DefKind::Type(TypeDef { ident: None, .. }) => {
                 self.types.intern(Type::Anonymous(def_id))
             }
-            DefKind::StringLiteral(_) => self.types.intern(Type::StringConstant(def_id)),
+            DefKind::TextLiteral(_) => self.types.intern(Type::TextConstant(def_id)),
             DefKind::Regex(_) => self.types.intern(Type::Regex(def_id)),
             DefKind::Relationship(relationship) => {
                 self.check_relationship(def_id, relationship, &def.span)

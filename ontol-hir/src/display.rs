@@ -46,7 +46,7 @@ impl<'a, L: Lang> Print<Kind<'a, L>> for Printer<L> {
                 write!(f, "{sep}{float}")?;
                 Ok(sep.multiline())
             }
-            Kind::String(string) => {
+            Kind::Text(string) => {
                 write!(f, "{sep}'{string}'")?;
                 Ok(sep.multiline())
             }

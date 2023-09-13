@@ -110,8 +110,8 @@ pub enum Constructor {
     Transparent,
     /// The type is a tuple-like sequence of other types
     Sequence(Sequence),
-    /// The type is a string pattern
-    StringFmt(TextPatternSegment),
+    /// The type is a text pattern
+    TextFmt(TextPatternSegment),
 }
 
 #[derive(Default, Debug)]

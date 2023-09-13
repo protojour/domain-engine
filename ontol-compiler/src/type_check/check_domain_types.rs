@@ -2,7 +2,7 @@ use fnv::FnvHashSet;
 use ontol_runtime::{
     ontology::{PropertyCardinality, ValueCardinality},
     smart_format,
-    string_types::StringLikeType,
+    text_like_types::TextLikeType,
     value::PropertyId,
     value_generator::ValueGenerator,
     DefId, RelationshipId, Role,
@@ -304,10 +304,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Some(Type::Primitive(PrimitiveKind::I64, _)) => {
                         Ok(ValueGenerator::Autoincrement)
                     }
-                    Some(Type::Primitive(PrimitiveKind::String, _)) => Ok(ValueGenerator::UuidV4),
-                    Some(Type::StringLike(_, StringLikeType::Uuid)) => Ok(ValueGenerator::UuidV4),
+                    Some(Type::Primitive(PrimitiveKind::Text, _)) => Ok(ValueGenerator::UuidV4),
+                    Some(Type::TextLike(_, TextLikeType::Uuid)) => Ok(ValueGenerator::UuidV4),
                     _ => match properties.map(|p| &p.constructor) {
-                        Some(Constructor::StringFmt(segment)) => {
+                        Some(Constructor::TextFmt(segment)) => {
                             self.auto_generator_for_text_pattern_segment(segment)
                         }
                         _ => Err(()),
@@ -316,7 +316,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             _ if generator_def_id == generators.create_time => {
                 match self.def_types.table.get(&scalar_def_id) {
-                    Some(Type::StringLike(_, StringLikeType::DateTime)) => {
+                    Some(Type::TextLike(_, TextLikeType::DateTime)) => {
                         Ok(ValueGenerator::CreatedAtTime)
                     }
                     _ => Err(()),
@@ -324,7 +324,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             _ if generator_def_id == generators.update_time => {
                 match self.def_types.table.get(&scalar_def_id) {
-                    Some(Type::StringLike(_, StringLikeType::DateTime)) => {
+                    Some(Type::TextLike(_, TextLikeType::DateTime)) => {
                         Ok(ValueGenerator::UpdatedAtTime)
                     }
                     _ => Err(()),

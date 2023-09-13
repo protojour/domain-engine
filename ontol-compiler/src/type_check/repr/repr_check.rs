@@ -267,7 +267,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                             PrimitiveKind::Boolean
                             | PrimitiveKind::False
                             | PrimitiveKind::True
-                            | PrimitiveKind::String
+                            | PrimitiveKind::Text
                             | PrimitiveKind::Number
                             | PrimitiveKind::Unit => {
                                 self.merge_repr(
@@ -309,7 +309,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                         }
                     }
                 }
-                DefKind::StringLiteral(_) | DefKind::NumberLiteral(_) => {
+                DefKind::TextLiteral(_) | DefKind::NumberLiteral(_) => {
                     self.merge_repr(
                         &mut builder,
                         ReprKind::Scalar(def_id, ReprScalarKind::Other, data.rel_span),
@@ -349,7 +349,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                                         self.merge_repr(&mut builder, ReprKind::Unit, def_id, data);
                                     }
                                 }
-                                Constructor::StringFmt(_) => {
+                                Constructor::TextFmt(_) => {
                                     assert!(!has_table);
                                     self.merge_repr(
                                         &mut builder,

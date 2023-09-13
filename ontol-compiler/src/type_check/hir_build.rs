@@ -205,7 +205,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Some(Type::Seq(rel_ty, val_ty)) => (*rel_ty, *val_ty),
                     Some(other_ty) => {
                         // Handle looping regular expressions
-                        if let Type::Primitive(PrimitiveKind::String, _) | Type::StringLike(..) =
+                        if let Type::Primitive(PrimitiveKind::Text, _) | Type::TextLike(..) =
                             other_ty
                         {
                             if pat_elements.len() == 1 {
@@ -313,17 +313,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
                 _ => self.error_node(CompileError::IncompatibleLiteral, &pattern.span),
             },
-            (PatternKind::ConstString(string), Some(expected_ty)) => match expected_ty {
-                Type::Primitive(PrimitiveKind::String, _) => TypedHirNode(
-                    ontol_hir::Kind::String(string.clone()),
+            (PatternKind::ConstText(literal), Some(expected_ty)) => match expected_ty {
+                Type::Primitive(PrimitiveKind::Text, _) => TypedHirNode(
+                    ontol_hir::Kind::Text(literal.clone()),
                     Meta {
                         ty: expected_ty,
                         span: pattern.span,
                     },
                 ),
-                Type::StringConstant(def_id) => match self.defs.def_kind(*def_id) {
-                    DefKind::StringLiteral(lit) if string == lit => TypedHirNode(
-                        ontol_hir::Kind::String(string.clone()),
+                Type::TextConstant(def_id) => match self.defs.def_kind(*def_id) {
+                    DefKind::TextLiteral(lit) if literal == lit => TypedHirNode(
+                        ontol_hir::Kind::Text(literal.clone()),
                         Meta {
                             ty: expected_ty,
                             span: pattern.span,
@@ -395,7 +395,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             (PatternKind::Regex(regex_pattern), Some(expected_ty)) => match expected_ty {
                 // TODO: Handle compile-time match of string constant?
-                Type::Primitive(PrimitiveKind::String, _) | Type::StringConstant(_) => {
+                Type::Primitive(PrimitiveKind::Text, _) | Type::TextConstant(_) => {
                     let capture_groups_list = self.build_regex_capture_alternations(
                         &regex_pattern.capture_node,
                         &pattern.span,
@@ -501,7 +501,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         node: &RegexPatternCaptureNode,
         pattern_span: &SourceSpan,
         // BUG: We want type inference for the capture groups,
-        // that falls back to string if both sides are unknown
+        // that falls back to text if both sides are unknown
         expected_ty: TypeRef<'m>,
         ctx: &mut HirBuildCtx<'m>,
     ) -> Vec<Vec<ontol_hir::CaptureGroup<'m, TypedHir>>> {
@@ -523,7 +523,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         node: &RegexPatternCaptureNode,
         pattern_span: &SourceSpan,
         // BUG: We want type inference for the capture groups,
-        // that falls back to string if both sides are unknown
+        // that falls back to text if both sides are unknown
         expected_ty: TypeRef<'m>,
         ctx: &mut HirBuildCtx<'m>,
     ) -> Vec<ontol_hir::CaptureGroup<'m, TypedHir>> {

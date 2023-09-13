@@ -25,14 +25,14 @@ pub enum VariantPurpose {
 pub enum Discriminant {
     IsUnit,
     IsInt,
-    IsString,
-    IsStringLiteral(String),
+    IsText,
+    IsTextLiteral(String),
     IsSequence,
     MatchesCapturingStringPattern(DefId),
     /// Matches any map
     MapFallback,
     /// Matches a map that has a single property, and only that property will be used for information
     IsSingletonProperty(RelationshipId, String),
-    HasStringAttribute(RelationshipId, String, String),
+    HasTextAttribute(RelationshipId, String, String),
     HasAttributeMatchingStringPattern(RelationshipId, String, DefId),
 }

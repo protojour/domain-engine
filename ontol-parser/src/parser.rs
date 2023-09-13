@@ -41,7 +41,7 @@ fn header_statement() -> impl AstParser<Spanned<Statement>> {
 
 fn use_statement() -> impl AstParser<UseStatement> {
     keyword(Token::Use)
-        .then(spanned(string_literal()))
+        .then(spanned(text_literal()))
         .then_ignore(sym("as", "`as`"))
         .then(spanned(ident()))
         .map(|((kw, source), as_ident)| UseStatement {
@@ -204,16 +204,16 @@ fn forward_relation(
 }
 
 fn backward_relation() -> impl AstParser<BackwardRelation> {
-    spanned(string_literal()).then(sigil('?').or_not()).map(
-        |(object_prop_ident, object_optional)| {
+    spanned(text_literal())
+        .then(sigil('?').or_not())
+        .map(|(object_prop_ident, object_optional)| {
             let object_cardinality = object_optional.map(|_| Cardinality::Optional);
 
             BackwardRelation {
                 object_prop_ident,
                 object_cardinality,
             }
-        },
-    )
+        })
 }
 
 fn fmt_statement() -> impl AstParser<FmtStatement> {
@@ -339,14 +339,14 @@ fn expr_pattern() -> impl AstParser<Spanned<ExprPattern>> {
     recursive(|expr_pattern| {
         let variable = variable().map(ExprPattern::Variable);
         let number_literal = number_literal().map(ExprPattern::NumberLiteral);
-        let string_literal = string_literal().map(ExprPattern::StringLiteral);
+        let text_literal = text_literal().map(ExprPattern::TextLiteral);
         let regex_literal =
             select! { Token::Regex(string) => string }.map(ExprPattern::RegexLiteral);
         let group = expr_pattern.delimited_by(open('('), close(')'));
 
         let atom = spanned(variable)
             .or(spanned(number_literal))
-            .or(spanned(string_literal))
+            .or(spanned(text_literal))
             .or(spanned(regex_literal))
             .or(group);
 
@@ -411,12 +411,12 @@ fn named_type() -> impl AstParser<Type> {
         .map(|_| Type::Unit);
     let path = path().map(Type::Path);
     let number_literal = number_literal().map(Type::NumberLiteral);
-    let string_literal = string_literal().map(Type::StringLiteral);
-    let regex = select! { Token::Regex(string) => string }.map(Type::Regex);
+    let text_literal = text_literal().map(Type::TextLiteral);
+    let regex = select! { Token::Regex(pattern) => pattern }.map(Type::Regex);
 
     unit.or(path)
         .or(number_literal)
-        .or(string_literal)
+        .or(text_literal)
         .or(regex)
         .labelled("type")
 }
@@ -430,7 +430,7 @@ fn anonymous_type(
 }
 
 fn doc_comments() -> impl AstParser<Vec<String>> {
-    select! { Token::DocComment(string) => string }.repeated()
+    select! { Token::DocComment(comment) => comment }.repeated()
 }
 
 fn open(char: char) -> impl AstParser<Token> {
@@ -481,7 +481,7 @@ fn any_sym() -> impl AstParser<String> {
 }
 
 fn sym(str: &'static str, label: &'static str) -> impl AstParser<String> {
-    select! { Token::Sym(string) => string }
+    select! { Token::Sym(sym) => sym }
         .labelled(label)
         .try_map(move |string, span| {
             if string == str {
@@ -501,7 +501,7 @@ fn variable() -> impl AstParser<String> {
 }
 
 fn number_literal() -> impl AstParser<String> {
-    select! { Token::Number(string) => string }.labelled("number")
+    select! { Token::Number(literal) => literal }.labelled("number")
 }
 
 fn u16() -> impl AstParser<u16> {
@@ -543,8 +543,8 @@ fn colon() -> impl AstParser<()> {
     just(Token::Sigil(':')).ignored()
 }
 
-fn string_literal() -> impl AstParser<String> {
-    select! { Token::StringLiteral(string) => string }
+fn text_literal() -> impl AstParser<String> {
+    select! { Token::TextLiteral(string) => string }
 }
 
 /// Parser combinator that transforms an output type O into Spanned<O>.

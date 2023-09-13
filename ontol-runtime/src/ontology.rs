@@ -12,7 +12,7 @@ use crate::{
         processor::{ProcessorLevel, ProcessorMode, SerdeProcessor},
         SerdeKey,
     },
-    string_types::StringLikeType,
+    text_like_types::TextLikeType,
     text_pattern::TextPattern,
     value::PropertyId,
     value_generator::ValueGenerator,
@@ -29,7 +29,7 @@ use crate::{
 pub struct Ontology {
     pub(crate) const_proc_table: FnvHashMap<DefId, Procedure>,
     pub(crate) map_meta_table: FnvHashMap<(MapKey, MapKey), MapMeta>,
-    pub(crate) string_like_types: FnvHashMap<DefId, StringLikeType>,
+    pub(crate) string_like_types: FnvHashMap<DefId, TextLikeType>,
     pub(crate) text_patterns: FnvHashMap<DefId, TextPattern>,
     pub(crate) lib: Lib,
 
@@ -90,7 +90,7 @@ impl Ontology {
         self.text_patterns.get(&def_id)
     }
 
-    pub fn get_string_like_type(&self, def_id: DefId) -> Option<StringLikeType> {
+    pub fn get_string_like_type(&self, def_id: DefId) -> Option<TextLikeType> {
         self.string_like_types.get(&def_id).cloned()
     }
 
@@ -311,7 +311,7 @@ impl OntologyBuilder {
         self
     }
 
-    pub fn string_like_types(mut self, types: FnvHashMap<DefId, StringLikeType>) -> Self {
+    pub fn string_like_types(mut self, types: FnvHashMap<DefId, TextLikeType>) -> Self {
         self.ontology.string_like_types = types;
         self
     }

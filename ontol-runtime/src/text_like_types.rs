@@ -9,7 +9,7 @@ use crate::{
 };
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
-pub enum StringLikeType {
+pub enum TextLikeType {
     Uuid,
     DateTime,
 }
@@ -17,7 +17,7 @@ pub enum StringLikeType {
 #[derive(Debug)]
 pub struct ParseError(pub String);
 
-impl StringLikeType {
+impl TextLikeType {
     pub fn try_deserialize(&self, def_id: DefId, str: &str) -> Result<Value, ParseError> {
         match self {
             Self::Uuid => {

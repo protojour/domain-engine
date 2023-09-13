@@ -61,7 +61,7 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                     free_vars: Default::default(),
                 },
             ),
-            ontol_hir::Kind::String(string) => expr::Expr(
+            ontol_hir::Kind::Text(string) => expr::Expr(
                 expr::Kind::String(string.clone()),
                 expr::Meta {
                     hir_meta: *meta,

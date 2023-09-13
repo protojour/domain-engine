@@ -238,7 +238,7 @@ impl<'g, 'm> serde::Serialize for Edge<'g, 'm> {
         map.serialize_entry("target", &self.target_meta.node_id)?;
 
         match self.relation_def_kind {
-            Some(DefKind::StringLiteral(literal)) => {
+            Some(DefKind::TextLiteral(literal)) => {
                 map.serialize_entry("kind", "prop")?;
                 map.serialize_entry("name", literal)?;
             }

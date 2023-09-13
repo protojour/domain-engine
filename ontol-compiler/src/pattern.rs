@@ -30,7 +30,7 @@ pub enum PatternKind {
     Seq(PatId, Vec<SeqPatternElement>),
     Variable(ontol_hir::Var),
     ConstI64(i64),
-    ConstString(String),
+    ConstText(String),
     Regex(RegexPattern),
 }
 

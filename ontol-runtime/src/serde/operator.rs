@@ -34,7 +34,7 @@ pub enum SerdeOperator {
     String(DefId),
     StringConstant(String, DefId),
 
-    /// Always deserializes into a string, ignores capture groups:
+    /// Always deserializes into text, ignores capture groups:
     TextPattern(DefId),
 
     /// Deserializes into a Struct if there are capture groups:

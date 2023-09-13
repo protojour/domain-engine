@@ -160,7 +160,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     self.builder,
                 );
             }
-            ontol_hir::Kind::String(string) => {
+            ontol_hir::Kind::Text(string) => {
                 block.op(
                     OpCode::String(string, ty.get_single_def_id().unwrap()),
                     Delta(1),
@@ -824,7 +824,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     panic!("Variable {} already in scope", arm_capture.var);
                 }
 
-                if arm_capture.def_id != self.primitives.string {
+                if arm_capture.def_id != self.primitives.text {
                     branch_block.op(
                         OpCode::TypePun(arm_capture.local, arm_capture.def_id),
                         Delta(0),

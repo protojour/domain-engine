@@ -37,7 +37,7 @@ impl<'o> OntolVm<'o> {
             abstract_vm: AbstractVm::new(ontology),
             processor: OntolProcessor {
                 stack: Default::default(),
-                string_def_id,
+                text_def_id: string_def_id,
             },
         }
     }
@@ -48,7 +48,7 @@ impl<'o> OntolVm<'o> {
             abstract_vm: AbstractVm::new(ontology),
             processor: OntolProcessor {
                 stack: Default::default(),
-                string_def_id: DefId::unit(),
+                text_def_id: DefId::unit(),
             },
         }
     }
@@ -81,7 +81,7 @@ impl<'o> OntolVm<'o> {
 
 pub struct OntolProcessor {
     stack: Vec<Value>,
-    string_def_id: DefId,
+    text_def_id: DefId,
 }
 
 impl Processor for OntolProcessor {
@@ -207,7 +207,7 @@ impl Processor for OntolProcessor {
     #[inline(always)]
     fn push_string(&mut self, k: &str, result_type: DefId) {
         self.stack
-            .push(Value::new(Data::String(k.into()), result_type));
+            .push(Value::new(Data::Text(k.into()), result_type));
     }
 
     #[inline(always)]
@@ -250,13 +250,13 @@ impl Processor for OntolProcessor {
     }
 
     fn regex_capture(&mut self, local: Local, text_pattern: &TextPattern, group_filter: &BitVec) {
-        let Data::String(haystack) = &self.local(local).data else {
+        let Data::Text(haystack) = &self.local(local).data else {
             panic!("Not a string");
         };
 
         match text_pattern.regex.captures(haystack) {
             Some(captures) => {
-                let values = extract_regex_captures(&captures, group_filter, self.string_def_id);
+                let values = extract_regex_captures(&captures, group_filter, self.text_def_id);
                 self.stack.extend(values);
                 self.push_true();
             }
@@ -272,7 +272,7 @@ impl Processor for OntolProcessor {
         text_pattern: &TextPattern,
         group_filter: &BitVec,
     ) {
-        let Data::String(haystack) = &self.local(local).data else {
+        let Data::Text(haystack) = &self.local(local).data else {
             panic!("Not a string");
         };
 
@@ -280,19 +280,19 @@ impl Processor for OntolProcessor {
 
         for captures in text_pattern.regex.captures_iter(haystack) {
             let value_attributes =
-                extract_regex_captures(&captures, group_filter, self.string_def_id)
+                extract_regex_captures(&captures, group_filter, self.text_def_id)
                     .into_iter()
                     .map(Attribute::from)
                     .collect();
             output_sequence.push(Attribute::from(Value::new(
                 Data::Sequence(value_attributes),
-                self.string_def_id,
+                self.text_def_id,
             )));
         }
 
         self.stack.push(Value::new(
             Data::Sequence(output_sequence),
-            self.string_def_id,
+            self.text_def_id,
         ));
     }
 
@@ -326,7 +326,7 @@ impl OntolProcessor {
             }
             BuiltinProc::Append => {
                 let [b, a]: [String; 2] = self.pop_n();
-                Data::String(a + b)
+                Data::Text(a + b)
             }
             BuiltinProc::NewStruct => Data::Struct([].into()),
             BuiltinProc::NewSeq => Data::Sequence(vec![]),
@@ -355,7 +355,7 @@ impl OntolProcessor {
     #[inline(always)]
     fn string_local_mut(&mut self, local: Local) -> &mut String {
         match &mut self.local_mut(local).data {
-            Data::String(string) => string,
+            Data::Text(string) => string,
             _ => panic!("Value at {local:?} is not a string"),
         }
     }
@@ -425,7 +425,7 @@ impl VmDebug<OntolProcessor> for Tracer {
 fn extract_regex_captures(
     captures: &Captures,
     group_filter: &BitVec,
-    string_def_id: DefId,
+    text_def_id: DefId,
 ) -> Vec<Value> {
     group_filter
         .iter()
@@ -433,7 +433,7 @@ fn extract_regex_captures(
         .filter_map(|(index, value)| if value { Some(index) } else { None })
         .map(|index| {
             if let Some(capture_match) = captures.get(index) {
-                Value::new(Data::String(capture_match.as_str().into()), string_def_id)
+                Value::new(Data::Text(capture_match.as_str().into()), text_def_id)
             } else {
                 Value::unit()
             }
@@ -483,11 +483,11 @@ mod tests {
                     [
                         (
                             "S:0:1".parse().unwrap(),
-                            Value::new(Data::String("foo".into()), def_id(0)).into(),
+                            Value::new(Data::Text("foo".into()), def_id(0)).into(),
                         ),
                         (
                             "S:0:2".parse().unwrap(),
-                            Value::new(Data::String("bar".into()), def_id(0)).into(),
+                            Value::new(Data::Text("bar".into()), def_id(0)).into(),
                         ),
                     ]
                     .into(),
@@ -674,16 +674,13 @@ mod tests {
             [Value::new(
                 Data::Struct(
                     [
-                        (
-                            prop_a,
-                            Value::new(Data::String("a".into()), def_id(0)).into(),
-                        ),
+                        (prop_a, Value::new(Data::Text("a".into()), def_id(0)).into()),
                         (
                             prop_b,
                             Value::new(
                                 Data::Sequence(vec![
-                                    Value::new(Data::String("b0".into()), def_id(0)).into(),
-                                    Value::new(Data::String("b1".into()), def_id(0)).into(),
+                                    Value::new(Data::Text("b0".into()), def_id(0)).into(),
+                                    Value::new(Data::Text("b1".into()), def_id(0)).into(),
                                 ]),
                                 def_id(0),
                             )
@@ -766,7 +763,7 @@ mod tests {
                             Data::Struct(
                                 [(
                                     prop,
-                                    Value::new(Data::String("a".into()), inner_def_id).into(),
+                                    Value::new(Data::Text("a".into()), inner_def_id).into(),
                                 )]
                                 .into()
                             ),
