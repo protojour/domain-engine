@@ -21,8 +21,8 @@ pub def Article {
     rel .'title': text
     rel .'description': text
     rel .'body': text
-    rel .'createdAt': text
-    rel .'updatedAt': text
+    rel .'createdAt': datetime
+    rel .'updatedAt': datetime
     rel .'favorited': boolean
     rel .'favoritesCount': i64
     rel .'author': Profile
