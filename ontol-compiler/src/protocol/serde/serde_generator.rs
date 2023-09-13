@@ -1,6 +1,5 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 
-use indexmap::IndexMap;
 use ontol_runtime::{
     discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
     ontology::{Cardinality, PropertyCardinality, ValueCardinality},
@@ -35,13 +34,14 @@ use crate::{
 use super::union_builder::UnionBuilder;
 
 pub struct SerdeGenerator<'c, 'm> {
-    pub(super) defs: &'c Defs<'m>,
-    pub(super) primitives: &'c Primitives,
-    pub(super) def_types: &'c DefTypes<'m>,
-    pub(super) relations: &'c Relations,
-    pub(super) seal_ctx: &'c SealCtx,
-    pub(super) patterns: &'c TextPatterns,
-    pub(super) codegen_tasks: &'c CodegenTasks<'m>,
+    pub defs: &'c Defs<'m>,
+    pub primitives: &'c Primitives,
+    pub def_types: &'c DefTypes<'m>,
+    pub relations: &'c Relations,
+    pub seal_ctx: &'c SealCtx,
+    pub patterns: &'c TextPatterns,
+    pub codegen_tasks: &'c CodegenTasks<'m>,
+
     pub(super) operators_by_id: Vec<SerdeOperator>,
     pub(super) operators_by_key: HashMap<SerdeKey, SerdeOperatorId>,
 }
@@ -88,6 +88,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 None => return None,
             }
         }
+    }
+
+    pub fn get_operator(&self, operator_id: SerdeOperatorId) -> &SerdeOperator {
+        &self.operators_by_id[operator_id.0 as usize]
     }
 
     pub fn gen_operator(&mut self, key: SerdeKey) -> Option<&SerdeOperator> {
@@ -371,92 +375,86 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         typename: &str,
         properties: Option<&Properties>,
     ) -> Option<OperatorAllocation> {
-        let repr = self.seal_ctx.repr_table.get(&def_variant.def_id)?;
-
-        let properties = match (properties, def_variant.modifier) {
-            (None, DataModifier::NONE) => {
-                return Some(OperatorAllocation::Allocated(
+        let Some(properties) = properties else {
+            return if matches!(def_variant.modifier, DataModifier::NONE) {
+                Some(OperatorAllocation::Allocated(
                     self.alloc_operator_id(&def_variant),
                     SerdeOperator::Struct(StructOperator {
                         typename: typename.into(),
                         def_variant,
                         properties: Default::default(),
                     }),
-                ));
-            }
-            (None, _) => {
-                return Some(OperatorAllocation::Redirect(DefVariant::new(
+                ))
+            } else {
+                Some(OperatorAllocation::Redirect(DefVariant::new(
                     def_variant.def_id,
                     DataModifier::NONE,
                 )))
-            }
-            (Some(properties), _) => properties,
+            };
         };
 
+        let repr = self.seal_ctx.repr_table.get(&def_variant.def_id)?;
+
         match &repr.kind {
-            ReprKind::Scalar(def_id, scalar_kind, _span) => {
-                match scalar_kind {
-                    ReprScalarKind::I64(range) => {
-                        return Some(OperatorAllocation::Allocated(
-                            self.alloc_operator_id(&def_variant),
-                            SerdeOperator::I64(
-                                *def_id,
-                                if *range == (i64::MIN..=i64::MAX) {
-                                    None
-                                } else {
-                                    Some(range.clone())
-                                },
-                            ),
-                        ));
-                    }
-                    ReprScalarKind::F64(range) => {
-                        let f64_range = range.start().into_inner()..=range.end().into_inner();
-                        return Some(OperatorAllocation::Allocated(
-                            self.alloc_operator_id(&def_variant),
-                            SerdeOperator::F64(
-                                *def_id,
-                                if f64_range == (f64::MIN..=f64::MAX) {
-                                    None
-                                } else {
-                                    Some(f64_range)
-                                },
-                            ),
-                        ));
-                    }
-                    _ => {
-                        if def_id == &def_variant.def_id {
-                            // If it's a "self-scalar" it must be a string fmt (for now).
-                            if let Constructor::TextFmt(segment) = &properties.constructor {
-                                return self.alloc_string_fmt_operator(def_variant, segment);
-                            }
-
-                            panic!("Self-scalar without fmt: {def_id:?}");
+            ReprKind::Scalar(def_id, ReprScalarKind::I64(range), _span) => {
+                Some(OperatorAllocation::Allocated(
+                    self.alloc_operator_id(&def_variant),
+                    SerdeOperator::I64(
+                        *def_id,
+                        if *range == (i64::MIN..=i64::MAX) {
+                            None
                         } else {
-                            let (requirement, inner_operator_id) = self.get_property_operator(
-                                *def_id,
-                                (PropertyCardinality::Mandatory, ValueCardinality::One),
-                            );
-
-                            if !matches!(requirement, PropertyCardinality::Mandatory) {
-                                panic!("Scalar cardinality must be mandatory, fix this during type check");
-                            }
-
-                            let operator_id = self.alloc_operator_id(&def_variant);
-
-                            return Some(OperatorAllocation::Allocated(
-                                operator_id,
-                                SerdeOperator::Alias(AliasOperator {
-                                    typename: typename.into(),
-                                    def_variant,
-                                    inner_operator_id,
-                                }),
-                            ));
-                        }
+                            Some(range.clone())
+                        },
+                    ),
+                ))
+            }
+            ReprKind::Scalar(def_id, ReprScalarKind::F64(range), _span) => {
+                let f64_range = range.start().into_inner()..=range.end().into_inner();
+                Some(OperatorAllocation::Allocated(
+                    self.alloc_operator_id(&def_variant),
+                    SerdeOperator::F64(
+                        *def_id,
+                        if f64_range == (f64::MIN..=f64::MAX) {
+                            None
+                        } else {
+                            Some(f64_range)
+                        },
+                    ),
+                ))
+            }
+            ReprKind::Scalar(def_id, _kind, _span) => {
+                if def_id == &def_variant.def_id {
+                    // If it's a "self-scalar" it must be a string fmt (for now).
+                    if let Constructor::TextFmt(segment) = &properties.constructor {
+                        return self.alloc_string_fmt_operator(def_variant, segment);
                     }
+
+                    panic!("Self-scalar without fmt: {def_id:?}");
+                } else {
+                    let (requirement, inner_operator_id) = self.get_property_operator(
+                        *def_id,
+                        (PropertyCardinality::Mandatory, ValueCardinality::One),
+                    );
+
+                    if !matches!(requirement, PropertyCardinality::Mandatory) {
+                        panic!("Scalar cardinality must be mandatory, fix this during type check");
+                    }
+
+                    let operator_id = self.alloc_operator_id(&def_variant);
+
+                    Some(OperatorAllocation::Allocated(
+                        operator_id,
+                        SerdeOperator::Alias(AliasOperator {
+                            typename: typename.into(),
+                            def_variant,
+                            inner_operator_id,
+                        }),
+                    ))
                 }
             }
             ReprKind::Unit | ReprKind::Struct => {
-                return self.alloc_struct_constructor_operator(def_variant, typename, properties);
+                self.alloc_struct_constructor_operator(def_variant, typename, properties)
             }
             ReprKind::StructIntersection(members) => {
                 if members.len() == 1 {
@@ -476,16 +474,16 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     );
                 }
 
-                return self.alloc_struct_intersection_operator(
+                self.alloc_struct_intersection_operator(
                     def_variant,
                     typename,
                     properties,
                     members.as_slice(),
-                );
+                )
             }
             ReprKind::Union(_) | ReprKind::StructUnion(_) => {
                 let operator_id = self.alloc_operator_id(&def_variant);
-                return Some(OperatorAllocation::Allocated(
+                Some(OperatorAllocation::Allocated(
                     operator_id,
                     if def_variant.modifier.contains(DataModifier::UNION) {
                         self.create_union_operator(def_variant, typename, properties)
@@ -494,55 +492,53 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         // Don't build a union
                         self.create_struct_operator(def_variant, typename, properties)
                     },
-                ));
-            }
-            _ => {}
-        }
-
-        match &properties.constructor {
-            Constructor::Sequence(sequence) => {
-                let mut sequence_range_builder = SequenceRangeBuilder::default();
-
-                let mut element_iterator = sequence.elements().peekable();
-
-                while let Some((_, element)) = element_iterator.next() {
-                    let operator_id = match element {
-                        None => self
-                            .gen_operator_id(SerdeKey::no_modifier(DefId::unit()))
-                            .unwrap(),
-                        Some(relationship_id) => {
-                            let meta = self.defs.relationship_meta(relationship_id);
-
-                            self.gen_operator_id(SerdeKey::Def(
-                                def_variant.with_def(meta.relationship.object.0),
-                            ))
-                            .expect("no inner operator")
-                        }
-                    };
-
-                    if element_iterator.peek().is_some() || !sequence.is_infinite() {
-                        sequence_range_builder.push_required_operator(operator_id);
-                    } else {
-                        // last operator is infinite and accepts zero or more items
-                        sequence_range_builder.push_infinite_operator(operator_id);
-                    }
-                }
-
-                let ranges = sequence_range_builder.build();
-                debug!("sequence ranges: {:#?}", ranges);
-
-                let operator_id = self.alloc_operator_id(&def_variant);
-                Some(OperatorAllocation::Allocated(
-                    operator_id,
-                    SerdeOperator::ConstructorSequence(ConstructorSequenceOperator {
-                        ranges,
-                        def_variant,
-                    }),
                 ))
             }
-            constructor => {
-                unreachable!("{:?}: {constructor:?}: repr {repr:?}", def_variant.def_id)
-            }
+            ReprKind::Seq | ReprKind::Intersection(_) => match &properties.constructor {
+                Constructor::Sequence(sequence) => {
+                    let mut sequence_range_builder = SequenceRangeBuilder::default();
+
+                    let mut element_iterator = sequence.elements().peekable();
+
+                    while let Some((_, element)) = element_iterator.next() {
+                        let operator_id = match element {
+                            None => self
+                                .gen_operator_id(SerdeKey::no_modifier(DefId::unit()))
+                                .unwrap(),
+                            Some(relationship_id) => {
+                                let meta = self.defs.relationship_meta(relationship_id);
+
+                                self.gen_operator_id(SerdeKey::Def(
+                                    def_variant.with_def(meta.relationship.object.0),
+                                ))
+                                .expect("no inner operator")
+                            }
+                        };
+
+                        if element_iterator.peek().is_some() || !sequence.is_infinite() {
+                            sequence_range_builder.push_required_operator(operator_id);
+                        } else {
+                            // last operator is infinite and accepts zero or more items
+                            sequence_range_builder.push_infinite_operator(operator_id);
+                        }
+                    }
+
+                    let ranges = sequence_range_builder.build();
+                    debug!("sequence ranges: {:#?}", ranges);
+
+                    let operator_id = self.alloc_operator_id(&def_variant);
+                    Some(OperatorAllocation::Allocated(
+                        operator_id,
+                        SerdeOperator::ConstructorSequence(ConstructorSequenceOperator {
+                            ranges,
+                            def_variant,
+                        }),
+                    ))
+                }
+                constructor => {
+                    unreachable!("{:?}: {constructor:?}: repr {repr:?}", def_variant.def_id)
+                }
+            },
         }
     }
 
@@ -795,116 +791,106 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         typename: &str,
         properties: &Properties,
     ) -> SerdeOperator {
-        let mut serde_properties: IndexMap<_, _> = Default::default();
-
-        if let Some(table) = &properties.table {
-            for (property_id, property) in table {
-                let (meta, prop_key, type_def_id) = match property_id.role {
-                    Role::Subject => {
-                        if property_id.relationship_id.0 == self.primitives.relations.identifies {
-                            // panic!();
-                        }
-
-                        let meta = self.defs.relationship_meta(property_id.relationship_id);
-                        let object = meta.relationship.object.0;
-
-                        let DefKind::TextLiteral(prop_key) = meta.relation_def_kind.value else {
-                            panic!("Subject property is not a string literal");
-                        };
-
-                        (meta, *prop_key, object)
-                    }
-                    Role::Object => {
-                        let meta = self.defs.relationship_meta(property_id.relationship_id);
-                        let subject = meta.relationship.subject.0;
-
-                        let prop_key = meta
-                            .relationship
-                            .object_prop
-                            .expect("Object property has no name");
-
-                        (meta, prop_key, subject)
-                    }
-                };
-
-                let (property_cardinality, value_operator_id) =
-                    self.get_property_operator(type_def_id, property.cardinality);
-
-                let rel_params_operator_id = match &meta.relationship.rel_params {
-                    RelParams::Type(def_id) => {
-                        let key = SerdeKey::Def(DefVariant::new(*def_id, DataModifier::default()));
-                        match self.gen_operator(key.clone()) {
-                            Some(SerdeOperator::Struct(struct_op)) => {
-                                if !struct_op.properties.is_empty() {
-                                    self.gen_operator_id(key)
-                                } else {
-                                    None
-                                }
-                            }
-                            Some(SerdeOperator::Unit) => None,
-                            Some(_) => self.gen_operator_id(key),
-                            _ => None,
-                        }
-                    }
-                    RelParams::Unit => None,
-                    _ => todo!(),
-                };
-
-                let mut value_generator: Option<ValueGenerator> = None;
-                let mut flags = SerdePropertyFlags::default();
-
-                if let Some(default_const_def) = self
-                    .relations
-                    .default_const_objects
-                    .get(&meta.relationship_id)
-                {
-                    let proc = self
-                        .codegen_tasks
-                        .result_const_procs
-                        .get(default_const_def)
-                        .unwrap_or_else(|| panic!());
-
-                    value_generator = Some(ValueGenerator::DefaultProc(proc.address));
-                }
-
-                if let Some(explicit_value_generator) = self
-                    .relations
-                    .value_generators
-                    .get(&property_id.relationship_id)
-                {
-                    flags |= SerdePropertyFlags::READ_ONLY;
-                    if value_generator.is_some() {
-                        panic!("BUG: Cannot have both a default value and a generator. Solve this in type check.");
-                    }
-                    value_generator = Some(*explicit_value_generator);
-                }
-
-                if property_cardinality.is_optional() {
-                    flags |= SerdePropertyFlags::OPTIONAL;
-                }
-
-                if property.is_entity_id {
-                    flags |= SerdePropertyFlags::ENTITY_ID;
-                }
-
-                serde_properties.insert(
-                    prop_key.into(),
-                    SerdeProperty {
-                        property_id: *property_id,
-                        value_operator_id,
-                        flags,
-                        value_generator,
-                        rel_params_operator_id,
-                    },
-                );
-            }
-        };
-
-        SerdeOperator::Struct(StructOperator {
+        let mut op = StructOperator {
             typename: typename.into(),
             def_variant,
-            properties: serde_properties,
-        })
+            properties: Default::default(),
+        };
+
+        let Some(table) = &properties.table else {
+            return SerdeOperator::Struct(op);
+        };
+
+        for (property_id, property) in table {
+            let meta = self.defs.relationship_meta(property_id.relationship_id);
+            let (type_def_id, ..) = meta.relationship.by(property_id.role.opposite());
+            let prop_key = match property_id.role {
+                Role::Subject => {
+                    let DefKind::TextLiteral(prop_key) = meta.relation_def_kind.value else {
+                        panic!("Subject property is not a string literal");
+                    };
+
+                    *prop_key
+                }
+                Role::Object => meta
+                    .relationship
+                    .object_prop
+                    .expect("Object property has no name"),
+            };
+
+            let (property_cardinality, value_operator_id) =
+                self.get_property_operator(type_def_id, property.cardinality);
+
+            let rel_params_operator_id = match &meta.relationship.rel_params {
+                RelParams::Type(def_id) => {
+                    let key = SerdeKey::Def(DefVariant::new(*def_id, DataModifier::default()));
+                    match self.gen_operator(key.clone()) {
+                        Some(SerdeOperator::Struct(struct_op)) => {
+                            if !struct_op.properties.is_empty() {
+                                self.gen_operator_id(key)
+                            } else {
+                                None
+                            }
+                        }
+                        Some(SerdeOperator::Unit) => None,
+                        Some(_) => self.gen_operator_id(key),
+                        _ => None,
+                    }
+                }
+                RelParams::Unit => None,
+                _ => todo!(),
+            };
+
+            let mut value_generator: Option<ValueGenerator> = None;
+            let mut flags = SerdePropertyFlags::default();
+
+            if let Some(default_const_def) = self
+                .relations
+                .default_const_objects
+                .get(&meta.relationship_id)
+            {
+                let proc = self
+                    .codegen_tasks
+                    .result_const_procs
+                    .get(default_const_def)
+                    .unwrap_or_else(|| panic!());
+
+                value_generator = Some(ValueGenerator::DefaultProc(proc.address));
+            }
+
+            if let Some(explicit_value_generator) = self
+                .relations
+                .value_generators
+                .get(&property_id.relationship_id)
+            {
+                flags |= SerdePropertyFlags::READ_ONLY;
+                if value_generator.is_some() {
+                    panic!("BUG: Cannot have both a default value and a generator. Solve this in type check.");
+                }
+                value_generator = Some(*explicit_value_generator);
+            }
+
+            if property_cardinality.is_optional() {
+                flags |= SerdePropertyFlags::OPTIONAL;
+            }
+
+            if property.is_entity_id {
+                flags |= SerdePropertyFlags::ENTITY_ID;
+            }
+
+            op.properties.insert(
+                prop_key.into(),
+                SerdeProperty {
+                    property_id: *property_id,
+                    value_operator_id,
+                    flags,
+                    value_generator,
+                    rel_params_operator_id,
+                },
+            );
+        }
+
+        SerdeOperator::Struct(op)
     }
 }
 
