@@ -15,13 +15,14 @@ use ontol_runtime::{
 };
 use tracing::{debug, trace};
 
+use super::sequence_range_builder::SequenceRangeBuilder;
+
 use crate::{
     codegen::task::CodegenTasks,
     compiler_queries::GetDefType,
     def::{DefKind, Defs, LookupRelationshipMeta, RelParams, TypeDef},
     primitive::{PrimitiveKind, Primitives},
     relation::{Constructor, Properties, Relations},
-    serde_codegen::sequence_range_builder::SequenceRangeBuilder,
     text_patterns::{TextPatternSegment, TextPatterns},
     type_check::{
         repr::repr_model::{ReprKind, ReprScalarKind},

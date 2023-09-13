@@ -1,6 +1,6 @@
-use crate::Compiler;
-
 use serde_generator::SerdeGenerator;
+
+use crate::Compiler;
 
 pub mod serde_generator;
 

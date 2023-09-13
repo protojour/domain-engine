@@ -18,8 +18,8 @@ use ontology_graph::OntologyGraph;
 use package::{PackageTopology, Packages, ParsedPackage};
 use pattern::Patterns;
 use primitive::Primitives;
+use protocol::serde::serde_generator::SerdeGenerator;
 use relation::{Properties, Property, Relations};
-use serde_codegen::serde_generator::SerdeGenerator;
 pub use source::*;
 use strings::Strings;
 use text_patterns::{compile_all_text_patterns, TextPatterns};
@@ -32,7 +32,7 @@ pub mod hir_unify;
 pub mod mem;
 pub mod ontology_graph;
 pub mod package;
-pub mod serde_codegen;
+pub mod protocol;
 pub mod source;
 pub mod typed_hir;
 
@@ -191,7 +191,7 @@ impl<'m> Compiler<'m> {
         let package_ids = self.package_ids();
 
         let mut namespaces = std::mem::take(&mut self.namespaces.namespaces);
-        let mut package_config_map = std::mem::take(&mut self.package_config_table);
+        let mut package_config_table = std::mem::take(&mut self.package_config_table);
         let docs = std::mem::take(&mut self.namespaces.docs);
         let mut serde_generator = self.serde_generator();
 
@@ -206,7 +206,7 @@ impl<'m> Compiler<'m> {
             let namespace = namespaces.remove(&package_id).unwrap();
             let type_namespace = namespace.types;
 
-            if let Some(package_config) = package_config_map.remove(&package_id) {
+            if let Some(package_config) = package_config_table.remove(&package_id) {
                 builder.add_package_config(package_id, package_config);
             }
 
