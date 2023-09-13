@@ -77,52 +77,8 @@ impl ProcBuilder {
         Local(self.stack_size as u16 - 1 - minus)
     }
 
-    pub fn commit(&mut self, block: Block, terminator: Terminator) -> BlockIndex {
-        let index = block.index;
-        self.blocks[index.0 as usize].ir = block.ir;
-        self.blocks[index.0 as usize].terminator = Some(terminator);
-        index
-    }
-
-    /// Generate one instruction in the given block
-    pub fn append_ir(
-        &mut self,
-        block: &mut Block,
-        ir: Ir,
-        stack_delta: Delta,
-        span: SourceSpan,
-    ) -> Local {
-        let local = Local(self.stack_size as u16);
-        self.stack_size += stack_delta.0;
-        block.ir.push((ir, span));
-        local
-    }
-
-    pub fn append_op(
-        &mut self,
-        block: &mut Block,
-        opcode: OpCode,
-        stack_delta: Delta,
-        span: SourceSpan,
-    ) -> Local {
-        self.append_ir(block, Ir::Op(opcode), stack_delta, span)
-    }
-
     pub fn prealloc_stack(&mut self, delta: Delta) {
         self.stack_size += delta.0;
-    }
-
-    pub fn append_pop_until(&mut self, block: &mut Block, local: Local, span: SourceSpan) {
-        let stack_delta = Delta(local.0 as i32 - self.top().0 as i32);
-        if stack_delta.0 != 0 {
-            if let Some((Ir::Op(OpCode::PopUntil(last_local)), _)) = block.ir.last_mut() {
-                // peephole optimization: No need for consecutive PopUntil
-                self.stack_size += stack_delta.0;
-                *last_local = local;
-            } else {
-                self.append_op(block, OpCode::PopUntil(local), stack_delta, span);
-            }
-        }
     }
 
     pub fn build(mut self) -> SpannedOpCodes {
@@ -241,6 +197,54 @@ pub struct Block {
 }
 
 impl Block {
+    /// Append an Ir (potentially escaped) opcode
+    #[inline]
+    pub fn ir(
+        &mut self,
+        ir: Ir,
+        stack_delta: Delta,
+        span: SourceSpan,
+        builder: &mut ProcBuilder,
+    ) -> Local {
+        let local = Local(builder.stack_size as u16);
+        builder.stack_size += stack_delta.0;
+        self.ir.push((ir, span));
+        local
+    }
+
+    /// Append an ontol-vm OpCode directly
+    #[inline]
+    pub fn op(
+        &mut self,
+        opcode: OpCode,
+        stack_delta: Delta,
+        span: SourceSpan,
+        builder: &mut ProcBuilder,
+    ) -> Local {
+        self.ir(Ir::Op(opcode), stack_delta, span, builder)
+    }
+
+    /// Append OpCode::PopUntil instruction (shrinks stack up to (not including) the given local)
+    pub fn pop_until(&mut self, local: Local, span: SourceSpan, builder: &mut ProcBuilder) {
+        let stack_delta = Delta(local.0 as i32 - builder.top().0 as i32);
+        if stack_delta.0 != 0 {
+            if let Some((Ir::Op(OpCode::PopUntil(last_local)), _)) = self.ir.last_mut() {
+                // peephole optimization: No need for consecutive PopUntil
+                builder.stack_size += stack_delta.0;
+                *last_local = local;
+            } else {
+                self.op(OpCode::PopUntil(local), stack_delta, span, builder);
+            }
+        }
+    }
+
+    pub fn commit(self, terminator: Terminator, builder: &mut ProcBuilder) -> BlockIndex {
+        let index = self.index;
+        builder.blocks[index.0 as usize].ir = self.ir;
+        builder.blocks[index.0 as usize].terminator = Some(terminator);
+        index
+    }
+
     pub fn index(&self) -> BlockIndex {
         self.index
     }

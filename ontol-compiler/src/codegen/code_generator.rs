@@ -51,7 +51,7 @@ pub(super) fn const_codegen<'m>(
         type_mapper,
     };
     generator.gen_node(expr, &mut block);
-    builder.commit(block, Terminator::Return(builder.top()));
+    block.commit(Terminator::Return(builder.top()), &mut builder);
 
     proc_table.const_procedures.insert(def_id, builder);
     errors
@@ -86,7 +86,7 @@ pub(super) fn map_codegen<'m>(
     };
     generator.scope.insert(func.arg.var, Local(0));
     generator.gen_node(func.body, &mut root_block);
-    builder.commit(root_block, Terminator::Return(builder.top()));
+    root_block.commit(Terminator::Return(builder.top()), &mut builder);
 
     match (
         type_mapper.find_domain_mapping_info(func.arg.meta.ty),
@@ -131,39 +131,38 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     return self.errors.error(CompileError::UnboundVariable, &span);
                 };
 
-                self.builder
-                    .append_op(block, OpCode::Clone(*local), Delta(1), span);
+                block.op(OpCode::Clone(*local), Delta(1), span, self.builder);
             }
             ontol_hir::Kind::Unit => {
-                self.builder.append_op(
-                    block,
+                block.op(
                     OpCode::CallBuiltin(BuiltinProc::NewUnit, DefId::unit()),
                     Delta(1),
                     span,
+                    self.builder,
                 );
             }
             ontol_hir::Kind::I64(int) => {
-                self.builder.append_op(
-                    block,
+                block.op(
                     OpCode::I64(int, ty.get_single_def_id().unwrap()),
                     Delta(1),
                     span,
+                    self.builder,
                 );
             }
             ontol_hir::Kind::F64(float) => {
-                self.builder.append_op(
-                    block,
+                block.op(
                     OpCode::F64(float, ty.get_single_def_id().unwrap()),
                     Delta(1),
                     span,
+                    self.builder,
                 );
             }
             ontol_hir::Kind::String(string) => {
-                self.builder.append_op(
-                    block,
+                block.op(
                     OpCode::String(string, ty.get_single_def_id().unwrap()),
                     Delta(1),
                     span,
+                    self.builder,
                 );
             }
             ontol_hir::Kind::Const(const_def_id) => {
@@ -171,8 +170,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     address: self.proc_table.gen_const_addr(const_def_id),
                     n_params: NParams(0),
                 };
-                self.builder
-                    .append_op(block, OpCode::Call(proc), Delta(1), span);
+                block.op(OpCode::Call(proc), Delta(1), span, self.builder);
             }
             ontol_hir::Kind::Let(binder, definition, body) => {
                 self.gen_node(*definition, block);
@@ -188,11 +186,11 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     self.gen_node(param, block);
                 }
                 let return_def_id = ty.get_single_def_id().unwrap();
-                self.builder.append_op(
-                    block,
+                block.op(
                     OpCode::CallBuiltin(proc, return_def_id),
                     stack_delta,
                     span,
+                    self.builder,
                 );
             }
             ontol_hir::Kind::Map(param) => {
@@ -212,8 +210,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                                     n_params: NParams(1),
                                 };
 
-                                self.builder
-                                    .append_op(block, OpCode::Call(proc), Delta(0), span);
+                                block.op(OpCode::Call(proc), Delta(0), span, self.builder);
                             }
                         }
                         _ => {
@@ -222,8 +219,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                                 n_params: NParams(1),
                             };
 
-                            self.builder
-                                .append_op(block, OpCode::Call(proc), Delta(0), span);
+                            block.op(OpCode::Call(proc), Delta(0), span, self.builder);
                         }
                     },
                     (Some(from), None) => {
@@ -247,16 +243,16 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
             }
             ontol_hir::Kind::Struct(binder, _flags, nodes) => {
                 let def_id = ty.get_single_def_id().unwrap();
-                let local = self.builder.append_op(
-                    block,
+                let local = block.op(
                     OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id),
                     Delta(1),
                     span,
+                    self.builder,
                 );
                 self.scope.insert(binder.var, local);
                 for node in nodes {
                     self.gen_node(node, block);
-                    self.builder.append_pop_until(block, local, span);
+                    block.pop_until(local, span, self.builder);
                 }
                 self.scope.remove(&binder.var);
             }
@@ -283,8 +279,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                         .iter()
                         .any(|arm| matches!(arm.pattern, ontol_hir::PropPattern::Absent))
                     {
-                        self.builder.append_op(
-                            block,
+                        block.op(
                             OpCode::GetAttr(
                                 struct_local,
                                 id,
@@ -294,6 +289,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                             // is not kept track of here.
                             Delta(2),
                             span,
+                            self.builder,
                         );
 
                         let status_local = self.builder.top_minus(1);
@@ -317,17 +313,17 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                                 }
                             }
 
-                            self.builder.commit(
-                                present_block,
+                            present_block.commit(
                                 Terminator::PopGoto(block.index(), post_cond_offset),
+                                self.builder,
                             )
                         };
 
-                        self.builder.append_ir(
-                            block,
+                        block.ir(
                             Ir::Cond(Predicate::YankTrue(status_local), present_body_index),
                             Delta(0),
                             span,
+                            self.builder,
                         );
                     } else {
                         todo!();
@@ -337,8 +333,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
                     match &arm.pattern {
                         PropPattern::Seq(ontol_hir::Binding::Binder(binder), HasDefault(true)) => {
-                            self.builder.append_op(
-                                block,
+                            block.op(
                                 OpCode::GetAttr(
                                     struct_local,
                                     id,
@@ -346,6 +341,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                                 ),
                                 Delta(2),
                                 span,
+                                self.builder,
                             );
 
                             let status_local = self.builder.top_minus(1);
@@ -365,45 +361,44 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                                 let mut default_block = self.builder.new_block(Delta(0), span);
 
                                 // rel_params (unit)
-                                self.builder.append_op(
-                                    &mut default_block,
+                                default_block.op(
                                     OpCode::CallBuiltin(BuiltinProc::NewUnit, DefId::unit()),
                                     Delta(0),
                                     NO_SPAN,
+                                    self.builder,
                                 );
                                 // empty sequence
-                                self.builder.append_op(
-                                    &mut default_block,
+                                default_block.op(
                                     OpCode::CallBuiltin(
                                         BuiltinProc::NewSeq,
                                         seq_item_ty.get_single_def_id().unwrap(),
                                     ),
                                     Delta(0),
                                     NO_SPAN,
+                                    self.builder,
                                 );
 
-                                self.builder.commit(
-                                    default_block,
+                                default_block.commit(
                                     Terminator::PopGoto(block.index(), post_cond_offset),
+                                    self.builder,
                                 )
                             };
 
                             // If the TryTakeAttr2 was false, run the default body
-                            self.builder.append_ir(
-                                block,
+                            block.ir(
                                 Ir::Cond(
                                     Predicate::YankFalse(status_local),
                                     default_fallback_body_index,
                                 ),
                                 Delta(0),
                                 span,
+                                self.builder,
                             );
 
                             self.gen_match_arm(arm, (rel_local, val_local), block);
                         }
                         _ => {
-                            self.builder.append_op(
-                                block,
+                            block.op(
                                 OpCode::GetAttr(
                                     struct_local,
                                     id,
@@ -412,6 +407,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                                 ),
                                 Delta(2),
                                 span,
+                                self.builder,
                             );
 
                             let val_local = self.builder.top();
@@ -426,8 +422,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 let Type::Seq(_, val_ty) = ty else {
                     panic!("Not a sequence: {ty:?}");
                 };
-                let seq_local = self.builder.append_op(
-                    block,
+                let seq_local = block.op(
                     OpCode::CallBuiltin(
                         BuiltinProc::NewSeq,
                         val_ty
@@ -436,19 +431,18 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     ),
                     Delta(1),
                     span,
+                    self.builder,
                 );
                 self.gen_in_scope(
                     &[(seq_local, ontol_hir::Binding::Binder(binder))],
                     nodes.into_iter(),
                     block,
                 );
-                self.builder.append_pop_until(block, seq_local, span);
+                block.pop_until(seq_local, span, self.builder);
             }
             ontol_hir::Kind::ForEach(seq_var, (rel_binding, val_binding), nodes) => {
                 let seq_local = self.var_local(seq_var);
-                let counter =
-                    self.builder
-                        .append_op(block, OpCode::I64(0, DefId::unit()), Delta(1), span);
+                let counter = block.op(OpCode::I64(0, DefId::unit()), Delta(1), span, self.builder);
 
                 let iter_offset = block.current_offset();
                 let elem_rel_local = self.builder.top_plus(1);
@@ -463,21 +457,20 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                         &mut iter_block,
                     );
 
-                    self.builder
-                        .append_pop_until(&mut iter_block, counter, span);
-
-                    self.builder
-                        .commit(iter_block, Terminator::PopGoto(block.index(), iter_offset))
+                    iter_block.pop_until(counter, span, self.builder);
+                    iter_block.commit(
+                        Terminator::PopGoto(block.index(), iter_offset),
+                        self.builder,
+                    )
                 };
 
-                self.builder.append_ir(
-                    block,
+                block.ir(
                     Ir::Iter(seq_local, counter, for_each_body_index),
                     Delta(0),
                     span,
+                    self.builder,
                 );
-
-                self.builder.append_pop_until(block, counter, span);
+                block.pop_until(counter, span, self.builder);
             }
             ontol_hir::Kind::SeqPush(seq_var, attr) => {
                 let top = self.builder.top();
@@ -487,21 +480,26 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
                 self.gen_node(*attr.val, block);
 
-                self.builder
-                    .append_op(block, OpCode::Clone(rel_local), Delta(1), span);
-
-                self.builder
-                    .append_op(block, OpCode::AppendAttr2(seq_local), Delta(-2), span);
-
-                self.builder.append_pop_until(block, top, span);
+                block.op(OpCode::Clone(rel_local), Delta(1), span, self.builder);
+                block.op(
+                    OpCode::AppendAttr2(seq_local),
+                    Delta(-2),
+                    span,
+                    self.builder,
+                );
+                block.pop_until(top, span, self.builder);
             }
             ontol_hir::Kind::StringPush(to_var, node) => {
                 let top = self.builder.top();
                 let to_local = self.var_local(to_var);
                 self.gen_node(*node, block);
-                self.builder
-                    .append_op(block, OpCode::AppendString(to_local), Delta(-1), span);
-                self.builder.append_pop_until(block, top, span);
+                block.op(
+                    OpCode::AppendString(to_local),
+                    Delta(-1),
+                    span,
+                    self.builder,
+                );
+                block.pop_until(top, span, self.builder);
             }
             ontol_hir::Kind::MatchRegex(
                 ontol_hir::Iter(false),
@@ -515,34 +513,26 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 let haystack_local = self.var_local(haystack_var);
                 let top = self.builder.top();
 
-                let mut pre_branch_block = self.builder.split_block(block);
-
+                let mut pre = self.builder.split_block(block);
                 let mut arms_gen =
                     CaptureMatchArmsGenerator::new_with_blocks(match_arms, self.builder, span);
-                self.gen_capture_match_arms(
-                    &mut arms_gen,
-                    Local(top.0 + 1),
-                    Terminator::Goto(block.index(), BlockOffset(0)),
-                    span,
-                );
 
-                self.builder.append_op(
-                    &mut pre_branch_block,
+                pre.op(
                     OpCode::RegexCapture(haystack_local, regex_def_id),
                     Delta((arms_gen.capture_index_union.len() + 1) as i32),
                     span,
+                    self.builder,
                 );
-                self.builder.append_op(
-                    &mut pre_branch_block,
+                pre.op(
                     OpCode::RegexCaptureIndexes(
                         arms_gen.capture_index_union.clone().into_bit_vec(),
                     ),
                     Delta(0),
                     span,
+                    self.builder,
                 );
                 // unconditional match (for now)
-                self.builder.append_ir(
-                    &mut pre_branch_block,
+                pre.ir(
                     Ir::Cond(
                         Predicate::YankFalse(Local(
                             top.0 + arms_gen.capture_index_union.iter().count() as u16 + 1,
@@ -551,13 +541,21 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     ),
                     Delta(-1),
                     span,
+                    self.builder,
                 );
-                self.builder.commit(
-                    pre_branch_block,
+                pre.commit(
                     Terminator::Goto(arms_gen.first_block_index, BlockOffset(0)),
+                    self.builder,
                 );
 
-                self.builder.append_pop_until(block, top, span);
+                self.gen_capture_match_arms(
+                    &mut arms_gen,
+                    Local(top.0 + 1),
+                    Terminator::Goto(block.index(), BlockOffset(0)),
+                    span,
+                );
+
+                block.pop_until(top, span, self.builder);
             }
             ontol_hir::Kind::MatchRegex(
                 ontol_hir::Iter(true),
@@ -579,63 +577,61 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 self.builder.prealloc_stack(Delta(2));
 
                 let (iter_block_index, arms_gen) = {
-                    let mut intro = self.builder.new_block(Delta(2), span);
+                    let mut pre = self.builder.new_block(Delta(2), span);
                     let mut arms_gen =
                         CaptureMatchArmsGenerator::new_with_blocks(match_arms, self.builder, span);
-                    let mut outro = self.builder.new_block(Delta(0), span);
+                    let mut post = self.builder.new_block(Delta(0), span);
 
-                    self.builder.append_op(
-                        &mut intro,
+                    pre.op(
                         OpCode::MoveSeqValsToStack(current_matches_seq_local),
                         Delta((arms_gen.capture_index_union.len()) as i32),
                         span,
+                        self.builder,
                     );
-                    let for_each_block_index = self.builder.commit(
-                        intro,
+                    let for_each_block_index = pre.commit(
                         Terminator::Goto(arms_gen.first_block_index, BlockOffset(0)),
+                        self.builder,
                     );
 
                     self.gen_capture_match_arms(
                         &mut arms_gen,
                         Local(current_matches_seq_local.0 + 1),
-                        Terminator::Goto(outro.index(), BlockOffset(0)),
+                        Terminator::Goto(post.index(), BlockOffset(0)),
                         span,
                     );
 
-                    self.builder
-                        .append_pop_until(&mut outro, counter_local, span);
-                    self.builder
-                        .commit(outro, Terminator::PopGoto(block.index(), iter_offset));
+                    post.pop_until(counter_local, span, self.builder);
+                    post.commit(
+                        Terminator::PopGoto(block.index(), iter_offset),
+                        self.builder,
+                    );
 
                     (for_each_block_index, arms_gen)
                 };
 
                 // Generate sequence
-                self.builder.append_op(
-                    block,
+                block.op(
                     OpCode::RegexCaptureIter(haystack_local, regex_def_id),
                     Delta(0),
                     span,
+                    self.builder,
                 );
-                self.builder.append_op(
-                    block,
+                block.op(
                     OpCode::RegexCaptureIndexes(
                         arms_gen.capture_index_union.clone().into_bit_vec(),
                     ),
                     Delta(0),
                     span,
+                    self.builder,
                 );
-                self.builder
-                    .append_op(block, OpCode::I64(0, DefId::unit()), Delta(0), span);
-
-                self.builder.append_ir(
-                    block,
+                block.op(OpCode::I64(0, DefId::unit()), Delta(0), span, self.builder);
+                block.ir(
                     Ir::Iter(all_matches_seq_local, counter_local, iter_block_index),
                     Delta(0),
                     span,
+                    self.builder,
                 );
-
-                self.builder.append_pop_until(block, top, span);
+                block.pop_until(top, span, self.builder);
             }
             kind @ (ontol_hir::Kind::DeclSeq(..) | ontol_hir::Kind::Regex(..)) => {
                 unreachable!(
@@ -686,11 +682,11 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
         match rel.kind() {
             ontol_hir::Kind::Unit => {
                 self.gen_node(val, block);
-                self.builder.append_op(
-                    block,
+                block.op(
                     OpCode::PutAttr1(struct_local, prop_id),
                     Delta(-1),
                     span,
+                    self.builder,
                 );
             }
             _ => {
@@ -698,14 +694,12 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 let rel_local = self.builder.top();
                 self.gen_node(val, block);
 
-                self.builder
-                    .append_op(block, OpCode::Clone(rel_local), Delta(1), span);
-
-                self.builder.append_op(
-                    block,
+                block.op(OpCode::Clone(rel_local), Delta(1), span, self.builder);
+                block.op(
                     OpCode::PutAttr2(struct_local, prop_id),
                     Delta(-2),
                     span,
+                    self.builder,
                 );
             }
         }
@@ -748,9 +742,10 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
             .collect();
 
         arms_gen.fail_block_index = {
-            let panic_block = self.builder.new_block(Delta(0), span);
-            self.builder
-                .commit(panic_block, Terminator::Panic("Regex did not match".into()))
+            self.builder.new_block(Delta(0), span).commit(
+                Terminator::Panic("Regex did not match".into()),
+                self.builder,
+            )
         };
 
         for (arm_index, match_arm) in std::mem::take(&mut arms_gen.match_arms)
@@ -794,11 +789,11 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     arms_gen.fail_block_index
                 };
 
-                self.builder.append_ir(
-                    &mut branch_block,
+                branch_block.ir(
                     Ir::Cond(Predicate::IsUnit(guard_capture.local), else_block_index),
                     Delta(0),
                     span,
+                    self.builder,
                 );
             }
 
@@ -813,11 +808,11 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 }
 
                 if arm_capture.def_id != self.primitives.string {
-                    self.builder.append_op(
-                        &mut branch_block,
+                    branch_block.op(
                         OpCode::TypePun(arm_capture.local, arm_capture.def_id),
                         Delta(0),
                         span,
+                        self.builder,
                     );
                 }
             }
@@ -831,7 +826,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 self.scope.remove(&arm_capture.var);
             }
 
-            self.builder.commit(branch_block, terminator.clone());
+            branch_block.commit(terminator.clone(), self.builder);
         }
     }
 
@@ -844,8 +839,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
     fn gen_pun(&mut self, block: &mut Block, def_id: DefId, span: SourceSpan) {
         let local = self.builder.top();
-        self.builder
-            .append_op(block, OpCode::TypePun(local, def_id), Delta(0), span);
+        block.op(OpCode::TypePun(local, def_id), Delta(0), span, self.builder);
     }
 
     fn report_not_mappable(&mut self, span: SourceSpan) {
