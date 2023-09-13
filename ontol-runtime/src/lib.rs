@@ -8,6 +8,7 @@ pub mod cast;
 pub mod config;
 pub mod discriminator;
 pub mod format_utils;
+pub mod graphql;
 pub mod json_schema;
 pub mod ontology;
 pub mod query;
