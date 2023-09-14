@@ -8,6 +8,7 @@ mod test_entity;
 mod test_faker;
 mod test_fundamentals;
 mod test_geojson;
+mod test_graphql_schema;
 mod test_json_schema;
 mod test_multi_package;
 mod test_repr;

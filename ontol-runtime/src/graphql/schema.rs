@@ -21,4 +21,9 @@ impl GraphqlSchema {
     pub fn type_data(&self, type_index: TypeIndex) -> &TypeData {
         &self.types[type_index.0 as usize]
     }
+
+    pub fn type_data_by_key(&self, key: (DefId, QueryLevel)) -> Option<&TypeData> {
+        let type_index = self.type_index_by_def.get(&key)?;
+        Some(self.type_data(*type_index))
+    }
 }

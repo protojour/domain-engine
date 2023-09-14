@@ -9,7 +9,8 @@ use ontol_compiler::{
 };
 use ontol_runtime::{
     config::{DataStoreConfig, PackageConfig},
-    ontology::Ontology,
+    graphql::schema::GraphqlSchema,
+    ontology::{DomainProtocol, Ontology},
     PackageId,
 };
 use type_binding::TypeBinding;
@@ -89,6 +90,18 @@ impl OntolTest {
     /// A type without prefix is interpreted as the root domain/package.
     pub fn bind<const N: usize>(&self, type_names: [&str; N]) -> [TypeBinding; N] {
         type_names.map(|type_name| TypeBinding::new(self, type_name))
+    }
+
+    /// Get the ontol_runtime GraphQL schema
+    pub fn graphql_schema(&self, source_name: &str) -> &GraphqlSchema {
+        self.ontology
+            .get_domain_protocols(self.get_package_id(source_name))
+            .expect("no protocols")
+            .iter()
+            .find_map(|domain_protocol| match domain_protocol {
+                DomainProtocol::GraphQL(schema) => Some(schema),
+            })
+            .expect("GraphQL schema not found in protocols")
     }
 }
 

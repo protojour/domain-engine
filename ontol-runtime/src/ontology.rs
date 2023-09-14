@@ -109,6 +109,12 @@ impl Ontology {
         self.package_config_table.get(&package_id)
     }
 
+    pub fn get_domain_protocols(&self, package_id: PackageId) -> Option<&[DomainProtocol]> {
+        self.domain_protocols
+            .get(&package_id)
+            .map(|protocols| protocols.as_slice())
+    }
+
     pub fn get_const_proc(&self, const_id: DefId) -> Option<Procedure> {
         self.const_proc_table.get(&const_id).cloned()
     }
