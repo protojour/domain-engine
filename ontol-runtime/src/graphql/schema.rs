@@ -8,9 +8,15 @@ use super::{
 };
 
 pub struct GraphqlSchema {
-    pub(super) package_id: PackageId,
-    pub(super) query: TypeIndex,
-    pub(super) mutation: TypeIndex,
-    pub(super) types: Vec<TypeData>,
-    pub(super) type_index_by_def: FnvHashMap<(DefId, QueryLevel), TypeIndex>,
+    pub package_id: PackageId,
+    pub query: TypeIndex,
+    pub mutation: TypeIndex,
+    pub types: Vec<TypeData>,
+    pub type_index_by_def: FnvHashMap<(DefId, QueryLevel), TypeIndex>,
+}
+
+impl GraphqlSchema {
+    pub fn type_data(&self, type_index: TypeIndex) -> &TypeData {
+        &self.types[type_index.0 as usize]
+    }
 }

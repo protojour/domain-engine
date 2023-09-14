@@ -15,10 +15,12 @@ use ontol_runtime::{
     DataModifier, DefId, DefVariant, PackageId,
 };
 use ontology_graph::OntologyGraph;
-use package::{PackageTopology, Packages, ParsedPackage};
+use package::{PackageTopology, Packages, ParsedPackage, ONTOL_PKG};
 use pattern::Patterns;
 use primitive::Primitives;
-use protocol::serde::serde_generator::SerdeGenerator;
+use protocol::{
+    graphql::generate::generate_graphql_schema, serde::serde_generator::SerdeGenerator,
+};
 use relation::{Properties, Property, Relations};
 pub use source::*;
 use strings::Strings;
@@ -200,7 +202,7 @@ impl<'m> Compiler<'m> {
         let dynamic_sequence_operator_id = serde_generator.make_dynamic_sequence_operator();
 
         // For now, create serde operators for every domain
-        for package_id in package_ids {
+        for package_id in package_ids.iter().cloned() {
             let mut domain = Domain::default();
 
             let namespace = namespaces.remove(&package_id).unwrap();
@@ -240,6 +242,17 @@ impl<'m> Compiler<'m> {
             }
 
             builder.add_domain(package_id, domain);
+        }
+
+        // protocol handling
+        for package_id in package_ids.iter().cloned() {
+            if package_id != ONTOL_PKG {
+                generate_graphql_schema(
+                    package_id,
+                    builder.partial_ontology(),
+                    &mut serde_generator,
+                );
+            }
         }
 
         let (serde_operators, serde_operators_per_def) = serde_generator.finish();

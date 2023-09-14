@@ -258,6 +258,11 @@ pub struct OntologyBuilder {
 }
 
 impl OntologyBuilder {
+    /// Access to the partial ontology being built
+    pub fn partial_ontology(&self) -> &Ontology {
+        &self.ontology
+    }
+
     pub fn add_domain(&mut self, package_id: PackageId, domain: Domain) {
         self.ontology.domain_table.insert(package_id, domain);
     }

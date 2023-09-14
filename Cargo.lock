@@ -1410,6 +1410,7 @@ dependencies = [
  "bit-set",
  "bumpalo",
  "chumsky",
+ "convert_case",
  "derive-debug-extras",
  "either",
  "ena",

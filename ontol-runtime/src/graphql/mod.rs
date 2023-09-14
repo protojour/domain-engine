@@ -1,6 +1,9 @@
-use crate::serde::{
-    operator::SerdeOperatorId,
-    processor::{ProcessorLevel, ProcessorMode},
+use crate::{
+    serde::{
+        operator::SerdeOperatorId,
+        processor::{ProcessorLevel, ProcessorMode},
+    },
+    DefId,
 };
 
 pub mod argument;
@@ -38,6 +41,10 @@ impl TypingPurpose {
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub enum QueryLevel {
     Node,
-    Edge { rel_params: Option<SerdeOperatorId> },
-    Connection { rel_params: Option<SerdeOperatorId> },
+    Edge {
+        rel_params: Option<(DefId, SerdeOperatorId)>,
+    },
+    Connection {
+        rel_params: Option<(DefId, SerdeOperatorId)>,
+    },
 }
