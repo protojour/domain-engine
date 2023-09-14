@@ -227,12 +227,19 @@ impl ser::Serializer for GqlScalarSerializer {
     }
 
     fn serialize_i64(self, value: i64) -> SerResult {
-        Ok(GqlScalar::F64(value as f64))
+        if value >= i32::MIN as i64 && value <= i32::MAX as i64 {
+            Ok(GqlScalar::I32(value as i32))
+        } else {
+            Ok(GqlScalar::F64(value as f64))
+        }
     }
 
-    fn serialize_i128(self, _value: i128) -> SerResult {
-        // FIXME
-        Err(GqlScalarError(smart_format!("i128 not supported")))
+    fn serialize_i128(self, value: i128) -> SerResult {
+        if value >= i32::MIN as i128 && value <= i32::MAX as i128 {
+            Ok(GqlScalar::I32(value as i32))
+        } else {
+            Ok(GqlScalar::F64(value as f64))
+        }
     }
 
     fn serialize_u8(self, value: u8) -> SerResult {

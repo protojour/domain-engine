@@ -484,7 +484,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                     NewType::NativeScalar(NativeScalarRef {
                         operator_id: self
                             .serde_generator
-                            .gen_operator_id(SerdeKey::no_modifier(*scalar_def_id))
+                            .gen_operator_id(SerdeKey::no_modifier(def_id))
                             .unwrap(),
                         kind: NativeScalarKind::Int(*scalar_def_id),
                     })
@@ -577,13 +577,17 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
             };
             let unit_ref = self.get_def_type_ref(type_def_id, query_level);
 
+            let value_operator_id = self
+                .serde_generator
+                .gen_operator_id(SerdeKey::no_modifier(type_def_id))
+                .unwrap();
+
             fields.insert(
                 field_namespace.unique_literal(prop_key),
                 FieldData {
                     kind: FieldKind::Property(PropertyData {
                         property_id: *property_id,
-                        // FIXME: Is this needed?
-                        value_operator_id: SerdeOperatorId(u32::MAX),
+                        value_operator_id,
                     }),
                     field_type: TypeRef {
                         modifier: TypeModifier::new_unit(Optionality::from_optional(matches!(
