@@ -1,4 +1,4 @@
-use domain_engine_juniper::{juniper::GraphQLError, SchemaBuildError};
+use domain_engine_juniper::{juniper::GraphQLError, CreateSchemaError};
 use serde::Serialize;
 use wasm_bindgen::JsValue;
 
@@ -34,8 +34,8 @@ impl From<WasmError> for JsValue {
     }
 }
 
-impl From<SchemaBuildError> for WasmError {
-    fn from(value: SchemaBuildError) -> Self {
+impl From<CreateSchemaError> for WasmError {
+    fn from(value: CreateSchemaError) -> Self {
         Self::Generic(format!("{value:?}"))
     }
 }

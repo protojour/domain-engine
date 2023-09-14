@@ -2,6 +2,13 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use juniper::graphql_value;
 use ontol_runtime::{
+    graphql::{
+        data::{
+            FieldKind, ObjectData, ObjectKind, TypeData, TypeIndex, TypeKind, TypeModifier,
+            TypeRef, UnionData,
+        },
+        TypingPurpose,
+    },
     serde::{
         operator::SerdeOperator,
         processor::{ProcessorLevel, ProcessorMode},
@@ -13,15 +20,9 @@ use tracing::debug;
 
 use crate::{
     gql_scalar::{GqlScalar, GqlScalarSerializer},
-    templates::{resolve_virtual_schema_field, sequence_type::SequenceType},
-    virtual_registry::VirtualRegistry,
-    virtual_schema::{
-        data::{
-            FieldKind, ObjectData, ObjectKind, TypeData, TypeIndex, TypeKind, TypeModifier,
-            TypeRef, UnionData,
-        },
-        TypingPurpose, VirtualIndexedTypeInfo, VirtualSchema,
-    },
+    registry_ctx::RegistryCtx,
+    schema_ctx::{IndexedTypeInfo, SchemaCtx},
+    templates::{resolve_indexed_schema_field, sequence_type::SequenceType},
     GqlContext,
 };
 
@@ -34,7 +35,7 @@ pub struct AttributeType<'v> {
 
 impl<'v> ::juniper::GraphQLValue<GqlScalar> for AttributeType<'v> {
     type Context = GqlContext;
-    type TypeInfo = VirtualIndexedTypeInfo;
+    type TypeInfo = IndexedTypeInfo;
 
     fn type_name<'i>(&self, info: &'i Self::TypeInfo) -> Option<&'i str> {
         Some(info.typename())
@@ -43,7 +44,7 @@ impl<'v> ::juniper::GraphQLValue<GqlScalar> for AttributeType<'v> {
     fn concrete_type_name(&self, _context: &Self::Context, info: &Self::TypeInfo) -> String {
         match &info.type_data().kind {
             TypeKind::Union(union_data) => {
-                let (_, variant_data) = self.find_union_variant(union_data, &info.virtual_schema);
+                let (_, variant_data) = self.find_union_variant(union_data, &info.schema_ctx);
                 variant_data.typename.to_string()
             }
             _ => panic!(
@@ -61,11 +62,10 @@ impl<'v> ::juniper::GraphQLValue<GqlScalar> for AttributeType<'v> {
     ) -> juniper::ExecutionResult<GqlScalar> {
         match &info.type_data().kind {
             TypeKind::Union(union_data) => {
-                let (variant_type_index, _) =
-                    self.find_union_variant(union_data, &info.virtual_schema);
+                let (variant_type_index, _) = self.find_union_variant(union_data, &info.schema_ctx);
                 self.resolve(
                     &info
-                        .virtual_schema
+                        .schema_ctx
                         .indexed_type_info(variant_type_index, TypingPurpose::Selection),
                     selection_set,
                     executor,
@@ -84,7 +84,7 @@ impl<'v> ::juniper::GraphQLValue<GqlScalar> for AttributeType<'v> {
     ) -> juniper::ExecutionResult<crate::gql_scalar::GqlScalar> {
         match &info.type_data().kind {
             TypeKind::Object(object_data) => {
-                self.resolve_object_field(&info.virtual_schema, object_data, field_name, executor)
+                self.resolve_object_field(&info.schema_ctx, object_data, field_name, executor)
             }
             TypeKind::Union(_) => panic!("union should be resolved earlier"),
             TypeKind::CustomScalar(_) => {
@@ -106,7 +106,7 @@ impl<'v> juniper::GraphQLType<GqlScalar> for AttributeType<'v> {
     where
         GqlScalar: 'r,
     {
-        let mut reg = VirtualRegistry::new(&info.virtual_schema, registry);
+        let mut reg = RegistryCtx::new(&info.schema_ctx, registry);
         match &info.type_data().kind {
             TypeKind::Object(_) => {
                 let fields = reg.get_fields(info.type_index);
@@ -121,12 +121,11 @@ impl<'v> juniper::GraphQLType<GqlScalar> for AttributeType<'v> {
                     .variants
                     .iter()
                     .map(|type_index| {
-                        reg.registry
-                            .get_type::<AttributeType>(&VirtualIndexedTypeInfo {
-                                virtual_schema: info.virtual_schema.clone(),
-                                type_index: *type_index,
-                                typing_purpose: TypingPurpose::Selection,
-                            })
+                        reg.registry.get_type::<AttributeType>(&IndexedTypeInfo {
+                            schema_ctx: info.schema_ctx.clone(),
+                            type_index: *type_index,
+                            typing_purpose: TypingPurpose::Selection,
+                        })
                     })
                     .collect();
 
@@ -168,10 +167,10 @@ impl<'v> AttributeType<'v> {
     fn find_union_variant<'s>(
         &self,
         union_data: &'s UnionData,
-        virtual_schema: &'s VirtualSchema,
+        ctx: &'s SchemaCtx,
     ) -> (TypeIndex, &'s TypeData) {
         for variant_type_index in &union_data.variants {
-            let variant_type_data = virtual_schema.type_data(*variant_type_index);
+            let variant_type_data = ctx.schema.type_data(*variant_type_index);
             match &variant_type_data.kind {
                 TypeKind::Object(ObjectData {
                     kind: ObjectKind::Node(node_data),
@@ -190,7 +189,7 @@ impl<'v> AttributeType<'v> {
 
     fn resolve_object_field(
         &self,
-        virtual_schema: &Arc<VirtualSchema>,
+        schema_ctx: &Arc<SchemaCtx>,
         object_data: &ObjectData,
         field_name: &str,
         executor: &juniper::Executor<GqlContext, GqlScalar>,
@@ -201,16 +200,16 @@ impl<'v> AttributeType<'v> {
         debug!("resolve object field `{field_name}`: {:?}", self.attr);
 
         match (&field_data.kind, &self.attr.value.data) {
-            (FieldKind::Edges, Data::Sequence(seq)) => resolve_virtual_schema_field(
+            (FieldKind::Edges, Data::Sequence(seq)) => resolve_indexed_schema_field(
                 SequenceType { seq },
-                virtual_schema
+                schema_ctx
                     .indexed_type_info_by_unit(field_type.unit, TypingPurpose::Selection)
                     .unwrap(),
                 executor,
             ),
-            (FieldKind::Node, Data::Struct(_)) => resolve_virtual_schema_field(
+            (FieldKind::Node, Data::Struct(_)) => resolve_indexed_schema_field(
                 self,
-                virtual_schema
+                schema_ctx
                     .indexed_type_info_by_unit(field_type.unit, TypingPurpose::Selection)
                     .unwrap(),
                 executor,
@@ -222,12 +221,12 @@ impl<'v> AttributeType<'v> {
                 },
                 Data::Struct(attrs),
             ) => {
-                let type_info = virtual_schema
+                let type_info = schema_ctx
                     .indexed_type_info_by_unit(field_type.unit, TypingPurpose::Selection)
                     .unwrap();
 
                 match attrs.get(property_id) {
-                    Some(attribute) => resolve_virtual_schema_field(
+                    Some(attribute) => resolve_indexed_schema_field(
                         AttributeType { attr: attribute },
                         type_info,
                         executor,
@@ -238,7 +237,7 @@ impl<'v> AttributeType<'v> {
                             rel_params: Value::unit(),
                         };
 
-                        resolve_virtual_schema_field(
+                        resolve_indexed_schema_field(
                             AttributeType { attr: &empty },
                             type_info,
                             executor,
@@ -252,7 +251,7 @@ impl<'v> AttributeType<'v> {
                     attrs,
                     property_data.property_id,
                     field_type,
-                    virtual_schema,
+                    schema_ctx,
                     executor,
                 )
             }
@@ -260,7 +259,7 @@ impl<'v> AttributeType<'v> {
                 attrs,
                 PropertyId::subject(id_property_data.relationship_id),
                 field_type,
-                virtual_schema,
+                schema_ctx,
                 executor,
             ),
             (FieldKind::EdgeProperty(property_data), _) => match &self.attr.rel_params.data {
@@ -268,7 +267,7 @@ impl<'v> AttributeType<'v> {
                     rel_attrs,
                     property_data.property_id,
                     field_type,
-                    virtual_schema,
+                    schema_ctx,
                     executor,
                 ),
                 other => {
@@ -283,7 +282,7 @@ impl<'v> AttributeType<'v> {
         map: &BTreeMap<PropertyId, Attribute>,
         property_id: PropertyId,
         type_ref: TypeRef,
-        virtual_schema: &Arc<VirtualSchema>,
+        schema_ctx: &Arc<SchemaCtx>,
         executor: &juniper::Executor<GqlContext, crate::gql_scalar::GqlScalar>,
     ) -> juniper::ExecutionResult<crate::gql_scalar::GqlScalar> {
         let attribute = match map.get(&property_id) {
@@ -293,21 +292,21 @@ impl<'v> AttributeType<'v> {
             }
         };
 
-        match virtual_schema.lookup_type_index(type_ref.unit) {
-            Ok(type_index) => resolve_virtual_schema_field(
+        match schema_ctx.lookup_type_index(type_ref.unit) {
+            Ok(type_index) => resolve_indexed_schema_field(
                 AttributeType { attr: attribute },
-                virtual_schema.indexed_type_info(type_index, TypingPurpose::Selection),
+                schema_ctx.indexed_type_info(type_index, TypingPurpose::Selection),
                 executor,
             ),
             Err(scalar_ref) => match (
                 type_ref.modifier,
-                virtual_schema
-                    .ontology()
+                schema_ctx
+                    .ontology
                     .get_serde_operator(scalar_ref.operator_id),
             ) {
                 (TypeModifier::Array(..), SerdeOperator::RelationSequence(operator)) => {
                     let attributes = attribute.value.cast_ref::<Vec<_>>();
-                    let processor = virtual_schema.ontology().new_serde_processor(
+                    let processor = schema_ctx.ontology.new_serde_processor(
                         operator.ranges[0].operator_id,
                         ProcessorMode::Read,
                         ProcessorLevel::new_root(),
@@ -328,8 +327,8 @@ impl<'v> AttributeType<'v> {
                     Ok(juniper::Value::List(graphql_values))
                 }
                 _ => {
-                    let scalar = virtual_schema
-                        .ontology()
+                    let scalar = schema_ctx
+                        .ontology
                         .new_serde_processor(
                             scalar_ref.operator_id,
                             ProcessorMode::Read,

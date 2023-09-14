@@ -1,16 +1,18 @@
 use std::fmt::Display;
 
 use juniper::{graphql_value, LookAheadArgument, LookAheadValue, Spanning};
-use ontol_runtime::{ontology::Ontology, serde::operator::SerdeOperatorId, smart_format, DefId};
-use serde::de::{self, DeserializeSeed, IntoDeserializer};
-
-use crate::{
-    gql_scalar::GqlScalar,
-    virtual_schema::{
+use ontol_runtime::{
+    graphql::{
         argument::{ArgKind, DomainFieldArg},
         TypingPurpose,
     },
+    ontology::Ontology,
+    serde::operator::SerdeOperatorId,
+    smart_format, DefId,
 };
+use serde::de::{self, DeserializeSeed, IntoDeserializer};
+
+use crate::gql_scalar::GqlScalar;
 
 pub struct ArgsWrapper<'a> {
     arguments: &'a [LookAheadArgument<'a, GqlScalar>],

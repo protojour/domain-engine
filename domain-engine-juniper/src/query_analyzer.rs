@@ -1,6 +1,10 @@
 use fnv::FnvHashMap;
 use juniper::LookAheadMethods;
 use ontol_runtime::{
+    graphql::{
+        argument::FieldArg,
+        data::{FieldData, FieldKind, NodeData, ObjectData, ObjectKind, TypeData, TypeKind},
+    },
     query::{EntityQuery, Query, StructOrUnionQuery, StructQuery},
     value::PropertyId,
     DefId, RelationshipId,
@@ -9,14 +13,7 @@ use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
-    gql_scalar::GqlScalar,
-    look_ahead_utils::ArgsWrapper,
-    virtual_schema::{
-        argument::FieldArg,
-        data::{FieldData, FieldKind, NodeData, ObjectData, ObjectKind, TypeData, TypeKind},
-        VirtualSchema,
-    },
-    GqlContext,
+    gql_scalar::GqlScalar, look_ahead_utils::ArgsWrapper, schema_ctx::SchemaCtx, GqlContext,
 };
 
 pub struct KeyedPropertySelection {
@@ -25,15 +22,15 @@ pub struct KeyedPropertySelection {
 }
 
 pub struct QueryAnalyzer<'a> {
-    virtual_schema: &'a VirtualSchema,
-    context: &'a GqlContext,
+    schema_ctx: &'a SchemaCtx,
+    gql_ctx: &'a GqlContext,
 }
 
 impl<'a> QueryAnalyzer<'a> {
-    pub fn new(virtual_schema: &'a VirtualSchema, context: &'a GqlContext) -> Self {
+    pub fn new(schema_ctx: &'a SchemaCtx, gql_ctx: &'a GqlContext) -> Self {
         Self {
-            virtual_schema,
-            context,
+            schema_ctx,
+            gql_ctx,
         }
     }
 
@@ -67,8 +64,7 @@ impl<'a> QueryAnalyzer<'a> {
     ) -> KeyedPropertySelection {
         match (
             &field_data.kind,
-            self.virtual_schema
-                .lookup_type_data(field_data.field_type.unit),
+            self.schema_ctx.lookup_type_data(field_data.field_type.unit),
         ) {
             (
                 FieldKind::Connection {
@@ -97,7 +93,7 @@ impl<'a> QueryAnalyzer<'a> {
                 let limit = args_wrapper
                     .deserialize::<u32>(first.name())
                     .unwrap()
-                    .unwrap_or(self.context.domain_engine.config().default_limit);
+                    .unwrap_or(self.gql_ctx.domain_engine.config().default_limit);
                 let cursor = args_wrapper.deserialize::<String>(after.name()).unwrap();
 
                 KeyedPropertySelection {
@@ -196,7 +192,7 @@ impl<'a> QueryAnalyzer<'a> {
                 ObjectKind::Edge(_)
                 | ObjectKind::Connection
                 | ObjectKind::Query
-                | ObjectKind::Mutation => panic!("Bug in virtual schema"),
+                | ObjectKind::Mutation => panic!("Bug in ONTOL protocol schema"),
             },
             TypeKind::Union(union_data) => {
                 let mut union_map: FnvHashMap<DefId, FnvHashMap<PropertyId, Query>> =
@@ -214,7 +210,7 @@ impl<'a> QueryAnalyzer<'a> {
                             .variants
                             .iter()
                             .find_map(|type_index| {
-                                let type_data = self.virtual_schema.type_data(*type_index);
+                                let type_data = self.schema_ctx.type_data(*type_index);
 
                                 if type_data.typename == applies_for {
                                     Some(type_data)

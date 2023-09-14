@@ -1,38 +1,39 @@
 use std::sync::Arc;
 
 use juniper::{GraphQLValue, ID};
-use ontol_runtime::serde::operator::{
-    FilteredVariants, SerdeOperator, SerdeOperatorId, SerdePropertyFlags,
-};
-use tracing::{trace, warn};
-
-use crate::{
-    gql_scalar::GqlScalar,
-    templates::{attribute_type::AttributeType, indexed_input_value::IndexedInputValue},
-    virtual_schema::{
+use ontol_runtime::{
+    graphql::{
         argument::{ArgKind, DomainFieldArg, FieldArg},
         data::{
             FieldKind, NativeScalarKind, Optionality, TypeIndex, TypeKind, TypeModifier, TypeRef,
             UnitTypeRef,
         },
-        QueryLevel, TypingPurpose, VirtualIndexedTypeInfo, VirtualSchema,
+        QueryLevel, TypingPurpose,
     },
+    serde::operator::{FilteredVariants, SerdeOperator, SerdeOperatorId, SerdePropertyFlags},
+    DefId,
+};
+use tracing::{trace, warn};
+
+use crate::{
+    gql_scalar::GqlScalar,
+    schema_ctx::{IndexedTypeInfo, SchemaCtx},
+    templates::{attribute_type::AttributeType, indexed_input_value::IndexedInputValue},
 };
 
-/// Juniper registry and virtual schema combined into
-/// one type to enable a nice unified API
-pub struct VirtualRegistry<'a, 'r> {
-    pub virtual_schema: &'a Arc<VirtualSchema>,
+/// SchemaCtx and juniper Registry combined together to provide more ergonimic API
+pub struct RegistryCtx<'a, 'r> {
+    pub schema_ctx: &'a Arc<SchemaCtx>,
     pub registry: &'a mut juniper::Registry<'r, GqlScalar>,
 }
 
-impl<'a, 'r> VirtualRegistry<'a, 'r> {
+impl<'a, 'r> RegistryCtx<'a, 'r> {
     pub fn new(
-        virtual_schema: &'a Arc<VirtualSchema>,
+        schema_ctx: &'a Arc<SchemaCtx>,
         registry: &'a mut juniper::Registry<'r, GqlScalar>,
     ) -> Self {
         Self {
-            virtual_schema,
+            schema_ctx,
             registry,
         }
     }
@@ -41,7 +42,7 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
         &mut self,
         type_index: TypeIndex,
     ) -> Vec<juniper::meta::Field<'r, GqlScalar>> {
-        let type_data = self.virtual_schema.type_data(type_index);
+        let type_data = self.schema_ctx.schema.type_data(type_index);
         match &type_data.kind {
             TypeKind::Object(object) => object
                 .fields
@@ -50,8 +51,8 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                     name: name.clone(),
                     description: match &field_data.kind {
                         FieldKind::Property(property) => self
-                            .virtual_schema
-                            .ontology()
+                            .schema_ctx
+                            .ontology
                             .get_docs(property.property_id.relationship_id.0),
                         _ => None,
                     },
@@ -71,10 +72,7 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
         output: &mut Vec<juniper::meta::Argument<'r, GqlScalar>>,
         typing_purpose: TypingPurpose,
     ) {
-        let serde_operator = self
-            .virtual_schema
-            .ontology()
-            .get_serde_operator(operator_id);
+        let serde_operator = self.schema_ctx.ontology.get_serde_operator(operator_id);
 
         match serde_operator {
             SerdeOperator::Struct(struct_op) => {
@@ -151,10 +149,7 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
         property_flags: SerdePropertyFlags,
         modifier: TypeModifier,
     ) -> juniper::meta::Argument<'r, GqlScalar> {
-        let operator = self
-            .virtual_schema
-            .ontology()
-            .get_serde_operator(operator_id);
+        let operator = self.schema_ctx.ontology.get_serde_operator(operator_id);
 
         trace!("register argument '{name}': {operator:?}");
 
@@ -181,14 +176,16 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
             }
             SerdeOperator::DynamicSequence => panic!("No dynamic sequence expected here"),
             SerdeOperator::RelationSequence(seq_op) => {
-                match self
-                    .virtual_schema
-                    .type_index_by_def(seq_op.def_variant.def_id, QueryLevel::Edge { rel_params })
-                {
+                match self.schema_ctx.type_index_by_def(
+                    seq_op.def_variant.def_id,
+                    QueryLevel::Edge {
+                        rel_params: rel_params.map(|rel_params| (todo!() as DefId, rel_params)),
+                    },
+                ) {
                     Some(type_index) => self.registry.arg::<Option<Vec<IndexedInputValue>>>(
                         name,
                         &self
-                            .virtual_schema
+                            .schema_ctx
                             .indexed_type_info(type_index, TypingPurpose::ReferenceInput),
                     ),
                     None => self.get_operator_argument(
@@ -214,7 +211,7 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
             ),
             SerdeOperator::Union(union_op) => {
                 let def_id = union_op.union_def_variant().def_id;
-                let type_info = self.virtual_schema.ontology().get_type_info(def_id);
+                let type_info = self.schema_ctx.ontology.get_type_info(def_id);
 
                 // If this is an entity, use Edge + ReferenceInput
                 // to get the option of just specifying an ID.
@@ -229,12 +226,12 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
                 };
 
                 let type_index = self
-                    .virtual_schema
+                    .schema_ctx
                     .type_index_by_def(def_id, query_level)
                     .expect("No union found");
 
                 let info = self
-                    .virtual_schema
+                    .schema_ctx
                     .indexed_type_info(type_index, typing_purpose);
 
                 match modifier.unit_optionality() {
@@ -247,12 +244,12 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
             SerdeOperator::Struct(struct_op) => {
                 let def_id = struct_op.def_variant.def_id;
                 let type_index = self
-                    .virtual_schema
+                    .schema_ctx
                     .type_index_by_def(def_id, QueryLevel::Node)
                     .expect("No struct found");
 
                 let info = self
-                    .virtual_schema
+                    .schema_ctx
                     .indexed_type_info(type_index, TypingPurpose::Input);
 
                 match modifier.unit_optionality() {
@@ -301,7 +298,7 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
             ArgKind::Def(type_index, _) => self.registry.arg::<IndexedInputValue>(
                 argument.name(),
                 &self
-                    .virtual_schema
+                    .schema_ctx
                     .indexed_type_info(type_index, argument.typing_purpose()),
             ),
             ArgKind::Operator(operator_id) => self.get_operator_argument(
@@ -322,12 +319,12 @@ impl<'a, 'r> VirtualRegistry<'a, 'r> {
     ) -> juniper::Type<'r>
     where
         I: juniper::GraphQLType<GqlScalar>
-            + juniper::GraphQLType<GqlScalar, TypeInfo = VirtualIndexedTypeInfo>,
+            + juniper::GraphQLType<GqlScalar, TypeInfo = IndexedTypeInfo>,
     {
         match type_ref.unit {
             UnitTypeRef::Indexed(type_index) => self.get_modified_type::<I>(
-                &VirtualIndexedTypeInfo {
-                    virtual_schema: self.virtual_schema.clone(),
+                &IndexedTypeInfo {
+                    schema_ctx: self.schema_ctx.clone(),
                     type_index,
                     typing_purpose,
                 },

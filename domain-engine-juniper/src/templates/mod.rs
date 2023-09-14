@@ -1,4 +1,4 @@
-use crate::virtual_schema::VirtualIndexedTypeInfo;
+use crate::schema_ctx::IndexedTypeInfo;
 
 pub mod attribute_type;
 pub mod indexed_input_value;
@@ -6,13 +6,13 @@ pub mod mutation_type;
 pub mod query_type;
 pub mod sequence_type;
 
-pub fn resolve_virtual_schema_field<'e, T, C, S>(
+pub fn resolve_indexed_schema_field<'e, T, C, S>(
     value: T,
-    sub_type_info: VirtualIndexedTypeInfo,
+    sub_type_info: IndexedTypeInfo,
     executor: &juniper::Executor<'e, 'e, C, S>,
 ) -> juniper::ExecutionResult<S>
 where
-    T: juniper::GraphQLValue<S, Context = C, TypeInfo = VirtualIndexedTypeInfo>,
+    T: juniper::GraphQLValue<S, Context = C, TypeInfo = IndexedTypeInfo>,
     C: juniper::Context + Send + Sync + 'static,
     S: juniper::ScalarValue + Send + Sync,
 {

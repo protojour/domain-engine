@@ -2,7 +2,7 @@ macro_rules! impl_graphql_value {
     ($ident:ident $(<$generics:tt>)?) => {
         impl $(<$generics>)? ::juniper::GraphQLValue<crate::gql_scalar::GqlScalar> for $ident $(<$generics>)? {
             type Context = crate::GqlContext;
-            type TypeInfo = crate::virtual_schema::VirtualIndexedTypeInfo;
+            type TypeInfo = crate::schema_ctx::IndexedTypeInfo;
 
             fn type_name<'i>(&self, info: &'i Self::TypeInfo) -> Option<&'i str> {
                 Some(info.typename())

@@ -1,4 +1,5 @@
 use ontol_runtime::{
+    graphql::TypingPurpose,
     value::{Attribute, Data, Value, ValueDebug},
     DefId,
 };
@@ -8,9 +9,8 @@ use crate::{
     gql_scalar::GqlScalar,
     macros::impl_graphql_value,
     query_analyzer::QueryAnalyzer,
-    templates::{attribute_type::AttributeType, resolve_virtual_schema_field},
-    virtual_registry::VirtualRegistry,
-    virtual_schema::TypingPurpose,
+    registry_ctx::RegistryCtx,
+    templates::{attribute_type::AttributeType, resolve_indexed_schema_field},
 };
 
 pub struct QueryType;
@@ -29,7 +29,7 @@ impl juniper::GraphQLType<GqlScalar> for QueryType {
     where
         GqlScalar: 'r,
     {
-        let mut reg = VirtualRegistry::new(&info.virtual_schema, registry);
+        let mut reg = RegistryCtx::new(&info.schema_ctx, registry);
         let fields = reg.get_fields(info.type_index);
 
         registry
@@ -48,10 +48,10 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
         executor: &'a juniper::Executor<Self::Context, GqlScalar>,
     ) -> juniper::BoxFuture<'a, juniper::ExecutionResult<GqlScalar>> {
         Box::pin(async move {
-            let virtual_schema = &info.virtual_schema;
+            let schema_ctx = &info.schema_ctx;
             let query_field = info.type_data().fields().unwrap().get(field_name).unwrap();
 
-            let entity_query = QueryAnalyzer::new(virtual_schema, executor.context())
+            let entity_query = QueryAnalyzer::new(schema_ctx, executor.context())
                 .analyze_entity_query(&executor.look_ahead(), query_field);
 
             debug!("Executing query {field_name}: {entity_query:#?}");
@@ -69,9 +69,9 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
 
             debug!("query result: {}", ValueDebug(&attribute.value));
 
-            resolve_virtual_schema_field(
+            resolve_indexed_schema_field(
                 AttributeType { attr: &attribute },
-                virtual_schema
+                schema_ctx
                     .indexed_type_info_by_unit(
                         query_field.field_type.unit,
                         TypingPurpose::Selection,

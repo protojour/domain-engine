@@ -1,13 +1,9 @@
+use ontol_runtime::graphql::data::{EdgeData, ObjectData, ObjectKind, TypeKind, TypeRef};
 use tracing::{debug, warn};
 
 use crate::{
-    gql_scalar::GqlScalar,
-    macros::impl_graphql_value,
-    virtual_registry::VirtualRegistry,
-    virtual_schema::{
-        data::{EdgeData, ObjectData, ObjectKind, TypeKind, TypeRef},
-        VirtualIndexedTypeInfo,
-    },
+    gql_scalar::GqlScalar, macros::impl_graphql_value, registry_ctx::RegistryCtx,
+    schema_ctx::IndexedTypeInfo,
 };
 
 pub struct IndexedInputValue;
@@ -15,7 +11,7 @@ pub struct IndexedInputValue;
 impl_graphql_value!(IndexedInputValue);
 
 impl juniper::GraphQLType<GqlScalar> for IndexedInputValue {
-    fn name(info: &VirtualIndexedTypeInfo) -> Option<&str> {
+    fn name(info: &IndexedTypeInfo) -> Option<&str> {
         Some(info.typename())
     }
 
@@ -26,7 +22,7 @@ impl juniper::GraphQLType<GqlScalar> for IndexedInputValue {
     where
         GqlScalar: 'r,
     {
-        let mut reg = VirtualRegistry::new(&info.virtual_schema, registry);
+        let mut reg = RegistryCtx::new(&info.schema_ctx, registry);
         match &info.type_data().kind {
             TypeKind::Object(ObjectData {
                 kind: ObjectKind::Node(node_data),

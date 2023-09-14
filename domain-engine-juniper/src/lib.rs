@@ -2,18 +2,22 @@ use std::sync::Arc;
 
 use domain_engine_core::DomainEngine;
 use gql_scalar::GqlScalar;
-use ontol_runtime::{ontology::Ontology, PackageId};
+use ontol_runtime::{
+    ontology::{DomainProtocol, Ontology},
+    PackageId,
+};
+use schema_ctx::SchemaCtx;
 use thiserror::Error;
 use tracing::debug;
 
 pub mod gql_scalar;
-mod virtual_schema;
 
 mod look_ahead_utils;
 mod macros;
 mod query_analyzer;
+mod registry_ctx;
+mod schema_ctx;
 mod templates;
-mod virtual_registry;
 
 #[derive(Clone)]
 pub struct GqlContext {
@@ -51,29 +55,41 @@ pub type Schema = juniper::RootNode<
 >;
 
 #[derive(Debug, Error)]
-pub enum SchemaBuildError {
-    #[error("unknown package")]
-    UnknownPackage,
+pub enum CreateSchemaError {
+    #[error("GraphQL protocol not found for given package")]
+    GraphqlProtocolNotFound,
 }
 
 pub fn create_graphql_schema(
     package_id: PackageId,
     ontology: Arc<Ontology>,
-) -> Result<Schema, SchemaBuildError> {
-    let virtual_schema = Arc::new(virtual_schema::VirtualSchema::build(package_id, ontology)?);
+) -> Result<Schema, CreateSchemaError> {
+    let ontol_protocol_schema = ontology
+        .get_domain_protocols(package_id)
+        .ok_or(CreateSchemaError::GraphqlProtocolNotFound)?
+        .iter()
+        .find_map(|domain_protocol| match domain_protocol {
+            DomainProtocol::GraphQL(schema) => Some(schema),
+        })
+        .ok_or(CreateSchemaError::GraphqlProtocolNotFound)?;
 
-    let schema = Schema::new_with_info(
+    let schema_ctx = Arc::new(SchemaCtx {
+        schema: ontol_protocol_schema.clone(),
+        ontology,
+    });
+
+    let juniper_schema = Schema::new_with_info(
         templates::query_type::QueryType,
         templates::mutation_type::MutationType,
         juniper::EmptySubscription::new(),
-        virtual_schema.query_type_info(),
-        virtual_schema.mutation_type_info(),
+        schema_ctx.query_type_info(),
+        schema_ctx.mutation_type_info(),
         (),
     );
 
-    debug!("Created schema \n{}", schema.as_schema_language());
+    debug!("Created schema \n{}", juniper_schema.as_schema_language());
 
-    Ok(schema)
+    Ok(juniper_schema)
 }
 
 /// Just some test code to be able to look at some macro expansions
