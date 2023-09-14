@@ -3,7 +3,7 @@ hljs.registerLanguage("ontol", (hljs) => ({
   keywords: {
     keyword: "def fmt map pub rel use as",
     built_in: "is id gen default auto create_time update_time",
-    type: "boolean number integer i64 float f64 string datetime date time regex uuid",
+    type: "boolean number integer i64 float f64 text datetime date time regex uuid",
     literal: "true false inf nan",
   },
   contains: [

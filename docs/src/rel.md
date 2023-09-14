@@ -5,10 +5,10 @@ The `rel` statement defines a relation, and has three parameters; the first is t
 The properties of a struct [`def`](def.md) are defined using relations:
 
 ```ontol
-rel some_def 'relation_name': string
+rel some_def 'relation_name': text
 ```
 
-Here `some_def` is the subject, `'relation_name':` names the relation itself, and `string` is the object. In other words `some_def` has a property called `'relation_name'` which is a `string`.
+Here `some_def` is the subject, `'relation_name':` names the relation itself, and `text` is the object. In other words `some_def` has a property called `'relation_name'` which is a `text`.
 
 ## local rel
 
@@ -16,7 +16,7 @@ A common pattern is to define relations locally, within the block of a def. In t
 
 ```ontol
 def some_def {
-    rel . 'relation_name': string
+    rel . 'relation_name': text
 }
 ```
 
@@ -24,12 +24,12 @@ This is the same as:
 
 ```ontol
 def some_def {}
-rel some_def 'relation_name': string
+rel some_def 'relation_name': text
 ```
 
 ## one-to-one def relation
 
-`rel` statements always describe relations between `def`s. If the object is a struct def (i.e. not a simple scalar def like `string`), the relation can have different names on each end of the relation. This is indicated by a `::` double colon operator:
+`rel` statements always describe relations between `def`s. If the object is a struct def (i.e. not a simple scalar def like `text`), the relation can have different names on each end of the relation. This is indicated by a `::` double colon operator:
 
 ```ontol
 rel def_a 'DefB'::'DefA' def_b

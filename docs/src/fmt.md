@@ -15,7 +15,7 @@ fmt '' => 'prefix/' => uuid
 Starting from an empty sequence `[]`, the `fmt` statement builds a sequence matching pattern. The pattern below describes a sequence of three consecutive strings.
 
 ```ontol
-fmt [] => string => string => string
+fmt [] => text => text => text
 ```
 
 ## usage

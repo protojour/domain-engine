@@ -14,7 +14,7 @@ def some_def {}
 // ...
 
 def some_def {
-    rel .'some_prop': string
+    rel .'some_prop': text
 }
 ```
 

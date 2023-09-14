@@ -9,7 +9,7 @@ integer
 i64
 float
 f64
-string
+text
 datetime
 date
 time

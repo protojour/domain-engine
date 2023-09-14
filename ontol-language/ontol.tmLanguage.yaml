@@ -40,7 +40,7 @@ patterns:
 
   - comment: built-in defs
     name: storage.type.ontol
-    match: \b(boolean|number|integer|i64|float|f64|string|datetime|date|time|uuid|regex|seq|dict|fn)\b
+    match: \b(boolean|number|integer|i64|float|f64|text|datetime|date|time|uuid|regex|seq|dict|fn)\b
 
   - comment: built-in constant value
     name: constant.language.ontol
