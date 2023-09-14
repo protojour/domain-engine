@@ -1,4 +1,5 @@
 use fnv::FnvHashMap;
+use serde::{Deserialize, Serialize};
 
 use crate::{DefId, PackageId};
 
@@ -7,6 +8,7 @@ use super::{
     QueryLevel,
 };
 
+#[derive(Serialize, Deserialize)]
 pub struct GraphqlSchema {
     pub package_id: PackageId,
     pub query: TypeIndex,

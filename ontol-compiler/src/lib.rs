@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use codegen::task::{execute_codegen_tasks, CodegenTasks};
 use def::{DefKind, Defs, LookupRelationshipMeta, RelationshipMeta, TypeDef};
 
@@ -9,7 +11,9 @@ use mem::Mem;
 use namespace::Namespaces;
 use ontol_runtime::{
     config::PackageConfig,
-    ontology::{Domain, EntityInfo, EntityRelationship, MapMeta, Ontology, TypeInfo},
+    ontology::{
+        Domain, DomainProtocol, EntityInfo, EntityRelationship, MapMeta, Ontology, TypeInfo,
+    },
     serde::SerdeKey,
     value::PropertyId,
     DataModifier, DefId, DefVariant, PackageId,
@@ -245,15 +249,23 @@ impl<'m> Compiler<'m> {
         }
 
         // protocol handling
-        for package_id in package_ids.iter().cloned() {
-            if package_id != ONTOL_PKG {
-                generate_graphql_schema(
-                    package_id,
-                    builder.partial_ontology(),
-                    &mut serde_generator,
-                );
+        let domain_protocols = {
+            let mut protocols: FnvHashMap<PackageId, Vec<DomainProtocol>> = Default::default();
+            for package_id in package_ids.iter().cloned() {
+                if package_id != ONTOL_PKG {
+                    let schema = generate_graphql_schema(
+                        package_id,
+                        builder.partial_ontology(),
+                        &mut serde_generator,
+                    );
+                    protocols
+                        .entry(package_id)
+                        .or_default()
+                        .push(DomainProtocol::GraphQL(Arc::new(schema)));
+                }
             }
-        }
+            protocols
+        };
 
         let (serde_operators, serde_operators_per_def) = serde_generator.finish();
 
@@ -296,6 +308,7 @@ impl<'m> Compiler<'m> {
             .string_like_types(self.defs.string_like_types)
             .text_patterns(self.text_patterns.text_patterns)
             .value_generators(self.relations.value_generators)
+            .domain_protocols(domain_protocols)
             .build()
     }
 

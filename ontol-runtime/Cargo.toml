@@ -13,7 +13,7 @@ smartstring = { workspace = true, features = ["serde"] }
 smallvec = { workspace = true, features = ["serde"] }
 indexmap = { workspace = true, features = ["serde"] }
 tracing.workspace = true
-serde = { workspace = true, features = ["derive"] }
+serde = { workspace = true, features = ["derive", "rc"] }
 serde_json.workspace = true
 fnv.workspace = true
 uuid.workspace = true

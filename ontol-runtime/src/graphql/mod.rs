@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{
     serde::{
         operator::SerdeOperatorId,
@@ -10,7 +12,7 @@ pub mod argument;
 pub mod data;
 pub mod schema;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
 pub enum TypingPurpose {
     Selection,
     Input,
@@ -38,7 +40,7 @@ impl TypingPurpose {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub enum QueryLevel {
     Node,
     Edge {

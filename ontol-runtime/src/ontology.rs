@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ops::Range};
+use std::{collections::HashMap, fmt::Debug, ops::Range, sync::Arc};
 
 use ::serde::{Deserialize, Serialize};
 use fnv::FnvHashMap;
@@ -7,6 +7,7 @@ use smartstring::alias::String;
 
 use crate::{
     config::PackageConfig,
+    graphql::schema::GraphqlSchema,
     serde::{
         operator::{SerdeOperator, SerdeOperatorId},
         processor::{ProcessorLevel, ProcessorMode, SerdeProcessor},
@@ -34,6 +35,7 @@ pub struct Ontology {
     pub(crate) lib: Lib,
 
     domain_table: FnvHashMap<PackageId, Domain>,
+    domain_protocols: FnvHashMap<PackageId, Vec<DomainProtocol>>,
     package_config_table: FnvHashMap<PackageId, PackageConfig>,
     docs: FnvHashMap<DefId, Vec<String>>,
     serde_operators_per_def: HashMap<SerdeKey, SerdeOperatorId>,
@@ -52,6 +54,7 @@ impl Ontology {
                 string_like_types: Default::default(),
                 text_patterns: Default::default(),
                 domain_table: Default::default(),
+                domain_protocols: Default::default(),
                 package_config_table: Default::default(),
                 docs: Default::default(),
                 lib: Lib::default(),
@@ -253,6 +256,19 @@ pub enum PropertyFlowData {
     DependentOn(PropertyId),
 }
 
+#[derive(Serialize, Deserialize)]
+pub enum DomainProtocol {
+    GraphQL(Arc<GraphqlSchema>),
+}
+
+impl Debug for DomainProtocol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::GraphQL(_) => write!(f, "GraphQL"),
+        }
+    }
+}
+
 pub struct OntologyBuilder {
     ontology: Ontology,
 }
@@ -271,6 +287,14 @@ impl OntologyBuilder {
         self.ontology
             .package_config_table
             .insert(package_id, config);
+    }
+
+    pub fn domain_protocols(
+        mut self,
+        domain_protocols: FnvHashMap<PackageId, Vec<DomainProtocol>>,
+    ) -> Self {
+        self.ontology.domain_protocols = domain_protocols;
+        self
     }
 
     pub fn docs(mut self, docs: FnvHashMap<DefId, Vec<String>>) -> Self {

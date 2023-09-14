@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{serde::operator::SerdeOperatorId, DefId};
 
 use super::{data::TypeIndex, TypingPurpose};
@@ -19,7 +21,7 @@ pub trait DomainFieldArg: FieldArg {
     fn kind(&self) -> ArgKind;
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Input(pub TypeIndex, pub DefId, pub TypingPurpose);
 
 impl FieldArg for Input {
@@ -38,7 +40,7 @@ impl DomainFieldArg for Input {
     }
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Id(pub SerdeOperatorId);
 
 impl FieldArg for Id {
@@ -53,7 +55,7 @@ impl DomainFieldArg for Id {
     }
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct First;
 
 impl FieldArg for First {
@@ -62,7 +64,7 @@ impl FieldArg for First {
     }
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct After;
 
 impl FieldArg for After {

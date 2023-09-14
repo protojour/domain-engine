@@ -1,4 +1,5 @@
 use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
 use smartstring::alias::String;
 
 use crate::{
@@ -7,10 +8,10 @@ use crate::{
 
 use super::argument::{self};
 
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
 pub struct TypeIndex(pub u32);
 
-#[derive(Clone, Copy, Default, Debug)]
+#[derive(Clone, Copy, Default, Serialize, Deserialize, Debug)]
 pub enum Optionality {
     #[default]
     Mandatory,
@@ -27,7 +28,7 @@ impl Optionality {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub enum TypeModifier {
     Unit(Optionality),
     Array(Optionality, Optionality),
@@ -46,19 +47,19 @@ impl TypeModifier {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub enum UnitTypeRef {
     Indexed(TypeIndex),
     NativeScalar(NativeScalarRef),
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub struct NativeScalarRef {
     pub operator_id: SerdeOperatorId,
     pub kind: NativeScalarKind,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub enum NativeScalarKind {
     Unit,
     Boolean,
@@ -68,7 +69,7 @@ pub enum NativeScalarKind {
     ID,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub struct TypeRef {
     pub modifier: TypeModifier,
     pub unit: UnitTypeRef,
@@ -97,6 +98,7 @@ impl TypeRef {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct TypeData {
     pub typename: String,
     pub input_typename: Option<String>,
@@ -140,17 +142,20 @@ impl TypeData {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub enum TypeKind {
     Object(ObjectData),
     Union(UnionData),
     CustomScalar(ScalarData),
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct ObjectData {
     pub fields: IndexMap<String, FieldData>,
     pub kind: ObjectKind,
 }
 
+#[derive(Serialize, Deserialize)]
 pub enum ObjectKind {
     Node(NodeData),
     Edge(EdgeData),
@@ -159,27 +164,31 @@ pub enum ObjectKind {
     Mutation,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct NodeData {
     pub def_id: DefId,
     pub entity_id: Option<DefId>,
     pub operator_id: SerdeOperatorId,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct UnionData {
     pub union_def_id: DefId,
     pub variants: Vec<TypeIndex>,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct EdgeData {
     pub node_operator_id: SerdeOperatorId,
     pub rel_edge_ref: Option<UnitTypeRef>,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct ScalarData {
     pub serde_operator_id: SerdeOperatorId,
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct FieldData {
     pub kind: FieldKind,
     pub field_type: TypeRef,
@@ -194,7 +203,7 @@ impl FieldData {
     }
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum FieldKind {
     Property(PropertyData),
     EdgeProperty(PropertyData),
@@ -218,13 +227,13 @@ pub enum FieldKind {
     },
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct PropertyData {
     pub property_id: PropertyId,
     pub value_operator_id: SerdeOperatorId,
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct IdPropertyData {
     pub relationship_id: RelationshipId,
     pub operator_id: SerdeOperatorId,
