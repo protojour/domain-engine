@@ -1,10 +1,13 @@
 use assert_matches::assert_matches;
-use ontol_runtime::graphql::{
-    data::{
-        FieldKind, NativeScalarKind, NativeScalarRef, ObjectData, ScalarData, TypeData, TypeIndex,
-        TypeKind, UnitTypeRef,
+use ontol_runtime::{
+    graphql::{
+        data::{
+            FieldKind, NativeScalarKind, NativeScalarRef, ObjectData, ScalarData, TypeData,
+            TypeIndex, TypeKind, UnitTypeRef,
+        },
+        schema::{GraphqlSchema, QueryLevel},
     },
-    schema::{GraphqlSchema, QueryLevel},
+    serde::operator::SerdeOperator,
 };
 use ontol_test_utils::{
     examples::ARTIST_AND_INSTRUMENT, expect_eq, OntolTest, TestCompile, ROOT_SRC_NAME,
@@ -78,6 +81,30 @@ fn test_graphql_default_scalar() {
 
         let native = prop_field.field_type.unit.native_scalar();
         assert_matches!(native.kind, NativeScalarKind::String);
+    });
+}
+
+#[test]
+fn test_graphql_scalar_array() {
+    "
+    pub def foo {
+        rel .id: { fmt '' => text => . }
+        rel .'tags': [text]
+    }
+    "
+    .compile_ok(|test| {
+        let (_schema, test) = schema_test(&test, ROOT_SRC_NAME);
+        let foo_node = test.type_data("foo", QueryLevel::Node);
+        let foo_object = foo_node.object_data();
+
+        let prop_field = foo_object.fields.get("tags").unwrap();
+        assert_matches!(prop_field.kind, FieldKind::Property(_));
+
+        let native = prop_field.field_type.unit.native_scalar();
+        assert_matches!(native.kind, NativeScalarKind::String);
+
+        let operator = test.test.ontology.get_serde_operator(native.operator_id);
+        assert_matches!(operator, SerdeOperator::RelationSequence(_));
     });
 }
 

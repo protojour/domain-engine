@@ -672,12 +672,18 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
             } else if let RelParams::Type(_) = meta.relationship.rel_params {
                 todo!("Edge list with rel params");
             } else {
-                let unit = self.get_def_type_ref(value_def_id, QLevel::Node);
+                let mut unit = self.get_def_type_ref(value_def_id, QLevel::Node);
 
                 let value_operator_id = self
                     .serde_generator
                     .gen_operator_id(gql_array_serde_key(value_def_id))
                     .unwrap();
+
+                debug!("Array value operator id: {value_operator_id:?}");
+
+                if let UnitTypeRef::NativeScalar(native) = &mut unit {
+                    native.operator_id = value_operator_id;
+                }
 
                 FieldData {
                     kind: property_field_producer.make_property(PropertyData {
