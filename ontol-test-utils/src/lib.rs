@@ -97,9 +97,10 @@ impl OntolTest {
         self.ontology
             .domain_interfaces(self.get_package_id(source_name))
             .iter()
-            .find_map(|interface| match interface {
-                DomainInterface::GraphQL(schema) => Some(schema),
+            .map(|interface| match interface {
+                DomainInterface::GraphQL(schema) => schema,
             })
+            .next()
             .expect("GraphQL schema not found in interfaces")
     }
 }

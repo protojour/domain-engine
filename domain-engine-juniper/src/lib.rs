@@ -67,9 +67,10 @@ pub fn create_graphql_schema(
     let ontol_interface_schema = ontology
         .domain_interfaces(package_id)
         .iter()
-        .find_map(|interface| match interface {
-            DomainInterface::GraphQL(schema) => Some(schema),
+        .map(|interface| match interface {
+            DomainInterface::GraphQL(schema) => schema,
         })
+        .next()
         .ok_or(CreateSchemaError::GraphqlInterfaceNotFound)?;
 
     let schema_ctx = Arc::new(SchemaCtx {
