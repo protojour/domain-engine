@@ -596,7 +596,6 @@ name = "domain-engine-juniper"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "convert_case",
  "domain-engine-core",
  "fnv",
  "indexmap",
