@@ -61,6 +61,27 @@ fn test_graphql_i64_custom_scalar() {
 }
 
 #[test]
+fn test_graphql_default_scalar() {
+    "
+    pub def foo {
+        rel .id: { fmt '' => text => . }
+        rel .'default'(rel .default := ''): text
+    }
+    "
+    .compile_ok(|test| {
+        let (_schema, test) = schema_test(&test, ROOT_SRC_NAME);
+        let foo_node = test.type_data("foo", QueryLevel::Node);
+        let foo_object = foo_node.object_data();
+
+        let prop_field = foo_object.fields.get("default").unwrap();
+        assert_matches!(prop_field.kind, FieldKind::Property(_));
+
+        let native = prop_field.field_type.unit.native_scalar();
+        assert_matches!(native.kind, NativeScalarKind::String);
+    });
+}
+
+#[test]
 fn test_graphql_artist_and_instrument() {
     ARTIST_AND_INSTRUMENT.1.compile_ok(|test| {
         let (schema, test) = schema_test(&test, ROOT_SRC_NAME);
@@ -154,6 +175,7 @@ impl UnitTypeRefExt for UnitTypeRef {
         *index
     }
 
+    #[track_caller]
     fn native_scalar(&self) -> &NativeScalarRef {
         let UnitTypeRef::NativeScalar(native_scalar_ref) = self else {
             panic!("not a native scalar: {self:?}");

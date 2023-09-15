@@ -303,7 +303,6 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
 
                     let typename = self.namespace.edge(Some(rel_type_info), type_info);
 
-                    debug!("Need to harvest fields for rel edge: `{typename}` {rel_def_id:?} / {edge_index:?}");
                     self.lazy_tasks.push(LazyTask::HarvestFields {
                         type_index: edge_index,
                         def_id: rel_def_id,
@@ -610,8 +609,21 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                                 .serde_generator
                                 .gen_operator_id(gql_serde_key(rel_def_id))
                                 .unwrap();
-                            QLevel::Edge {
-                                rel_params: Some((rel_def_id, operator_id)),
+                            let repr_kind = self.seal_ctx.get_repr_kind(&rel_def_id);
+
+                            if matches!(repr_kind, Some(ReprKind::Struct)) {
+                                // BUG(repr): The ReprKind should be Unit when the properties are None.
+                                if self.relations.properties_by_def_id(rel_def_id).is_none() {
+                                    QLevel::Node
+                                } else {
+                                    QLevel::Edge {
+                                        rel_params: Some((rel_def_id, operator_id)),
+                                    }
+                                }
+                            } else {
+                                QLevel::Edge {
+                                    rel_params: Some((rel_def_id, operator_id)),
+                                }
                             }
                         }
                         RelParams::IndexRange(_) => todo!(),
