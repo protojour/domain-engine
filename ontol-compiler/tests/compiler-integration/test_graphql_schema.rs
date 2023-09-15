@@ -4,8 +4,7 @@ use ontol_runtime::graphql::{
         FieldKind, NativeScalarKind, NativeScalarRef, ObjectData, ScalarData, TypeData, TypeIndex,
         TypeKind, UnitTypeRef,
     },
-    schema::GraphqlSchema,
-    QueryLevel,
+    schema::{GraphqlSchema, QueryLevel},
 };
 use ontol_test_utils::{
     examples::ARTIST_AND_INSTRUMENT, expect_eq, OntolTest, TestCompile, ROOT_SRC_NAME,

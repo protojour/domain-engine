@@ -1,5 +1,5 @@
 use ontol_runtime::{
-    graphql::TypingPurpose,
+    graphql::schema::TypingPurpose,
     value::{Attribute, Data, Value, ValueDebug},
     DefId,
 };

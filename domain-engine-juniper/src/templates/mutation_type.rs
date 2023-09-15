@@ -1,6 +1,6 @@
 use juniper::LookAheadMethods;
 use ontol_runtime::graphql::data::FieldKind;
-use ontol_runtime::graphql::TypingPurpose;
+use ontol_runtime::graphql::schema::TypingPurpose;
 use ontol_runtime::query::{Query, StructOrUnionQuery};
 use ontol_runtime::value::ValueDebug;
 use tracing::trace;

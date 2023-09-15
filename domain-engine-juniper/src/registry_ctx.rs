@@ -8,10 +8,9 @@ use ontol_runtime::{
             FieldKind, NativeScalarKind, Optionality, TypeIndex, TypeKind, TypeModifier, TypeRef,
             UnitTypeRef,
         },
-        QueryLevel, TypingPurpose,
+        schema::{QueryLevel, TypingPurpose},
     },
     serde::operator::{FilteredVariants, SerdeOperator, SerdeOperatorId, SerdePropertyFlags},
-    DefId,
 };
 use tracing::{trace, warn};
 
@@ -176,12 +175,10 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             }
             SerdeOperator::DynamicSequence => panic!("No dynamic sequence expected here"),
             SerdeOperator::RelationSequence(seq_op) => {
-                match self.schema_ctx.type_index_by_def(
-                    seq_op.def_variant.def_id,
-                    QueryLevel::Edge {
-                        rel_params: rel_params.map(|rel_params| (todo!() as DefId, rel_params)),
-                    },
-                ) {
+                match self
+                    .schema_ctx
+                    .type_index_by_def(seq_op.def_variant.def_id, QueryLevel::Edge { rel_params })
+                {
                     Some(type_index) => self.registry.arg::<Option<Vec<IndexedInputValue>>>(
                         name,
                         &self

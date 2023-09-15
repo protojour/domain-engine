@@ -228,6 +228,8 @@ impl ser::Serializer for GqlScalarSerializer {
 
     fn serialize_i64(self, value: i64) -> SerResult {
         if value >= i32::MIN as i64 && value <= i32::MAX as i64 {
+            // BUG: This hack doesn't belong here.
+            // What GraphQL should do is to use a proper SerdeOperator::I32 that calls serialize_i32.
             Ok(GqlScalar::I32(value as i32))
         } else {
             Ok(GqlScalar::F64(value as f64))

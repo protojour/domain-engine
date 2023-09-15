@@ -4,7 +4,7 @@ use juniper::{graphql_value, LookAheadArgument, LookAheadValue, Spanning};
 use ontol_runtime::{
     graphql::{
         argument::{ArgKind, DomainFieldArg},
-        TypingPurpose,
+        schema::TypingPurpose,
     },
     ontology::Ontology,
     serde::operator::SerdeOperatorId,

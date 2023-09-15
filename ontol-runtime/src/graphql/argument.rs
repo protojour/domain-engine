@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{serde::operator::SerdeOperatorId, DefId};
 
-use super::{data::TypeIndex, TypingPurpose};
+use super::{data::TypeIndex, schema::TypingPurpose};
 
 pub enum ArgKind {
     Def(TypeIndex, DefId),

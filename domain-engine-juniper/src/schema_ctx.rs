@@ -3,8 +3,7 @@ use std::sync::Arc;
 use ontol_runtime::{
     graphql::{
         data::{NativeScalarRef, TypeData, TypeIndex, UnitTypeRef},
-        schema::GraphqlSchema,
-        QueryLevel, TypingPurpose,
+        schema::{GraphqlSchema, QueryLevel, TypingPurpose},
     },
     ontology::Ontology,
     DefId, PackageId,

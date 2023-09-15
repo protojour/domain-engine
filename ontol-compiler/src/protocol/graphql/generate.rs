@@ -8,8 +8,7 @@ use ontol_runtime::{
             NodeData, ObjectData, ObjectKind, Optionality, PropertyData, ScalarData, TypeData,
             TypeIndex, TypeKind, TypeModifier, TypeRef, UnionData, UnitTypeRef,
         },
-        schema::GraphqlSchema,
-        QueryLevel, TypingPurpose,
+        schema::{GraphqlSchema, QueryLevel, TypingPurpose},
     },
     ontology::{Ontology, PropertyCardinality},
     serde::{
@@ -83,7 +82,7 @@ pub fn generate_graphql_schema<'c>(
                 name = type_info.name
             );
 
-            let type_ref = builder.get_def_type_ref(type_info.def_id, QueryLevel::Node);
+            let type_ref = builder.get_def_type_ref(type_info.def_id, QLevel::Node);
 
             if let Some(entity_info) = entity_check(builder.schema, type_ref) {
                 builder.add_entity_queries_and_mutations(entity_info);
@@ -211,8 +210,12 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
         self.schema.mutation = index;
     }
 
-    pub fn get_def_type_ref(&mut self, def_id: DefId, level: QueryLevel) -> UnitTypeRef {
-        if let Some(type_index) = self.schema.type_index_by_def.get(&(def_id, level)) {
+    pub fn get_def_type_ref(&mut self, def_id: DefId, level: QLevel) -> UnitTypeRef {
+        if let Some(type_index) = self
+            .schema
+            .type_index_by_def
+            .get(&(def_id, level.as_query_level()))
+        {
             return UnitTypeRef::Indexed(*type_index);
         }
 
@@ -229,7 +232,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
         TypeIndex(self.schema.types.len() as u32)
     }
 
-    fn alloc_def_type_index(&mut self, def_id: DefId, level: QueryLevel) -> TypeIndex {
+    fn alloc_def_type_index(&mut self, def_id: DefId, level: QLevel) -> TypeIndex {
         let index = self.next_type_index();
         // note: this will be overwritten later
         self.schema.types.push(TypeData {
@@ -240,19 +243,21 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 serde_operator_id: SerdeOperatorId(0),
             }),
         });
-        self.schema.type_index_by_def.insert((def_id, level), index);
+        self.schema
+            .type_index_by_def
+            .insert((def_id, level.as_query_level()), index);
         index
     }
 
-    fn make_def_type(&mut self, def_id: DefId, level: QueryLevel) -> NewType {
+    fn make_def_type(&mut self, def_id: DefId, level: QLevel) -> NewType {
         debug!("get type info for {def_id:?}");
 
         match level {
-            QueryLevel::Node => self.make_node_type(def_id),
-            QueryLevel::Edge { rel_params } => {
+            QLevel::Node => self.make_node_type(def_id),
+            QLevel::Edge { rel_params } => {
                 let type_info = self.partial_ontology.get_type_info(def_id);
                 let edge_index = self.alloc_def_type_index(def_id, level);
-                let node_ref = self.get_def_type_ref(def_id, QueryLevel::Node);
+                let node_ref = self.get_def_type_ref(def_id, QLevel::Node);
 
                 let mut field_namespace = GraphqlNamespace::new();
 
@@ -268,7 +273,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
 
                 if let Some((rel_def_id, _operator_id)) = rel_params {
                     let rel_type_info = self.partial_ontology.get_type_info(rel_def_id);
-                    let rel_edge_ref = self.get_def_type_ref(rel_def_id, QueryLevel::Node);
+                    let rel_edge_ref = self.get_def_type_ref(rel_def_id, QLevel::Node);
                     NewType::Indexed(
                         edge_index,
                         TypeData {
@@ -304,10 +309,10 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                     )
                 }
             }
-            QueryLevel::Connection { rel_params } => {
+            QLevel::Connection { rel_params } => {
                 let type_info = self.partial_ontology.get_type_info(def_id);
                 let connection_index = self.alloc_def_type_index(def_id, level);
-                let edge_ref = self.get_def_type_ref(def_id, QueryLevel::Edge { rel_params });
+                let edge_ref = self.get_def_type_ref(def_id, QLevel::Edge { rel_params });
 
                 NewType::Indexed(
                     connection_index,
@@ -349,7 +354,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
         match repr_kind {
             ReprKind::Unit | ReprKind::Struct => {
                 let type_info = self.partial_ontology.get_type_info(def_id);
-                let type_index = self.alloc_def_type_index(def_id, QueryLevel::Node);
+                let type_index = self.alloc_def_type_index(def_id, QLevel::Node);
 
                 let operator_id = type_info.operator_id.unwrap();
 
@@ -380,7 +385,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
             }
             ReprKind::StructIntersection(members) => {
                 let type_info = self.partial_ontology.get_type_info(def_id);
-                let type_index = self.alloc_def_type_index(def_id, QueryLevel::Node);
+                let type_index = self.alloc_def_type_index(def_id, QLevel::Node);
 
                 let operator_id = type_info.operator_id.unwrap();
 
@@ -413,7 +418,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
             }
             ReprKind::Union(variants) | ReprKind::StructUnion(variants) => {
                 let type_info = self.partial_ontology.get_type_info(def_id);
-                let node_index = self.alloc_def_type_index(def_id, QueryLevel::Node);
+                let node_index = self.alloc_def_type_index(def_id, QLevel::Node);
 
                 let mut needs_scalar = false;
                 let mut type_variants = vec![];
@@ -424,7 +429,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                             needs_scalar = true;
                             break;
                         }
-                        _ => match self.get_def_type_ref(*variant_def_id, QueryLevel::Node) {
+                        _ => match self.get_def_type_ref(*variant_def_id, QLevel::Node) {
                             UnitTypeRef::Indexed(type_index) => {
                                 type_variants.push(type_index);
                             }
@@ -465,7 +470,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                     .serde_generator
                     .gen_operator_id(SerdeKey::no_modifier(def_id))
                     .unwrap();
-                let type_index = self.alloc_def_type_index(def_id, QueryLevel::Node);
+                let type_index = self.alloc_def_type_index(def_id, QLevel::Node);
 
                 NewType::Indexed(
                     type_index,
@@ -491,7 +496,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 } else {
                     let type_info = self.partial_ontology.get_type_info(def_id);
                     NewType::Indexed(
-                        self.alloc_def_type_index(type_info.def_id, QueryLevel::Node),
+                        self.alloc_def_type_index(type_info.def_id, QLevel::Node),
                         TypeData {
                             // FIXME: Must make sure that domain typenames take precedence over generated ones
                             typename: smart_format!("i64"),
@@ -562,20 +567,20 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
 
             debug!("register struct field `{prop_key}`");
 
-            let query_level = match meta.relationship.rel_params {
-                RelParams::Unit => QueryLevel::Node,
+            let qlevel = match meta.relationship.rel_params {
+                RelParams::Unit => QLevel::Node,
                 RelParams::Type(rel_def_id) => {
                     let operator_id = self
                         .serde_generator
                         .gen_operator_id(SerdeKey::no_modifier(rel_def_id))
                         .unwrap();
-                    QueryLevel::Edge {
+                    QLevel::Edge {
                         rel_params: Some((rel_def_id, operator_id)),
                     }
                 }
                 RelParams::IndexRange(_) => todo!(),
             };
-            let unit_ref = self.get_def_type_ref(type_def_id, query_level);
+            let unit_ref = self.get_def_type_ref(type_def_id, qlevel);
 
             let value_operator_id = self
                 .serde_generator
@@ -607,7 +612,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
         let node_ref = UnitTypeRef::Indexed(entity_data.type_index);
         let connection_ref = self.get_def_type_ref(
             entity_data.node_def_id,
-            QueryLevel::Connection { rel_params: None },
+            QLevel::Connection { rel_params: None },
         );
 
         let id_type_info = self.partial_ontology.get_type_info(entity_data.id_def_id);
@@ -708,5 +713,30 @@ fn get_native_scalar_kind(
         | SerdeOperator::DynamicSequence
         | SerdeOperator::RelationSequence(_)
         | SerdeOperator::ConstructorSequence(_)) => panic!("not a native scalar: {op:?}"),
+    }
+}
+
+/// An extension of QueryLevel used only inside the generator
+pub enum QLevel {
+    Node,
+    Edge {
+        rel_params: Option<(DefId, SerdeOperatorId)>,
+    },
+    Connection {
+        rel_params: Option<(DefId, SerdeOperatorId)>,
+    },
+}
+
+impl QLevel {
+    fn as_query_level(&self) -> QueryLevel {
+        match self {
+            Self::Node => QueryLevel::Node,
+            Self::Edge { rel_params } => QueryLevel::Edge {
+                rel_params: rel_params.map(|(_, op_id)| op_id),
+            },
+            Self::Connection { rel_params } => QueryLevel::Connection {
+                rel_params: rel_params.map(|(_, op_id)| op_id),
+            },
+        }
     }
 }

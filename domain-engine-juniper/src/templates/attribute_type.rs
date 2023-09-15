@@ -7,7 +7,7 @@ use ontol_runtime::{
             FieldKind, ObjectData, ObjectKind, TypeData, TypeIndex, TypeKind, TypeModifier,
             TypeRef, UnionData,
         },
-        TypingPurpose,
+        schema::TypingPurpose,
     },
     serde::{
         operator::SerdeOperator,

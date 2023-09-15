@@ -23,12 +23,17 @@ fn test_graphql_empty_schema() {
 }
 
 #[test(tokio::test)]
-async fn test_graphql_basic_schema() {
+async fn test_graphql_smallint() {
     let (test, [schema]) = "
     pub def foo_id { fmt '' => text => . }
+    def smallint {
+        rel .is: integer
+        rel .min: 0
+        rel .max: 255
+    }
     pub def foo {
         rel foo_id identifies: .
-        rel .'prop': i64
+        rel .'prop': smallint
     }
     "
     .compile_schemas([ROOT]);
@@ -82,9 +87,7 @@ async fn test_graphql_basic_schema() {
         .await,
         expected = Ok(graphql_value!({
             "createfoo": {
-                // BUG: Floating point. The ontol type should be `i32` to make this an integer.
-                // BUG: Also, `i64` cannot be serialized to floating point.
-                "prop": 42.0
+                "prop": 42
             }
         })),
     );
