@@ -15,7 +15,7 @@ use ontol_runtime::{
         operator::{SerdeOperator, SerdeOperatorId},
         SerdeKey,
     },
-    smart_format, DefId, PackageId, Role,
+    smart_format, DataModifier, DefId, DefVariant, PackageId, Role,
 };
 use smartstring::alias::String;
 use tracing::debug;
@@ -378,7 +378,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
             return NewType::NativeScalar(NativeScalarRef {
                 operator_id: self
                     .serde_generator
-                    .gen_operator_id(SerdeKey::no_modifier(DefId::unit()))
+                    .gen_operator_id(gql_serde_key(DefId::unit()))
                     .unwrap(),
                 kind: NativeScalarKind::Unit,
             });
@@ -456,7 +456,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                         kind: if needs_scalar {
                             let operator_id = self
                                 .serde_generator
-                                .gen_operator_id(SerdeKey::no_modifier(def_id))
+                                .gen_operator_id(gql_serde_key(def_id))
                                 .unwrap();
                             TypeKind::CustomScalar(ScalarData {
                                 serde_operator_id: operator_id,
@@ -474,7 +474,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 let type_info = self.partial_ontology.get_type_info(def_id);
                 let operator_id = self
                     .serde_generator
-                    .gen_operator_id(SerdeKey::no_modifier(def_id))
+                    .gen_operator_id(gql_serde_key(def_id))
                     .unwrap();
                 let type_index = self.alloc_def_type_index(def_id, QLevel::Node);
 
@@ -495,7 +495,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                     NewType::NativeScalar(NativeScalarRef {
                         operator_id: self
                             .serde_generator
-                            .gen_operator_id(SerdeKey::no_modifier(def_id))
+                            .gen_operator_id(gql_serde_key(def_id))
                             .unwrap(),
                         kind: NativeScalarKind::Int(*scalar_def_id),
                     })
@@ -511,7 +511,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                             kind: TypeKind::CustomScalar(ScalarData {
                                 serde_operator_id: self
                                     .serde_generator
-                                    .gen_operator_id(SerdeKey::no_modifier(DefId::unit()))
+                                    .gen_operator_id(gql_serde_key(DefId::unit()))
                                     .unwrap(),
                             }),
                         },
@@ -522,7 +522,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 NewType::NativeScalar(NativeScalarRef {
                     operator_id: self
                         .serde_generator
-                        .gen_operator_id(SerdeKey::no_modifier(*def_id))
+                        .gen_operator_id(gql_serde_key(*def_id))
                         .unwrap(),
                     kind: NativeScalarKind::Number(*def_id),
                 })
@@ -530,7 +530,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
             ReprKind::Scalar(..) => {
                 let operator_id = self
                     .serde_generator
-                    .gen_operator_id(SerdeKey::no_modifier(def_id))
+                    .gen_operator_id(gql_serde_key(def_id))
                     .unwrap();
 
                 NewType::NativeScalar(NativeScalarRef {
@@ -589,7 +589,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
 
                 let value_operator_id = self
                     .serde_generator
-                    .gen_operator_id(SerdeKey::no_modifier(value_def_id))
+                    .gen_operator_id(gql_serde_key(value_def_id))
                     .unwrap();
 
                 let field_type = if property.is_entity_id {
@@ -606,7 +606,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                         RelParams::Type(rel_def_id) => {
                             let operator_id = self
                                 .serde_generator
-                                .gen_operator_id(SerdeKey::no_modifier(rel_def_id))
+                                .gen_operator_id(gql_serde_key(rel_def_id))
                                 .unwrap();
                             QLevel::Edge {
                                 rel_params: Some((rel_def_id, operator_id)),
@@ -634,7 +634,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                         RelParams::Type(rel_def_id) => Some((
                             rel_def_id,
                             self.serde_generator
-                                .gen_operator_id(SerdeKey::no_modifier(rel_def_id))
+                                .gen_operator_id(gql_serde_key(rel_def_id))
                                 .unwrap(),
                         )),
                         RelParams::IndexRange(_) => todo!(),
@@ -811,4 +811,8 @@ impl PropertyFieldProducer {
             Self::EdgeProperty => FieldKind::EdgeProperty(data),
         }
     }
+}
+
+fn gql_serde_key(def_id: DefId) -> SerdeKey {
+    SerdeKey::Def(DefVariant::new(def_id, DataModifier::default()))
 }
