@@ -153,6 +153,7 @@ enum LazyTask {
     HarvestFields {
         type_index: TypeIndex,
         def_id: DefId,
+        property_field_producer: PropertyFieldProducer,
         is_entrypoint: bool,
     },
 }
@@ -168,6 +169,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
             LazyTask::HarvestFields {
                 type_index,
                 def_id,
+                property_field_producer,
                 is_entrypoint,
             } => {
                 let properties = self.relations.properties_by_def_id(def_id).unwrap();
@@ -182,6 +184,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                             self.lazy_tasks.push(LazyTask::HarvestFields {
                                 type_index,
                                 def_id: *member_def_id,
+                                property_field_producer,
                                 is_entrypoint: false,
                             });
                         }
@@ -191,7 +194,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 self.harvest_struct_fields(
                     properties,
                     &mut fields,
-                    &FieldKind::Property,
+                    property_field_producer,
                     &mut GraphqlNamespace::new(),
                 );
 
@@ -302,6 +305,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                     self.lazy_tasks.push(LazyTask::HarvestFields {
                         type_index: edge_index,
                         def_id: rel_def_id,
+                        property_field_producer: PropertyFieldProducer::EdgeProperty,
                         is_entrypoint: true,
                     });
 
@@ -392,6 +396,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 self.lazy_tasks.push(LazyTask::HarvestFields {
                     type_index,
                     def_id: type_info.def_id,
+                    property_field_producer: PropertyFieldProducer::Property,
                     is_entrypoint: true,
                 });
 
@@ -543,7 +548,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
         &mut self,
         properties: &Properties,
         fields: &mut IndexMap<String, FieldData>,
-        _make_property_field_kind: &dyn Fn(PropertyData) -> FieldKind,
+        property_field_producer: PropertyFieldProducer,
         field_namespace: &mut GraphqlNamespace,
     ) {
         let Some(table) = &properties.table else {
@@ -569,7 +574,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                     .expect("Object property has no name"),
             };
 
-            debug!("    register struct field `{prop_key}`");
+            debug!("    register struct field `{prop_key}`: {property_id}");
 
             let value_properties = self.relations.properties_by_def_id(value_def_id);
             let is_entity_value = value_properties
@@ -616,7 +621,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 };
 
                 FieldData {
-                    kind: FieldKind::Property(PropertyData {
+                    kind: property_field_producer.make_property(PropertyData {
                         property_id,
                         value_operator_id,
                     }),
@@ -639,6 +644,8 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
 
                     self.get_def_type_ref(value_def_id, QLevel::Connection { rel_params })
                 };
+
+                debug!("Connection `{prop_key}` of prop {property_id:?}");
 
                 FieldData::mandatory(
                     FieldKind::Connection {
@@ -787,6 +794,21 @@ impl QLevel {
             Self::Connection { rel_params } => QueryLevel::Connection {
                 rel_params: rel_params.map(|(_, op_id)| op_id),
             },
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum PropertyFieldProducer {
+    Property,
+    EdgeProperty,
+}
+
+impl PropertyFieldProducer {
+    fn make_property(&self, data: PropertyData) -> FieldKind {
+        match self {
+            Self::Property => FieldKind::Property(data),
+            Self::EdgeProperty => FieldKind::EdgeProperty(data),
         }
     }
 }
