@@ -150,7 +150,11 @@ struct Builder<'a, 's, 'c, 'm> {
 }
 
 enum LazyTask {
-    HarvestFields(TypeIndex, DefId),
+    HarvestFields {
+        type_index: TypeIndex,
+        def_id: DefId,
+        is_entrypoint: bool,
+    },
 }
 
 enum NewType {
@@ -161,11 +165,28 @@ enum NewType {
 impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
     fn exec_lazy_task(&mut self, task: LazyTask) {
         match task {
-            LazyTask::HarvestFields(type_index, def_id) => {
+            LazyTask::HarvestFields {
+                type_index,
+                def_id,
+                is_entrypoint,
+            } => {
                 let properties = self.relations.properties_by_def_id(def_id).unwrap();
                 let mut fields = Default::default();
 
                 debug!("Harvest fields for {def_id:?} / {type_index:?}");
+
+                if is_entrypoint {
+                    let repr_kind = self.seal_ctx.get_repr_kind(&def_id).expect("NO REPR KIND");
+                    if let ReprKind::StructIntersection(members) = repr_kind {
+                        for (member_def_id, _) in members {
+                            self.lazy_tasks.push(LazyTask::HarvestFields {
+                                type_index,
+                                def_id: *member_def_id,
+                                is_entrypoint: false,
+                            });
+                        }
+                    }
+                }
 
                 self.harvest_struct_fields(
                     properties,
@@ -252,8 +273,6 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
     }
 
     fn make_def_type(&mut self, def_id: DefId, level: QLevel) -> NewType {
-        debug!("get type info for {def_id:?}");
-
         match level {
             QLevel::Node => self.make_node_type(def_id),
             QLevel::Edge { rel_params } => {
@@ -280,8 +299,11 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                     let typename = self.namespace.edge(Some(rel_type_info), type_info);
 
                     debug!("Need to harvest fields for rel edge: `{typename}` {rel_def_id:?} / {edge_index:?}");
-                    self.lazy_tasks
-                        .push(LazyTask::HarvestFields(edge_index, rel_def_id));
+                    self.lazy_tasks.push(LazyTask::HarvestFields {
+                        type_index: edge_index,
+                        def_id: rel_def_id,
+                        is_entrypoint: true,
+                    });
 
                     NewType::Indexed(
                         edge_index,
@@ -361,47 +383,17 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
         let repr_kind = self.seal_ctx.get_repr_kind(&def_id).expect("NO REPR KIND");
 
         match repr_kind {
-            ReprKind::Unit | ReprKind::Struct => {
+            ReprKind::Unit | ReprKind::Struct | ReprKind::StructIntersection(_) => {
                 let type_info = self.partial_ontology.get_type_info(def_id);
                 let type_index = self.alloc_def_type_index(def_id, QLevel::Node);
 
                 let operator_id = type_info.operator_id.unwrap();
 
-                self.lazy_tasks
-                    .push(LazyTask::HarvestFields(type_index, type_info.def_id));
-
-                let type_kind = TypeKind::Object(ObjectData {
-                    fields: Default::default(),
-                    kind: ObjectKind::Node(NodeData {
-                        def_id: type_info.def_id,
-                        entity_id: type_info
-                            .entity_info
-                            .as_ref()
-                            .map(|entity_info| entity_info.id_value_def_id),
-                        operator_id,
-                    }),
-                });
-
-                NewType::Indexed(
+                self.lazy_tasks.push(LazyTask::HarvestFields {
                     type_index,
-                    TypeData {
-                        typename: self.namespace.typename(type_info),
-                        input_typename: Some(self.namespace.input(type_info)),
-                        partial_input_typename: Some(self.namespace.partial_input(type_info)),
-                        kind: type_kind,
-                    },
-                )
-            }
-            ReprKind::StructIntersection(members) => {
-                let type_info = self.partial_ontology.get_type_info(def_id);
-                let type_index = self.alloc_def_type_index(def_id, QLevel::Node);
-
-                let operator_id = type_info.operator_id.unwrap();
-
-                for (member_def_id, _) in members {
-                    self.lazy_tasks
-                        .push(LazyTask::HarvestFields(type_index, *member_def_id));
-                }
+                    def_id: type_info.def_id,
+                    is_entrypoint: true,
+                });
 
                 let type_kind = TypeKind::Object(ObjectData {
                     fields: Default::default(),
