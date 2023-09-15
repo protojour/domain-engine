@@ -167,7 +167,7 @@ pub struct StringMatcher<'e> {
 
 impl<'e> ValueMatcher for StringMatcher<'e> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        // Even though it's called "text" in ONTOL, we can call it "string" in protocols
+        // Even though it's called "text" in ONTOL, we can call it "string" in domain interfaces
         write!(f, "string")
     }
 

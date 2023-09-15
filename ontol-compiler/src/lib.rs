@@ -6,13 +6,16 @@ use def::{DefKind, Defs, LookupRelationshipMeta, RelationshipMeta, TypeDef};
 pub use error::*;
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
+use interface::{
+    graphql::generate::generate_graphql_schema, serde::serde_generator::SerdeGenerator,
+};
 use lowering::Lowering;
 use mem::Mem;
 use namespace::Namespaces;
 use ontol_runtime::{
     config::PackageConfig,
     ontology::{
-        Domain, DomainProtocol, EntityInfo, EntityRelationship, MapMeta, Ontology, TypeInfo,
+        Domain, DomainInterface, EntityInfo, EntityRelationship, MapMeta, Ontology, TypeInfo,
     },
     serde::SerdeKey,
     value::PropertyId,
@@ -22,9 +25,6 @@ use ontology_graph::OntologyGraph;
 use package::{PackageTopology, Packages, ParsedPackage, ONTOL_PKG};
 use pattern::Patterns;
 use primitive::Primitives;
-use protocol::{
-    graphql::generate::generate_graphql_schema, serde::serde_generator::SerdeGenerator,
-};
 use relation::{Properties, Property, Relations};
 pub use source::*;
 use strings::Strings;
@@ -35,10 +35,10 @@ use types::{DefTypes, Types};
 
 pub mod error;
 pub mod hir_unify;
+pub mod interface;
 pub mod mem;
 pub mod ontology_graph;
 pub mod package;
-pub mod protocol;
 pub mod source;
 pub mod typed_hir;
 
@@ -248,9 +248,9 @@ impl<'m> Compiler<'m> {
             builder.add_domain(package_id, domain);
         }
 
-        // protocol handling
-        let domain_protocols = {
-            let mut protocols: FnvHashMap<PackageId, Vec<DomainProtocol>> = Default::default();
+        // interface handling
+        let domain_interfaces = {
+            let mut interfaces: FnvHashMap<PackageId, Vec<DomainInterface>> = Default::default();
             for package_id in package_ids.iter().cloned() {
                 if package_id != ONTOL_PKG {
                     let schema = generate_graphql_schema(
@@ -258,13 +258,13 @@ impl<'m> Compiler<'m> {
                         builder.partial_ontology(),
                         &mut serde_generator,
                     );
-                    protocols
+                    interfaces
                         .entry(package_id)
                         .or_default()
-                        .push(DomainProtocol::GraphQL(Arc::new(schema)));
+                        .push(DomainInterface::GraphQL(Arc::new(schema)));
                 }
             }
-            protocols
+            interfaces
         };
 
         let (serde_operators, serde_operators_per_def) = serde_generator.finish();
@@ -308,7 +308,7 @@ impl<'m> Compiler<'m> {
             .string_like_types(self.defs.string_like_types)
             .text_patterns(self.text_patterns.text_patterns)
             .value_generators(self.relations.value_generators)
-            .domain_protocols(domain_protocols)
+            .domain_interfaces(domain_interfaces)
             .build()
     }
 

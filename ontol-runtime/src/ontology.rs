@@ -7,7 +7,7 @@ use smartstring::alias::String;
 
 use crate::{
     config::PackageConfig,
-    graphql::schema::GraphqlSchema,
+    interface::graphql::schema::GraphqlSchema,
     serde::{
         operator::{SerdeOperator, SerdeOperatorId},
         processor::{ProcessorLevel, ProcessorMode, SerdeProcessor},
@@ -35,7 +35,7 @@ pub struct Ontology {
     pub(crate) lib: Lib,
 
     domain_table: FnvHashMap<PackageId, Domain>,
-    domain_protocols: FnvHashMap<PackageId, Vec<DomainProtocol>>,
+    domain_interfaces: FnvHashMap<PackageId, Vec<DomainInterface>>,
     package_config_table: FnvHashMap<PackageId, PackageConfig>,
     docs: FnvHashMap<DefId, Vec<String>>,
     serde_operators_per_def: HashMap<SerdeKey, SerdeOperatorId>,
@@ -54,7 +54,7 @@ impl Ontology {
                 string_like_types: Default::default(),
                 text_patterns: Default::default(),
                 domain_table: Default::default(),
-                domain_protocols: Default::default(),
+                domain_interfaces: Default::default(),
                 package_config_table: Default::default(),
                 docs: Default::default(),
                 lib: Lib::default(),
@@ -109,10 +109,11 @@ impl Ontology {
         self.package_config_table.get(&package_id)
     }
 
-    pub fn get_domain_protocols(&self, package_id: PackageId) -> Option<&[DomainProtocol]> {
-        self.domain_protocols
+    pub fn domain_interfaces(&self, package_id: PackageId) -> &[DomainInterface] {
+        self.domain_interfaces
             .get(&package_id)
-            .map(|protocols| protocols.as_slice())
+            .map(|interfaces| interfaces.as_slice())
+            .unwrap_or(&[])
     }
 
     pub fn get_const_proc(&self, const_id: DefId) -> Option<Procedure> {
@@ -263,11 +264,11 @@ pub enum PropertyFlowData {
 }
 
 #[derive(Serialize, Deserialize)]
-pub enum DomainProtocol {
+pub enum DomainInterface {
     GraphQL(Arc<GraphqlSchema>),
 }
 
-impl Debug for DomainProtocol {
+impl Debug for DomainInterface {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::GraphQL(_) => write!(f, "GraphQL"),
@@ -295,11 +296,11 @@ impl OntologyBuilder {
             .insert(package_id, config);
     }
 
-    pub fn domain_protocols(
+    pub fn domain_interfaces(
         mut self,
-        domain_protocols: FnvHashMap<PackageId, Vec<DomainProtocol>>,
+        interfaces: FnvHashMap<PackageId, Vec<DomainInterface>>,
     ) -> Self {
-        self.ontology.domain_protocols = domain_protocols;
+        self.ontology.domain_interfaces = interfaces;
         self
     }
 

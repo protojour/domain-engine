@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use juniper::{GraphQLValue, ID};
 use ontol_runtime::{
-    graphql::{
+    interface::graphql::{
         argument::{ArgKind, DomainFieldArg, FieldArg},
         data::{
             FieldKind, NativeScalarKind, Optionality, TypeIndex, TypeKind, TypeModifier, TypeRef,

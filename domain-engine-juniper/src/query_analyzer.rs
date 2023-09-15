@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
 use juniper::LookAheadMethods;
 use ontol_runtime::{
-    graphql::{
+    interface::graphql::{
         argument::FieldArg,
         data::{FieldData, FieldKind, NodeData, ObjectData, ObjectKind, TypeData, TypeKind},
     },
@@ -192,7 +192,7 @@ impl<'a> QueryAnalyzer<'a> {
                 ObjectKind::Edge(_)
                 | ObjectKind::Connection
                 | ObjectKind::Query
-                | ObjectKind::Mutation => panic!("Bug in ONTOL protocol schema"),
+                | ObjectKind::Mutation => panic!("Bug in ONTOL interface schema"),
             },
             TypeKind::Union(union_data) => {
                 let mut union_map: FnvHashMap<DefId, FnvHashMap<PropertyId, Query>> =

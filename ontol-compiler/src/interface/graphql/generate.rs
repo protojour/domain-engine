@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
-    graphql::{
+    interface::graphql::{
         argument,
         data::{
             EdgeData, EntityData, FieldData, FieldKind, NativeScalarKind, NativeScalarRef,
@@ -22,7 +22,7 @@ use tracing::debug;
 
 use crate::{
     def::{DefKind, Defs, LookupRelationshipMeta, RelParams},
-    protocol::serde::serde_generator::SerdeGenerator,
+    interface::serde::serde_generator::SerdeGenerator,
     relation::{Properties, Relations},
     type_check::{
         repr::repr_model::{ReprKind, ReprScalarKind},

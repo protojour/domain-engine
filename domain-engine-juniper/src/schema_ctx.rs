@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use ontol_runtime::{
-    graphql::{
+    interface::graphql::{
         data::{NativeScalarRef, TypeData, TypeIndex, UnitTypeRef},
         schema::{GraphqlSchema, QueryLevel, TypingPurpose},
     },

@@ -1,4 +1,6 @@
-use ontol_runtime::graphql::data::{EdgeData, ObjectData, ObjectKind, TypeKind, TypeRef};
+use ontol_runtime::interface::graphql::data::{
+    EdgeData, ObjectData, ObjectKind, TypeKind, TypeRef,
+};
 use tracing::{debug, warn};
 
 use crate::{

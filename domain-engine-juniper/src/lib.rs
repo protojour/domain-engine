@@ -3,7 +3,7 @@ use std::sync::Arc;
 use domain_engine_core::DomainEngine;
 use gql_scalar::GqlScalar;
 use ontol_runtime::{
-    ontology::{DomainProtocol, Ontology},
+    ontology::{DomainInterface, Ontology},
     PackageId,
 };
 use schema_ctx::SchemaCtx;
@@ -56,25 +56,24 @@ pub type Schema = juniper::RootNode<
 
 #[derive(Debug, Error)]
 pub enum CreateSchemaError {
-    #[error("GraphQL protocol not found for given package")]
-    GraphqlProtocolNotFound,
+    #[error("GraphQL interface not found for given package")]
+    GraphqlInterfaceNotFound,
 }
 
 pub fn create_graphql_schema(
     package_id: PackageId,
     ontology: Arc<Ontology>,
 ) -> Result<Schema, CreateSchemaError> {
-    let ontol_protocol_schema = ontology
-        .get_domain_protocols(package_id)
-        .ok_or(CreateSchemaError::GraphqlProtocolNotFound)?
+    let ontol_interface_schema = ontology
+        .domain_interfaces(package_id)
         .iter()
-        .find_map(|domain_protocol| match domain_protocol {
-            DomainProtocol::GraphQL(schema) => Some(schema),
+        .find_map(|interface| match interface {
+            DomainInterface::GraphQL(schema) => Some(schema),
         })
-        .ok_or(CreateSchemaError::GraphqlProtocolNotFound)?;
+        .ok_or(CreateSchemaError::GraphqlInterfaceNotFound)?;
 
     let schema_ctx = Arc::new(SchemaCtx {
-        schema: ontol_protocol_schema.clone(),
+        schema: ontol_interface_schema.clone(),
         ontology,
     });
 

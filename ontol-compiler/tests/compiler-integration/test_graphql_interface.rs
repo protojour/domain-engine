@@ -1,6 +1,6 @@
 use assert_matches::assert_matches;
 use ontol_runtime::{
-    graphql::{
+    interface::graphql::{
         data::{
             FieldKind, NativeScalarKind, NativeScalarRef, ObjectData, ScalarData, TypeData,
             TypeIndex, TypeKind, UnitTypeRef,

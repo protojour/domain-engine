@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use juniper::graphql_value;
 use ontol_runtime::{
-    graphql::{
+    interface::graphql::{
         data::{
             FieldKind, ObjectData, ObjectKind, TypeData, TypeIndex, TypeKind, TypeModifier,
             TypeRef, UnionData,

@@ -9,8 +9,8 @@ use ontol_compiler::{
 };
 use ontol_runtime::{
     config::{DataStoreConfig, PackageConfig},
-    graphql::schema::GraphqlSchema,
-    ontology::{DomainProtocol, Ontology},
+    interface::graphql::schema::GraphqlSchema,
+    ontology::{DomainInterface, Ontology},
     PackageId,
 };
 use type_binding::TypeBinding;
@@ -95,13 +95,12 @@ impl OntolTest {
     /// Get the ontol_runtime GraphQL schema
     pub fn graphql_schema(&self, source_name: &str) -> &GraphqlSchema {
         self.ontology
-            .get_domain_protocols(self.get_package_id(source_name))
-            .expect("no protocols")
+            .domain_interfaces(self.get_package_id(source_name))
             .iter()
-            .find_map(|domain_protocol| match domain_protocol {
-                DomainProtocol::GraphQL(schema) => Some(schema),
+            .find_map(|interface| match interface {
+                DomainInterface::GraphQL(schema) => Some(schema),
             })
-            .expect("GraphQL schema not found in protocols")
+            .expect("GraphQL schema not found in interfaces")
     }
 }
 
