@@ -172,7 +172,9 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 property_field_producer,
                 is_entrypoint,
             } => {
-                let properties = self.relations.properties_by_def_id(def_id).unwrap();
+                let Some(properties) = self.relations.properties_by_def_id(def_id) else {
+                    return;
+                };
                 let mut fields = Default::default();
 
                 debug!("Harvest fields for {def_id:?} / {type_index:?}");
