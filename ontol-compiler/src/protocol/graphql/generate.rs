@@ -549,7 +549,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
             return;
         };
 
-        for (property_id, _) in table {
+        for (property_id, property) in table {
             let meta = self.defs.relationship_meta(property_id.relationship_id);
             let (type_def_id, cardinality, _) = meta.relationship.by(property_id.role.opposite());
             let prop_key = match property_id.role {
@@ -567,42 +567,55 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
 
             debug!("register struct field `{prop_key}`");
 
-            let qlevel = match meta.relationship.rel_params {
-                RelParams::Unit => QLevel::Node,
-                RelParams::Type(rel_def_id) => {
-                    let operator_id = self
-                        .serde_generator
-                        .gen_operator_id(SerdeKey::no_modifier(rel_def_id))
-                        .unwrap();
-                    QLevel::Edge {
-                        rel_params: Some((rel_def_id, operator_id)),
+            let field_data = {
+                let modifier = TypeModifier::new_unit(Optionality::from_optional(matches!(
+                    cardinality.0,
+                    PropertyCardinality::Optional
+                )));
+
+                let value_operator_id = self
+                    .serde_generator
+                    .gen_operator_id(SerdeKey::no_modifier(type_def_id))
+                    .unwrap();
+
+                let field_type = if property.is_entity_id {
+                    TypeRef {
+                        modifier,
+                        unit: UnitTypeRef::NativeScalar(NativeScalarRef {
+                            operator_id: value_operator_id,
+                            kind: NativeScalarKind::ID,
+                        }),
                     }
-                }
-                RelParams::IndexRange(_) => todo!(),
-            };
-            let unit_ref = self.get_def_type_ref(type_def_id, qlevel);
+                } else {
+                    let qlevel = match meta.relationship.rel_params {
+                        RelParams::Unit => QLevel::Node,
+                        RelParams::Type(rel_def_id) => {
+                            let operator_id = self
+                                .serde_generator
+                                .gen_operator_id(SerdeKey::no_modifier(rel_def_id))
+                                .unwrap();
+                            QLevel::Edge {
+                                rel_params: Some((rel_def_id, operator_id)),
+                            }
+                        }
+                        RelParams::IndexRange(_) => todo!(),
+                    };
+                    TypeRef {
+                        modifier,
+                        unit: self.get_def_type_ref(type_def_id, qlevel),
+                    }
+                };
 
-            let value_operator_id = self
-                .serde_generator
-                .gen_operator_id(SerdeKey::no_modifier(type_def_id))
-                .unwrap();
-
-            fields.insert(
-                field_namespace.unique_literal(prop_key),
                 FieldData {
                     kind: FieldKind::Property(PropertyData {
                         property_id: *property_id,
                         value_operator_id,
                     }),
-                    field_type: TypeRef {
-                        modifier: TypeModifier::new_unit(Optionality::from_optional(matches!(
-                            cardinality.0,
-                            PropertyCardinality::Optional
-                        ))),
-                        unit: unit_ref,
-                    },
-                },
-            );
+                    field_type,
+                }
+            };
+
+            fields.insert(field_namespace.unique_literal(prop_key), field_data);
         }
     }
 
