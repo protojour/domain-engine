@@ -598,6 +598,7 @@ dependencies = [
  "async-trait",
  "domain-engine-core",
  "fnv",
+ "graphql-parser",
  "indexmap",
  "juniper",
  "ontol-runtime",

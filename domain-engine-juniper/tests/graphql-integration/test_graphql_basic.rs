@@ -1,6 +1,6 @@
 use domain_engine_core::data_store::DataStoreAPIMock;
 use juniper::graphql_value;
-use ontol_runtime::value::Attribute;
+use ontol_runtime::value::{Attribute, Value};
 use ontol_test_utils::{
     examples::{ARTIST_AND_INSTRUMENT, GEOJSON, GUITAR_SYNTH_UNION, MUNICIPALITIES, WGS},
     expect_eq,
@@ -12,7 +12,9 @@ use test_log::test;
 use unimock::*;
 
 use crate::{
-    gql_ctx_mock_data_store, mock_data_store_query_entities_empty, Exec, TestCompileSchema,
+    gql_ctx_mock_data_store, mock_data_store_query_entities_empty,
+    parser_document_utils::{find_input_object_type, Nullable},
+    Exec, TestCompileSchema,
 };
 
 const ROOT: SourceName = SourceName::root();
@@ -430,7 +432,7 @@ async fn test_graphql_artist_and_instrument_connections() {
 }
 
 #[test(tokio::test)]
-async fn test_graphql_guitar_synth_union_smoke_test() {
+async fn test_graphql_guitar_synth_union_selection() {
     let (test, [schema]) = GUITAR_SYNTH_UNION.1.compile_schemas([ROOT]);
     let [artist] = test.bind(["artist"]);
     let artist_entity: Attribute = artist
@@ -509,6 +511,96 @@ async fn test_graphql_guitar_synth_union_smoke_test() {
                     }
                 }]
             },
+        })),
+    );
+}
+
+#[test(tokio::test)]
+async fn test_graphql_guitar_synth_union_input_union_field_list() {
+    use graphql_parser::schema::Type;
+
+    let (_test, [schema]) = GUITAR_SYNTH_UNION.1.compile_schemas([ROOT]);
+    let parser_document = schema.as_parser_document();
+
+    let instrument_edge_input =
+        find_input_object_type(&parser_document, "instrumentEdgeInput").unwrap();
+
+    let field_names: Vec<_> = instrument_edge_input
+        .fields
+        .iter()
+        .map(|field| {
+            (
+                field.name,
+                Nullable(!matches!(field.value_type, Type::NonNullType(_))),
+            )
+        })
+        .collect();
+
+    // The fields of instrumentEdgeInput consist of a union of guitar and synth.
+    expect_eq!(
+        actual = field_names.as_slice(),
+        expected = &[
+            // The instrument_id should only be included once.
+            ("instrument_id", Nullable(true)),
+            ("type", Nullable(true)),
+            ("string_count", Nullable(true)),
+            ("polyphony", Nullable(true)),
+            ("played_by", Nullable(true)),
+        ]
+    );
+}
+
+#[test(tokio::test)]
+async fn test_graphql_guitar_synth_union_input() {
+    let (test, [schema]) = GUITAR_SYNTH_UNION.1.compile_schemas([ROOT]);
+    let [artist] = test.bind(["artist"]);
+    let ziggy: Value = artist
+        .entity_builder(
+            json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
+            json!({
+                "name": "Ziggy",
+                "plays": []
+            }),
+        )
+        .into();
+
+    expect_eq!(
+        actual = r#"
+            mutation {
+                createartist(input: {
+                    name: "Ziggy",
+                    plays: [
+                        {
+                            type: "guitar",
+                            string_count: 6
+                        },
+                        {
+                            instrument_id: "synth/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8"
+                        }
+                    ]
+                }) {
+                    artist_id
+                    name
+                }
+            }
+        "#
+        .exec(
+            &schema,
+            &gql_ctx_mock_data_store(
+                &test,
+                ROOT,
+                DataStoreAPIMock::store_new_entity
+                    .next_call(matching!(_, _, _))
+                    .returns(Ok(ziggy))
+            ),
+            []
+        )
+        .await,
+        expected = Ok(graphql_value!({
+            "createartist": {
+                "artist_id": "artist/88832e20-8c6e-46b4-af79-27b19b889a58",
+                "name": "Ziggy"
+            }
         })),
     );
 }

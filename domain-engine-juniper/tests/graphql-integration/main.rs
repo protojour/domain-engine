@@ -5,6 +5,7 @@ use domain_engine_juniper::{create_graphql_schema, gql_scalar::GqlScalar, GqlCon
 use ontol_test_utils::{OntolTest, SourceName, TestCompile};
 use unimock::*;
 
+mod parser_document_utils;
 mod test_graphql_basic;
 mod test_graphql_conduit;
 mod test_graphql_demo;

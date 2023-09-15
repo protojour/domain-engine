@@ -28,3 +28,4 @@ tokio.workspace = true
 async-trait = "0.1"
 pretty_assertions = "1"
 unimock = "0.5"
+graphql-parser = "0.4"

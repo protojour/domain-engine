@@ -4,19 +4,14 @@ pub def guitar_id {
 pub def synth_id {
     fmt '' => 'synth/' => uuid => .
 }
-pub def artist_id {
-    fmt '' => text => .
-}
 
 pub def guitar {
-    rel guitar_id identifies: .
-    rel .'instrument-id'(rel .gen: auto): guitar_id
+    rel .'instrument-id'(rel .gen: auto)|id: guitar_id
     rel .'type': 'guitar'
     rel .'string_count': i64
 }
 pub def synth {
-    rel synth_id identifies: .
-    rel .'instrument-id'(rel .gen: auto): synth_id
+    rel .'instrument-id'(rel .gen: auto)|id: synth_id
     rel .'type': 'synth'
     rel .'polyphony': i64
 }
@@ -25,8 +20,7 @@ pub def instrument {
     rel .is?: synth
 }
 pub def artist {
-    rel artist_id identifies: .
-    rel .'artist-id'(rel .gen: auto): artist_id
+    rel .'artist-id'(rel .gen: auto)|id: { fmt '' => text => . }
     rel .'name': text
     rel [.] 'plays'::'played-by' [instrument]
 }
