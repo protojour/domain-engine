@@ -293,11 +293,28 @@ impl<'v> AttributeType<'v> {
         };
 
         match schema_ctx.lookup_type_index(type_ref.unit) {
-            Ok(type_index) => resolve_indexed_schema_field(
-                AttributeType { attr: attribute },
-                schema_ctx.indexed_type_info(type_index, TypingPurpose::Selection),
-                executor,
-            ),
+            Ok(type_index) => {
+                let type_info = schema_ctx.indexed_type_info(type_index, TypingPurpose::Selection);
+                match &schema_ctx.type_data(type_info.type_index).kind {
+                    TypeKind::CustomScalar(scalar_data) => {
+                        let gql_scalar = schema_ctx
+                            .ontology
+                            .new_serde_processor(
+                                scalar_data.serde_operator_id,
+                                ProcessorMode::Read,
+                                ProcessorLevel::new_root(),
+                            )
+                            .serialize_value(&attribute.value, None, GqlScalarSerializer)?;
+
+                        Ok(juniper::Value::Scalar(gql_scalar))
+                    }
+                    TypeKind::Object(_) | TypeKind::Union(_) => resolve_indexed_schema_field(
+                        AttributeType { attr: attribute },
+                        type_info,
+                        executor,
+                    ),
+                }
+            }
             Err(scalar_ref) => match (
                 type_ref.modifier,
                 schema_ctx

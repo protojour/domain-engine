@@ -512,7 +512,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                             kind: TypeKind::CustomScalar(ScalarData {
                                 serde_operator_id: self
                                     .serde_generator
-                                    .gen_operator_id(gql_serde_key(DefId::unit()))
+                                    .gen_operator_id(gql_serde_key(def_id))
                                     .unwrap(),
                             }),
                         },
@@ -578,9 +578,24 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
             debug!("    register struct field `{prop_key}`: {property_id}");
 
             let value_properties = self.relations.properties_by_def_id(value_def_id);
-            let is_entity_value = value_properties
-                .map(|properties| properties.identified_by.is_some())
-                .unwrap_or(false);
+
+            let is_entity_value = {
+                let repr_kind = self.seal_ctx.get_repr_kind(&value_def_id);
+                match repr_kind {
+                    Some(ReprKind::StructUnion(variants)) => {
+                        variants.iter().all(|(variant_def_id, _)| {
+                            let variant_properties =
+                                self.relations.properties_by_def_id(*variant_def_id);
+                            variant_properties
+                                .map(|properties| properties.identified_by.is_some())
+                                .unwrap_or(false)
+                        })
+                    }
+                    _ => value_properties
+                        .map(|properties| properties.identified_by.is_some())
+                        .unwrap_or(false),
+                }
+            };
 
             let field_data = if matches!(value_cardinality, ValueCardinality::One) {
                 let modifier = TypeModifier::new_unit(Optionality::from_optional(matches!(

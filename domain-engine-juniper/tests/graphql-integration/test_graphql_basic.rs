@@ -495,15 +495,13 @@ async fn test_graphql_guitar_synth_union_smoke_test() {
                                 {
                                     "node": {
                                         "__typename": "synth",
-                                        // BUG: Floating point
-                                        "polyphony": 42.0
+                                        "polyphony": 42
                                     },
                                 },
                                 {
                                     "node": {
                                         "__typename": "guitar",
-                                        // BUG: Floating point
-                                        "string_count": 91.0
+                                        "string_count": 91
                                     }
                                 }
                             ]
