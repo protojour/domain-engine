@@ -943,12 +943,12 @@ impl<'s, 'm> Lowering<'s, 'm> {
     fn set_def_kind(&mut self, def_id: DefId, kind: DefKind<'m>, span: &Span) {
         self.compiler.defs.table.insert(
             def_id,
-            self.compiler.defs.mem.bump.alloc(Def {
+            Def {
                 id: def_id,
                 package: self.src.package_id,
                 kind,
                 span: self.src.span(span),
-            }),
+            },
         );
     }
 

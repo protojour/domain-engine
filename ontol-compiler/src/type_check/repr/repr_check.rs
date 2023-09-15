@@ -368,7 +368,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                                 }
                             }
                         } else {
-                            self.merge_repr(&mut builder, ReprKind::Struct, def_id, data);
+                            self.merge_repr(&mut builder, ReprKind::Unit, def_id, data);
                         }
                     }
                 }

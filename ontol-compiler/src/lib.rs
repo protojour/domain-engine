@@ -33,6 +33,8 @@ use tracing::debug;
 use type_check::seal::SealCtx;
 use types::{DefTypes, Types};
 
+use crate::{def::RelParams, type_check::repr::repr_model::ReprKind};
+
 pub mod error;
 pub mod hir_unify;
 pub mod interface;
@@ -84,7 +86,7 @@ pub struct Compiler<'m> {
 
 impl<'m> Compiler<'m> {
     pub fn new(mem: &'m Mem, sources: Sources) -> Self {
-        let mut defs = Defs::new(mem);
+        let mut defs = Defs::default();
         let primitives = Primitives::new(&mut defs);
 
         Self {
@@ -398,7 +400,7 @@ impl<'m> Compiler<'m> {
         &self,
         _entity_id: DefId,
         properties: &Properties,
-    ) -> Option<RelationshipMeta<'m>> {
+    ) -> Option<RelationshipMeta<'_, 'm>> {
         let id_relationship_id = properties.identified_by?;
         let inherent_id = self
             .relations
@@ -427,6 +429,27 @@ impl<'m> Compiler<'m> {
         }
 
         self.seal_ctx.mark_domain_sealed(package_id);
+
+        // Various cleanup/normalization
+        for def_id in self.defs.iter_package_def_ids(package_id) {
+            let Some(def) = self.defs.table.get_mut(&def_id) else {
+                // Can happen in error cases
+                continue;
+            };
+
+            if let DefKind::Relationship(relationship) = &mut def.kind {
+                // Reset RelParams::Type back to RelParams::Unit if its representation is ReprKind::Unit.
+                // This simplifies later compiler stages, that can trust RelParams::Type is a type with real data in it.
+                if let RelParams::Type(rel_def_id) = &relationship.rel_params {
+                    if matches!(
+                        self.seal_ctx.get_repr_kind(rel_def_id).unwrap(),
+                        ReprKind::Unit
+                    ) {
+                        relationship.rel_params = RelParams::Unit;
+                    }
+                }
+            }
+        }
     }
 
     /// Check for errors and bail out of the compilation process now, if in error state.

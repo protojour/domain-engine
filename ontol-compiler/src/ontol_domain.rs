@@ -24,6 +24,7 @@ impl<'m> Compiler<'m> {
         self.register_type(self.primitives.empty_sequence, Type::EmptySequence);
 
         // Pre-processe primitive definitions
+        let mut named_builtin_relations: Vec<(DefId, &'static str)> = vec![];
         for def_id in self.defs.iter_package_def_ids(ONTOL_PKG) {
             match self.defs.def_kind(def_id) {
                 DefKind::Primitive(kind, ident) => {
@@ -37,7 +38,7 @@ impl<'m> Compiler<'m> {
                 }
                 DefKind::BuiltinRelType(kind, ident) => {
                     if let Some(ident) = ident {
-                        self.register_named_type(def_id, ident, |_| Type::BuiltinRelation);
+                        named_builtin_relations.push((def_id, ident));
                     }
 
                     let constraints = match kind {
@@ -54,6 +55,10 @@ impl<'m> Compiler<'m> {
                 }
                 _ => {}
             }
+        }
+
+        for (def_id, ident) in named_builtin_relations {
+            self.register_named_type(def_id, ident, |_| Type::BuiltinRelation);
         }
 
         // bools

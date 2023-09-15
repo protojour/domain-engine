@@ -624,21 +624,9 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                                 .serde_generator
                                 .gen_operator_id(gql_serde_key(rel_def_id))
                                 .unwrap();
-                            let repr_kind = self.seal_ctx.get_repr_kind(&rel_def_id);
 
-                            if matches!(repr_kind, Some(ReprKind::Struct)) {
-                                // BUG(repr): The ReprKind should be Unit when the properties are None.
-                                if self.relations.properties_by_def_id(rel_def_id).is_none() {
-                                    QLevel::Node
-                                } else {
-                                    QLevel::Edge {
-                                        rel_params: Some((rel_def_id, operator_id)),
-                                    }
-                                }
-                            } else {
-                                QLevel::Edge {
-                                    rel_params: Some((rel_def_id, operator_id)),
-                                }
+                            QLevel::Edge {
+                                rel_params: Some((rel_def_id, operator_id)),
                             }
                         }
                         RelParams::IndexRange(_) => todo!(),

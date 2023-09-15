@@ -822,21 +822,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 self.get_property_operator(type_def_id, property.cardinality);
 
             let rel_params_operator_id = match &meta.relationship.rel_params {
-                RelParams::Type(def_id) => {
-                    let key = SerdeKey::Def(DefVariant::new(*def_id, DataModifier::default()));
-                    match self.gen_operator(key.clone()) {
-                        Some(SerdeOperator::Struct(struct_op)) => {
-                            if !struct_op.properties.is_empty() {
-                                self.gen_operator_id(key)
-                            } else {
-                                None
-                            }
-                        }
-                        Some(SerdeOperator::Unit) => None,
-                        Some(_) => self.gen_operator_id(key),
-                        _ => None,
-                    }
-                }
+                RelParams::Type(def_id) => self.gen_operator_id(SerdeKey::Def(DefVariant::new(
+                    *def_id,
+                    DataModifier::default(),
+                ))),
                 RelParams::Unit => None,
                 _ => todo!(),
             };

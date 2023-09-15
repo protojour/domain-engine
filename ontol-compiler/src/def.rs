@@ -8,16 +8,9 @@ use ontol_runtime::{
 use smartstring::alias::String;
 
 use crate::{
-    mem::{Intern, Mem},
-    namespace::Space,
-    package::ONTOL_PKG,
-    pattern::PatId,
-    primitive::PrimitiveKind,
-    regex_util::parse_literal_regex,
-    source::SourceSpan,
-    strings::Strings,
-    types::Type,
-    Compiler, SpannedBorrow, NO_SPAN,
+    mem::Intern, namespace::Space, package::ONTOL_PKG, pattern::PatId, primitive::PrimitiveKind,
+    regex_util::parse_literal_regex, source::SourceSpan, strings::Strings, types::Type, Compiler,
+    SpannedBorrow, NO_SPAN,
 };
 use ontol_parser::Span;
 
@@ -139,22 +132,27 @@ pub enum RelParams {
 }
 
 #[derive(Clone)]
-pub struct RelationshipMeta<'m> {
+pub struct RelationshipMeta<'d, 'm> {
     pub relationship_id: RelationshipId,
-    pub relationship: SpannedBorrow<'m, Relationship<'m>>,
-    pub relation_def_kind: SpannedBorrow<'m, DefKind<'m>>,
+    pub relationship: SpannedBorrow<'d, Relationship<'m>>,
+    pub relation_def_kind: SpannedBorrow<'d, DefKind<'m>>,
 }
 
 #[derive(Debug)]
 pub struct Defs<'m> {
-    pub(crate) mem: &'m Mem,
     def_id_allocators: FnvHashMap<PackageId, u16>,
     next_def_param: DefParamId,
-    pub(crate) table: FnvHashMap<DefId, &'m Def<'m>>,
+    pub(crate) table: FnvHashMap<DefId, Def<'m>>,
     pub(crate) string_literals: HashMap<&'m str, DefId>,
     pub(crate) regex_strings: HashMap<&'m str, DefId>,
     pub(crate) literal_regex_meta_table: FnvHashMap<DefId, RegexMeta<'m>>,
     pub(crate) string_like_types: FnvHashMap<DefId, TextLikeType>,
+}
+
+impl<'m> Default for Defs<'m> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[derive(Debug)]
@@ -165,9 +163,8 @@ pub struct RegexMeta<'m> {
 }
 
 impl<'m> Defs<'m> {
-    pub fn new(mem: &'m Mem) -> Self {
+    fn new() -> Self {
         Self {
-            mem,
             def_id_allocators: Default::default(),
             next_def_param: DefParamId(0),
             table: Default::default(),
@@ -178,7 +175,7 @@ impl<'m> Defs<'m> {
         }
     }
 
-    pub fn def_kind(&self, def_id: DefId) -> &'m DefKind<'m> {
+    pub fn def_kind(&self, def_id: DefId) -> &DefKind<'m> {
         self.table.get(&def_id).map(|def| &def.kind).unwrap()
     }
 
@@ -186,7 +183,7 @@ impl<'m> Defs<'m> {
         self.table.get(&def_id).map(|def| def.span).unwrap()
     }
 
-    pub fn get_spanned_def_kind(&self, def_id: DefId) -> Option<SpannedBorrow<'m, DefKind<'m>>> {
+    pub fn get_spanned_def_kind(&self, def_id: DefId) -> Option<SpannedBorrow<'_, DefKind<'m>>> {
         self.table.get(&def_id).map(|def| SpannedBorrow {
             value: &def.kind,
             span: &def.span,
@@ -221,12 +218,12 @@ impl<'m> Defs<'m> {
         let def_id = self.alloc_def_id(package);
         self.table.insert(
             def_id,
-            self.mem.bump.alloc(Def {
+            Def {
                 id: def_id,
                 package,
                 span,
                 kind,
-            }),
+            },
         );
 
         def_id
@@ -287,12 +284,12 @@ impl<'m> Defs<'m> {
 
 #[cfg_attr(test, unimock::unimock(api = LookupRelationshipMetaMock))]
 pub trait LookupRelationshipMeta<'m> {
-    fn relationship_meta(&self, relationship_id: RelationshipId) -> RelationshipMeta<'m>;
+    fn relationship_meta(&self, relationship_id: RelationshipId) -> RelationshipMeta<'_, 'm>;
 }
 
 impl<'m> LookupRelationshipMeta<'m> for Defs<'m> {
     #[track_caller]
-    fn relationship_meta(&self, relationship_id: RelationshipId) -> RelationshipMeta<'m> {
+    fn relationship_meta(&self, relationship_id: RelationshipId) -> RelationshipMeta<'_, 'm> {
         let relationship = self
             .get_spanned_def_kind(relationship_id.0)
             .unwrap()
@@ -330,12 +327,12 @@ impl<'m> Compiler<'m> {
             .insert(name.into(), def_id);
         self.defs.table.insert(
             def_id,
-            self.defs.mem.bump.alloc(Def {
+            Def {
                 id: def_id,
                 package,
                 span,
                 kind,
-            }),
+            },
         );
 
         def_id
@@ -345,12 +342,12 @@ impl<'m> Compiler<'m> {
         let package_id = package_def_id.package_id();
         self.defs.table.insert(
             package_def_id,
-            self.defs.mem.bump.alloc(Def {
+            Def {
                 id: package_def_id,
                 package: package_id,
                 span: NO_SPAN,
                 kind: DefKind::Package(package_def_id.package_id()),
-            }),
+            },
         );
         let ty = self.types.intern(Type::Package);
         self.def_types.table.insert(package_def_id, ty);
