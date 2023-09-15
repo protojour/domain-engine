@@ -10,7 +10,7 @@ use ontol_runtime::{
         },
         schema::{GraphqlSchema, QueryLevel, TypingPurpose},
     },
-    ontology::{Ontology, PropertyCardinality},
+    ontology::{Ontology, PropertyCardinality, ValueCardinality},
     serde::{
         operator::{SerdeOperator, SerdeOperatorId},
         SerdeKey,
@@ -165,6 +165,8 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 let properties = self.relations.properties_by_def_id(def_id).unwrap();
                 let mut fields = Default::default();
 
+                debug!("Harvest fields for {def_id:?} / {type_index:?}");
+
                 self.harvest_struct_fields(
                     properties,
                     &mut fields,
@@ -274,10 +276,17 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 if let Some((rel_def_id, _operator_id)) = rel_params {
                     let rel_type_info = self.partial_ontology.get_type_info(rel_def_id);
                     let rel_edge_ref = self.get_def_type_ref(rel_def_id, QLevel::Node);
+
+                    let typename = self.namespace.edge(Some(rel_type_info), type_info);
+
+                    debug!("Need to harvest fields for rel edge: `{typename}` {rel_def_id:?} / {edge_index:?}");
+                    self.lazy_tasks
+                        .push(LazyTask::HarvestFields(edge_index, rel_def_id));
+
                     NewType::Indexed(
                         edge_index,
                         TypeData {
-                            typename: self.namespace.edge(Some(rel_type_info), type_info),
+                            typename,
                             input_typename: Some(
                                 self.namespace.edge_input(Some(rel_type_info), type_info),
                             ),
@@ -550,8 +559,11 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
         };
 
         for (property_id, property) in table {
+            let property_id = *property_id;
             let meta = self.defs.relationship_meta(property_id.relationship_id);
-            let (type_def_id, cardinality, _) = meta.relationship.by(property_id.role.opposite());
+            let (_, (prop_cardinality, value_cardinality), _) =
+                meta.relationship.by(property_id.role);
+            let (value_def_id, ..) = meta.relationship.by(property_id.role.opposite());
             let prop_key = match property_id.role {
                 Role::Subject => {
                     let DefKind::TextLiteral(prop_key) = meta.relation_def_kind.value else {
@@ -565,17 +577,22 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                     .expect("Object property has no name"),
             };
 
-            debug!("register struct field `{prop_key}`");
+            debug!("    register struct field `{prop_key}`");
 
-            let field_data = {
+            let value_properties = self.relations.properties_by_def_id(value_def_id);
+            let is_entity_value = value_properties
+                .map(|properties| properties.identified_by.is_some())
+                .unwrap_or(false);
+
+            let field_data = if matches!(value_cardinality, ValueCardinality::One) {
                 let modifier = TypeModifier::new_unit(Optionality::from_optional(matches!(
-                    cardinality.0,
+                    prop_cardinality,
                     PropertyCardinality::Optional
                 )));
 
                 let value_operator_id = self
                     .serde_generator
-                    .gen_operator_id(SerdeKey::no_modifier(type_def_id))
+                    .gen_operator_id(SerdeKey::no_modifier(value_def_id))
                     .unwrap();
 
                 let field_type = if property.is_entity_id {
@@ -602,17 +619,45 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                     };
                     TypeRef {
                         modifier,
-                        unit: self.get_def_type_ref(type_def_id, qlevel),
+                        unit: self.get_def_type_ref(value_def_id, qlevel),
                     }
                 };
 
                 FieldData {
                     kind: FieldKind::Property(PropertyData {
-                        property_id: *property_id,
+                        property_id,
                         value_operator_id,
                     }),
                     field_type,
                 }
+            } else if is_entity_value {
+                let connection_ref = {
+                    let rel_params = match meta.relationship.rel_params {
+                        RelParams::Unit => None,
+                        RelParams::Type(rel_def_id) => Some((
+                            rel_def_id,
+                            self.serde_generator
+                                .gen_operator_id(SerdeKey::no_modifier(rel_def_id))
+                                .unwrap(),
+                        )),
+                        RelParams::IndexRange(_) => todo!(),
+                    };
+
+                    debug!("    connection/edge rel params {rel_params:?}");
+
+                    self.get_def_type_ref(value_def_id, QLevel::Connection { rel_params })
+                };
+
+                FieldData::mandatory(
+                    FieldKind::Connection {
+                        property_id: Some(property_id),
+                        first: argument::First,
+                        after: argument::After,
+                    },
+                    connection_ref,
+                )
+            } else {
+                todo!("{prop_key}/{property_id:?} {value_cardinality:?}")
             };
 
             fields.insert(field_namespace.unique_literal(prop_key), field_data);
