@@ -657,8 +657,25 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                     },
                     connection_ref,
                 )
+            } else if let RelParams::Type(_) = meta.relationship.rel_params {
+                todo!("Edge list with rel params");
             } else {
-                todo!("{prop_key}/{property_id:?} {value_cardinality:?}")
+                let unit = self.get_def_type_ref(value_def_id, QLevel::Node);
+
+                let value_operator_id = self
+                    .serde_generator
+                    .gen_operator_id(gql_array_serde_key(value_def_id))
+                    .unwrap();
+
+                FieldData {
+                    kind: property_field_producer.make_property(PropertyData {
+                        property_id,
+                        value_operator_id,
+                    }),
+                    field_type: TypeRef::mandatory(unit).to_array(Optionality::from_optional(
+                        matches!(prop_cardinality, PropertyCardinality::Optional),
+                    )),
+                }
             };
 
             fields.insert(field_namespace.unique_literal(prop_key), field_data);
@@ -817,4 +834,11 @@ impl PropertyFieldProducer {
 
 fn gql_serde_key(def_id: DefId) -> SerdeKey {
     SerdeKey::Def(DefVariant::new(def_id, DataModifier::default()))
+}
+
+fn gql_array_serde_key(def_id: DefId) -> SerdeKey {
+    SerdeKey::Def(DefVariant::new(
+        def_id,
+        DataModifier::default() | DataModifier::ARRAY,
+    ))
 }
