@@ -125,7 +125,7 @@ impl<'o> GraphqlNamespace<'o> {
             } else if typename == "Mutation" {
                 "Mutation_".into()
             } else {
-                make_valid_graphql_identifier(typename)
+                adapt_graphql_identifier(typename).into_adapted()
             };
 
             self.rewrites.insert(typename.into(), rewritten);
@@ -170,13 +170,27 @@ impl ProcessName for &'static str {
     }
 }
 
-pub fn make_valid_graphql_identifier(input: &str) -> String {
+pub enum GqlAdaptedIdent<'a> {
+    Valid(&'a str),
+    Adapted(String),
+}
+
+impl<'a> GqlAdaptedIdent<'a> {
+    fn into_adapted(self) -> String {
+        match self {
+            Self::Valid(valid) => valid.into(),
+            Self::Adapted(adapted) => adapted,
+        }
+    }
+}
+
+pub fn adapt_graphql_identifier(input: &str) -> GqlAdaptedIdent {
     if is_valid_graphql_identifier(input) {
-        input.into()
+        GqlAdaptedIdent::Valid(input)
     } else if input.contains('-') {
-        input.to_case(Case::Snake).into()
+        GqlAdaptedIdent::Adapted(input.to_case(Case::Snake).into())
     } else {
-        input.to_case(Case::Camel).into()
+        GqlAdaptedIdent::Adapted(input.to_case(Case::Camel).into())
     }
 }
 

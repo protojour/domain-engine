@@ -23,7 +23,7 @@ use crate::{
     codegen::task::CodegenTasks,
     compiler_queries::GetDefType,
     def::{DefKind, Defs, LookupRelationshipMeta, RelParams, TypeDef},
-    interface::graphql::make_valid_graphql_identifier,
+    interface::graphql::graphql_namespace::{adapt_graphql_identifier, GqlAdaptedIdent},
     primitive::{PrimitiveKind, Primitives},
     relation::{Constructor, Properties, Relations},
     text_patterns::{TextPatternSegment, TextPatterns},
@@ -209,13 +209,21 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     )))
                     .expect("No object operator for primary id property");
 
-                Some(OperatorAllocation::Allocated(
-                    self.alloc_operator_id_for_key(&key),
-                    SerdeOperator::PrimaryId(
-                        make_property_name(property_name, def_variant.modifier),
-                        object_operator_id,
-                    ),
-                ))
+                let (ident, adaption) = make_property_name(property_name, def_variant.modifier);
+                if matches!(adaption, IdentAdaption::Verbatim)
+                    && def_variant.modifier != SerdeModifier::PRIMARY_ID
+                {
+                    // Deduplicate
+                    Some(OperatorAllocation::Redirect(DefVariant::new(
+                        def_variant.def_id,
+                        SerdeModifier::PRIMARY_ID,
+                    )))
+                } else {
+                    Some(OperatorAllocation::Allocated(
+                        self.alloc_operator_id_for_key(&key),
+                        SerdeOperator::PrimaryId(ident, object_operator_id),
+                    ))
+                }
             }
             SerdeKey::Def(def_variant) if def_variant.modifier.contains(SerdeModifier::ARRAY) => {
                 let item_operator_id = self.gen_operator_id(SerdeKey::Def(
@@ -820,6 +828,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         SerdeOperator::Union(UnionOperator::new(typename.into(), def_variant, variants))
     }
 
+    /// TODO: It's probably possible to avoid duplicating structs
+    /// for different interfaces if there are no rewrites compared to plain JSON.
     fn create_struct_operator(
         &mut self,
         def_variant: DefVariant,
@@ -923,37 +933,47 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     }
 }
 
+pub enum IdentAdaption {
+    Verbatim,
+    Adapted,
+}
+
 fn insert_property(
     properties: &mut IndexMap<String, SerdeProperty>,
     property_name: &str,
     property: SerdeProperty,
     modifier: SerdeModifier,
-) {
+) -> IdentAdaption {
     if modifier.contains(SerdeModifier::GRAPHQL) {
-        let mut graphql_identifier = make_valid_graphql_identifier(property_name);
+        let (mut graphql_identifier, adaption) = make_property_name(property_name, modifier);
         let mut retries = 16;
 
         while properties.contains_key(&graphql_identifier) {
             retries -= 1;
             if retries == 0 {
                 error!("GraphQL tried too many rewrites. Ignoring property `{property_name}`");
-                return;
+                return IdentAdaption::Adapted;
             }
 
             graphql_identifier = smart_format!("{graphql_identifier}_");
         }
 
         properties.insert(graphql_identifier, property);
+        adaption
     } else {
         properties.insert(property_name.into(), property);
+        IdentAdaption::Verbatim
     }
 }
 
-fn make_property_name(input: &str, modifier: SerdeModifier) -> String {
+fn make_property_name(input: &str, modifier: SerdeModifier) -> (String, IdentAdaption) {
     if modifier.contains(SerdeModifier::GRAPHQL) {
-        make_valid_graphql_identifier(input)
+        match adapt_graphql_identifier(input) {
+            GqlAdaptedIdent::Valid(valid) => (valid.into(), IdentAdaption::Verbatim),
+            GqlAdaptedIdent::Adapted(adapted) => (adapted, IdentAdaption::Adapted),
+        }
     } else {
-        input.into()
+        (input.into(), IdentAdaption::Verbatim)
     }
 }
 
