@@ -18,6 +18,7 @@ use type_binding::TypeBinding;
 pub mod diagnostics;
 pub mod examples;
 pub mod serde_utils;
+pub mod test_extensions;
 pub mod test_map;
 pub mod type_binding;
 
