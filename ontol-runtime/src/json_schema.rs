@@ -16,7 +16,7 @@ use crate::{
     ontology::{Domain, Ontology},
     DefId, PackageId,
 };
-use crate::{smart_format, DataModifier, DefVariant};
+use crate::{smart_format, DefVariant, SerdeModifier};
 
 pub fn build_openapi_schemas<'e>(
     ontology: &'e Ontology,
@@ -85,8 +85,8 @@ impl<'e> Serialize for OpenApiSchemas<'e> {
 
         // serialize schema definitions belonging to the domain package first
         for (def_id, operator_id) in self.schema_graph.range(
-            DefVariant::new(DefId(package_id, 0), DataModifier::NONE)
-                ..DefVariant::new(DefId(next_package_id, 0), DataModifier::NONE),
+            DefVariant::new(DefId(package_id, 0), SerdeModifier::NONE)
+                ..DefVariant::new(DefId(next_package_id, 0), SerdeModifier::NONE),
         ) {
             map.serialize_entry(&ctx.format_key(*def_id), &ctx.definition(*operator_id))?;
         }
@@ -205,13 +205,13 @@ impl<'e> SchemaCtx<'e> {
 
     fn type_name(&self, def_variant: DefVariant) -> Option<String> {
         let mut modifier = String::from("");
-        if def_variant.modifier.contains(DataModifier::PRIMARY_ID) {
+        if def_variant.modifier.contains(SerdeModifier::PRIMARY_ID) {
             modifier.push_str("_id");
         }
-        if def_variant.modifier.contains(DataModifier::UNION) {
+        if def_variant.modifier.contains(SerdeModifier::UNION) {
             modifier.push_str("_union");
         }
-        if def_variant.modifier.contains(DataModifier::ARRAY) {
+        if def_variant.modifier.contains(SerdeModifier::ARRAY) {
             modifier.push_str("_array");
         }
         self.ontology
@@ -272,13 +272,13 @@ impl Display for Key {
 
         write!(f, "{}_{}", package.0, self.0.def_id.1)?;
 
-        if variant.modifier.contains(DataModifier::PRIMARY_ID) {
+        if variant.modifier.contains(SerdeModifier::PRIMARY_ID) {
             write!(f, "_id")?;
         }
-        if variant.modifier.contains(DataModifier::UNION) {
+        if variant.modifier.contains(SerdeModifier::UNION) {
             write!(f, "_union")?;
         }
-        if variant.modifier.contains(DataModifier::ARRAY) {
+        if variant.modifier.contains(SerdeModifier::ARRAY) {
             write!(f, "_array")?;
         }
 

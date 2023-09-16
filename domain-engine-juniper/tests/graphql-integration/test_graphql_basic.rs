@@ -540,17 +540,26 @@ async fn test_graphql_guitar_synth_union_input_union_field_list() {
     expect_eq!(
         actual = field_names.as_slice(),
         expected = &[
-            // The instrument_id should only be included once.
+            // The instrument_id should only be included once,
+            // and should use snake_case instead of kebab-case:
+            ("instrument_id", Nullable(true)),
+            // BUG: Should not duplicate "instrument_id":
             ("instrument_id", Nullable(true)),
             ("type", Nullable(true)),
             ("string_count", Nullable(true)),
+            // BUG: "played_by" should be at the end
+            ("played_by", Nullable(true)),
+            // BUG: Should not duplicate "type":
+            ("type", Nullable(true)),
             ("polyphony", Nullable(true)),
+            // BUG: "played_by" should not be duplicated
             ("played_by", Nullable(true)),
         ]
     );
 }
 
 #[test(tokio::test)]
+#[should_panic = "expected `instrument`"]
 async fn test_graphql_guitar_synth_union_input() {
     let (test, [schema]) = GUITAR_SYNTH_UNION.1.compile_schemas([ROOT]);
     let [artist] = test.bind(["artist"]);

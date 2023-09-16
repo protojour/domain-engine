@@ -1,5 +1,6 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 
+use indexmap::IndexMap;
 use ontol_runtime::{
     discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
     ontology::{Cardinality, PropertyCardinality, ValueCardinality},
@@ -9,10 +10,12 @@ use ontol_runtime::{
         ValueUnionVariant,
     },
     serde::{operator::SerdePropertyFlags, SerdeKey},
+    smart_format,
     value_generator::ValueGenerator,
-    DataModifier, DefId, DefVariant, Role,
+    DefId, DefVariant, Role, SerdeModifier,
 };
-use tracing::{debug, trace};
+use smartstring::alias::String;
+use tracing::{debug, error, trace};
 
 use super::sequence_range_builder::SequenceRangeBuilder;
 
@@ -20,6 +23,7 @@ use crate::{
     codegen::task::CodegenTasks,
     compiler_queries::GetDefType,
     def::{DefKind, Defs, LookupRelationshipMeta, RelParams, TypeDef},
+    interface::graphql::make_valid_graphql_identifier,
     primitive::{PrimitiveKind, Primitives},
     relation::{Constructor, Properties, Relations},
     text_patterns::{TextPatternSegment, TextPatterns},
@@ -103,13 +107,16 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         &mut self,
         type_def_id: DefId,
         cardinality: Cardinality,
+        cross_def_modifier: SerdeModifier,
     ) -> (PropertyCardinality, SerdeOperatorId) {
+        let default_modifier = SerdeModifier::json_default() | cross_def_modifier;
+
         match cardinality.1 {
             ValueCardinality::One => (
                 cardinality.0,
                 self.gen_operator_id(SerdeKey::Def(DefVariant {
                     def_id: type_def_id,
-                    modifier: DataModifier::default(),
+                    modifier: default_modifier,
                 }))
                 .expect("no property operator"),
             ),
@@ -117,7 +124,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 cardinality.0,
                 self.gen_operator_id(SerdeKey::Def(DefVariant {
                     def_id: type_def_id,
-                    modifier: DataModifier::default() | DataModifier::ARRAY,
+                    modifier: default_modifier | SerdeModifier::ARRAY,
                 }))
                 .expect("no property operator"),
             ),
@@ -158,7 +165,15 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                     if let Ok(next_map_type) = self.find_unambiguous_struct_operator(next_id) {
                         for (key, value) in &next_map_type.properties {
-                            intersected_map.properties.insert(key.clone(), *value);
+                            insert_property(
+                                &mut intersected_map.properties,
+                                key,
+                                *value,
+                                match next_key {
+                                    SerdeKey::Def(def_variant) => def_variant.modifier,
+                                    SerdeKey::Intersection(_) => panic!(),
+                                },
+                            );
                         }
                     }
                 }
@@ -168,7 +183,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     SerdeOperator::Struct(intersected_map),
                 ))
             }
-            SerdeKey::Def(def_variant) if def_variant.modifier == DataModifier::PRIMARY_ID => {
+            SerdeKey::Def(def_variant)
+                if def_variant.modifier - SerdeModifier::cross_def_mask()
+                    == SerdeModifier::PRIMARY_ID =>
+            {
                 let table = self
                     .relations
                     .properties_by_def_id
@@ -185,17 +203,23 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 };
 
                 let object_operator_id = self
-                    .gen_operator_id(SerdeKey::no_modifier(meta.relationship.object.0))
+                    .gen_operator_id(SerdeKey::Def(DefVariant::new(
+                        meta.relationship.object.0,
+                        def_variant.modifier.cross_def_flags(),
+                    )))
                     .expect("No object operator for primary id property");
 
                 Some(OperatorAllocation::Allocated(
                     self.alloc_operator_id_for_key(&key),
-                    SerdeOperator::PrimaryId(property_name.into(), object_operator_id),
+                    SerdeOperator::PrimaryId(
+                        make_property_name(property_name, def_variant.modifier),
+                        object_operator_id,
+                    ),
                 ))
             }
-            SerdeKey::Def(def_variant) if def_variant.modifier.contains(DataModifier::ARRAY) => {
+            SerdeKey::Def(def_variant) if def_variant.modifier.contains(SerdeModifier::ARRAY) => {
                 let item_operator_id = self.gen_operator_id(SerdeKey::Def(
-                    def_variant.remove_modifier(DataModifier::ARRAY),
+                    def_variant.remove_modifier(SerdeModifier::ARRAY),
                 ))?;
 
                 Some(OperatorAllocation::Allocated(
@@ -267,10 +291,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 )
             }
             Some(type_ref) => match def_variant.modifier {
-                DataModifier::NONE => self.alloc_ontol_type_serde_operator(def_variant, type_ref),
+                SerdeModifier::NONE => self.alloc_ontol_type_serde_operator(def_variant, type_ref),
                 _ => Some(OperatorAllocation::Redirect(DefVariant::new(
                     def_variant.def_id,
-                    DataModifier::NONE,
+                    SerdeModifier::NONE,
                 ))),
             },
             None => panic!(
@@ -376,7 +400,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         properties: Option<&Properties>,
     ) -> Option<OperatorAllocation> {
         let Some(properties) = properties else {
-            return if matches!(def_variant.modifier, DataModifier::NONE) {
+            return if matches!(
+                def_variant.modifier - SerdeModifier::cross_def_mask(),
+                SerdeModifier::NONE
+            ) {
                 Some(OperatorAllocation::Allocated(
                     self.alloc_operator_id(&def_variant),
                     SerdeOperator::Struct(StructOperator {
@@ -388,7 +415,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             } else {
                 Some(OperatorAllocation::Redirect(DefVariant::new(
                     def_variant.def_id,
-                    DataModifier::NONE,
+                    def_variant.modifier.cross_def_flags(),
                 )))
             };
         };
@@ -435,6 +462,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     let (requirement, inner_operator_id) = self.get_property_operator(
                         *def_id,
                         (PropertyCardinality::Mandatory, ValueCardinality::One),
+                        def_variant.modifier.cross_def_flags(),
                     );
 
                     if !matches!(requirement, PropertyCardinality::Mandatory) {
@@ -485,7 +513,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 let operator_id = self.alloc_operator_id(&def_variant);
                 Some(OperatorAllocation::Allocated(
                     operator_id,
-                    if def_variant.modifier.contains(DataModifier::UNION) {
+                    if def_variant.modifier.contains(SerdeModifier::UNION) {
                         self.create_union_operator(def_variant, typename, properties)
                     } else {
                         // just the inherent properties are requested.
@@ -503,7 +531,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     while let Some((_, element)) = element_iterator.next() {
                         let operator_id = match element {
                             None => self
-                                .gen_operator_id(SerdeKey::no_modifier(DefId::unit()))
+                                .gen_operator_id(SerdeKey::Def(DefVariant::new(
+                                    DefId::unit(),
+                                    def_variant.modifier.cross_def_flags(),
+                                )))
                                 .unwrap(),
                             Some(relationship_id) => {
                                 let meta = self.defs.relationship_meta(relationship_id);
@@ -548,24 +579,25 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         typename: &str,
         properties: &Properties,
     ) -> Option<OperatorAllocation> {
-        let union_id = DataModifier::UNION | DataModifier::PRIMARY_ID;
+        let union_mod = SerdeModifier::UNION | SerdeModifier::PRIMARY_ID;
 
-        if def_variant.modifier.contains(union_id) {
+        if def_variant.modifier.contains(union_mod) {
             let Some(identifies_relationship_id) = properties.identified_by else {
                 return Some(OperatorAllocation::Redirect(
-                    def_variant.remove_modifier(union_id),
+                    def_variant.remove_modifier(union_mod),
                 ));
             };
-            let Some(id_operator_id) = self.gen_operator_id(SerdeKey::Def(
-                def_variant.with_local_mod(DataModifier::PRIMARY_ID),
-            )) else {
+            let Some(id_operator_id) = self.gen_operator_id(SerdeKey::Def(DefVariant::new(
+                def_variant.def_id,
+                SerdeModifier::PRIMARY_ID | def_variant.modifier.cross_def_flags(),
+            ))) else {
                 // This type has no inherent id
                 return Some(OperatorAllocation::Redirect(
-                    def_variant.remove_modifier(union_id),
+                    def_variant.remove_modifier(union_mod),
                 ));
             };
 
-            let map_def_variant = def_variant.remove_modifier(union_id);
+            let map_def_variant = def_variant.remove_modifier(union_mod);
             let identifies_meta = self.defs.relationship_meta(identifies_relationship_id);
 
             // prevent recursion
@@ -597,7 +629,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                                 purpose: VariantPurpose::Identification,
                                 def_variant: DefVariant::new(
                                     identifies_meta.relationship.subject.0,
-                                    DataModifier::NONE,
+                                    def_variant.modifier.cross_def_flags(),
                                 ),
                             },
                             operator_id: id_operator_id,
@@ -635,22 +667,22 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         if members.is_empty() {
             Some(OperatorAllocation::Redirect(
-                def_variant.remove_modifier(DataModifier::INTERSECTION),
+                def_variant.remove_modifier(SerdeModifier::INTERSECTION),
             ))
-        } else if modifier.contains(DataModifier::INTERSECTION) {
+        } else if modifier.contains(SerdeModifier::INTERSECTION) {
             if members.len() == 1 && properties.table.is_none() {
                 Some(OperatorAllocation::Redirect(def_variant.remove_modifier(
-                    DataModifier::INTERSECTION | DataModifier::INHERENT_PROPS,
+                    SerdeModifier::INTERSECTION | SerdeModifier::INHERENT_PROPS,
                 )))
             } else if members.len() == 1 {
                 self.alloc_serde_operator_from_key(SerdeKey::Intersection(Box::new(
                     [
                         // Require intersected properties via [is] relation:
                         SerdeKey::Def(def_variant.remove_modifier(
-                            DataModifier::INTERSECTION | DataModifier::INHERENT_PROPS,
+                            SerdeModifier::INTERSECTION | SerdeModifier::INHERENT_PROPS,
                         )),
                         // Require inherent propserties:
-                        SerdeKey::Def(def_variant.remove_modifier(DataModifier::INTERSECTION)),
+                        SerdeKey::Def(def_variant.remove_modifier(SerdeModifier::INTERSECTION)),
                     ]
                     .into(),
                 )))
@@ -662,7 +694,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     intersection_keys.insert(SerdeKey::Def(DefVariant::new(
                         def_variant.def_id,
                         def_variant
-                            .remove_modifier(DataModifier::INTERSECTION)
+                            .remove_modifier(SerdeModifier::INTERSECTION)
                             .modifier,
                     )));
                 }
@@ -670,7 +702,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 for (def_id, _span) in members {
                     intersection_keys.insert(SerdeKey::Def(DefVariant::new(
                         *def_id,
-                        DataModifier::default(),
+                        def_variant.modifier.reset(),
                     )));
                 }
 
@@ -678,7 +710,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     intersection_keys,
                 )))
             }
-        } else if modifier.contains(DataModifier::INHERENT_PROPS) {
+        } else if modifier.contains(SerdeModifier::INHERENT_PROPS) {
             let operator_id = self.alloc_operator_id(&def_variant);
             Some(OperatorAllocation::Allocated(
                 operator_id,
@@ -690,6 +722,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             let (requirement, inner_operator_id) = self.get_property_operator(
                 value_def,
                 (PropertyCardinality::Mandatory, ValueCardinality::One),
+                def_variant.modifier.cross_def_flags(),
             );
 
             if !matches!(requirement, PropertyCardinality::Mandatory) {
@@ -756,8 +789,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         let variants: Vec<_> = if properties.table.is_some() {
             // Need to do an intersection of the union type's _inherent_
             // properties and each variant's properties
-            let inherent_properties_key =
-                SerdeKey::Def(def_variant.with_local_mod(DataModifier::INHERENT_PROPS));
+            let inherent_properties_key = SerdeKey::Def(DefVariant::new(
+                def_variant.def_id,
+                SerdeModifier::INHERENT_PROPS | def_variant.modifier.cross_def_flags(),
+            ));
 
             union_builder
                 .build(self, |this, operator_id, result_type| {
@@ -818,13 +853,16 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     .expect("Object property has no name"),
             };
 
-            let (property_cardinality, value_operator_id) =
-                self.get_property_operator(type_def_id, property.cardinality);
+            let (property_cardinality, value_operator_id) = self.get_property_operator(
+                type_def_id,
+                property.cardinality,
+                def_variant.modifier.cross_def_flags(),
+            );
 
             let rel_params_operator_id = match &meta.relationship.rel_params {
                 RelParams::Type(def_id) => self.gen_operator_id(SerdeKey::Def(DefVariant::new(
                     *def_id,
-                    DataModifier::default(),
+                    def_variant.modifier.reset(),
                 ))),
                 RelParams::Unit => None,
                 _ => todo!(),
@@ -867,8 +905,9 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 flags |= SerdePropertyFlags::ENTITY_ID;
             }
 
-            op.properties.insert(
-                prop_key.into(),
+            insert_property(
+                &mut op.properties,
+                prop_key,
                 SerdeProperty {
                     property_id: *property_id,
                     value_operator_id,
@@ -876,10 +915,45 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     value_generator,
                     rel_params_operator_id,
                 },
+                def_variant.modifier,
             );
         }
 
         SerdeOperator::Struct(op)
+    }
+}
+
+fn insert_property(
+    properties: &mut IndexMap<String, SerdeProperty>,
+    property_name: &str,
+    property: SerdeProperty,
+    modifier: SerdeModifier,
+) {
+    if modifier.contains(SerdeModifier::GRAPHQL) {
+        let mut graphql_identifier = make_valid_graphql_identifier(property_name);
+        let mut retries = 16;
+
+        while properties.contains_key(&graphql_identifier) {
+            retries -= 1;
+            if retries == 0 {
+                error!("GraphQL tried too many rewrites. Ignoring property `{property_name}`");
+                return;
+            }
+
+            graphql_identifier = smart_format!("{graphql_identifier}_");
+        }
+
+        properties.insert(graphql_identifier, property);
+    } else {
+        properties.insert(property_name.into(), property);
+    }
+}
+
+fn make_property_name(input: &str, modifier: SerdeModifier) -> String {
+    if modifier.contains(SerdeModifier::GRAPHQL) {
+        make_valid_graphql_identifier(input)
+    } else {
+        input.into()
     }
 }
 

@@ -15,7 +15,7 @@ use ontol_runtime::{
         operator::{SerdeOperator, SerdeOperatorId},
         SerdeKey,
     },
-    smart_format, DataModifier, DefId, DefVariant, PackageId, Role,
+    smart_format, DefId, DefVariant, PackageId, Role, SerdeModifier,
 };
 use smartstring::alias::String;
 use tracing::debug;
@@ -76,11 +76,8 @@ pub fn generate_graphql_schema<'c>(
             continue;
         }
 
-        if let Some(operator_id) = type_info.operator_id {
-            debug!(
-                "adapt type `{name:?}` {operator_id:?}",
-                name = type_info.name
-            );
+        if type_info.operator_id.is_some() {
+            debug!("adapt type `{name:?}`", name = type_info.name);
 
             let type_ref = builder.get_def_type_ref(type_info.def_id, QLevel::Node);
 
@@ -297,6 +294,11 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 )]
                 .into();
 
+                let node_operator_id = self
+                    .serde_generator
+                    .gen_operator_id(gql_serde_key(type_info.def_id))
+                    .unwrap();
+
                 if let Some((rel_def_id, _operator_id)) = rel_params {
                     let rel_type_info = self.partial_ontology.get_type_info(rel_def_id);
                     let rel_edge_ref = self.get_def_type_ref(rel_def_id, QLevel::Node);
@@ -321,7 +323,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                             kind: TypeKind::Object(ObjectData {
                                 fields,
                                 kind: ObjectKind::Edge(EdgeData {
-                                    node_operator_id: type_info.operator_id.unwrap(),
+                                    node_operator_id,
                                     rel_edge_ref: Some(rel_edge_ref),
                                 }),
                             }),
@@ -337,7 +339,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                             kind: TypeKind::Object(ObjectData {
                                 fields,
                                 kind: ObjectKind::Edge(EdgeData {
-                                    node_operator_id: type_info.operator_id.unwrap(),
+                                    node_operator_id,
                                     rel_edge_ref: None,
                                 }),
                             }),
@@ -392,7 +394,11 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 let type_info = self.partial_ontology.get_type_info(def_id);
                 let type_index = self.alloc_def_type_index(def_id, QLevel::Node);
 
-                let operator_id = type_info.operator_id.unwrap();
+                // let operator_id = type_info.operator_id.unwrap();
+                let operator_id = self
+                    .serde_generator
+                    .gen_operator_id(gql_serde_key(def_id))
+                    .unwrap();
 
                 self.lazy_tasks.push(LazyTask::HarvestFields {
                     type_index,
@@ -854,12 +860,12 @@ impl PropertyFieldProducer {
 }
 
 fn gql_serde_key(def_id: DefId) -> SerdeKey {
-    SerdeKey::Def(DefVariant::new(def_id, DataModifier::default()))
+    SerdeKey::Def(DefVariant::new(def_id, SerdeModifier::graphql_default()))
 }
 
 fn gql_array_serde_key(def_id: DefId) -> SerdeKey {
     SerdeKey::Def(DefVariant::new(
         def_id,
-        DataModifier::default() | DataModifier::ARRAY,
+        SerdeModifier::graphql_default() | SerdeModifier::ARRAY,
     ))
 }

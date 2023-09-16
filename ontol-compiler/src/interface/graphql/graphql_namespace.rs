@@ -124,12 +124,8 @@ impl<'o> GraphqlNamespace<'o> {
                 "Query_".into()
             } else if typename == "Mutation" {
                 "Mutation_".into()
-            } else if is_valid_name(typename) {
-                typename.into()
-            } else if typename.contains('-') {
-                typename.to_case(Case::Snake).into()
             } else {
-                typename.to_case(Case::Camel).into()
+                make_valid_graphql_identifier(typename)
             };
 
             self.rewrites.insert(typename.into(), rewritten);
@@ -174,8 +170,18 @@ impl ProcessName for &'static str {
     }
 }
 
+pub fn make_valid_graphql_identifier(input: &str) -> String {
+    if is_valid_graphql_identifier(input) {
+        input.into()
+    } else if input.contains('-') {
+        input.to_case(Case::Snake).into()
+    } else {
+        input.to_case(Case::Camel).into()
+    }
+}
+
 // copied from juniper, where this is not public API
-pub fn is_valid_name(input: &str) -> bool {
+pub fn is_valid_graphql_identifier(input: &str) -> bool {
     for (i, c) in input.chars().enumerate() {
         let is_valid = c.is_ascii_alphabetic() || c == '_' || (i > 0 && c.is_ascii_digit());
         if !is_valid {

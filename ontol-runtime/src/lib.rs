@@ -70,30 +70,55 @@ impl From<DefId> for MapKey {
 bitflags::bitflags! {
     /// Modifier for (de)serializers.
     #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize, Deserialize)]
-    pub struct DataModifier: u32 {
+    pub struct SerdeModifier: u32 {
+        /// No modifiers
         const NONE           = 0b00000000;
+        /// Make an array of the DefId
         const ARRAY          = 0b00000001;
+        /// Include Repr union of DefId
         const UNION          = 0b00000010;
+        /// Include Repr intersection of DefId
         const INTERSECTION   = 0b00000100;
+        /// Include the primary ID of the entity
         const PRIMARY_ID     = 0b00001000;
+        /// Include inherent properties
         const INHERENT_PROPS = 0b00010000;
+        /// Apply GraphQL field renaming
+        const GRAPHQL        = 0b00100000;
     }
 }
 
-impl Default for DataModifier {
-    fn default() -> Self {
+impl SerdeModifier {
+    pub fn cross_def_flags(self) -> Self {
+        self & Self::cross_def_mask()
+    }
+
+    pub fn reset(self) -> Self {
+        Self::json_default() | self.cross_def_flags()
+    }
+
+    pub fn json_default() -> Self {
         Self::UNION | Self::INTERSECTION | Self::PRIMARY_ID | Self::INHERENT_PROPS
+    }
+
+    pub fn graphql_default() -> Self {
+        Self::json_default() | Self::GRAPHQL
+    }
+
+    /// Flags that apply across DefIds
+    pub fn cross_def_mask() -> Self {
+        Self::GRAPHQL
     }
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct DefVariant {
     pub def_id: DefId,
-    pub modifier: DataModifier,
+    pub modifier: SerdeModifier,
 }
 
 impl DefVariant {
-    pub const fn new(def_id: DefId, modifier: DataModifier) -> Self {
+    pub const fn new(def_id: DefId, modifier: SerdeModifier) -> Self {
         Self { def_id, modifier }
     }
 
@@ -104,14 +129,7 @@ impl DefVariant {
         }
     }
 
-    pub fn with_local_mod(self, local_mod: DataModifier) -> Self {
-        Self {
-            def_id: self.def_id,
-            modifier: local_mod,
-        }
-    }
-
-    pub fn remove_modifier(self, diff: DataModifier) -> Self {
+    pub fn remove_modifier(self, diff: SerdeModifier) -> Self {
         Self {
             def_id: self.def_id,
             modifier: self.modifier.difference(diff),

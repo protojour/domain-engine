@@ -19,7 +19,7 @@ use ontol_runtime::{
     },
     serde::SerdeKey,
     value::PropertyId,
-    DataModifier, DefId, DefVariant, PackageId,
+    DefId, DefVariant, PackageId, SerdeModifier,
 };
 use ontology_graph::OntologyGraph;
 use package::{PackageTopology, Packages, ParsedPackage, ONTOL_PKG};
@@ -229,7 +229,7 @@ impl<'m> Compiler<'m> {
                     entity_info: self.entity_info(type_def_id, &mut serde_generator),
                     operator_id: serde_generator.gen_operator_id(SerdeKey::Def(DefVariant::new(
                         type_def_id,
-                        DataModifier::default(),
+                        SerdeModifier::json_default(),
                     ))),
                 });
             }
@@ -242,7 +242,7 @@ impl<'m> Compiler<'m> {
                     entity_info: None,
                     operator_id: serde_generator.gen_operator_id(SerdeKey::Def(DefVariant::new(
                         type_def_id,
-                        DataModifier::default(),
+                        SerdeModifier::json_default(),
                     ))),
                 });
             }
@@ -366,7 +366,7 @@ impl<'m> Compiler<'m> {
             id_operator_id: serde_generator
                 .gen_operator_id(SerdeKey::Def(DefVariant::new(
                     identifies_meta.relationship.subject.0,
-                    DataModifier::NONE,
+                    SerdeModifier::NONE,
                 )))
                 .unwrap(),
             entity_relationships,

@@ -2,12 +2,12 @@ use assert_matches::assert_matches;
 use ontol_runtime::{
     interface::graphql::{
         data::{
-            FieldKind, NativeScalarKind, NativeScalarRef, ObjectData, ScalarData, TypeData,
-            TypeIndex, TypeKind, UnitTypeRef,
+            FieldKind, NativeScalarKind, NativeScalarRef, NodeData, ObjectData, ObjectKind,
+            ScalarData, TypeData, TypeIndex, TypeKind, UnitTypeRef,
         },
         schema::{GraphqlSchema, QueryLevel},
     },
-    serde::operator::SerdeOperator,
+    serde::operator::{SerdeOperator, StructOperator},
 };
 use ontol_test_utils::{
     examples::ARTIST_AND_INSTRUMENT, expect_eq, OntolTest, TestCompile, ROOT_SRC_NAME,
@@ -29,8 +29,8 @@ fn test_graphql_small_range_number_becomes_int() {
     "
     .compile_ok(|test| {
         let (_schema, test) = schema_test(&test, ROOT_SRC_NAME);
-        let foo_node = test.type_data("foo", QueryLevel::Node);
-        let foo_object = foo_node.object_data();
+        let foo_type = test.type_data("foo", QueryLevel::Node);
+        let foo_object = foo_type.object_data();
 
         let prop_field = foo_object.fields.get("prop").unwrap();
         assert_matches!(prop_field.kind, FieldKind::Property(_));
@@ -50,8 +50,8 @@ fn test_graphql_i64_custom_scalar() {
     "
     .compile_ok(|test| {
         let (schema, test) = schema_test(&test, ROOT_SRC_NAME);
-        let foo_node = test.type_data("foo", QueryLevel::Node);
-        let foo_object = foo_node.object_data();
+        let foo_type = test.type_data("foo", QueryLevel::Node);
+        let foo_object = foo_type.object_data();
 
         let prop_field = foo_object.fields.get("prop").unwrap();
         assert_matches!(prop_field.kind, FieldKind::Property(_));
@@ -73,8 +73,8 @@ fn test_graphql_default_scalar() {
     "
     .compile_ok(|test| {
         let (_schema, test) = schema_test(&test, ROOT_SRC_NAME);
-        let foo_node = test.type_data("foo", QueryLevel::Node);
-        let foo_object = foo_node.object_data();
+        let foo_type = test.type_data("foo", QueryLevel::Node);
+        let foo_object = foo_type.object_data();
 
         let prop_field = foo_object.fields.get("default").unwrap();
         assert_matches!(prop_field.kind, FieldKind::Property(_));
@@ -94,8 +94,8 @@ fn test_graphql_scalar_array() {
     "
     .compile_ok(|test| {
         let (_schema, test) = schema_test(&test, ROOT_SRC_NAME);
-        let foo_node = test.type_data("foo", QueryLevel::Node);
-        let foo_object = foo_node.object_data();
+        let foo_type = test.type_data("foo", QueryLevel::Node);
+        let foo_object = foo_type.object_data();
 
         let prop_field = foo_object.fields.get("tags").unwrap();
         assert_matches!(prop_field.kind, FieldKind::Property(_));
@@ -105,6 +105,37 @@ fn test_graphql_scalar_array() {
 
         let operator = test.test.ontology.get_serde_operator(native.operator_id);
         assert_matches!(operator, SerdeOperator::RelationSequence(_));
+    });
+}
+
+#[test]
+fn test_graphql_serde_renaming() {
+    "
+    pub def foo {
+        rel .id: { fmt '' => text => . }
+        rel .'must-rewrite': text
+        rel .'must_rewrite': text
+    }
+    "
+    .compile_ok(|test| {
+        let (_schema, schema_test) = schema_test(&test, ROOT_SRC_NAME);
+        let foo_node = schema_test
+            .type_data("foo", QueryLevel::Node)
+            .object_data()
+            .node_data();
+
+        let fields: Vec<_> = test
+            .ontology
+            .get_serde_operator(foo_node.operator_id)
+            .struct_op()
+            .properties
+            .keys()
+            .collect();
+
+        expect_eq!(
+            actual = fields.as_slice(),
+            expected = &["must_rewrite", "must_rewrite_"]
+        );
     });
 }
 
@@ -170,9 +201,17 @@ trait TypeDataExt {
     fn custom_scalar(&self) -> &ScalarData;
 }
 
+trait ObjectDataExt {
+    fn node_data(&self) -> &NodeData;
+}
+
 trait UnitTypeRefExt {
     fn indexed(&self) -> TypeIndex;
     fn native_scalar(&self) -> &NativeScalarRef;
+}
+
+trait SerdeOperatorExt {
+    fn struct_op(&self) -> &StructOperator;
 }
 
 impl TypeDataExt for TypeData {
@@ -193,6 +232,15 @@ impl TypeDataExt for TypeData {
     }
 }
 
+impl ObjectDataExt for ObjectData {
+    fn node_data(&self) -> &NodeData {
+        let ObjectKind::Node(node_data) = &self.kind else {
+            panic!("ObjectData is not a Node");
+        };
+        node_data
+    }
+}
+
 impl UnitTypeRefExt for UnitTypeRef {
     #[track_caller]
     fn indexed(&self) -> TypeIndex {
@@ -204,9 +252,18 @@ impl UnitTypeRefExt for UnitTypeRef {
 
     #[track_caller]
     fn native_scalar(&self) -> &NativeScalarRef {
-        let UnitTypeRef::NativeScalar(native_scalar_ref) = self else {
+        let Self::NativeScalar(native_scalar_ref) = self else {
             panic!("not a native scalar: {self:?}");
         };
         native_scalar_ref
+    }
+}
+
+impl SerdeOperatorExt for SerdeOperator {
+    fn struct_op(&self) -> &StructOperator {
+        let Self::Struct(struct_op) = &self else {
+            panic!("Not a struct operator: {self:?}");
+        };
+        struct_op
     }
 }
