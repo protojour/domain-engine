@@ -404,7 +404,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
                     )
                     .map_err(|_| ())
                 }
-                Discriminant::MatchesCapturingStringPattern(def_id) => {
+                Discriminant::MatchesCapturingTextPattern(def_id) => {
                     let result_type = variant.discriminator.def_variant.def_id;
                     let pattern = self.ontology.text_patterns.get(def_id).unwrap();
 
@@ -449,10 +449,10 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
         if !self.variants.iter().any(|variant| {
             matches!(
                 &variant.discriminator.discriminant,
-                Discriminant::MapFallback
+                Discriminant::StructFallback
                     | Discriminant::IsSingletonProperty(..)
                     | Discriminant::HasTextAttribute(..)
-                    | Discriminant::HasAttributeMatchingStringPattern(..)
+                    | Discriminant::HasAttributeMatchingTextPattern(..)
             )
         }) {
             // None of the discriminators are matching a map.
@@ -519,7 +519,7 @@ impl<'e> MapMatcher<'e> {
                 ) => property == match_name && value == match_value,
                 (Discriminant::IsSingletonProperty(_, match_name), _) => property == match_name,
                 (
-                    Discriminant::HasAttributeMatchingStringPattern(_, match_name, def_id),
+                    Discriminant::HasAttributeMatchingTextPattern(_, match_name, def_id),
                     serde_value::Value::String(value),
                 ) => {
                     if property == match_name {
@@ -574,7 +574,7 @@ impl<'e> MapMatcher<'e> {
         for variant in self.variants {
             if matches!(
                 variant.discriminator.discriminant,
-                Discriminant::MapFallback
+                Discriminant::StructFallback
             ) {
                 match self.ontology.get_serde_operator(variant.operator_id) {
                     SerdeOperator::Struct(struct_op) => {

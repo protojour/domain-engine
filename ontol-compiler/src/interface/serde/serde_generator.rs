@@ -605,16 +605,16 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 ));
             };
 
-            let map_def_variant = def_variant.remove_modifier(union_mod);
+            let struct_def_variant = def_variant.remove_modifier(union_mod);
             let identifies_meta = self.defs.relationship_meta(identifies_relationship_id);
 
             // prevent recursion
             let new_operator_id = self.alloc_operator_id(&def_variant);
 
             // Create a union between { '_id' } and the map properties itself
-            let map_properties_operator_id = self
-                .gen_operator_id(SerdeKey::Def(map_def_variant))
-                .expect("No property map operator");
+            let struct_properties_operator_id = self
+                .gen_operator_id(SerdeKey::Def(struct_def_variant))
+                .expect("No property struct operator");
 
             let id_property_name =
                 match self.operators_by_id.get(id_operator_id.0 as usize).unwrap() {
@@ -644,11 +644,11 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         },
                         ValueUnionVariant {
                             discriminator: VariantDiscriminator {
-                                discriminant: Discriminant::MapFallback,
+                                discriminant: Discriminant::StructFallback,
                                 purpose: VariantPurpose::Data,
-                                def_variant: map_def_variant,
+                                def_variant: struct_def_variant,
                             },
-                            operator_id: map_properties_operator_id,
+                            operator_id: struct_properties_operator_id,
                         },
                     ],
                 )),
@@ -788,7 +788,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         for root_discriminator in &union_disciminator.variants {
             union_builder
-                .add_root_discriminator(self, root_discriminator)
+                .add_root_discriminator(root_discriminator, self)
                 .expect("Could not add root discriminator to union builder");
 
             root_types.insert(root_discriminator.def_variant.def_id);

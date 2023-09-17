@@ -28,11 +28,11 @@ pub enum Discriminant {
     IsText,
     IsTextLiteral(String),
     IsSequence,
-    MatchesCapturingStringPattern(DefId),
-    /// Matches any map
-    MapFallback,
-    /// Matches a map that has a single property, and only that property will be used for information
+    MatchesCapturingTextPattern(DefId),
+    /// Matches any struct
+    StructFallback,
+    /// Matches a struct that has a single property, and only that property will be used for informationk
     IsSingletonProperty(RelationshipId, String),
     HasTextAttribute(RelationshipId, String, String),
-    HasAttributeMatchingStringPattern(RelationshipId, String, DefId),
+    HasAttributeMatchingTextPattern(RelationshipId, String, DefId),
 }

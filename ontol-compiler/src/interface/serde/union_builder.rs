@@ -48,7 +48,7 @@ impl UnionBuilder {
             candidate.operator_id = map_operator_fn(generator, candidate.operator_id, result_type);
 
             match &mut candidate.discriminator.discriminant {
-                Discriminant::MapFallback => {
+                Discriminant::StructFallback => {
                     panic!("MapFallback should have been filtered already");
                 }
                 Discriminant::IsSingletonProperty(relationship_id, prop) => {
@@ -62,7 +62,7 @@ impl UnionBuilder {
                     if let Some(SerdeOperator::CapturingTextPattern(def_id)) = operator {
                         // convert this
                         candidate.discriminator.discriminant =
-                            Discriminant::HasAttributeMatchingStringPattern(
+                            Discriminant::HasAttributeMatchingTextPattern(
                                 *relationship_id,
                                 prop.clone(),
                                 *def_id,
@@ -88,8 +88,8 @@ impl UnionBuilder {
 
     pub fn add_root_discriminator(
         &mut self,
-        generator: &mut SerdeGenerator,
         discriminator: &VariantDiscriminator,
+        generator: &mut SerdeGenerator,
     ) -> Result<(), String> {
         let operator_id = match generator.gen_operator_id(SerdeKey::Def(
             self.def_variant.with_def(discriminator.def_variant.def_id),
@@ -99,29 +99,29 @@ impl UnionBuilder {
         };
 
         // Push with empty scope ('root scope')
-        self.push_discriminator(generator, &[], discriminator, operator_id)
+        self.push_discriminator(discriminator, operator_id, &[], generator)
     }
 
     fn push_discriminator(
         &mut self,
-        generator: &SerdeGenerator,
-        scope: &[&VariantDiscriminator],
         discriminator: &VariantDiscriminator,
         operator_id: SerdeOperatorId,
+        scope: &[&VariantDiscriminator],
+        generator: &SerdeGenerator,
     ) -> Result<(), String> {
         let operator = &generator.operators_by_id[operator_id.0 as usize];
         match operator {
             SerdeOperator::Union(union_op) => {
-                for inner_discriminator in union_op.unfiltered_variants() {
+                for variant in union_op.unfiltered_variants() {
                     let mut child_scope: Vec<&VariantDiscriminator> = vec![];
                     child_scope.extend(scope.iter());
                     child_scope.push(discriminator);
 
                     self.push_discriminator(
-                        generator,
+                        &variant.discriminator,
+                        variant.operator_id,
                         &child_scope,
-                        &inner_discriminator.discriminator,
-                        inner_discriminator.operator_id,
+                        generator,
                     )?;
                 }
                 Ok(())
@@ -129,7 +129,7 @@ impl UnionBuilder {
             _other => {
                 // debug!("PUSH DISCR scope={scope:#?} discriminator={discriminator:#?} {other:?}");
                 match discriminator.discriminant {
-                    Discriminant::MapFallback => {
+                    Discriminant::StructFallback => {
                         if let Some(scoping) = scope.last() {
                             self.variant_candidates_by_purpose
                                 .entry(scoping.purpose)
@@ -141,7 +141,7 @@ impl UnionBuilder {
 
                             Ok(())
                         } else {
-                            Err(smart_format!("MapFallback without scoping"))
+                            Err(smart_format!("StructFallback without scoping"))
                         }
                     }
                     _ => {
