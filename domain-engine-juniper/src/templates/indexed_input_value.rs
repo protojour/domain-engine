@@ -4,7 +4,9 @@ use ontol_runtime::interface::graphql::data::{
 use tracing::{debug, warn};
 
 use crate::{
-    gql_scalar::GqlScalar, macros::impl_graphql_value, registry_ctx::RegistryCtx,
+    gql_scalar::GqlScalar,
+    macros::impl_graphql_value,
+    registry_ctx::{ArgumentFilter, RegistryCtx},
     schema_ctx::IndexedTypeInfo,
 };
 
@@ -35,6 +37,7 @@ impl juniper::GraphQLType<GqlScalar> for IndexedInputValue {
                     node_data.operator_id,
                     &mut arguments,
                     info.typing_purpose,
+                    ArgumentFilter::default(),
                 );
                 registry
                     .build_input_object_type::<Self>(info, &arguments)
@@ -53,6 +56,7 @@ impl juniper::GraphQLType<GqlScalar> for IndexedInputValue {
                     *node_operator_id,
                     &mut arguments,
                     info.typing_purpose,
+                    ArgumentFilter::default(),
                 );
 
                 if let Some(rel_ref) = rel_ref {

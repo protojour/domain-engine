@@ -543,16 +543,13 @@ async fn test_graphql_guitar_synth_union_input_union_field_list() {
             // The instrument_id should only be included once,
             // and should use snake_case instead of kebab-case:
             ("instrument_id", Nullable(true)),
-            // BUG: Should not duplicate "instrument_id":
-            ("instrument_id", Nullable(true)),
+            // from "guitar".
             ("type", Nullable(true)),
+            // from "guitar".
             ("string_count", Nullable(true)),
-            // BUG: "played_by" should be at the end
-            ("played_by", Nullable(true)),
-            // BUG: Should not duplicate "type":
-            ("type", Nullable(true)),
+            // from "synth". Note the synth `type` is deduplicated.
             ("polyphony", Nullable(true)),
-            // BUG: "played_by" should not be duplicated
+            // object properties ordered last
             ("played_by", Nullable(true)),
         ]
     );
@@ -582,6 +579,10 @@ async fn test_graphql_guitar_synth_union_input() {
                         {
                             type: "guitar",
                             string_count: 6
+                        },
+                        {
+                            type: "synth",
+                            polyphony: 12
                         },
                         {
                             instrument_id: "synth/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8"

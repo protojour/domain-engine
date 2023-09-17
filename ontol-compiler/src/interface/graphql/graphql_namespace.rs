@@ -7,6 +7,7 @@ use ontol_runtime::{
 };
 use smartstring::alias::String;
 
+#[derive(Default)]
 pub struct GraphqlNamespace<'o> {
     rewrites: HashMap<String, String>,
     domain_disambiguation: Option<DomainDisambiguation<'o>>,
@@ -18,13 +19,6 @@ pub struct DomainDisambiguation<'o> {
 }
 
 impl<'o> GraphqlNamespace<'o> {
-    pub fn new() -> Self {
-        Self {
-            rewrites: Default::default(),
-            domain_disambiguation: None,
-        }
-    }
-
     pub fn with_domain_disambiguation(domain_disambiguation: DomainDisambiguation<'o>) -> Self {
         Self {
             rewrites: Default::default(),

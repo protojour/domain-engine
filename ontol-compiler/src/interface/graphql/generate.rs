@@ -194,7 +194,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                     properties,
                     &mut fields,
                     property_field_producer,
-                    &mut GraphqlNamespace::new(),
+                    &mut GraphqlNamespace::default(),
                 );
 
                 match &mut self.schema.types[type_index.0 as usize].kind {
@@ -282,7 +282,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 let edge_index = self.alloc_def_type_index(def_id, level);
                 let node_ref = self.get_def_type_ref(def_id, QLevel::Node);
 
-                let mut field_namespace = GraphqlNamespace::new();
+                let mut field_namespace = GraphqlNamespace::default();
 
                 // FIXME: what if some of the relation data's fields are called "node"
                 let fields: IndexMap<String, FieldData> = [(

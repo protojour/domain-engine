@@ -11,6 +11,8 @@ use ontol_runtime::{
         schema::{QueryLevel, TypingPurpose},
     },
     serde::operator::{FilteredVariants, SerdeOperator, SerdeOperatorId, SerdePropertyFlags},
+    value::PropertyId,
+    Role,
 };
 use tracing::{trace, warn};
 
@@ -70,6 +72,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         operator_id: SerdeOperatorId,
         output: &mut Vec<juniper::meta::Argument<'r, GqlScalar>>,
         typing_purpose: TypingPurpose,
+        filter: ArgumentFilter,
     ) {
         let serde_operator = self.schema_ctx.ontology.get_serde_operator(operator_id);
 
@@ -84,6 +87,10 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                             TypingPurpose::Input | TypingPurpose::PartialInput
                         )
                     {
+                        continue;
+                    }
+
+                    if !filter.filter_property(name, Some(property.property_id), output) {
                         continue;
                     }
 
@@ -109,7 +116,12 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 let (mode, level) = typing_purpose.mode_and_level();
                 match union_op.variants(mode, level) {
                     FilteredVariants::Single(operator_id) => {
-                        self.collect_operator_arguments(operator_id, output, typing_purpose);
+                        self.collect_operator_arguments(
+                            operator_id,
+                            output,
+                            typing_purpose,
+                            filter,
+                        );
                     }
                     FilteredVariants::Union(variants) => {
                         for variant in variants {
@@ -117,22 +129,46 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                                 variant.operator_id,
                                 output,
                                 TypingPurpose::PartialInput,
+                                ArgumentFilter {
+                                    deduplicate: true,
+                                    skip_subject: false,
+                                    skip_object: true,
+                                },
+                            );
+                        }
+                        for variant in variants {
+                            self.collect_operator_arguments(
+                                variant.operator_id,
+                                output,
+                                TypingPurpose::PartialInput,
+                                ArgumentFilter {
+                                    deduplicate: true,
+                                    skip_subject: true,
+                                    skip_object: false,
+                                },
                             );
                         }
                     }
                 }
             }
             SerdeOperator::Alias(alias_op) => {
-                self.collect_operator_arguments(alias_op.inner_operator_id, output, typing_purpose);
+                self.collect_operator_arguments(
+                    alias_op.inner_operator_id,
+                    output,
+                    typing_purpose,
+                    filter,
+                );
             }
             SerdeOperator::PrimaryId(property_name, id_operator_id) => {
-                output.push(self.get_operator_argument(
-                    property_name,
-                    *id_operator_id,
-                    None,
-                    SerdePropertyFlags::ENTITY_ID,
-                    TypeModifier::Unit(Optionality::Optional),
-                ))
+                if filter.filter_property(property_name, None, output) {
+                    output.push(self.get_operator_argument(
+                        property_name,
+                        *id_operator_id,
+                        None,
+                        SerdePropertyFlags::ENTITY_ID,
+                        TypeModifier::Unit(Optionality::Optional),
+                    ));
+                }
             }
             other => {
                 panic!("{other:?}");
@@ -401,5 +437,40 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 self.registry.arg::<Option<Vec<Option<T>>>>(name, &())
             }
         }
+    }
+}
+
+#[derive(Clone, Copy, Default)]
+pub struct ArgumentFilter {
+    deduplicate: bool,
+    skip_subject: bool,
+    skip_object: bool,
+}
+
+impl ArgumentFilter {
+    fn filter_property(
+        &self,
+        name: &str,
+        property_id: Option<PropertyId>,
+        output: &Vec<juniper::meta::Argument<GqlScalar>>,
+    ) -> bool {
+        if let Some(property_id) = property_id {
+            if self.skip_subject && matches!(property_id.role, Role::Subject) {
+                return false;
+            }
+            if self.skip_object && matches!(property_id.role, Role::Object) {
+                return false;
+            }
+        }
+
+        if self.deduplicate {
+            for arg in output {
+                if arg.name == name {
+                    return false;
+                }
+            }
+        }
+
+        true
     }
 }
