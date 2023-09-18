@@ -39,8 +39,20 @@ pub fn generate_graphql_schema<'c>(
     package_id: PackageId,
     partial_ontology: &'c Ontology,
     serde_generator: &mut SerdeGenerator<'c, '_>,
-) -> GraphqlSchema {
+) -> Option<GraphqlSchema> {
     let domain = partial_ontology.find_domain(package_id).unwrap();
+
+    let contains_entities = domain
+        .type_names
+        .iter()
+        .fold(false, |has_entities, (_, def_id)| {
+            has_entities || domain.type_info(*def_id).entity_info.is_some()
+        });
+
+    // A domain without entities doesn't get a GraphQL schema.
+    if !contains_entities {
+        return None;
+    }
 
     let mut schema = GraphqlSchema {
         package_id,
@@ -84,8 +96,8 @@ pub fn generate_graphql_schema<'c>(
 
             let type_ref = builder.get_def_type_ref(type_info.def_id, QLevel::Node);
 
-            if let Some(entity_info) = entity_check(builder.schema, type_ref) {
-                builder.add_entity_queries_and_mutations(entity_info);
+            if let Some(entity_data) = entity_check(builder.schema, type_ref) {
+                builder.add_entity_queries_and_mutations(entity_data);
             }
         }
     }
@@ -96,7 +108,7 @@ pub fn generate_graphql_schema<'c>(
         }
     }
 
-    schema
+    Some(schema)
 }
 
 fn entity_check(schema: &GraphqlSchema, type_ref: UnitTypeRef) -> Option<EntityData> {

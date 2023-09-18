@@ -255,12 +255,15 @@ impl<'m> Compiler<'m> {
         let domain_interfaces = {
             let mut interfaces: FnvHashMap<PackageId, Vec<DomainInterface>> = Default::default();
             for package_id in package_ids.iter().cloned() {
-                if package_id != ONTOL_PKG {
-                    let schema = generate_graphql_schema(
-                        package_id,
-                        builder.partial_ontology(),
-                        &mut serde_generator,
-                    );
+                if package_id == ONTOL_PKG {
+                    continue;
+                }
+
+                if let Some(schema) = generate_graphql_schema(
+                    package_id,
+                    builder.partial_ontology(),
+                    &mut serde_generator,
+                ) {
                     interfaces
                         .entry(package_id)
                         .or_default()

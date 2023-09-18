@@ -20,7 +20,8 @@ use crate::{
 const ROOT: SourceName = SourceName::root();
 
 #[test]
-fn test_graphql_empty_schema() {
+#[should_panic = "GraphqlInterfaceNotFound"]
+fn test_graphql_schema_for_entityless_domain_should_not_be_generated() {
     "".compile_schemas([ROOT]);
 }
 
