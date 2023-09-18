@@ -220,7 +220,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 } else {
                     Some(OperatorAllocation::Allocated(
                         self.alloc_operator_id_for_key(&key),
-                        SerdeOperator::PrimaryId(ident, object_operator_id),
+                        SerdeOperator::IdSingletonStruct(ident, object_operator_id),
                     ))
                 }
             }
@@ -597,7 +597,9 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
             let id_property_name =
                 match self.operators_by_id.get(id_operator_id.0 as usize).unwrap() {
-                    SerdeOperator::PrimaryId(id_property_name, _) => id_property_name.clone(),
+                    SerdeOperator::IdSingletonStruct(id_property_name, _) => {
+                        id_property_name.clone()
+                    }
                     other => panic!("id operator was not an Id: {other:?}"),
                 };
 

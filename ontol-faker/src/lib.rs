@@ -185,9 +185,6 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                     }
                 }
             }
-            SerdeOperator::PrimaryId(_name, inner_operator_id) => {
-                return self.fake_attribute(processor.narrow(*inner_operator_id))
-            }
             SerdeOperator::Struct(struct_op) => {
                 let mut attrs = BTreeMap::default();
                 for (_, property) in &struct_op.properties {
@@ -197,6 +194,9 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                 }
 
                 Value::new(Data::Struct(attrs), struct_op.def.def_id)
+            }
+            SerdeOperator::IdSingletonStruct(_name, inner_operator_id) => {
+                return self.fake_attribute(processor.narrow(*inner_operator_id))
             }
         };
 

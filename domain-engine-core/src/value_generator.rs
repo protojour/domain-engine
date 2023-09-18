@@ -164,7 +164,7 @@ impl<'e> Generator<'e> {
             SerdeOperator::Alias(alias_op) => alias_op.def.def_id,
             SerdeOperator::Union(union_op) => union_op.union_def().def_id,
             SerdeOperator::Struct(struct_op) => struct_op.def.def_id,
-            SerdeOperator::PrimaryId(_, operator_id) => {
+            SerdeOperator::IdSingletonStruct(_, operator_id) => {
                 self.operator_def_id(self.engine.ontology().get_serde_operator(*operator_id))
             }
         }

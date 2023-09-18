@@ -212,7 +212,7 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
                 ),
             },
 
-            SerdeOperator::PrimaryId(_name, _inner_operator_id) => {
+            SerdeOperator::IdSingletonStruct(_name, _inner_operator_id) => {
                 //deserializer.deserialize_map()
                 todo!()
             }

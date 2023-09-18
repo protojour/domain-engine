@@ -114,7 +114,7 @@ impl<'e> SerdeProcessor<'e> {
                     }
                 }
             },
-            SerdeOperator::PrimaryId(name, inner_operator_id) => {
+            SerdeOperator::IdSingletonStruct(name, inner_operator_id) => {
                 let mut map = serializer.serialize_map(Some(1 + option_len(&rel_params)))?;
                 map.serialize_entry(
                     name,

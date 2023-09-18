@@ -542,7 +542,7 @@ impl<'e> MapMatcher<'e> {
                     SerdeOperator::Struct(struct_op) => {
                         MapMatchResult::Match(self.new_match(MapMatchKind::StructType(struct_op)))
                     }
-                    SerdeOperator::PrimaryId(name, operator_id) => MapMatchResult::Match(
+                    SerdeOperator::IdSingletonStruct(name, operator_id) => MapMatchResult::Match(
                         self.new_match(MapMatchKind::IdType(name.as_str(), *operator_id)),
                     ),
                     SerdeOperator::Union(union_op) => {
@@ -582,7 +582,7 @@ impl<'e> MapMatcher<'e> {
                             self.new_match(MapMatchKind::StructType(struct_op)),
                         )
                     }
-                    SerdeOperator::PrimaryId(name, operator_id) => {
+                    SerdeOperator::IdSingletonStruct(name, operator_id) => {
                         return MapMatchResult::Match(
                             self.new_match(MapMatchKind::IdType(name.as_str(), *operator_id)),
                         )

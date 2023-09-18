@@ -161,7 +161,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                     filter,
                 );
             }
-            SerdeOperator::PrimaryId(property_name, id_operator_id) => {
+            SerdeOperator::IdSingletonStruct(property_name, id_operator_id) => {
                 if filter.filter_property(property_name, None, output) {
                     output.push(self.get_operator_argument(
                         property_name,
@@ -296,7 +296,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                     }
                 }
             }
-            SerdeOperator::PrimaryId(..) => {
+            SerdeOperator::IdSingletonStruct(..) => {
                 panic!()
             }
         }

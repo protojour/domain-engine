@@ -825,7 +825,7 @@ fn get_native_scalar_kind(
         | SerdeOperator::StringConstant(..)
         | SerdeOperator::TextPattern(_)
         | SerdeOperator::CapturingTextPattern(_) => NativeScalarKind::String,
-        SerdeOperator::PrimaryId(..) => panic!("Id should not appear in GraphQL"),
+        SerdeOperator::IdSingletonStruct(..) => panic!("Id should not appear in GraphQL"),
         SerdeOperator::Alias(alias_op) => get_native_scalar_kind(
             serde_generator,
             serde_generator.get_operator(alias_op.inner_operator_id),

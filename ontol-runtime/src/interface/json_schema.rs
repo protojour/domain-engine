@@ -430,7 +430,7 @@ fn serialize_schema_inline<S: Serializer>(
                 },
             )?;
         }
-        SerdeOperator::PrimaryId(_name, _inner_operator_id) => {
+        SerdeOperator::IdSingletonStruct(_name, _inner_operator_id) => {
             panic!("BUG: Id not handled here")
         }
         SerdeOperator::Struct(struct_op) => {
@@ -507,7 +507,7 @@ impl<'d, 'e> Serialize for SchemaReference<'d, 'e> {
             SerdeOperator::Union(union_op) => self
                 .compose(self.ctx.ref_link(union_op.union_def()))
                 .serialize(serializer),
-            SerdeOperator::PrimaryId(name, id_operator_id) => self
+            SerdeOperator::IdSingletonStruct(name, id_operator_id) => self
                 .compose(self.ctx.singleton_object(name.as_str(), *id_operator_id))
                 .serialize(serializer),
             SerdeOperator::Struct(struct_op) => self
@@ -791,7 +791,7 @@ impl SchemaGraphBuilder {
                     self.visit(discriminator.operator_id, ontology);
                 }
             }
-            SerdeOperator::PrimaryId(_, id_operator_id) => {
+            SerdeOperator::IdSingletonStruct(_, id_operator_id) => {
                 // id is not represented in the graph
                 self.visit(*id_operator_id, ontology);
             }

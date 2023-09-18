@@ -65,8 +65,8 @@ pub enum SerdeOperator {
     /// A type with many properties
     Struct(StructOperator),
 
-    /// A map with one property: A primary id
-    PrimaryId(String, SerdeOperatorId),
+    /// A map with one property: The ID of an entity.
+    IdSingletonStruct(String, SerdeOperatorId),
 }
 
 #[derive(Debug, Serialize, Deserialize)]

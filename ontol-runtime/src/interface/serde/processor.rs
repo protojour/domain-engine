@@ -252,7 +252,7 @@ impl<'e> Display for SerdeProcessor<'e> {
             }
             SerdeOperator::Alias(alias_op) => Backticks(&alias_op.typename).fmt(f),
             SerdeOperator::Union(_) => write!(f, "union"),
-            SerdeOperator::PrimaryId(..) => write!(f, "id"),
+            SerdeOperator::IdSingletonStruct(..) => write!(f, "id"),
             SerdeOperator::Struct(struct_op) => Backticks(&struct_op.typename).fmt(f),
         }
     }
