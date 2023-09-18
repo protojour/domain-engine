@@ -42,15 +42,12 @@ pub fn generate_graphql_schema<'c>(
 ) -> Option<GraphqlSchema> {
     let domain = partial_ontology.find_domain(package_id).unwrap();
 
-    let contains_entities = domain
+    if !domain
         .type_names
         .iter()
-        .fold(false, |has_entities, (_, def_id)| {
-            has_entities || domain.type_info(*def_id).entity_info.is_some()
-        });
-
-    // A domain without entities doesn't get a GraphQL schema.
-    if !contains_entities {
+        .any(|(_, def_id)| domain.type_info(*def_id).entity_info.is_some())
+    {
+        // A domain without entities doesn't get a GraphQL schema.
         return None;
     }
 
