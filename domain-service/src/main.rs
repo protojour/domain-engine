@@ -4,7 +4,7 @@ use anyhow::Context;
 use axum::Extension;
 use clap::Parser;
 use domain_engine_core::DomainEngine;
-use domain_engine_juniper::create_graphql_schema;
+use domain_engine_juniper::CreateSchemaError;
 use graphql::{graphiql_handler, GraphqlService};
 use ontol_runtime::{ontology::Ontology, PackageId};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -87,17 +87,25 @@ fn domain_router(
     domain_path: &str,
     package_id: PackageId,
 ) -> anyhow::Result<axum::Router> {
-    let graphql_service = GraphqlService {
-        schema: create_graphql_schema(package_id, engine.ontology_owned())
-            .context("Problem creating graphql schema")?,
-        gql_context: engine.into(),
-        endpoint_url: format!("{domain_path}/graphql"),
+    let mut router: axum::Router = axum::Router::new();
+
+    match domain_engine_juniper::create_graphql_schema(package_id, engine.ontology_owned()) {
+        Err(CreateSchemaError::GraphqlInterfaceNotFound) => {
+            // Don't create the graphql endpoints
+        }
+        Ok(schema) => {
+            router = router
+                .route(
+                    "/graphql",
+                    axum::routing::post(graphql_handler).get(graphiql_handler),
+                )
+                .layer(Extension(Arc::new(GraphqlService {
+                    schema,
+                    gql_context: engine.into(),
+                    endpoint_url: format!("{domain_path}/graphql"),
+                })));
+        }
     };
 
-    Ok(axum::Router::new()
-        .route(
-            "/graphql",
-            axum::routing::post(graphql_handler).get(graphiql_handler),
-        )
-        .layer(Extension(Arc::new(graphql_service))))
+    Ok(router)
 }
