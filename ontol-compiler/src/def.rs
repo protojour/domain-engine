@@ -2,8 +2,8 @@ use std::{borrow::Cow, collections::HashMap, ops::Range};
 
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    ontology::Cardinality, text_like_types::TextLikeType, vm::proc::BuiltinProc, DefId, DefParamId,
-    PackageId, RelationshipId, Role,
+    ontology::Cardinality, text_like_types::TextLikeType, vm::proc::BuiltinProc, DefId, PackageId,
+    RelationshipId, Role,
 };
 use smartstring::alias::String;
 
@@ -73,11 +73,6 @@ pub struct TypeDef<'m> {
     pub concrete: bool,
 }
 
-#[derive(Debug)]
-pub struct TypeDefParam {
-    pub id: DefParamId,
-}
-
 #[derive(Clone, Copy, Debug)]
 pub struct FmtFinalState(pub bool);
 
@@ -141,7 +136,6 @@ pub struct RelationshipMeta<'d, 'm> {
 #[derive(Debug)]
 pub struct Defs<'m> {
     def_id_allocators: FnvHashMap<PackageId, u16>,
-    next_def_param: DefParamId,
     pub(crate) table: FnvHashMap<DefId, Def<'m>>,
     pub(crate) string_literals: HashMap<&'m str, DefId>,
     pub(crate) regex_strings: HashMap<&'m str, DefId>,
@@ -166,7 +160,6 @@ impl<'m> Defs<'m> {
     fn new() -> Self {
         Self {
             def_id_allocators: Default::default(),
-            next_def_param: DefParamId(0),
             table: Default::default(),
             string_literals: Default::default(),
             regex_strings: Default::default(),
@@ -206,12 +199,6 @@ impl<'m> Defs<'m> {
             .unwrap_or(0);
 
         (0..max_idx).map(move |idx| DefId(package_id, idx))
-    }
-
-    pub fn alloc_def_param_id(&mut self) -> DefParamId {
-        let id = self.next_def_param;
-        self.next_def_param.0 += 1;
-        id
     }
 
     pub fn add_def(&mut self, kind: DefKind<'m>, package: PackageId, span: SourceSpan) -> DefId {
