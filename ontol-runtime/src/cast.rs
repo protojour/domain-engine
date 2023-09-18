@@ -125,15 +125,12 @@ impl Cast<Uuid> for Value {
 
     fn cast_into(self) -> Uuid {
         match self.data {
-            Data::Uuid(u) => u,
+            Data::OctetSequence(seq) => Uuid::from_slice(&seq).unwrap(),
             _ => panic!("not an uuid"),
         }
     }
 
     fn cast_ref(&self) -> &Self::Ref {
-        match &self.data {
-            Data::Uuid(u) => u,
-            _ => panic!("not an uuid"),
-        }
+        panic!("Uuid cannot be cast as ref")
     }
 }

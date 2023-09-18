@@ -34,8 +34,8 @@ pub struct InMemoryStore {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum DynamicKey {
-    String(String),
-    Uuid(Uuid),
+    Text(String),
+    Octets(Vec<u8>),
     Int(i64),
 }
 
@@ -488,8 +488,8 @@ impl InMemoryStore {
                 let attribute = struct_map.iter().next().unwrap();
                 Self::extract_dynamic_key(&attribute.1.value.data)
             }
-            Data::Text(string) => Ok(DynamicKey::String(string.clone())),
-            Data::Uuid(uuid) => Ok(DynamicKey::Uuid(*uuid)),
+            Data::Text(string) => Ok(DynamicKey::Text(string.clone())),
+            Data::OctetSequence(octets) => Ok(DynamicKey::Octets(octets.clone())),
             Data::I64(int) => Ok(DynamicKey::Int(*int)),
             _ => Err(DomainError::IdNotFound),
         }
@@ -516,10 +516,13 @@ impl InMemoryStore {
                 Ok(Value::new(Data::Text(string), *def_id))
             }
             (SerdeOperator::TextPattern(def_id), _) => {
-                match (ontology.get_string_like_type(*def_id), value_generator) {
-                    (Some(TextLikeType::Uuid), ValueGenerator::UuidV4) => {
-                        Ok(Value::new(Data::Uuid(Uuid::new_v4()), *def_id))
-                    }
+                match (ontology.get_text_like_type(*def_id), value_generator) {
+                    (Some(TextLikeType::Uuid), ValueGenerator::UuidV4) => Ok(Value::new(
+                        Data::OctetSequence(
+                            Uuid::new_v4().as_bytes().into_iter().cloned().collect(),
+                        ),
+                        *def_id,
+                    )),
                     _ => Err(DomainError::TypeCannotBeUsedForIdGeneration),
                 }
             }

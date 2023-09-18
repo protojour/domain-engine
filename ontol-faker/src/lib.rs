@@ -15,6 +15,7 @@ use ontol_runtime::{
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use regex_generate::Generator;
 use tracing::debug;
+use uuid::Uuid;
 
 const MAX_REPEAT: u32 = 128;
 
@@ -114,10 +115,14 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
             }
             SerdeOperator::StringConstant(s, def_id) => Value::new(Data::Text(s.clone()), *def_id),
             SerdeOperator::TextPattern(def_id) => {
-                if let Some(string_like_type) = self.ontology.get_string_like_type(*def_id) {
+                if let Some(string_like_type) = self.ontology.get_text_like_type(*def_id) {
                     match string_like_type {
                         TextLikeType::Uuid => {
-                            Value::new(Data::Uuid(Faker.fake_with_rng(self.rng)), *def_id)
+                            let uuid: Uuid = Faker.fake_with_rng(self.rng);
+                            Value::new(
+                                Data::OctetSequence(uuid.as_bytes().into_iter().cloned().collect()),
+                                *def_id,
+                            )
                         }
                         TextLikeType::DateTime => {
                             Value::new(Data::ChronoDateTime(Faker.fake_with_rng(self.rng)), *def_id)

@@ -11,7 +11,7 @@ use crate::{
     ontology::Ontology,
     smart_format,
     text_like_types::ParseError,
-    value::{Data, FormatStringData, PropertyId},
+    value::{Data, FormatDataAsText, PropertyId},
     DefId,
 };
 
@@ -96,21 +96,34 @@ pub struct TextPatternProperty {
     pub capture_group: usize,
 }
 
-pub struct FormatPattern<'a> {
-    pub pattern: &'a TextPattern,
-    pub data: &'a Data,
+pub struct FormatPattern<'d, 'o> {
+    pub pattern: &'d TextPattern,
+    pub data: &'d Data,
+    pub ontology: &'o Ontology,
 }
 
-impl<'a> Display for FormatPattern<'a> {
+impl<'d, 'o> Display for FormatPattern<'d, 'o> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for constant_part in &self.pattern.constant_parts {
             match (constant_part, self.data) {
                 (
-                    TextPatternConstantPart::Property(TextPatternProperty { property_id, .. }),
+                    TextPatternConstantPart::Property(TextPatternProperty {
+                        property_id,
+                        type_def_id,
+                        ..
+                    }),
                     Data::Struct(attrs),
                 ) => {
                     let attribute = attrs.get(property_id).unwrap();
-                    write!(f, "{}", FormatStringData(&attribute.value.data))?;
+                    write!(
+                        f,
+                        "{}",
+                        FormatDataAsText {
+                            data: &attribute.value.data,
+                            type_def_id: *type_def_id,
+                            ontology: self.ontology
+                        }
+                    )?;
                 }
                 (TextPatternConstantPart::Literal(string), _) => write!(f, "{string}")?,
                 (part, data) => {

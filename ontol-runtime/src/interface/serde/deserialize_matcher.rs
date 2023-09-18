@@ -608,7 +608,7 @@ fn try_deserialize_custom_string(
     def_id: DefId,
     str: &str,
 ) -> Result<Value, ParseError> {
-    match ontology.string_like_types.get(&def_id) {
+    match ontology.text_like_types.get(&def_id) {
         Some(custom_string_deserializer) => custom_string_deserializer.try_deserialize(def_id, str),
         None => Ok(Value::new(Data::Text(str.into()), def_id)),
     }
@@ -620,7 +620,7 @@ fn expecting_custom_string(
     f: &mut std::fmt::Formatter,
 ) -> Option<std::fmt::Result> {
     ontology
-        .string_like_types
+        .text_like_types
         .get(&def_id)
         .map(|custom_string_deserializer| write!(f, "`{}`", custom_string_deserializer.type_name()))
 }

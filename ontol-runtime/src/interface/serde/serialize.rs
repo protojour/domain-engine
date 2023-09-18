@@ -10,7 +10,7 @@ use crate::{
     cast::Cast,
     interface::serde::processor::RecursionLimitError,
     text_pattern::FormatPattern,
-    value::{Attribute, Data, FormatStringData, Value},
+    value::{Attribute, Data, FormatDataAsText, Value},
 };
 
 use super::{
@@ -46,13 +46,22 @@ impl<'e> SerdeProcessor<'e> {
             SerdeOperator::I64(..) | SerdeOperator::F64(..) => {
                 self.serialize_number(value, serializer)
             }
-            SerdeOperator::String(_)
-            | SerdeOperator::StringConstant(_, _)
-            | SerdeOperator::TextPattern(_) => match &value.data {
+            SerdeOperator::String(def_id)
+            | SerdeOperator::StringConstant(_, def_id)
+            | SerdeOperator::TextPattern(def_id) => match &value.data {
                 Data::Text(s) => serializer.serialize_str(s),
                 data => {
                     let mut buf = String::new();
-                    write!(&mut buf, "{}", FormatStringData(data)).unwrap();
+                    write!(
+                        &mut buf,
+                        "{}",
+                        FormatDataAsText {
+                            data,
+                            type_def_id: *def_id,
+                            ontology: self.ontology
+                        }
+                    )
+                    .unwrap();
                     serializer.serialize_str(&buf)
                 }
             },
@@ -64,7 +73,8 @@ impl<'e> SerdeProcessor<'e> {
                     "{}",
                     FormatPattern {
                         pattern,
-                        data: &value.data
+                        data: &value.data,
+                        ontology: self.ontology
                     }
                 )
                 .unwrap();

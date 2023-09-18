@@ -32,7 +32,7 @@ use crate::{
 pub struct Ontology {
     pub(crate) const_proc_table: FnvHashMap<DefId, Procedure>,
     pub(crate) map_meta_table: FnvHashMap<(MapKey, MapKey), MapMeta>,
-    pub(crate) string_like_types: FnvHashMap<DefId, TextLikeType>,
+    pub(crate) text_like_types: FnvHashMap<DefId, TextLikeType>,
     pub(crate) text_patterns: FnvHashMap<DefId, TextPattern>,
     pub(crate) lib: Lib,
 
@@ -53,7 +53,7 @@ impl Ontology {
             ontology: Self {
                 const_proc_table: Default::default(),
                 map_meta_table: Default::default(),
-                string_like_types: Default::default(),
+                text_like_types: Default::default(),
                 text_patterns: Default::default(),
                 domain_table: Default::default(),
                 domain_interfaces: Default::default(),
@@ -95,8 +95,8 @@ impl Ontology {
         self.text_patterns.get(&def_id)
     }
 
-    pub fn get_string_like_type(&self, def_id: DefId) -> Option<TextLikeType> {
-        self.string_like_types.get(&def_id).cloned()
+    pub fn get_text_like_type(&self, def_id: DefId) -> Option<TextLikeType> {
+        self.text_like_types.get(&def_id).cloned()
     }
 
     pub fn domains(&self) -> impl Iterator<Item = (&PackageId, &Domain)> {
@@ -339,7 +339,7 @@ impl OntologyBuilder {
     }
 
     pub fn string_like_types(mut self, types: FnvHashMap<DefId, TextLikeType>) -> Self {
-        self.ontology.string_like_types = types;
+        self.ontology.text_like_types = types;
         self
     }
 

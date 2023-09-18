@@ -7,7 +7,7 @@ use std::{
 use ::serde::{Deserialize, Serialize};
 use smartstring::alias::String;
 
-use crate::{cast::Cast, DefId, PackageId, RelationshipId, Role};
+use crate::{cast::Cast, ontology::Ontology, DefId, PackageId, RelationshipId, Role};
 
 #[derive(Clone, Debug)]
 pub struct Value {
@@ -101,7 +101,7 @@ pub enum Data {
     F64(f64),
     Rational(Box<num::rational::BigRational>),
     Text(String),
-    Uuid(uuid::Uuid),
+    OctetSequence(Vec<u8>),
     ChronoDateTime(chrono::DateTime<chrono::Utc>),
     ChronoDate(chrono::NaiveDate),
     ChronoTime(chrono::NaiveTime),
@@ -128,19 +128,27 @@ impl Data {
     }
 }
 
-pub struct FormatStringData<'d>(pub &'d Data);
+pub struct FormatDataAsText<'d, 'o> {
+    pub data: &'d Data,
+    pub type_def_id: DefId,
+    pub ontology: &'o Ontology,
+}
 
-impl<'d> Display for FormatStringData<'d> {
+impl<'d, 'o> Display for FormatDataAsText<'d, 'o> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.0 {
-            Data::Text(s) => write!(f, "{s}"),
-            Data::Uuid(uuid) => write!(f, "{uuid}"),
-            Data::ChronoDateTime(datetime) => {
-                // FIXME: A way to not do this via String
-                // Chrono 0.5 hopefully fixes this
-                write!(f, "{}", datetime.to_rfc3339())
+        if let Some(text_like_type) = self.ontology.get_text_like_type(self.type_def_id) {
+            text_like_type.format(self.data, f)
+        } else {
+            match self.data {
+                Data::Text(s) => write!(f, "{s}"),
+                Data::OctetSequence(vec) => write!(f, "b'{vec:x?}'"),
+                Data::ChronoDateTime(datetime) => {
+                    // FIXME: A way to not do this via String
+                    // Chrono 0.5 hopefully fixes this
+                    write!(f, "{}", datetime.to_rfc3339())
+                }
+                data => panic!("not a text-like type: {data:?}"),
             }
-            data => panic!("not a string-like type: {data:?}"),
         }
     }
 }
@@ -251,7 +259,7 @@ impl<'v> Display for ValueDebug<'v> {
             Data::F64(n) => write!(f, "flt({n})"),
             Data::Rational(r) => write!(f, "rat({r})"),
             Data::Text(s) => write!(f, "'{s}'"),
-            Data::Uuid(u) => write!(f, "uuid({u})"),
+            Data::OctetSequence(vec) => write!(f, "b'{vec:x?}'"),
             Data::ChronoDateTime(dt) => write!(f, "datetime({dt})"),
             Data::ChronoDate(d) => write!(f, "date({d})"),
             Data::ChronoTime(t) => write!(f, "time({t})"),

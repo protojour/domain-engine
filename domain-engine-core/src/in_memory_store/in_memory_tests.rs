@@ -63,7 +63,7 @@ async fn test_conduit_db_in_memory_id_generation() {
 
             expect_eq!(
                 actual = format!("{:?}", explicit_user_id.data),
-                expected = "Uuid(67e55044-10b1-426f-9247-bb680e5fe0c8)"
+                expected = "OctetSequence([103, 229, 80, 68, 16, 177, 66, 111, 146, 71, 187, 104, 14, 95, 224, 200])"
             );
 
             let article_id: Uuid = domain_engine
@@ -183,7 +183,8 @@ async fn test_conduit_db_store_entity_tree() {
                 .get_attribute(user_type.find_property("user_id").unwrap())
                 .unwrap()
                 .value
-                .cast_ref::<Uuid>();
+                .clone()
+                .cast_into::<Uuid>();
 
             expect_eq!(
                 actual = read_ser(&user_type).json(

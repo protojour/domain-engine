@@ -203,7 +203,7 @@ fn test_serde_uuid() {
         let [my_id] = test.bind(["my_id"]);
         assert_matches!(
             create_de(&my_id).data(json!("a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
-            Ok(Data::Uuid(_))
+            Ok(Data::OctetSequence(_))
         );
         assert_json_io_matches!(my_id, Create, "a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8");
         assert_error_msg!(
