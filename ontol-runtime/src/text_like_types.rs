@@ -25,7 +25,7 @@ impl TextLikeType {
                 let uuid =
                     Uuid::parse_str(str).map_err(|error| ParseError(smart_format!("{}", error)))?;
                 Ok(Value::new(
-                    Data::OctetSequence(uuid.as_bytes().to_vec()),
+                    Data::OctetSequence(uuid.as_bytes().iter().cloned().collect()),
                     def_id,
                 ))
             }

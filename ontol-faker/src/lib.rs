@@ -119,7 +119,10 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                     match string_like_type {
                         TextLikeType::Uuid => {
                             let uuid: Uuid = Faker.fake_with_rng(self.rng);
-                            Value::new(Data::OctetSequence(uuid.as_bytes().to_vec()), *def_id)
+                            Value::new(
+                                Data::OctetSequence(uuid.as_bytes().iter().cloned().collect()),
+                                *def_id,
+                            )
                         }
                         TextLikeType::DateTime => {
                             Value::new(Data::ChronoDateTime(Faker.fake_with_rng(self.rng)), *def_id)

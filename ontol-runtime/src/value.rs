@@ -5,6 +5,7 @@ use std::{
 };
 
 use ::serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
 use smartstring::alias::String;
 
 use crate::{cast::Cast, ontology::Ontology, DefId, PackageId, RelationshipId, Role};
@@ -101,7 +102,7 @@ pub enum Data {
     F64(f64),
     Rational(Box<num::rational::BigRational>),
     Text(String),
-    OctetSequence(Vec<u8>),
+    OctetSequence(SmallVec<[u8; 16]>),
     ChronoDateTime(chrono::DateTime<chrono::Utc>),
     ChronoDate(chrono::NaiveDate),
     ChronoTime(chrono::NaiveTime),

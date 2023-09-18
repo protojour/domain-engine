@@ -15,6 +15,7 @@ use ontol_runtime::{
     value_generator::ValueGenerator,
     DefId, RelationshipId, Role,
 };
+use smallvec::SmallVec;
 use smartstring::alias::String;
 use tracing::{debug, error};
 use uuid::Uuid;
@@ -35,7 +36,7 @@ pub struct InMemoryStore {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum DynamicKey {
     Text(String),
-    Octets(Vec<u8>),
+    Octets(SmallVec<[u8; 16]>),
     Int(i64),
 }
 
@@ -518,7 +519,7 @@ impl InMemoryStore {
             (SerdeOperator::TextPattern(def_id), _) => {
                 match (ontology.get_text_like_type(*def_id), value_generator) {
                     (Some(TextLikeType::Uuid), ValueGenerator::UuidV4) => Ok(Value::new(
-                        Data::OctetSequence(Uuid::new_v4().as_bytes().to_vec()),
+                        Data::OctetSequence(Uuid::new_v4().as_bytes().iter().cloned().collect()),
                         *def_id,
                     )),
                     _ => Err(DomainError::TypeCannotBeUsedForIdGeneration),

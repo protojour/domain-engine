@@ -21,6 +21,7 @@ uuid = { workspace = true, features = ["v4"] }
 tokio = { workspace = true, features = ["sync"] }
 async-trait.workspace = true
 chrono.workspace = true
+smallvec.workspace = true
 serde = "1"
 serde_json = "1"
 unimock = "0.5"
