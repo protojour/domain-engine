@@ -556,8 +556,7 @@ async fn test_graphql_guitar_synth_union_input_union_field_list() {
 }
 
 #[test(tokio::test)]
-#[should_panic = "expected `instrument`"]
-async fn test_graphql_guitar_synth_union_input() {
+async fn test_graphql_guitar_synth_union_input_exec() {
     let (test, [schema]) = GUITAR_SYNTH_UNION.1.compile_schemas([ROOT]);
     let [artist] = test.bind(["artist"]);
     let ziggy: Value = artist
@@ -577,6 +576,9 @@ async fn test_graphql_guitar_synth_union_input() {
                     name: "Ziggy",
                     plays: [
                         {
+                            instrument_id: "synth/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8"
+                        },
+                        {
                             type: "guitar",
                             string_count: 6
                         },
@@ -584,9 +586,6 @@ async fn test_graphql_guitar_synth_union_input() {
                             type: "synth",
                             polyphony: 12
                         },
-                        {
-                            instrument_id: "synth/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8"
-                        }
                     ]
                 }) {
                     artist_id

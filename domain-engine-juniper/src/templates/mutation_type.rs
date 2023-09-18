@@ -58,8 +58,8 @@ impl juniper::GraphQLValueAsync<GqlScalar> for MutationType {
 
             match &field_data.kind {
                 FieldKind::CreateMutation { input } => {
-                    let input_attribute =
-                        args_wrapper.deserialize_attribute(input, info.ontology())?;
+                    let input_attribute = args_wrapper
+                        .deserialize_domain_field_arg_as_attribute(input, info.ontology())?;
                     let struct_query = query_analyzer.analyze_struct_query(&look_ahead, field_data);
                     let query = match struct_query {
                         StructOrUnionQuery::Struct(struct_query) => Query::Struct(struct_query),
@@ -93,9 +93,10 @@ impl juniper::GraphQLValueAsync<GqlScalar> for MutationType {
                     )
                 }
                 FieldKind::UpdateMutation { id, input } => {
-                    let id_attribute = args_wrapper.deserialize_attribute(id, info.ontology())?;
-                    let input_attribute =
-                        args_wrapper.deserialize_attribute(input, info.ontology())?;
+                    let id_attribute = args_wrapper
+                        .deserialize_domain_field_arg_as_attribute(id, info.ontology())?;
+                    let input_attribute = args_wrapper
+                        .deserialize_domain_field_arg_as_attribute(input, info.ontology())?;
 
                     let query = query_analyzer.analyze_struct_query(&look_ahead, field_data);
 
@@ -107,7 +108,8 @@ impl juniper::GraphQLValueAsync<GqlScalar> for MutationType {
                     Ok(juniper::Value::Null)
                 }
                 FieldKind::DeleteMutation { id } => {
-                    let id_value = args_wrapper.deserialize_attribute(id, info.ontology())?;
+                    let id_value = args_wrapper
+                        .deserialize_domain_field_arg_as_attribute(id, info.ontology())?;
 
                     trace!("DELETE {id_value:?}");
 

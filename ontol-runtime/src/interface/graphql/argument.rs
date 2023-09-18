@@ -18,11 +18,18 @@ pub trait DomainFieldArg: FieldArg {
         TypingPurpose::Input
     }
 
+    fn operator_id(&self) -> SerdeOperatorId;
+
     fn kind(&self) -> ArgKind;
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Input(pub TypeIndex, pub DefId, pub TypingPurpose);
+pub struct Input {
+    pub type_index: TypeIndex,
+    pub def_id: DefId,
+    pub operator_id: SerdeOperatorId,
+    pub typing_purpose: TypingPurpose,
+}
 
 impl FieldArg for Input {
     fn name(&self) -> &str {
@@ -32,11 +39,15 @@ impl FieldArg for Input {
 
 impl DomainFieldArg for Input {
     fn typing_purpose(&self) -> TypingPurpose {
-        self.2
+        self.typing_purpose
+    }
+
+    fn operator_id(&self) -> SerdeOperatorId {
+        self.operator_id
     }
 
     fn kind(&self) -> ArgKind {
-        ArgKind::Def(self.0, self.1)
+        ArgKind::Def(self.type_index, self.def_id)
     }
 }
 
@@ -50,6 +61,10 @@ impl FieldArg for Id {
 }
 
 impl DomainFieldArg for Id {
+    fn operator_id(&self) -> SerdeOperatorId {
+        self.0
+    }
+
     fn kind(&self) -> ArgKind {
         ArgKind::Operator(self.0)
     }

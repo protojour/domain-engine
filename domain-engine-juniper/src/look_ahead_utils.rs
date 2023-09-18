@@ -2,13 +2,10 @@ use std::fmt::Display;
 
 use juniper::{graphql_value, LookAheadArgument, LookAheadValue, Spanning};
 use ontol_runtime::{
-    interface::graphql::{
-        argument::{ArgKind, DomainFieldArg},
-        schema::TypingPurpose,
-    },
+    interface::graphql::{argument::DomainFieldArg, schema::TypingPurpose},
     ontology::Ontology,
     serde::operator::SerdeOperatorId,
-    smart_format, DefId,
+    smart_format,
 };
 use serde::de::{self, DeserializeSeed, IntoDeserializer};
 
@@ -40,42 +37,14 @@ impl<'a> ArgsWrapper<'a> {
         }
     }
 
-    pub fn deserialize_attribute(
+    pub fn deserialize_domain_field_arg_as_attribute(
         &self,
         field_arg: &dyn DomainFieldArg,
         ontology: &Ontology,
     ) -> Result<ontol_runtime::value::Attribute, juniper::FieldError<GqlScalar>> {
         let name = field_arg.name();
-        match field_arg.kind() {
-            ArgKind::Def(_, def_id) => {
-                self.deserialize_def_attribute(name, def_id, ontology, field_arg.typing_purpose())
-            }
-            ArgKind::Operator(operator_id) => self.deserialize_operator_attribute(
-                name,
-                operator_id,
-                ontology,
-                field_arg.typing_purpose(),
-            ),
-        }
-    }
-
-    /// Deserialize some named juniper input argument using the given SerdeOperatorId.
-    pub fn deserialize_def_attribute(
-        &self,
-        name: &str,
-        def_id: DefId,
-        ontology: &Ontology,
-        typing_purpose: TypingPurpose,
-    ) -> Result<ontol_runtime::value::Attribute, juniper::FieldError<GqlScalar>> {
-        let type_info = ontology.get_type_info(def_id);
-        self.deserialize_operator_attribute(
-            name,
-            type_info
-                .operator_id
-                .expect("This type cannot be deserialized"),
-            ontology,
-            typing_purpose,
-        )
+        let operator_id = field_arg.operator_id();
+        self.deserialize_operator_attribute(name, operator_id, ontology, field_arg.typing_purpose())
     }
 
     pub fn deserialize_operator_attribute(

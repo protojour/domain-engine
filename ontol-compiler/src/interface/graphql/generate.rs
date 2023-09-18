@@ -718,6 +718,11 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
             QLevel::Connection { rel_params: None },
         );
 
+        let entity_operator_id = self
+            .serde_generator
+            .gen_operator_id(gql_serde_key(entity_data.node_def_id))
+            .unwrap();
+
         let id_type_info = self.partial_ontology.get_type_info(entity_data.id_def_id);
         let id_operator_id = id_type_info.operator_id.expect("No id_operator_id");
 
@@ -742,11 +747,12 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 self.namespace.create(type_info),
                 FieldData {
                     kind: FieldKind::CreateMutation {
-                        input: argument::Input(
-                            entity_data.type_index,
-                            entity_data.node_def_id,
-                            TypingPurpose::Input,
-                        ),
+                        input: argument::Input {
+                            type_index: entity_data.type_index,
+                            def_id: entity_data.node_def_id,
+                            operator_id: entity_operator_id,
+                            typing_purpose: TypingPurpose::Input,
+                        },
                     },
                     field_type: TypeRef::mandatory(node_ref),
                 },
@@ -756,11 +762,12 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 self.namespace.update(type_info),
                 FieldData {
                     kind: FieldKind::UpdateMutation {
-                        input: argument::Input(
-                            entity_data.type_index,
-                            entity_data.node_def_id,
-                            TypingPurpose::PartialInput,
-                        ),
+                        input: argument::Input {
+                            type_index: entity_data.type_index,
+                            def_id: entity_data.node_def_id,
+                            operator_id: entity_operator_id,
+                            typing_purpose: TypingPurpose::PartialInput,
+                        },
                         id: argument::Id(id_operator_id),
                     },
                     field_type: TypeRef::mandatory(node_ref),
