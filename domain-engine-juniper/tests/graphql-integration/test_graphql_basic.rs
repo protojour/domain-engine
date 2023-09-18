@@ -1,5 +1,6 @@
 use domain_engine_core::data_store::DataStoreAPIMock;
-use juniper::graphql_value;
+use domain_engine_juniper::gql_scalar::GqlScalar;
+use juniper::{graphql_value, parser::SourcePosition, ExecutionError, FieldError};
 use ontol_runtime::value::{Attribute, Value};
 use ontol_test_utils::{
     examples::{ARTIST_AND_INSTRUMENT, GEOJSON, GUITAR_SYNTH_UNION, MUNICIPALITIES, WGS},
@@ -14,7 +15,7 @@ use unimock::*;
 use crate::{
     gql_ctx_mock_data_store, mock_data_store_query_entities_empty,
     parser_document_utils::{find_input_object_type, Nullable},
-    Exec, TestCompileSchema,
+    Exec, TestCompileSchema, TestError,
 };
 
 const ROOT: SourceName = SourceName::root();
@@ -612,6 +613,40 @@ async fn test_graphql_guitar_synth_union_input_exec() {
                 "name": "Ziggy"
             }
         })),
+    );
+}
+
+#[test(tokio::test)]
+async fn test_graphql_guitar_synth_union_input_error_span() {
+    let (test, [schema]) = GUITAR_SYNTH_UNION.1.compile_schemas([ROOT]);
+    let expected_error: ExecutionError<GqlScalar> = ExecutionError::new(
+        SourcePosition::new(40, 2, 16),
+        &["createartist"],
+        FieldError::new(
+            "invalid map value, expected `instrument` (one of id, id, `guitar`, `synth`) in input at line 5 column 24",
+            juniper::Value::Null
+        )
+    );
+
+    expect_eq!(
+        actual = r#"
+            mutation {
+                createartist(input: {
+                    name: "Ziggy",
+                    plays: [
+                        {
+                            instrument_id: "bogus_value_here"
+                        }
+                    ]
+                }) {
+                    artist_id
+                    name
+                }
+            }
+        "#
+        .exec(&schema, &gql_ctx_mock_data_store(&test, ROOT, ()), [])
+        .await,
+        expected = Err(TestError::Execution(vec![expected_error])),
     );
 }
 

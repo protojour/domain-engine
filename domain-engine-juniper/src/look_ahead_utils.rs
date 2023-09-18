@@ -76,18 +76,22 @@ impl<'a> ArgsWrapper<'a> {
 #[derive(Debug)]
 struct Error {
     msg: smartstring::alias::String,
-    start: juniper::parser::SourcePosition,
+    start: Option<juniper::parser::SourcePosition>,
 }
 
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} in input at line {} column {}",
-            self.msg,
-            self.start.line(),
-            self.start.column()
-        )
+        let msg = &self.msg;
+        if let Some(start) = &self.start {
+            write!(
+                f,
+                "{msg} in input at line {} column {}",
+                start.line(),
+                start.column()
+            )
+        } else {
+            write!(f, "{msg}")
+        }
     }
 }
 
@@ -100,8 +104,23 @@ impl de::Error for Error {
     {
         Self {
             msg: smart_format!("{}", msg),
-            start: juniper::parser::SourcePosition::new_origin(),
+            start: None,
         }
+    }
+}
+
+trait ErrorContext {
+    fn context<'a>(self, ctx_value: &'a Spanning<LookAheadValue<'a, GqlScalar>>) -> Self;
+}
+
+impl<T> ErrorContext for Result<T, Error> {
+    fn context<'a>(self, ctx_value: &'a Spanning<LookAheadValue<'a, GqlScalar>>) -> Self {
+        self.map_err(|mut error| {
+            if error.start.is_none() {
+                error.start = Some(ctx_value.start);
+            }
+            error
+        })
     }
 }
 
@@ -113,46 +132,47 @@ impl<'a, 'de> de::Deserializer<'de> for LookAheadValueDeserializer<'a> {
     type Error = Error;
 
     fn deserialize_any<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
-        let result = match &self.value.item {
-            LookAheadValue::Null => visitor.visit_none::<Error>(),
-            LookAheadValue::Scalar(GqlScalar::Unit) => visitor.visit_unit(),
-            LookAheadValue::Scalar(GqlScalar::I32(value)) => visitor.visit_i32(*value),
-            LookAheadValue::Scalar(GqlScalar::F64(value)) => visitor.visit_f64(*value),
-            LookAheadValue::Scalar(GqlScalar::Boolean(value)) => visitor.visit_bool(*value),
-            LookAheadValue::Scalar(GqlScalar::String(value)) => visitor.visit_str(value),
+        match &self.value.item {
+            LookAheadValue::Null => visitor.visit_none::<Error>().context(self.value),
+            LookAheadValue::Scalar(GqlScalar::Unit) => visitor.visit_unit().context(self.value),
+            LookAheadValue::Scalar(GqlScalar::I32(value)) => {
+                visitor.visit_i32(*value).context(self.value)
+            }
+            LookAheadValue::Scalar(GqlScalar::F64(value)) => {
+                visitor.visit_f64(*value).context(self.value)
+            }
+            LookAheadValue::Scalar(GqlScalar::Boolean(value)) => {
+                visitor.visit_bool(*value).context(self.value)
+            }
+            LookAheadValue::Scalar(GqlScalar::String(value)) => {
+                visitor.visit_str(value).context(self.value)
+            }
             LookAheadValue::Enum(value) => visitor.visit_str(value),
             LookAheadValue::List(vec) => {
                 let mut iterator = vec.iter().fuse();
-                let value = visitor.visit_seq(SeqDeserializer::<_>::new(&mut iterator))?;
+                let value = visitor
+                    .visit_seq(SeqDeserializer::<_>::new(&mut iterator))
+                    .context(self.value)?;
                 match iterator.next() {
                     Some(item) => Err(Error {
                         msg: "trailing characters".into(),
-                        start: item.start,
+                        start: Some(item.start),
                     }),
                     None => Ok(value),
                 }
             }
             LookAheadValue::Object(vec) => {
                 let mut iterator = vec.iter().fuse();
-                let value = visitor.visit_map(MapDeserializer::<_>::new(&mut iterator))?;
+                let value = visitor
+                    .visit_map(MapDeserializer::<_>::new(&mut iterator))
+                    .context(self.value)?;
                 match iterator.next() {
                     Some((key, _)) => Err(Error {
                         msg: "trailing characters".into(),
-                        start: key.start,
+                        start: Some(key.start),
                     }),
                     None => Ok(value),
                 }
-            }
-        };
-
-        match result {
-            Ok(value) => Ok(value),
-            Err(mut error) => {
-                if error.start.line() == 0 {
-                    error.start = self.value.start;
-                }
-
-                Err(error)
             }
         }
     }
