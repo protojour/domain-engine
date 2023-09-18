@@ -215,7 +215,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             SerdeOperator::RelationSequence(seq_op) => {
                 match self
                     .schema_ctx
-                    .type_index_by_def(seq_op.def_variant.def_id, QueryLevel::Edge { rel_params })
+                    .type_index_by_def(seq_op.def.def_id, QueryLevel::Edge { rel_params })
                 {
                     Some(type_index) => self.registry.arg::<Option<Vec<IndexedInputValue>>>(
                         name,
@@ -245,7 +245,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 modifier,
             ),
             SerdeOperator::Union(union_op) => {
-                let def_id = union_op.union_def_variant().def_id;
+                let def_id = union_op.union_def().def_id;
                 let type_info = self.schema_ctx.ontology.get_type_info(def_id);
 
                 // If this is an entity, use Edge + ReferenceInput
@@ -277,7 +277,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 }
             }
             SerdeOperator::Struct(struct_op) => {
-                let def_id = struct_op.def_variant.def_id;
+                let def_id = struct_op.def.def_id;
                 let type_index = self
                     .schema_ctx
                     .type_index_by_def(def_id, QueryLevel::Node)

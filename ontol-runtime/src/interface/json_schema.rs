@@ -12,11 +12,13 @@ use crate::interface::serde::operator::{
 };
 use crate::interface::serde::processor::ProcessorMode;
 use crate::ontology::TypeInfo;
+use crate::smart_format;
 use crate::{
     ontology::{Domain, Ontology},
     DefId, PackageId,
 };
-use crate::{smart_format, DefVariant, SerdeModifier};
+
+use super::serde::{SerdeDef, SerdeModifier};
 
 pub fn build_openapi_schemas<'e>(
     ontology: &'e Ontology,
@@ -60,11 +62,11 @@ pub fn build_standalone_schema<'e>(
     })
 }
 
-type DefMap = BTreeMap<DefVariant, SerdeOperatorId>;
+type DefMap = BTreeMap<SerdeDef, SerdeOperatorId>;
 
 /// Includes all the schemas in a domain, for use in OpenApi
 pub struct OpenApiSchemas<'e> {
-    schema_graph: BTreeMap<DefVariant, SerdeOperatorId>,
+    schema_graph: BTreeMap<SerdeDef, SerdeOperatorId>,
     package_id: PackageId,
     ontology: &'e Ontology,
 }
@@ -85,15 +87,15 @@ impl<'e> Serialize for OpenApiSchemas<'e> {
 
         // serialize schema definitions belonging to the domain package first
         for (def_id, operator_id) in self.schema_graph.range(
-            DefVariant::new(DefId(package_id, 0), SerdeModifier::NONE)
-                ..DefVariant::new(DefId(next_package_id, 0), SerdeModifier::NONE),
+            SerdeDef::new(DefId(package_id, 0), SerdeModifier::NONE)
+                ..SerdeDef::new(DefId(next_package_id, 0), SerdeModifier::NONE),
         ) {
             map.serialize_entry(&ctx.format_key(*def_id), &ctx.definition(*operator_id))?;
         }
 
-        for (def_variant, operator_id) in &self.schema_graph {
-            if def_variant.def_id.0 != self.package_id {
-                map.serialize_entry(&ctx.format_key(*def_variant), &ctx.definition(*operator_id))?;
+        for (serde_def, operator_id) in &self.schema_graph {
+            if serde_def.def_id.0 != self.package_id {
+                map.serialize_entry(&ctx.format_key(*serde_def), &ctx.definition(*operator_id))?;
             }
         }
 
@@ -105,7 +107,7 @@ impl<'e> Serialize for OpenApiSchemas<'e> {
 pub struct StandaloneJsonSchema<'e> {
     operator_id: SerdeOperatorId,
     def_id: DefId,
-    defs: BTreeMap<DefVariant, SerdeOperatorId>,
+    defs: BTreeMap<SerdeDef, SerdeOperatorId>,
     ontology: &'e Ontology,
     mode: ProcessorMode,
 }
@@ -176,10 +178,10 @@ impl<'e> SchemaCtx<'e> {
     }
 
     /// Returns something that serializes as `{ "$ref": "some link" }`
-    fn ref_link(&self, def_variant: DefVariant) -> RefLink {
+    fn ref_link(&self, serde_def: SerdeDef) -> RefLink {
         RefLink {
             ctx: *self,
-            def_variant,
+            serde_def,
         }
     }
 
@@ -203,41 +205,39 @@ impl<'e> SchemaCtx<'e> {
         }
     }
 
-    fn type_name(&self, def_variant: DefVariant) -> Option<String> {
+    fn type_name(&self, serde_def: SerdeDef) -> Option<String> {
         let mut modifier = String::from("");
-        if def_variant.modifier.contains(SerdeModifier::PRIMARY_ID) {
+        if serde_def.modifier.contains(SerdeModifier::PRIMARY_ID) {
             modifier.push_str("_id");
         }
-        if def_variant.modifier.contains(SerdeModifier::UNION) {
+        if serde_def.modifier.contains(SerdeModifier::UNION) {
             modifier.push_str("_union");
         }
-        if def_variant.modifier.contains(SerdeModifier::ARRAY) {
+        if serde_def.modifier.contains(SerdeModifier::ARRAY) {
             modifier.push_str("_array");
         }
-        self.ontology
-            .find_domain(def_variant.def_id.0)
-            .map(|domain| {
-                smart_format!(
-                    "{}{}",
-                    domain.type_info(def_variant.def_id).name.as_ref().unwrap(),
-                    modifier
-                )
-            })
+        self.ontology.find_domain(serde_def.def_id.0).map(|domain| {
+            smart_format!(
+                "{}{}",
+                domain.type_info(serde_def.def_id).name.as_ref().unwrap(),
+                modifier
+            )
+        })
     }
 
-    fn format_key(&self, def_variant: DefVariant) -> String {
-        let package_id = def_variant.def_id.0;
-        match self.type_name(def_variant) {
+    fn format_key(&self, serde_def: SerdeDef) -> String {
+        let package_id = serde_def.def_id.0;
+        match self.type_name(serde_def) {
             Some(name) => smart_format!("{}_{}", package_id.0, encode(&name)),
-            None => smart_format!("{}", Key(def_variant)),
+            None => smart_format!("{}", Key(serde_def)),
         }
     }
 
-    fn format_ref_link(&self, def_variant: DefVariant) -> String {
-        let package_id = def_variant.def_id.0;
-        match self.type_name(def_variant) {
+    fn format_ref_link(&self, serde_def: SerdeDef) -> String {
+        let package_id = serde_def.def_id.0;
+        match self.type_name(serde_def) {
             Some(name) => smart_format!("{}{}_{}", self.link_anchor, package_id.0, encode(&name)),
-            None => smart_format!("{}{}", self.link_anchor, Key(def_variant)),
+            None => smart_format!("{}{}", self.link_anchor, Key(serde_def)),
         }
     }
 }
@@ -263,7 +263,7 @@ impl Display for LinkAnchor {
     }
 }
 
-struct Key(DefVariant);
+struct Key(SerdeDef);
 
 impl Display for Key {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -499,19 +499,19 @@ impl<'d, 'e> Serialize for SchemaReference<'d, 'e> {
                 map.end()
             }
             SerdeOperator::ConstructorSequence(seq_op) => self
-                .compose(self.ctx.ref_link(seq_op.def_variant))
+                .compose(self.ctx.ref_link(seq_op.def))
                 .serialize(serializer),
             SerdeOperator::Alias(value_op) => self
-                .compose(self.ctx.ref_link(value_op.def_variant))
+                .compose(self.ctx.ref_link(value_op.def))
                 .serialize(serializer),
             SerdeOperator::Union(union_op) => self
-                .compose(self.ctx.ref_link(union_op.union_def_variant()))
+                .compose(self.ctx.ref_link(union_op.union_def()))
                 .serialize(serializer),
             SerdeOperator::PrimaryId(name, id_operator_id) => self
                 .compose(self.ctx.singleton_object(name.as_str(), *id_operator_id))
                 .serialize(serializer),
             SerdeOperator::Struct(struct_op) => self
-                .compose(self.ctx.ref_link(struct_op.def_variant))
+                .compose(self.ctx.ref_link(struct_op.def))
                 .serialize(serializer),
         }
     }
@@ -573,7 +573,7 @@ impl<'d, 'e, T: Serialize> Serialize for Compose<'d, 'e, T> {
 struct ClosedMap<'d, 'e, T> {
     ctx: SchemaCtx<'e>,
     inner: T,
-    def_map: Option<&'d BTreeMap<DefVariant, SerdeOperatorId>>,
+    def_map: Option<&'d BTreeMap<SerdeDef, SerdeOperatorId>>,
 }
 
 impl<'d, 'e, T: Serialize> Serialize for ClosedMap<'d, 'e, T> {
@@ -697,13 +697,13 @@ impl<'e> Serialize for SingletonObjectSchema<'e> {
 // { "_ref": "some-link" }
 struct RefLink<'e> {
     ctx: SchemaCtx<'e>,
-    def_variant: DefVariant,
+    serde_def: SerdeDef,
 }
 
 impl<'e> Serialize for RefLink<'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut map = serializer.serialize_map(None)?;
-        map.serialize_entry("$ref", &self.ctx.format_ref_link(self.def_variant))?;
+        map.serialize_entry("$ref", &self.ctx.format_ref_link(self.serde_def))?;
         map.end()
     }
 }
@@ -711,7 +711,7 @@ impl<'e> Serialize for RefLink<'e> {
 // { "$defs": { .. } }
 struct Defs<'d, 'e> {
     ctx: SchemaCtx<'e>,
-    def_map: &'d BTreeMap<DefVariant, SerdeOperatorId>,
+    def_map: &'d BTreeMap<SerdeDef, SerdeOperatorId>,
 }
 
 impl<'d, 'e> Defs<'d, 'e> {
@@ -745,7 +745,7 @@ impl<'d, 'e> Serialize for Defs<'d, 'e> {
 
 #[derive(Default)]
 struct SchemaGraphBuilder {
-    graph: BTreeMap<DefVariant, SerdeOperatorId>,
+    graph: BTreeMap<SerdeDef, SerdeOperatorId>,
     visited: FnvHashSet<SerdeOperatorId>,
 }
 
@@ -770,7 +770,7 @@ impl SchemaGraphBuilder {
             | SerdeOperator::CapturingTextPattern(_)
             | SerdeOperator::DynamicSequence => {}
             SerdeOperator::ConstructorSequence(seq_op) => {
-                self.add_to_graph(seq_op.def_variant, operator_id);
+                self.add_to_graph(seq_op.def, operator_id);
                 for range in &seq_op.ranges {
                     self.visit(range.operator_id, ontology);
                 }
@@ -781,11 +781,11 @@ impl SchemaGraphBuilder {
                 }
             }
             SerdeOperator::Alias(value_op) => {
-                self.add_to_graph(value_op.def_variant, operator_id);
+                self.add_to_graph(value_op.def, operator_id);
                 self.visit(value_op.inner_operator_id, ontology);
             }
             SerdeOperator::Union(union_op) => {
-                self.add_to_graph(union_op.union_def_variant(), operator_id);
+                self.add_to_graph(union_op.union_def(), operator_id);
 
                 for discriminator in union_op.unfiltered_variants() {
                     self.visit(discriminator.operator_id, ontology);
@@ -796,7 +796,7 @@ impl SchemaGraphBuilder {
                 self.visit(*id_operator_id, ontology);
             }
             SerdeOperator::Struct(struct_op) => {
-                self.add_to_graph(struct_op.def_variant, operator_id);
+                self.add_to_graph(struct_op.def, operator_id);
 
                 for (_, property) in &struct_op.properties {
                     self.visit(property.value_operator_id, ontology);
@@ -808,8 +808,8 @@ impl SchemaGraphBuilder {
         }
     }
 
-    fn add_to_graph(&mut self, def_variant: DefVariant, operator_id: SerdeOperatorId) {
-        if self.graph.insert(def_variant, operator_id).is_some() {
+    fn add_to_graph(&mut self, serde_def: SerdeDef, operator_id: SerdeOperatorId) {
+        if self.graph.insert(serde_def, operator_id).is_some() {
             // panic!("{def_id:?} was already in graph");
         }
     }

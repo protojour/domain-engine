@@ -143,12 +143,12 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
             }
             SerdeOperator::RelationSequence(seq_op) => {
                 return if processor.level().current_level() > SENSIBLE_RECURSION_LEVEL {
-                    Ok(Value::new(Data::Sequence(vec![]), seq_op.def_variant.def_id).into())
+                    Ok(Value::new(Data::Sequence(vec![]), seq_op.def.def_id).into())
                 } else {
                     let variant = &seq_op.ranges[0];
                     let attr = self.fake_attribute(processor.narrow(variant.operator_id))?;
 
-                    Ok(Value::new(Data::Sequence([attr].into()), seq_op.def_variant.def_id).into())
+                    Ok(Value::new(Data::Sequence([attr].into()), seq_op.def.def_id).into())
                 }
             }
             SerdeOperator::ConstructorSequence(seq_op) => {
@@ -164,7 +164,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                     }
                 }
 
-                Value::new(Data::Sequence(seq), seq_op.def_variant.def_id)
+                Value::new(Data::Sequence(seq), seq_op.def.def_id)
             }
             SerdeOperator::Alias(alias_op) => {
                 return self.fake_attribute(processor.narrow(alias_op.inner_operator_id));
@@ -191,7 +191,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                     attrs.insert(property.property_id, attr);
                 }
 
-                Value::new(Data::Struct(attrs), struct_op.def_variant.def_id)
+                Value::new(Data::Struct(attrs), struct_op.def.def_id)
             }
         };
 

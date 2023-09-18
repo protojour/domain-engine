@@ -88,7 +88,7 @@ impl<'e> SerdeProcessor<'e> {
                     .serialize_value(value, rel_params, serializer),
                 FilteredVariants::Union(variants) => {
                     let variant = variants.iter().find(|discriminator| {
-                        value.type_def_id == discriminator.discriminator.def_variant.def_id
+                        value.type_def_id == discriminator.discriminator.serde_def.def_id
                     });
 
                     if let Some(variant) = variant {

@@ -3,10 +3,13 @@ use std::collections::HashSet;
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::{IndexMap, IndexSet};
 use ontol_runtime::{
-    discriminator::{Discriminant, UnionDiscriminator, VariantDiscriminator, VariantPurpose},
+    interface::{
+        discriminator::{Discriminant, UnionDiscriminator, VariantDiscriminator, VariantPurpose},
+        serde::{SerdeDef, SerdeModifier},
+    },
     smart_format,
     value::PropertyId,
-    DefId, DefVariant, SerdeModifier,
+    DefId,
 };
 use patricia_tree::PatriciaMap;
 use smartstring::alias::String;
@@ -395,7 +398,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             union_discriminator.variants.push(VariantDiscriminator {
                 discriminant: Discriminant::IsUnit,
                 purpose: VariantPurpose::Data,
-                def_variant: DefVariant::new(def_id, SerdeModifier::NONE),
+                serde_def: SerdeDef::new(def_id, SerdeModifier::NONE),
             })
         }
 
@@ -403,7 +406,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             union_discriminator.variants.push(VariantDiscriminator {
                 discriminant: Discriminant::IsInt,
                 purpose: VariantPurpose::Data,
-                def_variant: DefVariant::new(number.0, SerdeModifier::NONE),
+                serde_def: SerdeDef::new(number.0, SerdeModifier::NONE),
             })
         }
 
@@ -412,7 +415,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             union_discriminator.variants.push(VariantDiscriminator {
                 discriminant: Discriminant::MatchesCapturingTextPattern(variant_def_id),
                 purpose: VariantPurpose::Data,
-                def_variant: DefVariant::new(variant_def_id, SerdeModifier::NONE),
+                serde_def: SerdeDef::new(variant_def_id, SerdeModifier::NONE),
             });
         }
 
@@ -422,7 +425,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 union_discriminator.variants.push(VariantDiscriminator {
                     discriminant: Discriminant::IsText,
                     purpose: VariantPurpose::Data,
-                    def_variant: DefVariant::new(def_id, SerdeModifier::NONE),
+                    serde_def: SerdeDef::new(def_id, SerdeModifier::NONE),
                 });
             }
             TextDiscriminator::Literals(literals) => {
@@ -430,7 +433,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     union_discriminator.variants.push(VariantDiscriminator {
                         discriminant: Discriminant::IsTextLiteral(literal),
                         purpose: VariantPurpose::Data,
-                        def_variant: DefVariant::new(def_id, SerdeModifier::NONE),
+                        serde_def: SerdeDef::new(def_id, SerdeModifier::NONE),
                     });
                 }
             }
@@ -440,7 +443,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             union_discriminator.variants.push(VariantDiscriminator {
                 discriminant: Discriminant::IsSequence,
                 purpose: VariantPurpose::Data,
-                def_variant: DefVariant::new(sequence_def_id, SerdeModifier::NONE),
+                serde_def: SerdeDef::new(sequence_def_id, SerdeModifier::NONE),
             });
         }
 
@@ -449,10 +452,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 union_discriminator.variants.push(VariantDiscriminator {
                     discriminant: candidate.discriminant,
                     purpose: VariantPurpose::Data,
-                    def_variant: DefVariant::new(
-                        map_discriminator.result_type,
-                        SerdeModifier::NONE,
-                    ),
+                    serde_def: SerdeDef::new(map_discriminator.result_type, SerdeModifier::NONE),
                 })
             }
         }

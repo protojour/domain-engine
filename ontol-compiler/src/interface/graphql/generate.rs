@@ -1,21 +1,24 @@
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
-    interface::graphql::{
-        argument,
-        data::{
-            EdgeData, EntityData, FieldData, FieldKind, NativeScalarKind, NativeScalarRef,
-            NodeData, ObjectData, ObjectKind, Optionality, PropertyData, ScalarData, TypeData,
-            TypeIndex, TypeKind, TypeModifier, TypeRef, UnionData, UnitTypeRef,
-        },
-        schema::{GraphqlSchema, QueryLevel, TypingPurpose},
-    },
     interface::serde::{
         operator::{SerdeOperator, SerdeOperatorId},
-        SerdeKey,
+        SerdeDef, SerdeKey,
+    },
+    interface::{
+        graphql::{
+            argument,
+            data::{
+                EdgeData, EntityData, FieldData, FieldKind, NativeScalarKind, NativeScalarRef,
+                NodeData, ObjectData, ObjectKind, Optionality, PropertyData, ScalarData, TypeData,
+                TypeIndex, TypeKind, TypeModifier, TypeRef, UnionData, UnitTypeRef,
+            },
+            schema::{GraphqlSchema, QueryLevel, TypingPurpose},
+        },
+        serde::SerdeModifier,
     },
     ontology::{Ontology, PropertyCardinality, ValueCardinality},
-    smart_format, DefId, DefVariant, PackageId, Role, SerdeModifier,
+    smart_format, DefId, PackageId, Role,
 };
 use smartstring::alias::String;
 use tracing::debug;
@@ -867,11 +870,11 @@ impl PropertyFieldProducer {
 }
 
 fn gql_serde_key(def_id: DefId) -> SerdeKey {
-    SerdeKey::Def(DefVariant::new(def_id, SerdeModifier::graphql_default()))
+    SerdeKey::Def(SerdeDef::new(def_id, SerdeModifier::graphql_default()))
 }
 
 fn gql_array_serde_key(def_id: DefId) -> SerdeKey {
-    SerdeKey::Def(DefVariant::new(
+    SerdeKey::Def(SerdeDef::new(
         def_id,
         SerdeModifier::graphql_default() | SerdeModifier::ARRAY,
     ))

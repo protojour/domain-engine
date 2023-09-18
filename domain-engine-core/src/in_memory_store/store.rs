@@ -549,7 +549,7 @@ impl InMemoryStore {
             }
             (
                 SerdeOperator::Alias(AliasOperator {
-                    def_variant,
+                    def,
                     inner_operator_id,
                     ..
                 }),
@@ -557,7 +557,7 @@ impl InMemoryStore {
             ) => {
                 let mut value =
                     self.generate_entity_id(ontology, *inner_operator_id, value_generator)?;
-                value.type_def_id = def_variant.def_id;
+                value.type_def_id = def.def_id;
                 Ok(value)
             }
             _ => Err(DomainError::TypeCannotBeUsedForIdGeneration),

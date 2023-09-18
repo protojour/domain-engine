@@ -179,11 +179,11 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
                 Err(Error::custom("Cannot deserialize dynamic sequence"))
             }
             SerdeOperator::RelationSequence(seq_op) => deserializer.deserialize_seq(
-                SequenceMatcher::new(&seq_op.ranges, seq_op.def_variant.def_id, self.ctx)
+                SequenceMatcher::new(&seq_op.ranges, seq_op.def.def_id, self.ctx)
                     .into_visitor(self),
             ),
             SerdeOperator::ConstructorSequence(seq_op) => deserializer.deserialize_seq(
-                SequenceMatcher::new(&seq_op.ranges, seq_op.def_variant.def_id, self.ctx)
+                SequenceMatcher::new(&seq_op.ranges, seq_op.def.def_id, self.ctx)
                     .into_visitor(self),
             ),
             SerdeOperator::Alias(value_op) => {
@@ -191,7 +191,7 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
                     .narrow(value_op.inner_operator_id)
                     .deserialize(deserializer)?;
 
-                typed_attribute.value.type_def_id = value_op.def_variant.def_id;
+                typed_attribute.value.type_def_id = value_op.def.def_id;
 
                 Ok(typed_attribute)
             }
@@ -420,7 +420,7 @@ impl<'e, 'de> Visitor<'de> for StructVisitor<'e> {
     }
 
     fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {
-        let type_def_id = self.struct_op.def_variant.def_id;
+        let type_def_id = self.struct_op.def.def_id;
         let deserialized_map = deserialize_map(
             self.processor,
             map,

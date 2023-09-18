@@ -1,7 +1,7 @@
 use ::serde::{Deserialize, Serialize};
 use smartstring::alias::String;
 
-use crate::{DefId, DefVariant, RelationshipId};
+use crate::{interface::serde::SerdeDef, DefId, RelationshipId};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UnionDiscriminator {
@@ -12,7 +12,7 @@ pub struct UnionDiscriminator {
 pub struct VariantDiscriminator {
     pub discriminant: Discriminant,
     pub purpose: VariantPurpose,
-    pub def_variant: DefVariant,
+    pub serde_def: SerdeDef,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]

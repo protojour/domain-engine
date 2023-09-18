@@ -14,12 +14,12 @@ use mem::Mem;
 use namespace::Namespaces;
 use ontol_runtime::{
     config::PackageConfig,
-    interface::serde::SerdeKey,
+    interface::serde::{SerdeDef, SerdeKey, SerdeModifier},
     ontology::{
         Domain, DomainInterface, EntityInfo, EntityRelationship, MapMeta, Ontology, TypeInfo,
     },
     value::PropertyId,
-    DefId, DefVariant, PackageId, SerdeModifier,
+    DefId, PackageId,
 };
 use ontology_graph::OntologyGraph;
 use package::{PackageTopology, Packages, ParsedPackage, ONTOL_PKG};
@@ -227,7 +227,7 @@ impl<'m> Compiler<'m> {
                     },
                     name: Some(type_name),
                     entity_info: self.entity_info(type_def_id, &mut serde_generator),
-                    operator_id: serde_generator.gen_operator_id(SerdeKey::Def(DefVariant::new(
+                    operator_id: serde_generator.gen_operator_id(SerdeKey::Def(SerdeDef::new(
                         type_def_id,
                         SerdeModifier::json_default(),
                     ))),
@@ -240,7 +240,7 @@ impl<'m> Compiler<'m> {
                     public: false,
                     name: None,
                     entity_info: None,
-                    operator_id: serde_generator.gen_operator_id(SerdeKey::Def(DefVariant::new(
+                    operator_id: serde_generator.gen_operator_id(SerdeKey::Def(SerdeDef::new(
                         type_def_id,
                         SerdeModifier::json_default(),
                     ))),
@@ -364,7 +364,7 @@ impl<'m> Compiler<'m> {
             id_value_def_id: identifies_meta.relationship.subject.0,
             id_value_generator,
             id_operator_id: serde_generator
-                .gen_operator_id(SerdeKey::Def(DefVariant::new(
+                .gen_operator_id(SerdeKey::Def(SerdeDef::new(
                     identifies_meta.relationship.subject.0,
                     SerdeModifier::NONE,
                 )))

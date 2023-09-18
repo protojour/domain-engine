@@ -1,8 +1,8 @@
 use std::{fmt::Display, ops::RangeInclusive};
 
 use crate::{
-    discriminator::Discriminant,
     format_utils::{Backticks, LogicOp, Missing},
+    interface::discriminator::Discriminant,
     ontology::Ontology,
     text_like_types::ParseError,
     text_pattern::TextPattern,
@@ -391,7 +391,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
                 Discriminant::IsText => {
                     return try_deserialize_custom_string(
                         self.ontology,
-                        variant.discriminator.def_variant.def_id,
+                        variant.discriminator.serde_def.def_id,
                         str,
                     )
                     .map_err(|_| ())
@@ -399,13 +399,13 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
                 Discriminant::IsTextLiteral(lit) if lit == str => {
                     return try_deserialize_custom_string(
                         self.ontology,
-                        variant.discriminator.def_variant.def_id,
+                        variant.discriminator.serde_def.def_id,
                         str,
                     )
                     .map_err(|_| ())
                 }
                 Discriminant::MatchesCapturingTextPattern(def_id) => {
-                    let result_type = variant.discriminator.def_variant.def_id;
+                    let result_type = variant.discriminator.serde_def.def_id;
                     let pattern = self.ontology.text_patterns.get(def_id).unwrap();
 
                     if let Ok(data) = pattern.try_capturing_match(str, self.ontology) {
@@ -426,14 +426,14 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
                     SerdeOperator::RelationSequence(seq_op) => {
                         return Ok(SequenceMatcher::new(
                             &seq_op.ranges,
-                            seq_op.def_variant.def_id,
+                            seq_op.def.def_id,
                             self.ctx,
                         ))
                     }
                     SerdeOperator::ConstructorSequence(seq_op) => {
                         return Ok(SequenceMatcher::new(
                             &seq_op.ranges,
-                            seq_op.def_variant.def_id,
+                            seq_op.def.def_id,
                             self.ctx,
                         ))
                     }
@@ -473,7 +473,7 @@ impl<'e> UnionMatcher<'e> {
     fn match_discriminant(&self, discriminant: Discriminant) -> Result<DefId, ()> {
         for variant in self.variants {
             if variant.discriminator.discriminant == discriminant {
-                return Ok(variant.discriminator.def_variant.def_id);
+                return Ok(variant.discriminator.serde_def.def_id);
             }
         }
 

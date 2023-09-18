@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
-    discriminator::UnionDiscriminator, ontology::Cardinality, value::PropertyId,
+    interface::discriminator::UnionDiscriminator, ontology::Cardinality, value::PropertyId,
     value_generator::ValueGenerator, DefId, PackageId, RelationshipId,
 };
 

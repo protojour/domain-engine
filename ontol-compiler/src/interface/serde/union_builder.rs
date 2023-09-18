@@ -1,12 +1,12 @@
 use std::collections::BTreeMap;
 
 use ontol_runtime::{
-    discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
+    interface::discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
     interface::serde::{
         operator::{SerdeOperator, SerdeOperatorId, ValueUnionVariant},
-        SerdeKey,
+        SerdeDef, SerdeKey,
     },
-    smart_format, DefId, DefVariant,
+    smart_format, DefId,
 };
 use smartstring::alias::String;
 
@@ -15,14 +15,14 @@ use super::serde_generator::SerdeGenerator;
 pub struct UnionBuilder {
     // variants _sorted_ by purpose
     variant_candidates_by_purpose: BTreeMap<VariantPurpose, Vec<ValueUnionVariant>>,
-    def_variant: DefVariant,
+    def: SerdeDef,
 }
 
 impl UnionBuilder {
-    pub fn new(def_variant: DefVariant) -> Self {
+    pub fn new(def: SerdeDef) -> Self {
         Self {
             variant_candidates_by_purpose: Default::default(),
-            def_variant,
+            def,
         }
     }
 }
@@ -43,7 +43,7 @@ impl UnionBuilder {
             .collect();
 
         for candidate in &mut variant_candidates {
-            let result_type = candidate.discriminator.def_variant.def_id;
+            let result_type = candidate.discriminator.serde_def.def_id;
 
             candidate.operator_id = map_operator_fn(generator, candidate.operator_id, result_type);
 
@@ -54,9 +54,9 @@ impl UnionBuilder {
                 Discriminant::IsSingletonProperty(relationship_id, prop) => {
                     // TODO: We don't know that we have to do any disambiguation here
                     // (there might be only one singleton property)
-                    let operator = generator.gen_operator(SerdeKey::Def(DefVariant::new(
+                    let operator = generator.gen_operator(SerdeKey::Def(SerdeDef::new(
                         result_type,
-                        self.def_variant.modifier.cross_def_flags(),
+                        self.def.modifier.cross_def_flags(),
                     )));
 
                     if let Some(SerdeOperator::CapturingTextPattern(def_id)) = operator {
@@ -92,7 +92,7 @@ impl UnionBuilder {
         generator: &mut SerdeGenerator,
     ) -> Result<(), String> {
         let operator_id = match generator.gen_operator_id(SerdeKey::Def(
-            self.def_variant.with_def(discriminator.def_variant.def_id),
+            self.def.with_def(discriminator.serde_def.def_id),
         )) {
             Some(operator_id) => operator_id,
             None => return Ok(()),

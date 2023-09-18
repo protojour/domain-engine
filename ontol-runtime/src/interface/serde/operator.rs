@@ -10,13 +10,16 @@ use smallvec::SmallVec;
 use smartstring::alias::String;
 
 use crate::{
-    discriminator::{VariantDiscriminator, VariantPurpose},
+    interface::discriminator::{VariantDiscriminator, VariantPurpose},
     value::PropertyId,
     value_generator::ValueGenerator,
-    DefId, DefVariant,
+    DefId,
 };
 
-use super::processor::{ProcessorLevel, ProcessorMode};
+use super::{
+    processor::{ProcessorLevel, ProcessorMode},
+    SerdeDef,
+};
 
 /// SerdeOperatorId is an index into a vector of SerdeOperators.
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, DebugExtras)]
@@ -70,13 +73,13 @@ pub enum SerdeOperator {
 pub struct RelationSequenceOperator {
     // note: This is constant size array so that it can produce a dynamic slice
     pub ranges: [SequenceRange; 1],
-    pub def_variant: DefVariant,
+    pub def: SerdeDef,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ConstructorSequenceOperator {
     pub ranges: SmallVec<[SequenceRange; 3]>,
-    pub def_variant: DefVariant,
+    pub def: SerdeDef,
 }
 
 impl ConstructorSequenceOperator {
@@ -112,24 +115,20 @@ pub struct SequenceRange {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AliasOperator {
     pub typename: String,
-    pub def_variant: DefVariant,
+    pub def: SerdeDef,
     pub inner_operator_id: SerdeOperatorId,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UnionOperator {
     typename: String,
-    union_def_variant: DefVariant,
+    union_def: SerdeDef,
     variants: Vec<ValueUnionVariant>,
 }
 
 impl UnionOperator {
     /// Note: variants must be sorted according to its purpose (VariantPurpose)
-    pub fn new(
-        typename: String,
-        union_def_variant: DefVariant,
-        variants: Vec<ValueUnionVariant>,
-    ) -> Self {
+    pub fn new(typename: String, union_def: SerdeDef, variants: Vec<ValueUnionVariant>) -> Self {
         variants
             .iter()
             .fold(VariantPurpose::Identification, |last_purpose, variant| {
@@ -141,7 +140,7 @@ impl UnionOperator {
 
         Self {
             typename,
-            union_def_variant,
+            union_def,
             variants,
         }
     }
@@ -150,8 +149,8 @@ impl UnionOperator {
         &self.typename
     }
 
-    pub fn union_def_variant(&self) -> DefVariant {
-        self.union_def_variant
+    pub fn union_def(&self) -> SerdeDef {
+        self.union_def
     }
 
     pub fn variants(&self, mode: ProcessorMode, level: ProcessorLevel) -> FilteredVariants<'_> {
@@ -198,7 +197,7 @@ pub struct ValueUnionVariant {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StructOperator {
     pub typename: String,
-    pub def_variant: DefVariant,
+    pub def: SerdeDef,
     pub properties: IndexMap<String, SerdeProperty>,
 }
 
