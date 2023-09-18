@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{serde::operator::SerdeOperatorId, DefId};
+use crate::{interface::serde::operator::SerdeOperatorId, DefId};
 
 use super::{data::TypeIndex, schema::TypingPurpose};
 

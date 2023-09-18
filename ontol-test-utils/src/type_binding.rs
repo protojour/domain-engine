@@ -2,11 +2,11 @@ use fnv::FnvHashMap;
 use jsonschema::JSONSchema;
 use ontol_faker::new_constant_fake;
 use ontol_runtime::{
-    json_schema::build_standalone_schema,
+    interface::json_schema::build_standalone_schema,
+    interface::serde::operator::SerdeOperatorId,
+    interface::serde::processor::{ProcessorLevel, ProcessorMode},
     ontology::{Ontology, TypeInfo},
     query::{Query, StructQuery},
-    serde::operator::SerdeOperatorId,
-    serde::processor::{ProcessorLevel, ProcessorMode},
     value::{Attribute, Data, PropertyId, Value},
     DefId, PackageId,
 };

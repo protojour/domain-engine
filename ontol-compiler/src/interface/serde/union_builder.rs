@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use ontol_runtime::{
     discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
-    serde::{
+    interface::serde::{
         operator::{SerdeOperator, SerdeOperatorId, ValueUnionVariant},
         SerdeKey,
     },

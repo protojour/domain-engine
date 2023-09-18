@@ -10,7 +10,7 @@ use ontol_lsp::Backend;
 use ontol_parser::parse_statements;
 use ontol_runtime::{
     config::{DataStoreConfig, PackageConfig},
-    json_schema::build_openapi_schemas,
+    interface::json_schema::build_openapi_schemas,
     ontology::Ontology,
     PackageId,
 };

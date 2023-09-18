@@ -2,12 +2,12 @@ use std::sync::Arc;
 
 use ontol_faker::new_constant_fake;
 use ontol_runtime::{
-    json_schema::build_openapi_schemas,
-    ontology::{MapMeta, Ontology, TypeInfo},
-    serde::{
+    interface::json_schema::build_openapi_schemas,
+    interface::serde::{
         operator::SerdeOperatorId,
         processor::{ProcessorLevel, ProcessorMode},
     },
+    ontology::{MapMeta, Ontology, TypeInfo},
     value::Value,
     MapKey, PackageId,
 };

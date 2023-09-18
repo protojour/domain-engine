@@ -10,7 +10,9 @@ use ontol_runtime::{
         },
         schema::{QueryLevel, TypingPurpose},
     },
-    serde::operator::{FilteredVariants, SerdeOperator, SerdeOperatorId, SerdePropertyFlags},
+    interface::serde::operator::{
+        FilteredVariants, SerdeOperator, SerdeOperatorId, SerdePropertyFlags,
+    },
     value::PropertyId,
     Role,
 };

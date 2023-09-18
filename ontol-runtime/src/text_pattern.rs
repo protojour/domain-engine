@@ -7,8 +7,8 @@ use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
+    interface::serde::processor::{ProcessorLevel, ProcessorMode},
     ontology::Ontology,
-    serde::processor::{ProcessorLevel, ProcessorMode},
     smart_format,
     text_like_types::ParseError,
     value::{Data, FormatStringData, PropertyId},

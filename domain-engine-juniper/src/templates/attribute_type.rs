@@ -9,7 +9,7 @@ use ontol_runtime::{
         },
         schema::TypingPurpose,
     },
-    serde::{
+    interface::serde::{
         operator::SerdeOperator,
         processor::{ProcessorLevel, ProcessorMode},
     },

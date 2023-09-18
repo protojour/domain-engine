@@ -3,8 +3,8 @@ use std::fmt::Display;
 use juniper::{graphql_value, LookAheadArgument, LookAheadValue, Spanning};
 use ontol_runtime::{
     interface::graphql::{argument::DomainFieldArg, schema::TypingPurpose},
+    interface::serde::operator::SerdeOperatorId,
     ontology::Ontology,
-    serde::operator::SerdeOperatorId,
     smart_format,
 };
 use serde::de::{self, DeserializeSeed, IntoDeserializer};

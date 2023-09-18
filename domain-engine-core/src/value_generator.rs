@@ -1,11 +1,11 @@
 use std::collections::BTreeMap;
 
 use ontol_runtime::{
-    ontology::TypeInfo,
-    serde::{
+    interface::serde::{
         operator::{FilteredVariants, SerdeOperator, SerdeOperatorId, SerdeProperty},
         processor::{ProcessorLevel, ProcessorMode},
     },
+    ontology::TypeInfo,
     value::{Attribute, Data, PropertyId, Value},
     value_generator::ValueGenerator,
     DefId, Role,

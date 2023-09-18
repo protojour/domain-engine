@@ -2,11 +2,11 @@ use std::collections::BTreeMap;
 
 use fake::{Fake, Faker};
 use ontol_runtime::{
-    ontology::Ontology,
-    serde::{
+    interface::serde::{
         operator::{FilteredVariants, SerdeOperator},
         processor::{ProcessorLevel, ProcessorMode, SerdeProcessor},
     },
+    ontology::Ontology,
     text_like_types::TextLikeType,
     text_pattern::TextPattern,
     value::{Attribute, Data, Value},
@@ -26,8 +26,8 @@ pub enum Error {
     RecursionLimitExceeded,
 }
 
-impl From<ontol_runtime::serde::processor::RecursionLimitError> for Error {
-    fn from(_: ontol_runtime::serde::processor::RecursionLimitError) -> Self {
+impl From<ontol_runtime::interface::serde::processor::RecursionLimitError> for Error {
+    fn from(_: ontol_runtime::interface::serde::processor::RecursionLimitError) -> Self {
         Self::RecursionLimitExceeded
     }
 }

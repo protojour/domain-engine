@@ -8,7 +8,7 @@ use tracing::debug;
 
 use crate::{
     cast::Cast,
-    serde::processor::RecursionLimitError,
+    interface::serde::processor::RecursionLimitError,
     text_pattern::FormatPattern,
     value::{Attribute, Data, FormatStringData, Value},
 };

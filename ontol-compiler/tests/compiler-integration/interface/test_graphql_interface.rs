@@ -4,7 +4,7 @@ use ontol_runtime::{
         data::{FieldKind, NativeScalarKind, ObjectData, TypeData},
         schema::{GraphqlSchema, QueryLevel},
     },
-    serde::operator::SerdeOperator,
+    interface::serde::operator::SerdeOperator,
 };
 use ontol_test_utils::{
     examples::ARTIST_AND_INSTRUMENT,

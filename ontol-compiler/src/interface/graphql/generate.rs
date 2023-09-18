@@ -10,11 +10,11 @@ use ontol_runtime::{
         },
         schema::{GraphqlSchema, QueryLevel, TypingPurpose},
     },
-    ontology::{Ontology, PropertyCardinality, ValueCardinality},
-    serde::{
+    interface::serde::{
         operator::{SerdeOperator, SerdeOperatorId},
         SerdeKey,
     },
+    ontology::{Ontology, PropertyCardinality, ValueCardinality},
     smart_format, DefId, DefVariant, PackageId, Role, SerdeModifier,
 };
 use smartstring::alias::String;

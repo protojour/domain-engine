@@ -6,8 +6,8 @@ use clap::{Parser, ValueEnum};
 use clap_stdin::FileOrStdin;
 use domain_engine_core::system::SystemAPI;
 use ontol_runtime::{
+    interface::serde::processor::{ProcessorLevel, ProcessorMode},
     ontology::Ontology,
-    serde::processor::{ProcessorLevel, ProcessorMode},
     MapKey, PackageId,
 };
 use serde::de::DeserializeSeed;

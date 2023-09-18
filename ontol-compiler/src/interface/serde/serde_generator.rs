@@ -3,13 +3,13 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
     discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
-    ontology::{Cardinality, PropertyCardinality, ValueCardinality},
-    serde::operator::{
+    interface::serde::operator::{
         AliasOperator, ConstructorSequenceOperator, RelationSequenceOperator, SequenceRange,
         SerdeOperator, SerdeOperatorId, SerdeProperty, StructOperator, UnionOperator,
         ValueUnionVariant,
     },
-    serde::{operator::SerdePropertyFlags, SerdeKey},
+    interface::serde::{operator::SerdePropertyFlags, SerdeKey},
+    ontology::{Cardinality, PropertyCardinality, ValueCardinality},
     smart_format,
     value_generator::ValueGenerator,
     DefId, DefVariant, Role, SerdeModifier,

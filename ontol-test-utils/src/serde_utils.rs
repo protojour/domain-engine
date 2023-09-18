@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use ontol_runtime::{
-    serde::processor::{ProcessorLevel, ProcessorMode},
+    interface::serde::processor::{ProcessorLevel, ProcessorMode},
     value::{Attribute, Data, PropertyId, Value},
     DefId,
 };

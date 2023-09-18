@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use ontol_runtime::{
     config::DataStoreConfig,
+    interface::serde::processor::ProcessorMode,
     ontology::Ontology,
     query::{EntityQuery, Query},
-    serde::processor::ProcessorMode,
     value::{Attribute, Value},
     PackageId,
 };

@@ -1,7 +1,7 @@
 //! Extension traits for testing purposes
 
 pub mod serde {
-    use ontol_runtime::serde::operator::{SerdeOperator, StructOperator};
+    use ontol_runtime::interface::serde::operator::{SerdeOperator, StructOperator};
 
     pub trait SerdeOperatorExt {
         fn struct_op(&self) -> &StructOperator;

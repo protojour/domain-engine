@@ -3,7 +3,8 @@ use serde::{Deserialize, Serialize};
 use smartstring::alias::String;
 
 use crate::{
-    ontology::Ontology, serde::operator::SerdeOperatorId, value::PropertyId, DefId, RelationshipId,
+    interface::serde::operator::SerdeOperatorId, ontology::Ontology, value::PropertyId, DefId,
+    RelationshipId,
 };
 
 use super::argument::{self};

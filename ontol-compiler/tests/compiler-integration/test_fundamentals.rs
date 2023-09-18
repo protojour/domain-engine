@@ -1,4 +1,4 @@
-use ontol_runtime::{serde::operator::SerdeOperator, RelationshipId};
+use ontol_runtime::{interface::serde::operator::SerdeOperator, RelationshipId};
 use ontol_test_utils::{
     assert_json_io_matches, type_binding::TypeBinding, OntolTest, SourceName, TestCompile,
     TestPackages,

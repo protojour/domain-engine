@@ -1,4 +1,4 @@
-use ontol_runtime::serde::processor::ProcessorMode::*;
+use ontol_runtime::interface::serde::processor::ProcessorMode::*;
 use ontol_test_utils::{expect_eq, TestCompile};
 use serde_json::json;
 use test_log::test;

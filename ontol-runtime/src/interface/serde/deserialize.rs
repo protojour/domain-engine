@@ -10,7 +10,7 @@ use tracing::debug;
 
 use crate::{
     format_utils::{DoubleQuote, LogicOp, Missing},
-    serde::{deserialize_matcher::MapMatchResult, EDGE_PROPERTY},
+    interface::serde::{deserialize_matcher::MapMatchResult, EDGE_PROPERTY},
     value::{Attribute, Data, PropertyId, Value},
     value_generator::ValueGenerator,
     vm::proc::{NParams, Procedure},

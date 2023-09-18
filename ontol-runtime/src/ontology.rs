@@ -7,11 +7,13 @@ use smartstring::alias::String;
 
 use crate::{
     config::PackageConfig,
-    interface::graphql::schema::GraphqlSchema,
-    serde::{
-        operator::{SerdeOperator, SerdeOperatorId},
-        processor::{ProcessorLevel, ProcessorMode, SerdeProcessor},
-        SerdeKey,
+    interface::{
+        graphql::schema::GraphqlSchema,
+        serde::{
+            operator::{SerdeOperator, SerdeOperatorId},
+            processor::{ProcessorLevel, ProcessorMode, SerdeProcessor},
+            SerdeKey,
+        },
     },
     text_like_types::TextLikeType,
     text_pattern::TextPattern,

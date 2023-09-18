@@ -7,11 +7,11 @@ use serde::{ser::SerializeMap, ser::SerializeSeq, Serializer};
 use smartstring::alias::String;
 use urlencoding::encode;
 
-use crate::ontology::TypeInfo;
-use crate::serde::operator::{
+use crate::interface::serde::operator::{
     SequenceRange, SerdeOperator, SerdeOperatorId, StructOperator, UnionOperator,
 };
-use crate::serde::processor::ProcessorMode;
+use crate::interface::serde::processor::ProcessorMode;
+use crate::ontology::TypeInfo;
 use crate::{
     ontology::{Domain, Ontology},
     DefId, PackageId,

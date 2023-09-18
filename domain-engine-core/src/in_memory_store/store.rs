@@ -3,12 +3,12 @@ use std::collections::BTreeMap;
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
-    ontology::{EntityInfo, EntityRelationship, Ontology, PropertyCardinality, ValueCardinality},
-    query::{EntityQuery, Query, StructOrUnionQuery, StructQuery},
-    serde::{
+    interface::serde::{
         operator::{AliasOperator, SerdeOperator, SerdeOperatorId},
         processor::{ProcessorLevel, ProcessorMode},
     },
+    ontology::{EntityInfo, EntityRelationship, Ontology, PropertyCardinality, ValueCardinality},
+    query::{EntityQuery, Query, StructOrUnionQuery, StructQuery},
     smart_format,
     text_like_types::TextLikeType,
     value::{Attribute, Data, PropertyId, Value, ValueDebug},

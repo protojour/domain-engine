@@ -2,7 +2,7 @@ use fnv::FnvHashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    serde::{
+    interface::serde::{
         operator::SerdeOperatorId,
         processor::{ProcessorLevel, ProcessorMode},
     },
