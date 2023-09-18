@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Debug, ops::Range, sync::Arc};
+use std::{collections::HashMap, fmt::Debug, ops::Range};
 
 use ::serde::{Deserialize, Serialize};
 use fnv::FnvHashMap;
@@ -8,12 +8,12 @@ use smartstring::alias::String;
 use crate::{
     config::PackageConfig,
     interface::{
-        graphql::schema::GraphqlSchema,
         serde::{
             operator::{SerdeOperator, SerdeOperatorId},
             processor::{ProcessorLevel, ProcessorMode, SerdeProcessor},
             SerdeKey,
         },
+        DomainInterface,
     },
     text_like_types::TextLikeType,
     text_pattern::TextPattern,
@@ -224,6 +224,8 @@ pub struct TypeInfo {
     pub name: Option<String>,
     /// Some if this type is an entity
     pub entity_info: Option<EntityInfo>,
+    /// The SerdeOperatorId used for JSON.
+    /// FIXME: This should really be connected to a DomainInterface.
     pub operator_id: Option<SerdeOperatorId>,
 }
 
@@ -263,19 +265,6 @@ pub enum PropertyFlowData {
     Cardinality(Cardinality),
     ChildOf(PropertyId),
     DependentOn(PropertyId),
-}
-
-#[derive(Serialize, Deserialize)]
-pub enum DomainInterface {
-    GraphQL(Arc<GraphqlSchema>),
-}
-
-impl Debug for DomainInterface {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::GraphQL(_) => write!(f, "GraphQL"),
-        }
-    }
 }
 
 pub struct OntologyBuilder {

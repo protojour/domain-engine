@@ -2,10 +2,7 @@ use std::sync::Arc;
 
 use domain_engine_core::DomainEngine;
 use gql_scalar::GqlScalar;
-use ontol_runtime::{
-    ontology::{DomainInterface, Ontology},
-    PackageId,
-};
+use ontol_runtime::{interface::DomainInterface, ontology::Ontology, PackageId};
 use schema_ctx::SchemaCtx;
 use thiserror::Error;
 use tracing::debug;

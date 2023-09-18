@@ -9,8 +9,8 @@ use ontol_compiler::{
 };
 use ontol_runtime::{
     config::{DataStoreConfig, PackageConfig},
-    interface::graphql::schema::GraphqlSchema,
-    ontology::{DomainInterface, Ontology},
+    interface::{graphql::schema::GraphqlSchema, DomainInterface},
+    ontology::Ontology,
     PackageId,
 };
 use type_binding::TypeBinding;

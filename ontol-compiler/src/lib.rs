@@ -14,10 +14,11 @@ use mem::Mem;
 use namespace::Namespaces;
 use ontol_runtime::{
     config::PackageConfig,
-    interface::serde::{SerdeDef, SerdeKey, SerdeModifier},
-    ontology::{
-        Domain, DomainInterface, EntityInfo, EntityRelationship, MapMeta, Ontology, TypeInfo,
+    interface::{
+        serde::{SerdeDef, SerdeKey, SerdeModifier},
+        DomainInterface,
     },
+    ontology::{Domain, EntityInfo, EntityRelationship, MapMeta, Ontology, TypeInfo},
     value::PropertyId,
     DefId, PackageId,
 };
