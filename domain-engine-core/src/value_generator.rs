@@ -87,13 +87,7 @@ impl<'e> Generator<'e> {
                             struct_map.insert(
                                 property.property_id,
                                 Value::new(
-                                    Data::OctetSequence(
-                                        uuid::Uuid::new_v4()
-                                            .as_bytes()
-                                            .into_iter()
-                                            .cloned()
-                                            .collect(),
-                                    ),
+                                    Data::OctetSequence(uuid::Uuid::new_v4().as_bytes().to_vec()),
                                     self.property_def_id(property),
                                 )
                                 .into(),

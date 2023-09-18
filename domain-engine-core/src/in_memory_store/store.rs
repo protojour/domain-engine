@@ -518,9 +518,7 @@ impl InMemoryStore {
             (SerdeOperator::TextPattern(def_id), _) => {
                 match (ontology.get_text_like_type(*def_id), value_generator) {
                     (Some(TextLikeType::Uuid), ValueGenerator::UuidV4) => Ok(Value::new(
-                        Data::OctetSequence(
-                            Uuid::new_v4().as_bytes().into_iter().cloned().collect(),
-                        ),
+                        Data::OctetSequence(Uuid::new_v4().as_bytes().to_vec()),
                         *def_id,
                     )),
                     _ => Err(DomainError::TypeCannotBeUsedForIdGeneration),
