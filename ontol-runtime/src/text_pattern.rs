@@ -4,7 +4,7 @@ use ::serde::{Deserialize, Serialize};
 use regex::Regex;
 use serde::de::{value::StrDeserializer, DeserializeSeed};
 use smartstring::alias::String;
-use tracing::debug;
+use tracing::{debug, error};
 
 use crate::{
     interface::serde::processor::{ProcessorLevel, ProcessorMode},
@@ -114,7 +114,10 @@ impl<'d, 'o> Display for FormatPattern<'d, 'o> {
                     }),
                     Data::Struct(attrs),
                 ) => {
-                    let attribute = attrs.get(property_id).unwrap();
+                    let Some(attribute) = attrs.get(property_id) else {
+                        error!("Attribute {property_id} missing when formatting capturing text pattern");
+                        return Err(std::fmt::Error);
+                    };
                     write!(
                         f,
                         "{}",

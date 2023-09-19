@@ -80,7 +80,8 @@ impl<'e> SerdeProcessor<'e> {
                             ontology: self.ontology
                         }
                     )
-                    .unwrap();
+                    .map_err(|_| S::Error::custom("Conversion to text failed"))?;
+
                     serializer.serialize_str(&buf)
                 }
             },
@@ -96,7 +97,8 @@ impl<'e> SerdeProcessor<'e> {
                         ontology: self.ontology
                     }
                 )
-                .unwrap();
+                .map_err(|_| S::Error::custom("Failed to serialize capturing text pattern"))?;
+
                 serializer.serialize_str(&buf)
             }
             SerdeOperator::DynamicSequence => {
