@@ -1,53 +1,29 @@
 use std::sync::Arc;
 
-use domain_engine_core::DomainEngine;
+use context::{SchemaCtx, ServiceCtx};
 use gql_scalar::GqlScalar;
 use ontol_runtime::{interface::DomainInterface, ontology::Ontology, PackageId};
-use schema_ctx::SchemaCtx;
 use thiserror::Error;
 use tracing::debug;
 
+pub mod context;
 pub mod gql_scalar;
 
 mod look_ahead_utils;
 mod macros;
 mod query_analyzer;
 mod registry_ctx;
-mod schema_ctx;
 mod templates;
-
-#[derive(Clone)]
-pub struct GqlContext {
-    pub domain_engine: Arc<DomainEngine>,
-}
-
-impl From<DomainEngine> for GqlContext {
-    fn from(value: DomainEngine) -> Self {
-        Self {
-            domain_engine: Arc::new(value),
-        }
-    }
-}
-
-impl From<Arc<DomainEngine>> for GqlContext {
-    fn from(value: Arc<DomainEngine>) -> Self {
-        Self {
-            domain_engine: value,
-        }
-    }
-}
 
 pub mod juniper {
     pub use ::juniper::*;
 }
 
-impl juniper::Context for GqlContext {}
-
 pub type Schema = juniper::RootNode<
     'static,
     templates::query_type::QueryType,
     templates::mutation_type::MutationType,
-    juniper::EmptySubscription<GqlContext>,
+    juniper::EmptySubscription<ServiceCtx>,
     GqlScalar,
 >;
 
@@ -79,8 +55,8 @@ pub fn create_graphql_schema(
         templates::query_type::QueryType,
         templates::mutation_type::MutationType,
         juniper::EmptySubscription::new(),
-        schema_ctx.query_type_info(),
-        schema_ctx.mutation_type_info(),
+        schema_ctx.query_schema_type(),
+        schema_ctx.mutation_schema_type(),
         (),
     );
 

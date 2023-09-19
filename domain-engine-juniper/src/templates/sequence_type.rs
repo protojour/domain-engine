@@ -1,6 +1,6 @@
 use ontol_runtime::value::Attribute;
 
-use crate::{gql_scalar::GqlScalar, schema_ctx::IndexedTypeInfo, GqlContext};
+use crate::{context::SchemaType, gql_scalar::GqlScalar, ServiceCtx};
 
 use super::attribute_type::AttributeType;
 
@@ -9,8 +9,8 @@ pub struct SequenceType<'v> {
 }
 
 impl<'v> juniper::GraphQLValue<GqlScalar> for SequenceType<'v> {
-    type Context = GqlContext;
-    type TypeInfo = IndexedTypeInfo;
+    type Context = ServiceCtx;
+    type TypeInfo = SchemaType;
 
     fn type_name<'i>(&self, _info: &'i Self::TypeInfo) -> Option<&'i str> {
         None

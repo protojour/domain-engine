@@ -19,8 +19,8 @@ use ontol_runtime::{
 use tracing::{trace, warn};
 
 use crate::{
+    context::{SchemaCtx, SchemaType},
     gql_scalar::GqlScalar,
-    schema_ctx::{IndexedTypeInfo, SchemaCtx},
     templates::{attribute_type::AttributeType, indexed_input_value::IndexedInputValue},
 };
 
@@ -191,7 +191,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         trace!("register argument '{name}': {operator:?}");
 
         if property_flags.contains(SerdePropertyFlags::ENTITY_ID) {
-            return self.native_arg::<ID, _>(name, modifier, &());
+            return self.modified_arg::<ID>(name, modifier, &());
         }
 
         match operator {
@@ -199,25 +199,23 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 todo!("unit argument")
             }
             SerdeOperator::False(_) | SerdeOperator::True(_) | SerdeOperator::Boolean(_) => {
-                self.native_arg::<bool, _>(name, modifier, &())
+                self.modified_arg::<bool>(name, modifier, &())
             }
-            SerdeOperator::I32(_, _) => return self.native_arg::<i32, _>(name, modifier, &()),
+            SerdeOperator::I32(_, _) => return self.modified_arg::<i32>(name, modifier, &()),
             SerdeOperator::I64(_, _) => {
-                let i64_type_info = self.schema_ctx.indexed_type_info(
+                let i64_schema_type = self.schema_ctx.get_schema_type(
                     self.schema_ctx.schema.i64_custom_scalar.unwrap(),
                     TypingPurpose::Input,
                 );
 
-                self.native_arg::<IndexedInputValue, _>(name, modifier, &i64_type_info)
+                self.modified_arg::<IndexedInputValue>(name, modifier, &i64_schema_type)
             }
-            SerdeOperator::F64(_, _) => return self.native_arg::<f64, _>(name, modifier, &()),
-            SerdeOperator::String(_) => return self.native_arg::<String, _>(name, modifier, &()),
-            SerdeOperator::StringConstant(_, _) => {
-                self.native_arg::<String, _>(name, modifier, &())
-            }
-            SerdeOperator::TextPattern(_) => self.native_arg::<String, _>(name, modifier, &()),
+            SerdeOperator::F64(_, _) => return self.modified_arg::<f64>(name, modifier, &()),
+            SerdeOperator::String(_) => return self.modified_arg::<String>(name, modifier, &()),
+            SerdeOperator::StringConstant(_, _) => self.modified_arg::<String>(name, modifier, &()),
+            SerdeOperator::TextPattern(_) => self.modified_arg::<String>(name, modifier, &()),
             SerdeOperator::CapturingTextPattern(_) => {
-                self.native_arg::<String, _>(name, modifier, &())
+                self.modified_arg::<String>(name, modifier, &())
             }
             SerdeOperator::DynamicSequence => panic!("No dynamic sequence expected here"),
             SerdeOperator::RelationSequence(seq_op) => {
@@ -229,7 +227,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         name,
                         &self
                             .schema_ctx
-                            .indexed_type_info(type_index, TypingPurpose::ReferenceInput),
+                            .get_schema_type(type_index, TypingPurpose::ReferenceInput),
                     ),
                     None => self.get_operator_argument(
                         name,
@@ -273,9 +271,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                     .type_index_by_def(def_id, query_level)
                     .expect("No union found");
 
-                let info = self
-                    .schema_ctx
-                    .indexed_type_info(type_index, typing_purpose);
+                let info = self.schema_ctx.get_schema_type(type_index, typing_purpose);
 
                 match modifier.unit_optionality() {
                     Optionality::Mandatory => self.registry.arg::<IndexedInputValue>(name, &info),
@@ -293,7 +289,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
 
                 let info = self
                     .schema_ctx
-                    .indexed_type_info(type_index, TypingPurpose::Input);
+                    .get_schema_type(type_index, TypingPurpose::Input);
 
                 match modifier.unit_optionality() {
                     Optionality::Mandatory => {
@@ -342,7 +338,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 argument.name(),
                 &self
                     .schema_ctx
-                    .indexed_type_info(type_index, argument.typing_purpose()),
+                    .get_schema_type(type_index, argument.typing_purpose()),
             ),
             ArgKind::Operator(operator_id) => self.get_operator_argument(
                 argument.name(),
@@ -361,12 +357,11 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         typing_purpose: TypingPurpose,
     ) -> juniper::Type<'r>
     where
-        I: juniper::GraphQLType<GqlScalar>
-            + juniper::GraphQLType<GqlScalar, TypeInfo = IndexedTypeInfo>,
+        I: juniper::GraphQLType<GqlScalar> + juniper::GraphQLType<GqlScalar, TypeInfo = SchemaType>,
     {
         match type_ref.unit {
-            UnitTypeRef::Indexed(type_index) => self.get_modified_type::<I>(
-                &IndexedTypeInfo {
+            UnitTypeRef::Indexed(type_index) => self.modified_type::<I>(
+                &SchemaType {
                     schema_ctx: self.schema_ctx.clone(),
                     type_index,
                     typing_purpose,
@@ -377,23 +372,19 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 NativeScalarKind::Unit => {
                     todo!("Unit type")
                 }
-                NativeScalarKind::Boolean => self.get_modified_type::<bool>(&(), type_ref.modifier),
-                NativeScalarKind::Int(_) => self.get_modified_type::<i32>(&(), type_ref.modifier),
-                NativeScalarKind::Number(_) => {
-                    self.get_modified_type::<f64>(&(), type_ref.modifier)
-                }
+                NativeScalarKind::Boolean => self.modified_type::<bool>(&(), type_ref.modifier),
+                NativeScalarKind::Int(_) => self.modified_type::<i32>(&(), type_ref.modifier),
+                NativeScalarKind::Number(_) => self.modified_type::<f64>(&(), type_ref.modifier),
                 NativeScalarKind::String => {
-                    self.get_modified_type::<std::string::String>(&(), type_ref.modifier)
+                    self.modified_type::<std::string::String>(&(), type_ref.modifier)
                 }
-                NativeScalarKind::ID => {
-                    self.get_modified_type::<juniper::ID>(&(), type_ref.modifier)
-                }
+                NativeScalarKind::ID => self.modified_type::<juniper::ID>(&(), type_ref.modifier),
             },
         }
     }
 
     #[inline]
-    fn get_modified_type<T>(
+    fn modified_type<T>(
         &mut self,
         type_info: &<T as GraphQLValue<GqlScalar>>::TypeInfo,
         modifier: TypeModifier,
@@ -421,16 +412,16 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         }
     }
 
-    fn native_arg<T, I>(
+    fn modified_arg<T>(
         &mut self,
         name: &str,
         modifier: TypeModifier,
-        type_info: &I,
+        type_info: &<T as GraphQLValue<GqlScalar>>::TypeInfo,
     ) -> juniper::meta::Argument<'r, GqlScalar>
     where
         T: juniper::GraphQLType<GqlScalar>
             + juniper::FromInputValue<GqlScalar>
-            + juniper::GraphQLValue<GqlScalar, TypeInfo = I>,
+            + juniper::GraphQLValue<GqlScalar>,
     {
         match modifier {
             TypeModifier::Unit(Optionality::Mandatory) => self.registry.arg::<T>(name, type_info),

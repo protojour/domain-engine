@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use domain_engine_core::{data_store::DataStoreAPIMock, DomainEngine};
-use domain_engine_juniper::{GqlContext, Schema};
+use domain_engine_juniper::{context::ServiceCtx, Schema};
 use fnv::FnvHashMap;
 use juniper::{graphql_value, InputValue};
 use ontol_runtime::{
@@ -29,7 +29,7 @@ fn conduit_db_only() -> TestPackages {
 async fn test_graphql_in_memory_conduit_db() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
-    let gql_context: GqlContext = DomainEngine::test_builder(test.ontology.clone())
+    let gql_context: ServiceCtx = DomainEngine::test_builder(test.ontology.clone())
         .build()
         .into();
 
@@ -90,7 +90,7 @@ async fn test_graphql_in_memory_conduit_db() {
 async fn test_graphql_in_memory_conduit_db_create_with_foreign_reference() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
-    let gql_context: GqlContext = DomainEngine::test_builder(test.ontology.clone())
+    let gql_context: ServiceCtx = DomainEngine::test_builder(test.ontology.clone())
         .build()
         .into();
 
@@ -159,7 +159,7 @@ async fn test_graphql_in_memory_conduit_db_create_with_foreign_reference() {
 async fn test_graphql_in_memory_conduit_db_query_article_with_tags() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
-    let gql_context: GqlContext = DomainEngine::test_builder(test.ontology.clone())
+    let gql_context: ServiceCtx = DomainEngine::test_builder(test.ontology.clone())
         .build()
         .into();
 
@@ -242,8 +242,8 @@ impl BlogPostConduit {
         }
     }
 
-    fn gql_context(&self) -> GqlContext {
-        GqlContext {
+    fn gql_context(&self) -> ServiceCtx {
+        ServiceCtx {
             domain_engine: self.domain_engine.clone(),
         }
     }

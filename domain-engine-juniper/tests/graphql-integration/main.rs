@@ -1,7 +1,9 @@
 use std::{fmt::Display, sync::Arc};
 
 use domain_engine_core::{data_store::DataStoreAPIMock, DomainEngine};
-use domain_engine_juniper::{create_graphql_schema, gql_scalar::GqlScalar, GqlContext, Schema};
+use domain_engine_juniper::{
+    context::ServiceCtx, create_graphql_schema, gql_scalar::GqlScalar, Schema,
+};
 use ontol_test_utils::{OntolTest, SourceName, TestCompile};
 use unimock::*;
 
@@ -82,8 +84,8 @@ pub fn gql_ctx_mock_data_store(
     ontol_test: &OntolTest,
     data_store_package: SourceName,
     setup: impl unimock::Clause,
-) -> GqlContext {
-    GqlContext {
+) -> ServiceCtx {
+    ServiceCtx {
         domain_engine: Arc::new(
             DomainEngine::test_builder(ontol_test.ontology.clone())
                 .mock_data_store(ontol_test.get_package_id(data_store_package.0), setup)
@@ -97,7 +99,7 @@ trait Exec {
     async fn exec(
         self,
         schema: &Schema,
-        context: &GqlContext,
+        context: &ServiceCtx,
         variables: impl Into<juniper::Variables<GqlScalar>> + Send,
     ) -> Result<juniper::Value<GqlScalar>, TestError>;
 }
@@ -107,7 +109,7 @@ impl Exec for &'static str {
     async fn exec(
         self,
         schema: &Schema,
-        context: &GqlContext,
+        context: &ServiceCtx,
         variables: impl Into<juniper::Variables<GqlScalar>> + Send,
     ) -> Result<juniper::Value<GqlScalar>, TestError> {
         let variables = variables.into();

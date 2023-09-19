@@ -8,10 +8,10 @@ use ontol_runtime::{
 use tracing::{debug, warn};
 
 use crate::{
+    context::SchemaType,
     gql_scalar::GqlScalar,
     macros::impl_graphql_value,
     registry_ctx::{ArgumentFilter, RegistryCtx},
-    schema_ctx::IndexedTypeInfo,
 };
 
 pub struct IndexedInputValue;
@@ -19,12 +19,12 @@ pub struct IndexedInputValue;
 impl_graphql_value!(IndexedInputValue);
 
 impl juniper::GraphQLType<GqlScalar> for IndexedInputValue {
-    fn name(info: &IndexedTypeInfo) -> Option<&str> {
+    fn name(info: &SchemaType) -> Option<&str> {
         Some(info.typename())
     }
 
     fn meta<'r>(
-        info: &Self::TypeInfo,
+        info: &SchemaType,
         registry: &mut juniper::Registry<'r, GqlScalar>,
     ) -> juniper::meta::MetaType<'r, GqlScalar>
     where

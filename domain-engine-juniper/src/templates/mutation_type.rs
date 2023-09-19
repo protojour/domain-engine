@@ -5,13 +5,14 @@ use ontol_runtime::query::{Query, StructOrUnionQuery};
 use ontol_runtime::value::ValueDebug;
 use tracing::trace;
 
+use crate::context::SchemaType;
 use crate::{
     gql_scalar::GqlScalar,
     look_ahead_utils::ArgsWrapper,
     macros::impl_graphql_value,
     query_analyzer::QueryAnalyzer,
     registry_ctx::RegistryCtx,
-    templates::{attribute_type::AttributeType, resolve_indexed_schema_field},
+    templates::{attribute_type::AttributeType, resolve_schema_type_field},
 };
 
 pub struct MutationType;
@@ -19,12 +20,12 @@ pub struct MutationType;
 impl_graphql_value!(MutationType);
 
 impl juniper::GraphQLType<GqlScalar> for MutationType {
-    fn name(info: &Self::TypeInfo) -> Option<&str> {
+    fn name(info: &SchemaType) -> Option<&str> {
         Some(info.typename())
     }
 
     fn meta<'r>(
-        info: &Self::TypeInfo,
+        info: &SchemaType,
         registry: &mut juniper::Registry<'r, GqlScalar>,
     ) -> juniper::meta::MetaType<'r, GqlScalar>
     where
@@ -43,7 +44,7 @@ impl juniper::GraphQLValueAsync<GqlScalar> for MutationType {
     /// TODO: Might implement resolve_async instead, so we can have just one query
     fn resolve_field_async<'a>(
         &'a self,
-        info: &'a Self::TypeInfo,
+        info: &'a SchemaType,
         field_name: &'a str,
         _arguments: &'a juniper::Arguments<GqlScalar>,
         executor: &'a juniper::Executor<Self::Context, GqlScalar>,
@@ -79,12 +80,12 @@ impl juniper::GraphQLValueAsync<GqlScalar> for MutationType {
                         .store_new_entity(input_attribute.value, query)
                         .await?;
 
-                    resolve_indexed_schema_field(
+                    resolve_schema_type_field(
                         AttributeType {
                             attr: &value.into(),
                         },
                         schema_ctx
-                            .indexed_type_info_by_unit(
+                            .find_schema_type_by_unit(
                                 field_data.field_type.unit,
                                 TypingPurpose::Selection,
                             )

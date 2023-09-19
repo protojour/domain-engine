@@ -5,7 +5,7 @@ use domain_engine_juniper::{gql_scalar::GqlScalar, juniper};
 
 pub struct GraphqlService {
     pub schema: domain_engine_juniper::Schema,
-    pub gql_context: domain_engine_juniper::GqlContext,
+    pub service_ctx: domain_engine_juniper::context::ServiceCtx,
     pub endpoint_url: String,
 }
 
@@ -17,7 +17,7 @@ pub async fn graphql_handler(
     axum::Json<juniper::http::GraphQLBatchResponse<GqlScalar>>,
 ) {
     let response = batch_request
-        .execute(&service.schema, &service.gql_context)
+        .execute(&service.schema, &service.service_ctx)
         .await;
 
     (

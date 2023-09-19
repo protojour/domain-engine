@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use domain_engine_core::DomainEngine;
-use domain_engine_juniper::{create_graphql_schema, juniper, GqlContext, Schema};
+use domain_engine_juniper::{create_graphql_schema, juniper, Schema};
 use ontol_runtime::{ontology::Ontology, PackageId};
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
@@ -12,7 +12,7 @@ use crate::{wasm_error::WasmError, wasm_util::js_serializer};
 pub struct WasmGraphqlSchema {
     pub(crate) ontology: Arc<Ontology>,
     pub(crate) schema: Schema,
-    domain_engine: Arc<DomainEngine>,
+    service_ctx: domain_engine_juniper::context::ServiceCtx,
 }
 
 #[wasm_bindgen]
@@ -21,7 +21,7 @@ impl WasmGraphqlSchema {
         ontology: Arc<Ontology>,
         package_id: PackageId,
     ) -> Result<Self, WasmError> {
-        // Since the domain engine current gets created here,
+        // Since the domain engine currently gets created here,
         // its data store (if any) won't be shared with other interfaces.
         let domain_engine = DomainEngine::builder(ontology.clone()).build();
 
@@ -30,7 +30,7 @@ impl WasmGraphqlSchema {
         Ok(Self {
             ontology,
             schema,
-            domain_engine: Arc::new(domain_engine),
+            service_ctx: Arc::new(domain_engine).into(),
         })
     }
 
@@ -40,10 +40,6 @@ impl WasmGraphqlSchema {
         operation_name: Option<String>,
         variables: JsValue,
     ) -> Result<JsValue, WasmError> {
-        let gql_context = GqlContext {
-            domain_engine: self.domain_engine.clone(),
-        };
-
         let juniper_variables = serde_wasm_bindgen::from_value(variables)?;
 
         let (value, execution_errors) = juniper::execute(
@@ -51,7 +47,7 @@ impl WasmGraphqlSchema {
             operation_name.as_deref(),
             &self.schema,
             &juniper_variables,
-            &gql_context,
+            &self.service_ctx,
         )
         .await?;
 

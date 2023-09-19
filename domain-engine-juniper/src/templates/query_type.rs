@@ -6,11 +6,12 @@ use ontol_runtime::{
 use tracing::debug;
 
 use crate::{
+    context::SchemaType,
     gql_scalar::GqlScalar,
     macros::impl_graphql_value,
     query_analyzer::QueryAnalyzer,
     registry_ctx::RegistryCtx,
-    templates::{attribute_type::AttributeType, resolve_indexed_schema_field},
+    templates::{attribute_type::AttributeType, resolve_schema_type_field},
 };
 
 pub struct QueryType;
@@ -18,12 +19,12 @@ pub struct QueryType;
 impl_graphql_value!(QueryType);
 
 impl juniper::GraphQLType<GqlScalar> for QueryType {
-    fn name(info: &Self::TypeInfo) -> Option<&str> {
+    fn name(info: &SchemaType) -> Option<&str> {
         Some(info.typename())
     }
 
     fn meta<'r>(
-        info: &Self::TypeInfo,
+        info: &SchemaType,
         registry: &mut juniper::Registry<'r, GqlScalar>,
     ) -> juniper::meta::MetaType<'r, GqlScalar>
     where
@@ -42,7 +43,7 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
     /// TODO: Might implement resolve_async instead, so we can have just one engine_api call?
     fn resolve_field_async<'a>(
         &'a self,
-        info: &'a Self::TypeInfo,
+        info: &'a SchemaType,
         field_name: &'a str,
         _arguments: &'a juniper::Arguments<GqlScalar>,
         executor: &'a juniper::Executor<Self::Context, GqlScalar>,
@@ -69,13 +70,10 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
 
             debug!("query result: {}", ValueDebug(&attribute.value));
 
-            resolve_indexed_schema_field(
+            resolve_schema_type_field(
                 AttributeType { attr: &attribute },
                 schema_ctx
-                    .indexed_type_info_by_unit(
-                        query_field.field_type.unit,
-                        TypingPurpose::Selection,
-                    )
+                    .find_schema_type_by_unit(query_field.field_type.unit, TypingPurpose::Selection)
                     .unwrap(),
                 executor,
             )

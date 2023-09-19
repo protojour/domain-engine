@@ -19,29 +19,37 @@ use ontol_runtime::{
 use tracing::debug;
 
 use crate::{
+    context::{SchemaCtx, SchemaType},
     gql_scalar::{GqlScalar, GqlScalarSerializer},
     registry_ctx::RegistryCtx,
-    schema_ctx::{IndexedTypeInfo, SchemaCtx},
-    templates::{resolve_indexed_schema_field, sequence_type::SequenceType},
-    GqlContext,
+    templates::{resolve_schema_type_field, sequence_type::SequenceType},
+    ServiceCtx,
 };
 
 use super::indexed_input_value::IndexedInputValue;
 
+/// AttributeType combines two things:
+///
+/// 1. An ONTOL Attribute
+/// 2. A SchemaType, metadata info about a GraphQL type
+///
+/// and combines this information to derive GraphQL resolver logic for the data.
+///
+/// AttributeType is an output type, not used for input values.
 #[derive(Clone, Copy)]
 pub struct AttributeType<'v> {
     pub attr: &'v Attribute,
 }
 
 impl<'v> ::juniper::GraphQLValue<GqlScalar> for AttributeType<'v> {
-    type Context = GqlContext;
-    type TypeInfo = IndexedTypeInfo;
+    type Context = ServiceCtx;
+    type TypeInfo = SchemaType;
 
-    fn type_name<'i>(&self, info: &'i Self::TypeInfo) -> Option<&'i str> {
+    fn type_name<'i>(&self, info: &'i SchemaType) -> Option<&'i str> {
         Some(info.typename())
     }
 
-    fn concrete_type_name(&self, _context: &Self::Context, info: &Self::TypeInfo) -> String {
+    fn concrete_type_name(&self, _context: &ServiceCtx, info: &SchemaType) -> String {
         match &info.type_data().kind {
             TypeKind::Union(union_data) => {
                 let (_, variant_data) = self.find_union_variant(union_data, &info.schema_ctx);
@@ -55,7 +63,7 @@ impl<'v> ::juniper::GraphQLValue<GqlScalar> for AttributeType<'v> {
 
     fn resolve_into_type(
         &self,
-        info: &Self::TypeInfo,
+        info: &SchemaType,
         _type_name: &str,
         selection_set: Option<&[juniper::Selection<GqlScalar>]>,
         executor: &juniper::Executor<Self::Context, GqlScalar>,
@@ -66,7 +74,7 @@ impl<'v> ::juniper::GraphQLValue<GqlScalar> for AttributeType<'v> {
                 self.resolve(
                     &info
                         .schema_ctx
-                        .indexed_type_info(variant_type_index, TypingPurpose::Selection),
+                        .get_schema_type(variant_type_index, TypingPurpose::Selection),
                     selection_set,
                     executor,
                 )
@@ -77,7 +85,7 @@ impl<'v> ::juniper::GraphQLValue<GqlScalar> for AttributeType<'v> {
 
     fn resolve_field(
         &self,
-        info: &Self::TypeInfo,
+        info: &SchemaType,
         field_name: &str,
         _arguments: &juniper::Arguments<crate::gql_scalar::GqlScalar>,
         executor: &juniper::Executor<Self::Context, crate::gql_scalar::GqlScalar>,
@@ -95,12 +103,12 @@ impl<'v> ::juniper::GraphQLValue<GqlScalar> for AttributeType<'v> {
 }
 
 impl<'v> juniper::GraphQLType<GqlScalar> for AttributeType<'v> {
-    fn name(info: &Self::TypeInfo) -> Option<&str> {
+    fn name(info: &SchemaType) -> Option<&str> {
         Some(info.typename())
     }
 
     fn meta<'r>(
-        info: &Self::TypeInfo,
+        info: &SchemaType,
         registry: &mut juniper::Registry<'r, GqlScalar>,
     ) -> juniper::meta::MetaType<'r, GqlScalar>
     where
@@ -121,7 +129,7 @@ impl<'v> juniper::GraphQLType<GqlScalar> for AttributeType<'v> {
                     .variants
                     .iter()
                     .map(|type_index| {
-                        reg.registry.get_type::<AttributeType>(&IndexedTypeInfo {
+                        reg.registry.get_type::<AttributeType>(&SchemaType {
                             schema_ctx: info.schema_ctx.clone(),
                             type_index: *type_index,
                             typing_purpose: TypingPurpose::Selection,
@@ -192,7 +200,7 @@ impl<'v> AttributeType<'v> {
         schema_ctx: &Arc<SchemaCtx>,
         object_data: &ObjectData,
         field_name: &str,
-        executor: &juniper::Executor<GqlContext, GqlScalar>,
+        executor: &juniper::Executor<ServiceCtx, GqlScalar>,
     ) -> juniper::ExecutionResult<crate::gql_scalar::GqlScalar> {
         let field_data = object_data.fields.get(field_name).unwrap();
         let field_type = field_data.field_type;
@@ -200,17 +208,17 @@ impl<'v> AttributeType<'v> {
         debug!("resolve object field `{field_name}`: {:?}", self.attr);
 
         match (&field_data.kind, &self.attr.value.data) {
-            (FieldKind::Edges, Data::Sequence(seq)) => resolve_indexed_schema_field(
+            (FieldKind::Edges, Data::Sequence(seq)) => resolve_schema_type_field(
                 SequenceType { seq },
                 schema_ctx
-                    .indexed_type_info_by_unit(field_type.unit, TypingPurpose::Selection)
+                    .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
                     .unwrap(),
                 executor,
             ),
-            (FieldKind::Node, Data::Struct(_)) => resolve_indexed_schema_field(
+            (FieldKind::Node, Data::Struct(_)) => resolve_schema_type_field(
                 self,
                 schema_ctx
-                    .indexed_type_info_by_unit(field_type.unit, TypingPurpose::Selection)
+                    .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
                     .unwrap(),
                 executor,
             ),
@@ -222,11 +230,11 @@ impl<'v> AttributeType<'v> {
                 Data::Struct(attrs),
             ) => {
                 let type_info = schema_ctx
-                    .indexed_type_info_by_unit(field_type.unit, TypingPurpose::Selection)
+                    .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
                     .unwrap();
 
                 match attrs.get(property_id) {
-                    Some(attribute) => resolve_indexed_schema_field(
+                    Some(attribute) => resolve_schema_type_field(
                         AttributeType { attr: attribute },
                         type_info,
                         executor,
@@ -237,7 +245,7 @@ impl<'v> AttributeType<'v> {
                             rel_params: Value::unit(),
                         };
 
-                        resolve_indexed_schema_field(
+                        resolve_schema_type_field(
                             AttributeType { attr: &empty },
                             type_info,
                             executor,
@@ -283,7 +291,7 @@ impl<'v> AttributeType<'v> {
         property_id: PropertyId,
         type_ref: TypeRef,
         schema_ctx: &Arc<SchemaCtx>,
-        executor: &juniper::Executor<GqlContext, crate::gql_scalar::GqlScalar>,
+        executor: &juniper::Executor<ServiceCtx, crate::gql_scalar::GqlScalar>,
     ) -> juniper::ExecutionResult<crate::gql_scalar::GqlScalar> {
         let attribute = match map.get(&property_id) {
             Some(attribute) => attribute,
@@ -294,7 +302,7 @@ impl<'v> AttributeType<'v> {
 
         match schema_ctx.lookup_type_index(type_ref.unit) {
             Ok(type_index) => {
-                let type_info = schema_ctx.indexed_type_info(type_index, TypingPurpose::Selection);
+                let type_info = schema_ctx.get_schema_type(type_index, TypingPurpose::Selection);
                 match &schema_ctx.type_data(type_info.type_index).kind {
                     TypeKind::CustomScalar(scalar_data) => {
                         let gql_scalar = schema_ctx
@@ -308,7 +316,7 @@ impl<'v> AttributeType<'v> {
 
                         Ok(juniper::Value::Scalar(gql_scalar))
                     }
-                    TypeKind::Object(_) | TypeKind::Union(_) => resolve_indexed_schema_field(
+                    TypeKind::Object(_) | TypeKind::Union(_) => resolve_schema_type_field(
                         AttributeType { attr: attribute },
                         type_info,
                         executor,

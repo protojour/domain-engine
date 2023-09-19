@@ -12,9 +12,7 @@ use ontol_runtime::{
 use smartstring::alias::String;
 use tracing::debug;
 
-use crate::{
-    gql_scalar::GqlScalar, look_ahead_utils::ArgsWrapper, schema_ctx::SchemaCtx, GqlContext,
-};
+use crate::{context::SchemaCtx, gql_scalar::GqlScalar, look_ahead_utils::ArgsWrapper, ServiceCtx};
 
 pub struct KeyedPropertySelection {
     pub key: PropertyId,
@@ -23,11 +21,11 @@ pub struct KeyedPropertySelection {
 
 pub struct QueryAnalyzer<'a> {
     schema_ctx: &'a SchemaCtx,
-    gql_ctx: &'a GqlContext,
+    gql_ctx: &'a ServiceCtx,
 }
 
 impl<'a> QueryAnalyzer<'a> {
-    pub fn new(schema_ctx: &'a SchemaCtx, gql_ctx: &'a GqlContext) -> Self {
+    pub fn new(schema_ctx: &'a SchemaCtx, gql_ctx: &'a ServiceCtx) -> Self {
         Self {
             schema_ctx,
             gql_ctx,
