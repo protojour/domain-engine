@@ -67,6 +67,11 @@ impl Backend {
                 Err(err) => {
                     restart = false;
                     for err in err.errors {
+                        // handle caught panics
+                        if let ontol_compiler::CompileError::BUG(err) = &err.error {
+                            self.client.show_message(MessageType::ERROR, err).await;
+                        }
+
                         // handle missing packages if any
                         let mut data: Value = json!({});
                         if let ontol_compiler::CompileError::PackageNotFound(reference) = &err.error

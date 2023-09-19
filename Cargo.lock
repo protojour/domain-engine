@@ -1468,7 +1468,7 @@ dependencies = [
 
 [[package]]
 name = "ontol-lsp"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "async-compat",
  "chumsky",
@@ -1483,6 +1483,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "smartstring",
  "substring",
  "tokio",
  "tower-lsp",
@@ -1548,7 +1549,7 @@ dependencies = [
 
 [[package]]
 name = "ontool"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "ariadne",
  "bincode",

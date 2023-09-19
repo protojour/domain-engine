@@ -2,7 +2,7 @@
   "name": "ontol",
   "displayName": "ONTOL",
   "description": "ONTOL language support for VS Code",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "Protojour",
   "license": "MIT",
   "private": true,

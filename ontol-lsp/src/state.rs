@@ -6,7 +6,8 @@ use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
     package::{GraphState, PackageGraphBuilder, PackageReference, ParsedPackage},
-    Compiler, SourceCodeRegistry, SourceId, SourceSpan, Sources,
+    CompileError, Compiler, SourceCodeRegistry, SourceId, SourceSpan, Sources, SpannedCompileError,
+    NO_SPAN,
 };
 use ontol_parser::{
     ast::{
@@ -16,12 +17,13 @@ use ontol_parser::{
     lexer::lexer,
     parse_statements, Spanned, Token,
 };
-use ontol_runtime::config::PackageConfig;
+use ontol_runtime::{config::PackageConfig, smart_format};
 use regex::Regex;
 use std::{
     collections::{HashMap, HashSet},
     format,
     io::Error,
+    panic::{self},
 };
 use substring::Substring;
 
@@ -205,9 +207,27 @@ impl State {
             }
         };
 
-        let mem = Mem::default();
-        let mut compiler = Compiler::new(&mem, ontol_sources.clone()).with_ontol();
-        compiler.compile_package_topology(topology)
+        panic::catch_unwind(|| {
+            let mem = Mem::default();
+            let mut compiler = Compiler::new(&mem, ontol_sources.clone()).with_ontol();
+            compiler.compile_package_topology(topology)
+        })
+        .unwrap_or_else(|err| {
+            let message = if let Some(message) = err.downcast_ref::<&str>() {
+                smart_format!("Caught unexpected error: {message}")
+            } else {
+                smart_format!("Caught unknown error.")
+            };
+            Err(UnifiedCompileError {
+                errors: vec![
+                    (SpannedCompileError {
+                        error: CompileError::BUG(message),
+                        span: NO_SPAN,
+                        notes: vec![],
+                    }),
+                ],
+            })
+        })
     }
 
     /// Get Document if given SourceId is known
