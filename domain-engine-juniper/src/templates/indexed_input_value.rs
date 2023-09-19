@@ -1,5 +1,9 @@
-use ontol_runtime::interface::graphql::data::{
-    EdgeData, ObjectData, ObjectKind, TypeKind, TypeRef,
+use std::str::FromStr;
+
+use juniper::{ParseError, ScalarToken};
+use ontol_runtime::{
+    interface::graphql::data::{EdgeData, ObjectData, ObjectKind, TypeKind, TypeRef},
+    smart_format,
 };
 use tracing::{debug, warn};
 
@@ -102,7 +106,21 @@ impl juniper::FromInputValue<GqlScalar> for IndexedInputValue {
 }
 
 impl juniper::ParseScalarValue<GqlScalar> for IndexedInputValue {
-    fn from_str(_value: juniper::parser::ScalarToken<'_>) -> juniper::ParseScalarResult<GqlScalar> {
-        panic!("TODO: this won't work")
+    fn from_str(value: juniper::parser::ScalarToken<'_>) -> juniper::ParseScalarResult<GqlScalar> {
+        match value {
+            ScalarToken::String(str) => Ok(GqlScalar::String(str.into())),
+            ScalarToken::Float(str) => <f64 as FromStr>::from_str(str)
+                .map_err(|err| ParseError::UnexpectedToken(smart_format!("{err}")))
+                .map(GqlScalar::F64),
+            ScalarToken::Int(str) => {
+                <i32 as FromStr>::from_str(str)
+                    .map(GqlScalar::I32)
+                    .or_else(|_| {
+                        <i64 as FromStr>::from_str(str)
+                            .map(GqlScalar::I64)
+                            .map_err(|err| ParseError::UnexpectedToken(smart_format!("{err}")))
+                    })
+            }
+        }
     }
 }

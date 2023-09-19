@@ -91,6 +91,14 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                 };
                 Value::new(Data::I64(int), *def_id)
             }
+            SerdeOperator::I32(def_id, range) => {
+                let int: i32 = if let Some(range) = range {
+                    self.rng.gen_range(range.clone())
+                } else {
+                    self.rng.gen()
+                };
+                Value::new(Data::I64(int as i64), *def_id)
+            }
             SerdeOperator::F64(def_id, range) => {
                 let float: f64 = if let Some(range) = range {
                     self.rng.gen_range(range.clone())

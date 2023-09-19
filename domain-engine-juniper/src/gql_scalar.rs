@@ -8,7 +8,10 @@ use smartstring::alias::String;
 #[derive(Clone, PartialEq, Debug)]
 pub enum GqlScalar {
     Unit,
+    /// The standard Int type for GraphQL is an i32.
     I32(i32),
+    /// Memoriam supports the i64 custom scalar in GraphQL.
+    I64(i64),
     F64(f64),
     Boolean(bool),
     String(String),
@@ -49,6 +52,7 @@ impl Display for GqlScalar {
         match self {
             Self::Unit => write!(f, "{{}}"),
             Self::I32(i) => write!(f, "{i}"),
+            Self::I64(i) => write!(f, "{i}"),
             Self::F64(f64) => write!(f, "{f64}"),
             Self::Boolean(b) => write!(f, "{b}"),
             Self::String(s) => write!(f, "{s}"),
@@ -118,6 +122,7 @@ impl ser::Serialize for GqlScalar {
         match self {
             Self::Unit => serializer.serialize_unit(),
             Self::I32(i) => serializer.serialize_i32(*i),
+            Self::I64(i) => serializer.serialize_i64(*i),
             Self::F64(f) => serializer.serialize_f64(*f),
             Self::Boolean(b) => serializer.serialize_bool(*b),
             Self::String(s) => serializer.serialize_str(s),
@@ -140,28 +145,14 @@ impl<'de> de::Visitor<'de> for ScalarDeserializeVisitor {
     }
 
     fn visit_i64<E: de::Error>(self, v: i64) -> Result<GqlScalar, E> {
-        if v >= i64::from(i32::min_value()) && v <= i64::from(i32::max_value()) {
-            Ok(GqlScalar::I32(v as i32))
-        } else {
-            // Browser's JSON.stringify serialize all numbers having no
-            // fractional part as integers (no decimal point), so we
-            // must parse large integers as floating point otherwise
-            // we would error on transferring large floating point
-            // numbers.
-            Ok(GqlScalar::F64(v as f64))
-        }
+        Ok(GqlScalar::I64(v))
     }
 
     fn visit_u64<E: de::Error>(self, v: u64) -> Result<GqlScalar, E> {
-        if v <= i32::max_value() as u64 {
+        if v <= i64::max_value() as u64 {
             self.visit_i64(v as i64)
         } else {
-            // Browser's JSON.stringify serialize all numbers having no
-            // fractional part as integers (no decimal point), so we
-            // must parse large integers as floating point otherwise
-            // we would error on transferring large floating point
-            // numbers.
-            Ok(GqlScalar::F64(v as f64))
+            Err(E::custom("Overflow converting u64 to i64"))
         }
     }
 
@@ -228,11 +219,9 @@ impl ser::Serializer for GqlScalarSerializer {
 
     fn serialize_i64(self, value: i64) -> SerResult {
         if value >= i32::MIN as i64 && value <= i32::MAX as i64 {
-            // BUG: This hack doesn't belong here.
-            // What GraphQL should do is to use a proper SerdeOperator::I32 that calls serialize_i32.
             Ok(GqlScalar::I32(value as i32))
         } else {
-            Ok(GqlScalar::F64(value as f64))
+            Ok(GqlScalar::I64(value))
         }
     }
 
@@ -252,18 +241,27 @@ impl ser::Serializer for GqlScalarSerializer {
         Ok(GqlScalar::I32(value as i32))
     }
 
-    fn serialize_u32(self, _value: u32) -> SerResult {
-        // FIXME
-        Err(GqlScalarError(smart_format!("u32 does not fit in i32")))
+    fn serialize_u32(self, value: u32) -> SerResult {
+        let int_i64 = value as i64;
+        if int_i64 < (i32::MAX as i64) {
+            Ok(GqlScalar::I32(int_i64 as i32))
+        } else {
+            Ok(GqlScalar::I64(int_i64))
+        }
     }
 
-    fn serialize_u64(self, _value: u64) -> SerResult {
-        // FIXME
-        Err(GqlScalarError(smart_format!("u64 too big")))
+    fn serialize_u64(self, value: u64) -> SerResult {
+        let int_i64: i64 = value
+            .try_into()
+            .map_err(|_| GqlScalarError(smart_format!("u64 -> i64 overflow")))?;
+        self.serialize_i64(int_i64)
     }
 
-    fn serialize_u128(self, _value: u128) -> SerResult {
-        Err(GqlScalarError(smart_format!("u128 too big")))
+    fn serialize_u128(self, value: u128) -> SerResult {
+        let int_i64: i64 = value
+            .try_into()
+            .map_err(|_| GqlScalarError(smart_format!("u128 -> i64 overflow")))?;
+        self.serialize_i64(int_i64)
     }
 
     fn serialize_f32(self, v: f32) -> SerResult {

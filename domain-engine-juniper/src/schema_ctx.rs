@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use ontol_runtime::{
     interface::graphql::{
-        data::{NativeScalarRef, TypeData, TypeIndex, UnitTypeRef},
+        data::{NativeScalarRef, TypeData, TypeIndex, TypeKind, UnitTypeRef},
         schema::{GraphqlSchema, QueryLevel, TypingPurpose},
     },
     ontology::Ontology,
@@ -94,13 +94,15 @@ impl IndexedTypeInfo {
 
     pub fn typename(&self) -> &str {
         let type_data = &self.type_data();
-        match self.typing_purpose {
-            TypingPurpose::Selection => &type_data.typename,
-            TypingPurpose::Input | TypingPurpose::ReferenceInput => type_data
-                .input_typename
-                .as_deref()
-                .expect("No input typename available"),
-            TypingPurpose::PartialInput => type_data
+        match (&type_data.kind, self.typing_purpose) {
+            (TypeKind::CustomScalar(_), _) => &type_data.typename,
+            (_, TypingPurpose::Selection) => &type_data.typename,
+            (_, TypingPurpose::Input | TypingPurpose::ReferenceInput) => {
+                type_data.input_typename.as_deref().unwrap_or_else(|| {
+                    panic!("No input typename available for `{}`", type_data.typename)
+                })
+            }
+            (_, TypingPurpose::PartialInput) => type_data
                 .partial_input_typename
                 .as_deref()
                 .expect("No partial input typename available"),

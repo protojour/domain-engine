@@ -1,5 +1,5 @@
 use serde::{
-    ser::{SerializeMap, SerializeSeq},
+    ser::{Error, SerializeMap, SerializeSeq},
     Serializer,
 };
 use smartstring::alias::String;
@@ -9,6 +9,7 @@ use tracing::debug;
 use crate::{
     cast::Cast,
     interface::serde::processor::RecursionLimitError,
+    smart_format,
     text_pattern::FormatPattern,
     value::{Attribute, Data, FormatDataAsText, Value},
 };
@@ -43,9 +44,27 @@ impl<'e> SerdeProcessor<'e> {
             SerdeOperator::False(_) => serializer.serialize_bool(false),
             SerdeOperator::True(_) => serializer.serialize_bool(true),
             SerdeOperator::Boolean(_) => serializer.serialize_bool(*cast_ref::<bool>(value)),
-            SerdeOperator::I64(..) | SerdeOperator::F64(..) => {
-                self.serialize_number(value, serializer)
+            SerdeOperator::I64(..) => match &value.data {
+                Data::I64(int) => serializer.serialize_i64(*int),
+                Data::F64(f) => serializer.serialize_i64((*f).round() as i64),
+                other => panic!("BUG: Serialize expected number, got {other:?}"),
+            },
+            SerdeOperator::I32(..) => {
+                let int_i64: i64 = match &value.data {
+                    Data::I64(int) => *int,
+                    Data::F64(f) => (*f).round() as i64,
+                    other => panic!("BUG: Serialize expected number, got {other:?}"),
+                };
+
+                serializer.serialize_i32(int_i64.try_into().map_err(|err| {
+                    S::Error::custom(smart_format!("overflow when converting to i32: {err:?}"))
+                })?)
             }
+            SerdeOperator::F64(..) => match &value.data {
+                Data::I64(num) => serializer.serialize_f64(*num as f64),
+                Data::F64(f) => serializer.serialize_f64(*f),
+                other => panic!("BUG: Serialize expected number, got {other:?}"),
+            },
             SerdeOperator::String(def_id)
             | SerdeOperator::StringConstant(_, def_id)
             | SerdeOperator::TextPattern(def_id) => match &value.data {
@@ -138,14 +157,6 @@ impl<'e> SerdeProcessor<'e> {
 }
 
 impl<'e> SerdeProcessor<'e> {
-    fn serialize_number<S: Serializer>(&self, value: &Value, serializer: S) -> Res<S> {
-        match &value.data {
-            Data::I64(num) => serializer.serialize_i64(*num),
-            Data::F64(f) => serializer.serialize_f64(*f),
-            other => panic!("BUG: Serialize expected number, got {other:?}"),
-        }
-    }
-
     fn serialize_sequence<S: Serializer>(
         &self,
         elements: &[Attribute],

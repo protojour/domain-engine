@@ -132,6 +132,31 @@ impl ValueMatcher for NumberMatcher<i64> {
     }
 }
 
+impl ValueMatcher for NumberMatcher<i32> {
+    fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "integer{}", OptWithinRangeDisplay(&self.range))
+    }
+
+    fn match_u64(&self, value: u64) -> Result<Value, ()> {
+        u64_to_i64(value).and_then(|value| self.match_i64(value))
+    }
+
+    fn match_i64(&self, value: i64) -> Result<Value, ()> {
+        let value: i32 = value.try_into().map_err(|_| ())?;
+
+        if let Some(range) = &self.range {
+            if !range.contains(&value) {
+                return Err(());
+            }
+        }
+
+        Ok(Value {
+            data: Data::I64(value as i64),
+            type_def_id: self.def_id,
+        })
+    }
+}
+
 impl ValueMatcher for NumberMatcher<f64> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "float{}", OptWithinRangeDisplay(&self.range))

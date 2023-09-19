@@ -1,4 +1,7 @@
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::{
+    collections::{BTreeSet, HashMap, HashSet},
+    ops::RangeInclusive,
+};
 
 use indexmap::IndexMap;
 use ontol_runtime::{
@@ -425,14 +428,27 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             ReprKind::Scalar(def_id, ReprScalarKind::I64(range), _span) => {
                 Some(OperatorAllocation::Allocated(
                     self.alloc_operator_id(&def),
-                    SerdeOperator::I64(
-                        *def_id,
-                        if *range == (i64::MIN..=i64::MAX) {
-                            None
-                        } else {
-                            Some(range.clone())
-                        },
-                    ),
+                    // Use the I32 operator for GraphQL purposes (if the integer range is within i32's range)
+                    if *range.start() >= (i32::MIN as i64) && *range.end() <= (i32::MAX as i64) {
+                        let range = RangeInclusive::new(*range.start() as i32, *range.end() as i32);
+                        SerdeOperator::I32(
+                            *def_id,
+                            if range == (i32::MIN..=i32::MAX) {
+                                None
+                            } else {
+                                Some(range)
+                            },
+                        )
+                    } else {
+                        SerdeOperator::I64(
+                            *def_id,
+                            if *range == (i64::MIN..=i64::MAX) {
+                                None
+                            } else {
+                                Some(range.clone())
+                            },
+                        )
+                    },
                 ))
             }
             ReprKind::Scalar(def_id, ReprScalarKind::F64(range), _span) => {

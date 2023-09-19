@@ -138,6 +138,9 @@ impl<'a, 'de> de::Deserializer<'de> for LookAheadValueDeserializer<'a> {
             LookAheadValue::Scalar(GqlScalar::I32(value)) => {
                 visitor.visit_i32(*value).context(self.value)
             }
+            LookAheadValue::Scalar(GqlScalar::I64(value)) => {
+                visitor.visit_i64(*value).context(self.value)
+            }
             LookAheadValue::Scalar(GqlScalar::F64(value)) => {
                 visitor.visit_f64(*value).context(self.value)
             }

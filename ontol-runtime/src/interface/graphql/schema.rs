@@ -16,6 +16,7 @@ pub struct GraphqlSchema {
     pub package_id: PackageId,
     pub query: TypeIndex,
     pub mutation: TypeIndex,
+    pub i64_custom_scalar: Option<TypeIndex>,
     pub types: Vec<TypeData>,
     pub type_index_by_def: FnvHashMap<(DefId, QueryLevel), TypeIndex>,
 }

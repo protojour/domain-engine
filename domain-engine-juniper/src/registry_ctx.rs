@@ -191,7 +191,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         trace!("register argument '{name}': {operator:?}");
 
         if property_flags.contains(SerdePropertyFlags::ENTITY_ID) {
-            return self.get_native_argument::<ID>(name, modifier);
+            return self.native_arg::<ID, _>(name, modifier, &());
         }
 
         match operator {
@@ -199,17 +199,25 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 todo!("unit argument")
             }
             SerdeOperator::False(_) | SerdeOperator::True(_) | SerdeOperator::Boolean(_) => {
-                self.get_native_argument::<bool>(name, modifier)
+                self.native_arg::<bool, _>(name, modifier, &())
             }
-            SerdeOperator::I64(_, _) => return self.get_native_argument::<i32>(name, modifier),
-            SerdeOperator::F64(_, _) => return self.get_native_argument::<f64>(name, modifier),
-            SerdeOperator::String(_) => return self.get_native_argument::<String>(name, modifier),
+            SerdeOperator::I32(_, _) => return self.native_arg::<i32, _>(name, modifier, &()),
+            SerdeOperator::I64(_, _) => {
+                let i64_type_info = self.schema_ctx.indexed_type_info(
+                    self.schema_ctx.schema.i64_custom_scalar.unwrap(),
+                    TypingPurpose::Input,
+                );
+
+                self.native_arg::<IndexedInputValue, _>(name, modifier, &i64_type_info)
+            }
+            SerdeOperator::F64(_, _) => return self.native_arg::<f64, _>(name, modifier, &()),
+            SerdeOperator::String(_) => return self.native_arg::<String, _>(name, modifier, &()),
             SerdeOperator::StringConstant(_, _) => {
-                self.get_native_argument::<String>(name, modifier)
+                self.native_arg::<String, _>(name, modifier, &())
             }
-            SerdeOperator::TextPattern(_) => self.get_native_argument::<String>(name, modifier),
+            SerdeOperator::TextPattern(_) => self.native_arg::<String, _>(name, modifier, &()),
             SerdeOperator::CapturingTextPattern(_) => {
-                self.get_native_argument::<String>(name, modifier)
+                self.native_arg::<String, _>(name, modifier, &())
             }
             SerdeOperator::DynamicSequence => panic!("No dynamic sequence expected here"),
             SerdeOperator::RelationSequence(seq_op) => {
@@ -330,7 +338,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         argument: &dyn DomainFieldArg,
     ) -> juniper::meta::Argument<'r, GqlScalar> {
         match argument.kind() {
-            ArgKind::Def(type_index, _) => self.registry.arg::<IndexedInputValue>(
+            ArgKind::Indexed(type_index) => self.registry.arg::<IndexedInputValue>(
                 argument.name(),
                 &self
                     .schema_ctx
@@ -413,30 +421,33 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         }
     }
 
-    fn get_native_argument<T>(
+    fn native_arg<T, I>(
         &mut self,
         name: &str,
         modifier: TypeModifier,
+        type_info: &I,
     ) -> juniper::meta::Argument<'r, GqlScalar>
     where
         T: juniper::GraphQLType<GqlScalar>
             + juniper::FromInputValue<GqlScalar>
-            + juniper::GraphQLValue<GqlScalar, TypeInfo = ()>,
+            + juniper::GraphQLValue<GqlScalar, TypeInfo = I>,
     {
         match modifier {
-            TypeModifier::Unit(Optionality::Mandatory) => self.registry.arg::<T>(name, &()),
-            TypeModifier::Unit(Optionality::Optional) => self.registry.arg::<Option<T>>(name, &()),
+            TypeModifier::Unit(Optionality::Mandatory) => self.registry.arg::<T>(name, type_info),
+            TypeModifier::Unit(Optionality::Optional) => {
+                self.registry.arg::<Option<T>>(name, type_info)
+            }
             TypeModifier::Array(Optionality::Mandatory, Optionality::Mandatory) => {
-                self.registry.arg::<Vec<T>>(name, &())
+                self.registry.arg::<Vec<T>>(name, type_info)
             }
             TypeModifier::Array(Optionality::Mandatory, Optionality::Optional) => {
-                self.registry.arg::<Vec<Option<T>>>(name, &())
+                self.registry.arg::<Vec<Option<T>>>(name, type_info)
             }
             TypeModifier::Array(Optionality::Optional, Optionality::Mandatory) => {
-                self.registry.arg::<Option<Vec<T>>>(name, &())
+                self.registry.arg::<Option<Vec<T>>>(name, type_info)
             }
             TypeModifier::Array(Optionality::Optional, Optionality::Optional) => {
-                self.registry.arg::<Option<Vec<Option<T>>>>(name, &())
+                self.registry.arg::<Option<Vec<Option<T>>>>(name, type_info)
             }
         }
     }

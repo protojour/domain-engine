@@ -55,6 +55,7 @@ pub fn generate_graphql_schema<'c>(
         package_id,
         query: TypeIndex(0),
         mutation: TypeIndex(0),
+        i64_custom_scalar: None,
         types: Vec::with_capacity(domain.type_names.len()),
         type_index_by_def: FnvHashMap::with_capacity_and_hasher(
             domain.type_names.len(),
@@ -520,8 +521,10 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                     })
                 } else {
                     let type_info = self.partial_ontology.get_type_info(def_id);
+                    let type_index = self.alloc_def_type_index(type_info.def_id, QLevel::Node);
+                    self.schema.i64_custom_scalar = Some(type_index);
                     NewType::Indexed(
-                        self.alloc_def_type_index(type_info.def_id, QLevel::Node),
+                        type_index,
                         TypeData {
                             // FIXME: Must make sure that domain typenames take precedence over generated ones
                             typename: smart_format!("i64"),
@@ -738,6 +741,8 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
         let id_type_info = self.partial_ontology.get_type_info(entity_data.id_def_id);
         let id_operator_id = id_type_info.operator_id.expect("No id_operator_id");
 
+        let id_unit_type_ref = self.get_def_type_ref(entity_data.id_def_id, QLevel::Node);
+
         {
             let query = object_data_mut(self.schema.query, self.schema);
             query.fields.insert(
@@ -780,7 +785,10 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                             operator_id: entity_operator_id,
                             typing_purpose: TypingPurpose::PartialInput,
                         },
-                        id: argument::Id(id_operator_id),
+                        id: argument::Id {
+                            operator_id: id_operator_id,
+                            unit_type_ref: id_unit_type_ref,
+                        },
                     },
                     field_type: TypeRef::mandatory(node_ref),
                 },
@@ -790,7 +798,10 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 self.namespace.delete(type_info),
                 FieldData {
                     kind: FieldKind::DeleteMutation {
-                        id: argument::Id(id_operator_id),
+                        id: argument::Id {
+                            operator_id: id_operator_id,
+                            unit_type_ref: id_unit_type_ref,
+                        },
                     },
                     field_type: TypeRef::mandatory(UnitTypeRef::NativeScalar(NativeScalarRef {
                         operator_id: SerdeOperatorId(42),
@@ -819,7 +830,8 @@ fn get_native_scalar_kind(
         SerdeOperator::False(_) | SerdeOperator::True(_) | SerdeOperator::Boolean(_) => {
             NativeScalarKind::Boolean
         }
-        SerdeOperator::I64(def_id, _) => NativeScalarKind::Int(*def_id),
+        SerdeOperator::I64(..) => panic!("Must be a custom scalar"),
+        SerdeOperator::I32(def_id, _) => NativeScalarKind::Int(*def_id),
         SerdeOperator::F64(def_id, _) => NativeScalarKind::Number(*def_id),
         SerdeOperator::String(_)
         | SerdeOperator::StringConstant(..)
@@ -839,6 +851,7 @@ fn get_native_scalar_kind(
 }
 
 /// An extension of QueryLevel used only inside the generator
+#[derive(Clone, Copy)]
 pub enum QLevel {
     Node,
     Edge {

@@ -138,6 +138,13 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
                 }
                 .into_visitor_no_params(self),
             ),
+            SerdeOperator::I32(def_id, range) => deserializer.deserialize_i32(
+                NumberMatcher {
+                    def_id: *def_id,
+                    range: range.clone(),
+                }
+                .into_visitor_no_params(self),
+            ),
             SerdeOperator::F64(def_id, range) => deserializer.deserialize_f64(
                 NumberMatcher {
                     def_id: *def_id,
