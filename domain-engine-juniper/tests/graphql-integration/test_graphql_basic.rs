@@ -14,7 +14,9 @@ use unimock::*;
 
 use crate::{
     gql_ctx_mock_data_store, mock_data_store_query_entities_empty,
-    parser_document_utils::{find_input_object_type, Nullable},
+    parser_document_utils::{
+        find_input_object_type, find_object_field, find_object_type, Nullable,
+    },
     Exec, TestCompileSchema, TestError,
 };
 
@@ -27,7 +29,7 @@ fn test_graphql_schema_for_entityless_domain_should_not_be_generated() {
 }
 
 #[test(tokio::test)]
-async fn test_graphql_smallint() {
+async fn test_graphql_int_scalars() {
     let (test, [schema]) = "
     pub def foo_id { fmt '' => text => . }
     def smallint {
@@ -37,19 +39,45 @@ async fn test_graphql_smallint() {
     }
     pub def foo {
         rel foo_id identifies: .
-        rel .'prop': smallint
+        rel .'small': smallint
+        rel .'big': i64
     }
     "
     .compile_schemas([ROOT]);
+
+    {
+        let parser_document = schema.as_parser_document();
+        let foo_object = find_object_type(&parser_document, "foo").unwrap();
+
+        expect_eq!(
+            actual = find_object_field(foo_object, "small")
+                .unwrap()
+                .field_type
+                .to_string(),
+            expected = "Int!"
+        );
+        expect_eq!(
+            actual = find_object_field(foo_object, "big")
+                .unwrap()
+                .field_type
+                .to_string(),
+            expected = "i64!"
+        );
+    }
+
     let [foo] = test.bind(["foo"]);
-    let entity = foo.entity_builder(json!("my_id"), json!({ "prop": 42 }));
+    let entity = foo.entity_builder(
+        json!("my_id"),
+        json!({ "small": 42, "big": 112233445566778899 as i64 }),
+    );
 
     expect_eq!(
         actual = "{
             fooList {
                 edges {
                     node {
-                        prop
+                        small
+                        big
                     }
                 }
             }
@@ -71,10 +99,12 @@ async fn test_graphql_smallint() {
         actual = "mutation {
             createfoo(
                 input: {
-                    prop: 42
+                    small: 42
+                    big: 1337
                 }
             ) {
-                prop
+                small
+                big
             }
         }"
         .exec(
@@ -91,7 +121,8 @@ async fn test_graphql_smallint() {
         .await,
         expected = Ok(graphql_value!({
             "createfoo": {
-                "prop": 42
+                "small": 42,
+                "big": juniper::Value::Scalar(GqlScalar::I64(112233445566778899))
             }
         })),
     );
