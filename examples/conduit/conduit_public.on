@@ -67,34 +67,23 @@ def ArticleFilter {
     rel .'offset'?: i64
 }
 
+// endpoint '/api/articles/:slug'
 map {
-    query { // ERROR type not found
-        GET: '/api/articles/:slug'
-        'slug': slug
-    }
+    article_slug: slug
     SingleArticle {
         'article': ArticleFilter {
-            'slug': slug
+            'slug'?: slug
         }
     }
 }
 
+// endpoint '/api/articles'
 map {
-    query { // ERROR type not found
-        GET: '/api/articles'
-        'tag': [t]
-        'author': [a]
-        'favorited': [f]
-        'limit': limit
-        'offset': offset
-    }
+    ArticleFilter: filter // ERROR expected named property
     MultipleArticles {
-        'articles': ArticleFilter {
-            'tag': [t]
-            'author': [a]
-            'favorited': [f]
-            'limit': limit
-            'offset': offset
-        }
+        // The idea is that ArticleFilter can map to many db.Articles,
+        // and each db.Article maps to one public.Article.
+        'articles': filter // ERROR [Article] variable must be enclosed in []
+        'articlesCount': 0 // e.g. `length filter`
     }
 }
