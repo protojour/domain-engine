@@ -75,8 +75,7 @@ pub(super) fn map_codegen<'m>(
     let body = func.body;
     let body_span = body.as_ref().span();
 
-    let data_flow =
-        DataFlowAnalyzer::new(&compiler.defs, body.arena()).analyze(func.arg.0.var, body.node());
+    let data_flow = DataFlowAnalyzer::new(&compiler.defs).analyze(func.arg.0.var, body.as_ref());
     let mut errors = CompileErrors::default();
 
     let return_ty = body.as_ref().ty();

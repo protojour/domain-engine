@@ -10,19 +10,18 @@ use ontol_runtime::{
     DefId,
 };
 
-use crate::{def::LookupRelationshipMeta, hir_unify::VarSet, typed_hir::TypedArena, types::Type};
+use crate::{def::LookupRelationshipMeta, hir_unify::VarSet, typed_hir::TypedNodeRef, types::Type};
 
-pub struct DataFlowAnalyzer<'h, 'm, 'c, R> {
+pub struct DataFlowAnalyzer<'c, R> {
     defs: &'c R,
     /// A table of which variable produce which properties
     var_to_property: FnvHashMap<ontol_hir::Var, FnvHashSet<PropertyId>>,
     /// A mapping from variable to its dependencies
     var_dependencies: FnvHashMap<ontol_hir::Var, VarSet>,
     property_flow: BTreeSet<PropertyFlow>,
-    hir_arena: &'h TypedArena<'m>,
 }
 
-impl<'h, 'm, 'c, R> Debug for DataFlowAnalyzer<'h, 'm, 'c, R> {
+impl<'c, R> Debug for DataFlowAnalyzer<'c, R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DataFlowAnalyzer")
             .field("var_to_property", &self.var_to_property)
@@ -31,32 +30,31 @@ impl<'h, 'm, 'c, R> Debug for DataFlowAnalyzer<'h, 'm, 'c, R> {
     }
 }
 
-impl<'h, 'm, 'c, R> DataFlowAnalyzer<'h, 'm, 'c, R>
+impl<'c, 'm, R> DataFlowAnalyzer<'c, R>
 where
     R: LookupRelationshipMeta<'m>,
 {
-    pub fn new(defs: &'c R, hir_arena: &'h TypedArena<'m>) -> Self {
+    pub fn new(defs: &'c R) -> Self {
         Self {
             defs,
             var_to_property: FnvHashMap::default(),
             var_dependencies: FnvHashMap::default(),
             property_flow: BTreeSet::default(),
-            hir_arena,
         }
     }
 
     pub fn analyze(
         &mut self,
         arg: ontol_hir::Var,
-        body: ontol_hir::Node,
+        body: TypedNodeRef<'_, 'm>,
     ) -> Option<Vec<PropertyFlow>> {
-        match self.hir_arena.kind(body) {
+        match body.kind() {
             ontol_hir::Kind::Struct(struct_binder, _flags, nodes) => {
                 self.var_dependencies.insert(arg, VarSet::default());
                 self.var_dependencies
                     .insert(struct_binder.value().var, VarSet::default());
-                for node in nodes {
-                    self.analyze_node(*node);
+                for node_ref in body.arena().refs(nodes) {
+                    self.analyze_node(node_ref);
                 }
 
                 Some(
@@ -69,8 +67,9 @@ where
         }
     }
 
-    fn analyze_node(&mut self, node: ontol_hir::Node) -> VarSet {
-        match self.hir_arena.kind(node) {
+    fn analyze_node(&mut self, node_ref: TypedNodeRef<'_, 'm>) -> VarSet {
+        let arena = node_ref.arena();
+        match node_ref.kind() {
             ontol_hir::Kind::Var(var) => VarSet::from([*var]),
             ontol_hir::Kind::Unit => VarSet::default(),
             ontol_hir::Kind::I64(_) => VarSet::default(),
@@ -78,31 +77,31 @@ where
             ontol_hir::Kind::Text(_) => VarSet::default(),
             ontol_hir::Kind::Const(_) => VarSet::default(),
             ontol_hir::Kind::Let(binder, definition, body) => {
-                let var_deps = self.analyze_node(*definition);
+                let var_deps = self.analyze_node(arena.node_ref(*definition));
                 self.var_dependencies.insert(binder.value().var, var_deps);
 
                 let mut var_set = VarSet::default();
-                for node in body {
-                    var_set.union_with(&self.analyze_node(*node));
+                for child in arena.refs(body) {
+                    var_set.union_with(&self.analyze_node(child));
                 }
 
                 var_set
             }
             ontol_hir::Kind::Call(_, params) => {
                 let mut var_set = VarSet::default();
-                for node in params {
-                    var_set.union_with(&self.analyze_node(*node));
+                for child in arena.refs(params) {
+                    var_set.union_with(&self.analyze_node(child));
                 }
                 var_set
             }
-            ontol_hir::Kind::Map(node) => self.analyze_node(*node),
+            ontol_hir::Kind::Map(node) => self.analyze_node(arena.node_ref(*node)),
             ontol_hir::Kind::DeclSeq(_, _) => {
                 unreachable!()
             }
             ontol_hir::Kind::Struct(_, _, body) => {
                 let mut var_set = VarSet::default();
-                for node in body {
-                    var_set.union_with(&self.analyze_node(*node));
+                for child in arena.refs(body) {
+                    var_set.union_with(&self.analyze_node(child));
                 }
                 var_set
             }
@@ -114,14 +113,14 @@ where
 
                 for variant in variants {
                     match variant {
-                        PropVariant::Singleton(attr) => {
-                            var_set.union_with(&self.analyze_node(attr.rel));
-                            var_set.union_with(&self.analyze_node(attr.val));
+                        PropVariant::Singleton(ontol_hir::Attribute { rel, val }) => {
+                            var_set.union_with(&self.analyze_node(arena.node_ref(*rel)));
+                            var_set.union_with(&self.analyze_node(arena.node_ref(*val)));
                         }
                         PropVariant::Seq(SeqPropertyVariant { elements, .. }) => {
-                            for (_iter, attr) in elements {
-                                var_set.union_with(&self.analyze_node(attr.rel));
-                                var_set.union_with(&self.analyze_node(attr.val));
+                            for (_iter, ontol_hir::Attribute { rel, val }) in elements {
+                                var_set.union_with(&self.analyze_node(arena.node_ref(*rel)));
+                                var_set.union_with(&self.analyze_node(arena.node_ref(*val)));
                             }
                         }
                     }
@@ -162,8 +161,8 @@ where
                         ontol_hir::PropPattern::Absent => {}
                     }
 
-                    for node in body {
-                        var_set.0.extend(&self.analyze_node(*node).0);
+                    for child in arena.refs(body) {
+                        var_set.0.extend(&self.analyze_node(child).0);
                     }
                 }
 
@@ -177,8 +176,8 @@ where
             }
             ontol_hir::Kind::Sequence(_, body) => {
                 let mut var_set = VarSet::default();
-                for node in body {
-                    var_set.union_with(&self.analyze_node(*node));
+                for child in arena.refs(body) {
+                    var_set.union_with(&self.analyze_node(child));
                 }
                 var_set
             }
@@ -190,21 +189,21 @@ where
                     self.add_dep(binder.value().var, *var);
                 }
                 let mut var_set = VarSet::default();
-                for node in body {
-                    var_set.union_with(&self.analyze_node(*node));
+                for child in arena.refs(body) {
+                    var_set.union_with(&self.analyze_node(child));
                 }
                 var_set
             }
-            ontol_hir::Kind::SeqPush(var, attr) => {
-                let mut var_set = self.analyze_node(attr.rel);
-                var_set.union_with(&self.analyze_node(attr.val));
+            ontol_hir::Kind::SeqPush(var, ontol_hir::Attribute { rel, val }) => {
+                let mut var_set = self.analyze_node(arena.node_ref(*rel));
+                var_set.union_with(&self.analyze_node(arena.node_ref(*val)));
 
                 self.var_dependencies.insert(*var, var_set.clone());
 
                 var_set
             }
             ontol_hir::Kind::StringPush(to_var, node) => {
-                let var_set = self.analyze_node(*node);
+                let var_set = self.analyze_node(arena.node_ref(*node));
                 self.var_dependencies.insert(*to_var, var_set.clone());
                 var_set
             }
@@ -214,8 +213,8 @@ where
                     for group in &match_arm.capture_groups {
                         self.add_dep(group.binder.value().var, *var);
                     }
-                    for node in &match_arm.nodes {
-                        var_set.union_with(&self.analyze_node(*node));
+                    for child in arena.refs(&match_arm.nodes) {
+                        var_set.union_with(&self.analyze_node(child));
                     }
                 }
                 var_set

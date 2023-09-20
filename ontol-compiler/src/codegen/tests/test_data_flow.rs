@@ -47,8 +47,10 @@ fn analyze<'a>(arg: &str, hir: &str) -> Vec<PropertyFlow> {
                 }
             }),
     );
-    let mut analyzer = DataFlowAnalyzer::new(&deps, node.arena());
-    let flow = analyzer.analyze(arg.parse().unwrap(), node.node()).unwrap();
+    let mut analyzer = DataFlowAnalyzer::new(&deps);
+    let flow = analyzer
+        .analyze(arg.parse().unwrap(), node.as_ref())
+        .unwrap();
 
     debug!("post analysis: {analyzer:#?}");
 
