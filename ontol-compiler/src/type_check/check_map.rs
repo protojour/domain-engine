@@ -90,8 +90,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
                 _ => false,
             };
-            todo!()
-            // MapArm { node, is_match }
+            MapArm { node, is_match }
         }
 
         if let Some(key_pair) = TypeMapper::new(self.relations, self.defs, self.seal_ctx)

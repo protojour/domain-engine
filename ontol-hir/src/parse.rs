@@ -419,15 +419,15 @@ impl<'a, L: Lang> Parser<'a, L> {
     }
 
     fn make_node(&mut self, kind: Kind<'a, L>) -> Node {
-        self.arena.add(self.lang.with_meta(kind))
+        self.arena.add(self.lang.default_meta(kind))
     }
 
     fn make_binder(&self, var: Var) -> L::Meta<'a, Binder> {
-        self.lang.with_meta(Binder { var })
+        self.lang.default_meta(Binder { var })
     }
 
     fn make_label(&self, label: Label) -> L::Meta<'a, Label> {
-        self.lang.with_meta(label)
+        self.lang.default_meta(label)
     }
 }
 

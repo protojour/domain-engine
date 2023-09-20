@@ -5,7 +5,7 @@ use tracing::{debug, trace};
 use crate::{
     hir_unify::{UnifierError, UnifierResult, VarSet},
     mem::Intern,
-    typed_hir::{IntoTypedHirValue, Meta, TypedHir, TypedHirValue, UNIT_META},
+    typed_hir::{arena_import, IntoTypedHirValue, Meta, TypedHir, TypedHirValue, UNIT_META},
     types::{Type, Types},
     NO_SPAN,
 };
@@ -738,13 +738,9 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     .last()
                     .unwrap_or_else(|| self.types.unit_type());
 
-                todo!("Import def arena");
+                let def = arena_import(&mut self.hir_arena, let_scope.def.as_ref());
                 let node = self.mk_node(
-                    ontol_hir::Kind::Let(
-                        let_scope.inner_binder,
-                        let_scope.def.node(),
-                        block.into(),
-                    ),
+                    ontol_hir::Kind::Let(let_scope.inner_binder, def, block.into()),
                     Meta { ty, span: NO_SPAN },
                 );
 

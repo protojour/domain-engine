@@ -192,11 +192,11 @@ impl<'h, 'c, 'm> ExprBuilder<'h, 'c, 'm> {
             ontol_hir::Kind::Sequence(..) => {
                 todo!()
             }
-            kind @ (ontol_hir::Kind::MatchProp(..)
+            ontol_hir::Kind::MatchProp(..)
             | ontol_hir::Kind::MatchRegex(..)
             | ontol_hir::Kind::ForEach(..)
             | ontol_hir::Kind::StringPush(..)
-            | ontol_hir::Kind::SeqPush(..)) => {
+            | ontol_hir::Kind::SeqPush(..) => {
                 unimplemented!("BUG: {} is an output node", self.hir_arena.node_ref(node))
             }
         }

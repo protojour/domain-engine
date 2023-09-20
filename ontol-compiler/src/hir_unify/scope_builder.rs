@@ -6,7 +6,7 @@ use smallvec::SmallVec;
 
 use crate::{
     hir_unify::{UnifierError, UnifierResult, VarSet},
-    typed_hir::{self, IntoTypedHirValue, TypedHir, TypedHirValue},
+    typed_hir::{self, arena_import, IntoTypedHirValue, TypedHir, TypedHirValue},
     types::TypeRef,
     NO_SPAN,
 };
@@ -227,9 +227,9 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
             ontol_hir::Kind::SeqPush(..) => {
                 todo!()
             }
-            kind @ (ontol_hir::Kind::MatchProp(..)
+            ontol_hir::Kind::MatchProp(..)
             | ontol_hir::Kind::MatchRegex(..)
-            | ontol_hir::Kind::StringPush(..)) => {
+            | ontol_hir::Kind::StringPush(..) => {
                 unimplemented!("BUG: {} is an output node", self.hir_arena.node_ref(node))
             }
         }
@@ -351,9 +351,8 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
         let mut inverted_args = ontol_hir::Nodes::default();
 
         for (arg_index, arg) in args.iter().enumerate() {
-            todo!("Must import arg to def_arena");
             if arg_index != var_arg_index {
-                inverted_args.push(arg.clone());
+                inverted_args.push(arena_import(&mut def_arena, self.hir_arena.node_ref(*arg)));
             }
         }
         inverted_args.insert(var_arg_index, let_def);

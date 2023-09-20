@@ -88,7 +88,7 @@ pub trait Lang: Sized + Copy {
     where
         T: Clone;
 
-    fn with_meta<'a, T: Clone>(&self, value: T) -> Self::Meta<'a, T>;
+    fn default_meta<'a, T: Clone>(&self, value: T) -> Self::Meta<'a, T>;
 
     fn inner<'m, 'a, T: Clone>(meta: &'m Self::Meta<'a, T>) -> &'m T;
 }

@@ -10,7 +10,7 @@ struct TestLang;
 impl Lang for TestLang {
     type Meta<'a, T> = T where T: Clone;
 
-    fn with_meta<'a, T: Clone>(&self, value: T) -> Self::Meta<'a, T> {
+    fn default_meta<'a, T: Clone>(&self, value: T) -> Self::Meta<'a, T> {
         value
     }
 

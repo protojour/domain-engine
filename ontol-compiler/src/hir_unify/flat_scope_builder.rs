@@ -2,7 +2,10 @@ use std::rc::Rc;
 
 use ontol_hir::{visitor::HirVisitor, SeqPropertyVariant};
 
-use crate::{typed_hir::TypedHir, types::TypeRef};
+use crate::{
+    typed_hir::{arena_import_root, TypedHir},
+    types::TypeRef,
+};
 
 use super::{
     flat_scope::{self, FlatScope, OutputVar, PropDepth, ScopeNode, ScopeVar},
@@ -88,7 +91,7 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
             | ontol_hir::Kind::Const(_) => {
                 let const_var = ScopeVar(self.var_allocator.alloc());
                 self.scope_nodes.push(ScopeNode(
-                    flat_scope::Kind::Const(node),
+                    flat_scope::Kind::Const(arena_import_root(self.hir_arena.node_ref(node))),
                     flat_scope::Meta {
                         scope_var: const_var,
                         free_vars: Default::default(),
@@ -241,7 +244,7 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
                 let call_var = self.var_allocator.alloc();
                 if self.is_const(node) {
                     self.scope_nodes.push(ScopeNode(
-                        flat_scope::Kind::Const(node),
+                        flat_scope::Kind::Const(arena_import_root(self.hir_arena.node_ref(node))),
                         flat_scope::Meta {
                             scope_var: ScopeVar(call_var),
                             free_vars: Default::default(),
@@ -323,7 +326,7 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
                 }
             }
             ontol_hir::Kind::DeclSeq(..) => return Err(UnifierError::SequenceInputNotSupported),
-            kind => todo!("{}", self.hir_arena.node_ref(node)),
+            _ => todo!("{}", self.hir_arena.node_ref(node)),
         }
 
         Ok(())

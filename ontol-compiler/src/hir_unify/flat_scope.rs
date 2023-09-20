@@ -5,7 +5,7 @@ use std::{
 
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc, DefId};
 
-use crate::typed_hir::{self, TypedHirValue};
+use crate::typed_hir::{self, TypedHir, TypedHirValue};
 
 use super::VarSet;
 
@@ -91,7 +91,7 @@ impl Debug for PropDepth {
 #[derive(Clone, Debug)]
 pub enum Kind<'m> {
     Var,
-    Const(ontol_hir::Node),
+    Const(ontol_hir::RootNode<'m, TypedHir>),
     Struct,
     PropVariant(PropDepth, ontol_hir::Optional, ontol_hir::Var, PropertyId),
     PropRelParam,
