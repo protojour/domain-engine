@@ -133,11 +133,11 @@ pub(super) struct CodeGenerator<'a, 'm> {
 impl<'a, 'm> CodeGenerator<'a, 'm> {
     fn gen_node<'h>(
         &mut self,
-        node: ontol_hir::arena::NodeRef<'h, 'm, TypedHir>,
+        node_ref: ontol_hir::arena::NodeRef<'h, 'm, TypedHir>,
         block: &mut Block,
     ) {
-        let arena = node.arena();
-        let (kind, meta) = (&node.0, &node.1);
+        let arena = node_ref.arena();
+        let (kind, meta) = (&node_ref.0, &node_ref.1);
         let ty = meta.ty;
         let span = meta.span;
         match kind {
@@ -190,15 +190,15 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
             ontol_hir::Kind::Let(binder, definition, body) => {
                 self.gen_node(arena.node_ref(*definition), block);
                 self.scope.insert(binder.value().var, self.builder.top());
-                for node in body {
-                    self.gen_node(arena.node_ref(*node), block);
+                for node_ref in arena.refs(body) {
+                    self.gen_node(node_ref, block);
                 }
                 self.scope.remove(&binder.value().var);
             }
             ontol_hir::Kind::Call(proc, args) => {
                 let stack_delta = Delta(-(args.len() as i32) + 1);
-                for param in args {
-                    self.gen_node(arena.node_ref(*param), block);
+                for param in arena.refs(args) {
+                    self.gen_node(param, block);
                 }
                 let return_def_id = ty.get_single_def_id().unwrap();
                 block.op(
@@ -266,8 +266,8 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     self.builder,
                 );
                 self.scope.insert(binder.value().var, local);
-                for node in nodes {
-                    self.gen_node(arena.node_ref(*node), block);
+                for node_ref in arena.refs(nodes) {
+                    self.gen_node(node_ref, block);
                     block.pop_until(local, span, self.builder);
                 }
                 self.scope.remove(&binder.value().var);
@@ -460,7 +460,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 );
                 self.gen_in_scope(
                     &[(seq_local, ontol_hir::Binding::Binder(*binder))],
-                    nodes.into_iter().cloned(),
+                    nodes,
                     arena,
                     block,
                 );
@@ -484,7 +484,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                             (elem_rel_local, *rel_binding),
                             (elem_val_local, *val_binding),
                         ],
-                        nodes.into_iter().cloned(),
+                        nodes,
                         arena,
                         &mut iter_block,
                     );
@@ -676,7 +676,10 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 block.pop_until(top, span, self.builder);
             }
             ontol_hir::Kind::DeclSeq(..) | ontol_hir::Kind::Regex(..) => {
-                unreachable!("{} is only declarative, not used in code generation", node);
+                unreachable!(
+                    "{} is only declarative, not used in code generation",
+                    node_ref
+                );
             }
         }
     }
@@ -691,7 +694,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
         match pattern {
             ontol_hir::PropPattern::Attr(rel_binding, val_binding) => self.gen_in_scope(
                 &[(rel_local, *rel_binding), (val_local, *val_binding)],
-                nodes.into_iter().cloned(),
+                nodes,
                 arena,
                 block,
             ),
@@ -700,7 +703,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     (rel_local, ontol_hir::Binding::Wildcard),
                     (val_local, *binding),
                 ],
-                nodes.into_iter().cloned(),
+                nodes,
                 arena,
                 block,
             ),
@@ -749,10 +752,10 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
         }
     }
 
-    fn gen_in_scope(
+    fn gen_in_scope<'n>(
         &mut self,
         scopes: &[(Local, ontol_hir::Binding<TypedHir>)],
-        nodes: impl Iterator<Item = ontol_hir::Node>,
+        nodes: impl IntoIterator<Item = &'n ontol_hir::Node>,
         arena: &ontol_hir::arena::Arena<'m, TypedHir>,
         block: &mut Block,
     ) {
@@ -764,8 +767,8 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
             }
         }
 
-        for node in nodes {
-            self.gen_node(arena.node_ref(node), block);
+        for node_ref in arena.refs(nodes) {
+            self.gen_node(node_ref, block);
         }
 
         for (_, binding) in scopes {
@@ -860,8 +863,8 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 }
             }
 
-            for node in &match_arm.nodes {
-                self.gen_node(arena.node_ref(*node), &mut branch_block);
+            for node_ref in arena.refs(&match_arm.nodes) {
+                self.gen_node(node_ref, &mut branch_block);
             }
 
             // pop scope

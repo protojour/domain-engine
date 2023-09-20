@@ -38,6 +38,13 @@ impl<'a, L: Lang> Arena<'a, L> {
     pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut L::Data<'a, Kind<'a, L>>> {
         self.entries.iter_mut()
     }
+
+    pub fn refs<'n>(
+        &self,
+        nodes: impl IntoIterator<Item = &'n Node>,
+    ) -> impl Iterator<Item = NodeRef<'_, 'a, L>> {
+        nodes.into_iter().cloned().map(|node| self.node_ref(node))
+    }
 }
 
 impl<'a, L: Lang> std::ops::Index<Node> for Arena<'a, L> {
