@@ -85,8 +85,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     &mut ctx,
                 );
 
-                self.codegen_tasks
-                    .add_const_task(ConstCodegenTask { def_id, node });
+                todo!();
+                // self.codegen_tasks
+                //     .add_const_task(ConstCodegenTask { def_id, node });
 
                 ty
             }

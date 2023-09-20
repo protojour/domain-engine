@@ -1,7 +1,7 @@
 use std::collections::hash_map::Entry;
 
 use fnv::FnvHashSet;
-use ontol_hir::{visitor::HirMutVisitor, GetKind, Label, VarAllocator};
+use ontol_hir::{Label, VarAllocator};
 use ontol_runtime::smart_format;
 use tracing::debug;
 
@@ -15,7 +15,7 @@ use crate::{
     mem::Intern,
     pattern::{PatId, Pattern, PatternKind, Patterns, RegexPatternCaptureNode},
     type_check::hir_build_ctx::{Arm, VariableMapping},
-    typed_hir::TypedHirNode,
+    typed_hir::TypedHir,
     types::{Type, TypeRef, Types},
     CompileErrors, Note, SourceSpan, SpannedNote,
 };
@@ -83,18 +83,19 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         // unify the type of variables on either side:
         self.infer_hir_unify_arms(&mut first, &mut second, ctx);
 
-        fn mk_map_arm(node: TypedHirNode) -> MapArm {
-            let is_match = match node.kind() {
-                ontol_hir::Kind::Struct(_, flags, _) => {
+        fn mk_map_arm(node: ontol_hir::hir2::RootNode<TypedHir>) -> MapArm {
+            let is_match = match node.as_ref().value() {
+                ontol_hir::hir2::Kind::Struct(_, flags, _) => {
                     flags.contains(ontol_hir::StructFlags::MATCH)
                 }
                 _ => false,
             };
-            MapArm { node, is_match }
+            todo!()
+            // MapArm { node, is_match }
         }
 
         if let Some(key_pair) = TypeMapper::new(self.relations, self.defs, self.seal_ctx)
-            .find_map_key_pair(first.1.ty, second.1.ty)
+            .find_map_key_pair(first.as_ref().ty(), second.as_ref().ty())
         {
             self.codegen_tasks.add_map_task(
                 key_pair,
@@ -109,19 +110,25 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         Ok(())
     }
 
-    fn infer_hir_arm_types(&mut self, node: &mut TypedHirNode<'m>, ctx: &mut HirBuildCtx<'m>) {
+    fn infer_hir_arm_types(
+        &mut self,
+        hir_root_node: &mut ontol_hir::hir2::RootNode<'m, TypedHir>,
+        ctx: &mut HirBuildCtx<'m>,
+    ) {
         let mut inference = HirArmTypeInference {
             types: self.types,
             eq_relations: &mut ctx.inference.eq_relations,
             errors: self.errors,
         };
-        inference.visit_node(0, node);
+        for node in hir_root_node.arena_mut().iter_mut() {
+            inference.infer_node(node);
+        }
     }
 
     fn infer_hir_unify_arms(
         &mut self,
-        first: &mut TypedHirNode<'m>,
-        second: &mut TypedHirNode<'m>,
+        first: &mut ontol_hir::hir2::RootNode<'m, TypedHir>,
+        second: &mut ontol_hir::hir2::RootNode<'m, TypedHir>,
         ctx: &mut HirBuildCtx<'m>,
     ) {
         for (var, explicit_var) in &mut ctx.pattern_variables {
@@ -173,12 +180,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             variable_mapping: &ctx.variable_mapping,
             arm: Arm::First,
         }
-        .visit_node(0, first);
+        .map_vars(first.arena_mut());
         HirVariableMapper {
             variable_mapping: &ctx.variable_mapping,
             arm: Arm::Second,
         }
-        .visit_node(0, second);
+        .map_vars(second.arena_mut());
     }
 
     fn report_missing_prop_errors(&mut self, ctx: &mut HirBuildCtx<'m>) {

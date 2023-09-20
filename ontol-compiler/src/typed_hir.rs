@@ -47,7 +47,13 @@ impl ontol_hir::Lang for TypedHir {
     }
 }
 
+impl ontol_hir::hir2::Lang for TypedHir {
+    type Meta<'m, T> = TypedHirValue<'m, T> where T: Clone;
+}
+
 pub type TypedHirKind<'m> = ontol_hir::Kind<'m, TypedHir>;
+
+pub type TypedHirKind2<'m> = ontol_hir::hir2::Kind<'m, TypedHir>;
 
 /// The typed ontol_hir node type.
 #[derive(Clone)]
@@ -101,6 +107,56 @@ impl<'m> std::fmt::Display for TypedHirNode<'m> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Printer::default().print(Sep::None, &self.0, f)?;
         Ok(())
+    }
+}
+
+#[derive(Clone)]
+pub struct TypedHirValue<'m, T>(pub T, pub Meta<'m>);
+
+pub type TypedHirNode2<'m> = TypedHirValue<'m, ontol_hir::hir2::Kind<'m, TypedHir>>;
+
+impl<'m, T> TypedHirValue<'m, T> {
+    pub fn value(&self) -> &T {
+        &self.0
+    }
+
+    pub fn value_mut(&mut self) -> &mut T {
+        &mut self.0
+    }
+
+    pub fn into_value(self) -> T {
+        self.0
+    }
+
+    pub fn meta(&self) -> &Meta<'m> {
+        &self.1
+    }
+
+    pub fn meta_mut(&mut self) -> &mut Meta<'m> {
+        &mut self.1
+    }
+
+    pub fn ty(&self) -> TypeRef<'m> {
+        self.1.ty
+    }
+
+    pub fn span(&self) -> SourceSpan {
+        self.1.span
+    }
+}
+
+pub trait IntoTypedHirValue<'m>: Sized {
+    fn with_meta(self, meta: Meta<'m>) -> TypedHirValue<'m, Self>;
+    fn with_ty(self, ty: TypeRef<'m>) -> TypedHirValue<'m, Self>;
+}
+
+impl<'m, T> IntoTypedHirValue<'m> for T {
+    fn with_meta(self, meta: Meta<'m>) -> TypedHirValue<'m, Self> {
+        TypedHirValue(self, meta)
+    }
+
+    fn with_ty(self, ty: TypeRef<'m>) -> TypedHirValue<'m, Self> {
+        TypedHirValue(self, Meta { ty, span: NO_SPAN })
     }
 }
 

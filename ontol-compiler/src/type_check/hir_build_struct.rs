@@ -13,7 +13,7 @@ use crate::{
     pattern::{PatternKind, StructPatternAttr, StructPatternModifier},
     primitive::PrimitiveKind,
     type_check::{hir_build::NodeInfo, repr::repr_model::ReprKind, TypeError},
-    typed_hir::{Meta, TypedBinder, TypedHir, TypedHirNode, TypedLabel},
+    typed_hir::{Meta, TypedHir, TypedHirValue},
     types::{Type, TypeRef},
     CompileError, SourceSpan, NO_SPAN,
 };
@@ -47,7 +47,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         pattern_attrs: &[StructPatternAttr],
         span: SourceSpan,
         ctx: &mut HirBuildCtx<'m>,
-    ) -> TypedHirNode<'m> {
+    ) -> ontol_hir::hir2::Node {
         let properties = self.relations.properties_by_def_id(struct_def_id);
 
         let actual_struct_flags = match modifier {
@@ -55,17 +55,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             None => ontol_hir::StructFlags::empty(),
         } | parent_struct_flags;
 
-        let node_kind = match self.seal_ctx.get_repr_kind(&struct_def_id).unwrap() {
+        let struct_meta = Meta {
+            ty: struct_ty,
+            span,
+        };
+
+        match self.seal_ctx.get_repr_kind(&struct_def_id).unwrap() {
             ReprKind::Struct | ReprKind::Unit => {
                 match properties.and_then(|props| props.table.as_ref()) {
                     Some(property_set) => {
-                        let struct_binder = TypedBinder {
-                            var: ctx.var_allocator.alloc(),
-                            meta: Meta {
-                                ty: struct_ty,
-                                span,
-                            },
-                        };
+                        let struct_binder: TypedHirValue<'_, ontol_hir::hir2::Binder> =
+                            TypedHirValue(ctx.var_allocator.alloc().into(), struct_meta);
 
                         // The written attribute patterns should match against
                         // the relations defined on the type. Compute `MatchAttributes`:
@@ -108,7 +108,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         // Actually match the written attributes to the match attributes:
                         for pattern_attr in pattern_attrs {
                             let prop_node = self.build_struct_property_node(
-                                struct_binder.var,
+                                struct_binder.value().var,
                                 pattern_attr,
                                 &mut match_attributes,
                                 actual_struct_flags,
@@ -125,7 +125,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         // matter if there are unmentioned properties.
                         if !actual_struct_flags.contains(ontol_hir::StructFlags::MATCH) {
                             self.handle_missing_struct_attributes(
-                                struct_binder.var,
+                                struct_binder.value().var,
                                 span,
                                 match_attributes,
                                 &mut hir_props,
@@ -133,13 +133,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             );
                         }
 
-                        ontol_hir::Kind::Struct(struct_binder, actual_struct_flags, hir_props)
+                        ctx.hir_node(
+                            ontol_hir::hir2::Kind::Struct(
+                                struct_binder,
+                                actual_struct_flags,
+                                hir_props,
+                            ),
+                            struct_meta,
+                        )
                     }
                     None => {
                         if !pattern_attrs.is_empty() {
-                            return self.error_node(CompileError::NoPropertiesExpected, &span);
+                            return self.error_node(CompileError::NoPropertiesExpected, &span, ctx);
                         }
-                        ontol_hir::Kind::Unit
+                        ctx.hir_node(ontol_hir::hir2::Kind::Unit, struct_meta)
                     }
                 }
             }
@@ -191,11 +198,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     ctx,
                                 );
 
-                                inner_node.into_kind()
+                                *ctx.hir_arena.node_mut(inner_node).meta_mut() = struct_meta;
+
+                                inner_node
                             }
                             _ => {
-                                return self
-                                    .error_node(CompileError::ExpectedPatternAttribute, &span);
+                                return self.error_node(
+                                    CompileError::ExpectedPatternAttribute,
+                                    &span,
+                                    ctx,
+                                );
                             }
                         }
                     }
@@ -225,28 +237,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             ctx,
                         );
 
-                        inner_node.into_kind()
+                        *ctx.hir_arena.node_mut(inner_node).meta_mut() = struct_meta;
+
+                        inner_node
                     }
                     _ => {
-                        return self.error_node(CompileError::ExpectedPatternAttribute, &span);
+                        return self.error_node(CompileError::ExpectedPatternAttribute, &span, ctx);
                     }
                 }
             }
             ReprKind::Union(_) | ReprKind::StructUnion(_) => {
-                return self.error_node(CompileError::CannotMapUnion, &span)
+                return self.error_node(CompileError::CannotMapUnion, &span, ctx)
             }
             kind => todo!("{kind:?}"),
-        };
-
-        debug!("Struct type: {struct_ty:?}");
-
-        TypedHirNode(
-            node_kind,
-            Meta {
-                ty: struct_ty,
-                span,
-            },
-        )
+        }
     }
 
     fn build_struct_property_node(
@@ -256,7 +260,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         match_attributes: &mut IndexMap<&'m str, MatchAttribute>,
         actual_struct_flags: StructFlags,
         ctx: &mut HirBuildCtx<'m>,
-    ) -> Option<TypedHirNode<'m>> {
+    ) -> Option<ontol_hir::hir2::Node> {
         let StructPatternAttr {
             key: (def_id, prop_span),
             rel,
@@ -286,10 +290,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let rel_node = match (rel_params_ty, rel) {
             (Type::Primitive(PrimitiveKind::Unit, _), Some(rel)) => {
-                self.error_node(CompileError::NoRelationParametersExpected, &rel.span)
+                self.error_node(CompileError::NoRelationParametersExpected, &rel.span, ctx)
             }
-            (ty @ Type::Primitive(PrimitiveKind::Unit, _), None) => TypedHirNode(
-                ontol_hir::Kind::Unit,
+            (ty @ Type::Primitive(PrimitiveKind::Unit, _), None) => ctx.hir_node(
+                ontol_hir::hir2::Kind::Unit,
                 Meta {
                     ty,
                     span: *prop_span,
@@ -307,8 +311,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 match self.relations.properties_by_def_id(*def_id) {
                     Some(_) => self.build_implicit_rel_node(ty, value, *prop_span, ctx),
                     // An anonymous type without properties, i.e. just "meta relationships" about the relationship itself:
-                    None => TypedHirNode(
-                        ontol_hir::Kind::Unit,
+                    None => ctx.hir_node(
+                        ontol_hir::hir2::Kind::Unit,
                         Meta {
                             ty,
                             span: *prop_span,
@@ -332,9 +336,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     },
                     ctx,
                 );
-                ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
-                    rel: Box::new(rel_node),
-                    val: Box::new(val_node),
+                ontol_hir::hir2::PropVariant::Singleton(ontol_hir::Attribute {
+                    rel: rel_node,
+                    val: val_node,
                 })
             }
             ValueCardinality::Many => match &value.kind {
@@ -361,8 +365,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     let label = *ctx.label_map.get(aggr_pat_id).unwrap();
                     let seq_ty = self.types.intern(Type::Seq(rel_params_ty, value_ty));
 
-                    ontol_hir::PropVariant::Seq(ontol_hir::SeqPropertyVariant {
-                        label: TypedLabel { label, ty: seq_ty },
+                    ontol_hir::hir2::PropVariant::Seq(ontol_hir::hir2::SeqPropertyVariant {
+                        label: TypedHirValue(
+                            label,
+                            Meta {
+                                ty: seq_ty,
+                                span: NO_SPAN,
+                            },
+                        ),
                         has_default: ontol_hir::HasDefault(matches!(
                             match_property.property_id.role,
                             Role::Object
@@ -385,7 +395,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             PropertyCardinality::Optional
         ));
 
-        let prop_variants: Vec<ontol_hir::PropVariant<'_, TypedHir>> =
+        let prop_variants: Vec<ontol_hir::hir2::PropVariant<'_, TypedHir>> =
             match match_property.cardinality.0 {
                 PropertyCardinality::Mandatory => {
                     vec![prop_variant]
@@ -404,8 +414,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             };
 
-        Some(TypedHirNode(
-            ontol_hir::Kind::Prop(
+        Some(ctx.hir_node(
+            ontol_hir::hir2::Kind::Prop(
                 optional,
                 struct_binder_var,
                 match_property.property_id,
@@ -423,7 +433,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         struct_binder_var: ontol_hir::Var,
         struct_span: SourceSpan,
         match_attributes: IndexMap<&'m str, MatchAttribute>,
-        hir_props: &mut Vec<TypedHirNode<'m>>,
+        hir_props: &mut Vec<ontol_hir::hir2::Node>,
         ctx: &mut HirBuildCtx<'m>,
     ) {
         for (name, match_property) in match_attributes {
@@ -447,27 +457,32 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             {
                 // Generate code for default value.
                 let value_ty = self.check_def_sealed(const_def_id);
-                hir_props.push(TypedHirNode(
-                    ontol_hir::Kind::Prop(
-                        ontol_hir::Optional(false),
-                        struct_binder_var,
-                        match_property.property_id,
-                        vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
-                            rel: Box::new(self.unit_node_no_span()),
-                            val: Box::new(TypedHirNode(
-                                ontol_hir::Kind::Const(const_def_id),
-                                Meta {
-                                    ty: value_ty,
-                                    span: NO_SPAN,
-                                },
-                            )),
-                        })],
-                    ),
-                    Meta {
-                        ty: self.unit_type(),
-                        span: NO_SPAN,
-                    },
-                ));
+
+                let prop_node = {
+                    let rel = self.unit_node_no_span(ctx);
+                    let val = ctx.hir_node(
+                        ontol_hir::hir2::Kind::Const(const_def_id),
+                        Meta {
+                            ty: value_ty,
+                            span: NO_SPAN,
+                        },
+                    );
+                    ctx.hir_node(
+                        ontol_hir::hir2::Kind::Prop(
+                            ontol_hir::Optional(false),
+                            struct_binder_var,
+                            match_property.property_id,
+                            vec![ontol_hir::hir2::PropVariant::Singleton(
+                                ontol_hir::Attribute { rel, val },
+                            )],
+                        ),
+                        Meta {
+                            ty: self.unit_type(),
+                            span: NO_SPAN,
+                        },
+                    )
+                };
+                hir_props.push(prop_node);
                 continue;
             }
 

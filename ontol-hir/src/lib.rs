@@ -4,6 +4,7 @@ use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc, DefId};
 use smartstring::alias::String;
 
 pub mod display;
+pub mod hir2;
 pub mod parse;
 pub mod visitor;
 

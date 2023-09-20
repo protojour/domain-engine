@@ -1,7 +1,12 @@
 use fnv::FnvHashMap;
 use smartstring::alias::String;
 
-use crate::{pattern::PatId, types::TypeRef, SourceSpan};
+use crate::{
+    pattern::PatId,
+    typed_hir::{self, TypedHir, TypedHirValue},
+    types::TypeRef,
+    SourceSpan,
+};
 
 use super::inference::Inference;
 
@@ -9,6 +14,7 @@ use super::inference::Inference;
 pub struct CtrlFlowDepth(pub u16);
 
 pub struct HirBuildCtx<'m> {
+    pub hir_arena: ontol_hir::hir2::Arena<'m, TypedHir>,
     pub map_kw_span: SourceSpan,
     pub inference: Inference<'m>,
     pub pattern_variables: FnvHashMap<ontol_hir::Var, PatternVariable>,
@@ -37,6 +43,7 @@ pub struct HirBuildCtx<'m> {
 impl<'m> HirBuildCtx<'m> {
     pub fn new(map_kw_span: SourceSpan, var_allocator: ontol_hir::VarAllocator) -> Self {
         Self {
+            hir_arena: Default::default(),
             map_kw_span,
             inference: Inference::new(),
             pattern_variables: Default::default(),
@@ -62,6 +69,14 @@ impl<'m> HirBuildCtx<'m> {
         self.ctrl_flow_depth.0 -= 1;
 
         ret
+    }
+
+    pub fn hir_node(
+        &mut self,
+        kind: ontol_hir::hir2::Kind<'m, TypedHir>,
+        meta: typed_hir::Meta<'m>,
+    ) -> ontol_hir::hir2::Node {
+        self.hir_arena.add(TypedHirValue(kind, meta))
     }
 }
 
