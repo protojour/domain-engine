@@ -12,6 +12,7 @@ doctest = false
 ontol-runtime.path = "../ontol-runtime"
 smartstring.workspace = true
 bitflags.workspace = true
+smallvec.workspace = true
 
 [dev-dependencies]
 tracing-subscriber.workspace = true

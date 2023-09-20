@@ -18,16 +18,30 @@ impl<'a, L: Lang> Arena<'a, L> {
         }
     }
 
+    pub fn kind(&self, node: Node) -> &Kind<'a, L> {
+        L::inner(&self[node])
+    }
+
     pub fn node_ref(&self, node: Node) -> NodeRef<'_, 'a, L> {
         NodeRef { arena: self, node }
     }
 
-    pub fn node_mut(&mut self, node: Node) -> NodeMut<'_, 'a, L> {
-        NodeMut { arena: self, node }
-    }
-
     pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut L::Meta<'a, Kind<'a, L>>> {
         self.nodes.iter_mut()
+    }
+}
+
+impl<'a, L: Lang> std::ops::Index<Node> for Arena<'a, L> {
+    type Output = L::Meta<'a, Kind<'a, L>>;
+
+    fn index(&self, node: Node) -> &Self::Output {
+        &self.nodes[node.0 as usize]
+    }
+}
+
+impl<'a, L: Lang> std::ops::IndexMut<Node> for Arena<'a, L> {
+    fn index_mut(&mut self, node: Node) -> &mut Self::Output {
+        &mut self.nodes[node.0 as usize]
     }
 }
 
@@ -45,32 +59,23 @@ impl PreAllocator {
 
 impl<'a, L: Lang> Default for Arena<'a, L> {
     fn default() -> Self {
-        Arena { nodes: vec![] }
+        Arena {
+            nodes: Vec::with_capacity(16),
+        }
     }
 }
 
 pub struct NodeRef<'h, 'a, L: Lang> {
     pub arena: &'h Arena<'a, L>,
-    node: Node,
+    pub(crate) node: Node,
 }
 
 impl<'h, 'a, L: Lang> NodeRef<'h, 'a, L> {
-    pub fn meta(&self) -> &'h L::Meta<'a, Kind<'a, L>> {
+    pub fn value(&self) -> &'h L::Meta<'a, Kind<'a, L>> {
         &self.arena.nodes[self.node.0 as usize]
     }
 
     pub fn kind(&self) -> &'h Kind<'a, L> {
         L::inner(&self.arena.nodes[self.node.0 as usize])
-    }
-}
-
-pub struct NodeMut<'h, 'a, L: Lang> {
-    pub arena: &'h mut Arena<'a, L>,
-    node: Node,
-}
-
-impl<'h, 'a, L: Lang> NodeMut<'h, 'a, L> {
-    pub fn meta(&mut self) -> &mut L::Meta<'a, Kind<'a, L>> {
-        &mut self.arena.nodes[self.node.0 as usize]
     }
 }

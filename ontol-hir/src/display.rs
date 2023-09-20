@@ -3,22 +3,25 @@ use std::fmt::{Debug, Display};
 use ontol_runtime::vm::proc::BuiltinProc;
 
 use crate::{
-    arena::Arena, Attribute, Binding, CaptureGroup, CaptureMatchArm, HasDefault, Iter, Kind, Label,
-    Lang, Node, PropPattern, PropVariant, RootNode, StructFlags, Var,
+    arena::{Arena, NodeRef},
+    Attribute, Binding, CaptureGroup, CaptureMatchArm, HasDefault, Iter, Kind, Label, Lang, Node,
+    Nodes, PropPattern, PropVariant, RootNode, StructFlags, Var,
 };
 
-impl<'a, L: Lang> std::fmt::Display for RootNode<'a, L> {
+impl<'h, 'a, L: Lang> std::fmt::Display for NodeRef<'h, 'a, L> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let printer = Printer {
             indent: Sep::None,
             arena: &self.arena,
         };
-        printer.print(
-            Sep::None,
-            L::inner(self.arena.node_ref(self.node).meta()),
-            f,
-        )?;
+        printer.print(Sep::None, self.arena.kind(self.node), f)?;
         Ok(())
+    }
+}
+
+impl<'a, L: Lang> std::fmt::Display for RootNode<'a, L> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.as_ref().fmt(f)
     }
 }
 
@@ -36,7 +39,7 @@ pub struct Printer<'h, 'a, L: Lang> {
 
 impl<'h, 'a, L: Lang> Printer<'h, 'a, L> {
     fn kind(&self, node: Node) -> &Kind<'a, L> {
-        L::inner(self.arena.node_ref(node).meta())
+        self.arena.kind(node)
     }
 
     fn kinds<'n>(&self, nodes: &'n [Node]) -> KindsIter<'n, 'h, 'a, L> {
@@ -57,7 +60,7 @@ impl<'n, 'h, 'a, L: Lang> Iterator for KindsIter<'n, 'h, 'a, L> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let next = self.nodes.next()?;
-        Some(self.arena.node_ref(*next).kind())
+        Some(self.arena.kind(*next))
     }
 }
 
@@ -255,11 +258,11 @@ impl<'h, 'a, L: Lang> Print<(Iter, Attribute<Node>)> for Printer<'h, 'a, L> {
     }
 }
 
-impl<'h, 'a, L: Lang> Print<(PropPattern<'a, L>, Vec<Node>)> for Printer<'h, 'a, L> {
+impl<'h, 'a, L: Lang> Print<(PropPattern<'a, L>, Nodes)> for Printer<'h, 'a, L> {
     fn print(
         self,
         _sep: Sep,
-        arm: &(PropPattern<'a, L>, Vec<Node>),
+        arm: &(PropPattern<'a, L>, Nodes),
         f: &mut std::fmt::Formatter,
     ) -> PrintResult {
         let indent = self.indent;

@@ -116,7 +116,7 @@ impl<'a, L: Lang> Parser<'a, L> {
                 let (_, next) = parse_rparen(next)?;
                 let (body, next) = self.parse_many(next, Self::parse)?;
                 Ok((
-                    self.make_node(Kind::Let(self.make_binder(bind_var), def, body)),
+                    self.make_node(Kind::Let(self.make_binder(bind_var), def, body.into())),
                     next,
                 ))
             }
@@ -152,7 +152,7 @@ impl<'a, L: Lang> Parser<'a, L> {
                         prop.parse().map_err(|_| {
                             Error::Expected(Class::Property, Found(Token::Symbol(prop)))
                         })?,
-                        arms,
+                        arms.into(),
                     )),
                     next,
                 ))
@@ -160,7 +160,10 @@ impl<'a, L: Lang> Parser<'a, L> {
             ("sequence", next) => {
                 let (binder, next) = self.parse_binder(next)?;
                 let (children, next) = self.parse_many(next, Self::parse)?;
-                Ok((self.make_node(Kind::Sequence(binder, children)), next))
+                Ok((
+                    self.make_node(Kind::Sequence(binder, children.into())),
+                    next,
+                ))
             }
             ("for-each", next) => {
                 let (seq_var, next) = parse_dollar_var(next)?;
@@ -171,7 +174,7 @@ impl<'a, L: Lang> Parser<'a, L> {
                 })?;
                 let (body, next) = self.parse_many(next, Self::parse)?;
                 Ok((
-                    self.make_node(Kind::ForEach(seq_var, (rel, val), body)),
+                    self.make_node(Kind::ForEach(seq_var, (rel, val), body.into())),
                     next,
                 ))
             }
@@ -227,7 +230,7 @@ impl<'a, L: Lang> Parser<'a, L> {
                 var,
                 prop.parse()
                     .map_err(|_| Error::Expected(Class::Property, Found(Token::Symbol(prop))))?,
-                variants,
+                variants.into(),
             )),
             next,
         ))
@@ -260,7 +263,10 @@ impl<'a, L: Lang> Parser<'a, L> {
     ) -> ParseResult<'s, Node> {
         let (binder, next) = self.parse_binder(next)?;
         let (children, next) = self.parse_many(next, Self::parse)?;
-        Ok((self.make_node(Kind::Struct(binder, flags, children)), next))
+        Ok((
+            self.make_node(Kind::Struct(binder, flags, children.into())),
+            next,
+        ))
     }
 
     fn parse_prop_variant<'s>(&mut self, next: &'s str) -> ParseResult<'s, PropVariant<'a, L>> {
@@ -272,7 +278,7 @@ impl<'a, L: Lang> Parser<'a, L> {
                     PropVariant::Seq(SeqPropertyVariant {
                         label: self.make_label(label),
                         has_default: HasDefault(sym != "seq"),
-                        elements,
+                        elements: elements.into(),
                     }),
                     next,
                 ))
@@ -310,7 +316,7 @@ impl<'a, L: Lang> Parser<'a, L> {
     fn parse_prop_match_arm<'s>(
         &mut self,
         next: &'s str,
-    ) -> ParseResult<'s, (PropPattern<'a, L>, Vec<Node>)> {
+    ) -> ParseResult<'s, (PropPattern<'a, L>, Nodes)> {
         parse_paren_delimited(next, |next| {
             let (_, next) = parse_lparen(next)?;
             let (seq_default, next) = match parse_symbol(next) {
@@ -348,7 +354,7 @@ impl<'a, L: Lang> Parser<'a, L> {
             };
             let (nodes, next) = self.parse_many(next, Self::parse)?;
 
-            Ok(((pattern, nodes), next))
+            Ok(((pattern, nodes.into()), next))
         })
     }
 
@@ -364,7 +370,7 @@ impl<'a, L: Lang> Parser<'a, L> {
             Ok((
                 CaptureMatchArm {
                     capture_groups,
-                    nodes,
+                    nodes: nodes.into(),
                 },
                 next,
             ))

@@ -2,11 +2,12 @@ use std::{fmt::Debug, ops::Index};
 
 use arena::{Arena, NodeRef};
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc, DefId};
+use smallvec::SmallVec;
 use smartstring::alias::String;
 
 pub mod arena;
 pub mod display;
-pub mod old;
+// pub mod old;
 pub mod parse;
 pub mod visitor;
 
@@ -105,7 +106,11 @@ impl<'a, L: Lang> RootNode<'a, L> {
         self.node
     }
 
-    pub fn as_ref(&self) -> NodeRef<'a, '_, L> {
+    pub fn split(self) -> (Arena<'a, L>, Node) {
+        (self.arena, self.node)
+    }
+
+    pub fn as_ref(&self) -> NodeRef<'_, 'a, L> {
         self.arena.node_ref(self.node)
     }
 
@@ -128,6 +133,8 @@ impl From<Var> for Binder {
     }
 }
 
+pub type Nodes = SmallVec<[Node; 2]>;
+
 /// The syntax kind of a node.
 #[derive(Clone)]
 pub enum Kind<'a, L: Lang> {
@@ -144,25 +151,24 @@ pub enum Kind<'a, L: Lang> {
     /// Const procedure
     Const(DefId),
     /// A let expression
-    Let(L::Meta<'a, Binder>, Node, Vec<Node>),
+    Let(L::Meta<'a, Binder>, Node, Nodes),
     /// A function call
-    Call(BuiltinProc, Vec<Node>),
+    Call(BuiltinProc, Nodes),
     /// A map call
     Map(Node),
     /// Standalone sequence in declarative mode.
     DeclSeq(L::Meta<'a, Label>, Attribute<Node>),
     /// A struct with associated binder. The value is the struct.
-    Struct(L::Meta<'a, Binder>, StructFlags, Vec<Node>),
-    // /// A property definition associated with a struct var in scope
-    Prop(Optional, Var, PropertyId, Vec<PropVariant<'a, L>>),
-
-    // /// A property matcher/unpacker associated with a struct var
-    MatchProp(Var, PropertyId, Vec<(PropPattern<'a, L>, Vec<Node>)>),
+    Struct(L::Meta<'a, Binder>, StructFlags, Nodes),
+    /// A property definition associated with a struct var in scope
+    Prop(Optional, Var, PropertyId, SmallVec<[PropVariant<'a, L>; 1]>),
+    /// A property matcher/unpacker associated with a struct var
+    MatchProp(Var, PropertyId, SmallVec<[(PropPattern<'a, L>, Nodes); 1]>),
     /// A sequence with associated binder. The value is the sequence.
     /// TODO: This can be done with Let!
-    Sequence(L::Meta<'a, Binder>, Vec<Node>),
+    Sequence(L::Meta<'a, Binder>, Nodes),
     /// Iterate attributes in sequence var,
-    ForEach(Var, (Binding<'a, L>, Binding<'a, L>), Vec<Node>),
+    ForEach(Var, (Binding<'a, L>, Binding<'a, L>), Nodes),
     /// Push an attribute to the end of a sequence
     SeqPush(Var, Attribute<Node>),
     /// Push the second string at the end of the first string
@@ -188,7 +194,7 @@ pub enum PropVariant<'a, L: Lang> {
 pub struct SeqPropertyVariant<'a, L: Lang> {
     pub label: L::Meta<'a, Label>,
     pub has_default: HasDefault,
-    pub elements: Vec<(Iter, Attribute<Node>)>,
+    pub elements: SmallVec<[(Iter, Attribute<Node>); 1]>,
 }
 
 #[derive(Clone)]
@@ -217,7 +223,7 @@ pub struct CaptureGroup<'a, L: Lang> {
 #[derive(Clone)]
 pub struct CaptureMatchArm<'a, L: Lang> {
     pub capture_groups: Vec<CaptureGroup<'a, L>>,
-    pub nodes: Vec<Node>,
+    pub nodes: Nodes,
 }
 
 #[derive(Debug)]
