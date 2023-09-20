@@ -4,21 +4,21 @@ use super::expr;
 use crate::{
     def::Defs,
     hir_unify::VarSet,
-    typed_hir::{IntoTypedHirValue, TypedHir, TypedHirValue},
+    typed_hir::{IntoTypedHirValue, TypedArena, TypedHirValue},
 };
 
 pub struct ExprBuilder<'h, 'c, 'm> {
     in_scope: VarSet,
     var_allocator: ontol_hir::VarAllocator,
     defs: &'c Defs<'m>,
-    hir_arena: &'h ontol_hir::arena::Arena<'m, TypedHir>,
+    hir_arena: &'h TypedArena<'m>,
 }
 
 impl<'h, 'c, 'm> ExprBuilder<'h, 'c, 'm> {
     pub fn new(
         var_allocator: ontol_hir::VarAllocator,
         defs: &'c Defs<'m>,
-        hir_arena: &'h ontol_hir::arena::Arena<'m, TypedHir>,
+        hir_arena: &'h TypedArena<'m>,
     ) -> Self {
         Self {
             in_scope: Default::default(),

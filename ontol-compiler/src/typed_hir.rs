@@ -25,6 +25,9 @@ impl ontol_hir::Lang for TypedHir {
 
 pub type TypedHirKind<'m> = ontol_hir::Kind<'m, TypedHir>;
 
+pub type TypedArena<'m> = ontol_hir::arena::Arena<'m, TypedHir>;
+pub type TypedNodeRef<'h, 'm> = ontol_hir::arena::NodeRef<'h, 'm, TypedHir>;
+
 #[derive(Clone, Copy, Debug)]
 pub struct TypedHirValue<'m, T>(pub T, pub Meta<'m>);
 
@@ -104,24 +107,24 @@ impl<'m> Display for HirFunc<'m> {
 }
 
 pub fn arena_import_root<'h, 'm>(
-    source: ontol_hir::arena::NodeRef<'h, 'm, TypedHir>,
+    source: TypedNodeRef<'h, 'm>,
 ) -> ontol_hir::RootNode<'m, TypedHir> {
-    let mut target: ontol_hir::arena::Arena<'m, TypedHir> = Default::default();
+    let mut target: TypedArena<'m> = Default::default();
     let node = arena_import(&mut target, source);
     ontol_hir::RootNode::new(node, target)
 }
 
 // TODO: Generalize this in ontol-hir
 pub fn arena_import<'m>(
-    target: &mut ontol_hir::arena::Arena<'m, TypedHir>,
-    source: ontol_hir::arena::NodeRef<'_, 'm, TypedHir>,
+    target: &mut TypedArena<'m>,
+    source: TypedNodeRef<'_, 'm>,
 ) -> ontol_hir::Node {
     let value = &source.arena()[source.node()];
     let (kind, meta) = (&value.0, &value.1);
 
     fn import_nodes<'m>(
-        target: &mut ontol_hir::arena::Arena<'m, TypedHir>,
-        source: &ontol_hir::arena::Arena<'m, TypedHir>,
+        target: &mut TypedArena<'m>,
+        source: &TypedArena<'m>,
         nodes: &[ontol_hir::Node],
     ) -> ontol_hir::Nodes {
         let mut imported_nodes = ontol_hir::Nodes::default();
@@ -132,8 +135,8 @@ pub fn arena_import<'m>(
     }
 
     fn import_attr<'m>(
-        target: &mut ontol_hir::arena::Arena<'m, TypedHir>,
-        source: &ontol_hir::arena::Arena<'m, TypedHir>,
+        target: &mut TypedArena<'m>,
+        source: &TypedArena<'m>,
         attr: ontol_hir::Attribute<ontol_hir::Node>,
     ) -> ontol_hir::Attribute<ontol_hir::Node> {
         let rel = arena_import(target, source.node_ref(attr.rel));

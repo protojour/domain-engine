@@ -95,6 +95,10 @@ impl<'h, 'a, L: Lang> NodeRef<'h, 'a, L> {
     pub fn node(&self) -> Node {
         self.node
     }
+
+    pub fn kind(&self) -> &Kind<'a, L> {
+        L::inner(&self.arena[self.node])
+    }
 }
 
 impl<'h, 'a, L: Lang> std::ops::Deref for NodeRef<'h, 'a, L> {

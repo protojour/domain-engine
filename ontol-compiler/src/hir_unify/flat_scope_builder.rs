@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use ontol_hir::{visitor::HirVisitor, SeqPropertyVariant};
 
-use crate::typed_hir::{arena_import_root, TypedHir};
+use crate::typed_hir::{arena_import_root, TypedArena, TypedHir};
 
 use super::{
     flat_scope::{self, FlatScope, OutputVar, PropDepth, ScopeNode, ScopeVar},
@@ -19,14 +19,11 @@ struct NextNode {
 pub struct FlatScopeBuilder<'h, 'm> {
     var_allocator: ontol_hir::VarAllocator,
     scope_nodes: Vec<ScopeNode<'m>>,
-    hir_arena: &'h ontol_hir::arena::Arena<'m, TypedHir>,
+    hir_arena: &'h TypedArena<'m>,
 }
 
 impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
-    pub fn new(
-        var_allocator: ontol_hir::VarAllocator,
-        hir_arena: &'h ontol_hir::arena::Arena<'m, TypedHir>,
-    ) -> Self {
+    pub fn new(var_allocator: ontol_hir::VarAllocator, hir_arena: &'h TypedArena<'m>) -> Self {
         Self {
             // in_scope: VarSet::default(),
             var_allocator,
@@ -381,25 +378,17 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
     }
 
     fn is_const(&self, node: ontol_hir::Node) -> bool {
-        struct ConstChecker<'h, 'm> {
+        struct ConstChecker {
             has_var: bool,
-            arena: &'h ontol_hir::arena::Arena<'m, TypedHir>,
         }
 
-        impl<'h, 'm: 'h> ontol_hir::visitor::HirVisitor<'h, 'm, TypedHir> for ConstChecker<'h, 'm> {
-            fn arena(&self) -> &'h ontol_hir::arena::Arena<'m, TypedHir> {
-                self.arena
-            }
-
+        impl<'h, 'm: 'h> ontol_hir::visitor::HirVisitor<'h, 'm, TypedHir> for ConstChecker {
             fn visit_var(&mut self, _: ontol_hir::Var) {
                 self.has_var = true;
             }
         }
-        let mut checker = ConstChecker {
-            has_var: false,
-            arena: self.hir_arena,
-        };
-        checker.visit_node(0, node);
+        let mut checker = ConstChecker { has_var: false };
+        checker.visit_node(0, self.hir_arena.node_ref(node));
         !checker.has_var
     }
 }

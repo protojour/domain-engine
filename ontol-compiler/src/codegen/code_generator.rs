@@ -17,7 +17,7 @@ use crate::{
     },
     error::CompileError,
     primitive::Primitives,
-    typed_hir::{HirFunc, TypedHir},
+    typed_hir::{HirFunc, TypedArena, TypedHir, TypedNodeRef},
     types::Type,
     CompileErrors, Compiler, SourceSpan, NO_SPAN,
 };
@@ -131,11 +131,7 @@ pub(super) struct CodeGenerator<'a, 'm> {
 }
 
 impl<'a, 'm> CodeGenerator<'a, 'm> {
-    fn gen_node<'h>(
-        &mut self,
-        node_ref: ontol_hir::arena::NodeRef<'h, 'm, TypedHir>,
-        block: &mut Block,
-    ) {
+    fn gen_node<'h>(&mut self, node_ref: TypedNodeRef<'h, 'm>, block: &mut Block) {
         let arena = node_ref.arena();
         let (kind, meta) = (&node_ref.0, &node_ref.1);
         let ty = meta.ty;
@@ -688,7 +684,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
         &mut self,
         (pattern, nodes): &(ontol_hir::PropPattern<'m, TypedHir>, ontol_hir::Nodes),
         (rel_local, val_local): (Local, Local),
-        arena: &ontol_hir::arena::Arena<'m, TypedHir>,
+        arena: &TypedArena<'m>,
         block: &mut Block,
     ) {
         match pattern {
@@ -718,7 +714,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
         struct_var: ontol_hir::Var,
         prop_id: PropertyId,
         ontol_hir::Attribute { rel, val }: ontol_hir::Attribute<ontol_hir::Node>,
-        arena: &ontol_hir::arena::Arena<'m, TypedHir>,
+        arena: &TypedArena<'m>,
         span: SourceSpan,
         block: &mut Block,
     ) {
@@ -756,7 +752,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
         &mut self,
         scopes: &[(Local, ontol_hir::Binding<TypedHir>)],
         nodes: impl IntoIterator<Item = &'n ontol_hir::Node>,
-        arena: &ontol_hir::arena::Arena<'m, TypedHir>,
+        arena: &TypedArena<'m>,
         block: &mut Block,
     ) {
         for (local, binding) in scopes {
@@ -783,7 +779,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
         arms_gen: &mut CaptureMatchArmsGenerator<'_, 'm>,
         first_capture_local: Local,
         terminator: Terminator,
-        arena: &ontol_hir::arena::Arena<'m, TypedHir>,
+        arena: &TypedArena<'m>,
         span: SourceSpan,
     ) {
         let branch_block_indexes: Vec<BlockIndex> = (0..arms_gen.match_arms.len())

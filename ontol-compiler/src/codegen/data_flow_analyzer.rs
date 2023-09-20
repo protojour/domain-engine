@@ -10,7 +10,7 @@ use ontol_runtime::{
     DefId,
 };
 
-use crate::{def::LookupRelationshipMeta, hir_unify::VarSet, typed_hir::TypedHir, types::Type};
+use crate::{def::LookupRelationshipMeta, hir_unify::VarSet, typed_hir::TypedArena, types::Type};
 
 pub struct DataFlowAnalyzer<'h, 'm, 'c, R> {
     defs: &'c R,
@@ -19,7 +19,7 @@ pub struct DataFlowAnalyzer<'h, 'm, 'c, R> {
     /// A mapping from variable to its dependencies
     var_dependencies: FnvHashMap<ontol_hir::Var, VarSet>,
     property_flow: BTreeSet<PropertyFlow>,
-    hir_arena: &'h ontol_hir::arena::Arena<'m, TypedHir>,
+    hir_arena: &'h TypedArena<'m>,
 }
 
 impl<'h, 'm, 'c, R> Debug for DataFlowAnalyzer<'h, 'm, 'c, R> {
@@ -35,7 +35,7 @@ impl<'h, 'm, 'c, R> DataFlowAnalyzer<'h, 'm, 'c, R>
 where
     R: LookupRelationshipMeta<'m>,
 {
-    pub fn new(defs: &'c R, hir_arena: &'h ontol_hir::arena::Arena<'m, TypedHir>) -> Self {
+    pub fn new(defs: &'c R, hir_arena: &'h TypedArena<'m>) -> Self {
         Self {
             defs,
             var_to_property: FnvHashMap::default(),

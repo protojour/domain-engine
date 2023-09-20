@@ -6,7 +6,7 @@ use ontol_runtime::DefId;
 use crate::{
     relation::Constructor,
     text_patterns::TextPatternSegment,
-    typed_hir::{IntoTypedHirValue, Meta, TypedHir, TypedHirValue, UNIT_META},
+    typed_hir::{IntoTypedHirValue, Meta, TypedArena, TypedHir, TypedHirValue, UNIT_META},
     Compiler, NO_SPAN,
 };
 
@@ -79,8 +79,7 @@ fn autogenerate_fmt_hir_struct<'m>(
     var_map: &mut HashMap<DefId, ontol_hir::Var>,
     compiler: &Compiler<'m>,
 ) -> Option<ontol_hir::RootNode<'m, TypedHir>> {
-    let mut arena: ontol_hir::arena::Arena<'m, TypedHir> = Default::default();
-
+    let mut arena: TypedArena<'m> = Default::default();
     let mut nodes: Vec<ontol_hir::Node> = vec![];
 
     if let TextPatternSegment::Concat(segments) = segment {
@@ -121,7 +120,7 @@ fn autogenerate_fmt_segment_property<'m>(
     segment: &TextPatternSegment,
     var_map: &mut HashMap<DefId, ontol_hir::Var>,
     compiler: &Compiler<'m>,
-    arena: &mut ontol_hir::arena::Arena<'m, TypedHir>,
+    arena: &mut TypedArena<'m>,
 ) -> Option<ontol_hir::Node> {
     if let TextPatternSegment::Property {
         property_id,

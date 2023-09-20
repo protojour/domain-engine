@@ -14,7 +14,7 @@ use crate::{
     hir_unify::{flat_unifier_table::IsInScope, CLASSIC_UNIFIER_FALLBACK},
     mem::Intern,
     primitive::PrimitiveKind,
-    typed_hir::{self, IntoTypedHirValue, Meta, TypedHir, TypedHirValue, UNIT_META},
+    typed_hir::{self, IntoTypedHirValue, Meta, TypedHir, TypedHirValue, TypedNodeRef, UNIT_META},
     types::{Type, TypeRef, Types},
     NO_SPAN,
 };
@@ -1383,7 +1383,7 @@ fn find_and_unify_sequence<'m>(
     let mut seq_type_infer = SeqTypeInfer::new(output_seq_var);
 
     for node in &sequence_body {
-        seq_type_infer.traverse(*node, &unifier.hir_arena)
+        seq_type_infer.traverse(unifier.hir_arena.node_ref(*node));
     }
 
     let seq_ty = seq_type_infer.infer(unifier.types);
@@ -1436,38 +1436,30 @@ impl<'m> SeqTypeInfer<'m> {
         types.intern(Type::Seq(seq_type_pair.0, seq_type_pair.1))
     }
 
-    fn traverse(&mut self, node: ontol_hir::Node, arena: &ontol_hir::arena::Arena<'m, TypedHir>) {
+    fn traverse(&mut self, node_ref: TypedNodeRef<'_, 'm>) {
         SeqTypeLocator {
             output_seq_var: self.output_seq_var,
             types: &mut self.types,
-            arena,
         }
-        .visit_node(0, node);
+        .visit_node(0, node_ref);
     }
 }
 
-struct SeqTypeLocator<'i, 'h, 'm> {
+struct SeqTypeLocator<'i, 'm> {
     output_seq_var: OutputVar,
     types: &'i mut Vec<(TypeRef<'m>, TypeRef<'m>)>,
-    arena: &'h ontol_hir::arena::Arena<'m, TypedHir>,
 }
 
-impl<'i, 'h, 'm: 'h> ontol_hir::visitor::HirVisitor<'h, 'm, TypedHir>
-    for SeqTypeLocator<'i, 'h, 'm>
-{
-    fn arena(&self) -> &'h ontol_hir::arena::Arena<'m, TypedHir> {
-        self.arena
-    }
-
-    fn visit_node(&mut self, _: usize, node: ontol_hir::Node) {
-        let kind = self.arena.kind(node);
-        if let ontol_hir::Kind::SeqPush(seq_var, attr) = kind {
+impl<'i, 'h, 'm: 'h> ontol_hir::visitor::HirVisitor<'h, 'm, TypedHir> for SeqTypeLocator<'i, 'm> {
+    fn visit_node(&mut self, _: usize, node_ref: TypedNodeRef<'h, 'm>) {
+        let arena = node_ref.arena();
+        if let ontol_hir::Kind::SeqPush(seq_var, attr) = node_ref.kind() {
             if seq_var == &self.output_seq_var.0 {
                 self.types
-                    .push((self.arena[attr.rel].ty(), self.arena[attr.val].ty()));
+                    .push((arena[attr.rel].ty(), arena[attr.val].ty()));
             }
         }
-        self.visit_kind(0, kind);
+        self.traverse_node(node_ref);
     }
 }
 

@@ -174,17 +174,12 @@ impl VariableTracker {
         &mut self,
         node_ref: ontol_hir::arena::NodeRef<'_, '_, L>,
     ) {
-        struct Visitor<'h, 'm, L: ontol_hir::Lang> {
+        struct Visitor<'h> {
             tracker: &'h mut VariableTracker,
-            arena: &'h ontol_hir::arena::Arena<'m, L>,
         }
-        impl<'h, 'm: 'h, L: ontol_hir::Lang> ontol_hir::visitor::HirVisitor<'h, 'm, L>
-            for Visitor<'h, 'm, L>
+        impl<'h, 'm: 'h, L: ontol_hir::Lang + 'h> ontol_hir::visitor::HirVisitor<'h, 'm, L>
+            for Visitor<'h>
         {
-            fn arena(&self) -> &'h ontol_hir::arena::Arena<'m, L> {
-                self.arena
-            }
-
             fn visit_var(&mut self, var: ontol_hir::Var) {
                 self.tracker.observe(var);
             }
@@ -196,11 +191,7 @@ impl VariableTracker {
             }
         }
 
-        Visitor {
-            tracker: self,
-            arena: node_ref.arena(),
-        }
-        .visit_node(0, node_ref.node());
+        Visitor { tracker: self }.visit_node(0, node_ref);
     }
 }
 
