@@ -1,5 +1,5 @@
 use crate::{
-    typed_hir::{IntoTypedHirValue, Meta, UNIT_META},
+    typed_hir::{arena_import, IntoTypedHirValue, Meta, UNIT_META},
     NO_SPAN,
 };
 
@@ -135,9 +135,9 @@ pub(super) trait UnifyProps<'m>: Sized {
                     .last()
                     .unwrap_or_else(|| unifier.types.unit_type());
 
-                todo!("Import let def to arena");
+                let let_def = arena_import(&mut unifier.hir_arena, let_scope.def.as_ref());
                 let node = unifier.mk_node(
-                    ontol_hir::Kind::Let(let_scope.inner_binder, let_scope.def.node(), block),
+                    ontol_hir::Kind::Let(let_scope.inner_binder, let_def, block),
                     Meta { ty, span: NO_SPAN },
                 );
 

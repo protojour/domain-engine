@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ontol_hir::SeqPropertyVariant;
+use ontol_hir::{visitor::HirVisitor, SeqPropertyVariant};
 use ontol_runtime::vm::proc::BuiltinProc;
 use smallvec::SmallVec;
 
@@ -145,14 +145,13 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
             ontol_hir::Kind::DeclSeq(_label, _attr) => Err(UnifierError::SequenceInputNotSupported),
             ontol_hir::Kind::Struct(binder, _flags, nodes) => self.enter_binder(binder, |zelf| {
                 if zelf.current_prop_analysis_map.is_none() {
-                    todo!();
-                    // zelf.current_prop_analysis_map = Some({
-                    //     let mut dep_analyzer = DepScopeAnalyzer::default();
-                    //     for (index, node) in nodes.iter().enumerate() {
-                    //         dep_analyzer.visit_node(index, node);
-                    //     }
-                    //     dep_analyzer.prop_analysis()?
-                    // });
+                    zelf.current_prop_analysis_map = Some({
+                        let mut dep_analyzer = DepScopeAnalyzer::new(self.hir_arena);
+                        for (index, node) in nodes.iter().enumerate() {
+                            dep_analyzer.visit_node(index, *node);
+                        }
+                        dep_analyzer.prop_analysis()?
+                    });
                 }
 
                 // panic!("prop_analysis: {prop_analysis:#?}");

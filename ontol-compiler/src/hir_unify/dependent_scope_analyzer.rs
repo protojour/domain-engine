@@ -15,13 +15,13 @@ pub struct PropAnalysis {
     pub dependencies: VarSet,
 }
 
-#[derive(Default)]
-pub struct DepScopeAnalyzer {
+pub struct DepScopeAnalyzer<'h, 'm> {
     current_path: Path,
     stack: Vec<StackAtom>,
     prop_variables: VarSet,
     bound_variables: VarSet,
     prop_variant_deps: HashMap<Path, VarSet>,
+    hir_arena: &'h ontol_hir::arena::Arena<'m, TypedHir>,
 }
 
 enum StackAtom {
@@ -29,7 +29,18 @@ enum StackAtom {
     Node,
 }
 
-impl DepScopeAnalyzer {
+impl<'h, 'm> DepScopeAnalyzer<'h, 'm> {
+    pub fn new(hir_arena: &'h ontol_hir::arena::Arena<'m, TypedHir>) -> Self {
+        Self {
+            current_path: Default::default(),
+            stack: Default::default(),
+            prop_variables: Default::default(),
+            bound_variables: Default::default(),
+            prop_variant_deps: Default::default(),
+            hir_arena,
+        }
+    }
+
     pub fn prop_analysis(self) -> UnifierResult<HashMap<Path, PropAnalysis>> {
         let prop_variant_deps = self.prop_variant_deps;
 
@@ -113,58 +124,59 @@ impl DepScopeAnalyzer {
     }
 }
 
-// impl<'h, 'm: 'h> ontol_hir::visitor::HirVisitor<'h, 'm, TypedHir> for DepScopeAnalyzer {
-//     fn visit_node(&mut self, index: usize, node: ontol_hir::Node) {
-//         self.enter_child(index, |zelf| {
-//             if let Some(StackAtom::Prop) = zelf.stack.last() {
-//                 let mut prop_variables = VarSet::default();
-//                 std::mem::swap(&mut zelf.prop_variables, &mut prop_variables);
-//
-//                 zelf.stack.push(StackAtom::Node);
-//                 zelf.visit_kind(index, node.kind());
-//                 zelf.stack.pop();
-//
-//                 if !zelf.prop_variables.0.is_empty() {
-//                     zelf.prop_variant_deps
-//                         .insert(zelf.current_path.clone(), zelf.prop_variables.clone());
-//                 }
-//
-//                 std::mem::swap(&mut zelf.prop_variables, &mut prop_variables);
-//             } else {
-//                 zelf.stack.push(StackAtom::Node);
-//                 zelf.visit_kind(index, node.kind());
-//                 zelf.stack.pop();
-//             }
-//         });
-//     }
-//
-//     fn visit_prop_variant(
-//         &mut self,
-//         index: usize,
-//         variant: &'h ontol_hir::PropVariant<'m, TypedHir>,
-//     ) {
-//         self.stack.push(StackAtom::Prop);
-//
-//         self.enter_child(index, |zelf| match variant {
-//             ontol_hir::PropVariant::Singleton(_) => {
-//                 zelf.traverse_prop_variant(variant);
-//             }
-//             ontol_hir::PropVariant::Seq(_) => {}
-//         });
-//
-//         self.stack.pop();
-//     }
-//
-//     fn visit_var(&mut self, var: ontol_hir::Var) {
-//         if !self.bound_variables.0.contains(var.0 as usize) {
-//             self.prop_variables.0.insert(var.0 as usize);
-//         }
-//     }
-//
-//     fn visit_binder(&mut self, var: ontol_hir::Var) {
-//         self.bound_variables.0.insert(var.0 as usize);
-//     }
-//
-//     fn visit_label(&mut self, _label: ontol_hir::Label) {}
-// }
-//
+impl<'h, 'm: 'h> ontol_hir::visitor::HirVisitor<'h, 'm, TypedHir> for DepScopeAnalyzer<'h, 'm> {
+    fn arena(&self) -> &'h ontol_hir::arena::Arena<'m, TypedHir> {
+        self.hir_arena
+    }
+
+    fn visit_node(&mut self, index: usize, node: ontol_hir::Node) {
+        self.enter_child(index, |zelf| {
+            let kind = self.hir_arena.kind(node);
+
+            if let Some(StackAtom::Prop) = zelf.stack.last() {
+                let mut prop_variables = VarSet::default();
+                std::mem::swap(&mut zelf.prop_variables, &mut prop_variables);
+
+                zelf.stack.push(StackAtom::Node);
+                zelf.visit_kind(index, kind);
+                zelf.stack.pop();
+
+                if !zelf.prop_variables.0.is_empty() {
+                    zelf.prop_variant_deps
+                        .insert(zelf.current_path.clone(), zelf.prop_variables.clone());
+                }
+
+                std::mem::swap(&mut zelf.prop_variables, &mut prop_variables);
+            } else {
+                zelf.stack.push(StackAtom::Node);
+                zelf.visit_kind(index, kind);
+                zelf.stack.pop();
+            }
+        });
+    }
+
+    fn visit_prop_variant(&mut self, index: usize, variant: &ontol_hir::PropVariant<'m, TypedHir>) {
+        self.stack.push(StackAtom::Prop);
+
+        self.enter_child(index, |zelf| match variant {
+            ontol_hir::PropVariant::Singleton(_) => {
+                zelf.traverse_prop_variant(variant);
+            }
+            ontol_hir::PropVariant::Seq(_) => {}
+        });
+
+        self.stack.pop();
+    }
+
+    fn visit_var(&mut self, var: ontol_hir::Var) {
+        if !self.bound_variables.0.contains(var.0 as usize) {
+            self.prop_variables.0.insert(var.0 as usize);
+        }
+    }
+
+    fn visit_binder(&mut self, var: ontol_hir::Var) {
+        self.bound_variables.0.insert(var.0 as usize);
+    }
+
+    fn visit_label(&mut self, _label: ontol_hir::Label) {}
+}
