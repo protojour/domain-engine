@@ -13,8 +13,8 @@ use crate::{
     pattern::{PatternKind, StructPatternAttr, StructPatternModifier},
     primitive::PrimitiveKind,
     type_check::{hir_build::NodeInfo, repr::repr_model::ReprKind, TypeError},
-    typed_hir::{Meta, TypedHir, TypedHirValue},
-    types::{Type, TypeRef},
+    typed_hir::{Meta, TypedHir, TypedHirValue, UNIT_META},
+    types::{Type, TypeRef, UNIT_TYPE},
     CompileError, SourceSpan, NO_SPAN,
 };
 
@@ -276,7 +276,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let rel_params_ty = match match_property.rel_params_def {
             Some(rel_def_id) => self.check_def_sealed(rel_def_id),
-            None => self.unit_type(),
+            None => &UNIT_TYPE,
         };
         debug!("rel_params_ty: {rel_params_ty:?}");
 
@@ -414,7 +414,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 prop_variants.into(),
             ),
             Meta {
-                ty: self.unit_type(),
+                ty: &UNIT_TYPE,
                 span: *prop_span,
             },
         ))
@@ -451,7 +451,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let value_ty = self.check_def_sealed(const_def_id);
 
                 let prop_node = {
-                    let rel = self.unit_node_no_span(ctx);
+                    let rel = ctx.mk_unit_node_no_span();
                     let val = ctx.mk_node(
                         ontol_hir::Kind::Const(const_def_id),
                         Meta {
@@ -470,10 +470,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             })]
                             .into(),
                         ),
-                        Meta {
-                            ty: self.unit_type(),
-                            span: NO_SPAN,
-                        },
+                        UNIT_META,
                     )
                 };
                 hir_props.push(prop_node);

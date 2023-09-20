@@ -4,12 +4,9 @@ use ontol_hir::VarAllocator;
 use ontol_runtime::DefId;
 
 use crate::{
-    mem::Intern,
-    primitive::PrimitiveKind,
     relation::Constructor,
     text_patterns::TextPatternSegment,
-    typed_hir::{IntoTypedHirValue, Meta, TypedHir, TypedHirValue},
-    types::{Type, TypeRef},
+    typed_hir::{IntoTypedHirValue, Meta, TypedHir, TypedHirValue, UNIT_META},
     Compiler, NO_SPAN,
 };
 
@@ -22,10 +19,6 @@ pub fn autogenerate_mapping<'m>(
     let first_def_id = key_pair.first().def_id;
     let second_def_id = key_pair.second().def_id;
 
-    let unit_type = compiler
-        .types
-        .intern(Type::Primitive(PrimitiveKind::Unit, DefId::unit()));
-
     let first_properties = compiler.relations.properties_by_def_id(first_def_id)?;
     let second_properties = compiler.relations.properties_by_def_id(second_def_id)?;
 
@@ -36,7 +29,6 @@ pub fn autogenerate_mapping<'m>(
         (Constructor::TextFmt(first_fmt), Constructor::TextFmt(second_fmt)) => {
             autogenerate_fmt_to_fmt(
                 compiler,
-                unit_type,
                 (first_def_id, first_fmt),
                 (second_def_id, second_fmt),
             )
@@ -47,7 +39,6 @@ pub fn autogenerate_mapping<'m>(
 
 fn autogenerate_fmt_to_fmt<'m>(
     compiler: &Compiler<'m>,
-    unit_type: TypeRef<'m>,
     first: (DefId, &TextPatternSegment),
     second: (DefId, &TextPatternSegment),
 ) -> Option<ExplicitMapCodegenTask<'m>> {
@@ -62,18 +53,10 @@ fn autogenerate_fmt_to_fmt<'m>(
         first_var,
         first.1,
         &mut var_map,
-        unit_type,
         compiler,
     )?;
-    let second_node = autogenerate_fmt_hir_struct(
-        None,
-        second.0,
-        second_var,
-        second.1,
-        &mut var_map,
-        unit_type,
-        compiler,
-    )?;
+    let second_node =
+        autogenerate_fmt_hir_struct(None, second.0, second_var, second.1, &mut var_map, compiler)?;
 
     Some(ExplicitMapCodegenTask {
         first: MapArm {
@@ -94,7 +77,6 @@ fn autogenerate_fmt_hir_struct<'m>(
     binder_var: ontol_hir::Var,
     segment: &TextPatternSegment,
     var_map: &mut HashMap<DefId, ontol_hir::Var>,
-    unit_type: TypeRef<'m>,
     compiler: &Compiler<'m>,
 ) -> Option<ontol_hir::RootNode<'m, TypedHir>> {
     let mut arena: ontol_hir::arena::Arena<'m, TypedHir> = Default::default();
@@ -108,7 +90,6 @@ fn autogenerate_fmt_hir_struct<'m>(
                 binder_var,
                 child_segment,
                 var_map,
-                unit_type,
                 compiler,
                 &mut arena,
             ) {
@@ -139,7 +120,6 @@ fn autogenerate_fmt_segment_property<'m>(
     binder_var: ontol_hir::Var,
     segment: &TextPatternSegment,
     var_map: &mut HashMap<DefId, ontol_hir::Var>,
-    unit_type: TypeRef<'m>,
     compiler: &Compiler<'m>,
     arena: &mut ontol_hir::arena::Arena<'m, TypedHir>,
 ) -> Option<ontol_hir::Node> {
@@ -169,13 +149,7 @@ fn autogenerate_fmt_segment_property<'m>(
             }
         };
 
-        let rel = arena.add(TypedHirValue(
-            ontol_hir::Kind::Unit,
-            Meta {
-                ty: unit_type,
-                span: NO_SPAN,
-            },
-        ));
+        let rel = arena.add(TypedHirValue(ontol_hir::Kind::Unit, UNIT_META));
 
         Some(
             arena.add(TypedHirValue(

@@ -14,7 +14,7 @@ use crate::{
     hir_unify::{flat_unifier_table::IsInScope, CLASSIC_UNIFIER_FALLBACK},
     mem::Intern,
     primitive::PrimitiveKind,
-    typed_hir::{self, IntoTypedHirValue, Meta, TypedHir, TypedHirValue},
+    typed_hir::{self, IntoTypedHirValue, Meta, TypedHir, TypedHirValue, UNIT_META},
     types::{Type, TypeRef, Types},
     NO_SPAN,
 };
@@ -212,7 +212,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                                 expr::Kind::SeqItem(label, index, iter, Box::new(attr)),
                                 expr::Meta {
                                     free_vars,
-                                    hir_meta: self.unit_meta(),
+                                    hir_meta: UNIT_META,
                                 },
                             );
 
@@ -411,13 +411,6 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
             AssignResult::Unassigned(expr)
         }
     }
-
-    pub fn unit_meta(&mut self) -> typed_hir::Meta<'m> {
-        typed_hir::Meta {
-            ty: self.types.unit_type(),
-            span: NO_SPAN,
-        }
-    }
 }
 
 fn unify_single<'m>(
@@ -515,7 +508,6 @@ fn unify_single<'m>(
 
             for prop in props {
                 let free_vars = prop.free_vars.clone();
-                let unit_meta = unifier.unit_meta();
                 let prop_node = ScopedExprToNode {
                     table,
                     unifier,
@@ -527,7 +519,7 @@ fn unify_single<'m>(
                         expr::Kind::Prop(Box::new(prop)),
                         expr::Meta {
                             free_vars,
-                            hir_meta: unit_meta,
+                            hir_meta: UNIT_META,
                         },
                     ),
                     &next_in_scope,
@@ -729,14 +721,13 @@ fn unify_scope_structural<'m>(
                         )?;
 
                         if !push_nodes.is_empty() {
-                            let meta = unifier.unit_meta();
                             builder.output.push(unifier.mk_node(
                                 ontol_hir::Kind::ForEach(
                                     ontol_hir::Var(label.0),
                                     (bindings.rel, bindings.val),
                                     push_nodes.into(),
                                 ),
-                                meta,
+                                UNIT_META,
                             ));
                         }
                     }
@@ -784,7 +775,6 @@ fn unify_scope_structural<'m>(
                             Default::default();
 
                         let mut hir_props: Vec<ontol_hir::Node> = vec![];
-                        let unit_meta = unifier.unit_meta();
 
                         // Analyze which sequences are under scrutiny and allocate output variables
                         for assignment in std::mem::take(&mut scope_map.assignments) {
@@ -797,7 +787,7 @@ fn unify_scope_structural<'m>(
                                             ))
                                         });
 
-                                    let rel = unifier.mk_node(ontol_hir::Kind::Unit, unit_meta);
+                                    let rel = unifier.mk_node(ontol_hir::Kind::Unit, UNIT_META);
                                     let val = unifier.mk_node(
                                         ontol_hir::Kind::Var(infererer.output_seq_var.0),
                                         meta.hir_meta,
@@ -922,17 +912,16 @@ fn unify_scope_structural<'m>(
                                 sequence_meta,
                             );
 
-                            let unit_meta = unifier.unit_meta();
                             let let_node = unifier.mk_node(
                                 ontol_hir::Kind::Let(
                                     ontol_hir::Binder {
                                         var: output_seq_var.0,
                                     }
-                                    .with_meta(unit_meta),
+                                    .with_meta(UNIT_META),
                                     let_def,
                                     nodes,
                                 ),
-                                unit_meta,
+                                UNIT_META,
                             );
 
                             nodes = Default::default();
@@ -1235,9 +1224,8 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                             self.level.next(),
                         )?;
 
-                        let unit_meta = self.unifier.unit_meta();
                         [ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
-                            rel: self.mk_node(ontol_hir::Kind::Unit, unit_meta),
+                            rel: self.mk_node(ontol_hir::Kind::Unit, UNIT_META),
                             val: sequence_node,
                         })]
                         .into()
@@ -1310,7 +1298,6 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                                 self.scoped_expr_to_node(attr.rel, in_scope, main_scope.next())?;
                             let val =
                                 self.scoped_expr_to_node(attr.val, in_scope, main_scope.next())?;
-                            let unit_meta = self.unifier.unit_meta();
                             body.push(
                                 self.mk_node(
                                     ontol_hir::Kind::Prop(
@@ -1323,7 +1310,7 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                                         })]
                                         .into(),
                                     ),
-                                    unit_meta,
+                                    UNIT_META,
                                 ),
                             );
                         }
@@ -1348,10 +1335,9 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                 let rel = self.scoped_expr_to_node(attr.rel, in_scope, next_main_scope)?;
                 let val = self.scoped_expr_to_node(attr.val, in_scope, next_main_scope)?;
 
-                let unit_meta = self.unifier.unit_meta();
                 Ok(self.mk_node(
                     ontol_hir::Kind::SeqPush(output_var.0, ontol_hir::Attribute { rel, val }),
-                    unit_meta,
+                    UNIT_META,
                 ))
             }
             other => Err(unifier_todo(smart_format!("leaf expr to node: {other:?}"))),

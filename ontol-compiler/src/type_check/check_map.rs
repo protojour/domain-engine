@@ -16,7 +16,7 @@ use crate::{
     pattern::{PatId, Pattern, PatternKind, Patterns, RegexPatternCaptureNode},
     type_check::hir_build_ctx::{Arm, VariableMapping},
     typed_hir::TypedHir,
-    types::{Type, TypeRef, Types},
+    types::{Type, TypeRef, ERROR_TYPE},
     CompileErrors, Note, SourceSpan, SpannedNote,
 };
 
@@ -38,7 +38,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         {
             let mut map_check = MapCheck {
-                types: self.types,
                 errors: self.errors,
                 patterns: self.patterns,
             };
@@ -204,18 +203,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     }
 }
 
-pub struct MapCheck<'c, 'm> {
-    types: &'c mut Types<'m>,
+pub struct MapCheck<'c> {
     errors: &'c mut CompileErrors,
     patterns: &'c Patterns,
 }
 
-impl<'c, 'm> MapCheck<'c, 'm> {
+impl<'c> MapCheck<'c> {
     fn analyze_arm(
         &mut self,
         expr: &Pattern,
         parent_aggr_group: Option<CtrlFlowGroup>,
-        ctx: &mut HirBuildCtx<'m>,
+        ctx: &mut HirBuildCtx<'_>,
     ) -> Result<AggrGroupSet, AggrGroupError> {
         let mut group_set = AggrGroupSet::new();
 
@@ -338,7 +336,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
         node: &RegexPatternCaptureNode,
         full_span: &SourceSpan,
         parent_aggr_group: Option<CtrlFlowGroup>,
-        ctx: &mut HirBuildCtx<'m>,
+        ctx: &mut HirBuildCtx<'_>,
     ) -> Result<AggrGroupSet, AggrGroupError> {
         let mut group_set = AggrGroupSet::new();
         match node {
@@ -447,7 +445,7 @@ impl<'c, 'm> MapCheck<'c, 'm> {
         span: &SourceSpan,
         parent_aggr_group: Option<CtrlFlowGroup>,
         group_set: &mut AggrGroupSet,
-        ctx: &mut HirBuildCtx<'m>,
+        ctx: &mut HirBuildCtx<'_>,
     ) {
         if let Some(explicit_variable) = ctx.pattern_variables.get(&var) {
             // Variable is used more than once
@@ -487,9 +485,9 @@ impl<'c, 'm> MapCheck<'c, 'm> {
         }
     }
 
-    fn error(&mut self, error: CompileError, span: &SourceSpan) -> TypeRef<'m> {
+    fn error(&mut self, error: CompileError, span: &SourceSpan) -> TypeRef {
         self.errors.push(error.spanned(span));
-        self.types.intern(Type::Error)
+        &ERROR_TYPE
     }
 }
 

@@ -2,14 +2,12 @@ use std::fmt::Debug;
 
 use bit_set::BitSet;
 use ontol_hir::visitor::HirVisitor;
-use ontol_runtime::{format_utils::DebugViaDisplay, DefId};
+use ontol_runtime::format_utils::DebugViaDisplay;
 use smartstring::alias::String;
 use tracing::{info, warn};
 
 use crate::{
     hir_unify::{expr_builder::ExprBuilder, scope_builder::ScopeBuilder, unifier::Unifier},
-    mem::Intern,
-    primitive::PrimitiveKind,
     typed_hir::{HirFunc, IntoTypedHirValue, Meta, TypedHir},
     types::Type,
     Compiler, SourceSpan,
@@ -113,12 +111,8 @@ fn unify_classic<'m>(
     var_allocator: ontol_hir::VarAllocator,
     compiler: &mut Compiler<'m>,
 ) -> UnifierResult<(UnifiedRootNode<'m>, ontol_hir::VarAllocator)> {
-    let unit_type = compiler
-        .types
-        .intern(Type::Primitive(PrimitiveKind::Unit, DefId::unit()));
-
     let (scope_binder, var_allocator) = {
-        let mut scope_builder = ScopeBuilder::new(var_allocator, unit_type, scope.arena());
+        let mut scope_builder = ScopeBuilder::new(var_allocator, scope.arena());
         let scope_binder = scope_builder.build_scope_binder(scope.node())?;
         (scope_binder, scope_builder.var_allocator())
     };
@@ -147,12 +141,8 @@ fn unify_flat<'m>(
     var_allocator: ontol_hir::VarAllocator,
     compiler: &mut Compiler<'m>,
 ) -> UnifierResult<(UnifiedRootNode<'m>, ontol_hir::VarAllocator)> {
-    let unit_type = compiler
-        .types
-        .intern(Type::Primitive(PrimitiveKind::Unit, DefId::unit()));
-
     let (flat_scope, var_allocator) = {
-        let mut scope_builder = FlatScopeBuilder::new(var_allocator, unit_type, scope.arena());
+        let mut scope_builder = FlatScopeBuilder::new(var_allocator, scope.arena());
         let flat_scope = scope_builder.build_flat_scope(scope.node())?;
         (flat_scope, scope_builder.var_allocator())
     };
@@ -325,12 +315,7 @@ impl<'b> Iterator for VarSetIter<'b> {
 pub mod test_api {
     use std::fmt::Write;
 
-    use ontol_runtime::DefId;
-
-    use crate::{
-        hir_unify::unify_to_function, mem::Mem, primitive::PrimitiveKind, typed_hir::TypedHir,
-        types::Type, Compiler,
-    };
+    use crate::{hir_unify::unify_to_function, mem::Mem, typed_hir::TypedHir, Compiler};
 
     use super::{flat_scope_builder::FlatScopeBuilder, VariableTracker};
 
@@ -351,16 +336,13 @@ pub mod test_api {
         output
     }
 
-    static UNIT_TYPE: Type = Type::Primitive(PrimitiveKind::Unit, DefId::unit());
-
     pub fn mk_flat_scope(hir: &str) -> std::string::String {
         let hir_node = parse_typed(hir);
 
         let mut var_tracker = VariableTracker::default();
         var_tracker.track_largest(hir_node.as_ref());
 
-        let mut builder =
-            FlatScopeBuilder::new(var_tracker.var_allocator(), &UNIT_TYPE, hir_node.arena());
+        let mut builder = FlatScopeBuilder::new(var_tracker.var_allocator(), hir_node.arena());
         let flat_scope = builder.build_flat_scope(hir_node.node()).unwrap();
         let mut output = String::new();
         write!(&mut output, "{flat_scope}").unwrap();

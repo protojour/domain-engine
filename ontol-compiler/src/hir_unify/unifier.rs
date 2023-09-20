@@ -6,7 +6,7 @@ use crate::{
     hir_unify::{UnifierError, UnifierResult, VarSet},
     mem::Intern,
     typed_hir::{arena_import, IntoTypedHirValue, Meta, TypedHir, TypedHirValue, UNIT_META},
-    types::{Type, Types},
+    types::{Type, Types, UNIT_TYPE},
     NO_SPAN,
 };
 
@@ -65,8 +65,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
             // ### need to return scope binder
             (expr_kind, scope::Kind::Var(var)) => {
                 // TODO: remove const_scope, have a way to ergonomically re-assemble the scope
-                let const_scope = self.const_scope();
-                let unified = self.unify(const_scope, expr::Expr(expr_kind, expr_meta))?;
+                let unified = self.unify(scope::constant(), expr::Expr(expr_kind, expr_meta))?;
 
                 Ok(UnifiedNode {
                     typed_binder: Some(ontol_hir::Binder { var }.with_meta(scope_meta.hir_meta)),
@@ -74,8 +73,8 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 })
             }
             (expr_kind, scope::Kind::Regex(string_var, regex_def_id, scope_capture_groups)) => {
-                let const_scope = self.const_scope();
-                let unified = self.unify(const_scope, expr::Expr(expr_kind, expr_meta.clone()))?;
+                let unified =
+                    self.unify(scope::constant(), expr::Expr(expr_kind, expr_meta.clone()))?;
 
                 let capture_groups = scope_capture_groups
                     .iter()
@@ -136,9 +135,8 @@ impl<'a, 'm> Unifier<'a, 'm> {
             }),
             (expr::Kind::Prop(prop), scope::Kind::Const) => match prop.variant {
                 expr::PropVariant::Singleton(attr) => {
-                    let const_scope = self.const_scope();
-                    let rel = self.unify(const_scope.clone(), attr.rel)?;
-                    let val = self.unify(const_scope, attr.val)?;
+                    let rel = self.unify(scope::constant(), attr.rel)?;
+                    let val = self.unify(scope::constant(), attr.val)?;
 
                     Ok(UnifiedNode {
                         typed_binder: None,
@@ -182,15 +180,12 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         free_vars.0.union_with(&attr.rel.meta().free_vars.0);
                         free_vars.0.union_with(&attr.val.meta().free_vars.0);
 
-                        let unit_meta = self.unit_meta();
-
-                        let const_scope = self.const_scope();
                         let push_unified = self.unify(
-                            const_scope,
+                            scope::constant(),
                             expr::Expr(
                                 expr::Kind::Push(ontol_hir::Var(label.0), Box::new(attr)),
                                 expr::Meta {
-                                    hir_meta: unit_meta,
+                                    hir_meta: UNIT_META,
                                     free_vars,
                                 },
                             ),
@@ -216,8 +211,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         },
                     );
 
-                    let unit_meta = self.unit_meta();
-                    let unit_node = self.mk_node(ontol_hir::Kind::Unit, unit_meta);
+                    let unit_node = self.mk_node(ontol_hir::Kind::Unit, UNIT_META);
 
                     Ok(UnifiedNode {
                         typed_binder: None,
@@ -330,14 +324,12 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     free_vars.0.union_with(&attr.rel.meta().free_vars.0);
                     free_vars.0.union_with(&attr.val.meta().free_vars.0);
 
-                    let unit_meta = self.unit_meta();
-
                     let push_unified = self.unify(
                         joined_scope.clone(),
                         expr::Expr(
                             expr::Kind::Push(gen_scope.output_seq, Box::new(attr)),
                             expr::Meta {
-                                hir_meta: unit_meta,
+                                hir_meta: UNIT_META,
                                 free_vars,
                             },
                         ),
@@ -350,7 +342,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                                 (hir_rel_binding, hir_val_binding),
                                 [push_unified.node].into_iter().collect(),
                             ),
-                            unit_meta,
+                            UNIT_META,
                         ));
                     } else {
                         sequence_body.push(push_unified.node);
@@ -404,8 +396,6 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
                 let push_unified = {
                     let joined_scope = self.join_attr_scope(rel_binding, val_binding);
-                    let unit_meta = self.unit_meta();
-
                     let mut free_vars = VarSet::default();
                     free_vars.0.union_with(&attr.rel.meta().free_vars.0);
                     free_vars.0.union_with(&attr.val.meta().free_vars.0);
@@ -415,24 +405,21 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         expr::Expr(
                             expr::Kind::Push(gen_scope.output_seq, attr),
                             expr::Meta {
-                                hir_meta: unit_meta,
+                                hir_meta: UNIT_META,
                                 free_vars,
                             },
                         ),
                     )?
                 };
 
-                let for_each = {
-                    let unit_meta = self.unit_meta();
-                    self.mk_node(
-                        ontol_hir::Kind::ForEach(
-                            gen_scope.input_seq,
-                            (hir_rel_binding, hir_val_binding),
-                            [push_unified.node].into_iter().collect(),
-                        ),
-                        unit_meta,
-                    )
-                };
+                let for_each = self.mk_node(
+                    ontol_hir::Kind::ForEach(
+                        gen_scope.input_seq,
+                        (hir_rel_binding, hir_val_binding),
+                        [push_unified.node].into_iter().collect(),
+                    ),
+                    UNIT_META,
+                );
                 let sequence = self.mk_node(
                     ontol_hir::Kind::Sequence(
                         ontol_hir::Binder {
@@ -456,10 +443,9 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 })
             }
             (expr::Kind::Call(call), scope::Kind::Const) => {
-                let const_scope = self.const_scope();
                 let mut args = ontol_hir::Nodes::default();
                 for arg in call.1 {
-                    args.push(self.unify(const_scope.clone(), arg)?.node);
+                    args.push(self.unify(scope::constant(), arg)?.node);
                 }
                 Ok(UnifiedNode {
                     typed_binder: None,
@@ -467,8 +453,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 })
             }
             (expr::Kind::Map(param), scope::Kind::Const) => {
-                let const_scope = self.const_scope();
-                let unified_param = self.unify(const_scope, *param)?;
+                let unified_param = self.unify(scope::constant(), *param)?;
 
                 Ok(UnifiedNode {
                     typed_binder: unified_param.typed_binder,
@@ -484,7 +469,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
                 Ok(UnifiedNode {
                     typed_binder: Some(ontol_hir::Binder { var: seq_var }.with_meta(Meta {
-                        ty: self.types.unit_type(),
+                        ty: &UNIT_TYPE,
                         span: scope_hir_meta.span,
                     })),
                     node: self.mk_node(
@@ -559,10 +544,9 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 }
 
                 if !dep_tree.constants.is_empty() {
-                    let const_scope = self.const_scope();
                     let unscoped_nodes = expr::Prop::unify_sub_scoped(
                         self,
-                        const_scope,
+                        scope::constant(),
                         SubTree {
                             expressions: dep_tree.constants,
                             sub_trees: vec![],
@@ -597,10 +581,9 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 let scope = scope::Scope(scope_kind, scope_meta);
                 let mut nodes = ontol_hir::Nodes::default();
                 for prop in props {
-                    let hir_meta = self.unit_meta();
                     let expr_meta = expr::Meta {
                         free_vars: prop.free_vars.clone(),
-                        hir_meta,
+                        hir_meta: UNIT_META,
                     };
                     nodes.push(
                         self.unify(
@@ -736,7 +719,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     .cloned()
                     .map(|node| self.hir_arena[node].meta().ty)
                     .last()
-                    .unwrap_or_else(|| self.types.unit_type());
+                    .unwrap_or(&UNIT_TYPE);
 
                 let def = arena_import(&mut self.hir_arena, let_scope.def.as_ref());
                 let node = self.mk_node(
@@ -765,10 +748,9 @@ impl<'a, 'm> Unifier<'a, 'm> {
         &mut self,
         expressions: Vec<expr::Expr<'m>>,
     ) -> UnifierResult<Vec<ontol_hir::Node>> {
-        let const_scope = self.const_scope();
         let mut nodes = vec![];
         for expr in expressions {
-            nodes.push(self.unify(const_scope.clone(), expr)?.node);
+            nodes.push(self.unify(scope::constant(), expr)?.node);
         }
         Ok(nodes)
     }
@@ -780,7 +762,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
     ) -> scope::Scope<'m> {
         match (rel, val) {
             (scope::PatternBinding::Wildcard(_), scope::PatternBinding::Wildcard(_)) => {
-                self.const_scope()
+                scope::constant()
             }
             (scope::PatternBinding::Scope(_, rel), scope::PatternBinding::Wildcard(_)) => rel,
             (scope::PatternBinding::Wildcard(_), scope::PatternBinding::Scope(_, val)) => val,
@@ -792,7 +774,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     ) => {
                         // attribute scopes are special, we don't need to track the var binders, as
                         // those are handled outside this function
-                        self.const_scope()
+                        scope::constant()
                     }
                     (scope::Kind::Let(_let_scope), _other)
                     | (_other, scope::Kind::Let(_let_scope)) => {
@@ -807,7 +789,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                             scope::Meta {
                                 vars: VarSet::default(),
                                 dependencies: VarSet::default(),
-                                hir_meta: self.unit_meta(),
+                                hir_meta: UNIT_META,
                             },
                         )
                     }
@@ -816,24 +798,6 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     }
                 }
             }
-        }
-    }
-
-    pub(super) fn const_scope(&mut self) -> scope::Scope<'m> {
-        scope::Scope(
-            scope::Kind::Const,
-            scope::Meta {
-                hir_meta: self.unit_meta(),
-                vars: VarSet::default(),
-                dependencies: VarSet::default(),
-            },
-        )
-    }
-
-    pub(super) fn unit_meta(&mut self) -> Meta<'m> {
-        Meta {
-            ty: self.types.unit_type(),
-            span: NO_SPAN,
         }
     }
 

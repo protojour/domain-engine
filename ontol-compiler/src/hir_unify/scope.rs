@@ -2,7 +2,7 @@ use ontol_runtime::{value::PropertyId, DefId};
 
 use crate::{
     hir_unify::VarSet,
-    typed_hir::{self, TypedHir, TypedHirValue},
+    typed_hir::{self, TypedHir, TypedHirValue, UNIT_META},
 };
 
 #[derive(Clone, Debug)]
@@ -12,6 +12,17 @@ impl<'m> Scope<'m> {
     pub fn kind(&self) -> &Kind<'m> {
         &self.0
     }
+}
+
+pub fn constant<'m>() -> Scope<'m> {
+    Scope(
+        Kind::Const,
+        Meta {
+            hir_meta: UNIT_META,
+            vars: VarSet::default(),
+            dependencies: VarSet::default(),
+        },
+    )
 }
 
 #[derive(Clone, Debug)]

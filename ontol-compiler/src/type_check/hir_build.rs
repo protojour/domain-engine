@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use ontol_runtime::{smart_format, DefId};
+use ontol_runtime::smart_format;
 use tracing::debug;
 
 use crate::{
@@ -15,7 +15,7 @@ use crate::{
         inference::UnifyValue,
     },
     typed_hir::{IntoTypedHirValue, Meta, TypedHir, TypedHirValue},
-    types::{Type, TypeRef},
+    types::{Type, TypeRef, ERROR_TYPE, UNIT_TYPE},
     SourceSpan, NO_SPAN,
 };
 
@@ -264,7 +264,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         }
 
                         self.type_error(TypeError::MustBeSequence(other_ty), &pattern.span);
-                        (self.unit_type(), self.types.intern(Type::Error))
+                        (&UNIT_TYPE, &ERROR_TYPE)
                     }
                     None => {
                         let pat_id = self.patterns.alloc_pat_id();
@@ -273,7 +273,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             .intern(Type::Infer(ctx.inference.new_type_variable(pat_id)));
 
                         debug!("Infer seq val type: {val_ty:?}");
-                        (self.unit_type(), val_ty)
+                        (&UNIT_TYPE, val_ty)
                     }
                 };
 
@@ -285,7 +285,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     );
                 }
 
-                let rel = self.unit_node_no_span(ctx);
+                let rel = ctx.mk_unit_node_no_span();
                 let val = self.build_node(
                     &pat_elements.iter().next().unwrap().pattern,
                     NodeInfo {
@@ -632,24 +632,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         ctx.mk_node(
             ontol_hir::Kind::Unit,
             Meta {
-                ty: self.types.intern(Type::Error),
+                ty: &ERROR_TYPE,
                 span: *span,
             },
         )
-    }
-
-    pub(super) fn unit_node_no_span(&mut self, ctx: &mut HirBuildCtx<'m>) -> ontol_hir::Node {
-        ctx.mk_node(
-            ontol_hir::Kind::Unit,
-            Meta {
-                ty: self.unit_type(),
-                span: NO_SPAN,
-            },
-        )
-    }
-
-    pub(super) fn unit_type(&mut self) -> TypeRef<'m> {
-        self.types
-            .intern(Type::Primitive(PrimitiveKind::Unit, DefId::unit()))
     }
 }

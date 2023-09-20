@@ -3,7 +3,7 @@ use smartstring::alias::String;
 
 use crate::{
     pattern::PatId,
-    typed_hir::{self, TypedHir, TypedHirValue},
+    typed_hir::{self, TypedHir, TypedHirValue, UNIT_META},
     types::TypeRef,
     SourceSpan,
 };
@@ -77,6 +77,11 @@ impl<'m> HirBuildCtx<'m> {
         meta: typed_hir::Meta<'m>,
     ) -> ontol_hir::Node {
         self.hir_arena.add(TypedHirValue(kind, meta))
+    }
+
+    pub fn mk_unit_node_no_span(&mut self) -> ontol_hir::Node {
+        self.hir_arena
+            .add(TypedHirValue(ontol_hir::Kind::Unit, UNIT_META))
     }
 }
 

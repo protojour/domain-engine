@@ -3,7 +3,7 @@ use ontol_runtime::value::PropertyId;
 
 use crate::{
     hir_unify::flat_scope,
-    typed_hir::{self, IntoTypedHirValue, TypedHir},
+    typed_hir::{self, IntoTypedHirValue, TypedHir, UNIT_META},
 };
 
 use super::{
@@ -34,14 +34,13 @@ impl<'m> LevelBuilder<'m> {
                         .push((ontol_hir::PropPattern::Absent, ontol_hir::Nodes::default()));
                 }
 
-                let unit_meta = unifier.unit_meta();
                 self.output.push(unifier.mk_node(
                     ontol_hir::Kind::MatchProp(
                         struct_var,
                         property_id,
                         merged_match_arms.match_arms.into(),
                     ),
-                    unit_meta,
+                    UNIT_META,
                 ));
             }
         }

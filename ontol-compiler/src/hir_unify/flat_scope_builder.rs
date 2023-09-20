@@ -2,10 +2,7 @@ use std::rc::Rc;
 
 use ontol_hir::{visitor::HirVisitor, SeqPropertyVariant};
 
-use crate::{
-    typed_hir::{arena_import_root, TypedHir},
-    types::TypeRef,
-};
+use crate::typed_hir::{arena_import_root, TypedHir};
 
 use super::{
     flat_scope::{self, FlatScope, OutputVar, PropDepth, ScopeNode, ScopeVar},
@@ -20,8 +17,6 @@ struct NextNode {
 }
 
 pub struct FlatScopeBuilder<'h, 'm> {
-    #[allow(unused)]
-    unit_type: TypeRef<'m>,
     var_allocator: ontol_hir::VarAllocator,
     scope_nodes: Vec<ScopeNode<'m>>,
     hir_arena: &'h ontol_hir::arena::Arena<'m, TypedHir>,
@@ -30,11 +25,9 @@ pub struct FlatScopeBuilder<'h, 'm> {
 impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
     pub fn new(
         var_allocator: ontol_hir::VarAllocator,
-        unit_type: TypeRef<'m>,
         hir_arena: &'h ontol_hir::arena::Arena<'m, TypedHir>,
     ) -> Self {
         Self {
-            unit_type,
             // in_scope: VarSet::default(),
             var_allocator,
             // current_prop_path: Default::default(),

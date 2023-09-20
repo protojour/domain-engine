@@ -7,7 +7,6 @@ use smartstring::alias::String;
 
 pub mod arena;
 pub mod display;
-// pub mod old;
 pub mod parse;
 pub mod visitor;
 

@@ -9,7 +9,7 @@ use crate::{
     pattern::Patterns,
     primitive::Primitives,
     relation::Relations,
-    types::{DefTypes, FormatType, Type, TypeRef, Types},
+    types::{DefTypes, FormatType, Type, TypeRef, Types, ERROR_TYPE},
     CompileErrors, Compiler, SourceSpan, SpannedNote,
 };
 
@@ -76,7 +76,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         notes: Vec<SpannedNote>,
     ) -> TypeRef<'m> {
         self.errors.error_with_notes(error, span, notes);
-        self.types.intern(Type::Error)
+        &ERROR_TYPE
     }
 
     fn type_error(&mut self, error: TypeError<'m>, span: &SourceSpan) -> TypeRef<'m> {

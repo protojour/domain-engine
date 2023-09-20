@@ -6,9 +6,7 @@ use smallvec::SmallVec;
 
 use crate::{
     hir_unify::{UnifierError, UnifierResult, VarSet},
-    typed_hir::{self, arena_import, IntoTypedHirValue, TypedHir, TypedHirValue},
-    types::TypeRef,
-    NO_SPAN,
+    typed_hir::{self, arena_import, IntoTypedHirValue, TypedHir, TypedHirValue, UNIT_META},
 };
 
 use super::{
@@ -39,7 +37,6 @@ impl<'m> ScopeBinder<'m> {
 }
 
 pub struct ScopeBuilder<'h, 'm> {
-    unit_type: TypeRef<'m>,
     in_scope: VarSet,
     var_allocator: ontol_hir::VarAllocator,
     current_prop_path: SmallVec<[u16; 32]>,
@@ -50,11 +47,9 @@ pub struct ScopeBuilder<'h, 'm> {
 impl<'h, 'm> ScopeBuilder<'h, 'm> {
     pub fn new(
         var_allocator: ontol_hir::VarAllocator,
-        unit_type: TypeRef<'m>,
         hir_arena: &'h ontol_hir::arena::Arena<'m, TypedHir>,
     ) -> Self {
         Self {
-            unit_type,
             in_scope: VarSet::default(),
             var_allocator,
             current_prop_path: Default::default(),
@@ -381,11 +376,11 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
                             def: next_let_def,
                             sub_scope: Box::new(scope::Scope(
                                 scope::Kind::Const,
-                                scope::Meta::from(self.unit_hir_meta()),
+                                scope::Meta::from(UNIT_META),
                             )),
                         }),
                         scope::Meta {
-                            hir_meta: self.unit_hir_meta(),
+                            hir_meta: UNIT_META,
                             vars: VarSet::from([scoped_var]),
                             dependencies,
                         },
@@ -402,13 +397,6 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
                 dependencies,
             ),
             _ => panic!("invalid: {}", self.hir_arena.node_ref(args[var_arg_index])),
-        }
-    }
-
-    fn unit_hir_meta(&self) -> typed_hir::Meta<'m> {
-        typed_hir::Meta {
-            ty: self.unit_type,
-            span: NO_SPAN,
         }
     }
 

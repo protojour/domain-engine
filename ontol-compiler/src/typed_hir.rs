@@ -1,11 +1,9 @@
 use std::fmt::{Debug, Display};
 
 use ontol_hir::{CaptureMatchArm, PropVariant, SeqPropertyVariant};
-use ontol_runtime::DefId;
 
 use crate::{
-    primitive::PrimitiveKind,
-    types::{Type, TypeRef},
+    types::{TypeRef, ERROR_TYPE, UNIT_TYPE},
     SourceSpan, NO_SPAN,
 };
 
@@ -17,13 +15,7 @@ impl ontol_hir::Lang for TypedHir {
     type Data<'m, T> = TypedHirValue<'m, T> where T: Clone;
 
     fn default_data<'a, T: Clone>(&self, value: T) -> Self::Data<'a, T> {
-        TypedHirValue(
-            value,
-            Meta {
-                ty: &Type::Error,
-                span: NO_SPAN,
-            },
-        )
+        TypedHirValue(value, ERROR_META)
     }
 
     fn inner<'m, T: Clone>(meta: &'m Self::Data<'_, T>) -> &'m T {
@@ -91,10 +83,12 @@ pub struct Meta<'m> {
     pub span: SourceSpan,
 }
 
-static UNIT_TY: Type = Type::Primitive(PrimitiveKind::Unit, DefId::unit());
-
 pub static UNIT_META: Meta<'static> = Meta {
-    ty: &UNIT_TY,
+    ty: &UNIT_TYPE,
+    span: NO_SPAN,
+};
+pub static ERROR_META: Meta<'static> = Meta {
+    ty: &ERROR_TYPE,
     span: NO_SPAN,
 };
 

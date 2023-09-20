@@ -1,5 +1,6 @@
 use crate::{
     typed_hir::{arena_import, IntoTypedHirValue, Meta, UNIT_META},
+    types::UNIT_TYPE,
     NO_SPAN,
 };
 
@@ -46,7 +47,7 @@ pub(super) trait UnifyProps<'m>: Sized {
                     .iter()
                     .map(|node| unifier.hir_arena[*node].ty())
                     .last()
-                    .unwrap_or_else(|| unifier.types.unit_type());
+                    .unwrap_or(&UNIT_TYPE);
 
                 (
                     (
@@ -64,7 +65,7 @@ pub(super) trait UnifyProps<'m>: Sized {
                         bindings: Box::new((rel_binding, val_binding)),
                     }),
                     scope::Meta {
-                        hir_meta: unifier.unit_meta(),
+                        hir_meta: UNIT_META,
                         vars: VarSet::default(),
                         dependencies: VarSet::default(),
                     },
@@ -74,7 +75,7 @@ pub(super) trait UnifyProps<'m>: Sized {
                     .iter()
                     .map(|node| unifier.hir_arena[*node].ty())
                     .last()
-                    .unwrap_or_else(|| unifier.types.unit_type());
+                    .unwrap_or(&UNIT_TYPE);
 
                 (
                     (
@@ -127,13 +128,12 @@ pub(super) trait UnifyProps<'m>: Sized {
                 Self::unify_sub_scoped(unifier, scope::Scope(scope_kind, scope_meta), sub_scoped)
             }
             scope::Kind::Let(let_scope) => {
-                let const_scope = unifier.const_scope();
-                let block = Self::unify_sub_scoped(unifier, const_scope, sub_scoped)?;
+                let block = Self::unify_sub_scoped(unifier, scope::constant(), sub_scoped)?;
                 let ty = block
                     .iter()
                     .map(|node| unifier.hir_arena[*node].ty())
                     .last()
-                    .unwrap_or_else(|| unifier.types.unit_type());
+                    .unwrap_or(&UNIT_TYPE);
 
                 let let_def = arena_import(&mut unifier.hir_arena, let_scope.def.as_ref());
                 let node = unifier.mk_node(
@@ -165,7 +165,6 @@ impl<'m> UnifyProps<'m> for expr::Prop<'m> {
     ) -> UnifierResult<ontol_hir::Nodes> {
         let mut nodes = ontol_hir::Nodes::default();
         for prop in sub_scoped.expressions {
-            let unit_meta = unifier.unit_meta();
             nodes.push(
                 unifier
                     .unify(
@@ -173,7 +172,7 @@ impl<'m> UnifyProps<'m> for expr::Prop<'m> {
                         expr::Expr(
                             expr::Kind::Prop(Box::new(prop)),
                             expr::Meta {
-                                hir_meta: unit_meta,
+                                hir_meta: UNIT_META,
                                 free_vars: VarSet::default(),
                             },
                         ),

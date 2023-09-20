@@ -45,6 +45,9 @@ pub enum Type<'m> {
     Error,
 }
 
+pub static UNIT_TYPE: Type = Type::Primitive(PrimitiveKind::Unit, DefId::unit());
+pub static ERROR_TYPE: Type = Type::Error;
+
 impl<'m> Type<'m> {
     pub fn get_single_def_id(&self) -> Option<DefId> {
         match self {
@@ -91,10 +94,6 @@ impl<'m> Types<'m> {
             types: Default::default(),
             slices: Default::default(),
         }
-    }
-
-    pub fn unit_type(&mut self) -> TypeRef<'m> {
-        self.intern(Type::Primitive(PrimitiveKind::Unit, DefId::unit()))
     }
 }
 
