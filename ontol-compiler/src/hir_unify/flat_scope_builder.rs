@@ -73,7 +73,7 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
         })
     }
 
-    fn process<'a>(
+    fn process(
         &mut self,
         NextNode {
             node,
@@ -332,7 +332,7 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
         Ok(())
     }
 
-    fn process_attribute<'a>(
+    fn process_attribute(
         &mut self,
         rel: ontol_hir::Node,
         val: ontol_hir::Node,

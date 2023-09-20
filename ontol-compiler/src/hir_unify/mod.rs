@@ -180,9 +180,9 @@ struct VariableTracker {
 }
 
 impl VariableTracker {
-    fn track_largest<'h, 'm, L: ontol_hir::Lang>(
+    fn track_largest<L: ontol_hir::Lang>(
         &mut self,
-        node_ref: ontol_hir::arena::NodeRef<'h, 'm, L>,
+        node_ref: ontol_hir::arena::NodeRef<'_, '_, L>,
     ) {
         struct Visitor<'h, 'm, L: ontol_hir::Lang> {
             tracker: &'h mut VariableTracker,

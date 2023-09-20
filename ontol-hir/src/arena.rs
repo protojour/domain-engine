@@ -1,4 +1,4 @@
-use crate::{Kind, Lang, Node};
+use crate::{Kind, Lang, Node, RootNode};
 
 #[derive(Clone)]
 pub struct Arena<'a, L: Lang> {
@@ -10,6 +10,11 @@ impl<'a, L: Lang> Arena<'a, L> {
         let idx = self.entries.len();
         self.entries.push(kind);
         Node(idx as u32)
+    }
+
+    pub fn add_root(mut self, kind: L::Data<'a, Kind<'a, L>>) -> RootNode<'a, L> {
+        let node = self.add(kind);
+        RootNode::new(node, self)
     }
 
     pub fn pre_allocator(&self) -> PreAllocator {

@@ -166,19 +166,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 debug!("value_object_ty: {value_object_ty:?}");
 
                 match value_object_ty {
-                    Type::Domain(def_id) => {
-                        return self.build_property_matcher(
-                            StructInfo {
-                                struct_def_id: *def_id,
-                                struct_ty: value_object_ty,
-                                modifier,
-                                parent_struct_flags,
-                            },
-                            pattern_attrs,
-                            span,
-                            ctx,
-                        );
-                    }
+                    Type::Domain(def_id) => self.build_property_matcher(
+                        StructInfo {
+                            struct_def_id: *def_id,
+                            struct_ty: value_object_ty,
+                            modifier,
+                            parent_struct_flags,
+                        },
+                        pattern_attrs,
+                        span,
+                        ctx,
+                    ),
                     _ => {
                         let mut attributes = pattern_attrs.iter();
                         match attributes.next() {
@@ -198,16 +196,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     ctx,
                                 );
 
-                                *(&mut ctx.hir_arena[inner_node]).meta_mut() = struct_meta;
+                                *ctx.hir_arena[inner_node].meta_mut() = struct_meta;
 
                                 inner_node
                             }
                             _ => {
-                                return self.error_node(
-                                    CompileError::ExpectedPatternAttribute,
-                                    &span,
-                                    ctx,
-                                );
+                                self.error_node(CompileError::ExpectedPatternAttribute, &span, ctx)
                             }
                         }
                     }
@@ -237,17 +231,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             ctx,
                         );
 
-                        *(&mut ctx.hir_arena[inner_node]).meta_mut() = struct_meta;
+                        *ctx.hir_arena[inner_node].meta_mut() = struct_meta;
 
                         inner_node
                     }
-                    _ => {
-                        return self.error_node(CompileError::ExpectedPatternAttribute, &span, ctx);
-                    }
+                    _ => self.error_node(CompileError::ExpectedPatternAttribute, &span, ctx),
                 }
             }
             ReprKind::Union(_) | ReprKind::StructUnion(_) => {
-                return self.error_node(CompileError::CannotMapUnion, &span, ctx)
+                self.error_node(CompileError::CannotMapUnion, &span, ctx)
             }
             kind => todo!("{kind:?}"),
         }
@@ -356,7 +348,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         hir_elements.push((
                             ontol_hir::Iter(element.iter),
                             ontol_hir::Attribute {
-                                rel: rel_node.clone(),
+                                rel: rel_node,
                                 val: val_node,
                             },
                         ));

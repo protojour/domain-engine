@@ -12,7 +12,7 @@ impl<'h, 'a, L: Lang> std::fmt::Display for NodeRef<'h, 'a, L> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let printer = Printer {
             indent: Sep::None,
-            arena: &self.arena,
+            arena: self.arena,
         };
         printer.print(Sep::None, self.arena.kind(self.node), f)?;
         Ok(())
@@ -50,8 +50,8 @@ impl<'h, 'a, L: Lang> Printer<'h, 'a, L> {
 
     fn kinds<'n>(&self, nodes: &'n [Node]) -> KindsIter<'n, 'h, 'a, L> {
         KindsIter {
-            nodes: nodes.into_iter(),
-            arena: &self.arena,
+            nodes: nodes.iter(),
+            arena: self.arena,
         }
     }
 }

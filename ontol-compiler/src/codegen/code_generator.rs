@@ -142,7 +142,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
         let span = meta.span;
         match kind {
             ontol_hir::Kind::Var(var) => {
-                let Some(local) = self.scope.get(&var) else {
+                let Some(local) = self.scope.get(var) else {
                     return self.errors.error(CompileError::UnboundVariable, &span);
                 };
 
@@ -690,10 +690,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
     ) {
         match pattern {
             ontol_hir::PropPattern::Attr(rel_binding, val_binding) => self.gen_in_scope(
-                &[
-                    (rel_local, rel_binding.clone()),
-                    (val_local, val_binding.clone()),
-                ],
+                &[(rel_local, *rel_binding), (val_local, *val_binding)],
                 nodes.into_iter().cloned(),
                 arena,
                 block,
@@ -701,7 +698,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
             ontol_hir::PropPattern::Seq(binding, _has_default) => self.gen_in_scope(
                 &[
                     (rel_local, ontol_hir::Binding::Wildcard),
-                    (val_local, binding.clone()),
+                    (val_local, *binding),
                 ],
                 nodes.into_iter().cloned(),
                 arena,
@@ -797,10 +794,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
             )
         };
 
-        for (arm_index, match_arm) in std::mem::take(&mut arms_gen.match_arms)
-            .into_iter()
-            .enumerate()
-        {
+        for (arm_index, match_arm) in std::mem::take(&mut arms_gen.match_arms).iter().enumerate() {
             let mut branch_block = arms_gen.branch_blocks.remove(&arm_index).unwrap();
 
             struct ArmCapture {

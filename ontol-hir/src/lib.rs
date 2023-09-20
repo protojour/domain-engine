@@ -22,7 +22,7 @@ pub trait Lang: Sized + Copy {
 
     fn default_data<'a, T: Clone>(&self, inner: T) -> Self::Data<'a, T>;
 
-    fn inner<'m, 'a, T: Clone>(data: &'m Self::Data<'a, T>) -> &'m T;
+    fn inner<'m, T: Clone>(data: &'m Self::Data<'_, T>) -> &'m T;
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]

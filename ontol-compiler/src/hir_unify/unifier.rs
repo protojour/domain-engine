@@ -581,7 +581,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         .with_meta(scope_meta.hir_meta)
                     }),
                     node: self.mk_node(
-                        ontol_hir::Kind::Struct(expr_binder, flags, nodes.into()),
+                        ontol_hir::Kind::Struct(expr_binder, flags, nodes),
                         expr_meta.hir_meta,
                     ),
                 })

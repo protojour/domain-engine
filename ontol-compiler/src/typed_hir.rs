@@ -26,7 +26,7 @@ impl ontol_hir::Lang for TypedHir {
         )
     }
 
-    fn inner<'m, 'a, T: Clone>(meta: &'m Self::Data<'a, T>) -> &'m T {
+    fn inner<'m, T: Clone>(meta: &'m Self::Data<'_, T>) -> &'m T {
         meta.value()
     }
 }
@@ -118,14 +118,14 @@ pub fn arena_import_root<'h, 'm>(
 }
 
 // TODO: Generalize this in ontol-hir
-pub fn arena_import<'h, 'm>(
+pub fn arena_import<'m>(
     target: &mut ontol_hir::arena::Arena<'m, TypedHir>,
-    source: ontol_hir::arena::NodeRef<'h, 'm, TypedHir>,
+    source: ontol_hir::arena::NodeRef<'_, 'm, TypedHir>,
 ) -> ontol_hir::Node {
     let value = &source.arena()[source.node()];
     let (kind, meta) = (&value.0, &value.1);
 
-    fn import_nodes<'h, 'm>(
+    fn import_nodes<'m>(
         target: &mut ontol_hir::arena::Arena<'m, TypedHir>,
         source: &ontol_hir::arena::Arena<'m, TypedHir>,
         nodes: &[ontol_hir::Node],
@@ -137,7 +137,7 @@ pub fn arena_import<'h, 'm>(
         imported_nodes
     }
 
-    fn import_attr<'h, 'm>(
+    fn import_attr<'m>(
         target: &mut ontol_hir::arena::Arena<'m, TypedHir>,
         source: &ontol_hir::arena::Arena<'m, TypedHir>,
         attr: ontol_hir::Attribute<ontol_hir::Node>,

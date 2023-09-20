@@ -124,10 +124,12 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
                     }),
                     _ => {
                         let binder_var = self.var_allocator.alloc();
-                        let mut def_arena: ontol_hir::arena::Arena<'m, TypedHir> =
-                            Default::default();
-                        let next_def = def_arena
-                            .add(TypedHirValue(ontol_hir::Kind::Var(binder_var), hir_meta));
+                        let next_def = {
+                            let def_arena: ontol_hir::arena::Arena<'m, TypedHir> =
+                                Default::default();
+                            def_arena
+                                .add_root(TypedHirValue(ontol_hir::Kind::Var(binder_var), hir_meta))
+                        };
 
                         self.invert_expr(
                             *proc,
@@ -136,7 +138,6 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
                             ontol_hir::Binder { var: binder_var }.with_meta(hir_meta),
                             next_def,
                             dependencies,
-                            def_arena,
                         )
                     }
                 }
@@ -324,9 +325,8 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
         args: &ontol_hir::Nodes,
         analysis: ExprAnalysis<'m>,
         outer_binder: TypedHirValue<'m, ontol_hir::Binder>,
-        let_def: ontol_hir::Node,
+        let_def: ontol_hir::RootNode<'m, TypedHir>,
         dependencies: VarSet,
-        mut def_arena: ontol_hir::arena::Arena<'m, TypedHir>,
     ) -> UnifierResult<ScopeBinder<'m>> {
         let (var_arg_index, next_analysis) = match analysis.kind {
             ExprAnalysisKind::Const | ExprAnalysisKind::Var(_) => unreachable!(),
@@ -348,6 +348,7 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
         };
 
         let mut inverted_args = ontol_hir::Nodes::default();
+        let (mut def_arena, let_def) = let_def.split();
 
         for (arg_index, arg) in args.iter().enumerate() {
             if arg_index != var_arg_index {
@@ -356,7 +357,7 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
         }
         inverted_args.insert(var_arg_index, let_def);
 
-        let next_let_def = def_arena.add(TypedHirValue(
+        let next_let_def = def_arena.add_root(TypedHirValue(
             ontol_hir::Kind::Call(inverted_proc, inverted_args),
             // Is this correct?
             analysis.hir_meta,
@@ -376,8 +377,8 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
                         scope::Kind::Let(scope::Let {
                             outer_binder: Some(outer_binder),
                             inner_binder: ontol_hir::Binder { var: scoped_var }
-                                .with_meta(*def_arena[next_let_def].meta()),
-                            def: ontol_hir::RootNode::new(next_let_def, def_arena),
+                                .with_meta(*next_let_def.data().meta()),
+                            def: next_let_def,
                             sub_scope: Box::new(scope::Scope(
                                 scope::Kind::Const,
                                 scope::Meta::from(self.unit_hir_meta()),
@@ -399,7 +400,6 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
                 outer_binder,
                 next_let_def,
                 dependencies,
-                def_arena,
             ),
             _ => panic!("invalid: {}", self.hir_arena.node_ref(args[var_arg_index])),
         }
