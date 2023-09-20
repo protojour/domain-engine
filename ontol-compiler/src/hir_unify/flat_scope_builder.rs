@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use ontol_hir::{visitor::HirVisitor, GetKind, SeqPropertyVariant};
+use ontol_hir::{old::GetKind, visitor::HirVisitor, SeqPropertyVariant};
 
 use crate::{
     typed_hir::{TypedHir, TypedHirNode},

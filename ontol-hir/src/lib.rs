@@ -1,10 +1,12 @@
 use std::{fmt::Debug, ops::Index};
 
+use arena::{Arena, NodeRef};
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc, DefId};
 use smartstring::alias::String;
 
+pub mod arena;
 pub mod display;
-pub mod hir2;
+pub mod old;
 pub mod parse;
 pub mod visitor;
 
@@ -29,82 +31,6 @@ impl From<Label> for Var {
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub struct Label(pub u32);
 
-/// ontol_hir is a generic language, it does not specify the type of its language nodes.
-///
-/// Implementing this trait makes an ontol_hir "dialect" - the implementor may freely choose
-/// what kind of metadata to attach to each node.
-pub trait Lang: Sized + Copy {
-    type Node<'a>: Sized + GetKind<'a, Self>;
-    type Binder<'a>: Sized + GetVar<'a, Self>;
-    type Label<'a>: Sized + Clone + GetLabel<'a, Self>;
-
-    fn make_node<'a>(&self, kind: Kind<'a, Self>) -> Self::Node<'a>;
-    fn make_binder<'a>(&self, var: Var) -> Self::Binder<'a>;
-    fn make_label<'a>(&self, label: Label) -> Self::Label<'a>;
-}
-
-pub trait GetKind<'a, L: Lang> {
-    fn kind(&self) -> &Kind<'a, L>;
-    fn kind_mut(&mut self) -> &mut Kind<'a, L>;
-}
-
-pub trait GetVar<'a, L: Lang> {
-    fn var(&self) -> &Var;
-    fn var_mut(&mut self) -> &mut Var;
-}
-
-pub trait GetLabel<'a, L: Lang> {
-    fn label(&self) -> &Label;
-    fn label_mut(&mut self) -> &mut Label;
-}
-
-type Nodes<'a, L> = Vec<<L as Lang>::Node<'a>>;
-
-/// The syntax kind of a node.
-#[derive(Clone)]
-pub enum Kind<'a, L: Lang> {
-    /// A variable reference.
-    Var(Var),
-    /// A unit value.
-    Unit,
-    /// A 64 bit signed integer
-    I64(i64),
-    /// A 64 bit float
-    F64(f64),
-    /// A string
-    Text(String),
-    /// Const procedure
-    Const(DefId),
-    /// A let expression
-    Let(L::Binder<'a>, Box<L::Node<'a>>, Nodes<'a, L>),
-    /// A function call
-    Call(BuiltinProc, Nodes<'a, L>),
-    /// A map call
-    Map(Box<L::Node<'a>>),
-    /// Standalone sequence in declarative mode.
-    DeclSeq(L::Label<'a>, Attribute<Box<L::Node<'a>>>),
-    /// A struct with associated binder. The value is the struct.
-    Struct(L::Binder<'a>, StructFlags, Nodes<'a, L>),
-    /// A property definition associated with a struct var in scope
-    Prop(Optional, Var, PropertyId, Vec<PropVariant<'a, L>>),
-    /// A property matcher/unpacker associated with a struct var
-    MatchProp(Var, PropertyId, Vec<PropMatchArm<'a, L>>),
-    /// A sequence with associated binder. The value is the sequence.
-    /// TODO: This can be done with Let!
-    Sequence(L::Binder<'a>, Nodes<'a, L>),
-    /// Iterate attributes in sequence var,
-    ForEach(Var, (Binding<'a, L>, Binding<'a, L>), Nodes<'a, L>),
-    /// Push an attribute to the end of a sequence
-    SeqPush(Var, Attribute<Box<L::Node<'a>>>),
-    /// Push the second string at the end of the first string
-    StringPush(Var, Box<L::Node<'a>>),
-    /// Declarative regex w/captures.
-    /// If the label is defined, it is a looping regex
-    Regex(Option<L::Label<'a>>, DefId, Vec<Vec<CaptureGroup<'a, L>>>),
-    /// A regex matcher/unpacker
-    MatchRegex(Iter, Var, DefId, Vec<CaptureMatchArm<'a, L>>),
-}
-
 #[derive(Default, Clone, Copy)]
 pub struct Optional(pub bool);
 
@@ -120,42 +46,6 @@ impl Debug for Optional {
 
 #[derive(Clone, Copy, Debug)]
 pub struct HasDefault(pub bool);
-
-pub enum PropVariant<'a, L: Lang> {
-    Singleton(Attribute<Box<L::Node<'a>>>),
-    Seq(SeqPropertyVariant<'a, L>),
-}
-
-impl<'a, L: Lang> Clone for PropVariant<'a, L>
-where
-    L::Node<'a>: Clone,
-{
-    fn clone(&self) -> Self {
-        match self {
-            Self::Singleton(attr) => Self::Singleton(attr.clone()),
-            Self::Seq(seq) => Self::Seq(seq.clone()),
-        }
-    }
-}
-
-pub struct SeqPropertyVariant<'a, L: Lang> {
-    pub label: L::Label<'a>,
-    pub has_default: HasDefault,
-    pub elements: Vec<(Iter, Attribute<L::Node<'a>>)>,
-}
-
-impl<'a, L: Lang> Clone for SeqPropertyVariant<'a, L>
-where
-    L::Node<'a>: Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            label: self.label.clone(),
-            has_default: self.has_default,
-            elements: self.elements.clone(),
-        }
-    }
-}
 
 /// An attribute existing of (relation parameter, value)
 #[derive(Clone, Debug)]
@@ -188,24 +78,120 @@ impl<T> Index<usize> for Attribute<T> {
     }
 }
 
-pub struct PropMatchArm<'a, L: Lang> {
-    pub pattern: PropPattern<'a, L>,
-    pub nodes: Vec<<L as Lang>::Node<'a>>,
+#[derive(Clone, Copy, Debug)]
+pub struct Iter(pub bool);
+
+pub trait Lang: Sized + Copy {
+    type Meta<'a, T>: Clone
+    where
+        T: Clone;
+
+    fn with_meta<'a, T: Clone>(&self, value: T) -> Self::Meta<'a, T>;
+
+    fn inner<'m, 'a, T: Clone>(meta: &'m Self::Meta<'a, T>) -> &'m T;
 }
 
-impl<'a, L: Lang> Clone for PropMatchArm<'a, L>
-where
-    <L as Lang>::Binder<'a>: Clone,
-    <L as Lang>::Node<'a>: Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            pattern: self.pattern.clone(),
-            nodes: self.nodes.clone(),
-        }
+pub struct RootNode<'a, L: Lang> {
+    arena: Arena<'a, L>,
+    node: Node,
+}
+
+impl<'a, L: Lang> RootNode<'a, L> {
+    pub fn new(node: Node, arena: Arena<'a, L>) -> Self {
+        Self { arena, node }
+    }
+
+    pub fn node(&self) -> Node {
+        self.node
+    }
+
+    pub fn as_ref(&self) -> NodeRef<'a, '_, L> {
+        self.arena.node_ref(self.node)
+    }
+
+    pub fn arena_mut(&mut self) -> &mut Arena<'a, L> {
+        &mut self.arena
     }
 }
 
+#[derive(Clone, Copy)]
+pub struct Node(u32);
+
+#[derive(Clone, Copy)]
+pub struct Binder {
+    pub var: Var,
+}
+
+impl From<Var> for Binder {
+    fn from(value: Var) -> Self {
+        Self { var: value }
+    }
+}
+
+/// The syntax kind of a node.
+#[derive(Clone)]
+pub enum Kind<'a, L: Lang> {
+    /// A variable reference.
+    Var(Var),
+    /// A unit value.
+    Unit,
+    /// A 64 bit signed integer
+    I64(i64),
+    /// A 64 bit float
+    F64(f64),
+    /// A string
+    Text(String),
+    /// Const procedure
+    Const(DefId),
+    /// A let expression
+    Let(L::Meta<'a, Binder>, Node, Vec<Node>),
+    /// A function call
+    Call(BuiltinProc, Vec<Node>),
+    /// A map call
+    Map(Node),
+    /// Standalone sequence in declarative mode.
+    DeclSeq(L::Meta<'a, Label>, Attribute<Node>),
+    /// A struct with associated binder. The value is the struct.
+    Struct(L::Meta<'a, Binder>, StructFlags, Vec<Node>),
+    // /// A property definition associated with a struct var in scope
+    Prop(Optional, Var, PropertyId, Vec<PropVariant<'a, L>>),
+
+    // /// A property matcher/unpacker associated with a struct var
+    MatchProp(Var, PropertyId, Vec<(PropPattern<'a, L>, Vec<Node>)>),
+    /// A sequence with associated binder. The value is the sequence.
+    /// TODO: This can be done with Let!
+    Sequence(L::Meta<'a, Binder>, Vec<Node>),
+    /// Iterate attributes in sequence var,
+    ForEach(Var, (Binding<'a, L>, Binding<'a, L>), Vec<Node>),
+    /// Push an attribute to the end of a sequence
+    SeqPush(Var, Attribute<Node>),
+    /// Push the second string at the end of the first string
+    StringPush(Var, Node),
+    /// Declarative regex w/captures.
+    /// If the label is defined, it is a looping regex
+    Regex(
+        Option<L::Meta<'a, Label>>,
+        DefId,
+        Vec<Vec<CaptureGroup<'a, L>>>,
+    ),
+    /// A regex matcher/unpacker
+    MatchRegex(Iter, Var, DefId, Vec<CaptureMatchArm<'a, L>>),
+}
+
+#[derive(Clone)]
+pub enum PropVariant<'a, L: Lang> {
+    Singleton(Attribute<Node>),
+    Seq(SeqPropertyVariant<'a, L>),
+}
+
+#[derive(Clone)]
+pub struct SeqPropertyVariant<'a, L: Lang> {
+    pub label: L::Meta<'a, Label>,
+    pub has_default: HasDefault,
+    pub elements: Vec<(Iter, Attribute<Node>)>,
+}
+
+#[derive(Clone)]
 pub enum PropPattern<'a, L: Lang> {
     /// ($rel $val)
     Attr(Binding<'a, L>, Binding<'a, L>),
@@ -216,51 +202,23 @@ pub enum PropPattern<'a, L: Lang> {
     Absent,
 }
 
-impl<'a, L: Lang> Clone for PropPattern<'a, L>
-where
-    <L as Lang>::Binder<'a>: Clone,
-{
-    fn clone(&self) -> Self {
-        match self {
-            Self::Attr(rel, val) => Self::Attr(rel.clone(), val.clone()),
-            Self::Seq(b, has_default) => Self::Seq(b.clone(), *has_default),
-            Self::Absent => Self::Absent,
-        }
-    }
-}
-
-pub struct CaptureMatchArm<'a, L: Lang> {
-    pub capture_groups: Vec<CaptureGroup<'a, L>>,
-    pub nodes: Vec<<L as Lang>::Node<'a>>,
-}
-
-impl<'a, L: Lang> Clone for CaptureMatchArm<'a, L>
-where
-    <L as Lang>::Binder<'a>: Clone,
-    <L as Lang>::Node<'a>: Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            capture_groups: self.capture_groups.clone(),
-            nodes: self.nodes.clone(),
-        }
-    }
+#[derive(Clone)]
+pub enum Binding<'a, L: Lang> {
+    Wildcard,
+    Binder(L::Meta<'a, Binder>),
 }
 
 #[derive(Clone, Debug)]
 pub struct CaptureGroup<'a, L: Lang> {
     pub index: u32,
-    pub binder: L::Binder<'a>,
+    pub binder: L::Meta<'a, Binder>,
 }
 
-#[derive(Clone, Copy, Debug)]
-pub enum Binding<'a, L: Lang> {
-    Wildcard,
-    Binder(L::Binder<'a>),
+#[derive(Clone)]
+pub struct CaptureMatchArm<'a, L: Lang> {
+    pub capture_groups: Vec<CaptureGroup<'a, L>>,
+    pub nodes: Vec<Node>,
 }
-
-#[derive(Clone, Copy, Debug)]
-pub struct Iter(pub bool);
 
 #[derive(Debug)]
 pub struct VarAllocator {
@@ -288,36 +246,6 @@ impl Default for VarAllocator {
 impl From<Var> for VarAllocator {
     fn from(value: Var) -> Self {
         Self { next: value }
-    }
-}
-
-impl<'a, L: Lang> GetKind<'a, L> for Kind<'a, L> {
-    fn kind(&self) -> &Kind<'a, L> {
-        self
-    }
-
-    fn kind_mut(&mut self) -> &mut Kind<'a, L> {
-        self
-    }
-}
-
-impl<'a, L: Lang> GetVar<'a, L> for Var {
-    fn var(&self) -> &Var {
-        self
-    }
-
-    fn var_mut(&mut self) -> &mut Var {
-        self
-    }
-}
-
-impl<'a, L: Lang> GetLabel<'a, L> for Label {
-    fn label(&self) -> &Label {
-        self
-    }
-
-    fn label_mut(&mut self) -> &mut Label {
-        self
     }
 }
 

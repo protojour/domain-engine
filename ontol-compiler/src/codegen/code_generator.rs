@@ -1,6 +1,6 @@
 use bit_set::BitSet;
 use fnv::FnvHashMap;
-use ontol_hir::{GetKind, HasDefault, PropPattern, PropVariant};
+use ontol_hir::{old::GetKind, HasDefault, PropPattern, PropVariant};
 use ontol_runtime::{
     smart_format,
     value::PropertyId,
@@ -659,7 +659,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
     fn gen_match_arm(
         &mut self,
-        arm: ontol_hir::PropMatchArm<'m, TypedHir>,
+        arm: ontol_hir::old::PropMatchArm<'m, TypedHir>,
         (rel_local, val_local): (Local, Local),
         block: &mut Block,
     ) {

@@ -59,16 +59,25 @@ pub enum Token<'s> {
 
 type ParseResult<'s, T> = Result<(T, &'s str), Error<'s>>;
 
-pub struct Parser<L: Lang> {
+pub struct Parser<'a, L: Lang> {
     lang: L,
+    arena: Arena<'a, L>,
 }
 
-impl<L: Lang> Parser<L> {
+impl<'a, L: Lang> Parser<'a, L> {
     pub fn new(lang: L) -> Self {
-        Self { lang }
+        Self {
+            lang,
+            arena: Default::default(),
+        }
     }
 
-    pub fn parse<'a, 's>(&self, next: &'s str) -> ParseResult<'s, L::Node<'a>> {
+    pub fn parse_root<'s>(mut self, next: &'s str) -> ParseResult<'s, RootNode<'a, L>> {
+        let (root_node, next) = self.parse(next)?;
+        Ok((RootNode::new(root_node, self.arena), next))
+    }
+
+    fn parse<'s>(&mut self, next: &'s str) -> ParseResult<'s, Node> {
         match parse_token(next)? {
             (Token::LParen, next) => {
                 let (node, next) = self.parse_parenthesized(next)?;
@@ -94,7 +103,7 @@ impl<L: Lang> Parser<L> {
         }
     }
 
-    pub fn parse_parenthesized<'a, 's>(&self, next: &'s str) -> ParseResult<'s, L::Node<'a>> {
+    pub fn parse_parenthesized<'s>(&mut self, next: &'s str) -> ParseResult<'s, Node> {
         match parse_symbol(next)? {
             ("+", next) => self.parse_binary_call(BuiltinProc::Add, next),
             ("-", next) => self.parse_binary_call(BuiltinProc::Sub, next),
@@ -107,13 +116,13 @@ impl<L: Lang> Parser<L> {
                 let (_, next) = parse_rparen(next)?;
                 let (body, next) = self.parse_many(next, Self::parse)?;
                 Ok((
-                    self.make_node(Kind::Let(self.make_binder(bind_var), Box::new(def), body)),
+                    self.make_node(Kind::Let(self.make_binder(bind_var), def, body)),
                     next,
                 ))
             }
             ("map", next) => {
                 let (arg, next) = self.parse(next)?;
-                Ok((self.make_node(Kind::Map(Box::new(arg))), next))
+                Ok((self.make_node(Kind::Map(arg)), next))
             }
             ("struct", next) => self.parse_struct_inner(next, StructFlags::empty()),
             ("match-struct", next) => self.parse_struct_inner(next, StructFlags::MATCH),
@@ -128,10 +137,7 @@ impl<L: Lang> Parser<L> {
                 Ok((
                     self.make_node(Kind::DeclSeq(
                         self.make_label(label),
-                        Attribute {
-                            rel: Box::new(rel),
-                            val: Box::new(val),
-                        },
+                        Attribute { rel, val },
                     )),
                     next,
                 ))
@@ -174,13 +180,7 @@ impl<L: Lang> Parser<L> {
                 let (rel, next) = self.parse(next)?;
                 let (val, next) = self.parse(next)?;
                 Ok((
-                    self.make_node(Kind::SeqPush(
-                        seq_var,
-                        Attribute {
-                            rel: Box::new(rel),
-                            val: Box::new(val),
-                        },
-                    )),
+                    self.make_node(Kind::SeqPush(seq_var, Attribute { rel, val })),
                     next,
                 ))
             }
@@ -217,11 +217,7 @@ impl<L: Lang> Parser<L> {
         }
     }
 
-    pub fn parse_prop<'a, 's>(
-        &self,
-        optional: Optional,
-        next: &'s str,
-    ) -> ParseResult<'s, L::Node<'a>> {
+    pub fn parse_prop<'s>(&mut self, optional: Optional, next: &'s str) -> ParseResult<'s, Node> {
         let (var, next) = parse_dollar_var(next)?;
         let (prop, next) = parse_symbol(next)?;
         let (variants, next) = self.parse_many(next, Self::parse_prop_variant)?;
@@ -238,9 +234,9 @@ impl<L: Lang> Parser<L> {
     }
 
     fn parse_many<'p, 's, T>(
-        &'p self,
+        &'p mut self,
         mut next: &'s str,
-        item_fn: impl Fn(&'p Self, &'s str) -> ParseResult<'s, T>,
+        mut item_fn: impl FnMut(&mut Self, &'s str) -> ParseResult<'s, T>,
     ) -> ParseResult<'s, Vec<T>> {
         let mut nodes = vec![];
         loop {
@@ -257,17 +253,17 @@ impl<L: Lang> Parser<L> {
         }
     }
 
-    fn parse_struct_inner<'a, 's>(
-        &self,
+    fn parse_struct_inner<'s>(
+        &mut self,
         next: &'s str,
         flags: StructFlags,
-    ) -> ParseResult<'s, L::Node<'a>> {
+    ) -> ParseResult<'s, Node> {
         let (binder, next) = self.parse_binder(next)?;
         let (children, next) = self.parse_many(next, Self::parse)?;
         Ok((self.make_node(Kind::Struct(binder, flags, children)), next))
     }
 
-    fn parse_prop_variant<'a, 's>(&self, next: &'s str) -> ParseResult<'s, PropVariant<'a, L>> {
+    fn parse_prop_variant<'s>(&mut self, next: &'s str) -> ParseResult<'s, PropVariant<'a, L>> {
         parse_paren_delimited(next, |next| match parse_symbol(next) {
             Ok((sym @ ("seq" | "seq-default"), next)) => {
                 let (label, next) = parse_paren_delimited(next, parse_at_label)?;
@@ -284,23 +280,17 @@ impl<L: Lang> Parser<L> {
             Ok((sym, _)) => return Err(Error::Expected(Class::Seq, Found(Token::Symbol(sym)))),
             Err(_) => {
                 let (rel, next) = self.parse(next)?;
-                let (value, next) = self.parse(next)?;
+                let (val, next) = self.parse(next)?;
 
-                Ok((
-                    PropVariant::Singleton(Attribute {
-                        rel: Box::new(rel),
-                        val: Box::new(value),
-                    }),
-                    next,
-                ))
+                Ok((PropVariant::Singleton(Attribute { rel, val }), next))
             }
         })
     }
 
-    fn parse_seq_property_element<'a, 's>(
-        &self,
+    fn parse_seq_property_element<'s>(
+        &mut self,
         next: &'s str,
-    ) -> ParseResult<'s, (Iter, Attribute<L::Node<'a>>)> {
+    ) -> ParseResult<'s, (Iter, Attribute<Node>)> {
         parse_paren_delimited(next, |next| {
             let (iter, next) = match parse_symbol(next) {
                 Ok(("iter", next)) => (Iter(true), next),
@@ -317,7 +307,10 @@ impl<L: Lang> Parser<L> {
         })
     }
 
-    fn parse_prop_match_arm<'a, 's>(&self, next: &'s str) -> ParseResult<'s, PropMatchArm<'a, L>> {
+    fn parse_prop_match_arm<'s>(
+        &mut self,
+        next: &'s str,
+    ) -> ParseResult<'s, (PropPattern<'a, L>, Vec<Node>)> {
         parse_paren_delimited(next, |next| {
             let (_, next) = parse_lparen(next)?;
             let (seq_default, next) = match parse_symbol(next) {
@@ -355,12 +348,12 @@ impl<L: Lang> Parser<L> {
             };
             let (nodes, next) = self.parse_many(next, Self::parse)?;
 
-            Ok((PropMatchArm { pattern, nodes }, next))
+            Ok(((pattern, nodes), next))
         })
     }
 
-    fn parse_capture_match_arm<'a, 's>(
-        &self,
+    fn parse_capture_match_arm<'s>(
+        &mut self,
         next: &'s str,
     ) -> ParseResult<'s, CaptureMatchArm<'a, L>> {
         parse_paren_delimited(next, |next| {
@@ -378,25 +371,21 @@ impl<L: Lang> Parser<L> {
         })
     }
 
-    fn parse_binary_call<'a, 's>(
-        &self,
-        proc: BuiltinProc,
-        next: &'s str,
-    ) -> ParseResult<'s, L::Node<'a>> {
+    fn parse_binary_call<'s>(&mut self, proc: BuiltinProc, next: &'s str) -> ParseResult<'s, Node> {
         let (a, next) = self.parse(next)?;
         let (b, next) = self.parse(next)?;
 
         Ok((self.make_node(Kind::Call(proc, [a, b].into())), next))
     }
 
-    fn parse_binder<'a, 's>(&self, next: &'s str) -> ParseResult<'s, L::Binder<'a>> {
+    fn parse_binder<'s>(&self, next: &'s str) -> ParseResult<'s, L::Meta<'a, Binder>> {
         parse_paren_delimited(next, |next| {
             let (var, next) = parse_dollar_var(next)?;
             Ok((self.make_binder(var), next))
         })
     }
 
-    fn parse_pattern_binding<'a, 's>(&self, next: &'s str) -> ParseResult<'s, Binding<'a, L>> {
+    fn parse_pattern_binding<'s>(&self, next: &'s str) -> ParseResult<'s, Binding<'a, L>> {
         let (_, next) = parse_dollar(next)?;
         match parse_token(next)? {
             (Token::Symbol(sym), next) => Ok((
@@ -408,7 +397,7 @@ impl<L: Lang> Parser<L> {
         }
     }
 
-    fn parse_capture_group<'a, 's>(&self, next: &'s str) -> ParseResult<'s, CaptureGroup<'a, L>> {
+    fn parse_capture_group<'s>(&mut self, next: &'s str) -> ParseResult<'s, CaptureGroup<'a, L>> {
         parse_paren_delimited(next, |next| {
             let (index, next) = parse_i64(next)?;
             let (var, next) = parse_dollar_var(next)?;
@@ -423,16 +412,16 @@ impl<L: Lang> Parser<L> {
         })
     }
 
-    fn make_node<'a>(&self, kind: Kind<'a, L>) -> L::Node<'a> {
-        self.lang.make_node(kind)
+    fn make_node(&mut self, kind: Kind<'a, L>) -> Node {
+        self.arena.add(self.lang.with_meta(kind))
     }
 
-    fn make_binder<'a>(&self, var: Var) -> L::Binder<'a> {
-        self.lang.make_binder(var)
+    fn make_binder(&self, var: Var) -> L::Meta<'a, Binder> {
+        self.lang.with_meta(Binder { var })
     }
 
-    fn make_label<'a>(&self, label: Label) -> L::Label<'a> {
-        self.lang.make_label(label)
+    fn make_label(&self, label: Label) -> L::Meta<'a, Label> {
+        self.lang.with_meta(label)
     }
 }
 
@@ -461,7 +450,7 @@ fn parse_dollar_var(next: &str) -> ParseResult<Var> {
 /// Parse `(`, then closure, then `)`
 fn parse_paren_delimited<'s, T>(
     next: &'s str,
-    item_fn: impl Fn(&'s str) -> ParseResult<'s, T>,
+    mut item_fn: impl FnMut(&'s str) -> ParseResult<'s, T>,
 ) -> ParseResult<'s, T> {
     let (_, next) = parse_lparen(next)?;
     let (value, next) = item_fn(next)?;

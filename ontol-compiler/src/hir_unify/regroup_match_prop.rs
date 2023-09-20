@@ -1,6 +1,6 @@
 use fnv::FnvHashMap;
 use indexmap::{map::Entry, IndexMap};
-use ontol_hir::GetKind;
+use ontol_hir::old::GetKind;
 use ontol_runtime::value::PropertyId;
 
 use crate::typed_hir::{Meta, TypedHir, TypedHirNode};
@@ -53,13 +53,13 @@ pub fn regroup_match_prop(nodes: Vec<TypedHirNode>) -> Vec<TypedHirNode> {
 }
 
 struct Regrouped<'m> {
-    match_arms: Vec<ontol_hir::PropMatchArm<'m, TypedHir>>,
+    match_arms: Vec<ontol_hir::old::PropMatchArm<'m, TypedHir>>,
     first_meta: Meta<'m>,
-    absent_arm: Option<ontol_hir::PropMatchArm<'m, TypedHir>>,
+    absent_arm: Option<ontol_hir::old::PropMatchArm<'m, TypedHir>>,
 }
 
 impl<'m> Regrouped<'m> {
-    fn add_arms(&mut self, match_arms: Vec<ontol_hir::PropMatchArm<'m, TypedHir>>) {
+    fn add_arms(&mut self, match_arms: Vec<ontol_hir::old::PropMatchArm<'m, TypedHir>>) {
         for match_arm in match_arms {
             if matches!(match_arm.pattern, ontol_hir::PropPattern::Absent) {
                 self.absent_arm = Some(match_arm);

@@ -21,7 +21,7 @@ pub(super) struct LevelBuilder<'m> {
 #[derive(Default)]
 pub(super) struct MergedMatchArms<'m> {
     optional: ontol_hir::Optional,
-    match_arms: Vec<ontol_hir::PropMatchArm<'m, TypedHir>>,
+    match_arms: Vec<ontol_hir::old::PropMatchArm<'m, TypedHir>>,
 }
 
 impl<'m> LevelBuilder<'m> {
@@ -29,10 +29,12 @@ impl<'m> LevelBuilder<'m> {
         for ((struct_var, property_id), mut merged_match_arms) in self.merged_match_arms_table {
             if !merged_match_arms.match_arms.is_empty() {
                 if merged_match_arms.optional.0 {
-                    merged_match_arms.match_arms.push(ontol_hir::PropMatchArm {
-                        pattern: ontol_hir::PropPattern::Absent,
-                        nodes: vec![],
-                    });
+                    merged_match_arms
+                        .match_arms
+                        .push(ontol_hir::old::PropMatchArm {
+                            pattern: ontol_hir::PropPattern::Absent,
+                            nodes: vec![],
+                        });
                 }
 
                 self.output.push(TypedHirNode(
@@ -65,10 +67,12 @@ impl<'m> LevelBuilder<'m> {
         }
 
         if !body.is_empty() {
-            merged_match_arms.match_arms.push(ontol_hir::PropMatchArm {
-                pattern: ontol_hir::PropPattern::Attr(bindings.rel, bindings.val),
-                nodes: body,
-            });
+            merged_match_arms
+                .match_arms
+                .push(ontol_hir::old::PropMatchArm {
+                    pattern: ontol_hir::PropPattern::Attr(bindings.rel, bindings.val),
+                    nodes: body,
+                });
         }
     }
 
@@ -112,10 +116,12 @@ impl<'m> LevelBuilder<'m> {
                 },
             });
 
-            merged_match_arms.match_arms.push(ontol_hir::PropMatchArm {
-                pattern: ontol_hir::PropPattern::Seq(label_binding, has_default),
-                nodes: body,
-            });
+            merged_match_arms
+                .match_arms
+                .push(ontol_hir::old::PropMatchArm {
+                    pattern: ontol_hir::PropPattern::Seq(label_binding, has_default),
+                    nodes: body,
+                });
         }
     }
 }

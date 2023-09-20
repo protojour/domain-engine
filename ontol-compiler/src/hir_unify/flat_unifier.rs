@@ -4,7 +4,7 @@ use std::fmt::Display;
 
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
-use ontol_hir::{visitor::HirVisitor, GetKind};
+use ontol_hir::{old::GetKind, visitor::HirVisitor};
 use ontol_runtime::{smart_format, DefId};
 use smartstring::alias::String;
 use tracing::{debug, warn};

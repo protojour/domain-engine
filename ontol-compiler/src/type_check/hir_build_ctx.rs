@@ -14,7 +14,7 @@ use super::inference::Inference;
 pub struct CtrlFlowDepth(pub u16);
 
 pub struct HirBuildCtx<'m> {
-    pub hir_arena: ontol_hir::hir2::Arena<'m, TypedHir>,
+    pub hir_arena: ontol_hir::arena::Arena<'m, TypedHir>,
     pub map_kw_span: SourceSpan,
     pub inference: Inference<'m>,
     pub pattern_variables: FnvHashMap<ontol_hir::Var, PatternVariable>,
@@ -73,9 +73,9 @@ impl<'m> HirBuildCtx<'m> {
 
     pub fn hir_node(
         &mut self,
-        kind: ontol_hir::hir2::Kind<'m, TypedHir>,
+        kind: ontol_hir::Kind<'m, TypedHir>,
         meta: typed_hir::Meta<'m>,
-    ) -> ontol_hir::hir2::Node {
+    ) -> ontol_hir::Node {
         self.hir_arena.add(TypedHirValue(kind, meta))
     }
 }

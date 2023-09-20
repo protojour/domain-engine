@@ -33,7 +33,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &mut self,
         pat_id: PatId,
         ctx: &mut HirBuildCtx<'m>,
-    ) -> ontol_hir::hir2::RootNode<'m, TypedHir> {
+    ) -> ontol_hir::RootNode<'m, TypedHir> {
         let pattern = self.patterns.table.remove(&pat_id).unwrap();
 
         let node = self.build_node(
@@ -61,7 +61,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
         }
 
-        ontol_hir::hir2::RootNode::new(node, std::mem::take(&mut ctx.hir_arena))
+        ontol_hir::RootNode::new(node, std::mem::take(&mut ctx.hir_arena))
     }
 
     pub(super) fn build_node(
@@ -69,7 +69,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         pattern: &Pattern,
         node_info: NodeInfo<'m>,
         ctx: &mut HirBuildCtx<'m>,
-    ) -> ontol_hir::hir2::Node {
+    ) -> ontol_hir::Node {
         let node = match (&pattern.kind, node_info.expected_ty) {
             (PatternKind::Call(def_id, args), Some(_expected_output)) => {
                 match (
@@ -108,7 +108,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         }
 
                         ctx.hir_node(
-                            ontol_hir::hir2::Kind::Call(*proc, hir_args),
+                            ontol_hir::Kind::Call(*proc, hir_args),
                             Meta {
                                 ty: output,
                                 span: pattern.span,
@@ -235,7 +235,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                             );
 
                                         return ctx.hir_node(
-                                            ontol_hir::hir2::Kind::Regex(
+                                            ontol_hir::Kind::Regex(
                                                 Some(TypedHirValue(
                                                     label,
                                                     Meta {
@@ -297,7 +297,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let seq_ty = self.types.intern(Type::Seq(rel_ty, val_ty));
 
                 ctx.hir_node(
-                    ontol_hir::hir2::Kind::DeclSeq(
+                    ontol_hir::Kind::DeclSeq(
                         label.with_ty(seq_ty),
                         ontol_hir::Attribute { rel, val },
                     ),
@@ -309,7 +309,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             (PatternKind::ConstI64(int), Some(expected_ty)) => match expected_ty {
                 Type::Primitive(PrimitiveKind::I64, _) => ctx.hir_node(
-                    ontol_hir::hir2::Kind::I64(*int),
+                    ontol_hir::Kind::I64(*int),
                     Meta {
                         ty: expected_ty,
                         span: pattern.span,
@@ -319,7 +319,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     // Didn't find a way to go from i64 to f64 in Rust std..
                     match f64::from_str(&int.to_string()) {
                         Ok(float) => ctx.hir_node(
-                            ontol_hir::hir2::Kind::F64(float),
+                            ontol_hir::Kind::F64(float),
                             Meta {
                                 ty: expected_ty,
                                 span: pattern.span,
@@ -334,7 +334,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             },
             (PatternKind::ConstText(literal), Some(expected_ty)) => match expected_ty {
                 Type::Primitive(PrimitiveKind::Text, _) => ctx.hir_node(
-                    ontol_hir::hir2::Kind::Text(literal.clone()),
+                    ontol_hir::Kind::Text(literal.clone()),
                     Meta {
                         ty: expected_ty,
                         span: pattern.span,
@@ -342,7 +342,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 ),
                 Type::TextConstant(def_id) => match self.defs.def_kind(*def_id) {
                     DefKind::TextLiteral(lit) if literal == lit => ctx.hir_node(
-                        ontol_hir::hir2::Kind::Text(literal.clone()),
+                        ontol_hir::Kind::Text(literal.clone()),
                         Meta {
                             ty: expected_ty,
                             span: pattern.span,
@@ -381,7 +381,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ),
                     Some(expected_ty) => {
                         let variable_ref = ctx.hir_node(
-                            ontol_hir::hir2::Kind::Var(*var),
+                            ontol_hir::Kind::Var(*var),
                             Meta {
                                 ty: expected_ty,
                                 span: pattern.span,
@@ -424,7 +424,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     );
 
                     ctx.hir_node(
-                        ontol_hir::hir2::Kind::Regex(
+                        ontol_hir::Kind::Regex(
                             None,
                             regex_pattern.regex_def_id,
                             capture_groups_list,
@@ -474,7 +474,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         object: &Pattern,
         prop_span: SourceSpan,
         ctx: &mut HirBuildCtx<'m>,
-    ) -> ontol_hir::hir2::Node {
+    ) -> ontol_hir::Node {
         match &object.kind {
             PatternKind::Variable(object_var) => {
                 // implicit mapping; for now the object needs to be a variable
@@ -531,7 +531,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         // that falls back to text if both sides are unknown
         expected_ty: TypeRef<'m>,
         ctx: &mut HirBuildCtx<'m>,
-    ) -> Vec<Vec<ontol_hir::hir2::CaptureGroup<'m, TypedHir>>> {
+    ) -> Vec<Vec<ontol_hir::CaptureGroup<'m, TypedHir>>> {
         match node {
             RegexPatternCaptureNode::Alternation { variants } => variants
                 .iter()
@@ -553,7 +553,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         // that falls back to text if both sides are unknown
         expected_ty: TypeRef<'m>,
         ctx: &mut HirBuildCtx<'m>,
-    ) -> Vec<ontol_hir::hir2::CaptureGroup<'m, TypedHir>> {
+    ) -> Vec<ontol_hir::CaptureGroup<'m, TypedHir>> {
         match node {
             RegexPatternCaptureNode::Capture {
                 var,
@@ -580,9 +580,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 let _type_var = ctx.inference.new_type_variable(arm_pat_id);
 
-                vec![ontol_hir::hir2::CaptureGroup::<'m, TypedHir> {
+                vec![ontol_hir::CaptureGroup::<'m, TypedHir> {
                     index: *capture_index,
-                    binder: ontol_hir::hir2::Binder { var: *var }.with_meta(Meta {
+                    binder: ontol_hir::Binder { var: *var }.with_meta(Meta {
                         ty: expected_ty,
                         span: *name_span,
                     }),
@@ -608,7 +608,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         error: TypeError<'m>,
         span: &SourceSpan,
         ctx: &mut HirBuildCtx<'m>,
-    ) -> ontol_hir::hir2::Node {
+    ) -> ontol_hir::Node {
         self.type_error(error, span);
         self.make_error_node(span, ctx)
     }
@@ -618,7 +618,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         error: CompileError,
         span: &SourceSpan,
         ctx: &mut HirBuildCtx<'m>,
-    ) -> ontol_hir::hir2::Node {
+    ) -> ontol_hir::Node {
         self.error(error, span);
         self.make_error_node(span, ctx)
     }
@@ -627,9 +627,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &mut self,
         span: &SourceSpan,
         ctx: &mut HirBuildCtx<'m>,
-    ) -> ontol_hir::hir2::Node {
+    ) -> ontol_hir::Node {
         ctx.hir_node(
-            ontol_hir::hir2::Kind::Unit,
+            ontol_hir::Kind::Unit,
             Meta {
                 ty: self.types.intern(Type::Error),
                 span: *span,
@@ -637,9 +637,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         )
     }
 
-    pub(super) fn unit_node_no_span(&mut self, ctx: &mut HirBuildCtx<'m>) -> ontol_hir::hir2::Node {
+    pub(super) fn unit_node_no_span(&mut self, ctx: &mut HirBuildCtx<'m>) -> ontol_hir::Node {
         ctx.hir_node(
-            ontol_hir::hir2::Kind::Unit,
+            ontol_hir::Kind::Unit,
             Meta {
                 ty: self.unit_type(),
                 span: NO_SPAN,

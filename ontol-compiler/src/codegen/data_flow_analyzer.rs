@@ -3,7 +3,7 @@
 use std::{collections::BTreeSet, fmt::Debug};
 
 use fnv::{FnvHashMap, FnvHashSet};
-use ontol_hir::{GetKind, PropVariant, SeqPropertyVariant};
+use ontol_hir::{old::GetKind, PropVariant, SeqPropertyVariant};
 use ontol_runtime::{
     ontology::{PropertyFlow, PropertyFlowData},
     value::PropertyId,

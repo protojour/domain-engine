@@ -1,6 +1,7 @@
 use ontol_runtime::value::PropertyId;
 
-use crate::*;
+use crate::old::*;
+use crate::{Attribute, Iter, Label, Optional, Var};
 
 macro_rules! visitor_trait_methods {
     ($ref:tt, $kind:ident, $var:ident, $label:ident, $iter:ident) => {

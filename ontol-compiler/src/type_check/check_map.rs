@@ -83,9 +83,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         // unify the type of variables on either side:
         self.infer_hir_unify_arms(&mut first, &mut second, ctx);
 
-        fn mk_map_arm(node: ontol_hir::hir2::RootNode<TypedHir>) -> MapArm {
+        fn mk_map_arm(node: ontol_hir::RootNode<TypedHir>) -> MapArm {
             let is_match = match node.as_ref().value() {
-                ontol_hir::hir2::Kind::Struct(_, flags, _) => {
+                ontol_hir::Kind::Struct(_, flags, _) => {
                     flags.contains(ontol_hir::StructFlags::MATCH)
                 }
                 _ => false,
@@ -112,7 +112,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn infer_hir_arm_types(
         &mut self,
-        hir_root_node: &mut ontol_hir::hir2::RootNode<'m, TypedHir>,
+        hir_root_node: &mut ontol_hir::RootNode<'m, TypedHir>,
         ctx: &mut HirBuildCtx<'m>,
     ) {
         let mut inference = HirArmTypeInference {
@@ -127,8 +127,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn infer_hir_unify_arms(
         &mut self,
-        first: &mut ontol_hir::hir2::RootNode<'m, TypedHir>,
-        second: &mut ontol_hir::hir2::RootNode<'m, TypedHir>,
+        first: &mut ontol_hir::RootNode<'m, TypedHir>,
+        second: &mut ontol_hir::RootNode<'m, TypedHir>,
         ctx: &mut HirBuildCtx<'m>,
     ) {
         for (var, explicit_var) in &mut ctx.pattern_variables {

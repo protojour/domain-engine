@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ontol_hir::{visitor::HirVisitor, GetKind, SeqPropertyVariant};
+use ontol_hir::{old::GetKind, visitor::HirVisitor, SeqPropertyVariant};
 use ontol_runtime::vm::proc::BuiltinProc;
 use smallvec::SmallVec;
 

@@ -8,26 +8,20 @@ use pretty_assertions::assert_eq;
 struct TestLang;
 
 impl Lang for TestLang {
-    type Node<'a> = Kind<'a, Self>;
-    type Binder<'a> = Var;
-    type Label<'a> = Label;
+    type Meta<'a, T> = T where T: Clone;
 
-    fn make_node<'a>(&self, kind: Kind<'a, Self>) -> Self::Node<'a> {
-        kind
+    fn with_meta<'a, T: Clone>(&self, value: T) -> Self::Meta<'a, T> {
+        value
     }
 
-    fn make_binder<'a>(&self, var: Var) -> Self::Binder<'a> {
-        var
-    }
-
-    fn make_label<'a>(&self, label: Label) -> Self::Label<'a> {
-        label
+    fn inner<'m, 'a, T: Clone>(value: &'m Self::Meta<'a, T>) -> &'m T {
+        value
     }
 }
 
 fn parse_print(src: &str) -> String {
     let parser = Parser::new(TestLang);
-    let (node, _) = parser.parse(src).unwrap();
+    let (node, _) = parser.parse_root(src).unwrap();
     let mut out = String::new();
     use std::fmt::Write;
     write!(out, "{node}").unwrap();
