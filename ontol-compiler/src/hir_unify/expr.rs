@@ -3,7 +3,7 @@ use smartstring::alias::String;
 
 use crate::{
     hir_unify::VarSet,
-    typed_hir::{self, TypedBinder},
+    typed_hir::{self, TypedHirValue},
     SourceSpan,
 };
 
@@ -38,7 +38,7 @@ pub enum Kind<'m> {
     Var(ontol_hir::Var),
     Unit,
     Struct {
-        binder: TypedBinder<'m>,
+        binder: TypedHirValue<'m, ontol_hir::Binder>,
         flags: ontol_hir::StructFlags,
         props: Vec<Prop<'m>>,
     },
@@ -57,7 +57,10 @@ pub enum Kind<'m> {
         Box<ontol_hir::Attribute<Expr<'m>>>,
     ),
     Push(ontol_hir::Var, Box<ontol_hir::Attribute<Expr<'m>>>),
-    StringInterpolation(TypedBinder<'m>, Vec<StringInterpolationComponent>),
+    StringInterpolation(
+        TypedHirValue<'m, ontol_hir::Binder>,
+        Vec<StringInterpolationComponent>,
+    ),
 }
 
 impl<'m> Kind<'m> {
@@ -66,7 +69,7 @@ impl<'m> Kind<'m> {
         match self {
             Self::Var(var) => format!("Var({var})"),
             Self::Unit => "Unit".to_string(),
-            Self::Struct { binder, .. } => format!("Struct({})", binder.var),
+            Self::Struct { binder, .. } => format!("Struct({})", binder.value().var),
             Self::Prop(prop) => format!(
                 "Prop{}({}{}[{}])",
                 if prop.optional.0 { "?" } else { "" },
@@ -91,14 +94,16 @@ impl<'m> Kind<'m> {
                 attr.val.kind().debug_short()
             ),
             Self::Push(var, _) => format!("Push({var})"),
-            Self::StringInterpolation(binder, _) => format!("StringInterpolation({})", binder.var),
+            Self::StringInterpolation(binder, _) => {
+                format!("StringInterpolation({})", binder.value().var)
+            }
         }
     }
 }
 
 #[derive(Debug)]
 pub struct Struct<'m>(
-    pub TypedBinder<'m>,
+    pub TypedHirValue<'m, ontol_hir::Binder>,
     pub ontol_hir::StructFlags,
     pub Vec<Prop<'m>>,
 );

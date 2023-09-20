@@ -4,8 +4,9 @@ use std::fmt::Display;
 
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
-use ontol_hir::{old::GetKind, visitor::HirVisitor};
+use ontol_hir::visitor::HirVisitor;
 use ontol_runtime::{smart_format, DefId};
+use smallvec::SmallVec;
 use smartstring::alias::String;
 use tracing::{debug, warn};
 
@@ -13,7 +14,7 @@ use crate::{
     hir_unify::{flat_unifier_table::IsInScope, CLASSIC_UNIFIER_FALLBACK},
     mem::Intern,
     primitive::PrimitiveKind,
-    typed_hir::{self, TypedBinder, TypedHir, TypedHirNode},
+    typed_hir::{self, IntoTypedHirValue, Meta, TypedHir, TypedHirValue},
     types::{Type, TypeRef, Types},
     NO_SPAN,
 };
@@ -34,6 +35,7 @@ pub struct FlatUnifier<'a, 'm> {
     #[allow(unused)]
     pub(super) types: &'a mut Types<'m>,
     pub(super) var_allocator: ontol_hir::VarAllocator,
+    pub(super) hir_arena: ontol_hir::arena::Arena<'m, TypedHir>,
 }
 
 enum AssignResult<'m> {
@@ -86,6 +88,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
         Self {
             types,
             var_allocator,
+            hir_arena: Default::default(),
         }
     }
 
@@ -118,6 +121,15 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
         result?;
 
         unify_single(None, Default::default(), &mut table, self)
+    }
+
+    #[inline]
+    pub(super) fn mk_node(
+        &mut self,
+        kind: ontol_hir::Kind<'m, TypedHir>,
+        meta: Meta<'m>,
+    ) -> ontol_hir::Node {
+        self.hir_arena.add(TypedHirValue(kind, meta))
     }
 
     fn assign_to_scope(
@@ -352,7 +364,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                         let scope_map = &table.table_mut()[*idx];
                         matches!(scope_map.scope.kind(), flat_scope::Kind::IterElement(..))
                     })
-                    .map(|idx| (idx, label.label))
+                    .map(|idx| (idx, *label.value()))
                     .ok_or_else(|| {
                         unifier_todo(smart_format!(
                             "Unable to find IterElement scope under SeqPropVariant"
@@ -450,10 +462,12 @@ fn unify_single<'m>(
             }),
             flat_scope::Kind::Var,
         ) => {
-            let typed_binder = Some(TypedBinder {
-                var: scope_map.scope.meta().scope_var.0,
-                meta: scope_map.scope.meta().hir_meta,
-            });
+            let typed_binder = Some(
+                ontol_hir::Binder {
+                    var: scope_map.scope.meta().scope_var.0,
+                }
+                .with_meta(scope_map.scope.meta().hir_meta),
+            );
 
             let inner_node = ScopedExprToNode {
                 table,
@@ -491,7 +505,7 @@ fn unify_single<'m>(
             let next_in_scope = in_scope.union_one(scope_meta.scope_var.0);
             let mut body = unify_scope_structural(
                 MainScope::Value(scope_meta.scope_var),
-                ExprSelector::Struct(binder.var, scope_var),
+                ExprSelector::Struct(binder.value().var, scope_var),
                 StructuralOrigin::DependeesOf(scope_var),
                 next_in_scope.clone(),
                 table,
@@ -524,11 +538,16 @@ fn unify_single<'m>(
             }
 
             let node = UnifiedNode {
-                typed_binder: Some(TypedBinder {
-                    var: scope_meta.scope_var.0,
-                    meta: scope_meta.hir_meta,
-                }),
-                node: TypedHirNode(ontol_hir::Kind::Struct(binder, flags, body), meta.hir_meta),
+                typed_binder: Some(
+                    ontol_hir::Binder {
+                        var: scope_meta.scope_var.0,
+                    }
+                    .with_meta(scope_meta.hir_meta),
+                ),
+                node: unifier.mk_node(
+                    ontol_hir::Kind::Struct(binder, flags, body.into()),
+                    meta.hir_meta,
+                ),
             };
 
             Ok(node)
@@ -551,7 +570,7 @@ fn unify_scope_structural<'m>(
     table: &mut Table<'m>,
     unifier: &mut FlatUnifier<'_, 'm>,
     level: Level,
-) -> UnifierResult<Vec<TypedHirNode<'m>>> {
+) -> UnifierResult<Vec<ontol_hir::Node>> {
     let mut indexes = match origin {
         StructuralOrigin::DependeesOf(parent_scope_var) => table.dependees(Some(parent_scope_var)),
         StructuralOrigin::Start => vec![0],
@@ -664,7 +683,7 @@ fn unify_scope_structural<'m>(
                         level.next(),
                     )?);
 
-                    if !in_scope.contains(ontol_hir::Var(label.label.0)) {
+                    if !in_scope.contains(ontol_hir::Var(label.value().0)) {
                         body.extend(unify_scope_structural(
                             main_scope,
                             selector,
@@ -697,10 +716,10 @@ fn unify_scope_structural<'m>(
                             &|| {
                                 let mut next_in_scope = in_scope.clone();
                                 if let ontol_hir::Binding::Binder(binder) = &bindings.rel {
-                                    next_in_scope.insert(binder.var);
+                                    next_in_scope.insert(binder.value().var);
                                 }
                                 if let ontol_hir::Binding::Binder(binder) = &bindings.val {
-                                    next_in_scope.insert(binder.var);
+                                    next_in_scope.insert(binder.value().var);
                                 }
                                 next_in_scope
                             },
@@ -710,13 +729,14 @@ fn unify_scope_structural<'m>(
                         )?;
 
                         if !push_nodes.is_empty() {
-                            builder.output.push(TypedHirNode(
+                            let meta = unifier.unit_meta();
+                            builder.output.push(unifier.mk_node(
                                 ontol_hir::Kind::ForEach(
                                     ontol_hir::Var(label.0),
                                     (bindings.rel, bindings.val),
-                                    push_nodes,
+                                    push_nodes.into(),
                                 ),
-                                unifier.unit_meta(),
+                                meta,
                             ));
                         }
                     }
@@ -763,7 +783,7 @@ fn unify_scope_structural<'m>(
                         let mut seq_type_inferers: IndexMap<ontol_hir::Label, SeqTypeInfer<'m>> =
                             Default::default();
 
-                        let mut hir_props: Vec<TypedHirNode<'m>> = vec![];
+                        let mut hir_props: Vec<ontol_hir::Node> = vec![];
                         let unit_meta = unifier.unit_meta();
 
                         // Analyze which sequences are under scrutiny and allocate output variables
@@ -777,28 +797,26 @@ fn unify_scope_structural<'m>(
                                             ))
                                         });
 
-                                    hir_props.push(TypedHirNode(
-                                        ontol_hir::Kind::Prop(
-                                            prop.optional,
-                                            prop.struct_var,
-                                            prop.prop_id,
-                                            vec![ontol_hir::PropVariant::Singleton(
-                                                ontol_hir::Attribute {
-                                                    rel: Box::new(TypedHirNode(
-                                                        ontol_hir::Kind::Unit,
-                                                        unit_meta,
-                                                    )),
-                                                    val: Box::new(TypedHirNode(
-                                                        ontol_hir::Kind::Var(
-                                                            infererer.output_seq_var.0,
-                                                        ),
-                                                        meta.hir_meta,
-                                                    )),
-                                                },
-                                            )],
-                                        ),
+                                    let rel = unifier.mk_node(ontol_hir::Kind::Unit, unit_meta);
+                                    let val = unifier.mk_node(
+                                        ontol_hir::Kind::Var(infererer.output_seq_var.0),
                                         meta.hir_meta,
-                                    ));
+                                    );
+
+                                    hir_props.push(
+                                        unifier.mk_node(
+                                            ontol_hir::Kind::Prop(
+                                                prop.optional,
+                                                prop.struct_var,
+                                                prop.prop_id,
+                                                [ontol_hir::PropVariant::Singleton(
+                                                    ontol_hir::Attribute { rel, val },
+                                                )]
+                                                .into(),
+                                            ),
+                                            meta.hir_meta,
+                                        ),
+                                    );
                                 }
                             }
                         }
@@ -825,7 +843,7 @@ fn unify_scope_structural<'m>(
 
                             let mut match_arm = ontol_hir::CaptureMatchArm {
                                 capture_groups: vec![],
-                                nodes: vec![],
+                                nodes: Default::default(),
                             };
                             let mut captured_scope = VarSet::default();
 
@@ -841,10 +859,10 @@ fn unify_scope_structural<'m>(
 
                                 match_arm.capture_groups.push(ontol_hir::CaptureGroup {
                                     index: *cap_index,
-                                    binder: TypedBinder {
+                                    binder: ontol_hir::Binder {
                                         var: cap_scope_var.0,
-                                        meta: cap_scope_map.scope.meta().hir_meta,
-                                    },
+                                    }
+                                    .with_meta(cap_scope_map.scope.meta().hir_meta),
                                 });
                                 captured_scope.insert(cap_scope_var.0);
                             }
@@ -871,7 +889,8 @@ fn unify_scope_structural<'m>(
                             match_arms.push(match_arm);
                         }
 
-                        let mut nodes = vec![TypedHirNode(
+                        let mut nodes: ontol_hir::Nodes = Default::default();
+                        nodes.push(unifier.mk_node(
                             ontol_hir::Kind::MatchRegex(
                                 ontol_hir::Iter(true),
                                 scope_var.0,
@@ -879,7 +898,7 @@ fn unify_scope_structural<'m>(
                                 match_arms,
                             ),
                             regex_hir_meta,
-                        )];
+                        ));
                         nodes.extend(hir_props);
 
                         // wrap everything in sequence binders
@@ -892,26 +911,32 @@ fn unify_scope_structural<'m>(
                                 span: NO_SPAN,
                             };
 
-                            nodes = vec![TypedHirNode(
+                            let let_def = unifier.mk_node(
+                                ontol_hir::Kind::Sequence(
+                                    ontol_hir::Binder {
+                                        var: ontol_hir::Var(label.0),
+                                    }
+                                    .with_meta(sequence_meta),
+                                    ontol_hir::Nodes::default(),
+                                ),
+                                sequence_meta,
+                            );
+
+                            let unit_meta = unifier.unit_meta();
+                            let let_node = unifier.mk_node(
                                 ontol_hir::Kind::Let(
-                                    TypedBinder {
+                                    ontol_hir::Binder {
                                         var: output_seq_var.0,
-                                        meta: unit_meta,
-                                    },
-                                    Box::new(TypedHirNode(
-                                        ontol_hir::Kind::Sequence(
-                                            TypedBinder {
-                                                var: ontol_hir::Var(label.0),
-                                                meta: sequence_meta,
-                                            },
-                                            vec![],
-                                        ),
-                                        sequence_meta,
-                                    )),
+                                    }
+                                    .with_meta(unit_meta),
+                                    let_def,
                                     nodes,
                                 ),
-                                unifier.unit_meta(),
-                            )]
+                                unit_meta,
+                            );
+
+                            nodes = Default::default();
+                            nodes.push(let_node);
                         }
 
                         builder.output.extend(nodes);
@@ -926,7 +951,7 @@ fn unify_scope_structural<'m>(
 
                             let mut match_arm = ontol_hir::CaptureMatchArm {
                                 capture_groups: vec![],
-                                nodes: vec![],
+                                nodes: ontol_hir::Nodes::default(),
                             };
                             let mut captured_scope = VarSet::default();
 
@@ -942,10 +967,12 @@ fn unify_scope_structural<'m>(
 
                                 match_arm.capture_groups.push(ontol_hir::CaptureGroup {
                                     index: *cap_index,
-                                    binder: TypedBinder {
-                                        var: cap_scope_var.0,
-                                        meta: cap_scope_map.scope.meta().hir_meta,
-                                    },
+                                    binder: TypedHirValue(
+                                        ontol_hir::Binder {
+                                            var: cap_scope_var.0,
+                                        },
+                                        cap_scope_map.scope.meta().hir_meta,
+                                    ),
                                 });
                                 captured_scope.insert(cap_scope_var.0);
                             }
@@ -963,7 +990,7 @@ fn unify_scope_structural<'m>(
                             match_arms.push(match_arm);
                         }
 
-                        builder.output.push(TypedHirNode(
+                        builder.output.push(unifier.mk_node(
                             ontol_hir::Kind::MatchRegex(
                                 ontol_hir::Iter(false),
                                 scope_var.0,
@@ -998,7 +1025,7 @@ fn apply_lateral_scope<'m>(
     table: &mut Table<'m>,
     unifier: &mut FlatUnifier<'_, 'm>,
     level: Level,
-) -> UnifierResult<Vec<TypedHirNode<'m>>> {
+) -> UnifierResult<Vec<ontol_hir::Node>> {
     if assignments.is_empty() {
         return Ok(vec![]);
     }
@@ -1110,7 +1137,7 @@ fn apply_scope_group<'m>(
     scope_var: ScopeVar,
     scope_group: ScopeGroup<'m>,
     in_scope: &VarSet,
-    output: &mut Vec<TypedHirNode<'m>>,
+    output: &mut Vec<ontol_hir::Node>,
     table: &mut Table<'m>,
     unifier: &mut FlatUnifier<'_, 'm>,
     level: Level,
@@ -1182,71 +1209,61 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
         expr::Expr(kind, meta): expr::Expr<'m>,
         in_scope: &VarSet,
         main_scope: MainScope,
-    ) -> UnifierResult<TypedHirNode<'m>> {
+    ) -> UnifierResult<ontol_hir::Node> {
         match kind {
-            expr::Kind::Var(var) => Ok(TypedHirNode(ontol_hir::Kind::Var(var), meta.hir_meta)),
-            expr::Kind::Unit => Ok(TypedHirNode(ontol_hir::Kind::Unit, meta.hir_meta)),
-            expr::Kind::I64(int) => Ok(TypedHirNode(ontol_hir::Kind::I64(int), meta.hir_meta)),
-            expr::Kind::F64(float) => Ok(TypedHirNode(ontol_hir::Kind::F64(float), meta.hir_meta)),
-            expr::Kind::Prop(prop) => Ok(TypedHirNode(
-                ontol_hir::Kind::Prop(
-                    ontol_hir::Optional(false),
-                    prop.struct_var,
-                    prop.prop_id,
-                    match prop.variant {
-                        expr::PropVariant::Singleton(attr) => {
-                            vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
-                                rel: Box::new(self.scoped_expr_to_node(
-                                    attr.rel,
-                                    in_scope,
-                                    main_scope.next(),
-                                )?),
-                                val: Box::new(self.scoped_expr_to_node(
-                                    attr.val,
-                                    in_scope,
-                                    main_scope.next(),
-                                )?),
-                            })]
-                        }
-                        expr::PropVariant::Seq { label, elements } => {
-                            assert!(elements.is_empty());
-                            let sequence_node = find_and_unify_sequence(
-                                prop.struct_var,
-                                label,
-                                in_scope,
-                                self.table,
-                                self.unifier,
-                                self.level.next(),
-                            )?;
+            expr::Kind::Var(var) => Ok(self.mk_node(ontol_hir::Kind::Var(var), meta.hir_meta)),
+            expr::Kind::Unit => Ok(self.mk_node(ontol_hir::Kind::Unit, meta.hir_meta)),
+            expr::Kind::I64(int) => Ok(self.mk_node(ontol_hir::Kind::I64(int), meta.hir_meta)),
+            expr::Kind::F64(float) => Ok(self.mk_node(ontol_hir::Kind::F64(float), meta.hir_meta)),
+            expr::Kind::Prop(prop) => {
+                let variants: SmallVec<_> = match prop.variant {
+                    expr::PropVariant::Singleton(attr) => {
+                        [ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
+                            rel: self.scoped_expr_to_node(attr.rel, in_scope, main_scope.next())?,
+                            val: self.scoped_expr_to_node(attr.val, in_scope, main_scope.next())?,
+                        })]
+                        .into()
+                    }
+                    expr::PropVariant::Seq { label, elements } => {
+                        assert!(elements.is_empty());
+                        let sequence_node = find_and_unify_sequence(
+                            prop.struct_var,
+                            label,
+                            in_scope,
+                            self.table,
+                            self.unifier,
+                            self.level.next(),
+                        )?;
 
-                            vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
-                                rel: Box::new(TypedHirNode(
-                                    ontol_hir::Kind::Unit,
-                                    self.unifier.unit_meta(),
-                                )),
-                                val: Box::new(sequence_node),
-                            })]
-                        }
-                    },
-                ),
-                meta.hir_meta,
-            )),
-            expr::Kind::Call(expr::Call(proc, args)) => {
-                let mut hir_args = Vec::with_capacity(args.len());
-                for arg in args {
-                    hir_args.push(self.scoped_expr_to_node(arg, in_scope, main_scope.next())?);
-                }
-                Ok(TypedHirNode(
-                    ontol_hir::Kind::Call(proc, hir_args),
+                        let unit_meta = self.unifier.unit_meta();
+                        [ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
+                            rel: self.mk_node(ontol_hir::Kind::Unit, unit_meta),
+                            val: sequence_node,
+                        })]
+                        .into()
+                    }
+                };
+
+                Ok(self.mk_node(
+                    ontol_hir::Kind::Prop(
+                        ontol_hir::Optional(false),
+                        prop.struct_var,
+                        prop.prop_id,
+                        variants,
+                    ),
                     meta.hir_meta,
                 ))
             }
+            expr::Kind::Call(expr::Call(proc, args)) => {
+                let mut hir_args = ontol_hir::Nodes::default();
+                for arg in args {
+                    hir_args.push(self.scoped_expr_to_node(arg, in_scope, main_scope.next())?);
+                }
+                Ok(self.mk_node(ontol_hir::Kind::Call(proc, hir_args), meta.hir_meta))
+            }
             expr::Kind::Map(arg) => {
                 let hir_arg = self.scoped_expr_to_node(*arg, in_scope, main_scope.next())?;
-                Ok(TypedHirNode(
-                    ontol_hir::Kind::Map(Box::new(hir_arg)),
-                    meta.hir_meta,
-                ))
+                Ok(self.mk_node(ontol_hir::Kind::Map(hir_arg), meta.hir_meta))
             }
             expr::Kind::Struct {
                 binder,
@@ -1254,12 +1271,14 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                 props,
             } => {
                 let level = self.level;
-                let next_in_scope = in_scope.union_one(binder.var);
-                let mut body = vec![];
+                let next_in_scope = in_scope.union_one(binder.value().var);
+                let mut body = ontol_hir::Nodes::default();
 
                 debug!(
                     "{level}Make struct {} scope_var={:?} in_scope={:?} main_scope={main_scope:?}",
-                    binder.var, self.scope_var, in_scope
+                    binder.value().var,
+                    self.scope_var,
+                    in_scope
                 );
 
                 if self.scope_var.is_some() {
@@ -1268,10 +1287,10 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                         match main_scope {
                             MainScope::Const => unreachable!(),
                             MainScope::Value(scope_var) => {
-                                ExprSelector::Struct(binder.var, scope_var)
+                                ExprSelector::Struct(binder.value().var, scope_var)
                             }
                             MainScope::Sequence(scope_var, _) => {
-                                ExprSelector::Struct(binder.var, scope_var)
+                                ExprSelector::Struct(binder.value().var, scope_var)
                             }
                             MainScope::MultiSequence(_) => panic!(),
                         },
@@ -1287,39 +1306,33 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                 for prop in props {
                     match prop.variant {
                         expr::PropVariant::Singleton(attr) => {
-                            let rel = Box::new(self.scoped_expr_to_node(
-                                attr.rel,
-                                in_scope,
-                                main_scope.next(),
-                            )?);
-                            let val = Box::new(self.scoped_expr_to_node(
-                                attr.val,
-                                in_scope,
-                                main_scope.next(),
-                            )?);
+                            let rel =
+                                self.scoped_expr_to_node(attr.rel, in_scope, main_scope.next())?;
+                            let val =
+                                self.scoped_expr_to_node(attr.val, in_scope, main_scope.next())?;
                             let unit_meta = self.unifier.unit_meta();
-                            body.push(TypedHirNode(
-                                ontol_hir::Kind::Prop(
-                                    ontol_hir::Optional(false),
-                                    prop.struct_var,
-                                    prop.prop_id,
-                                    vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
-                                        rel,
-                                        val,
-                                    })],
+                            body.push(
+                                self.mk_node(
+                                    ontol_hir::Kind::Prop(
+                                        ontol_hir::Optional(false),
+                                        prop.struct_var,
+                                        prop.prop_id,
+                                        [ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
+                                            rel,
+                                            val,
+                                        })]
+                                        .into(),
+                                    ),
+                                    unit_meta,
                                 ),
-                                unit_meta,
-                            ));
+                            );
                         }
                         expr::PropVariant::Seq { .. } => {
                             return Err(unifier_todo(smart_format!("seq prop")))
                         }
                     }
                 }
-                Ok(TypedHirNode(
-                    ontol_hir::Kind::Struct(binder, flags, body),
-                    meta.hir_meta,
-                ))
+                Ok(self.mk_node(ontol_hir::Kind::Struct(binder, flags, body), meta.hir_meta))
             }
             expr::Kind::SeqItem(label, _index, _iter, attr) => {
                 let (scope_var, output_var) = match main_scope {
@@ -1332,18 +1345,22 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                 };
                 let next_main_scope = MainScope::Value(scope_var);
 
-                let rel =
-                    Box::new(self.scoped_expr_to_node(attr.rel, in_scope, next_main_scope)?);
-                let val =
-                    Box::new(self.scoped_expr_to_node(attr.val, in_scope, next_main_scope)?);
+                let rel = self.scoped_expr_to_node(attr.rel, in_scope, next_main_scope)?;
+                let val = self.scoped_expr_to_node(attr.val, in_scope, next_main_scope)?;
 
-                Ok(TypedHirNode(
+                let unit_meta = self.unifier.unit_meta();
+                Ok(self.mk_node(
                     ontol_hir::Kind::SeqPush(output_var.0, ontol_hir::Attribute { rel, val }),
-                    self.unifier.unit_meta(),
+                    unit_meta,
                 ))
             }
             other => Err(unifier_todo(smart_format!("leaf expr to node: {other:?}"))),
         }
+    }
+
+    #[inline]
+    fn mk_node(&mut self, kind: ontol_hir::Kind<'m, TypedHir>, meta: Meta<'m>) -> ontol_hir::Node {
+        self.unifier.mk_node(kind, meta)
     }
 }
 
@@ -1354,7 +1371,7 @@ fn find_and_unify_sequence<'m>(
     table: &mut Table<'m>,
     unifier: &mut FlatUnifier<'_, 'm>,
     level: Level,
-) -> UnifierResult<TypedHirNode<'m>> {
+) -> UnifierResult<ontol_hir::Node> {
     let output_seq_var = table
         .find_scope_map_by_scope_var(ScopeVar(ontol_hir::Var(label.0)))
         .and_then(|(_, scope_map)| match scope_map.scope.kind() {
@@ -1380,23 +1397,23 @@ fn find_and_unify_sequence<'m>(
     let mut seq_type_infer = SeqTypeInfer::new(output_seq_var);
 
     for node in &sequence_body {
-        seq_type_infer.visit_node(0, node);
+        seq_type_infer.traverse(*node, &unifier.hir_arena)
     }
 
     let seq_ty = seq_type_infer.infer(unifier.types);
 
     debug!("seq_ty: {seq_ty:?}");
 
-    let sequence_node = TypedHirNode(
+    let sequence_node = unifier.mk_node(
         ontol_hir::Kind::Sequence(
-            TypedBinder {
+            ontol_hir::Binder {
                 var: output_seq_var.0,
-                meta: typed_hir::Meta {
-                    ty: seq_ty,
-                    span: NO_SPAN,
-                },
-            },
-            sequence_body,
+            }
+            .with_meta(typed_hir::Meta {
+                ty: seq_ty,
+                span: NO_SPAN,
+            }),
+            sequence_body.into(),
         ),
         typed_hir::Meta {
             ty: seq_ty,
@@ -1432,16 +1449,39 @@ impl<'m> SeqTypeInfer<'m> {
         };
         types.intern(Type::Seq(seq_type_pair.0, seq_type_pair.1))
     }
+
+    fn traverse(&mut self, node: ontol_hir::Node, arena: &ontol_hir::arena::Arena<'m, TypedHir>) {
+        SeqTypeLocator {
+            output_seq_var: self.output_seq_var,
+            types: &mut self.types,
+            arena,
+        }
+        .visit_node(0, node);
+    }
 }
 
-impl<'s, 'm: 's> ontol_hir::visitor::HirVisitor<'s, 'm, TypedHir> for SeqTypeInfer<'m> {
-    fn visit_node(&mut self, _: usize, node: &TypedHirNode<'m>) {
-        if let ontol_hir::Kind::SeqPush(seq_var, attr) = node.kind() {
+struct SeqTypeLocator<'i, 'h, 'm> {
+    output_seq_var: OutputVar,
+    types: &'i mut Vec<(TypeRef<'m>, TypeRef<'m>)>,
+    arena: &'h ontol_hir::arena::Arena<'m, TypedHir>,
+}
+
+impl<'i, 'h, 'm: 'h> ontol_hir::visitor::HirVisitor<'h, 'm, TypedHir>
+    for SeqTypeLocator<'i, 'h, 'm>
+{
+    fn arena(&self) -> &'h ontol_hir::arena::Arena<'m, TypedHir> {
+        self.arena
+    }
+
+    fn visit_node(&mut self, _: usize, node: ontol_hir::Node) {
+        let kind = self.arena.kind(node);
+        if let ontol_hir::Kind::SeqPush(seq_var, attr) = kind {
             if seq_var == &self.output_seq_var.0 {
-                self.types.push((attr.rel.meta().ty, attr.val.meta().ty));
+                self.types
+                    .push((self.arena[attr.rel].ty(), self.arena[attr.val].ty()));
             }
         }
-        self.visit_kind(0, node.kind());
+        self.visit_kind(0, kind);
     }
 }
 

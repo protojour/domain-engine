@@ -3,7 +3,7 @@ use ontol_runtime::value::PropertyId;
 
 use crate::{
     hir_unify::flat_scope,
-    typed_hir::{self, TypedBinder, TypedHir, TypedHirNode},
+    typed_hir::{self, IntoTypedHirValue, TypedHir},
 };
 
 use super::{
@@ -14,36 +14,34 @@ use super::{
 
 #[derive(Default)]
 pub(super) struct LevelBuilder<'m> {
-    pub output: Vec<TypedHirNode<'m>>,
+    pub output: Vec<ontol_hir::Node>,
     merged_match_arms_table: IndexMap<(ontol_hir::Var, PropertyId), MergedMatchArms<'m>>,
 }
 
 #[derive(Default)]
 pub(super) struct MergedMatchArms<'m> {
     optional: ontol_hir::Optional,
-    match_arms: Vec<ontol_hir::old::PropMatchArm<'m, TypedHir>>,
+    match_arms: Vec<(ontol_hir::PropPattern<'m, TypedHir>, ontol_hir::Nodes)>,
 }
 
 impl<'m> LevelBuilder<'m> {
-    pub fn build<'a>(mut self, unifier: &mut FlatUnifier<'a, 'm>) -> Vec<TypedHirNode<'m>> {
+    pub fn build<'a>(mut self, unifier: &mut FlatUnifier<'a, 'm>) -> Vec<ontol_hir::Node> {
         for ((struct_var, property_id), mut merged_match_arms) in self.merged_match_arms_table {
             if !merged_match_arms.match_arms.is_empty() {
                 if merged_match_arms.optional.0 {
                     merged_match_arms
                         .match_arms
-                        .push(ontol_hir::old::PropMatchArm {
-                            pattern: ontol_hir::PropPattern::Absent,
-                            nodes: vec![],
-                        });
+                        .push((ontol_hir::PropPattern::Absent, ontol_hir::Nodes::default()));
                 }
 
-                self.output.push(TypedHirNode(
+                let unit_meta = unifier.unit_meta();
+                self.output.push(unifier.mk_node(
                     ontol_hir::Kind::MatchProp(
                         struct_var,
                         property_id,
-                        merged_match_arms.match_arms,
+                        merged_match_arms.match_arms.into(),
                     ),
-                    unifier.unit_meta(),
+                    unit_meta,
                 ));
             }
         }
@@ -55,7 +53,7 @@ impl<'m> LevelBuilder<'m> {
         &mut self,
         (optional, struct_var, property_id): (ontol_hir::Optional, ontol_hir::Var, PropertyId),
         bindings: RelValBindings<'m>,
-        body: Vec<TypedHirNode<'m>>,
+        body: Vec<ontol_hir::Node>,
     ) {
         let merged_match_arms = self
             .merged_match_arms_table
@@ -67,12 +65,10 @@ impl<'m> LevelBuilder<'m> {
         }
 
         if !body.is_empty() {
-            merged_match_arms
-                .match_arms
-                .push(ontol_hir::old::PropMatchArm {
-                    pattern: ontol_hir::PropPattern::Attr(bindings.rel, bindings.val),
-                    nodes: body,
-                });
+            merged_match_arms.match_arms.push((
+                ontol_hir::PropPattern::Attr(bindings.rel, bindings.val),
+                body.into(),
+            ));
         }
     }
 
@@ -85,7 +81,7 @@ impl<'m> LevelBuilder<'m> {
             ontol_hir::Var,
             PropertyId,
         ),
-        body: Vec<TypedHirNode<'m>>,
+        body: Vec<ontol_hir::Node>,
         table: &mut Table<'m>,
     ) {
         let scope_map = table
@@ -108,20 +104,17 @@ impl<'m> LevelBuilder<'m> {
         }
 
         if !body.is_empty() {
-            let label_binding = ontol_hir::Binding::Binder(TypedBinder {
-                var: scope_var.0,
-                meta: typed_hir::Meta {
-                    ty: label.ty,
+            let label_binding = ontol_hir::Binding::Binder(
+                ontol_hir::Binder { var: scope_var.0 }.with_meta(typed_hir::Meta {
+                    ty: label.ty(),
                     span: scope_map.scope.meta().hir_meta.span,
-                },
-            });
+                }),
+            );
 
-            merged_match_arms
-                .match_arms
-                .push(ontol_hir::old::PropMatchArm {
-                    pattern: ontol_hir::PropPattern::Seq(label_binding, has_default),
-                    nodes: body,
-                });
+            merged_match_arms.match_arms.push((
+                ontol_hir::PropPattern::Seq(label_binding, has_default),
+                body.into(),
+            ));
         }
     }
 }

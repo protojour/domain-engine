@@ -3,25 +3,26 @@
 use std::{collections::BTreeSet, fmt::Debug};
 
 use fnv::{FnvHashMap, FnvHashSet};
-use ontol_hir::{old::GetKind, PropVariant, SeqPropertyVariant};
+use ontol_hir::{PropVariant, SeqPropertyVariant};
 use ontol_runtime::{
     ontology::{PropertyFlow, PropertyFlowData},
     value::PropertyId,
     DefId,
 };
 
-use crate::{def::LookupRelationshipMeta, hir_unify::VarSet, typed_hir::TypedHirNode, types::Type};
+use crate::{def::LookupRelationshipMeta, hir_unify::VarSet, typed_hir::TypedHir, types::Type};
 
-pub struct DataFlowAnalyzer<'c, R> {
+pub struct DataFlowAnalyzer<'h, 'm, 'c, R> {
     defs: &'c R,
     /// A table of which variable produce which properties
     var_to_property: FnvHashMap<ontol_hir::Var, FnvHashSet<PropertyId>>,
     /// A mapping from variable to its dependencies
     var_dependencies: FnvHashMap<ontol_hir::Var, VarSet>,
     property_flow: BTreeSet<PropertyFlow>,
+    hir_arena: &'h ontol_hir::arena::Arena<'m, TypedHir>,
 }
 
-impl<'c, R> Debug for DataFlowAnalyzer<'c, R> {
+impl<'h, 'm, 'c, R> Debug for DataFlowAnalyzer<'h, 'm, 'c, R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DataFlowAnalyzer")
             .field("var_to_property", &self.var_to_property)
@@ -30,31 +31,32 @@ impl<'c, R> Debug for DataFlowAnalyzer<'c, R> {
     }
 }
 
-impl<'c, 'm, R> DataFlowAnalyzer<'c, R>
+impl<'h, 'm, 'c, R> DataFlowAnalyzer<'h, 'm, 'c, R>
 where
     R: LookupRelationshipMeta<'m>,
 {
-    pub fn new(defs: &'c R) -> Self {
+    pub fn new(defs: &'c R, hir_arena: &'h ontol_hir::arena::Arena<'m, TypedHir>) -> Self {
         Self {
             defs,
             var_to_property: FnvHashMap::default(),
             var_dependencies: FnvHashMap::default(),
             property_flow: BTreeSet::default(),
+            hir_arena,
         }
     }
 
     pub fn analyze(
         &mut self,
         arg: ontol_hir::Var,
-        body: &TypedHirNode,
+        body: ontol_hir::Node,
     ) -> Option<Vec<PropertyFlow>> {
-        match body.kind() {
+        match self.hir_arena.kind(body) {
             ontol_hir::Kind::Struct(struct_binder, _flags, nodes) => {
                 self.var_dependencies.insert(arg, VarSet::default());
                 self.var_dependencies
-                    .insert(struct_binder.var, VarSet::default());
+                    .insert(struct_binder.value().var, VarSet::default());
                 for node in nodes {
-                    self.analyze_node(node);
+                    self.analyze_node(*node);
                 }
 
                 Some(
@@ -67,8 +69,8 @@ where
         }
     }
 
-    fn analyze_node(&mut self, node: &TypedHirNode) -> VarSet {
-        match node.kind() {
+    fn analyze_node(&mut self, node: ontol_hir::Node) -> VarSet {
+        match self.hir_arena.kind(node) {
             ontol_hir::Kind::Var(var) => VarSet::from([*var]),
             ontol_hir::Kind::Unit => VarSet::default(),
             ontol_hir::Kind::I64(_) => VarSet::default(),
@@ -76,12 +78,12 @@ where
             ontol_hir::Kind::Text(_) => VarSet::default(),
             ontol_hir::Kind::Const(_) => VarSet::default(),
             ontol_hir::Kind::Let(binder, definition, body) => {
-                let var_deps = self.analyze_node(definition);
-                self.var_dependencies.insert(binder.var, var_deps);
+                let var_deps = self.analyze_node(*definition);
+                self.var_dependencies.insert(binder.value().var, var_deps);
 
                 let mut var_set = VarSet::default();
                 for node in body {
-                    var_set.union_with(&self.analyze_node(node));
+                    var_set.union_with(&self.analyze_node(*node));
                 }
 
                 var_set
@@ -89,18 +91,18 @@ where
             ontol_hir::Kind::Call(_, params) => {
                 let mut var_set = VarSet::default();
                 for node in params {
-                    var_set.union_with(&self.analyze_node(node));
+                    var_set.union_with(&self.analyze_node(*node));
                 }
                 var_set
             }
-            ontol_hir::Kind::Map(node) => self.analyze_node(node),
+            ontol_hir::Kind::Map(node) => self.analyze_node(*node),
             ontol_hir::Kind::DeclSeq(_, _) => {
                 unreachable!()
             }
             ontol_hir::Kind::Struct(_, _, body) => {
                 let mut var_set = VarSet::default();
                 for node in body {
-                    var_set.union_with(&self.analyze_node(node));
+                    var_set.union_with(&self.analyze_node(*node));
                 }
                 var_set
             }
@@ -113,13 +115,13 @@ where
                 for variant in variants {
                     match variant {
                         PropVariant::Singleton(attr) => {
-                            var_set.union_with(&self.analyze_node(&attr.rel));
-                            var_set.union_with(&self.analyze_node(&attr.val));
+                            var_set.union_with(&self.analyze_node(attr.rel));
+                            var_set.union_with(&self.analyze_node(attr.val));
                         }
                         PropVariant::Seq(SeqPropertyVariant { elements, .. }) => {
                             for (_iter, attr) in elements {
-                                var_set.union_with(&self.analyze_node(&attr.rel));
-                                var_set.union_with(&self.analyze_node(&attr.val));
+                                var_set.union_with(&self.analyze_node(attr.rel));
+                                var_set.union_with(&self.analyze_node(attr.val));
                             }
                         }
                     }
@@ -137,21 +139,21 @@ where
 
                 let mut value_def_id = None;
 
-                for arm in arms {
-                    match &arm.pattern {
+                for (pattern, body) in arms {
+                    match pattern {
                         ontol_hir::PropPattern::Attr(rel, val) => {
                             if let ontol_hir::Binding::Binder(binder) = rel {
-                                self.add_dep(binder.var, *struct_var);
+                                self.add_dep(binder.value().var, *struct_var);
                             }
                             if let ontol_hir::Binding::Binder(binder) = val {
-                                self.add_dep(binder.var, *struct_var);
-                                value_def_id = binder.meta.ty.get_single_def_id();
+                                self.add_dep(binder.value().var, *struct_var);
+                                value_def_id = binder.ty().get_single_def_id();
                             }
                         }
                         ontol_hir::PropPattern::Seq(binding, _has_default) => {
                             if let ontol_hir::Binding::Binder(binder) = binding {
-                                self.add_dep(binder.var, *struct_var);
-                                value_def_id = match binder.meta.ty {
+                                self.add_dep(binder.value().var, *struct_var);
+                                value_def_id = match binder.ty() {
                                     Type::Seq(_, val) => val.get_single_def_id(),
                                     _ => None,
                                 };
@@ -160,8 +162,8 @@ where
                         ontol_hir::PropPattern::Absent => {}
                     }
 
-                    for node in &arm.nodes {
-                        var_set.0.extend(&self.analyze_node(node).0);
+                    for node in body {
+                        var_set.0.extend(&self.analyze_node(*node).0);
                     }
                 }
 
@@ -176,33 +178,33 @@ where
             ontol_hir::Kind::Sequence(_, body) => {
                 let mut var_set = VarSet::default();
                 for node in body {
-                    var_set.union_with(&self.analyze_node(node));
+                    var_set.union_with(&self.analyze_node(*node));
                 }
                 var_set
             }
             ontol_hir::Kind::ForEach(var, (rel_binding, val_binding), body) => {
                 if let ontol_hir::Binding::Binder(binder) = rel_binding {
-                    self.add_dep(binder.var, *var);
+                    self.add_dep(binder.value().var, *var);
                 }
                 if let ontol_hir::Binding::Binder(binder) = val_binding {
-                    self.add_dep(binder.var, *var);
+                    self.add_dep(binder.value().var, *var);
                 }
                 let mut var_set = VarSet::default();
                 for node in body {
-                    var_set.union_with(&self.analyze_node(node));
+                    var_set.union_with(&self.analyze_node(*node));
                 }
                 var_set
             }
             ontol_hir::Kind::SeqPush(var, attr) => {
-                let mut var_set = self.analyze_node(&attr.rel);
-                var_set.union_with(&self.analyze_node(&attr.val));
+                let mut var_set = self.analyze_node(attr.rel);
+                var_set.union_with(&self.analyze_node(attr.val));
 
                 self.var_dependencies.insert(*var, var_set.clone());
 
                 var_set
             }
             ontol_hir::Kind::StringPush(to_var, node) => {
-                let var_set = self.analyze_node(node);
+                let var_set = self.analyze_node(*node);
                 self.var_dependencies.insert(*to_var, var_set.clone());
                 var_set
             }
@@ -210,10 +212,10 @@ where
                 let mut var_set = VarSet::default();
                 for match_arm in match_arms {
                     for group in &match_arm.capture_groups {
-                        self.add_dep(group.binder.var, *var);
+                        self.add_dep(group.binder.value().var, *var);
                     }
                     for node in &match_arm.nodes {
-                        var_set.union_with(&self.analyze_node(node));
+                        var_set.union_with(&self.analyze_node(*node));
                     }
                 }
                 var_set

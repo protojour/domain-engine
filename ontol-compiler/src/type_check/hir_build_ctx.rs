@@ -71,7 +71,7 @@ impl<'m> HirBuildCtx<'m> {
         ret
     }
 
-    pub fn hir_node(
+    pub fn mk_node(
         &mut self,
         kind: ontol_hir::Kind<'m, TypedHir>,
         meta: typed_hir::Meta<'m>,

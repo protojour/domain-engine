@@ -11,7 +11,7 @@ use ontol_runtime::{
 use tracing::{debug, warn};
 
 use crate::{
-    codegen::code_generator::map_codegen, hir_unify::unify_to_function, typed_hir::TypedHirNode,
+    codegen::code_generator::map_codegen, hir_unify::unify_to_function, typed_hir::TypedHir,
     Compiler, SourceSpan,
 };
 
@@ -63,7 +63,7 @@ impl<'m> CodegenTasks<'m> {
 
 pub struct ConstCodegenTask<'m> {
     pub def_id: DefId,
-    pub node: TypedHirNode<'m>,
+    pub node: ontol_hir::RootNode<'m, TypedHir>,
 }
 
 pub enum MapCodegenTask<'m> {
@@ -78,7 +78,7 @@ pub struct ExplicitMapCodegenTask<'m> {
 }
 
 pub struct MapArm<'m> {
-    pub node: TypedHirNode<'m>,
+    pub node: ontol_hir::RootNode<'m, TypedHir>,
     pub is_match: bool,
 }
 
@@ -187,12 +187,12 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
     for map_task in explicit_map_tasks {
         debug!(
             "1st (ty={:?}):\n{}",
-            map_task.first.node.ty(),
+            map_task.first.node.as_ref().meta().ty,
             map_task.first.node
         );
         debug!(
             "2nd (ty={:?}):\n{}",
-            map_task.second.node.ty(),
+            map_task.second.node.as_ref().meta().ty,
             map_task.second.node
         );
 

@@ -1,13 +1,9 @@
 use std::collections::HashMap;
 
-use ontol_hir::old::GetKind;
 use smallvec::SmallVec;
 use tracing::debug;
 
-use crate::{
-    hir_unify::UnifierError,
-    typed_hir::{TypedHir, TypedHirNode},
-};
+use crate::{hir_unify::UnifierError, typed_hir::TypedHir};
 
 use super::{UnifierResult, VarSet};
 
@@ -117,57 +113,58 @@ impl DepScopeAnalyzer {
     }
 }
 
-impl<'s, 'm: 's> ontol_hir::visitor::HirVisitor<'s, 'm, TypedHir> for DepScopeAnalyzer {
-    fn visit_node(&mut self, index: usize, node: &'s TypedHirNode<'m>) {
-        self.enter_child(index, |zelf| {
-            if let Some(StackAtom::Prop) = zelf.stack.last() {
-                let mut prop_variables = VarSet::default();
-                std::mem::swap(&mut zelf.prop_variables, &mut prop_variables);
-
-                zelf.stack.push(StackAtom::Node);
-                zelf.visit_kind(index, node.kind());
-                zelf.stack.pop();
-
-                if !zelf.prop_variables.0.is_empty() {
-                    zelf.prop_variant_deps
-                        .insert(zelf.current_path.clone(), zelf.prop_variables.clone());
-                }
-
-                std::mem::swap(&mut zelf.prop_variables, &mut prop_variables);
-            } else {
-                zelf.stack.push(StackAtom::Node);
-                zelf.visit_kind(index, node.kind());
-                zelf.stack.pop();
-            }
-        });
-    }
-
-    fn visit_prop_variant(
-        &mut self,
-        index: usize,
-        variant: &'s ontol_hir::PropVariant<'m, TypedHir>,
-    ) {
-        self.stack.push(StackAtom::Prop);
-
-        self.enter_child(index, |zelf| match variant {
-            ontol_hir::PropVariant::Singleton(_) => {
-                zelf.traverse_prop_variant(variant);
-            }
-            ontol_hir::PropVariant::Seq(_) => {}
-        });
-
-        self.stack.pop();
-    }
-
-    fn visit_var(&mut self, var: &ontol_hir::Var) {
-        if !self.bound_variables.0.contains(var.0 as usize) {
-            self.prop_variables.0.insert(var.0 as usize);
-        }
-    }
-
-    fn visit_binder(&mut self, var: &ontol_hir::Var) {
-        self.bound_variables.0.insert(var.0 as usize);
-    }
-
-    fn visit_label(&mut self, _label: &ontol_hir::Label) {}
-}
+// impl<'h, 'm: 'h> ontol_hir::visitor::HirVisitor<'h, 'm, TypedHir> for DepScopeAnalyzer {
+//     fn visit_node(&mut self, index: usize, node: ontol_hir::Node) {
+//         self.enter_child(index, |zelf| {
+//             if let Some(StackAtom::Prop) = zelf.stack.last() {
+//                 let mut prop_variables = VarSet::default();
+//                 std::mem::swap(&mut zelf.prop_variables, &mut prop_variables);
+//
+//                 zelf.stack.push(StackAtom::Node);
+//                 zelf.visit_kind(index, node.kind());
+//                 zelf.stack.pop();
+//
+//                 if !zelf.prop_variables.0.is_empty() {
+//                     zelf.prop_variant_deps
+//                         .insert(zelf.current_path.clone(), zelf.prop_variables.clone());
+//                 }
+//
+//                 std::mem::swap(&mut zelf.prop_variables, &mut prop_variables);
+//             } else {
+//                 zelf.stack.push(StackAtom::Node);
+//                 zelf.visit_kind(index, node.kind());
+//                 zelf.stack.pop();
+//             }
+//         });
+//     }
+//
+//     fn visit_prop_variant(
+//         &mut self,
+//         index: usize,
+//         variant: &'h ontol_hir::PropVariant<'m, TypedHir>,
+//     ) {
+//         self.stack.push(StackAtom::Prop);
+//
+//         self.enter_child(index, |zelf| match variant {
+//             ontol_hir::PropVariant::Singleton(_) => {
+//                 zelf.traverse_prop_variant(variant);
+//             }
+//             ontol_hir::PropVariant::Seq(_) => {}
+//         });
+//
+//         self.stack.pop();
+//     }
+//
+//     fn visit_var(&mut self, var: ontol_hir::Var) {
+//         if !self.bound_variables.0.contains(var.0 as usize) {
+//             self.prop_variables.0.insert(var.0 as usize);
+//         }
+//     }
+//
+//     fn visit_binder(&mut self, var: ontol_hir::Var) {
+//         self.bound_variables.0.insert(var.0 as usize);
+//     }
+//
+//     fn visit_label(&mut self, _label: ontol_hir::Label) {}
+// }
+//

@@ -25,6 +25,12 @@ impl<'a, L: Lang> std::fmt::Display for RootNode<'a, L> {
     }
 }
 
+impl<'a, L: Lang> std::fmt::Debug for RootNode<'a, L> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.as_ref().fmt(f)
+    }
+}
+
 type PrintResult = Result<Multiline, std::fmt::Error>;
 
 pub trait Print<T>: Copy {

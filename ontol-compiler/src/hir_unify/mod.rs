@@ -10,12 +10,14 @@ use crate::{
     hir_unify::{expr_builder::ExprBuilder, scope_builder::ScopeBuilder, unifier::Unifier},
     mem::Intern,
     primitive::PrimitiveKind,
-    typed_hir::{HirFunc, Meta, TypedBinder, TypedHir, TypedHirNode},
+    typed_hir::{HirFunc, IntoTypedHirValue, Meta, TypedHir},
     types::Type,
     Compiler, SourceSpan,
 };
 
-use self::{flat_scope_builder::FlatScopeBuilder, flat_unifier::FlatUnifier, unifier::UnifiedNode};
+use self::{
+    flat_scope_builder::FlatScopeBuilder, flat_unifier::FlatUnifier, unifier::UnifiedRootNode,
+};
 
 mod dep_tree;
 mod dependent_scope_analyzer;
@@ -47,13 +49,13 @@ const USE_FLAT_UNIFIER: bool = true;
 const CLASSIC_UNIFIER_FALLBACK: bool = true;
 
 pub fn unify_to_function<'m>(
-    scope: &TypedHirNode<'m>,
-    expr: &TypedHirNode<'m>,
+    scope: &ontol_hir::RootNode<'m, TypedHir>,
+    expr: &ontol_hir::RootNode<'m, TypedHir>,
     compiler: &mut Compiler<'m>,
 ) -> UnifierResult<HirFunc<'m>> {
     let mut var_tracker = VariableTracker::default();
-    var_tracker.visit_node(0, scope);
-    var_tracker.visit_node(0, expr);
+    var_tracker.track_largest(scope.as_ref());
+    var_tracker.track_largest(expr.as_ref());
 
     let (unified, mut var_allocator) = if !USE_FLAT_UNIFIER {
         unify_classic(scope, expr, var_tracker.var_allocator(), compiler)?
@@ -74,17 +76,17 @@ pub fn unify_to_function<'m>(
         }
     };
 
-    let scope_ty = scope.ty();
-    let expr_ty = expr.ty();
+    let scope_ty = scope.as_ref().ty();
+    let expr_ty = expr.as_ref().ty();
 
     match unified.typed_binder {
         Some(arg) => {
             // NB: Error is used in unification tests
             if !matches!(scope_ty, Type::Error) {
-                assert_eq!(arg.meta.ty, scope_ty);
+                assert_eq!(arg.ty(), scope_ty);
             }
             if !matches!(expr_ty, Type::Error) {
-                assert_eq!(unified.node.ty(), expr_ty);
+                assert_eq!(unified.node.meta().ty(), expr_ty);
             }
 
             Ok(HirFunc {
@@ -93,89 +95,122 @@ pub fn unify_to_function<'m>(
             })
         }
         None => Ok(HirFunc {
-            arg: TypedBinder {
+            arg: ontol_hir::Binder {
                 var: var_allocator.alloc(),
-                meta: Meta {
-                    ty: scope_ty,
-                    span: scope.span(),
-                },
-            },
+            }
+            .with_meta(Meta {
+                ty: scope_ty,
+                span: scope.meta().span(),
+            }),
             body: unified.node,
         }),
     }
 }
 
 fn unify_classic<'m>(
-    scope: &TypedHirNode<'m>,
-    expr: &TypedHirNode<'m>,
+    scope: &ontol_hir::RootNode<'m, TypedHir>,
+    expr: &ontol_hir::RootNode<'m, TypedHir>,
     var_allocator: ontol_hir::VarAllocator,
     compiler: &mut Compiler<'m>,
-) -> UnifierResult<(UnifiedNode<'m>, ontol_hir::VarAllocator)> {
+) -> UnifierResult<(UnifiedRootNode<'m>, ontol_hir::VarAllocator)> {
     let unit_type = compiler
         .types
         .intern(Type::Primitive(PrimitiveKind::Unit, DefId::unit()));
 
     let (scope_binder, var_allocator) = {
-        let mut scope_builder = ScopeBuilder::new(var_allocator, unit_type);
-        let scope_binder = scope_builder.build_scope_binder(scope)?;
+        let mut scope_builder = ScopeBuilder::new(var_allocator, unit_type, scope.arena());
+        let scope_binder = scope_builder.build_scope_binder(scope.node())?;
         (scope_binder, scope_builder.var_allocator())
     };
 
     let (expr, var_allocator) = {
-        let mut expr_builder = ExprBuilder::new(var_allocator, &compiler.defs);
-        let expr = expr_builder.hir_to_expr(expr);
+        let mut expr_builder = ExprBuilder::new(var_allocator, &compiler.defs, expr.arena());
+        let expr = expr_builder.hir_to_expr(expr.node());
         (expr, expr_builder.var_allocator())
     };
 
     let mut unifier = Unifier::new(&mut compiler.types, var_allocator);
     let unified = unifier.unify(scope_binder.scope, expr)?;
 
-    Ok((unified, unifier.var_allocator))
+    Ok((
+        UnifiedRootNode {
+            typed_binder: unified.typed_binder,
+            node: ontol_hir::RootNode::new(unified.node, unifier.hir_arena),
+        },
+        unifier.var_allocator,
+    ))
 }
 
 fn unify_flat<'m>(
-    scope: &TypedHirNode<'m>,
-    expr: &TypedHirNode<'m>,
+    scope: &ontol_hir::RootNode<'m, TypedHir>,
+    expr: &ontol_hir::RootNode<'m, TypedHir>,
     var_allocator: ontol_hir::VarAllocator,
     compiler: &mut Compiler<'m>,
-) -> UnifierResult<(UnifiedNode<'m>, ontol_hir::VarAllocator)> {
+) -> UnifierResult<(UnifiedRootNode<'m>, ontol_hir::VarAllocator)> {
     let unit_type = compiler
         .types
         .intern(Type::Primitive(PrimitiveKind::Unit, DefId::unit()));
 
     let (flat_scope, var_allocator) = {
-        let mut scope_builder = FlatScopeBuilder::new(var_allocator, unit_type);
-        let flat_scope = scope_builder.build_flat_scope(scope)?;
+        let mut scope_builder = FlatScopeBuilder::new(var_allocator, unit_type, scope.arena());
+        let flat_scope = scope_builder.build_flat_scope(scope.node())?;
         (flat_scope, scope_builder.var_allocator())
     };
 
     let (expr, var_allocator) = {
-        let mut expr_builder = ExprBuilder::new(var_allocator, &compiler.defs);
-        let expr = expr_builder.hir_to_expr(expr);
+        let mut expr_builder = ExprBuilder::new(var_allocator, &compiler.defs, expr.arena());
+        let expr = expr_builder.hir_to_expr(expr.node());
         (expr, expr_builder.var_allocator())
     };
 
     let mut unifier = FlatUnifier::new(&mut compiler.types, var_allocator);
     let unified = unifier.unify(flat_scope, expr)?;
 
-    Ok((unified, unifier.var_allocator))
+    Ok((
+        UnifiedRootNode {
+            typed_binder: unified.typed_binder,
+            node: ontol_hir::RootNode::new(unified.node, unifier.hir_arena),
+        },
+        unifier.var_allocator,
+    ))
 }
 
 struct VariableTracker {
     largest: ontol_hir::Var,
 }
 
-impl<'s, 'm: 's> ontol_hir::visitor::HirVisitor<'s, 'm, TypedHir> for VariableTracker {
-    fn visit_var(&mut self, var: &ontol_hir::Var) {
-        self.observe(*var);
-    }
+impl VariableTracker {
+    fn track_largest<'h, 'm, L: ontol_hir::Lang>(
+        &mut self,
+        node_ref: ontol_hir::arena::NodeRef<'h, 'm, L>,
+    ) {
+        struct Visitor<'h, 'm, L: ontol_hir::Lang> {
+            tracker: &'h mut VariableTracker,
+            arena: &'h ontol_hir::arena::Arena<'m, L>,
+        }
+        impl<'h, 'm: 'h, L: ontol_hir::Lang> ontol_hir::visitor::HirVisitor<'h, 'm, L>
+            for Visitor<'h, 'm, L>
+        {
+            fn arena(&self) -> &'h ontol_hir::arena::Arena<'m, L> {
+                self.arena
+            }
 
-    fn visit_binder(&mut self, var: &ontol_hir::Var) {
-        self.observe(*var);
-    }
+            fn visit_var(&mut self, var: ontol_hir::Var) {
+                self.tracker.observe(var);
+            }
+            fn visit_binder(&mut self, var: ontol_hir::Var) {
+                self.tracker.observe(var);
+            }
+            fn visit_label(&mut self, label: ontol_hir::Label) {
+                self.tracker.observe(ontol_hir::Var(label.0));
+            }
+        }
 
-    fn visit_label(&mut self, label: &ontol_hir::Label) {
-        self.observe(ontol_hir::Var(label.0))
+        Visitor {
+            tracker: self,
+            arena: node_ref.arena(),
+        }
+        .visit_node(0, node_ref.node());
     }
 }
 
@@ -290,23 +325,18 @@ impl<'b> Iterator for VarSetIter<'b> {
 pub mod test_api {
     use std::fmt::Write;
 
-    use ontol_hir::visitor::HirVisitor;
     use ontol_runtime::DefId;
 
     use crate::{
-        hir_unify::unify_to_function,
-        mem::Mem,
-        primitive::PrimitiveKind,
-        typed_hir::{TypedHir, TypedHirNode},
-        types::Type,
-        Compiler,
+        hir_unify::unify_to_function, mem::Mem, primitive::PrimitiveKind, typed_hir::TypedHir,
+        types::Type, Compiler,
     };
 
     use super::{flat_scope_builder::FlatScopeBuilder, VariableTracker};
 
-    fn parse_typed<'m>(src: &str) -> TypedHirNode<'m> {
+    fn parse_typed<'m>(src: &str) -> ontol_hir::RootNode<'m, TypedHir> {
         ontol_hir::parse::Parser::new(TypedHir)
-            .parse(src)
+            .parse_root(src)
             .unwrap()
             .0
     }
@@ -321,17 +351,21 @@ pub mod test_api {
         output
     }
 
+    static UNIT_TYPE: Type = Type::Primitive(PrimitiveKind::Unit, DefId::unit());
+
     pub fn mk_flat_scope(hir: &str) -> std::string::String {
         let hir_node = parse_typed(hir);
 
         let mut var_tracker = VariableTracker::default();
-        var_tracker.visit_node(0, &hir_node);
+        var_tracker.track_largest(hir_node.as_ref());
 
-        let unit_type = &Type::Primitive(PrimitiveKind::Unit, DefId::unit());
-        let mut builder = FlatScopeBuilder::new(var_tracker.var_allocator(), unit_type);
-        let flat_scope = builder.build_flat_scope(&hir_node).unwrap();
+        let mut builder =
+            FlatScopeBuilder::new(var_tracker.var_allocator(), &UNIT_TYPE, hir_node.arena());
+        let flat_scope = builder.build_flat_scope(hir_node.node()).unwrap();
         let mut output = String::new();
         write!(&mut output, "{flat_scope}").unwrap();
+
+        drop(builder);
 
         output
     }

@@ -27,7 +27,7 @@ const MOCK_RELATION: DefKind = DefKind::TextLiteral("mock-relation");
 
 fn analyze<'a>(arg: &str, hir: &str) -> Vec<PropertyFlow> {
     let node = ontol_hir::parse::Parser::new(TypedHir)
-        .parse(hir)
+        .parse_root(hir)
         .unwrap()
         .0;
     let deps = Unimock::new(
@@ -47,8 +47,8 @@ fn analyze<'a>(arg: &str, hir: &str) -> Vec<PropertyFlow> {
                 }
             }),
     );
-    let mut analyzer = DataFlowAnalyzer::new(&deps);
-    let flow = analyzer.analyze(arg.parse().unwrap(), &node).unwrap();
+    let mut analyzer = DataFlowAnalyzer::new(&deps, node.arena());
+    let flow = analyzer.analyze(arg.parse().unwrap(), node.node()).unwrap();
 
     debug!("post analysis: {analyzer:#?}");
 

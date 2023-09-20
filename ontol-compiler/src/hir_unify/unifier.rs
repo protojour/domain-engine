@@ -5,7 +5,7 @@ use tracing::{debug, trace};
 use crate::{
     hir_unify::{UnifierError, UnifierResult, VarSet},
     mem::Intern,
-    typed_hir::{Meta, TypedBinder, TypedHirNode},
+    typed_hir::{IntoTypedHirValue, Meta, TypedHir, TypedHirValue, UNIT_META},
     types::{Type, Types},
     NO_SPAN,
 };
@@ -23,11 +23,17 @@ const UNIFIER_DEBUG: bool = true;
 pub struct Unifier<'a, 'm> {
     pub(super) types: &'a mut Types<'m>,
     pub(super) var_allocator: ontol_hir::VarAllocator,
+    pub(super) hir_arena: ontol_hir::arena::Arena<'m, TypedHir>,
 }
 
 pub(super) struct UnifiedNode<'m> {
-    pub typed_binder: Option<TypedBinder<'m>>,
-    pub node: TypedHirNode<'m>,
+    pub typed_binder: Option<TypedHirValue<'m, ontol_hir::Binder>>,
+    pub node: ontol_hir::Node,
+}
+
+pub(super) struct UnifiedRootNode<'m> {
+    pub typed_binder: Option<TypedHirValue<'m, ontol_hir::Binder>>,
+    pub node: ontol_hir::RootNode<'m, TypedHir>,
 }
 
 impl<'a, 'm> Unifier<'a, 'm> {
@@ -35,6 +41,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
         Self {
             types,
             var_allocator,
+            hir_arena: Default::default(),
         }
     }
 
@@ -62,10 +69,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 let unified = self.unify(const_scope, expr::Expr(expr_kind, expr_meta))?;
 
                 Ok(UnifiedNode {
-                    typed_binder: Some(TypedBinder {
-                        var,
-                        meta: scope_meta.hir_meta,
-                    }),
+                    typed_binder: Some(ontol_hir::Binder { var }.with_meta(scope_meta.hir_meta)),
                     node: unified.node,
                 })
             }
@@ -82,18 +86,17 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     .collect();
 
                 Ok(UnifiedNode {
-                    typed_binder: Some(TypedBinder {
-                        var: string_var,
-                        meta: scope_meta.hir_meta,
-                    }),
-                    node: TypedHirNode(
+                    typed_binder: Some(
+                        ontol_hir::Binder { var: string_var }.with_meta(scope_meta.hir_meta),
+                    ),
+                    node: self.mk_node(
                         ontol_hir::Kind::MatchRegex(
                             ontol_hir::Iter(false),
                             string_var,
                             regex_def_id,
                             vec![ontol_hir::CaptureMatchArm {
                                 capture_groups,
-                                nodes: vec![unified.node],
+                                nodes: [unified.node].into_iter().collect(),
                             }],
                         ),
                         expr_meta.hir_meta,
@@ -103,23 +106,23 @@ impl<'a, 'm> Unifier<'a, 'm> {
             // ### Expr constants - no scope needed:
             (expr::Kind::Unit, _) => Ok(UnifiedNode {
                 typed_binder: None,
-                node: TypedHirNode(ontol_hir::Kind::Unit, expr_meta.hir_meta),
+                node: self.mk_node(ontol_hir::Kind::Unit, expr_meta.hir_meta),
             }),
             (expr::Kind::I64(int), _) => Ok(UnifiedNode {
                 typed_binder: None,
-                node: TypedHirNode(ontol_hir::Kind::I64(int), expr_meta.hir_meta),
+                node: self.mk_node(ontol_hir::Kind::I64(int), expr_meta.hir_meta),
             }),
             (expr::Kind::F64(float), _) => Ok(UnifiedNode {
                 typed_binder: None,
-                node: TypedHirNode(ontol_hir::Kind::F64(float), expr_meta.hir_meta),
+                node: self.mk_node(ontol_hir::Kind::F64(float), expr_meta.hir_meta),
             }),
             (expr::Kind::String(string), _) => Ok(UnifiedNode {
                 typed_binder: None,
-                node: TypedHirNode(ontol_hir::Kind::Text(string), expr_meta.hir_meta),
+                node: self.mk_node(ontol_hir::Kind::Text(string), expr_meta.hir_meta),
             }),
             (expr::Kind::Const(const_def_id), _) => Ok(UnifiedNode {
                 typed_binder: None,
-                node: TypedHirNode(ontol_hir::Kind::Const(const_def_id), expr_meta.hir_meta),
+                node: self.mk_node(ontol_hir::Kind::Const(const_def_id), expr_meta.hir_meta),
             }),
             // ### forced scope expansions:
             (expr_kind, scope_kind @ scope::Kind::Let(_)) => self.unify_scope_block(
@@ -129,7 +132,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
             // ### Const scopes (fully expanded):
             (expr::Kind::Var(var), scope::Kind::Const) => Ok(UnifiedNode {
                 typed_binder: None,
-                node: TypedHirNode(ontol_hir::Kind::Var(var), expr_meta.hir_meta),
+                node: self.mk_node(ontol_hir::Kind::Var(var), expr_meta.hir_meta),
             }),
             (expr::Kind::Prop(prop), scope::Kind::Const) => match prop.variant {
                 expr::PropVariant::Singleton(attr) => {
@@ -139,15 +142,16 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
                     Ok(UnifiedNode {
                         typed_binder: None,
-                        node: TypedHirNode(
+                        node: self.mk_node(
                             ontol_hir::Kind::Prop(
                                 ontol_hir::Optional(false),
                                 prop.struct_var,
                                 prop.prop_id,
-                                vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
-                                    rel: Box::new(rel.node),
-                                    val: Box::new(val.node),
-                                })],
+                                [ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
+                                    rel: rel.node,
+                                    val: val.node,
+                                })]
+                                .into(),
                             ),
                             expr_meta.hir_meta,
                         ),
@@ -195,16 +199,16 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         sequence_body.push(push_unified.node);
                     }
 
-                    let sequence_node = TypedHirNode(
+                    let sequence_node = self.mk_node(
                         ontol_hir::Kind::Sequence(
-                            TypedBinder {
+                            ontol_hir::Binder {
                                 var: ontol_hir::Var(label.0),
-                                meta: Meta {
-                                    ty: seq_ty,
-                                    span: NO_SPAN,
-                                },
-                            },
-                            sequence_body,
+                            }
+                            .with_meta(Meta {
+                                ty: seq_ty,
+                                span: NO_SPAN,
+                            }),
+                            sequence_body.into(),
                         ),
                         Meta {
                             ty: seq_ty,
@@ -212,20 +216,21 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         },
                     );
 
+                    let unit_meta = self.unit_meta();
+                    let unit_node = self.mk_node(ontol_hir::Kind::Unit, unit_meta);
+
                     Ok(UnifiedNode {
                         typed_binder: None,
-                        node: TypedHirNode(
+                        node: self.mk_node(
                             ontol_hir::Kind::Prop(
                                 ontol_hir::Optional(false),
                                 prop.struct_var,
                                 prop.prop_id,
-                                vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
-                                    rel: Box::new(TypedHirNode(
-                                        ontol_hir::Kind::Unit,
-                                        self.unit_meta(),
-                                    )),
-                                    val: Box::new(sequence_node),
-                                })],
+                                [ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
+                                    rel: unit_node,
+                                    val: sequence_node,
+                                })]
+                                .into(),
                             ),
                             expr_meta.hir_meta,
                         ),
@@ -233,44 +238,32 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 }
             },
             (expr::Kind::StringInterpolation(binder, components), scope::Kind::Const) => {
+                let let_def = self.mk_node(ontol_hir::Kind::Text("".into()), expr_meta.hir_meta);
+                let components: ontol_hir::Nodes = components
+                    .into_iter()
+                    .map(|component| {
+                        let string_push_param = match component {
+                            StringInterpolationComponent::Const(string) => {
+                                self.mk_node(ontol_hir::Kind::Text(string), UNIT_META)
+                            }
+                            StringInterpolationComponent::Var(var, span) => self.mk_node(
+                                ontol_hir::Kind::Var(var),
+                                Meta {
+                                    ty: UNIT_META.ty,
+                                    span,
+                                },
+                            ),
+                        };
+                        self.mk_node(
+                            ontol_hir::Kind::StringPush(binder.value().var, string_push_param),
+                            UNIT_META,
+                        )
+                    })
+                    .collect();
                 Ok(UnifiedNode {
                     typed_binder: None,
-                    node: TypedHirNode(
-                        ontol_hir::Kind::Let(
-                            binder,
-                            Box::new(TypedHirNode(
-                                ontol_hir::Kind::Text("".into()),
-                                expr_meta.hir_meta,
-                            )),
-                            components
-                                .into_iter()
-                                .map(|component| {
-                                    TypedHirNode(
-                                        ontol_hir::Kind::StringPush(
-                                            binder.var,
-                                            Box::new(match component {
-                                                StringInterpolationComponent::Const(string) => {
-                                                    TypedHirNode(
-                                                        ontol_hir::Kind::Text(string),
-                                                        self.unit_meta(),
-                                                    )
-                                                }
-                                                StringInterpolationComponent::Var(var, span) => {
-                                                    TypedHirNode(
-                                                        ontol_hir::Kind::Var(var),
-                                                        Meta {
-                                                            ty: self.unit_meta().ty,
-                                                            span,
-                                                        },
-                                                    )
-                                                }
-                                            }),
-                                        ),
-                                        self.unit_meta(),
-                                    )
-                                })
-                                .collect(),
-                        ),
+                    node: self.mk_node(
+                        ontol_hir::Kind::Let(binder, let_def, components),
                         expr_meta.hir_meta,
                     ),
                 })
@@ -288,15 +281,16 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
                 Ok(UnifiedNode {
                     typed_binder: None,
-                    node: TypedHirNode(
+                    node: self.mk_node(
                         ontol_hir::Kind::Prop(
                             ontol_hir::Optional(false),
                             prop.struct_var,
                             prop.prop_id,
-                            vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
-                                rel: Box::new(rel.node),
-                                val: Box::new(val.node),
-                            })],
+                            [ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
+                                rel: rel.node,
+                                val: val.node,
+                            })]
+                            .into(),
                         ),
                         expr_meta.hir_meta,
                     ),
@@ -329,7 +323,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
                 let joined_scope = self.join_attr_scope(rel_binding, val_binding);
 
-                let mut sequence_body = Vec::with_capacity(elements.len());
+                let mut sequence_body: ontol_hir::Nodes = Default::default();
 
                 for (iter, attr) in elements {
                     let mut free_vars = VarSet::default();
@@ -350,11 +344,11 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     )?;
 
                     if iter.0 {
-                        sequence_body.push(TypedHirNode(
+                        sequence_body.push(self.mk_node(
                             ontol_hir::Kind::ForEach(
                                 gen_scope.input_seq,
                                 (hir_rel_binding, hir_val_binding),
-                                vec![push_unified.node],
+                                [push_unified.node].into_iter().collect(),
                             ),
                             unit_meta,
                         ));
@@ -363,15 +357,15 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     };
                 }
 
-                let sequence_node = TypedHirNode(
+                let sequence_node = self.mk_node(
                     ontol_hir::Kind::Sequence(
-                        TypedBinder {
+                        ontol_hir::Binder {
                             var: gen_scope.output_seq,
-                            meta: Meta {
-                                ty: seq_ty,
-                                span: scope_meta.hir_meta.span,
-                            },
-                        },
+                        }
+                        .with_meta(Meta {
+                            ty: seq_ty,
+                            span: scope_meta.hir_meta.span,
+                        }),
                         sequence_body,
                     ),
                     Meta {
@@ -380,20 +374,20 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     },
                 );
 
+                let unit = self.mk_node(ontol_hir::Kind::Unit, UNIT_META);
+
                 Ok(UnifiedNode {
                     typed_binder: None,
-                    node: TypedHirNode(
+                    node: self.mk_node(
                         ontol_hir::Kind::Prop(
                             ontol_hir::Optional(false),
                             prop.struct_var,
                             prop.prop_id,
-                            vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
-                                rel: Box::new(TypedHirNode(
-                                    ontol_hir::Kind::Unit,
-                                    self.unit_meta(),
-                                )),
-                                val: Box::new(sequence_node),
-                            })],
+                            [ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
+                                rel: unit,
+                                val: sequence_node,
+                            })]
+                            .into(),
                         ),
                         expr_meta.hir_meta,
                     ),
@@ -428,24 +422,27 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     )?
                 };
 
-                let unit_meta = self.unit_meta();
-                let seq_node = TypedHirNode(
+                let for_each = {
+                    let unit_meta = self.unit_meta();
+                    self.mk_node(
+                        ontol_hir::Kind::ForEach(
+                            gen_scope.input_seq,
+                            (hir_rel_binding, hir_val_binding),
+                            [push_unified.node].into_iter().collect(),
+                        ),
+                        unit_meta,
+                    )
+                };
+                let sequence = self.mk_node(
                     ontol_hir::Kind::Sequence(
-                        TypedBinder {
+                        ontol_hir::Binder {
                             var: gen_scope.output_seq,
-                            meta: Meta {
-                                ty: seq_ty,
-                                span: scope_meta.hir_meta.span,
-                            },
-                        },
-                        vec![TypedHirNode(
-                            ontol_hir::Kind::ForEach(
-                                gen_scope.input_seq,
-                                (hir_rel_binding, hir_val_binding),
-                                vec![push_unified.node],
-                            ),
-                            unit_meta,
-                        )],
+                        }
+                        .with_meta(Meta {
+                            ty: seq_ty,
+                            span: scope_meta.hir_meta.span,
+                        }),
+                        [for_each].into_iter().collect(),
                     ),
                     Meta {
                         ty: seq_ty,
@@ -455,18 +452,18 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
                 Ok(UnifiedNode {
                     typed_binder: None,
-                    node: seq_node,
+                    node: sequence,
                 })
             }
             (expr::Kind::Call(call), scope::Kind::Const) => {
                 let const_scope = self.const_scope();
-                let mut args = Vec::with_capacity(call.1.len());
+                let mut args = ontol_hir::Nodes::default();
                 for arg in call.1 {
                     args.push(self.unify(const_scope.clone(), arg)?.node);
                 }
                 Ok(UnifiedNode {
                     typed_binder: None,
-                    node: TypedHirNode(ontol_hir::Kind::Call(call.0, args), expr_meta.hir_meta),
+                    node: self.mk_node(ontol_hir::Kind::Call(call.0, args), expr_meta.hir_meta),
                 })
             }
             (expr::Kind::Map(param), scope::Kind::Const) => {
@@ -475,10 +472,8 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
                 Ok(UnifiedNode {
                     typed_binder: unified_param.typed_binder,
-                    node: TypedHirNode(
-                        ontol_hir::Kind::Map(Box::new(unified_param.node)),
-                        expr_meta.hir_meta,
-                    ),
+                    node: self
+                        .mk_node(ontol_hir::Kind::Map(unified_param.node), expr_meta.hir_meta),
                 })
             }
             (expr::Kind::Push(seq_var, attr), scope_kind) => {
@@ -488,22 +483,19 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 let val = self.unify(scope, attr.val)?;
 
                 Ok(UnifiedNode {
-                    typed_binder: Some(TypedBinder {
-                        var: seq_var,
-                        meta: Meta {
-                            ty: self.types.unit_type(),
-                            span: scope_hir_meta.span,
-                        },
-                    }),
-                    node: TypedHirNode(
+                    typed_binder: Some(ontol_hir::Binder { var: seq_var }.with_meta(Meta {
+                        ty: self.types.unit_type(),
+                        span: scope_hir_meta.span,
+                    })),
+                    node: self.mk_node(
                         ontol_hir::Kind::SeqPush(
                             seq_var,
                             ontol_hir::Attribute {
-                                rel: Box::new(rel.node),
-                                val: Box::new(val.node),
+                                rel: rel.node,
+                                val: val.node,
                             },
                         ),
-                        self.unit_meta(),
+                        UNIT_META,
                     ),
                 })
             }
@@ -526,7 +518,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         // panic!("Using subtree");
                     }
                 }
-                let mut nodes = Vec::with_capacity(dep_tree.trees.len() + dep_tree.constants.len());
+                let mut nodes = ontol_hir::Nodes::default();
 
                 for (prop_scope, sub_tree) in dep_tree.trees {
                     nodes.push(expr::Prop::unify_match_arm(self, prop_scope, sub_tree)?.node);
@@ -579,15 +571,17 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     nodes.extend(unscoped_nodes);
                 }
 
-                let nodes = regroup_match_prop(nodes);
+                let nodes = regroup_match_prop(nodes, &mut self.hir_arena);
 
                 Ok(UnifiedNode {
-                    typed_binder: scope_binder.map(|binder| TypedBinder {
-                        var: binder.var,
-                        meta: scope_meta.hir_meta,
+                    typed_binder: scope_binder.map(|binder| {
+                        ontol_hir::Binder {
+                            var: binder.value().var,
+                        }
+                        .with_meta(scope_meta.hir_meta)
                     }),
-                    node: TypedHirNode(
-                        ontol_hir::Kind::Struct(expr_binder, flags, nodes),
+                    node: self.mk_node(
+                        ontol_hir::Kind::Struct(expr_binder, flags, nodes.into()),
                         expr_meta.hir_meta,
                     ),
                 })
@@ -601,7 +595,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 scope_kind,
             ) => {
                 let scope = scope::Scope(scope_kind, scope_meta);
-                let mut nodes = Vec::with_capacity(props.len());
+                let mut nodes = ontol_hir::Nodes::default();
                 for prop in props {
                     let hir_meta = self.unit_meta();
                     let expr_meta = expr::Meta {
@@ -619,7 +613,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
                 Ok(UnifiedNode {
                     typed_binder: None,
-                    node: TypedHirNode(
+                    node: self.mk_node(
                         ontol_hir::Kind::Struct(binder, flags, nodes),
                         expr_meta.hir_meta,
                     ),
@@ -681,9 +675,11 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 let node = expr::Expr::unify_match_arm(self, scope_prop, sub_scoped)?.node;
 
                 Ok(UnifiedNode {
-                    typed_binder: scope_binder.map(|binder| TypedBinder {
-                        var: binder.var,
-                        meta: scope_meta.hir_meta,
+                    typed_binder: scope_binder.map(|binder| {
+                        ontol_hir::Binder {
+                            var: binder.value().var,
+                        }
+                        .with_meta(scope_meta.hir_meta)
                     }),
                     node,
                 })
@@ -725,10 +721,9 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 match block.len() {
                     0 => todo!("empty"),
                     1 => Ok(UnifiedNode {
-                        typed_binder: Some(TypedBinder {
-                            var,
-                            meta: scope_meta.hir_meta,
-                        }),
+                        typed_binder: Some(
+                            ontol_hir::Binder { var }.with_meta(scope_meta.hir_meta),
+                        ),
                         node: block.into_iter().next().unwrap(),
                     }),
                     _ => todo!("multiple nodes in var scope"),
@@ -738,12 +733,18 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 let block = self.unify_expressions(expressions)?;
                 let ty = block
                     .iter()
-                    .map(TypedHirNode::ty)
+                    .cloned()
+                    .map(|node| self.hir_arena[node].meta().ty)
                     .last()
                     .unwrap_or_else(|| self.types.unit_type());
 
-                let node = TypedHirNode(
-                    ontol_hir::Kind::Let(let_scope.inner_binder, Box::new(let_scope.def), block),
+                todo!("Import def arena");
+                let node = self.mk_node(
+                    ontol_hir::Kind::Let(
+                        let_scope.inner_binder,
+                        let_scope.def.node(),
+                        block.into(),
+                    ),
                     Meta { ty, span: NO_SPAN },
                 );
 
@@ -767,7 +768,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
     fn unify_expressions(
         &mut self,
         expressions: Vec<expr::Expr<'m>>,
-    ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
+    ) -> UnifierResult<Vec<ontol_hir::Node>> {
         let const_scope = self.const_scope();
         let mut nodes = vec![];
         for expr in expressions {
@@ -838,5 +839,14 @@ impl<'a, 'm> Unifier<'a, 'm> {
             ty: self.types.unit_type(),
             span: NO_SPAN,
         }
+    }
+
+    #[inline]
+    pub(super) fn mk_node(
+        &mut self,
+        kind: ontol_hir::Kind<'m, TypedHir>,
+        meta: Meta<'m>,
+    ) -> ontol_hir::Node {
+        self.hir_arena.add(TypedHirValue(kind, meta))
     }
 }

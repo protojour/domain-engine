@@ -85,9 +85,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     &mut ctx,
                 );
 
-                todo!();
-                // self.codegen_tasks
-                //     .add_const_task(ConstCodegenTask { def_id, node });
+                self.codegen_tasks.add_const_task(ConstCodegenTask {
+                    def_id,
+                    node: ontol_hir::RootNode::new(node, ctx.hir_arena),
+                });
 
                 ty
             }

@@ -1,33 +1,35 @@
 use std::rc::Rc;
 
-use ontol_hir::{old::GetKind, visitor::HirVisitor, SeqPropertyVariant};
+use ontol_hir::{visitor::HirVisitor, SeqPropertyVariant};
 
-use crate::{
-    typed_hir::{TypedHir, TypedHirNode},
-    types::TypeRef,
-};
+use crate::{typed_hir::TypedHir, types::TypeRef};
 
 use super::{
     flat_scope::{self, FlatScope, OutputVar, PropDepth, ScopeNode, ScopeVar},
     UnifierError, UnifierResult, VarSet,
 };
 
-struct NextNode<'a, 'm> {
-    node: &'a TypedHirNode<'m>,
+struct NextNode {
+    node: ontol_hir::Node,
     prop_depth: PropDepth,
     constraints: Rc<VarSet>,
     deps: VarSet,
 }
 
-pub struct FlatScopeBuilder<'m> {
+pub struct FlatScopeBuilder<'h, 'm> {
     #[allow(unused)]
     unit_type: TypeRef<'m>,
     var_allocator: ontol_hir::VarAllocator,
     scope_nodes: Vec<ScopeNode<'m>>,
+    hir_arena: &'h ontol_hir::arena::Arena<'m, TypedHir>,
 }
 
-impl<'m> FlatScopeBuilder<'m> {
-    pub fn new(var_allocator: ontol_hir::VarAllocator, unit_type: TypeRef<'m>) -> Self {
+impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
+    pub fn new(
+        var_allocator: ontol_hir::VarAllocator,
+        unit_type: TypeRef<'m>,
+        hir_arena: &'h ontol_hir::arena::Arena<'m, TypedHir>,
+    ) -> Self {
         Self {
             unit_type,
             // in_scope: VarSet::default(),
@@ -35,6 +37,7 @@ impl<'m> FlatScopeBuilder<'m> {
             // current_prop_path: Default::default(),
             // current_prop_analysis_map: None,
             scope_nodes: vec![],
+            hir_arena,
         }
     }
 
@@ -42,7 +45,7 @@ impl<'m> FlatScopeBuilder<'m> {
         self.var_allocator
     }
 
-    pub fn build_flat_scope(&mut self, node: &TypedHirNode<'m>) -> UnifierResult<FlatScope<'m>> {
+    pub fn build_flat_scope(&mut self, node: ontol_hir::Node) -> UnifierResult<FlatScope<'m>> {
         let mut node_set = vec![NextNode {
             node,
             prop_depth: PropDepth(0),
@@ -74,10 +77,10 @@ impl<'m> FlatScopeBuilder<'m> {
             mut deps,
             prop_depth,
             constraints,
-        }: NextNode<'a, 'm>,
-        next_node_set: &mut Vec<NextNode<'a, 'm>>,
+        }: NextNode,
+        next_node_set: &mut Vec<NextNode>,
     ) -> Result<(), UnifierError> {
-        match node.kind() {
+        match self.hir_arena.kind(node) {
             ontol_hir::Kind::Unit
             | ontol_hir::Kind::I64(_)
             | ontol_hir::Kind::F64(_)
@@ -85,14 +88,14 @@ impl<'m> FlatScopeBuilder<'m> {
             | ontol_hir::Kind::Const(_) => {
                 let const_var = ScopeVar(self.var_allocator.alloc());
                 self.scope_nodes.push(ScopeNode(
-                    flat_scope::Kind::Const(flat_scope::Const(node.kind().clone())),
+                    flat_scope::Kind::Const(node),
                     flat_scope::Meta {
                         scope_var: const_var,
                         free_vars: Default::default(),
                         constraints,
                         defs: Default::default(),
                         deps,
-                        hir_meta: *node.meta(),
+                        hir_meta: *self.hir_arena[node].meta(),
                     },
                 ))
             }
@@ -105,12 +108,12 @@ impl<'m> FlatScopeBuilder<'m> {
                         constraints,
                         defs: [*var].into(),
                         deps,
-                        hir_meta: *node.meta(),
+                        hir_meta: *self.hir_arena[node].meta(),
                     },
                 ));
             }
             ontol_hir::Kind::Map(inner) => next_node_set.push(NextNode {
-                node: inner,
+                node: *inner,
                 deps,
                 constraints,
                 prop_depth,
@@ -118,7 +121,7 @@ impl<'m> FlatScopeBuilder<'m> {
             ontol_hir::Kind::Struct(binder, _flags, nodes) => {
                 for node in nodes {
                     next_node_set.push(NextNode {
-                        node,
+                        node: *node,
                         prop_depth,
                         constraints: constraints.clone(),
                         deps: [].into(),
@@ -127,12 +130,12 @@ impl<'m> FlatScopeBuilder<'m> {
                 self.scope_nodes.push(ScopeNode(
                     flat_scope::Kind::Struct,
                     flat_scope::Meta {
-                        scope_var: ScopeVar(binder.var),
+                        scope_var: ScopeVar(binder.value().var),
                         free_vars: Default::default(),
                         constraints,
-                        defs: [binder.var].into(),
+                        defs: [binder.value().var].into(),
                         deps,
-                        hir_meta: *node.meta(),
+                        hir_meta: *self.hir_arena[node].meta(),
                     },
                 ));
             }
@@ -163,13 +166,13 @@ impl<'m> FlatScopeBuilder<'m> {
                                     constraints: constraints.clone(),
                                     defs: Default::default(),
                                     deps: deps.clone(),
-                                    hir_meta: *node.meta(),
+                                    hir_meta: *self.hir_arena[node].meta(),
                                 },
                             ));
 
                             self.process_attribute(
-                                &attr.rel,
-                                &attr.val,
+                                attr.rel,
+                                attr.val,
                                 prop_depth.next(),
                                 [variant_var].into(),
                                 constraints,
@@ -181,7 +184,7 @@ impl<'m> FlatScopeBuilder<'m> {
                             has_default,
                             elements,
                         }) => {
-                            let label_var = ontol_hir::Var(label.label.0);
+                            let label_var = ontol_hir::Var(label.value().0);
                             let output_var = OutputVar(self.var_allocator.alloc());
 
                             self.scope_nodes.push(ScopeNode(
@@ -199,7 +202,7 @@ impl<'m> FlatScopeBuilder<'m> {
                                     constraints: constraints.clone(),
                                     defs: [label_var].into(),
                                     deps: deps.clone(),
-                                    hir_meta: *node.meta(),
+                                    hir_meta: *self.hir_arena[node].meta(),
                                 },
                             ));
 
@@ -207,14 +210,14 @@ impl<'m> FlatScopeBuilder<'m> {
                                 let attr_deps: VarSet = if iter.0 {
                                     let iter_var = self.var_allocator.alloc();
                                     self.scope_nodes.push(ScopeNode(
-                                        flat_scope::Kind::IterElement(label.label, output_var),
+                                        flat_scope::Kind::IterElement(*label.value(), output_var),
                                         flat_scope::Meta {
                                             scope_var: ScopeVar(iter_var),
                                             free_vars: Default::default(),
                                             constraints: constraints.clone(),
                                             defs: Default::default(),
                                             deps: [label_var].into(),
-                                            hir_meta: *node.meta(),
+                                            hir_meta: *self.hir_arena[node].meta(),
                                         },
                                     ));
                                     [iter_var].into()
@@ -222,8 +225,8 @@ impl<'m> FlatScopeBuilder<'m> {
                                     [label_var].into()
                                 };
                                 self.process_attribute(
-                                    &attr.rel,
-                                    &attr.val,
+                                    attr.rel,
+                                    attr.val,
                                     prop_depth.next(),
                                     attr_deps,
                                     constraints.clone(),
@@ -236,22 +239,22 @@ impl<'m> FlatScopeBuilder<'m> {
             }
             ontol_hir::Kind::Call(proc, args) => {
                 let call_var = self.var_allocator.alloc();
-                if is_const(node) {
+                if self.is_const(node) {
                     self.scope_nodes.push(ScopeNode(
-                        flat_scope::Kind::Const(flat_scope::Const(node.kind().clone())),
+                        flat_scope::Kind::Const(node),
                         flat_scope::Meta {
                             scope_var: ScopeVar(call_var),
                             free_vars: Default::default(),
                             constraints,
                             defs: Default::default(),
                             deps,
-                            hir_meta: *node.meta(),
+                            hir_meta: *self.hir_arena[node].meta(),
                         },
                     ))
                 } else {
                     for arg in args {
                         next_node_set.push(NextNode {
-                            node: arg,
+                            node: *arg,
                             prop_depth,
                             constraints: constraints.clone(),
                             deps: [call_var].into(),
@@ -265,26 +268,28 @@ impl<'m> FlatScopeBuilder<'m> {
                             constraints,
                             defs: Default::default(),
                             deps,
-                            hir_meta: *node.meta(),
+                            hir_meta: *self.hir_arena[node].meta(),
                         },
                     ));
                 }
             }
             ontol_hir::Kind::Regex(opt_seq_label, regex_def_id, capture_group_alternations) => {
                 let (scope_var, opt_label) = match opt_seq_label {
-                    Some(seq_label) => (ontol_hir::Var(seq_label.label.0), Some(seq_label.label)),
+                    Some(seq_label) => {
+                        (ontol_hir::Var(seq_label.value().0), Some(seq_label.value()))
+                    }
                     None => (self.var_allocator.alloc(), None),
                 };
 
                 self.scope_nodes.push(ScopeNode(
-                    flat_scope::Kind::Regex(opt_label, *regex_def_id),
+                    flat_scope::Kind::Regex(opt_label.cloned(), *regex_def_id),
                     flat_scope::Meta {
                         scope_var: ScopeVar(scope_var),
                         free_vars: Default::default(),
                         constraints: constraints.clone(),
                         defs: Default::default(),
                         deps,
-                        hir_meta: *node.meta(),
+                        hir_meta: *self.hir_arena[node].meta(),
                     },
                 ));
                 for alternation in capture_group_alternations {
@@ -297,27 +302,28 @@ impl<'m> FlatScopeBuilder<'m> {
                             constraints: constraints.clone(),
                             defs: Default::default(),
                             deps: [scope_var].into(),
-                            hir_meta: *node.meta(),
+                            hir_meta: *self.hir_arena[node].meta(),
                         },
                     ));
 
                     for capture_group in alternation {
+                        let binder_var = capture_group.binder.value().var;
                         self.scope_nodes.push(ScopeNode(
                             flat_scope::Kind::RegexCapture(capture_group.index),
                             flat_scope::Meta {
-                                scope_var: ScopeVar(capture_group.binder.var),
-                                free_vars: [capture_group.binder.var].into(),
+                                scope_var: ScopeVar(binder_var),
+                                free_vars: [binder_var].into(),
                                 constraints: constraints.clone(),
-                                defs: [capture_group.binder.var].into(),
+                                defs: [binder_var].into(),
                                 deps: [alt_scope_var].into(),
-                                hir_meta: *node.meta(),
+                                hir_meta: *self.hir_arena[node].meta(),
                             },
                         ));
                     }
                 }
             }
             ontol_hir::Kind::DeclSeq(..) => return Err(UnifierError::SequenceInputNotSupported),
-            kind => todo!("{kind}"),
+            kind => todo!("{}", self.hir_arena.node_ref(node)),
         }
 
         Ok(())
@@ -325,14 +331,14 @@ impl<'m> FlatScopeBuilder<'m> {
 
     fn process_attribute<'a>(
         &mut self,
-        rel: &'a TypedHirNode<'m>,
-        val: &'a TypedHirNode<'m>,
+        rel: ontol_hir::Node,
+        val: ontol_hir::Node,
         prop_depth: PropDepth,
         deps: VarSet,
         constraints: Rc<VarSet>,
-        next_node_set: &mut Vec<NextNode<'a, 'm>>,
+        next_node_set: &mut Vec<NextNode>,
     ) {
-        if !is_unit(rel) {
+        if !self.is_unit(rel) {
             let rel_var = self.var_allocator.alloc();
             next_node_set.push(NextNode {
                 node: rel,
@@ -348,11 +354,11 @@ impl<'m> FlatScopeBuilder<'m> {
                     constraints: constraints.clone(),
                     defs: Default::default(),
                     deps: deps.clone(),
-                    hir_meta: *rel.meta(),
+                    hir_meta: *self.hir_arena[rel].meta(),
                 },
             ));
         }
-        if !is_unit(val) {
+        if !self.is_unit(val) {
             let val_var = self.var_allocator.alloc();
             next_node_set.push(NextNode {
                 node: val,
@@ -368,30 +374,38 @@ impl<'m> FlatScopeBuilder<'m> {
                     constraints: constraints.clone(),
                     defs: Default::default(),
                     deps,
-                    hir_meta: *val.meta(),
+                    hir_meta: *self.hir_arena[val].meta(),
                 },
             ));
         }
     }
-}
 
-fn is_unit(node: &TypedHirNode) -> bool {
-    matches!(node.kind(), ontol_hir::Kind::Unit)
-}
-
-fn is_const(node: &TypedHirNode) -> bool {
-    struct ConstChecker {
-        has_var: bool,
+    fn is_unit(&self, node: ontol_hir::Node) -> bool {
+        matches!(self.hir_arena.kind(node), ontol_hir::Kind::Unit)
     }
 
-    impl<'s, 'm: 's> ontol_hir::visitor::HirVisitor<'s, 'm, TypedHir> for ConstChecker {
-        fn visit_var(&mut self, _: &ontol_hir::Var) {
-            self.has_var = true;
+    fn is_const(&self, node: ontol_hir::Node) -> bool {
+        struct ConstChecker<'h, 'm> {
+            has_var: bool,
+            arena: &'h ontol_hir::arena::Arena<'m, TypedHir>,
         }
+
+        impl<'h, 'm: 'h> ontol_hir::visitor::HirVisitor<'h, 'm, TypedHir> for ConstChecker<'h, 'm> {
+            fn arena(&self) -> &'h ontol_hir::arena::Arena<'m, TypedHir> {
+                self.arena
+            }
+
+            fn visit_var(&mut self, _: ontol_hir::Var) {
+                self.has_var = true;
+            }
+        }
+        let mut checker = ConstChecker {
+            has_var: false,
+            arena: self.hir_arena,
+        };
+        checker.visit_node(0, node);
+        !checker.has_var
     }
-    let mut checker = ConstChecker { has_var: false };
-    checker.visit_node(0, node);
-    !checker.has_var
 }
 
 fn propagate_vars(scope_nodes: &mut Vec<ScopeNode>) {

@@ -4,21 +4,27 @@ use super::expr;
 use crate::{
     def::Defs,
     hir_unify::VarSet,
-    typed_hir::{TypedBinder, TypedHirNode},
+    typed_hir::{IntoTypedHirValue, TypedHir, TypedHirValue},
 };
 
-pub struct ExprBuilder<'c, 'm> {
+pub struct ExprBuilder<'h, 'c, 'm> {
     in_scope: VarSet,
     var_allocator: ontol_hir::VarAllocator,
     defs: &'c Defs<'m>,
+    hir_arena: &'h ontol_hir::arena::Arena<'m, TypedHir>,
 }
 
-impl<'c, 'm> ExprBuilder<'c, 'm> {
-    pub fn new(var_allocator: ontol_hir::VarAllocator, defs: &'c Defs<'m>) -> Self {
+impl<'h, 'c, 'm> ExprBuilder<'h, 'c, 'm> {
+    pub fn new(
+        var_allocator: ontol_hir::VarAllocator,
+        defs: &'c Defs<'m>,
+        hir_arena: &'h ontol_hir::arena::Arena<'m, TypedHir>,
+    ) -> Self {
         Self {
             in_scope: Default::default(),
             var_allocator,
             defs,
+            hir_arena,
         }
     }
 
@@ -26,7 +32,11 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
         self.var_allocator
     }
 
-    pub fn hir_to_expr(&mut self, TypedHirNode(kind, meta): &TypedHirNode<'m>) -> expr::Expr<'m> {
+    pub fn hir_to_expr(&mut self, node: ontol_hir::Node) -> expr::Expr<'m> {
+        let (kind, meta) = {
+            let hir = &self.hir_arena[node];
+            (hir.value(), hir.meta())
+        };
         match kind {
             ontol_hir::Kind::Var(var) => {
                 let mut free_vars = VarSet::default();
@@ -77,7 +87,7 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
             ),
             ontol_hir::Kind::Let(..) => panic!(),
             ontol_hir::Kind::Call(proc, args) => {
-                let args: Vec<_> = args.iter().map(|arg| self.hir_to_expr(arg)).collect();
+                let args: Vec<_> = args.iter().map(|arg| self.hir_to_expr(*arg)).collect();
                 let mut free_vars = VarSet::default();
                 for param in &args {
                     free_vars.union_with(&param.1.free_vars);
@@ -92,7 +102,7 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                 )
             }
             ontol_hir::Kind::Map(arg) => {
-                let arg = self.hir_to_expr(arg);
+                let arg = self.hir_to_expr(*arg);
                 let expr_meta = expr::Meta {
                     free_vars: arg.1.free_vars.clone(),
                     hir_meta: *meta,
@@ -100,17 +110,17 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                 expr::Expr(expr::Kind::Map(Box::new(arg)), expr_meta)
             }
             ontol_hir::Kind::DeclSeq(typed_label, attr) => {
-                let rel = self.hir_to_expr(&attr.rel);
-                let val = self.hir_to_expr(&attr.val);
+                let rel = self.hir_to_expr(attr.rel);
+                let val = self.hir_to_expr(attr.val);
 
                 let mut free_vars = VarSet::default();
                 free_vars.union_with(&rel.1.free_vars);
                 free_vars.union_with(&val.1.free_vars);
-                free_vars.insert(typed_label.label.into());
+                free_vars.insert((*typed_label.value()).into());
 
                 expr::Expr(
                     expr::Kind::Seq(
-                        typed_label.label,
+                        *typed_label.value(),
                         Box::new(ontol_hir::Attribute { rel, val }),
                     ),
                     expr::Meta {
@@ -122,7 +132,7 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
             ontol_hir::Kind::Struct(binder, flags, nodes) => self.enter_binder(binder, |zelf| {
                 let props: Vec<_> = nodes
                     .iter()
-                    .flat_map(|node| zelf.node_to_props(node))
+                    .flat_map(|node| zelf.node_to_props(*node))
                     .collect();
                 let mut free_vars = VarSet::default();
                 for prop in &props {
@@ -151,7 +161,7 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                 let mut free_vars = VarSet::default();
                 for altneration in capture_group_alternation {
                     for capture_group in altneration {
-                        free_vars.insert(capture_group.binder.var);
+                        free_vars.insert(capture_group.binder.value().var);
                     }
                 }
 
@@ -168,7 +178,10 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
 
                 let var = self.var_allocator.alloc();
                 expr::Expr(
-                    expr::Kind::StringInterpolation(TypedBinder { var, meta: *meta }, components),
+                    expr::Kind::StringInterpolation(
+                        ontol_hir::Binder { var }.with_meta(*meta),
+                        components,
+                    ),
                     expr::Meta {
                         hir_meta: *meta,
                         free_vars,
@@ -184,20 +197,21 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
             | ontol_hir::Kind::ForEach(..)
             | ontol_hir::Kind::StringPush(..)
             | ontol_hir::Kind::SeqPush(..)) => {
-                unimplemented!("BUG: {kind} is an output node",)
+                unimplemented!("BUG: {} is an output node", self.hir_arena.node_ref(node))
             }
         }
     }
 
-    fn node_to_props(&mut self, TypedHirNode(kind, _): &TypedHirNode<'m>) -> Vec<expr::Prop<'m>> {
+    fn node_to_props(&mut self, node: ontol_hir::Node) -> Vec<expr::Prop<'m>> {
+        let kind = self.hir_arena.kind(node);
         match kind {
             ontol_hir::Kind::Prop(optional, struct_var, prop_id, variants) => variants
                 .iter()
                 .map(|variant| match variant {
                     PropVariant::Singleton(attribute) => {
                         let mut union = UnionBuilder::default();
-                        let rel = union.plus(self.hir_to_expr(&attribute.rel));
-                        let val = union.plus(self.hir_to_expr(&attribute.val));
+                        let rel = union.plus(self.hir_to_expr(attribute.rel));
+                        let val = union.plus(self.hir_to_expr(attribute.val));
 
                         expr::Prop {
                             optional: *optional,
@@ -218,8 +232,8 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                         let prop_elements = elements
                             .iter()
                             .map(|(iter, attr)| {
-                                let mut rel = self.hir_to_expr(&attr.rel);
-                                let mut val = self.hir_to_expr(&attr.val);
+                                let mut rel = self.hir_to_expr(attr.rel);
+                                let mut val = self.hir_to_expr(attr.val);
 
                                 if !iter.0 {
                                     // non-iter element variables may refer to outer scope
@@ -231,16 +245,16 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                             })
                             .collect();
 
-                        union.vars.insert(label.label.into());
+                        union.vars.insert((*label.value()).into());
 
                         expr::Prop {
                             optional: *optional,
                             prop_id: *prop_id,
                             free_vars: union.vars,
-                            seq: Some(label.label),
+                            seq: Some(*label.value()),
                             struct_var: *struct_var,
                             variant: expr::PropVariant::Seq {
-                                label: label.label,
+                                label: *label.value(),
                                 elements: prop_elements,
                             },
                         }
@@ -252,15 +266,19 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
     }
 
     // do we even need this, expression are so simple
-    fn enter_binder<T>(&mut self, binder: &TypedBinder, func: impl FnOnce(&mut Self) -> T) -> T {
-        if !self.in_scope.insert(binder.var) {
+    fn enter_binder<T>(
+        &mut self,
+        binder: &TypedHirValue<'m, ontol_hir::Binder>,
+        func: impl FnOnce(&mut Self) -> T,
+    ) -> T {
+        if !self.in_scope.insert(binder.value().var) {
             panic!(
                 "Malformed HIR: {:?} variable was already in scope",
-                binder.var
+                binder.value().var
             );
         }
         let value = func(self);
-        self.in_scope.remove(binder.var);
+        self.in_scope.remove(binder.value().var);
         value
     }
 }
@@ -325,8 +343,8 @@ mod regex {
                             .unwrap();
 
                         self.components.push(StringInterpolationComponent::Var(
-                            capture_group.binder.var,
-                            capture_group.binder.meta.span,
+                            capture_group.binder.value().var,
+                            capture_group.binder.meta().span,
                         ));
                     } else {
                         self.traverse_hir(&capture.sub);

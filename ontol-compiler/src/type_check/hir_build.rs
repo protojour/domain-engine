@@ -46,17 +46,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             ctx,
         );
 
-        let node_ref = ctx.hir_arena.node_ref(node);
+        let node_meta = ctx.hir_arena[node].meta();
 
         // Save typing result for the final type unification:
-        match node_ref.ty() {
+        match node_meta.ty {
             Type::Error | Type::Infer(_) => {}
             _ => {
                 let type_var = ctx.inference.new_type_variable(pat_id);
-                debug!("Check pat(2) root type result: {:?}", node_ref.ty());
+                debug!("Check pat(2) root type result: {:?}", node_meta.ty);
                 ctx.inference
                     .eq_relations
-                    .unify_var_value(type_var, UnifyValue::Known(node_ref.ty()))
+                    .unify_var_value(type_var, UnifyValue::Known(node_meta.ty))
                     .unwrap();
             }
         }
@@ -107,8 +107,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             hir_args.push(node);
                         }
 
-                        ctx.hir_node(
-                            ontol_hir::Kind::Call(*proc, hir_args),
+                        ctx.mk_node(
+                            ontol_hir::Kind::Call(*proc, hir_args.into()),
                             Meta {
                                 ty: output,
                                 span: pattern.span,
@@ -151,12 +151,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ctx,
                 );
 
-                let struct_meta = *ctx.hir_arena.node_ref(struct_node).meta();
+                let struct_meta = *ctx.hir_arena[struct_node].meta();
                 match expected_ty {
                     Some(Type::Infer(_)) => struct_node,
                     Some(Type::Domain(_)) => struct_node,
                     Some(Type::Option(Type::Domain(_))) => {
-                        *ctx.hir_arena.node_mut(struct_node).meta_mut() = Meta {
+                        let hir_node = &mut ctx.hir_arena[struct_node];
+                        *hir_node.meta_mut() = Meta {
                             ty: self.types.intern(Type::Option(struct_meta.ty)),
                             span: struct_meta.span,
                         };
@@ -234,7 +235,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                                 ctx,
                                             );
 
-                                        return ctx.hir_node(
+                                        return ctx.mk_node(
                                             ontol_hir::Kind::Regex(
                                                 Some(TypedHirValue(
                                                     label,
@@ -296,7 +297,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let label = *ctx.label_map.get(aggr_pat_id).unwrap();
                 let seq_ty = self.types.intern(Type::Seq(rel_ty, val_ty));
 
-                ctx.hir_node(
+                ctx.mk_node(
                     ontol_hir::Kind::DeclSeq(
                         label.with_ty(seq_ty),
                         ontol_hir::Attribute { rel, val },
@@ -308,7 +309,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 )
             }
             (PatternKind::ConstI64(int), Some(expected_ty)) => match expected_ty {
-                Type::Primitive(PrimitiveKind::I64, _) => ctx.hir_node(
+                Type::Primitive(PrimitiveKind::I64, _) => ctx.mk_node(
                     ontol_hir::Kind::I64(*int),
                     Meta {
                         ty: expected_ty,
@@ -318,7 +319,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 Type::Primitive(PrimitiveKind::F64, _) => {
                     // Didn't find a way to go from i64 to f64 in Rust std..
                     match f64::from_str(&int.to_string()) {
-                        Ok(float) => ctx.hir_node(
+                        Ok(float) => ctx.mk_node(
                             ontol_hir::Kind::F64(float),
                             Meta {
                                 ty: expected_ty,
@@ -333,7 +334,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 _ => self.error_node(CompileError::IncompatibleLiteral, &pattern.span, ctx),
             },
             (PatternKind::ConstText(literal), Some(expected_ty)) => match expected_ty {
-                Type::Primitive(PrimitiveKind::Text, _) => ctx.hir_node(
+                Type::Primitive(PrimitiveKind::Text, _) => ctx.mk_node(
                     ontol_hir::Kind::Text(literal.clone()),
                     Meta {
                         ty: expected_ty,
@@ -341,7 +342,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     },
                 ),
                 Type::TextConstant(def_id) => match self.defs.def_kind(*def_id) {
-                    DefKind::TextLiteral(lit) if literal == lit => ctx.hir_node(
+                    DefKind::TextLiteral(lit) if literal == lit => ctx.mk_node(
                         ontol_hir::Kind::Text(literal.clone()),
                         Meta {
                             ty: expected_ty,
@@ -380,7 +381,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         ctx,
                     ),
                     Some(expected_ty) => {
-                        let variable_ref = ctx.hir_node(
+                        let variable_ref = ctx.mk_node(
                             ontol_hir::Kind::Var(*var),
                             Meta {
                                 ty: expected_ty,
@@ -423,7 +424,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         ctx,
                     );
 
-                    ctx.hir_node(
+                    ctx.mk_node(
                         ontol_hir::Kind::Regex(
                             None,
                             regex_pattern.regex_def_id,
@@ -446,20 +447,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             ),
         };
 
-        let node_ref = ctx.hir_arena.node_ref(node);
+        let typed_node = &ctx.hir_arena[node];
 
         debug!(
             "expected/meta: {:?} {:?}",
             node_info.expected_ty,
-            node_ref.ty()
+            typed_node.ty()
         );
 
-        match (node_info.expected_ty, node_ref.ty()) {
+        match (node_info.expected_ty, typed_node.ty()) {
             (_, Type::Error | Type::Infer(_)) => {}
             (Some(Type::Infer(type_var)), _) => {
                 ctx.inference
                     .eq_relations
-                    .unify_var_value(*type_var, UnifyValue::Known(node_ref.ty()))
+                    .unify_var_value(*type_var, UnifyValue::Known(typed_node.ty()))
                     .unwrap();
             }
             _ => {}
@@ -512,7 +513,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 // FIXME: Unsure how correct this is:
                 for element in elements {
                     let node = self.build_implicit_rel_node(ty, &element.pattern, prop_span, ctx);
-                    if !matches!(ctx.hir_arena.node_ref(node).meta().ty, Type::Error) {
+                    if !matches!(ctx.hir_arena[node].meta().ty, Type::Error) {
                         return node;
                     }
                 }
@@ -628,7 +629,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         span: &SourceSpan,
         ctx: &mut HirBuildCtx<'m>,
     ) -> ontol_hir::Node {
-        ctx.hir_node(
+        ctx.mk_node(
             ontol_hir::Kind::Unit,
             Meta {
                 ty: self.types.intern(Type::Error),
@@ -638,7 +639,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     }
 
     pub(super) fn unit_node_no_span(&mut self, ctx: &mut HirBuildCtx<'m>) -> ontol_hir::Node {
-        ctx.hir_node(
+        ctx.mk_node(
             ontol_hir::Kind::Unit,
             Meta {
                 ty: self.unit_type(),

@@ -49,7 +49,7 @@ impl Debug for Optional {
 pub struct HasDefault(pub bool);
 
 /// An attribute existing of (relation parameter, value)
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Attribute<T> {
     pub rel: T,
     pub val: T,
@@ -83,6 +83,7 @@ impl<T> Index<usize> for Attribute<T> {
 pub struct Iter(pub bool);
 
 pub trait Lang: Sized + Copy {
+    // TODO: Rename, it's confusing when everything is called Meta
     type Meta<'a, T>: Clone
     where
         T: Clone;
@@ -92,6 +93,7 @@ pub trait Lang: Sized + Copy {
     fn inner<'m, 'a, T: Clone>(meta: &'m Self::Meta<'a, T>) -> &'m T;
 }
 
+#[derive(Clone)]
 pub struct RootNode<'a, L: Lang> {
     arena: Arena<'a, L>,
     node: Node,
@@ -106,6 +108,10 @@ impl<'a, L: Lang> RootNode<'a, L> {
         self.node
     }
 
+    pub fn meta(&self) -> &L::Meta<'a, Kind<'a, L>> {
+        &self.arena[self.node]
+    }
+
     pub fn split(self) -> (Arena<'a, L>, Node) {
         (self.arena, self.node)
     }
@@ -114,15 +120,19 @@ impl<'a, L: Lang> RootNode<'a, L> {
         self.arena.node_ref(self.node)
     }
 
+    pub fn arena(&self) -> &Arena<'a, L> {
+        &self.arena
+    }
+
     pub fn arena_mut(&mut self) -> &mut Arena<'a, L> {
         &mut self.arena
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Node(u32);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Binder {
     pub var: Var,
 }
@@ -208,7 +218,7 @@ pub enum PropPattern<'a, L: Lang> {
     Absent,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum Binding<'a, L: Lang> {
     Wildcard,
     Binder(L::Meta<'a, Binder>),

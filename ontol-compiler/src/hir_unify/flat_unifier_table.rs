@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use tracing::debug;
 
-use crate::typed_hir::{TypedBinder, TypedHir};
+use crate::typed_hir::{IntoTypedHirValue, TypedHir};
 
 use super::{
     expr,
@@ -308,10 +308,12 @@ impl<'m> Table<'m> {
             scope_node: Option<&flat_scope::ScopeNode<'m>>,
         ) -> ontol_hir::Binding<'m, TypedHir> {
             match scope_node {
-                Some(scope_node) => ontol_hir::Binding::Binder(TypedBinder {
-                    var: scope_node.meta().scope_var.0,
-                    meta: scope_node.meta().hir_meta,
-                }),
+                Some(scope_node) => ontol_hir::Binding::Binder(
+                    ontol_hir::Binder {
+                        var: scope_node.meta().scope_var.0,
+                    }
+                    .with_meta(scope_node.meta().hir_meta),
+                ),
                 None => ontol_hir::Binding::Wildcard,
             }
         }
@@ -454,14 +456,14 @@ impl<'m> Debug for RelValBindings<'m> {
 impl<'m> IsInScope for ontol_hir::Binding<'m, TypedHir> {
     fn is_in_scope(&self, in_scope: &VarSet) -> bool {
         match self {
-            ontol_hir::Binding::Binder(binder) => in_scope.contains(binder.var),
+            ontol_hir::Binding::Binder(binder) => in_scope.contains(binder.value().var),
             ontol_hir::Binding::Wildcard => true,
         }
     }
 
     fn var_set(&self) -> VarSet {
         match self {
-            ontol_hir::Binding::Binder(binder) => [binder.var].into(),
+            ontol_hir::Binding::Binder(binder) => [binder.value().var].into(),
             ontol_hir::Binding::Wildcard => Default::default(),
         }
     }

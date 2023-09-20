@@ -95,7 +95,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
 
         if let Some(key_pair) = TypeMapper::new(self.relations, self.defs, self.seal_ctx)
-            .find_map_key_pair(first.as_ref().ty(), second.as_ref().ty())
+            .find_map_key_pair(first.as_ref().meta().ty, second.as_ref().meta().ty)
         {
             self.codegen_tasks.add_map_task(
                 key_pair,

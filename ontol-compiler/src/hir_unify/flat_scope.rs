@@ -5,7 +5,7 @@ use std::{
 
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc, DefId};
 
-use crate::typed_hir::{self, TypedHirKind, TypedLabel};
+use crate::typed_hir::{self, TypedHirValue};
 
 use super::VarSet;
 
@@ -91,13 +91,13 @@ impl Debug for PropDepth {
 #[derive(Clone, Debug)]
 pub enum Kind<'m> {
     Var,
-    Const(Const<'m>),
+    Const(ontol_hir::Node),
     Struct,
     PropVariant(PropDepth, ontol_hir::Optional, ontol_hir::Var, PropertyId),
     PropRelParam,
     PropValue,
     SeqPropVariant(
-        TypedLabel<'m>,
+        TypedHirValue<'m, ontol_hir::Label>,
         OutputVar,
         ontol_hir::Optional,
         ontol_hir::HasDefault,
@@ -111,14 +111,5 @@ pub enum Kind<'m> {
     RegexCapture(u32),
 }
 
-#[derive(Clone)]
-pub struct Const<'m>(pub TypedHirKind<'m>);
-
 #[derive(Clone, Copy, Debug)]
 pub struct OutputVar(pub ontol_hir::Var);
-
-impl<'m> Debug for Const<'m> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}

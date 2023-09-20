@@ -26,6 +26,10 @@ impl<'a, L: Lang> Arena<'a, L> {
         NodeRef { arena: self, node }
     }
 
+    pub fn iter(&self) -> impl Iterator<Item = &L::Meta<'a, Kind<'a, L>>> {
+        self.nodes.iter()
+    }
+
     pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut L::Meta<'a, Kind<'a, L>>> {
         self.nodes.iter_mut()
     }
@@ -65,17 +69,26 @@ impl<'a, L: Lang> Default for Arena<'a, L> {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct NodeRef<'h, 'a, L: Lang> {
-    pub arena: &'h Arena<'a, L>,
+    pub(crate) arena: &'h Arena<'a, L>,
     pub(crate) node: Node,
 }
 
 impl<'h, 'a, L: Lang> NodeRef<'h, 'a, L> {
-    pub fn value(&self) -> &'h L::Meta<'a, Kind<'a, L>> {
-        &self.arena.nodes[self.node.0 as usize]
+    pub fn arena(&self) -> &'h Arena<'a, L> {
+        self.arena
     }
 
-    pub fn kind(&self) -> &'h Kind<'a, L> {
-        L::inner(&self.arena.nodes[self.node.0 as usize])
+    pub fn node(&self) -> Node {
+        self.node
+    }
+}
+
+impl<'h, 'a, L: Lang> std::ops::Deref for NodeRef<'h, 'a, L> {
+    type Target = L::Meta<'a, Kind<'a, L>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.arena.nodes[self.node.0 as usize]
     }
 }

@@ -1,5 +1,5 @@
 use crate::{
-    typed_hir::{Meta, TypedBinder, TypedHirNode},
+    typed_hir::{IntoTypedHirValue, Meta, UNIT_META},
     NO_SPAN,
 };
 
@@ -20,14 +20,14 @@ pub(super) trait UnifyProps<'m>: Sized {
         unifier: &mut Unifier<'a, 'm>,
         inner_scope: scope::Scope<'m>,
         sub_scoped: SubTree<Self, scope::Prop<'m>>,
-    ) -> UnifierResult<Vec<TypedHirNode<'m>>>;
+    ) -> UnifierResult<ontol_hir::Nodes>;
 
     // Required method
     fn unify_with_prop_set<'a>(
         unifier: &mut Unifier<'a, 'm>,
         prop_set_scope: (scope::PropSet<'m>, scope::Meta<'m>),
         sub_scoped: SubTree<Self, scope::Prop<'m>>,
-    ) -> UnifierResult<Vec<TypedHirNode<'m>>>;
+    ) -> UnifierResult<ontol_hir::Nodes>;
 
     // Common logic
     fn unify_match_arm<'a>(
@@ -44,22 +44,22 @@ pub(super) trait UnifyProps<'m>: Sized {
                 let nodes = Self::wrap_sub_scoped_in_scope(unifier, joined_scope, sub_scoped)?;
                 let ty = nodes
                     .iter()
-                    .map(TypedHirNode::ty)
+                    .map(|node| unifier.hir_arena[*node].ty())
                     .last()
                     .unwrap_or_else(|| unifier.types.unit_type());
 
                 (
-                    ontol_hir::old::PropMatchArm {
-                        pattern: ontol_hir::PropPattern::Attr(hir_rel_binding, hir_val_binding),
+                    (
+                        ontol_hir::PropPattern::Attr(hir_rel_binding, hir_val_binding),
                         nodes,
-                    },
+                    ),
                     ty,
                 )
             }
             scope::PropKind::Seq(typed_label, has_default, rel_binding, val_binding) => {
                 let gen_scope = scope::Scope(
                     scope::Kind::Gen(scope::Gen {
-                        input_seq: ontol_hir::Var(typed_label.label.0),
+                        input_seq: ontol_hir::Var(typed_label.value().0),
                         output_seq: unifier.var_allocator.alloc(),
                         bindings: Box::new((rel_binding, val_binding)),
                     }),
@@ -72,24 +72,26 @@ pub(super) trait UnifyProps<'m>: Sized {
                 let nodes = Self::wrap_sub_scoped_in_scope(unifier, gen_scope, sub_scoped)?;
                 let arm_ty = nodes
                     .iter()
-                    .map(TypedHirNode::ty)
+                    .map(|node| unifier.hir_arena[*node].ty())
                     .last()
                     .unwrap_or_else(|| unifier.types.unit_type());
 
                 (
-                    ontol_hir::old::PropMatchArm {
-                        pattern: ontol_hir::PropPattern::Seq(
-                            ontol_hir::Binding::Binder(TypedBinder {
-                                var: ontol_hir::Var(typed_label.label.0),
-                                meta: Meta {
-                                    ty: typed_label.ty,
+                    (
+                        ontol_hir::PropPattern::Seq(
+                            ontol_hir::Binding::Binder(
+                                ontol_hir::Binder {
+                                    var: ontol_hir::Var(typed_label.value().0),
+                                }
+                                .with_meta(Meta {
+                                    ty: typed_label.ty(),
                                     span: NO_SPAN,
-                                },
-                            }),
+                                }),
+                            ),
                             has_default,
                         ),
                         nodes,
-                    },
+                    ),
                     arm_ty,
                 )
             }
@@ -98,16 +100,17 @@ pub(super) trait UnifyProps<'m>: Sized {
         let mut match_arms = vec![match_arm];
 
         if scope_prop.optional.0 {
-            match_arms.push(ontol_hir::old::PropMatchArm {
-                pattern: ontol_hir::PropPattern::Absent,
-                nodes: vec![],
-            });
+            match_arms.push((ontol_hir::PropPattern::Absent, ontol_hir::Nodes::default()));
         }
 
         Ok(UnifiedNode {
             typed_binder: None,
-            node: TypedHirNode(
-                ontol_hir::Kind::MatchProp(scope_prop.struct_var, scope_prop.prop_id, match_arms),
+            node: unifier.mk_node(
+                ontol_hir::Kind::MatchProp(
+                    scope_prop.struct_var,
+                    scope_prop.prop_id,
+                    match_arms.into(),
+                ),
                 Meta { ty, span: NO_SPAN },
             ),
         })
@@ -118,7 +121,7 @@ pub(super) trait UnifyProps<'m>: Sized {
         unifier: &mut Unifier<'a, 'm>,
         scope::Scope(scope_kind, scope_meta): scope::Scope<'m>,
         sub_scoped: SubTree<Self, scope::Prop<'m>>,
-    ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
+    ) -> UnifierResult<ontol_hir::Nodes> {
         match scope_kind {
             scope::Kind::Const | scope::Kind::Var(_) | scope::Kind::Regex(..) => {
                 Self::unify_sub_scoped(unifier, scope::Scope(scope_kind, scope_meta), sub_scoped)
@@ -128,16 +131,17 @@ pub(super) trait UnifyProps<'m>: Sized {
                 let block = Self::unify_sub_scoped(unifier, const_scope, sub_scoped)?;
                 let ty = block
                     .iter()
-                    .map(TypedHirNode::ty)
+                    .map(|node| unifier.hir_arena[*node].ty())
                     .last()
                     .unwrap_or_else(|| unifier.types.unit_type());
 
-                let node = TypedHirNode(
-                    ontol_hir::Kind::Let(let_scope.inner_binder, Box::new(let_scope.def), block),
+                todo!("Import let def to arena");
+                let node = unifier.mk_node(
+                    ontol_hir::Kind::Let(let_scope.inner_binder, let_scope.def.node(), block),
                     Meta { ty, span: NO_SPAN },
                 );
 
-                Ok(vec![node])
+                Ok([node].into_iter().collect())
             }
             scope::Kind::PropSet(prop_set) => {
                 Self::unify_with_prop_set(unifier, (prop_set, scope_meta), sub_scoped)
@@ -158,9 +162,8 @@ impl<'m> UnifyProps<'m> for expr::Prop<'m> {
         unifier: &mut Unifier<'a, 'm>,
         inner_scope: scope::Scope<'m>,
         sub_scoped: SubTree<Self, scope::Prop<'m>>,
-    ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
-        let mut nodes =
-            Vec::with_capacity(sub_scoped.expressions.len() + sub_scoped.sub_trees.len());
+    ) -> UnifierResult<ontol_hir::Nodes> {
+        let mut nodes = ontol_hir::Nodes::default();
         for prop in sub_scoped.expressions {
             let unit_meta = unifier.unit_meta();
             nodes.push(
@@ -183,39 +186,40 @@ impl<'m> UnifyProps<'m> for expr::Prop<'m> {
             nodes.push(Self::unify_match_arm(unifier, sub_prop_scope, sub_scoped)?.node);
         }
 
-        Ok(regroup_match_prop(nodes))
+        Ok(regroup_match_prop(nodes, &mut unifier.hir_arena))
     }
 
     fn unify_with_prop_set<'a>(
         unifier: &mut Unifier<'a, 'm>,
         (prop_set, scope_meta): (scope::PropSet<'m>, scope::Meta<'m>),
         sub_scoped: SubTree<Self, scope::Prop<'m>>,
-    ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
+    ) -> UnifierResult<ontol_hir::Nodes> {
         let scope = scope::Scope(scope::Kind::PropSet(prop_set), scope_meta);
-        let mut nodes =
-            Vec::with_capacity(sub_scoped.expressions.len() + sub_scoped.sub_trees.len());
+        let mut nodes = ontol_hir::Nodes::default();
 
         for prop in sub_scoped.expressions {
-            nodes.push(TypedHirNode(
+            let variant = match prop.variant {
+                expr::PropVariant::Singleton(attr) => {
+                    // FIXME: avoid clone by taking scope reference?
+                    let rel = unifier.unify(scope.clone(), attr.rel)?;
+                    let val = unifier.unify(scope.clone(), attr.val)?;
+
+                    ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
+                        rel: rel.node,
+                        val: val.node,
+                    })
+                }
+                expr::PropVariant::Seq { .. } => todo!(),
+            };
+
+            nodes.push(unifier.mk_node(
                 ontol_hir::Kind::Prop(
                     ontol_hir::Optional(false),
                     prop.struct_var,
                     prop.prop_id,
-                    vec![match prop.variant {
-                        expr::PropVariant::Singleton(attr) => {
-                            // FIXME: avoid clone by taking scope reference?
-                            let rel = unifier.unify(scope.clone(), attr.rel)?;
-                            let val = unifier.unify(scope.clone(), attr.val)?;
-
-                            ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
-                                rel: Box::new(rel.node),
-                                val: Box::new(val.node),
-                            })
-                        }
-                        expr::PropVariant::Seq { .. } => todo!(),
-                    }],
+                    [variant].into(),
                 ),
-                unifier.unit_meta(),
+                UNIT_META,
             ));
         }
 
@@ -233,9 +237,8 @@ impl<'m> UnifyProps<'m> for expr::Expr<'m> {
         unifier: &mut Unifier<'a, 'm>,
         inner_scope: scope::Scope<'m>,
         sub_scoped: SubTree<Self, scope::Prop<'m>>,
-    ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
-        let mut nodes =
-            Vec::with_capacity(sub_scoped.expressions.len() + sub_scoped.sub_trees.len());
+    ) -> UnifierResult<ontol_hir::Nodes> {
+        let mut nodes = ontol_hir::Nodes::default();
 
         for expr in sub_scoped.expressions {
             nodes.push(unifier.unify(inner_scope.clone(), expr)?.node);
@@ -250,7 +253,7 @@ impl<'m> UnifyProps<'m> for expr::Expr<'m> {
         _unifier: &mut Unifier<'a, 'm>,
         _: (scope::PropSet<'m>, scope::Meta<'m>),
         sub_scoped: SubTree<Self, scope::Prop<'m>>,
-    ) -> UnifierResult<Vec<TypedHirNode<'m>>> {
+    ) -> UnifierResult<ontol_hir::Nodes> {
         todo!("sub_scoped: {sub_scoped:?}");
     }
 }

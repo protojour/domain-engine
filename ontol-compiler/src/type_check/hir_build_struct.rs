@@ -133,8 +133,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             );
                         }
 
-                        ctx.hir_node(
-                            ontol_hir::Kind::Struct(struct_binder, actual_struct_flags, hir_props),
+                        ctx.mk_node(
+                            ontol_hir::Kind::Struct(
+                                struct_binder,
+                                actual_struct_flags,
+                                hir_props.into(),
+                            ),
                             struct_meta,
                         )
                     }
@@ -142,7 +146,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         if !pattern_attrs.is_empty() {
                             return self.error_node(CompileError::NoPropertiesExpected, &span, ctx);
                         }
-                        ctx.hir_node(ontol_hir::Kind::Unit, struct_meta)
+                        ctx.mk_node(ontol_hir::Kind::Unit, struct_meta)
                     }
                 }
             }
@@ -194,7 +198,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     ctx,
                                 );
 
-                                *ctx.hir_arena.node_mut(inner_node).meta_mut() = struct_meta;
+                                *(&mut ctx.hir_arena[inner_node]).meta_mut() = struct_meta;
 
                                 inner_node
                             }
@@ -233,7 +237,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             ctx,
                         );
 
-                        *ctx.hir_arena.node_mut(inner_node).meta_mut() = struct_meta;
+                        *(&mut ctx.hir_arena[inner_node]).meta_mut() = struct_meta;
 
                         inner_node
                     }
@@ -288,7 +292,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             (Type::Primitive(PrimitiveKind::Unit, _), Some(rel)) => {
                 self.error_node(CompileError::NoRelationParametersExpected, &rel.span, ctx)
             }
-            (ty @ Type::Primitive(PrimitiveKind::Unit, _), None) => ctx.hir_node(
+            (ty @ Type::Primitive(PrimitiveKind::Unit, _), None) => ctx.mk_node(
                 ontol_hir::Kind::Unit,
                 Meta {
                     ty,
@@ -307,7 +311,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 match self.relations.properties_by_def_id(*def_id) {
                     Some(_) => self.build_implicit_rel_node(ty, value, *prop_span, ctx),
                     // An anonymous type without properties, i.e. just "meta relationships" about the relationship itself:
-                    None => ctx.hir_node(
+                    None => ctx.mk_node(
                         ontol_hir::Kind::Unit,
                         Meta {
                             ty,
@@ -373,7 +377,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             match_property.property_id.role,
                             Role::Object
                         )),
-                        elements: hir_elements,
+                        elements: hir_elements.into(),
                     })
                 }
                 _ => {
@@ -410,12 +414,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             };
 
-        Some(ctx.hir_node(
+        Some(ctx.mk_node(
             ontol_hir::Kind::Prop(
                 optional,
                 struct_binder_var,
                 match_property.property_id,
-                prop_variants,
+                prop_variants.into(),
             ),
             Meta {
                 ty: self.unit_type(),
@@ -456,22 +460,23 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 let prop_node = {
                     let rel = self.unit_node_no_span(ctx);
-                    let val = ctx.hir_node(
+                    let val = ctx.mk_node(
                         ontol_hir::Kind::Const(const_def_id),
                         Meta {
                             ty: value_ty,
                             span: NO_SPAN,
                         },
                     );
-                    ctx.hir_node(
+                    ctx.mk_node(
                         ontol_hir::Kind::Prop(
                             ontol_hir::Optional(false),
                             struct_binder_var,
                             match_property.property_id,
-                            vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
+                            [ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
                                 rel,
                                 val,
-                            })],
+                            })]
+                            .into(),
                         ),
                         Meta {
                             ty: self.unit_type(),

@@ -8,7 +8,7 @@ use crate::{
     primitive::PrimitiveKind,
     relation::Constructor,
     text_patterns::TextPatternSegment,
-    typed_hir::{Meta, TypedBinder, TypedHirNode},
+    typed_hir::{IntoTypedHirValue, Meta, TypedHir, TypedHirValue},
     types::{Type, TypeRef},
     Compiler, NO_SPAN,
 };
@@ -96,8 +96,10 @@ fn autogenerate_fmt_hir_struct<'m>(
     var_map: &mut HashMap<DefId, ontol_hir::Var>,
     unit_type: TypeRef<'m>,
     compiler: &Compiler<'m>,
-) -> Option<TypedHirNode<'m>> {
-    let mut nodes: Vec<TypedHirNode<'m>> = vec![];
+) -> Option<ontol_hir::RootNode<'m, TypedHir>> {
+    let mut arena: ontol_hir::arena::Arena<'m, TypedHir> = Default::default();
+
+    let mut nodes: Vec<ontol_hir::Node> = vec![];
 
     if let TextPatternSegment::Concat(segments) = segment {
         for child_segment in segments {
@@ -108,6 +110,7 @@ fn autogenerate_fmt_hir_struct<'m>(
                 var_map,
                 unit_type,
                 compiler,
+                &mut arena,
             ) {
                 nodes.push(node);
             }
@@ -116,20 +119,19 @@ fn autogenerate_fmt_hir_struct<'m>(
 
     let ty = compiler.def_types.table.get(&def_id)?;
 
-    Some(TypedHirNode(
+    let struct_node = arena.add(TypedHirValue(
         ontol_hir::Kind::Struct(
-            TypedBinder {
-                var: binder_var,
-                meta: Meta {
-                    ty: compiler.def_types.table.get(&def_id).unwrap(),
-                    span: NO_SPAN,
-                },
-            },
+            ontol_hir::Binder { var: binder_var }.with_meta(Meta {
+                ty: compiler.def_types.table.get(&def_id).unwrap(),
+                span: NO_SPAN,
+            }),
             ontol_hir::StructFlags::empty(),
-            nodes,
+            nodes.into(),
         ),
         Meta { ty, span: NO_SPAN },
-    ))
+    ));
+
+    Some(ontol_hir::RootNode::new(struct_node, arena))
 }
 
 fn autogenerate_fmt_segment_property<'m>(
@@ -139,7 +141,8 @@ fn autogenerate_fmt_segment_property<'m>(
     var_map: &mut HashMap<DefId, ontol_hir::Var>,
     unit_type: TypeRef<'m>,
     compiler: &Compiler<'m>,
-) -> Option<TypedHirNode<'m>> {
+    arena: &mut ontol_hir::arena::Arena<'m, TypedHir>,
+) -> Option<ontol_hir::Node> {
     if let TextPatternSegment::Property {
         property_id,
         type_def_id,
@@ -156,37 +159,42 @@ fn autogenerate_fmt_segment_property<'m>(
             // first arm
             let var = var_allocator.alloc();
             var_map.insert(*type_def_id, var);
-            TypedHirNode(ontol_hir::Kind::Var(var), meta)
+            arena.add(TypedHirValue(ontol_hir::Kind::Var(var), meta))
         } else {
             // second arm
             if let Some(var) = var_map.get(type_def_id) {
-                TypedHirNode(ontol_hir::Kind::Var(*var), meta)
+                arena.add(TypedHirValue(ontol_hir::Kind::Var(*var), meta))
             } else {
                 return None;
             }
         };
 
-        Some(TypedHirNode(
-            ontol_hir::Kind::Prop(
-                ontol_hir::Optional(false),
-                binder_var,
-                *property_id,
-                vec![ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
-                    rel: Box::new(TypedHirNode(
-                        ontol_hir::Kind::Unit,
-                        Meta {
-                            ty: unit_type,
-                            span: NO_SPAN,
-                        },
-                    )),
-                    val: Box::new(var_node),
-                })],
-            ),
+        let rel = arena.add(TypedHirValue(
+            ontol_hir::Kind::Unit,
             Meta {
-                ty: object_ty,
+                ty: unit_type,
                 span: NO_SPAN,
             },
-        ))
+        ));
+
+        Some(
+            arena.add(TypedHirValue(
+                ontol_hir::Kind::Prop(
+                    ontol_hir::Optional(false),
+                    binder_var,
+                    *property_id,
+                    [ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
+                        rel,
+                        val: var_node,
+                    })]
+                    .into(),
+                ),
+                Meta {
+                    ty: object_ty,
+                    span: NO_SPAN,
+                },
+            )),
+        )
     } else {
         None
     }
