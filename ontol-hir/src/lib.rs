@@ -14,6 +14,17 @@ pub mod visitor;
 #[cfg(test)]
 mod tests;
 
+pub trait Lang: Sized + Copy {
+    /// The data to attach to each piece of ontol-hir information:
+    type Data<'a, T>: Clone
+    where
+        T: Clone;
+
+    fn default_data<'a, T: Clone>(&self, inner: T) -> Self::Data<'a, T>;
+
+    fn inner<'m, 'a, T: Clone>(data: &'m Self::Data<'a, T>) -> &'m T;
+}
+
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Var(pub u32);
 
@@ -82,17 +93,7 @@ impl<T> Index<usize> for Attribute<T> {
 #[derive(Clone, Copy, Debug)]
 pub struct Iter(pub bool);
 
-pub trait Lang: Sized + Copy {
-    // TODO: Rename, it's confusing when everything is called Meta
-    type Meta<'a, T>: Clone
-    where
-        T: Clone;
-
-    fn default_meta<'a, T: Clone>(&self, value: T) -> Self::Meta<'a, T>;
-
-    fn inner<'m, 'a, T: Clone>(meta: &'m Self::Meta<'a, T>) -> &'m T;
-}
-
+/// A RootNode owns its own Arena
 #[derive(Clone)]
 pub struct RootNode<'a, L: Lang> {
     arena: Arena<'a, L>,
@@ -108,7 +109,7 @@ impl<'a, L: Lang> RootNode<'a, L> {
         self.node
     }
 
-    pub fn meta(&self) -> &L::Meta<'a, Kind<'a, L>> {
+    pub fn data(&self) -> &L::Data<'a, Kind<'a, L>> {
         &self.arena[self.node]
     }
 
@@ -161,22 +162,22 @@ pub enum Kind<'a, L: Lang> {
     /// Const procedure
     Const(DefId),
     /// A let expression
-    Let(L::Meta<'a, Binder>, Node, Nodes),
+    Let(L::Data<'a, Binder>, Node, Nodes),
     /// A function call
     Call(BuiltinProc, Nodes),
     /// A map call
     Map(Node),
     /// Standalone sequence in declarative mode.
-    DeclSeq(L::Meta<'a, Label>, Attribute<Node>),
+    DeclSeq(L::Data<'a, Label>, Attribute<Node>),
     /// A struct with associated binder. The value is the struct.
-    Struct(L::Meta<'a, Binder>, StructFlags, Nodes),
+    Struct(L::Data<'a, Binder>, StructFlags, Nodes),
     /// A property definition associated with a struct var in scope
     Prop(Optional, Var, PropertyId, SmallVec<[PropVariant<'a, L>; 1]>),
     /// A property matcher/unpacker associated with a struct var
     MatchProp(Var, PropertyId, SmallVec<[(PropPattern<'a, L>, Nodes); 1]>),
     /// A sequence with associated binder. The value is the sequence.
     /// TODO: This can be done with Let!
-    Sequence(L::Meta<'a, Binder>, Nodes),
+    Sequence(L::Data<'a, Binder>, Nodes),
     /// Iterate attributes in sequence var,
     ForEach(Var, (Binding<'a, L>, Binding<'a, L>), Nodes),
     /// Push an attribute to the end of a sequence
@@ -186,7 +187,7 @@ pub enum Kind<'a, L: Lang> {
     /// Declarative regex w/captures.
     /// If the label is defined, it is a looping regex
     Regex(
-        Option<L::Meta<'a, Label>>,
+        Option<L::Data<'a, Label>>,
         DefId,
         Vec<Vec<CaptureGroup<'a, L>>>,
     ),
@@ -202,7 +203,7 @@ pub enum PropVariant<'a, L: Lang> {
 
 #[derive(Clone)]
 pub struct SeqPropertyVariant<'a, L: Lang> {
-    pub label: L::Meta<'a, Label>,
+    pub label: L::Data<'a, Label>,
     pub has_default: HasDefault,
     pub elements: SmallVec<[(Iter, Attribute<Node>); 1]>,
 }
@@ -221,13 +222,13 @@ pub enum PropPattern<'a, L: Lang> {
 #[derive(Clone, Copy)]
 pub enum Binding<'a, L: Lang> {
     Wildcard,
-    Binder(L::Meta<'a, Binder>),
+    Binder(L::Data<'a, Binder>),
 }
 
 #[derive(Clone, Debug)]
 pub struct CaptureGroup<'a, L: Lang> {
     pub index: u32,
-    pub binder: L::Meta<'a, Binder>,
+    pub binder: L::Data<'a, Binder>,
 }
 
 #[derive(Clone)]

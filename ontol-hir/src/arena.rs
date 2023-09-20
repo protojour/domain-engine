@@ -2,19 +2,19 @@ use crate::{Kind, Lang, Node};
 
 #[derive(Clone)]
 pub struct Arena<'a, L: Lang> {
-    nodes: Vec<L::Meta<'a, Kind<'a, L>>>,
+    entries: Vec<L::Data<'a, Kind<'a, L>>>,
 }
 
 impl<'a, L: Lang> Arena<'a, L> {
-    pub fn add(&mut self, kind: L::Meta<'a, Kind<'a, L>>) -> Node {
-        let idx = self.nodes.len();
-        self.nodes.push(kind);
+    pub fn add(&mut self, kind: L::Data<'a, Kind<'a, L>>) -> Node {
+        let idx = self.entries.len();
+        self.entries.push(kind);
         Node(idx as u32)
     }
 
     pub fn pre_allocator(&self) -> PreAllocator {
         PreAllocator {
-            node: Node(self.nodes.len() as u32),
+            node: Node(self.entries.len() as u32),
         }
     }
 
@@ -26,26 +26,26 @@ impl<'a, L: Lang> Arena<'a, L> {
         NodeRef { arena: self, node }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &L::Meta<'a, Kind<'a, L>>> {
-        self.nodes.iter()
+    pub fn iter(&self) -> impl Iterator<Item = &L::Data<'a, Kind<'a, L>>> {
+        self.entries.iter()
     }
 
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut L::Meta<'a, Kind<'a, L>>> {
-        self.nodes.iter_mut()
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut L::Data<'a, Kind<'a, L>>> {
+        self.entries.iter_mut()
     }
 }
 
 impl<'a, L: Lang> std::ops::Index<Node> for Arena<'a, L> {
-    type Output = L::Meta<'a, Kind<'a, L>>;
+    type Output = L::Data<'a, Kind<'a, L>>;
 
     fn index(&self, node: Node) -> &Self::Output {
-        &self.nodes[node.0 as usize]
+        &self.entries[node.0 as usize]
     }
 }
 
 impl<'a, L: Lang> std::ops::IndexMut<Node> for Arena<'a, L> {
     fn index_mut(&mut self, node: Node) -> &mut Self::Output {
-        &mut self.nodes[node.0 as usize]
+        &mut self.entries[node.0 as usize]
     }
 }
 
@@ -64,7 +64,7 @@ impl PreAllocator {
 impl<'a, L: Lang> Default for Arena<'a, L> {
     fn default() -> Self {
         Arena {
-            nodes: Vec::with_capacity(16),
+            entries: Vec::with_capacity(16),
         }
     }
 }
@@ -86,9 +86,9 @@ impl<'h, 'a, L: Lang> NodeRef<'h, 'a, L> {
 }
 
 impl<'h, 'a, L: Lang> std::ops::Deref for NodeRef<'h, 'a, L> {
-    type Target = L::Meta<'a, Kind<'a, L>>;
+    type Target = L::Data<'a, Kind<'a, L>>;
 
     fn deref(&self) -> &Self::Target {
-        &self.arena.nodes[self.node.0 as usize]
+        &self.arena.entries[self.node.0 as usize]
     }
 }

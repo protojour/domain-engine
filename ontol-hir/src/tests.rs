@@ -8,14 +8,14 @@ use pretty_assertions::assert_eq;
 struct TestLang;
 
 impl Lang for TestLang {
-    type Meta<'a, T> = T where T: Clone;
+    type Data<'a, T> = T where T: Clone;
 
-    fn default_meta<'a, T: Clone>(&self, value: T) -> Self::Meta<'a, T> {
-        value
+    fn default_data<'a, T: Clone>(&self, data: T) -> Self::Data<'a, T> {
+        data
     }
 
-    fn inner<'m, 'a, T: Clone>(value: &'m Self::Meta<'a, T>) -> &'m T {
-        value
+    fn inner<'m, 'a, T: Clone>(data: &'m Self::Data<'a, T>) -> &'m T {
+        data
     }
 }
 

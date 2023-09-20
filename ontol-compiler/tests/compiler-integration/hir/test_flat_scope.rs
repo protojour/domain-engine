@@ -126,11 +126,11 @@ fn test_flat_seq() {
     let expected = indoc! {
         "
         $b: {} - Struct def{$b} cns{}
-        $f: {$b} - SeqPropVariant(TypedLabel { label: Label(f), ty: Error }, OutputVar(Var(h)), opt=f, HasDefault(false), Var(b), S:0:0) def{$f} cns{}
+        $f: {$b} - SeqPropVariant(TypedHirValue(Label(f), Meta { ty: Error, span: src@0[0;0] }), OutputVar(Var(h)), opt=f, HasDefault(false), Var(b), S:0:0) def{$f} cns{}
         $i: {$f} - IterElement(Label(f), OutputVar(Var(h))) def{} cns{}
         $j: {$i} - PropValue def{$c} cns{}
         $c: {$j} - Struct def{$c} cns{}
-        $g: {$c} - SeqPropVariant(TypedLabel { label: Label(g), ty: Error }, OutputVar(Var(k)), opt=f, HasDefault(false), Var(c), S:1:1) def{$g} cns{}
+        $g: {$c} - SeqPropVariant(TypedHirValue(Label(g), Meta { ty: Error, span: src@0[0;0] }), OutputVar(Var(k)), opt=f, HasDefault(false), Var(c), S:1:1) def{$g} cns{}
         $l: {$g} - IterElement(Label(g), OutputVar(Var(k))) def{} cns{}
         $m: {$l} - PropValue def{$a} cns{}
         $a: {$m} - Var def{$a} cns{}
@@ -154,7 +154,7 @@ fn test_flat_seq_mix() {
     let expected = indoc! {
         "
         $c: {} - Struct def{$c} cns{}
-        $d: {$c} - SeqPropVariant(TypedLabel { label: Label(d), ty: Error }, OutputVar(Var(e)), opt=f, HasDefault(false), Var(c), S:1:1) def{$a, $c, $d} cns{}
+        $d: {$c} - SeqPropVariant(TypedHirValue(Label(d), Meta { ty: Error, span: src@0[0;0] }), OutputVar(Var(e)), opt=f, HasDefault(false), Var(c), S:1:1) def{$a, $c, $d} cns{}
         $f: {$d} - PropValue def{$a} cns{}
         $g: {$d} - IterElement(Label(d), OutputVar(Var(e))) def{} cns{}
         $h: {$g} - PropValue def{$b} cns{}

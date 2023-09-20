@@ -86,7 +86,7 @@ pub fn unify_to_function<'m>(
                 assert_eq!(arg.ty(), scope_ty);
             }
             if !matches!(expr_ty, Type::Error) {
-                assert_eq!(unified.node.meta().ty(), expr_ty);
+                assert_eq!(unified.node.data().ty(), expr_ty);
             }
 
             Ok(HirFunc {
@@ -100,7 +100,7 @@ pub fn unify_to_function<'m>(
             }
             .with_meta(Meta {
                 ty: scope_ty,
-                span: scope.meta().span(),
+                span: scope.data().span(),
             }),
             body: unified.node,
         }),

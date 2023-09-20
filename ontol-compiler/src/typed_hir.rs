@@ -14,9 +14,9 @@ use crate::{
 pub struct TypedHir;
 
 impl ontol_hir::Lang for TypedHir {
-    type Meta<'m, T> = TypedHirValue<'m, T> where T: Clone;
+    type Data<'m, T> = TypedHirValue<'m, T> where T: Clone;
 
-    fn default_meta<'a, T: Clone>(&self, value: T) -> Self::Meta<'a, T> {
+    fn default_data<'a, T: Clone>(&self, value: T) -> Self::Data<'a, T> {
         TypedHirValue(
             value,
             Meta {
@@ -26,7 +26,7 @@ impl ontol_hir::Lang for TypedHir {
         )
     }
 
-    fn inner<'m, 'a, T: Clone>(meta: &'m Self::Meta<'a, T>) -> &'m T {
+    fn inner<'m, 'a, T: Clone>(meta: &'m Self::Data<'a, T>) -> &'m T {
         meta.value()
     }
 }

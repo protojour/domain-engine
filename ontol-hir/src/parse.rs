@@ -384,7 +384,7 @@ impl<'a, L: Lang> Parser<'a, L> {
         Ok((self.make_node(Kind::Call(proc, [a, b].into())), next))
     }
 
-    fn parse_binder<'s>(&self, next: &'s str) -> ParseResult<'s, L::Meta<'a, Binder>> {
+    fn parse_binder<'s>(&self, next: &'s str) -> ParseResult<'s, L::Data<'a, Binder>> {
         parse_paren_delimited(next, |next| {
             let (var, next) = parse_dollar_var(next)?;
             Ok((self.make_binder(var), next))
@@ -419,15 +419,15 @@ impl<'a, L: Lang> Parser<'a, L> {
     }
 
     fn make_node(&mut self, kind: Kind<'a, L>) -> Node {
-        self.arena.add(self.lang.default_meta(kind))
+        self.arena.add(self.lang.default_data(kind))
     }
 
-    fn make_binder(&self, var: Var) -> L::Meta<'a, Binder> {
-        self.lang.default_meta(Binder { var })
+    fn make_binder(&self, var: Var) -> L::Data<'a, Binder> {
+        self.lang.default_data(Binder { var })
     }
 
-    fn make_label(&self, label: Label) -> L::Meta<'a, Label> {
-        self.lang.default_meta(label)
+    fn make_label(&self, label: Label) -> L::Data<'a, Label> {
+        self.lang.default_data(label)
     }
 }
 
