@@ -467,6 +467,11 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                     }
                 }
 
+                let operator_id = self
+                    .serde_generator
+                    .gen_operator_id(gql_serde_key(def_id))
+                    .unwrap();
+
                 NewType::Indexed(
                     node_index,
                     TypeData {
@@ -474,10 +479,6 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                         input_typename: Some(self.namespace.union_input(type_info)),
                         partial_input_typename: Some(self.namespace.union_partial_input(type_info)),
                         kind: if needs_scalar {
-                            let operator_id = self
-                                .serde_generator
-                                .gen_operator_id(gql_serde_key(def_id))
-                                .unwrap();
                             TypeKind::CustomScalar(ScalarData {
                                 serde_operator_id: operator_id,
                             })
@@ -485,6 +486,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                             TypeKind::Union(UnionData {
                                 union_def_id: type_info.def_id,
                                 variants: type_variants,
+                                operator_id,
                             })
                         },
                     },

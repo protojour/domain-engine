@@ -15,7 +15,7 @@ use unimock::*;
 use crate::{
     gql_ctx_mock_data_store, mock_data_store_query_entities_empty,
     parser_document_utils::{
-        find_input_object_type, find_object_field, find_object_type, Nullable,
+        find_input_object_type, find_object_field, find_object_type, FieldInfo,
     },
     Exec, TestCompileSchema, TestError,
 };
@@ -161,8 +161,8 @@ async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
     );
 }
 
-#[test(tokio::test)]
-async fn test_graphql_value_type_as_field() {
+#[test]
+fn test_graphql_value_type_as_field() {
     "
     def foo { rel .is: text }
     pub def bar {
@@ -173,8 +173,8 @@ async fn test_graphql_value_type_as_field() {
     .compile_schemas([ROOT]);
 }
 
-#[test(tokio::test)]
-async fn test_graphql_value_type_in_array() {
+#[test]
+fn test_graphql_value_type_in_array() {
     "
     def foo { rel .is: text }
     pub def bar {
@@ -548,10 +548,8 @@ async fn test_graphql_guitar_synth_union_selection() {
     );
 }
 
-#[test(tokio::test)]
-async fn test_graphql_guitar_synth_union_input_union_field_list() {
-    use graphql_parser::schema::Type;
-
+#[test]
+fn test_graphql_guitar_synth_union_input_union_field_list() {
     let (_test, [schema]) = GUITAR_SYNTH_UNION.1.compile_schemas([ROOT]);
     let parser_document = schema.as_parser_document();
 
@@ -561,12 +559,7 @@ async fn test_graphql_guitar_synth_union_input_union_field_list() {
     let field_names: Vec<_> = instrument_edge_input
         .fields
         .iter()
-        .map(|field| {
-            (
-                field.name,
-                Nullable(!matches!(field.value_type, Type::NonNullType(_))),
-            )
-        })
+        .map(FieldInfo::from)
         .collect();
 
     // The fields of instrumentEdgeInput consist of a union of guitar and synth.
@@ -575,15 +568,15 @@ async fn test_graphql_guitar_synth_union_input_union_field_list() {
         expected = &[
             // The instrument_id should only be included once,
             // and should use snake_case instead of kebab-case:
-            ("instrument_id", Nullable(true)),
+            FieldInfo::from(("instrument_id", "ID")),
             // from "guitar".
-            ("type", Nullable(true)),
+            FieldInfo::from(("type", "String")),
             // from "guitar".
-            ("string_count", Nullable(true)),
+            FieldInfo::from(("string_count", "i64")),
             // from "synth". Note the synth `type` is deduplicated.
-            ("polyphony", Nullable(true)),
+            FieldInfo::from(("polyphony", "i64")),
             // object properties ordered last
-            ("played_by", Nullable(true)),
+            FieldInfo::from(("played_by", "[artistEdgeInput!]")),
         ]
     );
 }
@@ -723,4 +716,31 @@ async fn test_graphql_municipalities() {
             })),
         );
     }
+}
+
+#[test]
+fn test_graphql_municipalities_geojson_union() {
+    let (_test, [schema]) = TestPackages::with_sources([(ROOT, MUNICIPALITIES.1), GEOJSON, WGS])
+        .compile_schemas([ROOT]);
+
+    let parser_document = schema.as_parser_document();
+
+    let geometry_union_input =
+        find_input_object_type(&parser_document, "_domain2_GeometryUnionInput").unwrap();
+
+    let field_names: Vec<_> = geometry_union_input
+        .fields
+        .iter()
+        .map(FieldInfo::from)
+        .collect();
+
+    expect_eq!(
+        actual = field_names.as_slice(),
+        // BUG: The field types look weird
+        expected = &[
+            FieldInfo::from(("type", "String")),
+            FieldInfo::from(("coordinates", "Boolean!")),
+            FieldInfo::from(("geometries", "_domain2_LeafGeometryUnionInput!")),
+        ]
+    );
 }

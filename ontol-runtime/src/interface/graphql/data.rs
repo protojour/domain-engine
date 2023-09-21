@@ -176,6 +176,7 @@ pub struct NodeData {
 pub struct UnionData {
     pub union_def_id: DefId,
     pub variants: Vec<TypeIndex>,
+    pub operator_id: SerdeOperatorId,
 }
 
 #[derive(Serialize, Deserialize)]

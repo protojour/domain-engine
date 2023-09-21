@@ -1,9 +1,30 @@
 use graphql_parser::schema::{
-    Definition, Document, Field, InputObjectType, ObjectType, TypeDefinition,
+    Definition, Document, Field, InputObjectType, InputValue, ObjectType, TypeDefinition,
 };
 
-#[derive(Eq, PartialEq, Debug)]
-pub struct Nullable(pub bool);
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct FieldInfo {
+    pub name: String,
+    pub field_type: String,
+}
+
+impl From<(&str, &str)> for FieldInfo {
+    fn from(value: (&str, &str)) -> Self {
+        FieldInfo {
+            name: value.0.to_string(),
+            field_type: value.1.to_string(),
+        }
+    }
+}
+
+impl<'a> From<&InputValue<'a, &'a str>> for FieldInfo {
+    fn from(value: &InputValue<'a, &'a str>) -> Self {
+        FieldInfo {
+            name: value.name.to_string(),
+            field_type: value.value_type.to_string(),
+        }
+    }
+}
 
 pub fn find_object_type<'d, 'a>(
     parser_document: &'d Document<'a, &'a str>,

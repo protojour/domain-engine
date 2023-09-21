@@ -5,7 +5,7 @@ use ontol_runtime::{
     interface::graphql::data::{EdgeData, ObjectData, ObjectKind, TypeKind, TypeRef},
     smart_format,
 };
-use tracing::{debug, warn};
+use tracing::debug;
 
 use crate::{
     context::SchemaType,
@@ -77,10 +77,16 @@ impl juniper::GraphQLType<GqlScalar> for IndexedInputValue {
                     .build_input_object_type::<Self>(info, &arguments)
                     .into_meta()
             }
-            TypeKind::Union(_union_data) => {
-                warn!("No support for unions as input values yet");
+            TypeKind::Union(union_data) => {
+                let mut arguments = vec![];
+                reg.collect_operator_arguments(
+                    union_data.operator_id,
+                    &mut arguments,
+                    info.typing_purpose,
+                    ArgumentFilter::default(),
+                );
                 registry
-                    .build_input_object_type::<Self>(info, &[])
+                    .build_input_object_type::<Self>(info, &arguments)
                     .into_meta()
             }
             TypeKind::CustomScalar(_) => registry.build_scalar_type::<Self>(info).into_meta(),
