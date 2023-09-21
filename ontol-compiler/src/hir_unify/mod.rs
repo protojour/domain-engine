@@ -118,8 +118,8 @@ fn unify_classic<'m>(
     };
 
     let (expr, var_allocator) = {
-        let mut expr_builder = ExprBuilder::new(var_allocator, &compiler.defs, expr.arena());
-        let expr = expr_builder.hir_to_expr(expr.node());
+        let mut expr_builder = ExprBuilder::new(var_allocator, &compiler.defs);
+        let expr = expr_builder.hir_to_expr(expr.as_ref());
         (expr, expr_builder.var_allocator())
     };
 
@@ -148,8 +148,8 @@ fn unify_flat<'m>(
     };
 
     let (expr, var_allocator) = {
-        let mut expr_builder = ExprBuilder::new(var_allocator, &compiler.defs, expr.arena());
-        let expr = expr_builder.hir_to_expr(expr.node());
+        let mut expr_builder = ExprBuilder::new(var_allocator, &compiler.defs);
+        let expr = expr_builder.hir_to_expr(expr.as_ref());
         (expr, expr_builder.var_allocator())
     };
 

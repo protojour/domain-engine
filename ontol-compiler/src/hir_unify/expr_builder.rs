@@ -4,27 +4,21 @@ use super::expr;
 use crate::{
     def::Defs,
     hir_unify::VarSet,
-    typed_hir::{IntoTypedHirData, TypedArena, TypedHirData},
+    typed_hir::{IntoTypedHirData, TypedHirData, TypedNodeRef},
 };
 
-pub struct ExprBuilder<'h, 'c, 'm> {
+pub struct ExprBuilder<'c, 'm> {
     in_scope: VarSet,
     var_allocator: ontol_hir::VarAllocator,
     defs: &'c Defs<'m>,
-    hir_arena: &'h TypedArena<'m>,
 }
 
-impl<'h, 'c, 'm> ExprBuilder<'h, 'c, 'm> {
-    pub fn new(
-        var_allocator: ontol_hir::VarAllocator,
-        defs: &'c Defs<'m>,
-        hir_arena: &'h TypedArena<'m>,
-    ) -> Self {
+impl<'c, 'm> ExprBuilder<'c, 'm> {
+    pub fn new(var_allocator: ontol_hir::VarAllocator, defs: &'c Defs<'m>) -> Self {
         Self {
             in_scope: Default::default(),
             var_allocator,
             defs,
-            hir_arena,
         }
     }
 
@@ -32,12 +26,9 @@ impl<'h, 'c, 'm> ExprBuilder<'h, 'c, 'm> {
         self.var_allocator
     }
 
-    pub fn hir_to_expr(&mut self, node: ontol_hir::Node) -> expr::Expr<'m> {
-        let (kind, meta) = {
-            let hir = &self.hir_arena[node];
-            (hir.hir(), hir.meta())
-        };
-        match kind {
+    pub fn hir_to_expr(&mut self, node_ref: TypedNodeRef<'_, 'm>) -> expr::Expr<'m> {
+        let (arena, hir_meta) = (node_ref.arena(), *node_ref.meta());
+        match node_ref.kind() {
             ontol_hir::Kind::Var(var) => {
                 let mut free_vars = VarSet::default();
                 free_vars.insert(*var);
@@ -45,7 +36,7 @@ impl<'h, 'c, 'm> ExprBuilder<'h, 'c, 'm> {
                 expr::Expr(
                     expr::Kind::Var(*var),
                     expr::Meta {
-                        hir_meta: *meta,
+                        hir_meta,
                         free_vars,
                     },
                 )
@@ -53,41 +44,44 @@ impl<'h, 'c, 'm> ExprBuilder<'h, 'c, 'm> {
             ontol_hir::Kind::Unit => expr::Expr(
                 expr::Kind::Unit,
                 expr::Meta {
-                    hir_meta: *meta,
+                    hir_meta,
                     free_vars: Default::default(),
                 },
             ),
             ontol_hir::Kind::I64(int) => expr::Expr(
                 expr::Kind::I64(*int),
                 expr::Meta {
-                    hir_meta: *meta,
+                    hir_meta,
                     free_vars: Default::default(),
                 },
             ),
             ontol_hir::Kind::F64(float) => expr::Expr(
                 expr::Kind::F64(*float),
                 expr::Meta {
-                    hir_meta: *meta,
+                    hir_meta,
                     free_vars: Default::default(),
                 },
             ),
             ontol_hir::Kind::Text(string) => expr::Expr(
                 expr::Kind::String(string.clone()),
                 expr::Meta {
-                    hir_meta: *meta,
+                    hir_meta,
                     free_vars: Default::default(),
                 },
             ),
             ontol_hir::Kind::Const(const_def_id) => expr::Expr(
                 expr::Kind::Const(*const_def_id),
                 expr::Meta {
-                    hir_meta: *meta,
+                    hir_meta,
                     free_vars: Default::default(),
                 },
             ),
             ontol_hir::Kind::Let(..) => panic!(),
             ontol_hir::Kind::Call(proc, args) => {
-                let args: Vec<_> = args.iter().map(|arg| self.hir_to_expr(*arg)).collect();
+                let args: Vec<_> = args
+                    .iter()
+                    .map(|arg| self.hir_to_expr(arena.node_ref(*arg)))
+                    .collect();
                 let mut free_vars = VarSet::default();
                 for param in &args {
                     free_vars.union_with(&param.1.free_vars);
@@ -96,22 +90,22 @@ impl<'h, 'c, 'm> ExprBuilder<'h, 'c, 'm> {
                 expr::Expr(
                     expr::Kind::Call(expr::Call(*proc, args)),
                     expr::Meta {
-                        hir_meta: *meta,
+                        hir_meta,
                         free_vars,
                     },
                 )
             }
             ontol_hir::Kind::Map(arg) => {
-                let arg = self.hir_to_expr(*arg);
+                let arg = self.hir_to_expr(arena.node_ref(*arg));
                 let expr_meta = expr::Meta {
                     free_vars: arg.1.free_vars.clone(),
-                    hir_meta: *meta,
+                    hir_meta,
                 };
                 expr::Expr(expr::Kind::Map(Box::new(arg)), expr_meta)
             }
             ontol_hir::Kind::DeclSeq(typed_label, attr) => {
-                let rel = self.hir_to_expr(attr.rel);
-                let val = self.hir_to_expr(attr.val);
+                let rel = self.hir_to_expr(arena.node_ref(attr.rel));
+                let val = self.hir_to_expr(arena.node_ref(attr.val));
 
                 let mut free_vars = VarSet::default();
                 free_vars.union_with(&rel.1.free_vars);
@@ -125,14 +119,14 @@ impl<'h, 'c, 'm> ExprBuilder<'h, 'c, 'm> {
                     ),
                     expr::Meta {
                         free_vars,
-                        hir_meta: *meta,
+                        hir_meta,
                     },
                 )
             }
             ontol_hir::Kind::Struct(binder, flags, nodes) => self.enter_binder(binder, |zelf| {
                 let props: Vec<_> = nodes
                     .iter()
-                    .flat_map(|node| zelf.node_to_props(*node))
+                    .flat_map(|node| zelf.node_to_props(arena.node_ref(*node)))
                     .collect();
                 let mut free_vars = VarSet::default();
                 for prop in &props {
@@ -146,7 +140,7 @@ impl<'h, 'c, 'm> ExprBuilder<'h, 'c, 'm> {
                         props,
                     },
                     expr::Meta {
-                        hir_meta: *meta,
+                        hir_meta,
                         free_vars,
                     },
                 )
@@ -179,11 +173,11 @@ impl<'h, 'c, 'm> ExprBuilder<'h, 'c, 'm> {
                 let var = self.var_allocator.alloc();
                 expr::Expr(
                     expr::Kind::StringInterpolation(
-                        ontol_hir::Binder { var }.with_meta(*meta),
+                        ontol_hir::Binder { var }.with_meta(hir_meta),
                         components,
                     ),
                     expr::Meta {
-                        hir_meta: *meta,
+                        hir_meta,
                         free_vars,
                     },
                 )
@@ -197,21 +191,21 @@ impl<'h, 'c, 'm> ExprBuilder<'h, 'c, 'm> {
             | ontol_hir::Kind::ForEach(..)
             | ontol_hir::Kind::StringPush(..)
             | ontol_hir::Kind::SeqPush(..) => {
-                unimplemented!("BUG: {} is an output node", self.hir_arena.node_ref(node))
+                unimplemented!("BUG: {} is an output node", node_ref)
             }
         }
     }
 
-    fn node_to_props(&mut self, node: ontol_hir::Node) -> Vec<expr::Prop<'m>> {
-        let kind = self.hir_arena.kind(node);
-        match kind {
+    fn node_to_props(&mut self, node_ref: TypedNodeRef<'_, 'm>) -> Vec<expr::Prop<'m>> {
+        let arena = node_ref.arena();
+        match node_ref.kind() {
             ontol_hir::Kind::Prop(optional, struct_var, prop_id, variants) => variants
                 .iter()
                 .map(|variant| match variant {
-                    PropVariant::Singleton(attribute) => {
+                    PropVariant::Singleton(ontol_hir::Attribute { rel, val }) => {
                         let mut union = UnionBuilder::default();
-                        let rel = union.plus(self.hir_to_expr(attribute.rel));
-                        let val = union.plus(self.hir_to_expr(attribute.val));
+                        let rel = union.plus(self.hir_to_expr(arena.node_ref(*rel)));
+                        let val = union.plus(self.hir_to_expr(arena.node_ref(*val)));
 
                         expr::Prop {
                             optional: *optional,
@@ -231,9 +225,9 @@ impl<'h, 'c, 'm> ExprBuilder<'h, 'c, 'm> {
                         let mut union = UnionBuilder::default();
                         let prop_elements = elements
                             .iter()
-                            .map(|(iter, attr)| {
-                                let mut rel = self.hir_to_expr(attr.rel);
-                                let mut val = self.hir_to_expr(attr.val);
+                            .map(|(iter, ontol_hir::Attribute { rel, val })| {
+                                let mut rel = self.hir_to_expr(arena.node_ref(*rel));
+                                let mut val = self.hir_to_expr(arena.node_ref(*val));
 
                                 if !iter.0 {
                                     // non-iter element variables may refer to outer scope
