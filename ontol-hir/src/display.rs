@@ -48,25 +48,11 @@ impl<'h, 'a, L: Lang> Printer<'h, 'a, L> {
         self.arena.kind_of(node)
     }
 
-    fn kinds<'n>(&self, nodes: &'n [Node]) -> KindsIter<'n, 'h, 'a, L> {
-        KindsIter {
-            nodes: nodes.iter(),
-            arena: self.arena,
-        }
-    }
-}
-
-struct KindsIter<'n, 'h, 'a, L: Lang> {
-    nodes: <&'n [Node] as IntoIterator>::IntoIter,
-    arena: &'h Arena<'a, L>,
-}
-
-impl<'n, 'h, 'a, L: Lang> Iterator for KindsIter<'n, 'h, 'a, L> {
-    type Item = &'h Kind<'a, L>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let next = self.nodes.next()?;
-        Some(self.arena.kind_of(*next))
+    fn kinds<'n>(&self, nodes: &'n [Node]) -> impl Iterator<Item = &'h Kind<'a, L>> + 'n
+    where
+        'h: 'n,
+    {
+        nodes.iter().map(|node| self.arena.kind_of(*node))
     }
 }
 
