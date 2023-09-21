@@ -3,7 +3,7 @@ use ontol_runtime::value::PropertyId;
 
 use crate::{
     hir_unify::flat_scope,
-    typed_hir::{self, IntoTypedHirValue, TypedHir, UNIT_META},
+    typed_hir::{self, IntoTypedHirData, TypedHir, UNIT_META},
 };
 
 use super::{

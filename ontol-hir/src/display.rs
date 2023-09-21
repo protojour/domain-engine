@@ -99,7 +99,7 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
                 Ok(sep.multiline())
             }
             Kind::Let(binder, definition, body) => {
-                write!(f, "{indent}(let ({}", L::inner(binder).var)?;
+                write!(f, "{indent}(let ({}", L::as_hir(binder).var)?;
                 let multi = self.print(Sep::Space, self.kind(*definition), f)?;
                 self.print_rparen(multi, f)?;
                 let multi = self.print_all(self.indent.indent(), self.kinds(body), f)?;
@@ -126,16 +126,16 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
                 Ok(multi.or(sep))
             }
             Kind::DeclSeq(label, attr) => {
-                write!(f, "{indent}(decl-seq ({})", L::inner(label))?;
+                write!(f, "{indent}(decl-seq ({})", L::as_hir(label))?;
                 let multi = self.print_all(Sep::Space, self.kinds(&[attr.rel, attr.val]), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
             Kind::Struct(binder, flags, children) => {
                 if flags.contains(StructFlags::MATCH) {
-                    write!(f, "{indent}(match-struct ({})", L::inner(binder).var)?;
+                    write!(f, "{indent}(match-struct ({})", L::as_hir(binder).var)?;
                 } else {
-                    write!(f, "{indent}(struct ({})", L::inner(binder).var)?;
+                    write!(f, "{indent}(struct ({})", L::as_hir(binder).var)?;
                 }
                 let multi = self.print_all(Sep::Space, self.kinds(children), f)?;
                 self.print_rparen(multi, f)?;
@@ -159,7 +159,7 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
             }
             Kind::Sequence(binder, children) => {
                 let indent = if children.is_empty() { sep } else { indent };
-                write!(f, "{indent}(sequence ({})", L::inner(binder).var)?;
+                write!(f, "{indent}(sequence ({})", L::as_hir(binder).var)?;
                 let multi = self.print_all(Sep::Space, self.kinds(children), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(multi)
@@ -184,7 +184,7 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
             }
             Kind::Regex(label, regex_def_id, captures) => {
                 if let Some(label) = label {
-                    write!(f, "{sep}(regex-seq ({}) {regex_def_id:?}", L::inner(label))?;
+                    write!(f, "{sep}(regex-seq ({}) {regex_def_id:?}", L::as_hir(label))?;
                 } else {
                     write!(f, "{sep}(regex {regex_def_id:?}")?;
                 }
@@ -227,7 +227,7 @@ impl<'h, 'a, L: Lang> Print<PropVariant<'a, L>> for Printer<'h, 'a, L> {
                 } else {
                     write!(f, "seq")?;
                 }
-                write!(f, " ({})", L::inner(&seq_variant.label))?;
+                write!(f, " ({})", L::as_hir(&seq_variant.label))?;
 
                 self.print_all(Sep::Space, seq_variant.elements.iter(), f)?;
                 Multiline(true)
@@ -322,7 +322,7 @@ impl<'h, 'a, L: Lang> Print<Binding<'a, L>> for Printer<'h, 'a, L> {
     fn print(self, sep: Sep, ast: &Binding<'a, L>, f: &mut std::fmt::Formatter) -> PrintResult {
         match ast {
             Binding::Binder(binder) => {
-                write!(f, "{sep}{}", L::inner(binder).var)?;
+                write!(f, "{sep}{}", L::as_hir(binder).var)?;
             }
             Binding::Wildcard => {
                 write!(f, "{sep}$_")?;
@@ -339,7 +339,7 @@ impl<'h, 'a, L: Lang> Print<CaptureGroup<'a, L>> for Printer<'h, 'a, L> {
         group: &CaptureGroup<'a, L>,
         f: &mut std::fmt::Formatter,
     ) -> PrintResult {
-        write!(f, "{sep}({} {})", group.index, L::inner(&group.binder).var)?;
+        write!(f, "{sep}({} {})", group.index, L::as_hir(&group.binder).var)?;
         Ok(Multiline(false))
     }
 }
@@ -485,7 +485,7 @@ impl<'a, L: Lang> Display for Binding<'a, L> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Wildcard => write!(f, "$_"),
-            Self::Binder(binder) => write!(f, "{}", L::inner(binder).var),
+            Self::Binder(binder) => write!(f, "{}", L::as_hir(binder).var),
         }
     }
 }

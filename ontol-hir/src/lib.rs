@@ -19,9 +19,11 @@ pub trait Lang: Sized + Copy {
     where
         T: Clone;
 
-    fn default_data<'a, T: Clone>(&self, inner: T) -> Self::Data<'a, T>;
+    /// Wrapping the given ontol_hir data T in Lang-specific Data.
+    fn default_data<'a, T: Clone>(&self, hir: T) -> Self::Data<'a, T>;
 
-    fn inner<'m, T: Clone>(data: &'m Self::Data<'_, T>) -> &'m T;
+    /// Extract the ontol-hir part of the data
+    fn as_hir<'m, T: Clone>(data: &'m Self::Data<'_, T>) -> &'m T;
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -110,6 +112,10 @@ impl<'a, L: Lang> RootNode<'a, L> {
 
     pub fn data(&self) -> &L::Data<'a, Kind<'a, L>> {
         &self.arena[self.node]
+    }
+
+    pub fn kind(&self) -> &Kind<'a, L> {
+        L::as_hir(self.data())
     }
 
     pub fn split(self) -> (Arena<'a, L>, Node) {

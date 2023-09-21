@@ -2,7 +2,7 @@ use fnv::FnvHashMap;
 use indexmap::{map::Entry, IndexMap};
 use ontol_runtime::value::PropertyId;
 
-use crate::typed_hir::{Meta, TypedHir, TypedHirValue};
+use crate::typed_hir::{Meta, TypedHir, TypedHirData};
 
 pub fn regroup_match_prop<'m>(
     nodes: ontol_hir::Nodes,
@@ -16,9 +16,8 @@ pub fn regroup_match_prop<'m>(
     let mut other_nodes: Vec<ontol_hir::Node> = vec![];
 
     for node in nodes {
-        let hir_node = &arena[node];
-        let kind = hir_node.value();
-        let meta = hir_node.meta();
+        let data = &arena[node];
+        let (kind, meta) = (data.hir(), data.meta());
         if let ontol_hir::Kind::MatchProp(struct_var, prop_id, match_arms) = kind {
             match regroup_map.entry((*struct_var, *prop_id)) {
                 Entry::Occupied(mut regrouped) => {
@@ -46,7 +45,7 @@ pub fn regroup_match_prop<'m>(
             regrouped.match_arms.push(absent_arm);
         }
 
-        output.push(arena.add(TypedHirValue(
+        output.push(arena.add(TypedHirData(
             ontol_hir::Kind::MatchProp(struct_var, prop_id, regrouped.match_arms.into()),
             regrouped.first_meta,
         )));

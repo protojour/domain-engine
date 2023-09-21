@@ -123,10 +123,10 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
                 self.scope_nodes.push(ScopeNode(
                     flat_scope::Kind::Struct,
                     flat_scope::Meta {
-                        scope_var: ScopeVar(binder.value().var),
+                        scope_var: ScopeVar(binder.hir().var),
                         free_vars: Default::default(),
                         constraints,
-                        defs: [binder.value().var].into(),
+                        defs: [binder.hir().var].into(),
                         deps,
                         hir_meta: *self.hir_arena[node].meta(),
                     },
@@ -177,7 +177,7 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
                             has_default,
                             elements,
                         }) => {
-                            let label_var = ontol_hir::Var(label.value().0);
+                            let label_var = ontol_hir::Var(label.hir().0);
                             let output_var = OutputVar(self.var_allocator.alloc());
 
                             self.scope_nodes.push(ScopeNode(
@@ -203,7 +203,7 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
                                 let attr_deps: VarSet = if iter.0 {
                                     let iter_var = self.var_allocator.alloc();
                                     self.scope_nodes.push(ScopeNode(
-                                        flat_scope::Kind::IterElement(*label.value(), output_var),
+                                        flat_scope::Kind::IterElement(*label.hir(), output_var),
                                         flat_scope::Meta {
                                             scope_var: ScopeVar(iter_var),
                                             free_vars: Default::default(),
@@ -268,9 +268,7 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
             }
             ontol_hir::Kind::Regex(opt_seq_label, regex_def_id, capture_group_alternations) => {
                 let (scope_var, opt_label) = match opt_seq_label {
-                    Some(seq_label) => {
-                        (ontol_hir::Var(seq_label.value().0), Some(seq_label.value()))
-                    }
+                    Some(seq_label) => (ontol_hir::Var(seq_label.hir().0), Some(seq_label.hir())),
                     None => (self.var_allocator.alloc(), None),
                 };
 
@@ -300,7 +298,7 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
                     ));
 
                     for capture_group in alternation {
-                        let binder_var = capture_group.binder.value().var;
+                        let binder_var = capture_group.binder.hir().var;
                         self.scope_nodes.push(ScopeNode(
                             flat_scope::Kind::RegexCapture(capture_group.index),
                             flat_scope::Meta {

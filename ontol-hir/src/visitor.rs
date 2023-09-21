@@ -97,19 +97,19 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                 self.visit_node(0, arena.node_ref(*arg));
             }
             Kind::Let(binder, def, body) => {
-                self.visit_binder(L::inner(binder).var);
+                self.visit_binder(L::as_hir(binder).var);
                 self.visit_node(0, arena.node_ref(*def));
                 for (index, node_ref) in arena.refs(body).enumerate() {
                     self.visit_node(index + 1, node_ref);
                 }
             }
             Kind::DeclSeq(label, attr) => {
-                self.visit_label(*L::inner(label));
+                self.visit_label(*L::as_hir(label));
                 self.visit_node(0, arena.node_ref(attr.rel));
                 self.visit_node(1, arena.node_ref(attr.val));
             }
             Kind::Struct(binder, _flags, children) => {
-                self.visit_binder(L::inner(binder).var);
+                self.visit_binder(L::as_hir(binder).var);
                 for (index, child) in arena.refs(children).enumerate() {
                     self.visit_node(index, child);
                 }
@@ -125,7 +125,7 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                 }
             }
             Kind::Sequence(binder, children) => {
-                self.visit_binder(L::inner(binder).var);
+                self.visit_binder(L::as_hir(binder).var);
                 for (index, child) in arena.refs(children).enumerate() {
                     self.visit_node(index, child);
                 }
@@ -149,12 +149,12 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
             }
             Kind::Regex(label, _, capture_groups_list) => {
                 if let Some(label) = label {
-                    self.visit_label(*L::inner(label));
+                    self.visit_label(*L::as_hir(label));
                 }
 
                 for capture_groups in capture_groups_list.iter() {
                     for capture_group in capture_groups.iter() {
-                        self.visit_binder(L::inner(&capture_group.binder).var);
+                        self.visit_binder(L::as_hir(&capture_group.binder).var);
                     }
                 }
             }
@@ -189,7 +189,7 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                 self.visit_node(1, arena.node_ref(attr.val));
             }
             PropVariant::Seq(seq_variant) => {
-                self.visit_label(*L::inner(&seq_variant.label));
+                self.visit_label(*L::as_hir(&seq_variant.label));
                 for (index, element) in seq_variant.elements.iter().enumerate() {
                     self.visit_seq_prop_element(index, element, arena);
                 }
@@ -234,7 +234,7 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
         arena: &'h Arena<'a, L>,
     ) {
         for group in match_arm.capture_groups.iter() {
-            self.visit_binder(L::inner(&group.binder).var);
+            self.visit_binder(L::as_hir(&group.binder).var);
         }
         for (index, node) in match_arm.nodes.iter().enumerate() {
             self.visit_node(index, arena.node_ref(*node));
@@ -243,7 +243,7 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
 
     fn traverse_pattern_binding(&mut self, binding: &Binding<'a, L>) {
         match binding {
-            Binding::Binder(binder) => self.visit_binder(L::inner(binder).var),
+            Binding::Binder(binder) => self.visit_binder(L::as_hir(binder).var),
             Binding::Wildcard => {}
         }
     }

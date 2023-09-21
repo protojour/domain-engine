@@ -24,7 +24,7 @@ impl<'a, L: Lang> Arena<'a, L> {
     }
 
     pub fn kind(&self, node: Node) -> &Kind<'a, L> {
-        L::inner(&self[node])
+        L::as_hir(&self[node])
     }
 
     pub fn node_ref(&self, node: Node) -> NodeRef<'_, 'a, L> {
@@ -97,7 +97,7 @@ impl<'h, 'a, L: Lang> NodeRef<'h, 'a, L> {
     }
 
     pub fn kind(&self) -> &Kind<'a, L> {
-        L::inner(&self.arena[self.node])
+        L::as_hir(&self.arena[self.node])
     }
 }
 

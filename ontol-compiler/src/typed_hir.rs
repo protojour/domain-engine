@@ -12,14 +12,14 @@ use crate::{
 pub struct TypedHir;
 
 impl ontol_hir::Lang for TypedHir {
-    type Data<'m, T> = TypedHirValue<'m, T> where T: Clone;
+    type Data<'m, T> = TypedHirData<'m, T> where T: Clone;
 
     fn default_data<'a, T: Clone>(&self, value: T) -> Self::Data<'a, T> {
-        TypedHirValue(value, ERROR_META)
+        TypedHirData(value, ERROR_META)
     }
 
-    fn inner<'m, T: Clone>(meta: &'m Self::Data<'_, T>) -> &'m T {
-        meta.value()
+    fn as_hir<'m, T: Clone>(data: &'m Self::Data<'_, T>) -> &'m T {
+        data.hir()
     }
 }
 
@@ -28,23 +28,25 @@ pub type TypedHirKind<'m> = ontol_hir::Kind<'m, TypedHir>;
 pub type TypedArena<'m> = ontol_hir::arena::Arena<'m, TypedHir>;
 pub type TypedNodeRef<'h, 'm> = ontol_hir::arena::NodeRef<'h, 'm, TypedHir>;
 
-#[derive(Clone, Copy, Debug)]
-pub struct TypedHirValue<'m, T>(pub T, pub Meta<'m>);
+/// Data structure for associating ontol-hir data with the compiler's metadata attached to each hir node.
+#[derive(Clone, Copy)]
+pub struct TypedHirData<'m, T>(pub T, pub Meta<'m>);
 
-impl<'m, T> TypedHirValue<'m, T> {
+impl<'m, T> TypedHirData<'m, T> {
     pub fn split(self) -> (T, Meta<'m>) {
         (self.0, self.1)
     }
 
-    pub fn value(&self) -> &T {
+    /// Access the ontol-hir part of data
+    pub fn hir(&self) -> &T {
         &self.0
     }
 
-    pub fn value_mut(&mut self) -> &mut T {
+    pub fn hir_mut(&mut self) -> &mut T {
         &mut self.0
     }
 
-    pub fn into_value(self) -> T {
+    pub fn into_hir(self) -> T {
         self.0
     }
 
@@ -65,21 +67,31 @@ impl<'m, T> TypedHirValue<'m, T> {
     }
 }
 
-pub trait IntoTypedHirValue<'m>: Sized {
-    fn with_meta(self, meta: Meta<'m>) -> TypedHirValue<'m, Self>;
-    fn with_ty(self, ty: TypeRef<'m>) -> TypedHirValue<'m, Self>;
-}
-
-impl<'m, T> IntoTypedHirValue<'m> for T {
-    fn with_meta(self, meta: Meta<'m>) -> TypedHirValue<'m, Self> {
-        TypedHirValue(self, meta)
-    }
-
-    fn with_ty(self, ty: TypeRef<'m>) -> TypedHirValue<'m, Self> {
-        TypedHirValue(self, Meta { ty, span: NO_SPAN })
+impl<'m, T: Debug> std::fmt::Debug for TypedHirData<'m, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut tup = f.debug_tuple("Data");
+        tup.field(&self.0);
+        tup.field(&self.meta().ty);
+        tup.finish()
     }
 }
 
+pub trait IntoTypedHirData<'m>: Sized {
+    fn with_meta(self, meta: Meta<'m>) -> TypedHirData<'m, Self>;
+    fn with_ty(self, ty: TypeRef<'m>) -> TypedHirData<'m, Self>;
+}
+
+impl<'m, T> IntoTypedHirData<'m> for T {
+    fn with_meta(self, meta: Meta<'m>) -> TypedHirData<'m, Self> {
+        TypedHirData(self, meta)
+    }
+
+    fn with_ty(self, ty: TypeRef<'m>) -> TypedHirData<'m, Self> {
+        TypedHirData(self, Meta { ty, span: NO_SPAN })
+    }
+}
+
+/// The compiler's metadata for each interesting bit in ontol-hir
 #[derive(Clone, Copy, Debug)]
 pub struct Meta<'m> {
     pub ty: TypeRef<'m>,
@@ -96,7 +108,7 @@ pub static ERROR_META: Meta<'static> = Meta {
 };
 
 pub struct HirFunc<'m> {
-    pub arg: TypedHirValue<'m, ontol_hir::Binder>,
+    pub arg: TypedHirData<'m, ontol_hir::Binder>,
     pub body: ontol_hir::RootNode<'m, TypedHir>,
 }
 
@@ -149,29 +161,29 @@ pub fn arena_import<'m>(
     match kind {
         Var(_) | Unit | I64(_) | F64(_) | Text(_) | Const(_) => {
             // No subnodes
-            target.add(TypedHirValue(kind.clone(), *meta))
+            target.add(TypedHirData(kind.clone(), *meta))
         }
         Let(binder, def, body) => {
             let def = arena_import(target, source.arena().node_ref(*def));
             let body = import_nodes(target, source.arena(), body);
 
-            target.add(TypedHirValue(Let(*binder, def, body), *meta))
+            target.add(TypedHirData(Let(*binder, def, body), *meta))
         }
         Call(proc, args) => {
             let args = import_nodes(target, source.arena(), args);
-            target.add(TypedHirValue(Call(*proc, args), *meta))
+            target.add(TypedHirData(Call(*proc, args), *meta))
         }
         Map(arg) => {
             let arg = arena_import(target, source.arena().node_ref(*arg));
-            target.add(TypedHirValue(Map(arg), *meta))
+            target.add(TypedHirData(Map(arg), *meta))
         }
         DeclSeq(label, attr) => {
             let attr = import_attr(target, source.arena(), *attr);
-            target.add(TypedHirValue(DeclSeq(*label, attr), *meta))
+            target.add(TypedHirData(DeclSeq(*label, attr), *meta))
         }
         Struct(binder, flags, body) => {
             let body = import_nodes(target, source.arena(), body);
-            target.add(TypedHirValue(Struct(*binder, *flags, body), *meta))
+            target.add(TypedHirData(Struct(*binder, *flags, body), *meta))
         }
         Prop(optional, struct_var, prop_id, variants) => {
             let variants = variants
@@ -194,7 +206,7 @@ pub fn arena_import<'m>(
                     }
                 })
                 .collect();
-            target.add(TypedHirValue(
+            target.add(TypedHirData(
                 Prop(*optional, *struct_var, *prop_id, variants),
                 *meta,
             ))
@@ -207,25 +219,25 @@ pub fn arena_import<'m>(
                     (pattern.clone(), body)
                 })
                 .collect();
-            target.add(TypedHirValue(MatchProp(*struct_var, *prop_id, arms), *meta))
+            target.add(TypedHirData(MatchProp(*struct_var, *prop_id, arms), *meta))
         }
         Sequence(binder, body) => {
             let body = import_nodes(target, source.arena(), body);
-            target.add(TypedHirValue(Sequence(*binder, body), *meta))
+            target.add(TypedHirData(Sequence(*binder, body), *meta))
         }
         ForEach(var, (rel, val), body) => {
             let body = import_nodes(target, source.arena(), body);
-            target.add(TypedHirValue(ForEach(*var, (*rel, *val), body), *meta))
+            target.add(TypedHirData(ForEach(*var, (*rel, *val), body), *meta))
         }
         SeqPush(var, attr) => {
             let attr = import_attr(target, source.arena(), *attr);
-            target.add(TypedHirValue(SeqPush(*var, attr), *meta))
+            target.add(TypedHirData(SeqPush(*var, attr), *meta))
         }
         StringPush(var, node) => {
             let node = arena_import(target, source.arena().node_ref(*node));
-            target.add(TypedHirValue(StringPush(*var, node), *meta))
+            target.add(TypedHirData(StringPush(*var, node), *meta))
         }
-        Regex(label, def_id, groups_list) => target.add(TypedHirValue(
+        Regex(label, def_id, groups_list) => target.add(TypedHirData(
             Regex(*label, *def_id, groups_list.clone()),
             *meta,
         )),
@@ -240,7 +252,7 @@ pub fn arena_import<'m>(
                     }
                 })
                 .collect();
-            target.add(TypedHirValue(MatchRegex(*iter, *var, *def_id, arms), *meta))
+            target.add(TypedHirData(MatchRegex(*iter, *var, *def_id, arms), *meta))
         }
     }
 }

@@ -187,12 +187,12 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
     for map_task in explicit_map_tasks {
         debug!(
             "1st (ty={:?}):\n{}",
-            map_task.first.node.as_ref().meta().ty,
+            map_task.first.node.data().ty(),
             map_task.first.node
         );
         debug!(
             "2nd (ty={:?}):\n{}",
-            map_task.second.node.as_ref().meta().ty,
+            map_task.second.node.data().ty(),
             map_task.second.node
         );
 

@@ -14,7 +14,7 @@ use crate::{
     hir_unify::{flat_unifier_table::IsInScope, CLASSIC_UNIFIER_FALLBACK},
     mem::Intern,
     primitive::PrimitiveKind,
-    typed_hir::{self, IntoTypedHirValue, Meta, TypedHir, TypedHirValue, TypedNodeRef, UNIT_META},
+    typed_hir::{self, IntoTypedHirData, Meta, TypedHir, TypedHirData, TypedNodeRef, UNIT_META},
     types::{Type, TypeRef, Types},
     NO_SPAN,
 };
@@ -129,7 +129,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
         kind: ontol_hir::Kind<'m, TypedHir>,
         meta: Meta<'m>,
     ) -> ontol_hir::Node {
-        self.hir_arena.add(TypedHirValue(kind, meta))
+        self.hir_arena.add(TypedHirData(kind, meta))
     }
 
     fn assign_to_scope(
@@ -364,7 +364,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                         let scope_map = &table.table_mut()[*idx];
                         matches!(scope_map.scope.kind(), flat_scope::Kind::IterElement(..))
                     })
-                    .map(|idx| (idx, *label.value()))
+                    .map(|idx| (idx, *label.hir()))
                     .ok_or_else(|| {
                         unifier_todo(smart_format!(
                             "Unable to find IterElement scope under SeqPropVariant"
@@ -498,7 +498,7 @@ fn unify_single<'m>(
             let next_in_scope = in_scope.union_one(scope_meta.scope_var.0);
             let mut body = unify_scope_structural(
                 MainScope::Value(scope_meta.scope_var),
-                ExprSelector::Struct(binder.value().var, scope_var),
+                ExprSelector::Struct(binder.hir().var, scope_var),
                 StructuralOrigin::DependeesOf(scope_var),
                 next_in_scope.clone(),
                 table,
@@ -675,7 +675,7 @@ fn unify_scope_structural<'m>(
                         level.next(),
                     )?);
 
-                    if !in_scope.contains(ontol_hir::Var(label.value().0)) {
+                    if !in_scope.contains(ontol_hir::Var(label.hir().0)) {
                         body.extend(unify_scope_structural(
                             main_scope,
                             selector,
@@ -708,10 +708,10 @@ fn unify_scope_structural<'m>(
                             &|| {
                                 let mut next_in_scope = in_scope.clone();
                                 if let ontol_hir::Binding::Binder(binder) = &bindings.rel {
-                                    next_in_scope.insert(binder.value().var);
+                                    next_in_scope.insert(binder.hir().var);
                                 }
                                 if let ontol_hir::Binding::Binder(binder) = &bindings.val {
-                                    next_in_scope.insert(binder.value().var);
+                                    next_in_scope.insert(binder.hir().var);
                                 }
                                 next_in_scope
                             },
@@ -956,7 +956,7 @@ fn unify_scope_structural<'m>(
 
                                 match_arm.capture_groups.push(ontol_hir::CaptureGroup {
                                     index: *cap_index,
-                                    binder: TypedHirValue(
+                                    binder: TypedHirData(
                                         ontol_hir::Binder {
                                             var: cap_scope_var.0,
                                         },
@@ -1259,12 +1259,12 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                 props,
             } => {
                 let level = self.level;
-                let next_in_scope = in_scope.union_one(binder.value().var);
+                let next_in_scope = in_scope.union_one(binder.hir().var);
                 let mut body = ontol_hir::Nodes::default();
 
                 debug!(
                     "{level}Make struct {} scope_var={:?} in_scope={:?} main_scope={main_scope:?}",
-                    binder.value().var,
+                    binder.hir().var,
                     self.scope_var,
                     in_scope
                 );
@@ -1275,10 +1275,10 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                         match main_scope {
                             MainScope::Const => unreachable!(),
                             MainScope::Value(scope_var) => {
-                                ExprSelector::Struct(binder.value().var, scope_var)
+                                ExprSelector::Struct(binder.hir().var, scope_var)
                             }
                             MainScope::Sequence(scope_var, _) => {
-                                ExprSelector::Struct(binder.value().var, scope_var)
+                                ExprSelector::Struct(binder.hir().var, scope_var)
                             }
                             MainScope::MultiSequence(_) => panic!(),
                         },

@@ -14,7 +14,7 @@ use crate::{
         hir_build_struct::StructInfo,
         inference::UnifyValue,
     },
-    typed_hir::{IntoTypedHirValue, Meta, TypedHir, TypedHirValue},
+    typed_hir::{IntoTypedHirData, Meta, TypedHir, TypedHirData},
     types::{Type, TypeRef, ERROR_TYPE, UNIT_TYPE},
     SourceSpan, NO_SPAN,
 };
@@ -237,7 +237,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                                         return ctx.mk_node(
                                             ontol_hir::Kind::Regex(
-                                                Some(TypedHirValue(
+                                                Some(TypedHirData(
                                                     label,
                                                     Meta {
                                                         ty: other_ty,

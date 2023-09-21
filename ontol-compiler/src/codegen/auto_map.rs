@@ -6,7 +6,7 @@ use ontol_runtime::DefId;
 use crate::{
     relation::Constructor,
     text_patterns::TextPatternSegment,
-    typed_hir::{IntoTypedHirValue, Meta, TypedArena, TypedHir, TypedHirValue, UNIT_META},
+    typed_hir::{IntoTypedHirData, Meta, TypedArena, TypedHir, TypedHirData, UNIT_META},
     Compiler, NO_SPAN,
 };
 
@@ -99,7 +99,7 @@ fn autogenerate_fmt_hir_struct<'m>(
 
     let ty = compiler.def_types.table.get(&def_id)?;
 
-    let struct_node = arena.add(TypedHirValue(
+    let struct_node = arena.add(TypedHirData(
         ontol_hir::Kind::Struct(
             ontol_hir::Binder { var: binder_var }.with_meta(Meta {
                 ty: compiler.def_types.table.get(&def_id).unwrap(),
@@ -138,20 +138,20 @@ fn autogenerate_fmt_segment_property<'m>(
             // first arm
             let var = var_allocator.alloc();
             var_map.insert(*type_def_id, var);
-            arena.add(TypedHirValue(ontol_hir::Kind::Var(var), meta))
+            arena.add(TypedHirData(ontol_hir::Kind::Var(var), meta))
         } else {
             // second arm
             if let Some(var) = var_map.get(type_def_id) {
-                arena.add(TypedHirValue(ontol_hir::Kind::Var(*var), meta))
+                arena.add(TypedHirData(ontol_hir::Kind::Var(*var), meta))
             } else {
                 return None;
             }
         };
 
-        let rel = arena.add(TypedHirValue(ontol_hir::Kind::Unit, UNIT_META));
+        let rel = arena.add(TypedHirData(ontol_hir::Kind::Unit, UNIT_META));
 
         Some(
-            arena.add(TypedHirValue(
+            arena.add(TypedHirData(
                 ontol_hir::Kind::Prop(
                     ontol_hir::Optional(false),
                     binder_var,

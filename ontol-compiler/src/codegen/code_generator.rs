@@ -40,7 +40,7 @@ pub(super) fn const_codegen<'m>(
 
     debug!("Generating code for\n{}", expr);
 
-    let expr_meta = *expr.as_ref().meta();
+    let expr_meta = *expr.data().meta();
 
     let mut builder = ProcBuilder::new(NParams(0));
     let mut block = builder.new_block(Delta(0), expr_meta.span);
@@ -73,12 +73,12 @@ pub(super) fn map_codegen<'m>(
     debug!("Generating code for\n{}", func);
 
     let body = func.body;
-    let body_span = body.as_ref().span();
+    let body_span = body.data().span();
 
     let data_flow = DataFlowAnalyzer::new(&compiler.defs).analyze(func.arg.0.var, body.as_ref());
     let mut errors = CompileErrors::default();
 
-    let return_ty = body.as_ref().ty();
+    let return_ty = body.data().ty();
 
     let mut builder = ProcBuilder::new(NParams(0));
     let mut root_block = builder.new_block(Delta(1), body_span);
@@ -184,11 +184,11 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
             }
             ontol_hir::Kind::Let(binder, definition, body) => {
                 self.gen_node(arena.node_ref(*definition), block);
-                self.scope.insert(binder.value().var, self.builder.top());
+                self.scope.insert(binder.hir().var, self.builder.top());
                 for node_ref in arena.refs(body) {
                     self.gen_node(node_ref, block);
                 }
-                self.scope.remove(&binder.value().var);
+                self.scope.remove(&binder.hir().var);
             }
             ontol_hir::Kind::Call(proc, args) => {
                 let stack_delta = Delta(-(args.len() as i32) + 1);
@@ -260,12 +260,12 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     span,
                     self.builder,
                 );
-                self.scope.insert(binder.value().var, local);
+                self.scope.insert(binder.hir().var, local);
                 for node_ref in arena.refs(nodes) {
                     self.gen_node(node_ref, block);
                     block.pop_until(local, span, self.builder);
                 }
-                self.scope.remove(&binder.value().var);
+                self.scope.remove(&binder.hir().var);
             }
             ontol_hir::Kind::Prop(_, struct_var, prop_id, variants) => {
                 if let Some(variant) = variants.into_iter().next() {
@@ -756,8 +756,8 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
     ) {
         for (local, binding) in scopes {
             if let ontol_hir::Binding::Binder(binder) = binding {
-                if self.scope.insert(binder.value().var, *local).is_some() {
-                    panic!("Variable {} already in scope", binder.value().var);
+                if self.scope.insert(binder.hir().var, *local).is_some() {
+                    panic!("Variable {} already in scope", binder.hir().var);
                 }
             }
         }
@@ -768,7 +768,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
         for (_, binding) in scopes {
             if let ontol_hir::Binding::Binder(binder) = binding {
-                self.scope.remove(&binder.value().var);
+                self.scope.remove(&binder.hir().var);
             }
         }
     }
@@ -815,7 +815,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
                 arm_captures.push(ArmCapture {
                     local: Local(first_capture_local.0 + local_position as u16),
-                    var: capture_group.binder.value().var,
+                    var: capture_group.binder.hir().var,
                     def_id: capture_group.binder.meta().ty.get_single_def_id().unwrap(),
                 });
             }

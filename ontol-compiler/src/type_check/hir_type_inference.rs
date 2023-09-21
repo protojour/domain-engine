@@ -3,7 +3,7 @@ use ontol_runtime::smart_format;
 
 use crate::{
     error::CompileError,
-    typed_hir::{Meta, TypedHir, TypedHirValue},
+    typed_hir::{Meta, TypedArena, TypedHir, TypedHirData},
     types::Types,
     CompileErrors,
 };
@@ -22,7 +22,7 @@ pub(super) struct HirArmTypeInference<'c, 'm> {
 }
 
 impl<'c, 'm> HirArmTypeInference<'c, 'm> {
-    pub fn infer_node(&mut self, node: &mut TypedHirValue<'m, ontol_hir::Kind<'m, TypedHir>>) {
+    pub fn infer_node(&mut self, node: &mut TypedHirData<'m, ontol_hir::Kind<'m, TypedHir>>) {
         let mut infer = Infer {
             types: self.types,
             eq_relations: self.eq_relations,
@@ -49,12 +49,12 @@ pub(super) struct HirVariableMapper<'c, 'm> {
 }
 
 impl<'c, 'm> HirVariableMapper<'c, 'm> {
-    pub fn map_vars(&mut self, arena: &mut ontol_hir::arena::Arena<'m, TypedHir>) {
+    pub fn map_vars(&mut self, arena: &mut TypedArena<'m>) {
         let mut alloc = arena.pre_allocator();
-        let mut new_var_nodes: Vec<TypedHirValue<'m, ontol_hir::Kind<'m, TypedHir>>> = vec![];
+        let mut new_var_nodes: Vec<TypedHirData<'m, ontol_hir::Kind<'m, TypedHir>>> = vec![];
 
-        for hir_node in arena.iter_mut() {
-            if let ontol_hir::Kind::Var(var) = hir_node.value() {
+        for data in arena.iter_mut() {
+            if let ontol_hir::Kind::Var(var) = data.hir() {
                 if let Some(var_mapping) = self.variable_mapping.get(var) {
                     let arm = self.arm;
                     let mapped_type = match arm {
@@ -63,16 +63,16 @@ impl<'c, 'm> HirVariableMapper<'c, 'm> {
                     };
 
                     // Make a new node which is the new var reference
-                    new_var_nodes.push(TypedHirValue(
+                    new_var_nodes.push(TypedHirData(
                         ontol_hir::Kind::Var(*var),
                         Meta {
                             ty: mapped_type,
-                            span: hir_node.span(),
+                            span: data.span(),
                         },
                     ));
 
                     // Replace the old node with a Map expression referencing the new var node
-                    *hir_node.value_mut() = ontol_hir::Kind::Map(alloc.prealloc_node());
+                    *data.hir_mut() = ontol_hir::Kind::Map(alloc.prealloc_node());
                 }
             }
         }

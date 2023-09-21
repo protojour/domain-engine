@@ -5,7 +5,7 @@ use tracing::{debug, trace};
 use crate::{
     hir_unify::{UnifierError, UnifierResult, VarSet},
     mem::Intern,
-    typed_hir::{arena_import, IntoTypedHirValue, Meta, TypedHir, TypedHirValue, UNIT_META},
+    typed_hir::{arena_import, IntoTypedHirData, Meta, TypedHir, TypedHirData, UNIT_META},
     types::{Type, Types, UNIT_TYPE},
     NO_SPAN,
 };
@@ -27,12 +27,12 @@ pub struct Unifier<'a, 'm> {
 }
 
 pub(super) struct UnifiedNode<'m> {
-    pub typed_binder: Option<TypedHirValue<'m, ontol_hir::Binder>>,
+    pub typed_binder: Option<TypedHirData<'m, ontol_hir::Binder>>,
     pub node: ontol_hir::Node,
 }
 
 pub(super) struct UnifiedRootNode<'m> {
-    pub typed_binder: Option<TypedHirValue<'m, ontol_hir::Binder>>,
+    pub typed_binder: Option<TypedHirData<'m, ontol_hir::Binder>>,
     pub node: ontol_hir::RootNode<'m, TypedHir>,
 }
 
@@ -249,7 +249,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                             ),
                         };
                         self.mk_node(
-                            ontol_hir::Kind::StringPush(binder.value().var, string_push_param),
+                            ontol_hir::Kind::StringPush(binder.hir().var, string_push_param),
                             UNIT_META,
                         )
                     })
@@ -560,7 +560,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 Ok(UnifiedNode {
                     typed_binder: scope_binder.map(|binder| {
                         ontol_hir::Binder {
-                            var: binder.value().var,
+                            var: binder.hir().var,
                         }
                         .with_meta(scope_meta.hir_meta)
                     }),
@@ -660,7 +660,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 Ok(UnifiedNode {
                     typed_binder: scope_binder.map(|binder| {
                         ontol_hir::Binder {
-                            var: binder.value().var,
+                            var: binder.hir().var,
                         }
                         .with_meta(scope_meta.hir_meta)
                     }),
@@ -807,6 +807,6 @@ impl<'a, 'm> Unifier<'a, 'm> {
         kind: ontol_hir::Kind<'m, TypedHir>,
         meta: Meta<'m>,
     ) -> ontol_hir::Node {
-        self.hir_arena.add(TypedHirValue(kind, meta))
+        self.hir_arena.add(TypedHirData(kind, meta))
     }
 }

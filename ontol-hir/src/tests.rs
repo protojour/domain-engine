@@ -14,7 +14,7 @@ impl Lang for TestLang {
         data
     }
 
-    fn inner<'m, 'a, T: Clone>(data: &'m Self::Data<'a, T>) -> &'m T {
+    fn as_hir<'m, 'a, T: Clone>(data: &'m Self::Data<'a, T>) -> &'m T {
         data
     }
 }

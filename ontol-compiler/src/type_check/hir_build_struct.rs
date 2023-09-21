@@ -13,7 +13,7 @@ use crate::{
     pattern::{PatternKind, StructPatternAttr, StructPatternModifier},
     primitive::PrimitiveKind,
     type_check::{hir_build::NodeInfo, repr::repr_model::ReprKind, TypeError},
-    typed_hir::{Meta, TypedHir, TypedHirValue, UNIT_META},
+    typed_hir::{Meta, TypedHir, TypedHirData, UNIT_META},
     types::{Type, TypeRef, UNIT_TYPE},
     CompileError, SourceSpan, NO_SPAN,
 };
@@ -64,8 +64,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             ReprKind::Struct | ReprKind::Unit => {
                 match properties.and_then(|props| props.table.as_ref()) {
                     Some(property_set) => {
-                        let struct_binder: TypedHirValue<'_, ontol_hir::Binder> =
-                            TypedHirValue(ctx.var_allocator.alloc().into(), struct_meta);
+                        let struct_binder: TypedHirData<'_, ontol_hir::Binder> =
+                            TypedHirData(ctx.var_allocator.alloc().into(), struct_meta);
 
                         // The written attribute patterns should match against
                         // the relations defined on the type. Compute `MatchAttributes`:
@@ -108,7 +108,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         // Actually match the written attributes to the match attributes:
                         for pattern_attr in pattern_attrs {
                             let prop_node = self.build_struct_property_node(
-                                struct_binder.value().var,
+                                struct_binder.hir().var,
                                 pattern_attr,
                                 &mut match_attributes,
                                 actual_struct_flags,
@@ -125,7 +125,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         // matter if there are unmentioned properties.
                         if !actual_struct_flags.contains(ontol_hir::StructFlags::MATCH) {
                             self.handle_missing_struct_attributes(
-                                struct_binder.value().var,
+                                struct_binder.hir().var,
                                 span,
                                 match_attributes,
                                 &mut hir_props,
@@ -358,7 +358,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     let seq_ty = self.types.intern(Type::Seq(rel_params_ty, value_ty));
 
                     ontol_hir::PropVariant::Seq(ontol_hir::SeqPropertyVariant {
-                        label: TypedHirValue(
+                        label: TypedHirData(
                             label,
                             Meta {
                                 ty: seq_ty,

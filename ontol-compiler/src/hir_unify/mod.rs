@@ -8,7 +8,7 @@ use tracing::{info, warn};
 
 use crate::{
     hir_unify::{expr_builder::ExprBuilder, scope_builder::ScopeBuilder, unifier::Unifier},
-    typed_hir::{HirFunc, IntoTypedHirValue, Meta, TypedHir},
+    typed_hir::{HirFunc, IntoTypedHirData, Meta, TypedHir},
     types::Type,
     Compiler, SourceSpan,
 };
@@ -74,8 +74,8 @@ pub fn unify_to_function<'m>(
         }
     };
 
-    let scope_ty = scope.as_ref().ty();
-    let expr_ty = expr.as_ref().ty();
+    let scope_ty = scope.data().ty();
+    let expr_ty = expr.data().ty();
 
     match unified.typed_binder {
         Some(arg) => {

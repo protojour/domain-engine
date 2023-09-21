@@ -6,7 +6,7 @@ use smallvec::SmallVec;
 
 use crate::{
     hir_unify::{UnifierError, UnifierResult, VarSet},
-    typed_hir::{self, arena_import, IntoTypedHirValue, TypedHir, TypedHirValue, UNIT_META},
+    typed_hir::{self, arena_import, IntoTypedHirData, TypedHir, TypedHirData, UNIT_META},
 };
 
 use super::{
@@ -17,7 +17,7 @@ use super::{
 
 #[derive(Debug)]
 pub struct ScopeBinder<'m> {
-    pub binder: Option<TypedHirValue<'m, ontol_hir::Binder>>,
+    pub binder: Option<TypedHirData<'m, ontol_hir::Binder>>,
     pub scope: scope::Scope<'m>,
 }
 
@@ -123,7 +123,7 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
                             let def_arena: ontol_hir::arena::Arena<'m, TypedHir> =
                                 Default::default();
                             def_arena
-                                .add_root(TypedHirValue(ontol_hir::Kind::Var(binder_var), hir_meta))
+                                .add_root(TypedHirData(ontol_hir::Kind::Var(binder_var), hir_meta))
                         };
 
                         self.invert_expr(
@@ -166,7 +166,7 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
                 Ok(ScopeBinder {
                     binder: Some(
                         ontol_hir::Binder {
-                            var: binder.value().var,
+                            var: binder.hir().var,
                         }
                         .with_meta(hir_meta),
                     ),
@@ -190,7 +190,7 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
                 let scope_capture_groups = capture_groups
                     .iter()
                     .map(|capture_group| {
-                        vars.insert(capture_group.binder.value().var);
+                        vars.insert(capture_group.binder.hir().var);
                         ScopeCaptureGroup {
                             index: capture_group.index,
                             binder: capture_group.binder,
@@ -288,7 +288,7 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
 
                             (
                                 scope::PropKind::Seq(*label, *has_default, rel, val),
-                                VarSet::from([label.value().0.into()]),
+                                VarSet::from([label.hir().0.into()]),
                                 VarSet::default(),
                             )
                         }
@@ -319,7 +319,7 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
         proc: BuiltinProc,
         args: &ontol_hir::Nodes,
         analysis: ExprAnalysis<'m>,
-        outer_binder: TypedHirValue<'m, ontol_hir::Binder>,
+        outer_binder: TypedHirData<'m, ontol_hir::Binder>,
         let_def: ontol_hir::RootNode<'m, TypedHir>,
         dependencies: VarSet,
     ) -> UnifierResult<ScopeBinder<'m>> {
@@ -352,7 +352,7 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
         }
         inverted_args.insert(var_arg_index, let_def);
 
-        let next_let_def = def_arena.add_root(TypedHirValue(
+        let next_let_def = def_arena.add_root(TypedHirData(
             ontol_hir::Kind::Call(inverted_proc, inverted_args),
             // Is this correct?
             analysis.hir_meta,
@@ -402,14 +402,14 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
 
     fn enter_binder<T>(
         &mut self,
-        binder: &TypedHirValue<ontol_hir::Binder>,
+        binder: &TypedHirData<ontol_hir::Binder>,
         func: impl FnOnce(&mut Self) -> T,
     ) -> T {
-        if !self.in_scope.insert(binder.value().var) {
+        if !self.in_scope.insert(binder.hir().var) {
             panic!("Malformed HIR: {binder:?} variable was already in scope");
         }
         let value = func(self);
-        self.in_scope.remove(binder.value().var);
+        self.in_scope.remove(binder.hir().var);
         value
     }
 

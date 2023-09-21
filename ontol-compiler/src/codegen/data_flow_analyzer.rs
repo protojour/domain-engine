@@ -52,7 +52,7 @@ where
             ontol_hir::Kind::Struct(struct_binder, _flags, nodes) => {
                 self.var_dependencies.insert(arg, VarSet::default());
                 self.var_dependencies
-                    .insert(struct_binder.value().var, VarSet::default());
+                    .insert(struct_binder.hir().var, VarSet::default());
                 for node_ref in body.arena().refs(nodes) {
                     self.analyze_node(node_ref);
                 }
@@ -78,7 +78,7 @@ where
             ontol_hir::Kind::Const(_) => VarSet::default(),
             ontol_hir::Kind::Let(binder, definition, body) => {
                 let var_deps = self.analyze_node(arena.node_ref(*definition));
-                self.var_dependencies.insert(binder.value().var, var_deps);
+                self.var_dependencies.insert(binder.hir().var, var_deps);
 
                 let mut var_set = VarSet::default();
                 for child in arena.refs(body) {
@@ -142,16 +142,16 @@ where
                     match pattern {
                         ontol_hir::PropPattern::Attr(rel, val) => {
                             if let ontol_hir::Binding::Binder(binder) = rel {
-                                self.add_dep(binder.value().var, *struct_var);
+                                self.add_dep(binder.hir().var, *struct_var);
                             }
                             if let ontol_hir::Binding::Binder(binder) = val {
-                                self.add_dep(binder.value().var, *struct_var);
+                                self.add_dep(binder.hir().var, *struct_var);
                                 value_def_id = binder.ty().get_single_def_id();
                             }
                         }
                         ontol_hir::PropPattern::Seq(binding, _has_default) => {
                             if let ontol_hir::Binding::Binder(binder) = binding {
-                                self.add_dep(binder.value().var, *struct_var);
+                                self.add_dep(binder.hir().var, *struct_var);
                                 value_def_id = match binder.ty() {
                                     Type::Seq(_, val) => val.get_single_def_id(),
                                     _ => None,
@@ -183,10 +183,10 @@ where
             }
             ontol_hir::Kind::ForEach(var, (rel_binding, val_binding), body) => {
                 if let ontol_hir::Binding::Binder(binder) = rel_binding {
-                    self.add_dep(binder.value().var, *var);
+                    self.add_dep(binder.hir().var, *var);
                 }
                 if let ontol_hir::Binding::Binder(binder) = val_binding {
-                    self.add_dep(binder.value().var, *var);
+                    self.add_dep(binder.hir().var, *var);
                 }
                 let mut var_set = VarSet::default();
                 for child in arena.refs(body) {
@@ -211,7 +211,7 @@ where
                 let mut var_set = VarSet::default();
                 for match_arm in match_arms {
                     for group in &match_arm.capture_groups {
-                        self.add_dep(group.binder.value().var, *var);
+                        self.add_dep(group.binder.hir().var, *var);
                     }
                     for child in arena.refs(&match_arm.nodes) {
                         var_set.union_with(&self.analyze_node(child));

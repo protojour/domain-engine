@@ -5,7 +5,7 @@ use std::{
 
 use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc, DefId};
 
-use crate::typed_hir::{self, TypedHir, TypedHirValue};
+use crate::typed_hir::{self, TypedHir, TypedHirData};
 
 use super::VarSet;
 
@@ -97,7 +97,7 @@ pub enum Kind<'m> {
     PropRelParam,
     PropValue,
     SeqPropVariant(
-        TypedHirValue<'m, ontol_hir::Label>,
+        TypedHirData<'m, ontol_hir::Label>,
         OutputVar,
         ontol_hir::Optional,
         ontol_hir::HasDefault,

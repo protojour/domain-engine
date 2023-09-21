@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use tracing::debug;
 
-use crate::typed_hir::{IntoTypedHirValue, TypedHir};
+use crate::typed_hir::{IntoTypedHirData, TypedHir};
 
 use super::{
     expr,
@@ -456,14 +456,14 @@ impl<'m> Debug for RelValBindings<'m> {
 impl<'m> IsInScope for ontol_hir::Binding<'m, TypedHir> {
     fn is_in_scope(&self, in_scope: &VarSet) -> bool {
         match self {
-            ontol_hir::Binding::Binder(binder) => in_scope.contains(binder.value().var),
+            ontol_hir::Binding::Binder(binder) => in_scope.contains(binder.hir().var),
             ontol_hir::Binding::Wildcard => true,
         }
     }
 
     fn var_set(&self) -> VarSet {
         match self {
-            ontol_hir::Binding::Binder(binder) => [binder.value().var].into(),
+            ontol_hir::Binding::Binder(binder) => [binder.hir().var].into(),
             ontol_hir::Binding::Wildcard => Default::default(),
         }
     }

@@ -2,7 +2,7 @@ use ontol_runtime::{value::PropertyId, DefId};
 
 use crate::{
     hir_unify::VarSet,
-    typed_hir::{self, TypedHir, TypedHirValue, UNIT_META},
+    typed_hir::{self, TypedHir, TypedHirData, UNIT_META},
 };
 
 #[derive(Clone, Debug)]
@@ -75,7 +75,7 @@ impl<'m> Kind<'m> {
                     .map(|prop| prop.prop_id)
                     .collect::<Vec<_>>()
             ),
-            Self::Let(let_) => format!("Let({})", let_.inner_binder.value().var),
+            Self::Let(let_) => format!("Let({})", let_.inner_binder.hir().var),
             Self::Gen(gen) => format!("Gen({})", gen.input_seq),
             Self::Regex(_, _, captures) => format!("Regex({:?})", captures),
             Self::Escape(inner) => format!("Esc({})", inner.debug_short()),
@@ -109,14 +109,14 @@ impl<'m> Kind<'m> {
 
 #[derive(Clone, Debug)]
 pub struct PropSet<'m>(
-    pub Option<TypedHirValue<'m, ontol_hir::Binder>>,
+    pub Option<TypedHirData<'m, ontol_hir::Binder>>,
     pub Vec<Prop<'m>>,
 );
 
 #[derive(Clone, Debug)]
 pub struct Let<'m> {
-    pub outer_binder: Option<TypedHirValue<'m, ontol_hir::Binder>>,
-    pub inner_binder: TypedHirValue<'m, ontol_hir::Binder>,
+    pub outer_binder: Option<TypedHirData<'m, ontol_hir::Binder>>,
+    pub inner_binder: TypedHirData<'m, ontol_hir::Binder>,
     pub def: ontol_hir::RootNode<'m, TypedHir>,
     pub sub_scope: Box<Scope<'m>>,
 }
@@ -143,7 +143,7 @@ impl<'m> Prop<'m> {
     fn collect_seq_labels(&self, output: &mut VarSet) {
         match &self.kind {
             PropKind::Seq(label, _, rel, val) => {
-                output.insert(ontol_hir::Var(label.value().0));
+                output.insert(ontol_hir::Var(label.hir().0));
                 rel.collect_seq_labels(output);
                 val.collect_seq_labels(output);
             }
@@ -159,7 +159,7 @@ impl<'m> Prop<'m> {
 pub enum PropKind<'m> {
     Attr(PatternBinding<'m>, PatternBinding<'m>),
     Seq(
-        TypedHirValue<'m, ontol_hir::Label>,
+        TypedHirData<'m, ontol_hir::Label>,
         ontol_hir::HasDefault,
         PatternBinding<'m>,
         PatternBinding<'m>,
@@ -169,7 +169,7 @@ pub enum PropKind<'m> {
 #[derive(Clone, Debug)]
 pub enum PatternBinding<'m> {
     Wildcard(typed_hir::Meta<'m>),
-    Scope(TypedHirValue<'m, ontol_hir::Binder>, Scope<'m>),
+    Scope(TypedHirData<'m, ontol_hir::Binder>, Scope<'m>),
 }
 
 impl<'m> PatternBinding<'m> {
@@ -190,7 +190,7 @@ impl<'m> PatternBinding<'m> {
 #[derive(Clone, Debug)]
 pub struct ScopeCaptureGroup<'m> {
     pub index: u32,
-    pub binder: TypedHirValue<'m, ontol_hir::Binder>,
+    pub binder: TypedHirData<'m, ontol_hir::Binder>,
 }
 
 impl<'m> super::dep_tree::Scope for Scope<'m> {
