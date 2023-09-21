@@ -22,7 +22,7 @@ fn test_map_regex_duplex1() {
         }
     }
     "#
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(
             ("foo", "bar"),
             json!({ "input": "Hello world!"}),
@@ -59,7 +59,7 @@ fn test_map_regex_alternation1() {
         }
     }
     "#
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(
             ("foo", "bar"),
             json!({ "input": "first=FOO!"}),
@@ -103,7 +103,7 @@ fn test_map_regex_loop_pattern() {
         }
     }
     "#
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(
             ("in", "out"),
             json!({ "input": "" }),
@@ -145,7 +145,7 @@ fn test_map_regex_loop_alternation() {
         }
     }
     "#
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(
             ("in", "out"),
             json!({ "input": "" }),

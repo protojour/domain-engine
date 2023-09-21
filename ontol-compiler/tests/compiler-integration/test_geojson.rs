@@ -11,7 +11,7 @@ use test_log::test;
 fn test_geojson() {
     TestPackages::with_sources(
         [GEOJSON.root(), WGS]
-    ).compile_ok(|test| {
+    ).compile_then(|test| {
         let [geometry] = test.bind(["Geometry"]);
         assert_json_io_matches!(geometry, Create, {
             "type": "Point",
@@ -84,5 +84,5 @@ fn test_municipalities() {
             ",
         ),
     ])
-    .compile_ok(|_test| {});
+    .compile_then(|_test| {});
 }

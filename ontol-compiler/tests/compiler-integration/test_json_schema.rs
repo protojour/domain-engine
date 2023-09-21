@@ -22,7 +22,7 @@ fn json_schema_from_simple_entity() {
         rel .'baz': i64
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [entity] = test.bind(["entity"]);
         expect_eq!(
             actual = entity.new_json_schema(Create),

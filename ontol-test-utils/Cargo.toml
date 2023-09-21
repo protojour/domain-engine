@@ -16,7 +16,6 @@ tracing.workspace = true
 pretty_assertions = "1"
 serde.workspace = true
 serde_json.workspace = true
-async-trait.workspace = true
 fnv.workspace = true
 bincode.workspace = true
 jsonschema = { version = "0.17", default-features = false, features = ["draft202012"] }

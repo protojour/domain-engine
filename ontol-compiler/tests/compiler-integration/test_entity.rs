@@ -31,7 +31,7 @@ fn entity_without_inherent_id() {
         rel .'foo': text
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [entity] = test.bind(["entity"]);
         assert_json_io_matches!(entity, Create, { "foo": "foo" });
     });
@@ -47,7 +47,7 @@ fn inherent_id_no_autogen() {
         rel .'children': [foo]
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, { "key": "id", "children": [{ "key": "foreign_id" }] });
 
@@ -68,7 +68,7 @@ fn inherent_id_autogen() {
         rel .'children': [foo]
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, { "children": [{ "key": "foreign_id" }] });
 
@@ -88,7 +88,7 @@ fn id_and_inherent_property_inline_type() {
         rel .'children': [foo]
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, {
             "key": "outer",
@@ -111,80 +111,77 @@ fn entity_id_inline_fmt() {
         rel .'key'|id: { fmt '' => 'foo/' => uuid => . }
     }
     "
-    .compile_ok(|_| {});
+    .compile();
 }
 
 #[test]
 fn artist_and_instrument_io_artist() {
-    ARTIST_AND_INSTRUMENT.1.compile_ok(|test| {
-        let [artist] = test.bind(["artist"]);
-        assert_json_io_matches!(artist, Create, {
-            "name": "Zappa",
-            "plays": [
-                {
-                    "name": "guitar",
-                    "_edge": {
-                        "how_much": "a lot"
-                    }
+    let test = ARTIST_AND_INSTRUMENT.1.compile();
+    let [artist] = test.bind(["artist"]);
+    assert_json_io_matches!(artist, Create, {
+        "name": "Zappa",
+        "plays": [
+            {
+                "name": "guitar",
+                "_edge": {
+                    "how_much": "a lot"
                 }
-            ]
-        });
+            }
+        ]
     });
 }
 
 #[test]
 fn artist_and_instrument_io_instrument() {
-    ARTIST_AND_INSTRUMENT.1.compile_ok(|test| {
-        let [instrument] = test.bind(["instrument"]);
-        assert_json_io_matches!(instrument, Create, {
-            "name": "guitar",
-            "played_by": [
-                {
-                    "name": "Zappa",
-                    "_edge": {
-                        "how_much": "a lot"
-                    }
+    let test = ARTIST_AND_INSTRUMENT.1.compile();
+    let [instrument] = test.bind(["instrument"]);
+    assert_json_io_matches!(instrument, Create, {
+        "name": "guitar",
+        "played_by": [
+            {
+                "name": "Zappa",
+                "_edge": {
+                    "how_much": "a lot"
                 }
-            ]
-        });
+            }
+        ]
     });
 }
 
 #[test]
 fn artist_and_instrument_error_artist() {
-    ARTIST_AND_INSTRUMENT.1.compile_ok(|test| {
-        let [artist] = test.bind(["artist"]);
-        assert_error_msg!(
-            create_de(&artist).data(json!({
-                "name": "Herbie Hancock",
-                "plays": [{ "name": "piano" }]
-            })),
-            r#"missing properties, expected "_edge" at line 1 column 50"#
-        );
-    });
+    let test = ARTIST_AND_INSTRUMENT.1.compile();
+    let [artist] = test.bind(["artist"]);
+    assert_error_msg!(
+        create_de(&artist).data(json!({
+            "name": "Herbie Hancock",
+            "plays": [{ "name": "piano" }]
+        })),
+        r#"missing properties, expected "_edge" at line 1 column 50"#
+    );
 }
 
 #[test]
 fn artist_and_instrument_id_as_relation_object() {
-    ARTIST_AND_INSTRUMENT.1.compile_ok(|test| {
-        let [artist, instrument_id] = test.bind(["artist", "instrument-id"]);
-        let plays = artist.find_property("plays").unwrap();
-        let example_id = "instrument/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8";
+    let test = ARTIST_AND_INSTRUMENT.1.compile();
+    let [artist, instrument_id] = test.bind(["artist", "instrument-id"]);
+    let plays = artist.find_property("plays").unwrap();
+    let example_id = "instrument/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8";
 
-        assert_json_io_matches!(artist, Create, {
-            "name": "Jimi Hendrix",
-            "plays": [
-                {
-                    "ID": example_id,
-                    "_edge": {
-                        "how_much": "all the time"
-                    }
+    assert_json_io_matches!(artist, Create, {
+        "name": "Jimi Hendrix",
+        "plays": [
+            {
+                "ID": example_id,
+                "_edge": {
+                    "how_much": "all the time"
                 }
-            ]
-        });
+            }
+        ]
+    });
 
-        let john = create_de(&artist).value(
-            json!({
+    let john = create_de(&artist)
+        .value(json!({
                 "name": "John McLaughlin",
                 "plays": [
                     {
@@ -194,54 +191,54 @@ fn artist_and_instrument_id_as_relation_object() {
                         }
                     }
                 ]
-        })).unwrap();
+        }))
+        .unwrap();
 
-        let plays_attributes = john
-            .get_attribute_value(plays)
-            .unwrap()
-            .cast_ref::<Vec<_>>();
+    let plays_attributes = john
+        .get_attribute_value(plays)
+        .unwrap()
+        .cast_ref::<Vec<_>>();
 
-        // The value of the `plays` attribute is an `artist-id`
-        expect_eq!(
-            actual = create_ser(&instrument_id).json(&plays_attributes[0].value),
-            expected = json!(example_id)
-        );
+    // The value of the `plays` attribute is an `artist-id`
+    expect_eq!(
+        actual = create_ser(&instrument_id).json(&plays_attributes[0].value),
+        expected = json!(example_id)
+    );
 
-        assert_error_msg!(
-            create_de(&artist).data(json!({
-                "name": "Santana",
-                "plays": [
-                    {
-                        "ID": "junk",
-                    }
-                ]
-            })),
-            r#"invalid type: string "junk", expected string matching /(?:\A(?:instrument/)((?:[0-9A-Fa-f]{32}|(?:[0-9A-Fa-f]{8}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{12})))\z)/ at line 1 column 40"#
-        );
-        assert_error_msg!(
-            create_de(&artist).data(json!({
-                "name": "Robert Fripp",
-                "plays": [{ "ID": example_id }]
-            })),
-            r#"missing properties, expected "_edge" at line 1 column 88"#
-        );
+    assert_error_msg!(
+        create_de(&artist).data(json!({
+            "name": "Santana",
+            "plays": [
+                {
+                    "ID": "junk",
+                }
+            ]
+        })),
+        r#"invalid type: string "junk", expected string matching /(?:\A(?:instrument/)((?:[0-9A-Fa-f]{32}|(?:[0-9A-Fa-f]{8}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{12})))\z)/ at line 1 column 40"#
+    );
+    assert_error_msg!(
+        create_de(&artist).data(json!({
+            "name": "Robert Fripp",
+            "plays": [{ "ID": example_id }]
+        })),
+        r#"missing properties, expected "_edge" at line 1 column 88"#
+    );
 
-        // The following tests show that { "ID" } and the property map is a type union:
-        assert_error_msg!(
-            create_de(&artist).data(json!({
-                "name": "Tony Levin",
-                "plays": [{ "ID": example_id, "name": "Chapman stick" }]
-            })),
-            r#"unknown property `name` at line 1 column 92"#
-        );
-        assert_error_msg!(
-            create_de(&artist).data(json!({
-                "name": "Allan Holdsworth",
-                "plays": [{ "name": "Synthaxe", "ID": example_id }]
-            })),
-            r#"unknown property `name` at line 1 column 98"#
-        );
-    });
+    // The following tests show that { "ID" } and the property map is a type union:
+    assert_error_msg!(
+        create_de(&artist).data(json!({
+            "name": "Tony Levin",
+            "plays": [{ "ID": example_id, "name": "Chapman stick" }]
+        })),
+        r#"unknown property `name` at line 1 column 92"#
+    );
+    assert_error_msg!(
+        create_de(&artist).data(json!({
+            "name": "Allan Holdsworth",
+            "plays": [{ "name": "Synthaxe", "ID": example_id }]
+        })),
+        r#"unknown property `name` at line 1 column 98"#
+    );
 }
 
 #[test]
@@ -254,7 +251,7 @@ fn test_entity_self_relationship_optional_object() {
         rel .'children'::'parent'? [node]
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [node] = test.bind(["node"]);
         assert_error_msg!(
             create_de(&node).data(json!({})),
@@ -291,7 +288,7 @@ fn test_entity_self_relationship_mandatory_object() {
         rel .'children'::'parent' [.]
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [node] = test.bind(["node"]);
         assert_error_msg!(
             create_de(&node).data(json!({})),
@@ -302,72 +299,69 @@ fn test_entity_self_relationship_mandatory_object() {
 
 #[test]
 fn entity_union_simple() {
-    GUITAR_SYNTH_UNION.1.compile_ok(|test| {
-        let [instrument] = test.bind(["instrument"]);
-        assert_json_io_matches!(
-            instrument,
-            Create,
-            {
-                "type": "synth",
-                "polyphony": 8,
-            }
-        );
-    });
+    let test = GUITAR_SYNTH_UNION.1.compile();
+    let [instrument] = test.bind(["instrument"]);
+    assert_json_io_matches!(
+        instrument,
+        Create,
+        {
+            "type": "synth",
+            "polyphony": 8,
+        }
+    );
 }
 
 #[test]
 fn entity_union_with_object_relation() {
-    GUITAR_SYNTH_UNION.1.compile_ok(|test| {
-        let [instrument] = test.bind(["instrument"]);
-        assert_json_io_matches!(instrument, Create, {
-            "type": "synth",
-            "polyphony": 8,
-            "played-by": [{
-                "artist-id": "some_artist"
-            }]
-        });
+    let test = GUITAR_SYNTH_UNION.1.compile();
+    let [instrument] = test.bind(["instrument"]);
+    assert_json_io_matches!(instrument, Create, {
+        "type": "synth",
+        "polyphony": 8,
+        "played-by": [{
+            "artist-id": "some_artist"
+        }]
     });
 }
 
 #[test]
 fn entity_union_in_relation_with_ids() {
-    GUITAR_SYNTH_UNION.1.compile_ok(|test| {
-        let [artist, guitar_id, synth_id] = test.bind(["artist", "guitar_id", "synth_id"]);
-        let plays = artist.find_property("plays").unwrap();
+    let test = GUITAR_SYNTH_UNION.1.compile();
+    let [artist, guitar_id, synth_id] = test.bind(["artist", "guitar_id", "synth_id"]);
+    let plays = artist.find_property("plays").unwrap();
 
-        assert!(artist.type_info.entity_info.is_some());
-        assert!(guitar_id.type_info.entity_info.is_none());
+    assert!(artist.type_info.entity_info.is_some());
+    assert!(guitar_id.type_info.entity_info.is_none());
 
-        let json = json!({
-            "name": "Someone",
-            "plays": [
-                { "instrument-id": "guitar/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8" },
-                { "instrument-id": "synth/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8" }
-            ]
-        });
-
-        assert_json_io_matches!(artist, Create, {
-            "name": "Someone",
-            "plays": [
-                { "instrument-id": "guitar/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8" },
-                { "instrument-id": "synth/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8" }
-            ]
-        });
-
-        let artist_value = create_de(&artist).value(json.clone()).unwrap();
-
-        let plays_attributes = artist_value
-            .get_attribute_value(plays)
-            .unwrap()
-            .cast_ref::<Vec<_>>();
-
-        let guitar_id_attr = &plays_attributes[0];
-        let synth_id_attr = &plays_attributes[1];
-
-        assert_ne!(guitar_id.type_info.def_id, synth_id.type_info.def_id);
-        assert_eq!(guitar_id_attr.value.type_def_id, guitar_id.type_info.def_id);
-        assert_eq!(synth_id_attr.value.type_def_id, synth_id.type_info.def_id);
+    let json = json!({
+        "name": "Someone",
+        "plays": [
+            { "instrument-id": "guitar/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8" },
+            { "instrument-id": "synth/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8" }
+        ]
     });
+
+    assert_json_io_matches!(artist, Create, {
+        "name": "Someone",
+        "plays": [
+            { "instrument-id": "guitar/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8" },
+            { "instrument-id": "synth/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8" }
+        ]
+    });
+
+    let artist_value = create_de(&artist).value(json.clone()).unwrap();
+
+    let plays_attributes = artist_value
+        .get_attribute_value(plays)
+        .unwrap()
+        .cast_ref::<Vec<_>>();
+
+    let guitar_id_attr = &plays_attributes[0];
+    let synth_id_attr = &plays_attributes[1];
+
+    assert_ne!(guitar_id.type_info.def_id, synth_id.type_info.def_id);
+    assert_eq!(guitar_id_attr.value.type_def_id, guitar_id.type_info.def_id);
+    assert_eq!(synth_id_attr.value.type_def_id, synth_id.type_info.def_id);
 }
 
 #[test]
@@ -385,7 +379,7 @@ fn entity_relationship_without_reverse() {
         rel .'favorite-language': language
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [programmer] = test.bind(["programmer"]);
         assert_json_io_matches!(programmer, Create, {
             "name": "audun",
@@ -420,7 +414,7 @@ fn recursive_entity_union() {
         rel .'owns': [lifeform]
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [lifeform] = test.bind(["lifeform"]);
         assert_json_io_matches!(lifeform, Create, {
             "class": "animal",

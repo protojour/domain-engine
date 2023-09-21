@@ -12,7 +12,7 @@ fn map_incorrect_function_arguments() {
         42
     }
     "
-    .compile_fail()
+    .compile_fail();
 }
 
 #[test]
@@ -26,7 +26,7 @@ fn map_obj_non_domain_type_and_unit_type() {
         }
     }
     "
-    .compile_fail()
+    .compile_fail();
 }
 
 #[test]
@@ -44,7 +44,7 @@ fn map_attribute_mismatch() {
         bar {} // ERROR expected attribute
     }
     "
-    .compile_fail()
+    .compile_fail();
 }
 
 #[test]
@@ -57,7 +57,7 @@ fn map_missing_attributes_in_match_is_ok() {
         bar { 'c': x } // ERROR missing property `d`// NOTE Consider using `match {}`
     }
     "
-    .compile_fail()
+    .compile_fail();
 }
 
 #[test]
@@ -75,7 +75,7 @@ fn map_duplicate_unknown_property() {
         bar {}
     }
     "
-    .compile_fail()
+    .compile_fail();
 }
 
 #[test]
@@ -118,7 +118,7 @@ fn map_type_mismatch_in_func() {
         }
     }
     "
-    .compile_fail()
+    .compile_fail();
 }
 
 #[test]
@@ -174,7 +174,7 @@ fn only_entities_may_have_reverse_relationship() {
     rel [foo] 'a'()::'aa' bar // ERROR only entities may have named reverse relationship
     rel [foo] 'b'::'bb' text // ERROR only entities may have named reverse relationship
     "
-    .compile_fail()
+    .compile_fail();
 }
 
 #[test]

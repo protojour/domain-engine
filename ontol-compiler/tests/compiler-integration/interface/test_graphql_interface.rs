@@ -30,7 +30,7 @@ fn test_graphql_small_range_number_becomes_int() {
         rel .'prop': myint
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let (_schema, test) = schema_test(&test, ROOT_SRC_NAME);
         let foo_type = test.type_data("foo", QueryLevel::Node);
         let foo_object = foo_type.object_data();
@@ -51,7 +51,7 @@ fn test_graphql_i64_custom_scalar() {
         rel .'prop': i64
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let (schema, test) = schema_test(&test, ROOT_SRC_NAME);
         let foo_type = test.type_data("foo", QueryLevel::Node);
         let foo_object = foo_type.object_data();
@@ -74,7 +74,7 @@ fn test_graphql_default_scalar() {
         rel .'default'(rel .default := ''): text
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let (_schema, test) = schema_test(&test, ROOT_SRC_NAME);
         let foo_type = test.type_data("foo", QueryLevel::Node);
         let foo_object = foo_type.object_data();
@@ -95,7 +95,7 @@ fn test_graphql_scalar_array() {
         rel .'tags': [text]
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let (_schema, test) = schema_test(&test, ROOT_SRC_NAME);
         let foo_type = test.type_data("foo", QueryLevel::Node);
         let foo_object = foo_type.object_data();
@@ -120,7 +120,7 @@ fn test_graphql_serde_renaming() {
         rel .'must_rewrite': text
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let (_schema, schema_test) = schema_test(&test, ROOT_SRC_NAME);
         let foo_node = schema_test
             .type_data("foo", QueryLevel::Node)
@@ -144,32 +144,31 @@ fn test_graphql_serde_renaming() {
 
 #[test]
 fn test_graphql_artist_and_instrument() {
-    ARTIST_AND_INSTRUMENT.1.compile_ok(|test| {
-        let (schema, test) = schema_test(&test, ROOT_SRC_NAME);
-        let query_object = test.query_object_data();
+    let test = ARTIST_AND_INSTRUMENT.1.compile();
+    let (schema, test) = schema_test(&test, ROOT_SRC_NAME);
+    let query_object = test.query_object_data();
 
-        let artist_list_field = query_object.fields.get("artistList").unwrap();
-        let artist_connection = schema.type_data(artist_list_field.field_type.unit.indexed());
+    let artist_list_field = query_object.fields.get("artistList").unwrap();
+    let artist_connection = schema.type_data(artist_list_field.field_type.unit.indexed());
 
-        expect_eq!(
-            actual = artist_connection.typename,
-            expected = "artistConnection"
-        );
+    expect_eq!(
+        actual = artist_connection.typename,
+        expected = "artistConnection"
+    );
 
-        let edges_field = artist_connection.object_data().fields.get("edges").unwrap();
-        let artist_edge = schema.type_data(edges_field.field_type.unit.indexed());
+    let edges_field = artist_connection.object_data().fields.get("edges").unwrap();
+    let artist_edge = schema.type_data(edges_field.field_type.unit.indexed());
 
-        expect_eq!(actual = artist_edge.typename, expected = "artistEdge");
+    expect_eq!(actual = artist_edge.typename, expected = "artistEdge");
 
-        let node_field = artist_edge.object_data().fields.get("node").unwrap();
-        let artist = schema.type_data(node_field.field_type.unit.indexed());
+    let node_field = artist_edge.object_data().fields.get("node").unwrap();
+    let artist = schema.type_data(node_field.field_type.unit.indexed());
 
-        expect_eq!(actual = artist.typename, expected = "artist");
-        expect_eq!(
-            actual = artist.input_typename.as_deref(),
-            expected = Some("artistInput")
-        );
-    });
+    expect_eq!(actual = artist.typename, expected = "artist");
+    expect_eq!(
+        actual = artist.input_typename.as_deref(),
+        expected = Some("artistInput")
+    );
 }
 
 struct SchemaTest<'o> {

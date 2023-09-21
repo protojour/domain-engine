@@ -20,7 +20,7 @@ fn should_map_inherent_capturing_pattern_id() {
         bar { 'id': id }
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(
             ("foo", "bar"),
             json!({ "id": "foo/67e55044-10b1-426f-9247-bb680e5fe0c8" }),
@@ -74,7 +74,7 @@ fn test_extract_rel_params() {
         }
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(
             ("a1", "b1"),
             json!({
@@ -155,7 +155,7 @@ fn test_rel_params_implicit_map() {
         b { 'foreign': x }
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(
             ("a", "b"),
             json!({
@@ -201,7 +201,7 @@ fn test_map_relation_sequence_default_fallback() {
         }
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         // The point of this test is to show that a
         // "foos" in input is not needed to produce a "foo" in output,
         // since the input "foo" is an inverted/object relation sequence property:
@@ -294,7 +294,7 @@ fn test_map_invert() {
             ",
         ),
     ])
-    .compile_fail()
+    .compile_fail();
 }
 
 #[test]
@@ -337,5 +337,5 @@ fn artist_etc_routing() {
             ",
         ),
     ])
-    .compile_fail()
+    .compile_fail();
 }

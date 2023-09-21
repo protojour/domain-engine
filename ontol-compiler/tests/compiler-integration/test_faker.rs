@@ -16,7 +16,7 @@ fn test_fake_primitives() {
         rel .'i': i64
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         expect_eq!(
             actual = read_ser(&foo).json(&foo.new_fake(ProcessorMode::Inspect)),
@@ -36,7 +36,7 @@ fn test_fake_text_like_types() {
         rel .'created_at': datetime
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         expect_eq!(
             actual = read_ser(&foo).json(&foo.new_fake(ProcessorMode::Inspect)),
@@ -50,7 +50,7 @@ fn test_fake_text_like_types() {
 
 #[test]
 fn test_fake_geojson() {
-    TestPackages::with_sources([GEOJSON.root(), WGS]).compile_ok(|test| {
+    TestPackages::with_sources([GEOJSON.root(), WGS]).compile_then(|test| {
         let [geometry] = test.bind(["Geometry"]);
         expect_eq!(
             actual = read_ser(&geometry).json(&geometry.new_fake(ProcessorMode::Inspect)),
@@ -70,7 +70,7 @@ fn test_fake_geojson() {
 
 #[test]
 fn test_fake_guitar_synth() {
-    GUITAR_SYNTH_UNION.1.compile_ok(|test| {
+    GUITAR_SYNTH_UNION.1.compile_then(|test| {
         let [artist] = test.bind(["artist"]);
         expect_eq!(
             actual = read_ser(&artist).json(&artist.new_fake(ProcessorMode::Inspect)),

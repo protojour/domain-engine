@@ -27,7 +27,7 @@ fn test_relations_are_distinct_for_different_domains() {
             ",
         ),
     ])
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo, other_foo] = test.bind(["foo", "other.foo"]);
 
         fn extract_prop_rel_id<'o>(binding: &TypeBinding, test: &'o OntolTest) -> RelationshipId {
@@ -70,7 +70,7 @@ fn ontol_domain_is_defined_in_the_namespace() {
         rel .is: text
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [integer] = test.bind(["integer"]);
         assert_json_io_matches!(integer, Create, 42);
     });

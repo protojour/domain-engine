@@ -1535,7 +1535,6 @@ dependencies = [
 name = "ontol-test-utils"
 version = "0.1.0"
 dependencies = [
- "async-trait",
  "bincode",
  "fnv",
  "jsonschema",

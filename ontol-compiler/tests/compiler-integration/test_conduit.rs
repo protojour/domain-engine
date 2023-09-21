@@ -15,74 +15,71 @@ fn test_compile_conduit_public() {
 
 #[test]
 fn test_compile_conduit_db() {
-    CONDUIT_DB.1.compile_ok(|_test| {});
+    CONDUIT_DB.1.compile_then(|_test| {});
 }
 
 #[test]
 fn test_map_conduit_blog_post() {
-    TestPackages::with_sources([CONDUIT_DB, BLOG_POST_PUBLIC.root()]).compile_ok(|test| {
-        test.assert_domain_map(
-            ("conduit_db.Article", "BlogPost"),
-            json!({
-                "article_id": "11111111-1111-1111-1111-111111111111",
-                "slug": "s",
-                "title": "t",
-                "description": "d",
-                "body": "THE BODY",
-                "author": {
-                    "user_id": "22222222-2222-2222-2222-222222222222",
-                    "username": "some_user",
-                    "email": "e@mail",
-                    "password_hash": "h",
-                },
-                "tags": [{ "tag": "foobar" }],
-                "created_at": "2023-01-01T00:00:00.000+00:00",
-                "updated_at": "2023-01-01T00:00:00.000+00:00",
-            }),
-            json!({
-                "post_id": "11111111-1111-1111-1111-111111111111",
-                "contents": "THE BODY",
-                "written_by": "some_user",
-                "tags": ["foobar"]
-            }),
-        )
-    });
+    let test = TestPackages::with_sources([CONDUIT_DB, BLOG_POST_PUBLIC.root()]).compile();
+    test.assert_domain_map(
+        ("conduit_db.Article", "BlogPost"),
+        json!({
+            "article_id": "11111111-1111-1111-1111-111111111111",
+            "slug": "s",
+            "title": "t",
+            "description": "d",
+            "body": "THE BODY",
+            "author": {
+                "user_id": "22222222-2222-2222-2222-222222222222",
+                "username": "some_user",
+                "email": "e@mail",
+                "password_hash": "h",
+            },
+            "tags": [{ "tag": "foobar" }],
+            "created_at": "2023-01-01T00:00:00.000+00:00",
+            "updated_at": "2023-01-01T00:00:00.000+00:00",
+        }),
+        json!({
+            "post_id": "11111111-1111-1111-1111-111111111111",
+            "contents": "THE BODY",
+            "written_by": "some_user",
+            "tags": ["foobar"]
+        }),
+    );
 }
 
 /// Test that the mapping works without providing the "tags" property in the input.
 #[test]
 fn test_map_conduit_no_tags_in_db_object() {
-    TestPackages::with_sources([CONDUIT_DB, BLOG_POST_PUBLIC.root()]).compile_ok(|test| {
-        test.assert_domain_map(
-            ("conduit_db.Article", "BlogPost"),
-            json!({
-                "article_id": "11111111-1111-1111-1111-111111111111",
-                "slug": "s",
-                "title": "t",
-                "description": "d",
-                "body": "THE BODY",
-                "created_at": "2023-01-01T00:00:00.000+00:00",
-                "updated_at": "2023-01-01T00:00:00.000+00:00",
-                "author": {
-                    "user_id": "22222222-2222-2222-2222-222222222222",
-                    "username": "some_user",
-                    "email": "e@mail",
-                    "password_hash": "h",
-                },
-            }),
-            json!({
-                "post_id": "11111111-1111-1111-1111-111111111111",
-                "contents": "THE BODY",
-                "written_by": "some_user",
-                "tags": []
-            }),
-        )
-    });
+    let test = TestPackages::with_sources([CONDUIT_DB, BLOG_POST_PUBLIC.root()]).compile();
+    test.assert_domain_map(
+        ("conduit_db.Article", "BlogPost"),
+        json!({
+            "article_id": "11111111-1111-1111-1111-111111111111",
+            "slug": "s",
+            "title": "t",
+            "description": "d",
+            "body": "THE BODY",
+            "created_at": "2023-01-01T00:00:00.000+00:00",
+            "updated_at": "2023-01-01T00:00:00.000+00:00",
+            "author": {
+                "user_id": "22222222-2222-2222-2222-222222222222",
+                "username": "some_user",
+                "email": "e@mail",
+                "password_hash": "h",
+            },
+        }),
+        json!({
+            "post_id": "11111111-1111-1111-1111-111111111111",
+            "contents": "THE BODY",
+            "written_by": "some_user",
+            "tags": []
+        }),
+    )
 }
 
 // BUG: There are many things that must be fixed for this to work:
 #[test]
 fn test_map_conduit_contrived_signup() {
-    TestPackages::with_sources([CONDUIT_DB, CONDUIT_CONTRIVED_SIGNUP.root()])
-        .compile_ok(|_test| {});
+    TestPackages::with_sources([CONDUIT_DB, CONDUIT_CONTRIVED_SIGNUP.root()]).compile();
 }

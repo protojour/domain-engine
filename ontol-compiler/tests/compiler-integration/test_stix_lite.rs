@@ -16,7 +16,7 @@ fn stix_bundle() -> TestPackages {
 
 #[test]
 fn test_stix_lite() {
-    stix_bundle().compile_ok(|test| {
+    stix_bundle().compile_then(|test| {
         let [attack_pattern] = test.bind(["attack-pattern"]);
         assert_error_msg!(
             create_de(&attack_pattern).data(json!({

@@ -25,7 +25,7 @@ impl<T: TestCompile> TestCompileSchema for T {
         self,
         source_names: [SourceName; N],
     ) -> (OntolTest, [Schema; N]) {
-        let mut ontol_test = self.compile_ok(|_| {});
+        let mut ontol_test = self.compile();
         // Don't want JSON schema noise in GraphQL tests:
         ontol_test.compile_json_schema = false;
 

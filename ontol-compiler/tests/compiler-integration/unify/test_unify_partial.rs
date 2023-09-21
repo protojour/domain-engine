@@ -19,5 +19,5 @@ fn test_unify_partial() {
         Foo { 'foo': foo } // ERROR missing property `bar`// NOTE Consider using `match {}`
     }
     "
-    .compile_fail()
+    .compile_fail();
 }

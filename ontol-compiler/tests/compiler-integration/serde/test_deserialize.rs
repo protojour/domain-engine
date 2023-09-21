@@ -8,7 +8,7 @@ use test_log::test;
 
 #[test]
 fn deserialize_empty_type() {
-    "pub def foo {}".compile_ok(|test| {
+    "pub def foo {}".compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_error_msg!(
             create_de(&foo).data(json!(42)),
@@ -31,7 +31,7 @@ fn deserialize_is_i64() {
     pub def foo {}
     rel foo is: i64
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_matches!(create_de(&foo).data_variant(json!(42)), Ok(Data::I64(42)));
         assert_matches!(create_de(&foo).data_variant(json!(-42)), Ok(Data::I64(-42)));
@@ -53,7 +53,7 @@ fn deserialize_is_maybe_i64() {
     pub def foo {}
     rel foo is?: i64
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_matches!(create_de(&foo).data_variant(json!(42)), Ok(Data::I64(42)));
         assert_matches!(create_de(&foo).data_variant(json!(-42)), Ok(Data::I64(-42)));
@@ -75,7 +75,7 @@ fn deserialize_string() {
     pub def foo {}
     rel foo is?: text
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_matches!(
             create_de(&foo).data_variant(json!("hei")),
@@ -96,7 +96,7 @@ fn deserialize_object_properties() {
     rel obj 'a': text
     rel obj 'b': i64
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [obj] = test.bind(["obj"]);
         assert_matches!(
             create_de(&obj).data(json!({ "a": "hei", "b": 42 })),
@@ -124,7 +124,7 @@ fn deserialize_read_only_property_error() {
     pub def obj {}
     rel obj 'created'(rel .gen: create_time): datetime
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [obj] = test.bind(["obj"]);
         assert_error_msg!(
             create_de(&obj).data(json!({ "created": "something" })),
@@ -144,7 +144,7 @@ fn deserialize_nested() {
     rel two 'y': three
     rel three is?: text
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [one] = test.bind(["one"]);
         assert_matches!(
             create_de(&one).data(json!({
@@ -166,7 +166,7 @@ fn deserialize_recursive() {
     rel foo 'b': bar
     rel bar 'f': foo
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_error_msg!(
             create_de(&foo).data(json!({
@@ -188,7 +188,7 @@ fn deserialize_union_of_primitives() {
     rel foo is?: text
     rel foo is?: i64
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_matches!(
             create_de(&foo).data_variant(json!(42)),
@@ -208,7 +208,7 @@ fn deserialize_string_constant() {
     pub def foo {}
     rel foo is?: 'my_value'
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_matches!(
             create_de(&foo).data_variant(json!("my_value")),
@@ -232,7 +232,7 @@ fn deserialize_finite_non_uniform_sequence() {
     rel foo 0: i64
     rel foo 1: 'a'
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_matches!(
             create_de(&foo).data(json!([42, "a"])),
@@ -259,7 +259,7 @@ fn deserialize_finite_uniform_sequence() {
     pub def foo {}
     rel foo ..2: i64
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_matches!(
             create_de(&foo).data(json!([42, 42])),
@@ -287,7 +287,7 @@ fn deserialize_string_union() {
     rel foo is?: 'a'
     rel foo is?: 'b'
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_matches!(
             create_de(&foo).data_variant(json!("a")),
@@ -314,7 +314,7 @@ fn deserialize_map_union() {
         rel .is?: bar
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [union] = test.bind(["union"]);
         assert_matches!(
             create_de(&union).data_variant(json!({ "variant": "foo" })),
@@ -355,7 +355,7 @@ fn union_tree() {
         rel .is?: u2
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [u3] = test.bind(["u3"]);
         assert_matches!(
             create_de(&u3).data_variant(json!("1a")),

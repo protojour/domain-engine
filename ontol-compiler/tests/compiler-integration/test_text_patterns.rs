@@ -11,7 +11,7 @@ fn constant_text_pattern() {
         fmt '' => 'foo' => .
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, "foo");
         assert_error_msg!(
@@ -28,7 +28,7 @@ fn concatenated_constant_string_constructor_pattern() {
         fmt '' => 'foo' => 'bar' => .
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foobar] = test.bind(["foobar"]);
         assert_json_io_matches!(foobar, Create, "foobar");
         assert_error_msg!(
@@ -45,7 +45,7 @@ fn uuid_in_string_constructor_pattern() {
         fmt '' => 'foo/' => uuid => .
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
 
         assert_matches!(
@@ -78,7 +78,7 @@ fn test_text_pattern_constructor_union() {
         rel .is?: bar
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foobar] = test.bind(["foobar"]);
         assert_matches!(
             create_de(&foobar).data_variant(json!("foo/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
@@ -104,7 +104,7 @@ fn test_regex_property() {
         rel .'prop': /abc*/
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, { "prop": "abc" });
         assert_json_io_matches!(foo, Create, { "prop": "123abc" });
@@ -123,7 +123,7 @@ fn test_simple_regex_pattern_constructor() {
         fmt '' => /a/ => /bc*/ => .
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [re] = test.bind(["re"]);
         assert_json_io_matches!(re, Create, "ab");
         assert_json_io_matches!(re, Create, "abc" == "ab");
@@ -159,7 +159,7 @@ fn test_text_patterns() {
     type my_id
     rel '' 'my/': [uuid] my_id
     "
-    .compile_fail()
+    .compile_fail();
 }
 
 #[test]
@@ -169,7 +169,7 @@ fn regex_named_group_as_relation() {
         rel .is: /abc(?<named>.)/
     }
     "
-    .compile_ok(|_test| {});
+    .compile_then(|_test| {});
 }
 
 #[test]

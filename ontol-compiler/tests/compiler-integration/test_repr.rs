@@ -108,7 +108,7 @@ fn test_repr_tuple() {
         rel .'tup': tup
     }
     "
-    .compile_ok(|_| {});
+    .compile_then(|_| {});
 }
 
 #[test]
@@ -132,7 +132,7 @@ fn test_repr_valid_mesh1() {
             ",
         ),
     ])
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [meters, length] = test.bind(["si.meters", "length"]);
 
         assert!(

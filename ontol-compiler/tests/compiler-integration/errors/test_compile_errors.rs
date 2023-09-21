@@ -38,12 +38,12 @@ fn error_def_parse_error() {
 
 #[test]
 fn error_incomplete_statement() {
-    "use 'foobar' // ERROR parse error: expected `as`".compile_fail()
+    "use 'foobar' // ERROR parse error: expected `as`".compile_fail();
 }
 
 #[test]
 fn error_underscore_not_allowed_at_start_of_identifier() {
-    "def _foo // ERROR parse error: found `_`, expected identifier".compile_fail()
+    "def _foo // ERROR parse error: found `_`, expected identifier".compile_fail();
 }
 
 #[test]
@@ -67,7 +67,7 @@ fn error_lex_recovery_works() {
         } // ERROR parse error: found `}`, expected one of `(`, `.`, `:`, `?`
     }
     "
-    .compile_fail()
+    .compile_fail();
 }
 
 #[test]
@@ -77,7 +77,7 @@ fn error_rel_type_not_found() {
     rel foo 'bar':
         baz // ERROR type not found
     "
-    .compile_fail()
+    .compile_fail();
 }
 
 #[test]
@@ -90,7 +90,7 @@ fn error_rel_duplicate_anonymous_relation() {
     rel // ERROR duplicate anonymous relationship
         foo is?: bar
     "
-    .compile_fail()
+    .compile_fail();
 }
 
 #[test]
@@ -103,7 +103,7 @@ fn error_map_union_unit_type() {
         rel .is?: bar // ERROR unit type `bar` cannot be part of a union
     }
     "
-    .compile_fail()
+    .compile_fail();
 }
 
 #[test]
@@ -120,7 +120,7 @@ fn error_map_union_missing_discriminator() {
         rel .is?: bar // ERROR cannot discriminate type
     }
     "
-    .compile_fail()
+    .compile_fail();
 }
 
 #[test]
@@ -137,7 +137,7 @@ fn error_map_union_non_uniform_discriminators() {
         rel .is?: bar
     }
     "
-    .compile_fail()
+    .compile_fail();
 }
 
 #[test]
@@ -148,7 +148,7 @@ fn error_non_disjoint_text_union() {
         rel .is?: 'a' // ERROR duplicate anonymous relationship
     }
     "
-    .compile_fail()
+    .compile_fail();
 }
 
 #[test]
@@ -229,7 +229,7 @@ fn error_various_monadic_properties() {
         rel .'nullable': () // ERROR union in named relationship is not supported yet. Make a union instead.
     }
     "
-    .compile_fail()
+    .compile_fail();
 }
 
 #[test]
@@ -240,7 +240,7 @@ fn error_mix_of_index_and_edge_type() {
 
     rel foo 0(rel .is: bar): text // ERROR cannot mix index relation identifiers and edge types
     "#
-    .compile_fail()
+    .compile_fail();
 }
 
 #[test]
@@ -250,7 +250,7 @@ fn error_invalid_subject_types() {
         'a' // ERROR subject must be a domain type
         'b': text
     "
-    .compile_fail()
+    .compile_fail();
 }
 
 #[test]
@@ -262,7 +262,7 @@ fn error_invalid_relation_type() {
         uuid: // ERROR invalid relation type
         bar
     "
-    .compile_fail()
+    .compile_fail();
 }
 
 #[test]
@@ -270,7 +270,7 @@ fn error_invalid_fmt_syntax() {
     "
     fmt () => () () // ERROR parse error: found `(`, expected one of `def`, `rel`, `fmt`, `map`, `pub`, `=>`
     "
-    .compile_fail()
+    .compile_fail();
 }
 
 #[test]
@@ -280,7 +280,7 @@ fn error_invalid_fmt_semantics() {
     fmt () => () // ERROR fmt needs at least two transitions: `fmt a => b => c`
     fmt () => . => 'bar' // ERROR fmt only supports `.` at the final target position
     "
-    .compile_fail()
+    .compile_fail();
 }
 
 #[test]
@@ -356,7 +356,7 @@ fn error_rel_wildcard_span() {
     rel integer // ERROR definition is sealed and cannot be modified
         'likes': integer
     "
-    .compile_fail()
+    .compile_fail();
 }
 
 #[test]

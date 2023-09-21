@@ -1,4 +1,4 @@
-use std::{collections::HashMap, future::Future, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use diagnostics::AnnotatedCompileError;
 use ontol_compiler::{
@@ -106,39 +106,32 @@ impl OntolTest {
     }
 }
 
-#[async_trait::async_trait]
 pub trait TestCompile: Sized {
-    /// Compile
-    fn compile_ok(self, validator: impl Fn(OntolTest)) -> OntolTest;
+    /// Compile, expect no errors, return the OntolTest as the ontology interface
+    fn compile(self) -> OntolTest;
 
-    /// Compile (async validator)
-    async fn compile_ok_async<F: Future<Output = ()> + Send>(
-        self,
-        validator: impl Fn(OntolTest) -> F + Send,
-    ) -> OntolTest;
+    /// Compile, then run closure on the resulting test.
+    /// This style is suitable when the ONTOL source is contained inline in the test.
+    fn compile_then(self, validator: impl Fn(OntolTest)) -> OntolTest {
+        let test = self.compile();
+        validator(test.clone());
+        test
+    }
 
     /// Compile, expect failure
-    fn compile_fail(self) {
-        self.compile_fail_then(|_| {})
-    }
+    fn compile_fail(self) -> Vec<AnnotatedCompileError>;
 
     /// Compile, expect failure with error closure
     fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>));
 }
 
-#[async_trait::async_trait]
 impl TestCompile for &'static str {
-    fn compile_ok(self, validator: impl Fn(OntolTest)) -> OntolTest {
-        TestPackages::with_root(self).compile_ok(validator)
+    fn compile(self) -> OntolTest {
+        TestPackages::with_root(self).compile()
     }
 
-    async fn compile_ok_async<F: Future<Output = ()> + Send>(
-        self,
-        validator: impl Fn(OntolTest) -> F + Send,
-    ) -> OntolTest {
-        TestPackages::with_root(self)
-            .compile_ok_async(validator)
-            .await
+    fn compile_fail(self) -> Vec<AnnotatedCompileError> {
+        TestPackages::with_root(self).compile_fail()
     }
 
     fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>)) {
@@ -273,22 +266,20 @@ impl TestPackages {
     }
 }
 
-#[async_trait::async_trait]
 impl TestCompile for TestPackages {
-    fn compile_ok(mut self, validator: impl Fn(OntolTest)) -> OntolTest {
-        let ontol_test = self.compile_topology_ok();
-        validator(ontol_test.clone());
-        ontol_test
+    fn compile(mut self) -> OntolTest {
+        self.compile_topology_ok()
     }
 
-    async fn compile_ok_async<F: Future<Output = ()> + Send>(
-        mut self,
-        validator: impl Fn(OntolTest) -> F + Send,
-    ) -> OntolTest {
-        let ontol_test = self.compile_topology_ok();
-        let fut = validator(ontol_test.clone());
-        fut.await;
-        ontol_test
+    fn compile_fail(mut self) -> Vec<AnnotatedCompileError> {
+        match self.compile_topology() {
+            Ok(_) => {
+                panic!("Scripts did not fail to compile");
+            }
+            Err(error) => {
+                diagnostics::diff_errors(error, &self.sources, &self.source_code_registry)
+            }
+        }
     }
 
     fn compile_fail_then(mut self, validator: impl Fn(Vec<AnnotatedCompileError>)) {
@@ -308,7 +299,7 @@ impl TestCompile for TestPackages {
 #[test]
 #[should_panic(expected = "it works")]
 fn ok_validator_must_run() {
-    "".compile_ok(|_| {
+    "".compile_then(|_| {
         panic!("it works");
     });
 }

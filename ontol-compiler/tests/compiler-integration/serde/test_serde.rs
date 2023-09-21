@@ -6,7 +6,7 @@ use test_log::test;
 
 #[test]
 fn test_serde_empty_type() {
-    "pub def foo {}".compile_ok(|test| {
+    "pub def foo {}".compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, {});
     });
@@ -17,7 +17,7 @@ fn test_serde_value_type() {
     "
     pub def foo { rel .is: text }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, "string");
     });
@@ -30,7 +30,7 @@ fn test_serde_booleans() {
     pub def t { rel .is: true }
     pub def b { rel .is: boolean }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [f, t, b] = test.bind(["f", "t", "b"]);
 
         assert_json_io_matches!(f, Create, false);
@@ -54,7 +54,7 @@ fn test_serde_map_type() {
     "
     pub def foo { rel .'a': text }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, { "a": "string" });
     });
@@ -69,7 +69,7 @@ fn test_serde_complex_type() {
     rel foo 'b': bar
     rel bar 'c': text
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, { "a": "A", "b": { "c": "C" }});
     });
@@ -83,7 +83,7 @@ fn test_serde_sequence() {
         rel .1: i64
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [t] = test.bind(["t"]);
         assert_json_io_matches!(t, Create, ["a", 1]);
     });
@@ -97,7 +97,7 @@ fn test_serde_value_union1() {
         rel .is?: 'b'
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [u] = test.bind(["u"]);
         assert_json_io_matches!(u, Create, "a");
     });
@@ -115,7 +115,7 @@ fn test_serde_string_or_unit() {
         rel .'a': text-or-unit
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, { "a": "string" });
         assert_json_io_matches!(foo, Create, { "a": null });
@@ -138,7 +138,7 @@ fn test_serde_map_union() {
         rel .is?: bar
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [u] = test.bind(["u"]);
         assert_json_io_matches!(u, Create, { "type": "foo", "c": 7});
     });
@@ -153,7 +153,7 @@ fn test_serde_noop_intersection() {
         rel .'foobar': bar
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, { "foobar": {} });
     });
@@ -166,7 +166,7 @@ fn test_serde_many_cardinality() {
         rel .'s': [text]
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, { "s": []});
         assert_json_io_matches!(foo, Create, { "s": ["a", "b"]});
@@ -183,7 +183,7 @@ fn test_serde_infinite_sequence() {
         rel . 6.. : i64
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, [42, 43, "a", "b", null, 44]);
         assert_json_io_matches!(foo, Create, [42, 43, "a", "b", null, 44, 45, 46]);
@@ -199,7 +199,7 @@ fn test_serde_uuid() {
     "
     pub def my_id { rel .is: uuid }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [my_id] = test.bind(["my_id"]);
         assert_matches!(
             create_de(&my_id).data(json!("a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
@@ -222,7 +222,7 @@ fn test_serde_datetime() {
     "
     pub def my_dt { rel .is: datetime }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [my_dt] = test.bind(["my_dt"]);
         assert_matches!(
             create_de(&my_dt).data(json!("1983-10-01T01:31:32.59+01:00")),
@@ -251,7 +251,7 @@ fn test_integer_default() {
         rel .'bar'(rel .default := 42): i64
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, { "bar": 1 } == { "bar": 1 });
         assert_json_io_matches!(foo, Create, {} == { "bar": 42 });
@@ -267,7 +267,7 @@ fn test_i64_range_constrained() {
         rel .max: 100
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [percentage] = test.bind(["percentage"]);
         assert_json_io_matches!(percentage, Create, 0 == 0);
         assert_json_io_matches!(percentage, Create, 100 == 100);
@@ -287,7 +287,7 @@ fn test_integer_range_constrained() {
         rel .max: 1
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, 0 == 0);
         assert_json_io_matches!(foo, Create, (-1) == (-1));
@@ -307,7 +307,7 @@ fn test_f64_range_constrained() {
         rel .max: 1
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [fraction] = test.bind(["fraction"]);
         assert_json_io_matches!(fraction, Create, 0 == 0.0);
         assert_json_io_matches!(fraction, Create, 0.0 == 0.0);
@@ -327,7 +327,7 @@ fn test_float_default() {
         rel .'bar'(rel .default := 42): f64
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, { "bar": 1.618 } == { "bar": 1.618 });
         assert_json_io_matches!(foo, Create, {} == { "bar": 42.0 });
@@ -341,7 +341,7 @@ fn test_string_default() {
         rel .'bar'(rel .default := 'baz'): text
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, { "bar": "yay" } == { "bar": "yay" });
         assert_json_io_matches!(foo, Create, {} == { "bar": "baz" });
@@ -358,7 +358,7 @@ fn test_prop_union() {
         }
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [foo] = test.bind(["vec3"]);
         assert_json_io_matches!(foo, Create, { "x": 1, "y": 2, "z": 3 });
     });
@@ -391,7 +391,7 @@ fn test_jsonml() {
     // BUG: should accept any string as key
     rel attributes 'class'?: text
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [element] = test.bind(["element"]);
 
         assert_json_io_matches!(element, Create, "text");

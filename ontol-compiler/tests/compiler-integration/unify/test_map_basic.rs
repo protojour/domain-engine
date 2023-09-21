@@ -16,7 +16,7 @@ fn test_map_simple() {
         bar { 'b': x }
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(
             ("foo", "bar"),
             json!({ "f": "my_value"}),
@@ -41,7 +41,7 @@ fn test_map_value_to_primitive() {
         bar { 'b': x }
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(
             ("foo", "bar"),
             json!({ "a": "my_value"}),
@@ -65,7 +65,7 @@ fn test_meters() {
         millimeters: x
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(("meters", "millimeters"), json!(5), json!(5000));
         test.assert_domain_map(("millimeters", "meters"), json!(5000), json!(5));
     });
@@ -81,7 +81,7 @@ fn test_temperature() {
         fahrenheit: x * 9 / 5 + 32
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(("celsius", "fahrenheit"), json!(10), json!(50));
         test.assert_domain_map(("fahrenheit", "celsius"), json!(50), json!(10));
     });
@@ -134,7 +134,7 @@ fn test_nested_optional_attribute() {
         }
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(("person", "creature"), json!({}), json!({}));
         test.assert_domain_map(
             ("person", "creature"),
@@ -175,7 +175,7 @@ fn test_map_value_to_struct_no_func() {
         }
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(("one", "two"), json!("foo"), json!({ "a": "foo" }));
         test.assert_domain_map(("two", "one"), json!({ "a": "foo" }), json!("foo"));
     });
@@ -197,7 +197,7 @@ fn test_map_value_to_struct_func() {
         }
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(("one", "two"), json!(2), json!({ "a": 4 }));
         test.assert_domain_map(("two", "one"), json!({ "a": 4 }), json!(2));
     });
@@ -215,7 +215,7 @@ fn test_map_into_default_field_using_default_value() {
         target {}
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(
             ("empty", "target"),
             json!({}),
@@ -243,7 +243,7 @@ fn test_map_into_default_field_using_provided_value() {
         target { 'field': val }
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(
             ("required", "target"),
             json!({ "field": "This" }),
@@ -269,7 +269,7 @@ fn test_map_into_default_field_using_map_provided() {
         target { 'field': 'Mapped!' }
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(
             ("empty", "target"),
             json!({}),
@@ -325,7 +325,7 @@ fn test_deep_structural_map() {
         }
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(
             ("foo", "bar"),
             json!({ "a": "A", "inner": { "b": "B", "c": "C" }}),
@@ -357,7 +357,7 @@ fn test_map_matching_sequence() {
         }
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(("foo", "bar"), json!({ "a": [42] }), json!({ "b": [42] }));
         test.assert_domain_map(("bar", "foo"), json!({ "b": [42] }), json!({ "a": [42] }));
     });
@@ -382,50 +382,47 @@ map {
 
 #[test]
 fn test_map_in_sequence_item_empty() {
-    MAP_IN_SEQUENCE.compile_ok(|test| {
-        test.assert_domain_map(
-            ("foos", "bars"),
-            json!({ "foos": [] }),
-            json!({ "bars": [] }),
-        );
-        test.assert_domain_map(
-            ("bars", "foos"),
-            json!({ "bars": [] }),
-            json!({ "foos": [] }),
-        );
-    });
+    let test = MAP_IN_SEQUENCE.compile();
+    test.assert_domain_map(
+        ("foos", "bars"),
+        json!({ "foos": [] }),
+        json!({ "bars": [] }),
+    );
+    test.assert_domain_map(
+        ("bars", "foos"),
+        json!({ "bars": [] }),
+        json!({ "foos": [] }),
+    );
 }
 
 #[test]
 fn test_map_in_sequence_item_one() {
-    MAP_IN_SEQUENCE.compile_ok(|test| {
-        test.assert_domain_map(
-            ("foos", "bars"),
-            json!({ "foos": [{ "f": "42" }] }),
-            json!({ "bars": [{ "b": "42" }] }),
-        );
-        test.assert_domain_map(
-            ("bars", "foos"),
-            json!({ "bars": [{ "b": "42" }] }),
-            json!({ "foos": [{ "f": "42" }] }),
-        );
-    });
+    let test = MAP_IN_SEQUENCE.compile();
+    test.assert_domain_map(
+        ("foos", "bars"),
+        json!({ "foos": [{ "f": "42" }] }),
+        json!({ "bars": [{ "b": "42" }] }),
+    );
+    test.assert_domain_map(
+        ("bars", "foos"),
+        json!({ "bars": [{ "b": "42" }] }),
+        json!({ "foos": [{ "f": "42" }] }),
+    );
 }
 
 #[test]
 fn test_map_in_sequence_item_many() {
-    MAP_IN_SEQUENCE.compile_ok(|test| {
-        test.assert_domain_map(
-            ("foos", "bars"),
-            json!({ "foos": [{ "f": "42" }, { "f": "84" }] }),
-            json!({ "bars": [{ "b": "42" }, { "b": "84" }] }),
-        );
-        test.assert_domain_map(
-            ("bars", "foos"),
-            json!({ "bars": [{ "b": "42" }, { "b": "84" }] }),
-            json!({ "foos": [{ "f": "42" }, { "f": "84" }] }),
-        );
-    });
+    let test = MAP_IN_SEQUENCE.compile();
+    test.assert_domain_map(
+        ("foos", "bars"),
+        json!({ "foos": [{ "f": "42" }, { "f": "84" }] }),
+        json!({ "bars": [{ "b": "42" }, { "b": "84" }] }),
+    );
+    test.assert_domain_map(
+        ("bars", "foos"),
+        json!({ "bars": [{ "b": "42" }, { "b": "84" }] }),
+        json!({ "foos": [{ "f": "42" }, { "f": "84" }] }),
+    );
 }
 
 #[test]
@@ -457,7 +454,7 @@ fn test_sequence_cross_parallel() {
         }
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(
             ("foos", "bars"),
             json!({ "f1": [{ "f": "1A" }, { "f": "1B" }], "f2": [{ "f": "2" }] }),
@@ -515,7 +512,7 @@ fn test_sequence_inner_loop() {
         }
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(
             ("f1", "b1"),
             json!({ "a": [{ "a": [{ "P": "0" }], "b": [{ "P": "1" }]}], "b": [{ "a": [{ "P": "2" }], "b": [{ "P": "3" }]}]}),
@@ -553,7 +550,7 @@ fn test_sequence_flat_map1() {
         }]
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(
             ("foo", "bar".seq()),
             json!({ "a": "A", "inner": [{ "b": "B0" }, { "b": "B1" }] }),
@@ -584,7 +581,7 @@ fn test_sequence_composer_no_iteration() {
         }
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(
             ("foo", "bar"),
             json!({
@@ -619,7 +616,7 @@ fn test_sequence_composer_with_iteration() {
         }
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(
             ("foo", "bar"),
             json!({
@@ -665,7 +662,7 @@ fn test_map_complex_flow() {
         }
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(
             ("one", "two"),
             json!({ "a": "X", "b": "Y" }),
@@ -712,7 +709,7 @@ fn test_map_delegation() {
             ",
         ),
     ])
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(
             ("car", "vehicle"),
             json!({ "length": 3 }),
@@ -784,7 +781,7 @@ fn test_map_delegation_abstract_types() {
             ",
         ),
     ])
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(
             ("c.car", "c.vehicle"),
             json!({ "length": 3 }),
@@ -821,7 +818,7 @@ fn test_map_dependent_scoping() {
         }
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(
             ("one", "two"),
             json!({ "total_weight": 100, "net_weight": 75 }),
@@ -867,7 +864,7 @@ fn test_seq_scope_escape1() {
         }
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(
             ("bar", "qux"),
             json!({ "foo": {}, "p1": ["1"] }),
@@ -914,7 +911,7 @@ fn test_seq_scope_escape2() {
         }
     }
     "
-    .compile_ok(|test| {
+    .compile_then(|test| {
         test.assert_domain_map(
             ("bar", "qux"),
             json!({ "foo": { "p0": ["0"] }, "p1": ["1"] }),

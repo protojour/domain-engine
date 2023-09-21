@@ -8,7 +8,7 @@ fn import_package_not_found_error() {
     'pkg' // ERROR package not found
     as foo
     "
-    .compile_fail()
+    .compile_fail();
 }
 
 #[test]
@@ -33,7 +33,7 @@ fn load_package() {
             ",
         ),
     ])
-    .compile_ok(|test| {
+    .compile_then(|test| {
         let [bar] = test.bind(["bar"]);
         assert_json_io_matches!(bar, Create, {
             "foo": {
@@ -78,7 +78,7 @@ fn dependency_dag() {
         ),
         (SourceName("c"), "pub def c { rel .is: i64 }"),
     ])
-    .compile_ok(|test| {
+    .compile_then(|test| {
         // four user domains, plus `ontol`:
         expect_eq!(actual = test.ontology.domains().count(), expected = 5);
 
