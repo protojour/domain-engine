@@ -12,10 +12,10 @@ use crate::{
 pub struct TypedHir;
 
 impl ontol_hir::Lang for TypedHir {
-    type Data<'m, T> = TypedHirData<'m, T> where T: Clone;
+    type Data<'m, H> = TypedHirData<'m, H> where H: Clone;
 
-    fn default_data<'a, T: Clone>(&self, value: T) -> Self::Data<'a, T> {
-        TypedHirData(value, ERROR_META)
+    fn default_data<'m, H: Clone>(&self, hir: H) -> Self::Data<'m, H> {
+        TypedHirData(hir, ERROR_META)
     }
 
     fn as_hir<'m, T: Clone>(data: &'m Self::Data<'_, T>) -> &'m T {
@@ -30,23 +30,23 @@ pub type TypedNodeRef<'h, 'm> = ontol_hir::arena::NodeRef<'h, 'm, TypedHir>;
 
 /// Data structure for associating ontol-hir data with the compiler's metadata attached to each hir node.
 #[derive(Clone, Copy)]
-pub struct TypedHirData<'m, T>(pub T, pub Meta<'m>);
+pub struct TypedHirData<'m, H>(pub H, pub Meta<'m>);
 
-impl<'m, T> TypedHirData<'m, T> {
-    pub fn split(self) -> (T, Meta<'m>) {
+impl<'m, H> TypedHirData<'m, H> {
+    pub fn split(self) -> (H, Meta<'m>) {
         (self.0, self.1)
     }
 
     /// Access the ontol-hir part of data
-    pub fn hir(&self) -> &T {
+    pub fn hir(&self) -> &H {
         &self.0
     }
 
-    pub fn hir_mut(&mut self) -> &mut T {
+    pub fn hir_mut(&mut self) -> &mut H {
         &mut self.0
     }
 
-    pub fn into_hir(self) -> T {
+    pub fn into_hir(self) -> H {
         self.0
     }
 

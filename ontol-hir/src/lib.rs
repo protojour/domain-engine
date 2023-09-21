@@ -13,17 +13,21 @@ pub mod visitor;
 #[cfg(test)]
 mod tests;
 
+/// ontol_hir is a generic language, it lets the implementor of a "dialect" specify
+/// what kind of data to attach to each AST node.
 pub trait Lang: Sized + Copy {
-    /// The data to attach to each piece of ontol-hir information:
-    type Data<'a, T>: Clone
+    /// The data to attach to each piece of ontol-hir information.
+    ///
+    /// The data has to be generic, because it can attach to different kinds of ontol_hir nodes.
+    type Data<'a, H>: Clone
     where
-        T: Clone;
+        H: Clone;
 
     /// Wrapping the given ontol_hir data T in Lang-specific Data.
-    fn default_data<'a, T: Clone>(&self, hir: T) -> Self::Data<'a, T>;
+    fn default_data<'a, H: Clone>(&self, hir: H) -> Self::Data<'a, H>;
 
     /// Extract the ontol-hir part of the data
-    fn as_hir<'m, T: Clone>(data: &'m Self::Data<'_, T>) -> &'m T;
+    fn as_hir<'a, H: Clone>(data: &'a Self::Data<'_, H>) -> &'a H;
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]

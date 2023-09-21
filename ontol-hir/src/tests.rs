@@ -8,13 +8,13 @@ use pretty_assertions::assert_eq;
 struct TestLang;
 
 impl Lang for TestLang {
-    type Data<'a, T> = T where T: Clone;
+    type Data<'a, H> = H where H: Clone;
 
-    fn default_data<'a, T: Clone>(&self, data: T) -> Self::Data<'a, T> {
-        data
+    fn default_data<'a, H: Clone>(&self, hir: H) -> Self::Data<'a, H> {
+        hir
     }
 
-    fn as_hir<'m, 'a, T: Clone>(data: &'m Self::Data<'a, T>) -> &'m T {
+    fn as_hir<'m, 'a, H: Clone>(data: &'m Self::Data<'a, H>) -> &'m H {
         data
     }
 }
