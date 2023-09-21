@@ -15,7 +15,7 @@ fn test_compile_conduit_public() {
 
 #[test]
 fn test_compile_conduit_db() {
-    CONDUIT_DB.1.compile_then(|_test| {});
+    CONDUIT_DB.1.compile();
 }
 
 #[test]

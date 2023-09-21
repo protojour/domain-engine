@@ -50,41 +50,39 @@ fn test_fake_text_like_types() {
 
 #[test]
 fn test_fake_geojson() {
-    TestPackages::with_sources([GEOJSON.root(), WGS]).compile_then(|test| {
-        let [geometry] = test.bind(["Geometry"]);
-        expect_eq!(
-            actual = read_ser(&geometry).json(&geometry.new_fake(ProcessorMode::Inspect)),
-            expected = json!({
-                "type": "Polygon",
-                "coordinates": [
-                    [0.016321353287595652, 0.9547727023524024],
-                    [0.6674473470759333, 0.5091214128693887],
-                    [0.2626779163488635, 0.1856411528755303],
-                    [0.720634883796082, 0.47809322766615],
-                    [0.7067125942841727, 0.7238569168072458],
-                ]
-            }),
-        );
-    });
+    let test = TestPackages::with_sources([GEOJSON.root(), WGS]).compile();
+    let [geometry] = test.bind(["Geometry"]);
+    expect_eq!(
+        actual = read_ser(&geometry).json(&geometry.new_fake(ProcessorMode::Inspect)),
+        expected = json!({
+            "type": "Polygon",
+            "coordinates": [
+                [0.016321353287595652, 0.9547727023524024],
+                [0.6674473470759333, 0.5091214128693887],
+                [0.2626779163488635, 0.1856411528755303],
+                [0.720634883796082, 0.47809322766615],
+                [0.7067125942841727, 0.7238569168072458],
+            ]
+        }),
+    );
 }
 
 #[test]
 fn test_fake_guitar_synth() {
-    GUITAR_SYNTH_UNION.1.compile_then(|test| {
-        let [artist] = test.bind(["artist"]);
-        expect_eq!(
-            actual = read_ser(&artist).json(&artist.new_fake(ProcessorMode::Inspect)),
-            expected = json!({
-                "artist-id": "mollitia sit porro tenetur",
-                "name": "delectus molestias aspernatur voluptatem reprehenderit",
-                "plays": [
-                    {
-                        "instrument-id": "guitar/c6f2c9be-dcaa-7bfa-8763-dd16ca1baa0a",
-                        "type": "guitar",
-                        "string_count": 1500328598,
-                    }
-                ]
-            }),
-        );
-    });
+    let test = GUITAR_SYNTH_UNION.1.compile();
+    let [artist] = test.bind(["artist"]);
+    expect_eq!(
+        actual = read_ser(&artist).json(&artist.new_fake(ProcessorMode::Inspect)),
+        expected = json!({
+            "artist-id": "mollitia sit porro tenetur",
+            "name": "delectus molestias aspernatur voluptatem reprehenderit",
+            "plays": [
+                {
+                    "instrument-id": "guitar/c6f2c9be-dcaa-7bfa-8763-dd16ca1baa0a",
+                    "type": "guitar",
+                    "string_count": 1500328598,
+                }
+            ]
+        }),
+    );
 }
