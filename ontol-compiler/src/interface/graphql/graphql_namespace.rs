@@ -97,8 +97,15 @@ impl<'o> GraphqlNamespace<'o> {
             if let Some(def_id) = elements.iter().find_map(|elem| elem.def_id()) {
                 let package_id = def_id.0;
                 if package_id != domain_disambiguation.root_domain {
-                    // FIXME: Domains could have globally unique names that we can use here?
-                    output.push_str(&format!("_domain{}_", package_id.0));
+                    output.push('_');
+                    if let Some(domain) = domain_disambiguation.ontology.find_domain(package_id) {
+                        let domain_name =
+                            adapt_graphql_identifier(&domain.unique_name).into_adapted();
+                        output.push_str(&domain_name);
+                    } else {
+                        output.push_str(&format!("domain{}", package_id.0));
+                    }
+                    output.push('_');
                 }
             }
         }

@@ -688,12 +688,12 @@ async fn test_graphql_municipalities() {
                             code
                             geometry {
                                 __typename
-                                ... on _domain2_Polygon {
+                                ... on _geojson_Polygon {
                                     coordinates
                                 }
-                                ... on _domain2_GeometryCollection {
+                                ... on _geojson_GeometryCollection {
                                     geometries {
-                                        ... on _domain2_Polygon {
+                                        ... on _geojson_Polygon {
                                             coordinates
                                         }
                                     }
@@ -726,7 +726,7 @@ fn test_graphql_municipalities_geojson_union() {
     let parser_document = schema.as_parser_document();
 
     let geometry_union_input =
-        find_input_object_type(&parser_document, "_domain2_GeometryUnionInput").unwrap();
+        find_input_object_type(&parser_document, "_geojson_GeometryUnionInput").unwrap();
 
     let field_names: Vec<_> = geometry_union_input
         .fields
@@ -740,7 +740,7 @@ fn test_graphql_municipalities_geojson_union() {
         expected = &[
             FieldInfo::from(("type", "String")),
             FieldInfo::from(("coordinates", "Boolean!")),
-            FieldInfo::from(("geometries", "_domain2_LeafGeometryUnionInput!")),
+            FieldInfo::from(("geometries", "_geojson_LeafGeometryUnionInput!")),
         ]
     );
 }
