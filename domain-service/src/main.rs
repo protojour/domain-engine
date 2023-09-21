@@ -8,11 +8,16 @@ use domain_engine_juniper::CreateSchemaError;
 use graphql::{graphiql_handler, GraphqlService};
 use ontol_runtime::{ontology::Ontology, PackageId};
 use tracing::info;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::graphql::graphql_handler;
 
 mod graphql;
+
+/// This environment variable is used to control logs.
+const LOG_ENV_VAR: &str = "LOG";
+
+const SERVER_SOCKET_ADDR: &str = "0.0.0.0:8080";
 
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
@@ -35,7 +40,12 @@ async fn main() -> anyhow::Result<()> {
                 || target.starts_with("ontol")
                 || target.starts_with("tower_http")
         }))
-        .with(tracing_subscriber::EnvFilter::from_default_env())
+        .with(
+            tracing_subscriber::EnvFilter::builder()
+                .with_default_directive(LevelFilter::INFO.into())
+                .with_env_var(LOG_ENV_VAR)
+                .from_env_lossy(),
+        )
         .init();
 
     let args: Args = Args::parse();
@@ -59,12 +69,14 @@ async fn main() -> anyhow::Result<()> {
             domain_router(engine.clone(), &domain_path, *package_id)?,
         );
 
-        info!("Domain {package_id:?} served under {domain_path}");
+        info!("domain {package_id:?} served under {domain_path}");
     }
 
     router = router.layer(tower_http::trace::TraceLayer::new_for_http());
 
-    axum::Server::bind(&"0.0.0.0:8080".parse()?)
+    info!("binding server to {SERVER_SOCKET_ADDR}");
+
+    axum::Server::bind(&SERVER_SOCKET_ADDR.parse()?)
         .serve(router.into_make_service())
         .await
         .context("error running HTTP server")?;
