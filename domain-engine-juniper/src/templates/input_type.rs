@@ -14,11 +14,15 @@ use crate::{
     registry_ctx::{ArgumentFilter, RegistryCtx},
 };
 
-pub struct IndexedInputValue;
+/// GraphQL input types for things in the SchemaCtx.
+/// i.e. object types and custom scalars.
+///
+/// Native scalars are supported by juniper directly.
+pub struct InputType;
 
-impl_graphql_value!(IndexedInputValue);
+impl_graphql_value!(InputType);
 
-impl juniper::GraphQLType<GqlScalar> for IndexedInputValue {
+impl juniper::GraphQLType<GqlScalar> for InputType {
     fn name(info: &SchemaType) -> Option<&str> {
         Some(info.typename())
     }
@@ -66,7 +70,7 @@ impl juniper::GraphQLType<GqlScalar> for IndexedInputValue {
                 if let Some(rel_ref) = rel_ref {
                     arguments.push(juniper::meta::Argument::new(
                         "_edge",
-                        reg.get_type::<IndexedInputValue>(
+                        reg.get_type::<InputType>(
                             TypeRef::mandatory(*rel_ref),
                             info.typing_purpose,
                         ),
@@ -95,14 +99,14 @@ impl juniper::GraphQLType<GqlScalar> for IndexedInputValue {
     }
 }
 
-impl juniper::ToInputValue<GqlScalar> for IndexedInputValue {
+impl juniper::ToInputValue<GqlScalar> for InputType {
     fn to_input_value(&self) -> juniper::InputValue<GqlScalar> {
         let v = juniper::Value::scalar(42);
         juniper::ToInputValue::to_input_value(&v)
     }
 }
 
-impl juniper::FromInputValue<GqlScalar> for IndexedInputValue {
+impl juniper::FromInputValue<GqlScalar> for InputType {
     type Error = String;
 
     fn from_input_value(_: &juniper::InputValue<GqlScalar>) -> Result<Self, Self::Error> {
@@ -111,7 +115,7 @@ impl juniper::FromInputValue<GqlScalar> for IndexedInputValue {
     }
 }
 
-impl juniper::ParseScalarValue<GqlScalar> for IndexedInputValue {
+impl juniper::ParseScalarValue<GqlScalar> for InputType {
     fn from_str(value: juniper::parser::ScalarToken<'_>) -> juniper::ParseScalarResult<GqlScalar> {
         match value {
             ScalarToken::String(str) => Ok(GqlScalar::String(str.into())),

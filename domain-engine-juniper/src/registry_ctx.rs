@@ -21,7 +21,7 @@ use tracing::{trace, warn};
 use crate::{
     context::{SchemaCtx, SchemaType},
     gql_scalar::GqlScalar,
-    templates::{attribute_type::AttributeType, indexed_input_value::IndexedInputValue},
+    templates::{attribute_type::AttributeType, input_type::InputType},
 };
 
 /// SchemaCtx and juniper Registry combined together to provide more ergonimic API
@@ -208,7 +208,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                     TypingPurpose::Input,
                 );
 
-                self.modified_arg::<IndexedInputValue>(name, modifier, &i64_schema_type)
+                self.modified_arg::<InputType>(name, modifier, &i64_schema_type)
             }
             SerdeOperator::F64(_, _) => return self.modified_arg::<f64>(name, modifier, &()),
             SerdeOperator::String(_) => return self.modified_arg::<String>(name, modifier, &()),
@@ -223,7 +223,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                     .schema_ctx
                     .type_index_by_def(seq_op.def.def_id, QueryLevel::Edge { rel_params })
                 {
-                    Some(type_index) => self.registry.arg::<Option<Vec<IndexedInputValue>>>(
+                    Some(type_index) => self.registry.arg::<Option<Vec<InputType>>>(
                         name,
                         &self
                             .schema_ctx
@@ -274,10 +274,8 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 let info = self.schema_ctx.get_schema_type(type_index, typing_purpose);
 
                 match modifier.unit_optionality() {
-                    Optionality::Mandatory => self.registry.arg::<IndexedInputValue>(name, &info),
-                    Optionality::Optional => {
-                        self.registry.arg::<Option<IndexedInputValue>>(name, &info)
-                    }
+                    Optionality::Mandatory => self.registry.arg::<InputType>(name, &info),
+                    Optionality::Optional => self.registry.arg::<Option<InputType>>(name, &info),
                 }
             }
             SerdeOperator::Struct(struct_op) => {
@@ -293,10 +291,10 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
 
                 match modifier.unit_optionality() {
                     Optionality::Mandatory => {
-                        return self.registry.arg::<IndexedInputValue>(name, &info);
+                        return self.registry.arg::<InputType>(name, &info);
                     }
                     Optionality::Optional => {
-                        return self.registry.arg::<Option<IndexedInputValue>>(name, &info)
+                        return self.registry.arg::<Option<InputType>>(name, &info)
                     }
                 }
             }
@@ -334,7 +332,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         argument: &dyn DomainFieldArg,
     ) -> juniper::meta::Argument<'r, GqlScalar> {
         match argument.kind() {
-            ArgKind::Indexed(type_index) => self.registry.arg::<IndexedInputValue>(
+            ArgKind::Indexed(type_index) => self.registry.arg::<InputType>(
                 argument.name(),
                 &self
                     .schema_ctx

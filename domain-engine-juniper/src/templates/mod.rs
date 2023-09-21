@@ -1,7 +1,7 @@
 use crate::context::SchemaType;
 
 pub mod attribute_type;
-pub mod indexed_input_value;
+pub mod input_type;
 pub mod mutation_type;
 pub mod query_type;
 pub mod sequence_type;

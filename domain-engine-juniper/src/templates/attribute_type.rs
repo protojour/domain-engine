@@ -26,7 +26,7 @@ use crate::{
     ServiceCtx,
 };
 
-use super::indexed_input_value::IndexedInputValue;
+use super::input_type::InputType;
 
 /// AttributeType combines two things:
 ///
@@ -140,7 +140,7 @@ impl<'v> juniper::GraphQLType<GqlScalar> for AttributeType<'v> {
                 registry.build_union_type::<Self>(info, &types).into_meta()
             }
             TypeKind::CustomScalar(_) => {
-                let mut builder = registry.build_scalar_type::<IndexedInputValue>(info);
+                let mut builder = registry.build_scalar_type::<InputType>(info);
                 if let Some(description) = info.description() {
                     builder = builder.description(&description);
                 }
