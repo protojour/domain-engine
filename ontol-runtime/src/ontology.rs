@@ -169,8 +169,10 @@ impl Ontology {
     }
 }
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Domain {
+    pub unique_name: String,
+
     /// Map that stores types in insertion/definition order
     pub type_names: IndexMap<String, DefId>,
 
@@ -179,6 +181,14 @@ pub struct Domain {
 }
 
 impl Domain {
+    pub fn new(unique_name: String) -> Self {
+        Self {
+            unique_name,
+            type_names: Default::default(),
+            info: Default::default(),
+        }
+    }
+
     pub fn type_info(&self, def_id: DefId) -> &TypeInfo {
         &self.info[def_id.1 as usize]
     }

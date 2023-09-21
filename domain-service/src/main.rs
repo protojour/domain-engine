@@ -7,6 +7,7 @@ use domain_engine_core::DomainEngine;
 use domain_engine_juniper::CreateSchemaError;
 use graphql::{graphiql_handler, GraphqlService};
 use ontol_runtime::{ontology::Ontology, PackageId};
+use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::graphql::graphql_handler;
@@ -30,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .with(tracing_subscriber::filter::FilterFn::new(|metadata| {
             let target = metadata.target();
-            target.starts_with("domain_engine")
+            target.starts_with("domain_")
                 || target.starts_with("ontol")
                 || target.starts_with("tower_http")
         }))
@@ -47,16 +48,18 @@ async fn main() -> anyhow::Result<()> {
 
     let mut router: axum::Router = axum::Router::new();
 
-    for (index, (package_id, _domain)) in ontology
+    for (package_id, domain) in ontology
         .domains()
         .filter(|(package_id, _)| **package_id != PackageId(0))
-        .enumerate()
     {
-        let domain_path = format!("/{index}");
+        let unique_name = &domain.unique_name;
+        let domain_path = format!("/{unique_name}");
         router = router.nest(
             &domain_path,
             domain_router(engine.clone(), &domain_path, *package_id)?,
         );
+
+        info!("Domain {package_id:?} served under {domain_path}");
     }
 
     router = router.layer(tower_http::trace::TraceLayer::new_for_http());

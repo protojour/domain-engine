@@ -1,7 +1,7 @@
 use ontol_runtime::{interface::serde::operator::SerdeOperator, RelationshipId};
 use ontol_test_utils::{
-    assert_json_io_matches, type_binding::TypeBinding, OntolTest, SourceName, TestCompile,
-    TestPackages,
+    assert_json_io_matches, expect_eq, type_binding::TypeBinding, OntolTest, SourceName,
+    TestCompile, TestPackages,
 };
 use test_log::test;
 
@@ -29,6 +29,15 @@ fn test_relations_are_distinct_for_different_domains() {
     ])
     .compile_then(|test| {
         let [foo, other_foo] = test.bind(["foo", "other.foo"]);
+        let ontology = &test.ontology;
+
+        let root_domain = ontology.find_domain(foo.def_id().package_id()).unwrap();
+        expect_eq!(actual = root_domain.unique_name, expected = "test_root.on");
+
+        let other_domain = ontology
+            .find_domain(other_foo.def_id().package_id())
+            .unwrap();
+        expect_eq!(actual = other_domain.unique_name, expected = "other");
 
         fn extract_prop_rel_id<'o>(binding: &TypeBinding, test: &'o OntolTest) -> RelationshipId {
             let operator = test

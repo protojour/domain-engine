@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use codegen::task::{execute_codegen_tasks, CodegenTasks};
 use def::{DefKind, Defs, LookupRelationshipMeta, RelationshipMeta, TypeDef};
@@ -66,6 +66,7 @@ pub struct Compiler<'m> {
     pub sources: Sources,
 
     pub(crate) packages: Packages,
+    pub(crate) package_names: Vec<(PackageId, Arc<String>)>,
 
     pub(crate) namespaces: Namespaces,
     pub(crate) defs: Defs<'m>,
@@ -93,6 +94,7 @@ impl<'m> Compiler<'m> {
         Self {
             sources,
             packages: Default::default(),
+            package_names: Default::default(),
             namespaces: Default::default(),
             defs,
             package_config_table: Default::default(),
@@ -187,6 +189,9 @@ impl<'m> Compiler<'m> {
 
         self.seal_domain(package.package_id);
 
+        self.package_names
+            .push((package.package_id, src.name.clone()));
+
         self.check_error()
     }
 
@@ -198,6 +203,7 @@ impl<'m> Compiler<'m> {
     /// Finish compilation, turn into runtime ontology.
     pub fn into_ontology(mut self) -> Ontology {
         let package_ids = self.package_ids();
+        let unique_domain_names = self.unique_domain_names();
 
         let mut namespaces = std::mem::take(&mut self.namespaces.namespaces);
         let mut package_config_table = std::mem::take(&mut self.package_config_table);
@@ -210,7 +216,10 @@ impl<'m> Compiler<'m> {
 
         // For now, create serde operators for every domain
         for package_id in package_ids.iter().cloned() {
-            let mut domain = Domain::default();
+            let domain_name = unique_domain_names
+                .get(&package_id)
+                .expect("Anonymous domain");
+            let mut domain = Domain::new(domain_name.into());
 
             let namespace = namespaces.remove(&package_id).unwrap();
             let type_namespace = namespace.types;
@@ -454,6 +463,24 @@ impl<'m> Compiler<'m> {
                 }
             }
         }
+    }
+
+    fn unique_domain_names(&self) -> FnvHashMap<PackageId, String> {
+        let mut map: HashMap<String, PackageId> = HashMap::new();
+        map.insert("ontol".into(), ONTOL_PKG);
+
+        for (package_id, name) in &self.package_names {
+            if map.contains_key(name.as_ref()) {
+                todo!("Two distinct domains are called `{name}`. This is not handled yet");
+            }
+
+            map.insert(name.as_ref().clone(), *package_id);
+        }
+
+        // invert
+        map.into_iter()
+            .map(|(name, package_id)| (package_id, name))
+            .collect()
     }
 
     /// Check for errors and bail out of the compilation process now, if in error state.
