@@ -64,7 +64,7 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
 
     pub fn build_scope_binder(&mut self, node: ontol_hir::Node) -> UnifierResult<ScopeBinder<'m>> {
         let hir_meta = *self.hir_arena[node].meta();
-        match self.hir_arena.kind(node) {
+        match self.hir_arena.kind_of(node) {
             ontol_hir::Kind::Var(var) => Ok(ScopeBinder {
                 binder: Some(ontol_hir::Binder { var: *var }.with_meta(hir_meta)),
                 scope: scope::Scope(
@@ -236,7 +236,7 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
         disjoint_group: usize,
     ) -> UnifierResult<Vec<scope::Prop<'m>>> {
         if let ontol_hir::Kind::Prop(optional, struct_var, prop_id, variants) =
-            self.hir_arena.kind(node)
+            self.hir_arena.kind_of(node)
         {
             let mut props = Vec::with_capacity(variants.len());
 
@@ -358,7 +358,7 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
             analysis.hir_meta,
         ));
 
-        match (self.hir_arena.kind(args[var_arg_index]), next_analysis) {
+        match (self.hir_arena.kind_of(args[var_arg_index]), next_analysis) {
             (
                 ontol_hir::Kind::Var(_),
                 ExprAnalysis {
@@ -470,7 +470,7 @@ fn analyze_expr<'m>(
     defining_var_hint: Option<ontol_hir::Var>,
     hir_arena: &ontol_hir::arena::Arena<'m, TypedHir>,
 ) -> UnifierResult<ExprAnalysis<'m>> {
-    match hir_arena.kind(node) {
+    match hir_arena.kind_of(node) {
         ontol_hir::Kind::Call(_, args) => {
             let mut kind = ExprAnalysisKind::Const;
             let mut defining_var = None;

@@ -721,7 +721,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
             return;
         };
 
-        match arena.kind(rel) {
+        match arena.kind_of(rel) {
             ontol_hir::Kind::Unit => {
                 self.gen_node(arena.node_ref(val), block);
                 block.op(

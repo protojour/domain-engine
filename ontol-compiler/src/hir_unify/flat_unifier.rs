@@ -780,7 +780,7 @@ fn unify_scope_structural<'m>(
                         for assignment in std::mem::take(&mut scope_map.assignments) {
                             if let expr::Expr(expr::Kind::Prop(prop), meta) = assignment.expr {
                                 if let expr::PropVariant::Seq { label, .. } = &prop.variant {
-                                    let infererer =
+                                    let inferer =
                                         seq_type_inferers.entry(*label).or_insert_with(|| {
                                             SeqTypeInfer::new(OutputVar(
                                                 unifier.var_allocator.alloc(),
@@ -789,7 +789,7 @@ fn unify_scope_structural<'m>(
 
                                     let rel = unifier.mk_node(ontol_hir::Kind::Unit, UNIT_META);
                                     let val = unifier.mk_node(
-                                        ontol_hir::Kind::Var(infererer.output_seq_var.0),
+                                        ontol_hir::Kind::Var(inferer.output_seq_var.0),
                                         meta.hir_meta,
                                     );
 

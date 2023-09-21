@@ -73,7 +73,7 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
         }: NextNode,
         next_node_set: &mut Vec<NextNode>,
     ) -> Result<(), UnifierError> {
-        match self.hir_arena.kind(node) {
+        match self.hir_arena.kind_of(node) {
             ontol_hir::Kind::Unit
             | ontol_hir::Kind::I64(_)
             | ontol_hir::Kind::F64(_)
@@ -372,7 +372,7 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
     }
 
     fn is_unit(&self, node: ontol_hir::Node) -> bool {
-        matches!(self.hir_arena.kind(node), ontol_hir::Kind::Unit)
+        matches!(self.hir_arena.kind_of(node), ontol_hir::Kind::Unit)
     }
 
     fn is_const(&self, node: ontol_hir::Node) -> bool {

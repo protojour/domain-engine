@@ -14,7 +14,7 @@ impl<'h, 'a, L: Lang> std::fmt::Display for NodeRef<'h, 'a, L> {
             indent: Sep::None,
             arena: self.arena,
         };
-        printer.print(Sep::None, self.arena.kind(self.node), f)?;
+        printer.print(Sep::None, self.arena.kind_of(self.node), f)?;
         Ok(())
     }
 }
@@ -45,7 +45,7 @@ pub struct Printer<'h, 'a, L: Lang> {
 
 impl<'h, 'a, L: Lang> Printer<'h, 'a, L> {
     fn kind(&self, node: Node) -> &Kind<'a, L> {
-        self.arena.kind(node)
+        self.arena.kind_of(node)
     }
 
     fn kinds<'n>(&self, nodes: &'n [Node]) -> KindsIter<'n, 'h, 'a, L> {
@@ -66,7 +66,7 @@ impl<'n, 'h, 'a, L: Lang> Iterator for KindsIter<'n, 'h, 'a, L> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let next = self.nodes.next()?;
-        Some(self.arena.kind(*next))
+        Some(self.arena.kind_of(*next))
     }
 }
 

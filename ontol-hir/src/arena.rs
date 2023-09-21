@@ -23,7 +23,7 @@ impl<'a, L: Lang> Arena<'a, L> {
         }
     }
 
-    pub fn kind(&self, node: Node) -> &Kind<'a, L> {
+    pub fn kind_of(&self, node: Node) -> &Kind<'a, L> {
         L::as_hir(&self[node])
     }
 
@@ -31,11 +31,11 @@ impl<'a, L: Lang> Arena<'a, L> {
         NodeRef { arena: self, node }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &L::Data<'a, Kind<'a, L>>> {
+    pub fn iter_data(&self) -> impl Iterator<Item = &L::Data<'a, Kind<'a, L>>> {
         self.entries.iter()
     }
 
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut L::Data<'a, Kind<'a, L>>> {
+    pub fn iter_data_mut(&mut self) -> impl Iterator<Item = &mut L::Data<'a, Kind<'a, L>>> {
         self.entries.iter_mut()
     }
 

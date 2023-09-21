@@ -22,18 +22,18 @@ pub(super) struct HirArmTypeInference<'c, 'm> {
 }
 
 impl<'c, 'm> HirArmTypeInference<'c, 'm> {
-    pub fn infer_node(&mut self, node: &mut TypedHirData<'m, ontol_hir::Kind<'m, TypedHir>>) {
+    pub fn infer(&mut self, data: &mut TypedHirData<'m, ontol_hir::Kind<'m, TypedHir>>) {
         let mut infer = Infer {
             types: self.types,
             eq_relations: self.eq_relations,
         };
-        match infer.infer_recursive(node.ty()) {
-            Ok(ty) => node.meta_mut().ty = ty,
+        match infer.infer_recursive(data.ty()) {
+            Ok(ty) => data.meta_mut().ty = ty,
             Err(TypeError::Propagated) => {}
             Err(TypeError::NotEnoughInformation) => {
                 self.errors.error(
                     CompileError::TODO(smart_format!("Not enough type information")),
-                    &node.span(),
+                    &data.span(),
                 );
             }
             _ => panic!("Unexpected inference error"),
@@ -53,7 +53,7 @@ impl<'c, 'm> HirVariableMapper<'c, 'm> {
         let mut alloc = arena.pre_allocator();
         let mut new_var_nodes: Vec<TypedHirData<'m, ontol_hir::Kind<'m, TypedHir>>> = vec![];
 
-        for data in arena.iter_mut() {
+        for data in arena.iter_data_mut() {
             if let ontol_hir::Kind::Var(var) = data.hir() {
                 if let Some(var_mapping) = self.variable_mapping.get(var) {
                     let arm = self.arm;

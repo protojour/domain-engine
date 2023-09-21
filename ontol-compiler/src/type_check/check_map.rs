@@ -118,8 +118,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             eq_relations: &mut ctx.inference.eq_relations,
             errors: self.errors,
         };
-        for node in hir_root_node.arena_mut().iter_mut() {
-            inference.infer_node(node);
+        for data in hir_root_node.arena_mut().iter_data_mut() {
+            inference.infer(data);
         }
     }
 

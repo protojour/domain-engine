@@ -81,7 +81,7 @@ fn needs_regroup(nodes: &[ontol_hir::Node], arena: &ontol_hir::arena::Arena<Type
     let mut variant_counter: FnvHashMap<(ontol_hir::Var, PropertyId), usize> = Default::default();
 
     for node in nodes {
-        if let ontol_hir::Kind::MatchProp(struct_var, prop_id, _) = arena.kind(*node) {
+        if let ontol_hir::Kind::MatchProp(struct_var, prop_id, _) = arena.kind_of(*node) {
             let count = variant_counter.entry((*struct_var, *prop_id)).or_default();
             *count += 1;
         }
