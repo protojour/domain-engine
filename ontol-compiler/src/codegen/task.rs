@@ -8,7 +8,7 @@ use ontol_runtime::{
     vm::proc::{Address, Lib, Procedure},
     DefId, MapKey,
 };
-use tracing::{debug, warn};
+use tracing::{debug, debug_span, warn};
 
 use crate::{
     codegen::code_generator::map_codegen, hir_unify::unify_to_function, typed_hir::TypedHir,
@@ -197,7 +197,7 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
         );
 
         if !map_task.second.is_match {
-            debug!("Forward start");
+            let _entered = debug_span!("forward").entered();
             match unify_to_function(&map_task.first.node, &map_task.second.node, compiler) {
                 Ok(func) => {
                     let errors = map_codegen(&mut proc_table, func, compiler);
@@ -208,7 +208,7 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
         }
 
         if !map_task.first.is_match {
-            debug!("Backward start");
+            let _entered = debug_span!("backward").entered();
             match unify_to_function(&map_task.second.node, &map_task.first.node, compiler) {
                 Ok(func) => {
                     let errors = map_codegen(&mut proc_table, func, compiler);

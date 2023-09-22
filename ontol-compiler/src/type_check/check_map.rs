@@ -3,7 +3,7 @@ use std::collections::hash_map::Entry;
 use fnv::FnvHashSet;
 use ontol_hir::{Label, VarAllocator};
 use ontol_runtime::smart_format;
-use tracing::debug;
+use tracing::{debug, debug_span};
 
 use crate::{
     codegen::{
@@ -52,27 +52,33 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 _ => false,
             }
         };
-        // ctx.is_scalar_mapping = true;
+        ctx.is_scalar_mapping = false;
 
         {
             let mut map_check = MapCheck {
                 errors: self.errors,
                 patterns: self.patterns,
             };
-            debug!("FIRST ARM START");
-            ctx.arm = Arm::First;
-            let _ = map_check.analyze_arm(
-                map_check.patterns.table.get(&first_id).unwrap(),
-                None,
-                &mut ctx,
-            )?;
-            debug!("SECOND ARM START");
-            ctx.arm = Arm::Second;
-            let _ = map_check.analyze_arm(
-                map_check.patterns.table.get(&second_id).unwrap(),
-                None,
-                &mut ctx,
-            )?;
+
+            {
+                let _entered = debug_span!("1st").entered();
+                ctx.arm = Arm::First;
+                map_check.analyze_arm(
+                    map_check.patterns.table.get(&first_id).unwrap(),
+                    None,
+                    &mut ctx,
+                )?;
+            }
+
+            {
+                let _entered = debug_span!("2nd").entered();
+                ctx.arm = Arm::Second;
+                map_check.analyze_arm(
+                    map_check.patterns.table.get(&second_id).unwrap(),
+                    None,
+                    &mut ctx,
+                )?;
+            }
         }
 
         self.build_arms(def, first_id, second_id, &mut ctx)?;
@@ -89,15 +95,21 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         second_id: PatId,
         ctx: &mut HirBuildCtx<'m>,
     ) -> Result<(), AggrGroupError> {
-        ctx.arm = Arm::First;
-        debug!("Build first arm");
-        let mut first = self.build_root_pattern(first_id, ctx);
-        self.infer_hir_arm_types(&mut first, ctx);
+        let mut first = {
+            let _entered = debug_span!("1st").entered();
+            ctx.arm = Arm::First;
+            let mut root_node = self.build_root_pattern(first_id, ctx);
+            self.infer_hir_arm_types(&mut root_node, ctx);
+            root_node
+        };
 
-        ctx.arm = Arm::Second;
-        debug!("Build second arm");
-        let mut second = self.build_root_pattern(second_id, ctx);
-        self.infer_hir_arm_types(&mut second, ctx);
+        let mut second = {
+            let _entered = debug_span!("2nd").entered();
+            ctx.arm = Arm::Second;
+            let mut root_node = self.build_root_pattern(second_id, ctx);
+            self.infer_hir_arm_types(&mut root_node, ctx);
+            root_node
+        };
 
         // unify the type of variables on either side:
         self.infer_hir_unify_arms(&mut first, &mut second, ctx);
