@@ -16,8 +16,6 @@ pub struct CtrlFlowDepth(pub u16);
 pub struct HirBuildCtx<'m> {
     /// The ontol-hir arena that is getting built
     pub hir_arena: ontol_hir::arena::Arena<'m, TypedHir>,
-    /// Whether the mapping is a scalar mapping, .i.e. from `x: a` to `y: b`
-    pub is_scalar_mapping: bool,
     pub map_kw_span: SourceSpan,
     pub inference: Inference<'m>,
     pub pattern_variables: FnvHashMap<ontol_hir::Var, PatternVariable>,
@@ -47,7 +45,6 @@ impl<'m> HirBuildCtx<'m> {
     pub fn new(map_kw_span: SourceSpan, var_allocator: ontol_hir::VarAllocator) -> Self {
         Self {
             hir_arena: Default::default(),
-            is_scalar_mapping: false,
             map_kw_span,
             inference: Inference::new(),
             pattern_variables: Default::default(),

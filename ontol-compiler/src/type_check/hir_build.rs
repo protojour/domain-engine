@@ -10,7 +10,7 @@ use crate::{
     pattern::{PatId, Pattern, PatternKind, RegexPatternCaptureNode},
     primitive::PrimitiveKind,
     type_check::{
-        ena_inference::UnifyValue,
+        ena_inference::{InferValue, Strength},
         hir_build_ctx::{ExplicitVariableArm, PatternVariable},
         hir_build_unpack::UnpackInfo,
     },
@@ -19,10 +19,12 @@ use crate::{
     SourceSpan, NO_SPAN,
 };
 
-use super::{hir_build_ctx::HirBuildCtx, TypeCheck, TypeEquation, TypeError};
+use super::{
+    ena_inference::KnownType, hir_build_ctx::HirBuildCtx, TypeCheck, TypeEquation, TypeError,
+};
 
 pub(super) struct NodeInfo<'m> {
-    pub expected_ty: Option<TypeRef<'m>>,
+    pub expected_ty: Option<KnownType<'m>>,
     pub parent_struct_flags: ontol_hir::StructFlags,
 }
 
@@ -56,7 +58,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 debug!("Check pat(2) root type result: {:?}", node_meta.ty);
                 ctx.inference
                     .eq_relations
-                    .unify_var_value(type_var, UnifyValue::Known(node_meta.ty))
+                    .unify_var_value(
+                        type_var,
+                        InferValue::Known((node_meta.ty, Strength::Strong)),
+                    )
                     .unwrap();
             }
         }
@@ -99,7 +104,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             let node = self.build_node(
                                 arg,
                                 NodeInfo {
-                                    expected_ty: Some(param_ty),
+                                    // Function arguments have weak type constraints.
+                                    expected_ty: Some((param_ty, Strength::Weak)),
                                     parent_struct_flags: node_info.parent_struct_flags,
                                 },
                                 ctx,
@@ -155,19 +161,19 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 let struct_meta = *ctx.hir_arena[struct_node].meta();
                 match expected_ty {
-                    Some(Type::Infer(_)) => struct_node,
-                    Some(Type::Domain(_)) => struct_node,
-                    Some(Type::Option(Type::Domain(_))) => {
+                    Some((Type::Infer(_), _)) => struct_node,
+                    Some((Type::Domain(_), _)) => struct_node,
+                    Some((Type::Option(Type::Domain(_)), _)) => {
                         *ctx.hir_arena[struct_node].meta_mut() = Meta {
                             ty: self.types.intern(Type::Option(struct_meta.ty)),
                             span: struct_meta.span,
                         };
                         struct_node
                     }
-                    Some(expected_ty) => self.type_error_node(
+                    Some((expected_ty, _)) => self.type_error_node(
                         TypeError::Mismatch(TypeEquation {
-                            actual: struct_meta.ty,
-                            expected: expected_ty,
+                            actual: (struct_meta.ty, Strength::Strong),
+                            expected: (expected_ty, Strength::Strong),
                         }),
                         &pattern.span,
                         ctx,
@@ -182,14 +188,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     is_unit_binding,
                     attributes,
                 },
-                Some(expected_struct_ty @ Type::Anonymous(def_id)),
+                Some((expected_struct_ty @ Type::Anonymous(def_id), _)),
             ) => {
                 let actual_ty = self.check_def_sealed(*def_id);
                 if actual_ty != expected_struct_ty {
                     return self.type_error_node(
                         TypeError::Mismatch(TypeEquation {
-                            actual: actual_ty,
-                            expected: expected_struct_ty,
+                            actual: (actual_ty, Strength::Strong),
+                            expected: (expected_struct_ty, Strength::Strong),
                         }),
                         &pattern.span,
                         ctx,
@@ -217,8 +223,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             ) => self.type_error_node(TypeError::NoRelationParametersExpected, &pattern.span, ctx),
             (PatternKind::Seq(aggr_pat_id, pat_elements), expected_ty) => {
                 let (rel_ty, val_ty) = match expected_ty {
-                    Some(Type::Seq(rel_ty, val_ty)) => (*rel_ty, *val_ty),
-                    Some(other_ty) => {
+                    Some((Type::Seq(rel_ty, val_ty), _)) => (*rel_ty, *val_ty),
+                    Some((other_ty, _strength)) => {
                         // Handle looping regular expressions
                         if let Type::Primitive(PrimitiveKind::Text, _) | Type::TextLike(..) =
                             other_ty
@@ -292,7 +298,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let val = self.build_node(
                     &pat_elements.iter().next().unwrap().pattern,
                     NodeInfo {
-                        expected_ty: Some(val_ty),
+                        expected_ty: Some((val_ty, Strength::Strong)),
                         parent_struct_flags: node_info.parent_struct_flags,
                     },
                     ctx,
@@ -312,20 +318,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 )
             }
             (PatternKind::ConstI64(int), Some(expected_ty)) => match expected_ty {
-                Type::Primitive(PrimitiveKind::I64, _) => ctx.mk_node(
+                (Type::Primitive(PrimitiveKind::I64, _), _strengt) => ctx.mk_node(
                     ontol_hir::Kind::I64(*int),
                     Meta {
-                        ty: expected_ty,
+                        ty: expected_ty.0,
                         span: pattern.span,
                     },
                 ),
-                Type::Primitive(PrimitiveKind::F64, _) => {
+                (Type::Primitive(PrimitiveKind::F64, _), _strength) => {
                     // Didn't find a way to go from i64 to f64 in Rust std..
                     match f64::from_str(&int.to_string()) {
                         Ok(float) => ctx.mk_node(
                             ontol_hir::Kind::F64(float),
                             Meta {
-                                ty: expected_ty,
+                                ty: expected_ty.0,
                                 span: pattern.span,
                             },
                         ),
@@ -337,18 +343,18 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 _ => self.error_node(CompileError::IncompatibleLiteral, &pattern.span, ctx),
             },
             (PatternKind::ConstText(literal), Some(expected_ty)) => match expected_ty {
-                Type::Primitive(PrimitiveKind::Text, _) => ctx.mk_node(
+                (Type::Primitive(PrimitiveKind::Text, _), _strength) => ctx.mk_node(
                     ontol_hir::Kind::Text(literal.clone()),
                     Meta {
-                        ty: expected_ty,
+                        ty: expected_ty.0,
                         span: pattern.span,
                     },
                 ),
-                Type::TextConstant(def_id) => match self.defs.def_kind(*def_id) {
+                (Type::TextConstant(def_id), _strength) => match self.defs.def_kind(*def_id) {
                     DefKind::TextLiteral(lit) if literal == lit => ctx.mk_node(
                         ontol_hir::Kind::Text(literal.clone()),
                         Meta {
-                            ty: expected_ty,
+                            ty: expected_ty.0,
                             span: pattern.span,
                         },
                     ),
@@ -378,7 +384,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let type_var = ctx.inference.new_type_variable(arm_pat_id);
 
                 match expected_ty {
-                    Some(Type::Seq(_rel_ty, val_ty)) => self.type_error_node(
+                    Some((Type::Seq(_rel_ty, val_ty), _)) => self.type_error_node(
                         TypeError::VariableMustBeSequenceEnclosed(val_ty),
                         &pattern.span,
                         ctx,
@@ -387,7 +393,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         let variable_ref = ctx.mk_node(
                             ontol_hir::Kind::Var(*var),
                             Meta {
-                                ty: expected_ty,
+                                ty: expected_ty.0,
                                 span: pattern.span,
                             },
                         );
@@ -397,14 +403,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         match ctx
                             .inference
                             .eq_relations
-                            .unify_var_value(type_var, UnifyValue::Known(expected_ty))
+                            .unify_var_value(type_var, InferValue::Known(expected_ty))
                         {
                             // Variables are the same type, no mapping necessary:
                             Ok(_) => variable_ref,
                             // Need to map:
                             Err(err @ TypeError::Mismatch(type_eq)) => {
                                 match (&type_eq.actual, &type_eq.expected) {
-                                    (Type::Domain(_), Type::Domain(_)) => {
+                                    ((Type::Domain(_), _), (Type::Domain(_), _)) => {
                                         panic!("Should not happen anymore");
                                     }
 
@@ -421,11 +427,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             (PatternKind::Regex(regex_pattern), Some(expected_ty)) => match expected_ty {
                 // TODO: Handle compile-time match of string constant?
-                Type::Primitive(PrimitiveKind::Text, _) | Type::TextConstant(_) => {
+                (Type::Primitive(PrimitiveKind::Text, _) | Type::TextConstant(_), _strength) => {
                     let capture_groups_list = self.build_regex_capture_alternations(
                         &regex_pattern.capture_node,
                         &pattern.span,
-                        expected_ty,
+                        expected_ty.0,
                         ctx,
                     );
 
@@ -436,7 +442,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             capture_groups_list,
                         ),
                         Meta {
-                            ty: expected_ty,
+                            ty: expected_ty.0,
                             span: pattern.span,
                         },
                     )
@@ -462,10 +468,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         match (node_info.expected_ty, typed_node.ty()) {
             (_, Type::Error | Type::Infer(_)) => {}
-            (Some(Type::Infer(type_var)), _) => {
+            (Some((Type::Infer(type_var), strength)), _) => {
                 ctx.inference
                     .eq_relations
-                    .unify_var_value(*type_var, UnifyValue::Known(typed_node.ty()))
+                    .unify_var_value(*type_var, InferValue::Known((typed_node.ty(), strength)))
                     .unwrap();
             }
             _ => {}
@@ -508,7 +514,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         span: prop_span,
                     },
                     NodeInfo {
-                        expected_ty: Some(ty),
+                        expected_ty: Some((ty, Strength::Strong)),
                         parent_struct_flags: Default::default(),
                     },
                     ctx,

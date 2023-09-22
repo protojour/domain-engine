@@ -21,8 +21,10 @@ use crate::{
 };
 
 use super::{
+    ena_inference::{KnownType, Strength},
     hir_build_ctx::{CtrlFlowDepth, CtrlFlowGroup, HirBuildCtx, PatternVariable},
     hir_type_inference::{HirArmTypeInference, HirVariableMapper},
+    repr::repr_model::ReprKind,
     TypeCheck, TypeEquation, TypeError,
 };
 
@@ -35,24 +37,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         second_id: PatId,
     ) -> Result<TypeRef<'m>, AggrGroupError> {
         let mut ctx = HirBuildCtx::new(def.span, VarAllocator::from(*var_allocator.peek_next()));
-        ctx.is_scalar_mapping = {
-            let first_pat_kind = self.patterns.table.get(&first_id).map(Pattern::kind);
-            let second_pat_kind = self.patterns.table.get(&second_id).map(Pattern::kind);
-            match (first_pat_kind, second_pat_kind) {
-                (
-                    Some(PatternKind::Unpack {
-                        is_unit_binding: is_unit1,
-                        ..
-                    }),
-                    Some(PatternKind::Unpack {
-                        is_unit_binding: is_unit2,
-                        ..
-                    }),
-                ) => *is_unit1 && *is_unit2,
-                _ => false,
-            }
-        };
-        ctx.is_scalar_mapping = false;
 
         {
             let mut map_check = MapCheck {
@@ -165,43 +149,49 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             let first_arm = explicit_var.hir_arms.get(&Arm::First);
             let second_arm = explicit_var.hir_arms.get(&Arm::Second);
 
-            if let (Some(first_arm), Some(second_arm)) = (first_arm, second_arm) {
-                let first_type_var = ctx.inference.new_type_variable(first_arm.pat_id);
-                let second_type_var = ctx.inference.new_type_variable(second_arm.pat_id);
+            let (Some(first_arm), Some(second_arm)) = (first_arm, second_arm) else {
+                continue;
+            };
+            let first_type_var = ctx.inference.new_type_variable(first_arm.pat_id);
+            let second_type_var = ctx.inference.new_type_variable(second_arm.pat_id);
 
-                match ctx
-                    .inference
-                    .eq_relations
-                    .unify_var_var(first_type_var, second_type_var)
+            let Err(type_error) = ctx
+                .inference
+                .eq_relations
+                .unify_var_var(first_type_var, second_type_var)
+            else {
+                continue;
+            };
+            let TypeError::Mismatch(TypeEquation { actual, expected }) = type_error else {
+                unreachable!();
+            };
+
+            match (actual.0.get_single_def_id(), expected.0.get_single_def_id()) {
+                (Some(first_def_id), Some(second_def_id))
+                    if actual.0.is_domain_specific() || expected.0.is_domain_specific() =>
                 {
-                    Ok(_) => {}
-                    Err(TypeError::Mismatch(TypeEquation { actual, expected })) => {
-                        match (actual.get_single_def_id(), expected.get_single_def_id()) {
-                            (Some(first_def_id), Some(second_def_id))
-                                if actual.is_domain_specific() || expected.is_domain_specific() =>
-                            {
-                                ctx.variable_mapping.insert(
-                                    *var,
-                                    VariableMapping {
-                                        first_arm_type: actual,
-                                        second_arm_type: expected,
-                                    },
-                                );
-
-                                self.codegen_tasks.add_map_task(
-                                    MapKeyPair::new(first_def_id.into(), second_def_id.into()),
-                                    MapCodegenTask::Auto,
-                                );
-                            }
-                            _ => {
-                                self.type_error(
-                                    TypeError::Mismatch(TypeEquation { actual, expected }),
-                                    &second_arm.span,
-                                );
-                            }
-                        }
+                    if self.are_distinct_domain_types_weakly_repr_compatible(actual, expected) {
+                        continue;
                     }
-                    Err(_) => todo!(),
+
+                    ctx.variable_mapping.insert(
+                        *var,
+                        VariableMapping {
+                            first_arm_type: actual.0,
+                            second_arm_type: expected.0,
+                        },
+                    );
+
+                    self.codegen_tasks.add_map_task(
+                        MapKeyPair::new(first_def_id.into(), second_def_id.into()),
+                        MapCodegenTask::Auto,
+                    );
+                }
+                _ => {
+                    self.type_error(
+                        TypeError::Mismatch(TypeEquation { actual, expected }),
+                        &second_arm.span,
+                    );
                 }
             }
         }
@@ -216,6 +206,38 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             arm: Arm::Second,
         }
         .map_vars(second.arena_mut());
+    }
+
+    /// Computes whether two scalar types are compatible when one has
+    /// a weak type constraint and the other has a strong strong type constraint.
+    /// In that case, the variables do not need to be mapped.
+    fn are_distinct_domain_types_weakly_repr_compatible(
+        &mut self,
+        first: KnownType,
+        second: KnownType,
+    ) -> bool {
+        if first.1 == Strength::Strong && second.1 == Strength::Strong {
+            return false;
+        }
+
+        let first_def_id = first.0.get_single_def_id().unwrap();
+        let second_def_id = second.0.get_single_def_id().unwrap();
+        let first_repr = self.seal_ctx.get_repr_kind(&first_def_id).unwrap();
+        let second_repr = self.seal_ctx.get_repr_kind(&second_def_id).unwrap();
+
+        match (first_repr, second_repr) {
+            (
+                ReprKind::Scalar(first_sc_def_id, first_kind, _),
+                ReprKind::Scalar(second_sc_def_id, second_kind, _),
+            ) => {
+                if first_kind != second_kind {
+                    return false;
+                }
+
+                first_sc_def_id == second_sc_def_id
+            }
+            _ => false,
+        }
     }
 
     fn report_missing_prop_errors(&mut self, ctx: &mut HirBuildCtx<'m>) {

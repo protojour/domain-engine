@@ -20,7 +20,7 @@ impl<'m> Debug for TypeVar<'m> {
 }
 
 impl<'m> ena::unify::UnifyKey for TypeVar<'m> {
-    type Value = UnifyValue<'m>;
+    type Value = InferValue<'m>;
 
     fn index(&self) -> u32 {
         self.0
@@ -35,29 +35,39 @@ impl<'m> ena::unify::UnifyKey for TypeVar<'m> {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Debug)]
-pub enum UnifyValue<'m> {
-    Known(TypeRef<'m>),
+pub type KnownType<'m> = (TypeRef<'m>, Strength);
+
+/// If a weak type is unified with a strong type and they are
+/// Repr-compatible, choose the strong type
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
+pub enum Strength {
+    Strong,
+    Weak,
+}
+
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
+pub enum InferValue<'m> {
+    Known(KnownType<'m>),
     Unknown,
 }
 
-impl<'m> ena::unify::UnifyValue for UnifyValue<'m> {
+impl<'m> ena::unify::UnifyValue for InferValue<'m> {
     type Error = TypeError<'m>;
 
     fn unify_values(value1: &Self, value2: &Self) -> Result<Self, Self::Error> {
         match (value1, value2) {
-            (Self::Known(a), Self::Known(b)) => {
+            (Self::Known((a, a_strength)), Self::Known((b, b_strength))) => {
                 if a == b {
                     Ok(value1.clone())
                 } else {
                     Err(TypeError::Mismatch(TypeEquation {
-                        actual: a,
-                        expected: b,
+                        actual: (a, *a_strength),
+                        expected: (b, *b_strength),
                     }))
                 }
             }
-            (Self::Known(_), Self::Unknown) => Ok(value1.clone()),
-            (Self::Unknown, Self::Known(_)) => Ok(value2.clone()),
+            (Self::Known(..), Self::Unknown) => Ok(value1.clone()),
+            (Self::Unknown, Self::Known(..)) => Ok(value2.clone()),
             (Self::Unknown, Self::Unknown) => Ok(Self::Unknown),
         }
     }
@@ -77,7 +87,7 @@ impl<'m> Inference<'m> {
     }
 
     pub fn new_type_variable(&mut self, variable_id: PatId) -> TypeVar<'m> {
-        let type_var = self.eq_relations.new_key(UnifyValue::Unknown);
+        let type_var = self.eq_relations.new_key(InferValue::Unknown);
         let var_equations = self.variables.entry(variable_id).or_default();
 
         for var in var_equations.iter() {
@@ -99,8 +109,8 @@ impl<'c, 'm> Infer<'c, 'm> {
         match ty {
             Type::Error => Err(TypeError::Propagated),
             Type::Infer(var) => match self.eq_relations.probe_value(*var) {
-                UnifyValue::Known(ty) => Ok(ty),
-                UnifyValue::Unknown => Err(TypeError::NotEnoughInformation),
+                InferValue::Known((ty, _)) => Ok(ty),
+                InferValue::Unknown => Err(TypeError::NotEnoughInformation),
             },
             Type::Seq(rel, val) => {
                 let rel = self.infer_recursive(rel)?;

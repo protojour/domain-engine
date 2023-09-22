@@ -12,7 +12,9 @@ use crate::{
     mem::Intern,
     pattern::{PatternKind, StructPatternAttr, UnpackPatternModifier},
     primitive::PrimitiveKind,
-    type_check::{hir_build::NodeInfo, repr::repr_model::ReprKind, TypeError},
+    type_check::{
+        ena_inference::Strength, hir_build::NodeInfo, repr::repr_model::ReprKind, TypeError,
+    },
     typed_hir::{Meta, TypedHir, TypedHirData, UNIT_META},
     types::{Type, TypeRef, UNIT_TYPE},
     CompileError, SourceSpan, NO_SPAN,
@@ -190,7 +192,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 let inner_node = self.build_node(
                                     value,
                                     NodeInfo {
-                                        expected_ty: Some(object_ty),
+                                        expected_ty: Some((object_ty, Strength::Strong)),
                                         parent_struct_flags,
                                     },
                                     ctx,
@@ -222,17 +224,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }) if is_unit_binding => {
                         assert!(*def_id == DefId::unit());
 
-                        let value_ty = if ctx.is_scalar_mapping {
-                            self.check_def_sealed(scalar_def_id)
-                        } else {
-                            self.check_def_sealed(type_def_id)
-                        };
+                        let value_ty = self.check_def_sealed(type_def_id);
                         debug!("scalar_object_ty({type_def_id:?})={scalar_object_ty:?} value_ty={value_ty:?}");
 
                         let inner_node = self.build_node(
                             value,
                             NodeInfo {
-                                expected_ty: Some(value_ty),
+                                expected_ty: Some((value_ty, Strength::Strong)),
                                 parent_struct_flags,
                             },
                             ctx,
@@ -301,7 +299,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             (_, Some(rel)) => self.build_node(
                 rel,
                 NodeInfo {
-                    expected_ty: Some(rel_params_ty),
+                    expected_ty: Some((rel_params_ty, Strength::Strong)),
                     parent_struct_flags: actual_struct_flags,
                 },
                 ctx,
@@ -330,7 +328,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let val_node = self.build_node(
                     value,
                     NodeInfo {
-                        expected_ty: Some(value_ty),
+                        expected_ty: Some((value_ty, Strength::Strong)),
                         parent_struct_flags: actual_struct_flags,
                     },
                     ctx,
@@ -347,7 +345,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         let val_node = self.build_node(
                             &element.pattern,
                             NodeInfo {
-                                expected_ty: Some(value_ty),
+                                expected_ty: Some((value_ty, Strength::Strong)),
                                 parent_struct_flags: actual_struct_flags,
                             },
                             ctx,

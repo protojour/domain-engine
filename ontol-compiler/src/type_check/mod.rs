@@ -13,7 +13,7 @@ use crate::{
     CompileErrors, Compiler, SourceSpan, SpannedNote,
 };
 
-use self::{repr::repr_check::ReprCheck, seal::SealCtx};
+use self::{ena_inference::KnownType, repr::repr_check::ReprCheck, seal::SealCtx};
 
 pub mod check_def;
 pub mod check_domain_types;
@@ -43,8 +43,8 @@ pub enum TypeError<'m> {
 
 #[derive(Clone, Copy, Debug)]
 pub struct TypeEquation<'m> {
-    actual: TypeRef<'m>,
-    expected: TypeRef<'m>,
+    actual: KnownType<'m>,
+    expected: KnownType<'m>,
 }
 
 /// Type checking is a stage in compilation.
@@ -86,11 +86,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 CompileError::TypeMismatch {
                     actual: smart_format!(
                         "{}",
-                        FormatType(equation.actual, self.defs, self.primitives)
+                        FormatType(equation.actual.0, self.defs, self.primitives)
                     ),
                     expected: smart_format!(
                         "{}",
-                        FormatType(equation.expected, self.defs, self.primitives)
+                        FormatType(equation.expected.0, self.defs, self.primitives)
                     ),
                 },
                 span,

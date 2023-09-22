@@ -13,7 +13,7 @@ use crate::{
     types::{Type, TypeRef},
 };
 
-use super::{hir_build::NodeInfo, TypeCheck};
+use super::{ena_inference::Strength, hir_build::NodeInfo, TypeCheck};
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
     /// Do type check of a type and then seal it.
@@ -79,7 +79,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let node = self.build_node(
                     &pattern,
                     NodeInfo {
-                        expected_ty: Some(ty),
+                        expected_ty: Some((ty, Strength::Strong)),
                         parent_struct_flags: Default::default(),
                     },
                     &mut ctx,
