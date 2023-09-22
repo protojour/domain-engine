@@ -453,6 +453,11 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 })
             }
             (expr::Kind::Map(param), scope::Kind::Const) => {
+                debug!(
+                    "expr::Kind::Map outer_ty={:?} inner_ty={:?}",
+                    expr_meta.hir_meta.ty,
+                    param.meta().hir_meta.ty
+                );
                 let unified_param = self.unify(scope::constant(), *param)?;
 
                 Ok(UnifiedNode {

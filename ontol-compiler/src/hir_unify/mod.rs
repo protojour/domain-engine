@@ -8,8 +8,7 @@ use tracing::{info, warn};
 
 use crate::{
     hir_unify::{expr_builder::ExprBuilder, scope_builder::ScopeBuilder, unifier::Unifier},
-    typed_hir::{HirFunc, IntoTypedHirData, Meta, TypedHir},
-    types::Type,
+    typed_hir::{HirFunc, IntoTypedHirData, TypedHir},
     Compiler, SourceSpan,
 };
 
@@ -74,35 +73,15 @@ pub fn unify_to_function<'m>(
         }
     };
 
-    let scope_ty = scope.data().ty();
-    let expr_ty = expr.data().ty();
-
-    match unified.typed_binder {
-        Some(arg) => {
-            // NB: Error is used in unification tests
-            if !matches!(scope_ty, Type::Error) {
-                assert_eq!(arg.ty(), scope_ty);
-            }
-            if !matches!(expr_ty, Type::Error) {
-                assert_eq!(unified.node.data().ty(), expr_ty);
-            }
-
-            Ok(HirFunc {
-                arg,
-                body: unified.node,
-            })
-        }
-        None => Ok(HirFunc {
-            arg: ontol_hir::Binder {
+    Ok(HirFunc {
+        arg: unified.typed_binder.unwrap_or_else(|| {
+            ontol_hir::Binder {
                 var: var_allocator.alloc(),
             }
-            .with_meta(Meta {
-                ty: scope_ty,
-                span: scope.data().span(),
-            }),
-            body: unified.node,
+            .with_meta(*scope.data().meta())
         }),
-    }
+        body: unified.node,
+    })
 }
 
 fn unify_classic<'m>(

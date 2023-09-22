@@ -360,7 +360,7 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
 
         match (self.hir_arena.kind_of(args[var_arg_index]), next_analysis) {
             (
-                ontol_hir::Kind::Var(_),
+                ontol_hir::Kind::Var(_) | ontol_hir::Kind::Map(_),
                 ExprAnalysis {
                     kind: ExprAnalysisKind::Var(scoped_var),
                     ..
@@ -526,6 +526,7 @@ fn analyze_expr<'m>(
             kind: ExprAnalysisKind::Var(*var),
             hir_meta: *hir_arena[node].meta(),
         }),
+        ontol_hir::Kind::Map(inner) => analyze_expr(*inner, defining_var_hint, hir_arena),
         _ => Ok(ExprAnalysis {
             kind: ExprAnalysisKind::Const,
             hir_meta: *hir_arena[node].meta(),

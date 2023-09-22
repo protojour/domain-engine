@@ -12,7 +12,7 @@ use tracing::{debug, debug_span, warn};
 
 use crate::{
     codegen::code_generator::map_codegen, hir_unify::unify_to_function, typed_hir::TypedHir,
-    Compiler, SourceSpan,
+    types::Type, Compiler, SourceSpan,
 };
 
 use super::{
@@ -184,38 +184,18 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
         compiler.errors.extend(errors);
     }
 
-    for map_task in explicit_map_tasks {
-        debug!(
-            "1st (ty={:?}):\n{}",
-            map_task.first.node.data().ty(),
-            map_task.first.node
-        );
-        debug!(
-            "2nd (ty={:?}):\n{}",
-            map_task.second.node.data().ty(),
-            map_task.second.node
-        );
+    for ExplicitMapCodegenTask { first, second, .. } in explicit_map_tasks {
+        debug!("1st (ty={:?}):\n{}", first.node.data().ty(), first.node);
+        debug!("2nd (ty={:?}):\n{}", second.node.data().ty(), second.node);
 
-        if !map_task.second.is_match {
+        if !second.is_match {
             let _entered = debug_span!("forward").entered();
-            match unify_to_function(&map_task.first.node, &map_task.second.node, compiler) {
-                Ok(func) => {
-                    let errors = map_codegen(&mut proc_table, func, compiler);
-                    compiler.errors.extend(errors);
-                }
-                Err(err) => warn!("unifier error: {err:?}"),
-            }
+            generate_map_proc(&first.node, &second.node, &mut proc_table, compiler);
         }
 
-        if !map_task.first.is_match {
+        if !first.is_match {
             let _entered = debug_span!("backward").entered();
-            match unify_to_function(&map_task.second.node, &map_task.first.node, compiler) {
-                Ok(func) => {
-                    let errors = map_codegen(&mut proc_table, func, compiler);
-                    compiler.errors.extend(errors);
-                }
-                Err(err) => warn!("unifier error: {err:?}"),
-            }
+            generate_map_proc(&second.node, &first.node, &mut proc_table, compiler);
         }
     }
 
@@ -229,4 +209,32 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
     compiler.codegen_tasks.result_const_procs = const_procs;
     compiler.codegen_tasks.result_map_proc_table = map_proc_table;
     compiler.codegen_tasks.result_propflow_table = proc_table.propflow_table;
+}
+
+fn generate_map_proc<'m>(
+    scope: &ontol_hir::RootNode<'m, TypedHir>,
+    expr: &ontol_hir::RootNode<'m, TypedHir>,
+    proc_table: &mut ProcTable,
+    compiler: &mut Compiler<'m>,
+) {
+    let func = match unify_to_function(scope, expr, compiler) {
+        Ok(func) => func,
+        Err(err) => {
+            warn!("unifier error: {err:?}");
+            return;
+        }
+    };
+
+    debug!("unified, ready for codegen:\n{}", func);
+
+    // NB: Error is used in unification tests, so don't assert on types matching if there are type errors
+    if !matches!(scope.data().ty(), Type::Error) {
+        assert_eq!(func.arg.ty(), scope.data().ty());
+    }
+    if !matches!(expr.data().ty(), Type::Error) {
+        assert_eq!(func.body.data().ty(), expr.data().ty());
+    }
+
+    let errors = map_codegen(proc_table, &func, compiler);
+    compiler.errors.extend(errors);
 }

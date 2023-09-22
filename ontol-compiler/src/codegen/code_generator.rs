@@ -65,14 +65,12 @@ pub(super) fn const_codegen<'m>(
 /// Maybe find a solution for that.
 pub(super) fn map_codegen<'m>(
     proc_table: &mut ProcTable,
-    func: HirFunc<'m>,
+    func: &HirFunc<'m>,
     compiler: &Compiler<'m>,
 ) -> CompileErrors {
     let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs, &compiler.seal_ctx);
 
-    debug!("Generating code for\n{}", func);
-
-    let body = func.body;
+    let body = &func.body;
     let body_span = body.data().span();
 
     let data_flow = DataFlowAnalyzer::new(&compiler.defs).analyze(func.arg.0.var, body.as_ref());
