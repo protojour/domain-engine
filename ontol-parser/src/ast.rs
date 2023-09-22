@@ -88,7 +88,9 @@ pub enum Cardinality {
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct MapStatement {
+    pub docs: Vec<String>,
     pub kw: Span,
+    pub ident: Option<Spanned<String>>,
     pub first: Spanned<(UnitOrSeq, MapArm)>,
     pub second: Spanned<(UnitOrSeq, MapArm)>,
 }

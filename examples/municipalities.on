@@ -5,7 +5,19 @@ pub def code {
 }
 
 pub def municipality {
-    rel code identifies: .
-    rel .'code': code
+    rel .'code'|id: code
     rel .'geometry': geojson.Geometry
 }
+
+/// Get a single municipality
+map municipality {
+    code: code
+    municipality match { 'code': code }
+}
+
+// map municipalityList {
+//     args { 'first': first , 'after': after }
+//     [
+//         ..municipality match(first, after) {}
+//     ]
+// }

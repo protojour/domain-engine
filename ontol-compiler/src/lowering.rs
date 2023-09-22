@@ -108,7 +108,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 self.fmt_transitions_to_def(fmt_stmt, span, block_context)
             }
             ast::Statement::Map(ast::MapStatement {
+                docs: _,
                 kw: _,
+                ident: _,
                 first,
                 second,
             }) => {
