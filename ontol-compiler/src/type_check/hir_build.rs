@@ -122,7 +122,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 PatternKind::Unpack {
                     type_path: Some(type_path),
                     modifier,
-                    is_unit_binding: _,
+                    is_unit_binding,
                     attributes,
                 },
                 expected_ty,
@@ -145,6 +145,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         type_def_id: type_path.def_id,
                         ty: struct_ty,
                         modifier: *modifier,
+                        is_unit_binding: *is_unit_binding,
                         parent_struct_flags: node_info.parent_struct_flags,
                     },
                     attributes,
@@ -178,7 +179,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 PatternKind::Unpack {
                     type_path: None,
                     modifier,
-                    is_unit_binding: _,
+                    is_unit_binding,
                     attributes,
                 },
                 Some(expected_struct_ty @ Type::Anonymous(def_id)),
@@ -200,6 +201,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         type_def_id: *def_id,
                         ty: actual_ty,
                         modifier: *modifier,
+                        is_unit_binding: *is_unit_binding,
                         parent_struct_flags: node_info.parent_struct_flags,
                     },
                     attributes,
@@ -356,13 +358,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             },
             (PatternKind::Variable(var), expected_ty) => {
                 let arm = ctx.arm;
-                let explicit_variable = ctx
+                let pattern_variable = ctx
                     .pattern_variables
                     .get_mut(var)
                     .expect("variable not found");
 
                 let arm_pat_id = {
-                    let hir_arm = explicit_variable.hir_arms.entry(arm).or_insert_with(|| {
+                    let hir_arm = pattern_variable.hir_arms.entry(arm).or_insert_with(|| {
                         let pat_id = self.patterns.alloc_pat_id();
 
                         ExplicitVariableArm {
@@ -389,6 +391,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 span: pattern.span,
                             },
                         );
+
+                        debug!("Unifying type inference for variable {var}: {expected_ty:?}");
 
                         match ctx
                             .inference
@@ -563,13 +567,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 name_span,
             } => {
                 let arm = ctx.arm;
-                let explicit_variable = ctx
+                let pattern_variable = ctx
                     .pattern_variables
                     .get_mut(var)
                     .expect("variable not found");
 
                 let arm_pat_id = {
-                    let hir_arm = explicit_variable.hir_arms.entry(arm).or_insert_with(|| {
+                    let hir_arm = pattern_variable.hir_arms.entry(arm).or_insert_with(|| {
                         let pat_id = self.patterns.alloc_pat_id();
 
                         ExplicitVariableArm {

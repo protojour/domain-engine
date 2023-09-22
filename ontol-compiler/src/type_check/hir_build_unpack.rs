@@ -24,6 +24,7 @@ pub(super) struct UnpackInfo<'m> {
     pub type_def_id: DefId,
     pub ty: TypeRef<'m>,
     pub modifier: Option<UnpackPatternModifier>,
+    pub is_unit_binding: bool,
     pub parent_struct_flags: ontol_hir::StructFlags,
 }
 
@@ -42,6 +43,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             type_def_id,
             ty,
             modifier,
+            is_unit_binding,
             parent_struct_flags,
         }: UnpackInfo<'m>,
         pattern_attrs: &[StructPatternAttr],
@@ -168,6 +170,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             type_def_id: *def_id,
                             ty: value_object_ty,
                             modifier,
+                            is_unit_binding: false,
                             parent_struct_flags,
                         },
                         pattern_attrs,
@@ -216,18 +219,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         rel: _,
                         bind_option: _,
                         value,
-                    }) if *def_id == DefId::unit() => {
-                        let object_ty = if ctx.is_scalar_mapping {
+                    }) if is_unit_binding => {
+                        assert!(*def_id == DefId::unit());
+
+                        let value_ty = if ctx.is_scalar_mapping {
                             self.check_def_sealed(scalar_def_id)
                         } else {
                             self.check_def_sealed(type_def_id)
                         };
-                        debug!("scalar_object_ty: {type_def_id:?}: {scalar_object_ty:?} object_ty={object_ty:?}");
+                        debug!("scalar_object_ty({type_def_id:?})={scalar_object_ty:?} value_ty={value_ty:?}");
 
                         let inner_node = self.build_node(
                             value,
                             NodeInfo {
-                                expected_ty: Some(object_ty),
+                                expected_ty: Some(value_ty),
                                 parent_struct_flags,
                             },
                             ctx,

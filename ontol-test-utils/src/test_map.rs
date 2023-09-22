@@ -54,6 +54,7 @@ impl Key {
 
 impl OntolTest {
     /// Use mapping procedure to map the json-encoded input value to an output value.
+    #[track_caller]
     pub fn domain_map(
         &self,
         (from, to): (impl AsKey, impl AsKey),
@@ -93,6 +94,7 @@ impl OntolTest {
     }
 
     /// Assert that the serialized output of the mapping of the json-encoded input value matches the expected json document
+    #[track_caller]
     pub fn assert_domain_map(
         &self,
         (from, to): (impl AsKey, impl AsKey),
