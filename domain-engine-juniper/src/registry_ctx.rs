@@ -16,7 +16,7 @@ use ontol_runtime::{
     value::PropertyId,
     Role,
 };
-use tracing::{trace, warn};
+use tracing::trace;
 
 use crate::{
     context::{SchemaCtx, SchemaType},
@@ -45,12 +45,14 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         &mut self,
         type_index: TypeIndex,
     ) -> Vec<juniper::meta::Field<'r, GqlScalar>> {
+        // This is part of a big recursive algorithm, so iterator mapping is avoided
+        let mut fields = vec![];
+
         let type_data = self.schema_ctx.schema.type_data(type_index);
-        match &type_data.kind {
-            TypeKind::Object(object) => object
-                .fields
-                .iter()
-                .map(|(name, field_data)| juniper::meta::Field {
+
+        if let TypeKind::Object(object) = &type_data.kind {
+            for (name, field_data) in &object.fields {
+                let field = juniper::meta::Field {
                     name: name.clone(),
                     description: match &field_data.kind {
                         FieldKind::Property(property) => self
@@ -59,14 +61,17 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                             .get_docs(property.property_id.relationship_id.0),
                         _ => None,
                     },
-                    arguments: self.get_arguments_for_field(&field_data.kind),
+                    arguments: self.get_arguments_to_field(&field_data.kind),
                     field_type: self
                         .get_type::<AttributeType>(field_data.field_type, TypingPurpose::Selection),
                     deprecation_status: juniper::meta::DeprecationStatus::Current,
-                })
-                .collect(),
-            _ => vec![],
+                };
+
+                fields.push(field);
+            }
         }
+
+        fields
     }
 
     pub fn collect_operator_arguments(
@@ -126,6 +131,10 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         );
                     }
                     FilteredVariants::Union(variants) => {
+                        // FIXME: Instead of just deduplicating the properties,
+                        // the documentation for each of them should be combined in some way.
+                        // When a union is used as an InputValue, the GraphQL functions purely
+                        // as a documentation layer anyway.
                         for variant in variants {
                             self.collect_operator_arguments(
                                 variant.operator_id,
@@ -227,7 +236,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         name,
                         &self
                             .schema_ctx
-                            .get_schema_type(type_index, TypingPurpose::ReferenceInput),
+                            .get_schema_type(type_index, TypingPurpose::InputOrReference),
                     ),
                     None => self.get_operator_argument(
                         name,
@@ -239,9 +248,13 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 }
             }
             SerdeOperator::ConstructorSequence(_) => {
-                warn!("Skipping constructor sequence for now");
-                return self.registry.arg::<bool>(name, &());
-                // registry.arg::<CustomScalar>(name, &()),
+                let json_scalar_info = self.schema_ctx.get_schema_type(
+                    self.schema_ctx.schema.json_scalar,
+                    TypingPurpose::PartialInput,
+                );
+
+                self.registry
+                    .arg::<Option<InputType>>(name, &json_scalar_info)
             }
             SerdeOperator::Alias(alias_op) => self.get_operator_argument(
                 name,
@@ -260,7 +273,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 let (query_level, typing_purpose) = if type_info.entity_info.is_some() {
                     (
                         QueryLevel::Edge { rel_params: None },
-                        TypingPurpose::ReferenceInput,
+                        TypingPurpose::InputOrReference,
                     )
                 } else {
                     (QueryLevel::Node, TypingPurpose::Input)
@@ -304,7 +317,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         }
     }
 
-    fn get_arguments_for_field(
+    fn get_arguments_to_field(
         &mut self,
         field_kind: &FieldKind,
     ) -> Option<Vec<juniper::meta::Argument<'r, GqlScalar>>> {
@@ -314,11 +327,12 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 self.registry
                     .arg::<Option<std::string::String>>(after.name(), &()),
             ]),
-            FieldKind::CreateMutation { input } => Some(vec![self.get_domain_arg(input)]),
-            FieldKind::UpdateMutation { id, input } => {
-                Some(vec![self.get_domain_arg(id), self.get_domain_arg(input)])
-            }
-            FieldKind::DeleteMutation { id } => Some(vec![self.get_domain_arg(id)]),
+            FieldKind::CreateMutation { input } => Some(vec![self.get_domain_field_arg(input)]),
+            FieldKind::UpdateMutation { id, input } => Some(vec![
+                self.get_domain_field_arg(id),
+                self.get_domain_field_arg(input),
+            ]),
+            FieldKind::DeleteMutation { id } => Some(vec![self.get_domain_field_arg(id)]),
             FieldKind::Property(_)
             | FieldKind::EdgeProperty(_)
             | FieldKind::Id(_)
@@ -327,7 +341,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         }
     }
 
-    fn get_domain_arg(
+    fn get_domain_field_arg(
         &mut self,
         argument: &dyn DomainFieldArg,
     ) -> juniper::meta::Argument<'r, GqlScalar> {

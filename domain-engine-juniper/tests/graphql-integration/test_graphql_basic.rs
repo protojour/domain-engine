@@ -61,7 +61,7 @@ async fn test_graphql_int_scalars() {
                 .unwrap()
                 .field_type
                 .to_string(),
-            expected = "i64!"
+            expected = "_ontol_i64!"
         );
     }
 
@@ -572,9 +572,9 @@ fn test_graphql_guitar_synth_union_input_union_field_list() {
             // from "guitar".
             FieldInfo::from(("type", "String")),
             // from "guitar".
-            FieldInfo::from(("string_count", "i64")),
+            FieldInfo::from(("string_count", "_ontol_i64")),
             // from "synth". Note the synth `type` is deduplicated.
-            FieldInfo::from(("polyphony", "i64")),
+            FieldInfo::from(("polyphony", "_ontol_i64")),
             // object properties ordered last
             FieldInfo::from(("played_by", "[artistEdgeInput!]")),
         ]
@@ -679,43 +679,41 @@ async fn test_graphql_municipalities() {
     let (test, [schema]) = TestPackages::with_sources([(ROOT, MUNICIPALITIES.1), GEOJSON, WGS])
         .compile_schemas([ROOT]);
 
-    {
-        expect_eq!(
-            actual = "{
-                municipalityList {
-                    edges {
-                        node {
-                            code
-                            geometry {
-                                __typename
-                                ... on _geojson_Polygon {
-                                    coordinates
-                                }
-                                ... on _geojson_GeometryCollection {
-                                    geometries {
-                                        ... on _geojson_Polygon {
-                                            coordinates
-                                        }
+    expect_eq!(
+        actual = "{
+            municipalityList {
+                edges {
+                    node {
+                        code
+                        geometry {
+                            __typename
+                            ... on _geojson_Polygon {
+                                coordinates
+                            }
+                            ... on _geojson_GeometryCollection {
+                                geometries {
+                                    ... on _geojson_Polygon {
+                                        coordinates
                                     }
                                 }
                             }
                         }
                     }
                 }
-            }"
-            .exec(
-                &schema,
-                &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()),
-                []
-            )
-            .await,
-            expected = Ok(graphql_value!({
-                "municipalityList": {
-                    "edges": []
-                }
-            })),
-        );
-    }
+            }
+        }"
+        .exec(
+            &schema,
+            &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()),
+            []
+        )
+        .await,
+        expected = Ok(graphql_value!({
+            "municipalityList": {
+                "edges": []
+            }
+        })),
+    );
 }
 
 #[test]
@@ -739,7 +737,7 @@ fn test_graphql_municipalities_geojson_union() {
         // BUG: The field types look weird
         expected = &[
             FieldInfo::from(("type", "String")),
-            FieldInfo::from(("coordinates", "Boolean!")),
+            FieldInfo::from(("coordinates", "_ontol_json")),
             FieldInfo::from(("geometries", "_geojson_LeafGeometryUnionInput!")),
         ]
     );

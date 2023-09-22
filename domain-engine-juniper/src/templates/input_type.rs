@@ -41,12 +41,14 @@ impl juniper::GraphQLType<GqlScalar> for InputType {
                 ..
             }) => {
                 let mut arguments = vec![];
+
                 reg.collect_operator_arguments(
                     node_data.operator_id,
                     &mut arguments,
                     info.typing_purpose,
                     ArgumentFilter::default(),
                 );
+
                 registry
                     .build_input_object_type::<Self>(info, &arguments)
                     .into_meta()

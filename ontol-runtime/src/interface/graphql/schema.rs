@@ -16,6 +16,7 @@ pub struct GraphqlSchema {
     pub package_id: PackageId,
     pub query: TypeIndex,
     pub mutation: TypeIndex,
+    pub json_scalar: TypeIndex,
     pub i64_custom_scalar: Option<TypeIndex>,
     pub types: Vec<TypeData>,
     pub type_index_by_def: FnvHashMap<(DefId, QueryLevel), TypeIndex>,
@@ -37,7 +38,7 @@ pub enum TypingPurpose {
     Selection,
     Input,
     PartialInput,
-    ReferenceInput,
+    InputOrReference,
 }
 
 impl TypingPurpose {
@@ -46,7 +47,7 @@ impl TypingPurpose {
             Self::Selection => Self::Selection,
             Self::Input => Self::Input,
             Self::PartialInput => Self::Input,
-            Self::ReferenceInput => Self::Input,
+            Self::InputOrReference => Self::Input,
         }
     }
 
@@ -55,7 +56,7 @@ impl TypingPurpose {
             TypingPurpose::Selection => (ProcessorMode::Inspect, ProcessorLevel::new_root()),
             TypingPurpose::Input => (ProcessorMode::Create, ProcessorLevel::new_root()),
             TypingPurpose::PartialInput => (ProcessorMode::Update, ProcessorLevel::new_root()),
-            TypingPurpose::ReferenceInput => (ProcessorMode::Create, ProcessorLevel::new_child()),
+            TypingPurpose::InputOrReference => (ProcessorMode::Create, ProcessorLevel::new_child()),
         }
     }
 }

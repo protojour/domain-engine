@@ -56,6 +56,7 @@ pub fn generate_graphql_schema<'c>(
         query: TypeIndex(0),
         mutation: TypeIndex(0),
         i64_custom_scalar: None,
+        json_scalar: TypeIndex(0),
         types: Vec::with_capacity(domain.type_names.len()),
         type_index_by_def: FnvHashMap::with_capacity_and_hasher(
             domain.type_names.len(),
@@ -80,6 +81,7 @@ pub fn generate_graphql_schema<'c>(
         seal_ctx,
     };
 
+    builder.register_json_scalar();
     builder.register_query();
     builder.register_mutation();
 
@@ -218,6 +220,19 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 }
             }
         }
+    }
+
+    fn register_json_scalar(&mut self) {
+        let index = self.next_type_index();
+        self.schema.types.push(TypeData {
+            typename: "_ontol_json".into(),
+            input_typename: None,
+            partial_input_typename: None,
+            kind: TypeKind::CustomScalar(ScalarData {
+                serde_operator_id: SerdeOperatorId(0),
+            }),
+        });
+        self.schema.json_scalar = index;
     }
 
     fn register_query(&mut self) {
@@ -529,7 +544,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                         type_index,
                         TypeData {
                             // FIXME: Must make sure that domain typenames take precedence over generated ones
-                            typename: smart_format!("i64"),
+                            typename: smart_format!("_ontol_i64"),
                             input_typename: None,
                             partial_input_typename: None,
                             kind: TypeKind::CustomScalar(ScalarData {

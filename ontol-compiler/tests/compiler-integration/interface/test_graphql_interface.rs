@@ -61,7 +61,7 @@ fn test_graphql_i64_custom_scalar() {
 
         let prop_type_data = schema.type_data(prop_field.field_type.unit.indexed());
 
-        expect_eq!(actual = prop_type_data.typename, expected = "i64");
+        expect_eq!(actual = prop_type_data.typename, expected = "_ontol_i64");
         let _i64_scalar_data = prop_type_data.custom_scalar();
     });
 }

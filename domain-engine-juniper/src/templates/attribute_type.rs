@@ -16,7 +16,7 @@ use ontol_runtime::{
     value::{Attribute, Data, PropertyId, Value},
     DefId,
 };
-use tracing::debug;
+use tracing::trace;
 
 use crate::{
     context::{SchemaCtx, SchemaType},
@@ -205,7 +205,7 @@ impl<'v> AttributeType<'v> {
         let field_data = object_data.fields.get(field_name).unwrap();
         let field_type = field_data.field_type;
 
-        debug!("resolve object field `{field_name}`: {:?}", self.attr);
+        trace!("resolve object field `{field_name}`: {:?}", self.attr);
 
         match (&field_data.kind, &self.attr.value.data) {
             (FieldKind::Edges, Data::Sequence(seq)) => resolve_schema_type_field(
@@ -254,7 +254,7 @@ impl<'v> AttributeType<'v> {
                 }
             }
             (FieldKind::Property(property_data), Data::Struct(attrs)) => {
-                debug!("lookup property {field_name} => {:?}", property_data);
+                trace!("lookup property {field_name} => {:?}", property_data);
                 Self::resolve_property(
                     attrs,
                     property_data.property_id,
