@@ -1120,7 +1120,7 @@ dependencies = [
 [[package]]
 name = "juniper"
 version = "0.16.0-dev"
-source = "git+https://github.com/protojour/juniper?branch=protojour-mods#15965e2da40e9da2e9a359c534d45f10bb8c79b2"
+source = "git+https://github.com/protojour/juniper?branch=protojour-mods#d45044a493fb0b65240aa387241e7c5b57cadedd"
 dependencies = [
  "async-trait",
  "fnv",
@@ -1138,7 +1138,7 @@ dependencies = [
 [[package]]
 name = "juniper_codegen"
 version = "0.16.0-dev"
-source = "git+https://github.com/protojour/juniper?branch=protojour-mods#15965e2da40e9da2e9a359c534d45f10bb8c79b2"
+source = "git+https://github.com/protojour/juniper?branch=protojour-mods#d45044a493fb0b65240aa387241e7c5b57cadedd"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
