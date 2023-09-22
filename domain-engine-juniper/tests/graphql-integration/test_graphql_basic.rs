@@ -734,7 +734,6 @@ fn test_graphql_municipalities_geojson_union() {
 
     expect_eq!(
         actual = field_names.as_slice(),
-        // BUG: The field types look weird
         expected = &[
             FieldInfo::from(("type", "String")),
             FieldInfo::from(("coordinates", "_ontol_json")),
