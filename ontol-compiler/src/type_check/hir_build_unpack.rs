@@ -10,7 +10,7 @@ use tracing::debug;
 use crate::{
     def::{DefKind, LookupRelationshipMeta, RelParams},
     mem::Intern,
-    pattern::{PatternKind, StructPatternAttr, StructPatternModifier},
+    pattern::{PatternKind, StructPatternAttr, UnpackPatternModifier},
     primitive::PrimitiveKind,
     type_check::{hir_build::NodeInfo, repr::repr_model::ReprKind, TypeError},
     typed_hir::{Meta, TypedHir, TypedHirData, UNIT_META},
@@ -20,10 +20,10 @@ use crate::{
 
 use super::{hir_build_ctx::HirBuildCtx, TypeCheck};
 
-pub(super) struct StructInfo<'m> {
-    pub struct_def_id: DefId,
-    pub struct_ty: TypeRef<'m>,
-    pub modifier: Option<StructPatternModifier>,
+pub(super) struct UnpackInfo<'m> {
+    pub type_def_id: DefId,
+    pub ty: TypeRef<'m>,
+    pub modifier: Option<UnpackPatternModifier>,
     pub parent_struct_flags: ontol_hir::StructFlags,
 }
 
@@ -38,34 +38,31 @@ struct MatchAttribute {
 impl<'c, 'm> TypeCheck<'c, 'm> {
     pub(super) fn build_property_matcher(
         &mut self,
-        StructInfo {
-            struct_def_id,
-            struct_ty,
+        UnpackInfo {
+            type_def_id,
+            ty,
             modifier,
             parent_struct_flags,
-        }: StructInfo<'m>,
+        }: UnpackInfo<'m>,
         pattern_attrs: &[StructPatternAttr],
         span: SourceSpan,
         ctx: &mut HirBuildCtx<'m>,
     ) -> ontol_hir::Node {
-        let properties = self.relations.properties_by_def_id(struct_def_id);
+        let properties = self.relations.properties_by_def_id(type_def_id);
 
         let actual_struct_flags = match modifier {
-            Some(StructPatternModifier::Match) => ontol_hir::StructFlags::MATCH,
+            Some(UnpackPatternModifier::Match) => ontol_hir::StructFlags::MATCH,
             None => ontol_hir::StructFlags::empty(),
         } | parent_struct_flags;
 
-        let struct_meta = Meta {
-            ty: struct_ty,
-            span,
-        };
+        let hir_meta = Meta { ty, span };
 
-        match self.seal_ctx.get_repr_kind(&struct_def_id).unwrap() {
+        match self.seal_ctx.get_repr_kind(&type_def_id).unwrap() {
             ReprKind::Struct | ReprKind::Unit => {
                 match properties.and_then(|props| props.table.as_ref()) {
                     Some(property_set) => {
                         let struct_binder: TypedHirData<'_, ontol_hir::Binder> =
-                            TypedHirData(ctx.var_allocator.alloc().into(), struct_meta);
+                            TypedHirData(ctx.var_allocator.alloc().into(), hir_meta);
 
                         // The written attribute patterns should match against
                         // the relations defined on the type. Compute `MatchAttributes`:
@@ -139,14 +136,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 actual_struct_flags,
                                 hir_props.into(),
                             ),
-                            struct_meta,
+                            hir_meta,
                         )
                     }
                     None => {
                         if !pattern_attrs.is_empty() {
                             return self.error_node(CompileError::NoPropertiesExpected, &span, ctx);
                         }
-                        ctx.mk_node(ontol_hir::Kind::Unit, struct_meta)
+                        ctx.mk_node(ontol_hir::Kind::Unit, hir_meta)
                     }
                 }
             }
@@ -167,9 +164,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 match value_object_ty {
                     Type::Domain(def_id) => self.build_property_matcher(
-                        StructInfo {
-                            struct_def_id: *def_id,
-                            struct_ty: value_object_ty,
+                        UnpackInfo {
+                            type_def_id: *def_id,
+                            ty: value_object_ty,
                             modifier,
                             parent_struct_flags,
                         },
@@ -196,7 +193,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     ctx,
                                 );
 
-                                *ctx.hir_arena[inner_node].meta_mut() = struct_meta;
+                                *ctx.hir_arena[inner_node].meta_mut() = hir_meta;
 
                                 inner_node
                             }
@@ -211,7 +208,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let scalar_def_id = *scalar_def_id;
 
                 let scalar_object_ty = self.check_def_sealed(scalar_def_id);
-                debug!("scalar_object_ty: {struct_def_id:?}: {scalar_object_ty:?}");
 
                 let mut attributes = pattern_attrs.iter();
                 match attributes.next() {
@@ -221,7 +217,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         bind_option: _,
                         value,
                     }) if *def_id == DefId::unit() => {
-                        let object_ty = self.check_def_sealed(scalar_def_id);
+                        let object_ty = if ctx.is_scalar_mapping {
+                            self.check_def_sealed(scalar_def_id)
+                        } else {
+                            self.check_def_sealed(type_def_id)
+                        };
+                        debug!("scalar_object_ty: {type_def_id:?}: {scalar_object_ty:?} object_ty={object_ty:?}");
+
                         let inner_node = self.build_node(
                             value,
                             NodeInfo {
@@ -231,7 +233,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             ctx,
                         );
 
-                        *ctx.hir_arena[inner_node].meta_mut() = struct_meta;
+                        *ctx.hir_arena[inner_node].meta_mut() = Meta { ty, span };
 
                         inner_node
                     }

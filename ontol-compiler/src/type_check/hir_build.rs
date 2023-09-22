@@ -10,9 +10,9 @@ use crate::{
     pattern::{PatId, Pattern, PatternKind, RegexPatternCaptureNode},
     primitive::PrimitiveKind,
     type_check::{
+        ena_inference::UnifyValue,
         hir_build_ctx::{ExplicitVariableArm, PatternVariable},
-        hir_build_struct::StructInfo,
-        inference::UnifyValue,
+        hir_build_unpack::UnpackInfo,
     },
     typed_hir::{IntoTypedHirData, Meta, TypedHir, TypedHirData},
     types::{Type, TypeRef, ERROR_TYPE, UNIT_TYPE},
@@ -119,9 +119,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             (
-                PatternKind::Struct {
+                PatternKind::Unpack {
                     type_path: Some(type_path),
                     modifier,
+                    is_unit_binding: _,
                     attributes,
                 },
                 expected_ty,
@@ -140,9 +141,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 };
                 let struct_node = self.build_property_matcher(
-                    StructInfo {
-                        struct_def_id: type_path.def_id,
-                        struct_ty,
+                    UnpackInfo {
+                        type_def_id: type_path.def_id,
+                        ty: struct_ty,
                         modifier: *modifier,
                         parent_struct_flags: node_info.parent_struct_flags,
                     },
@@ -156,8 +157,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Some(Type::Infer(_)) => struct_node,
                     Some(Type::Domain(_)) => struct_node,
                     Some(Type::Option(Type::Domain(_))) => {
-                        let hir_node = &mut ctx.hir_arena[struct_node];
-                        *hir_node.meta_mut() = Meta {
+                        *ctx.hir_arena[struct_node].meta_mut() = Meta {
                             ty: self.types.intern(Type::Option(struct_meta.ty)),
                             span: struct_meta.span,
                         };
@@ -175,9 +175,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             (
-                PatternKind::Struct {
+                PatternKind::Unpack {
                     type_path: None,
                     modifier,
+                    is_unit_binding: _,
                     attributes,
                 },
                 Some(expected_struct_ty @ Type::Anonymous(def_id)),
@@ -195,9 +196,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
 
                 self.build_property_matcher(
-                    StructInfo {
-                        struct_def_id: *def_id,
-                        struct_ty: actual_ty,
+                    UnpackInfo {
+                        type_def_id: *def_id,
+                        ty: actual_ty,
                         modifier: *modifier,
                         parent_struct_flags: node_info.parent_struct_flags,
                     },
@@ -207,7 +208,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 )
             }
             (
-                PatternKind::Struct {
+                PatternKind::Unpack {
                     type_path: None, ..
                 },
                 _,

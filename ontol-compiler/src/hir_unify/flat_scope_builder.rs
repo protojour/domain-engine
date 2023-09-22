@@ -11,6 +11,8 @@ use super::{
 
 struct NextNode {
     node: ontol_hir::Node,
+    // The node that provides the type (i.e. a Map node)
+    type_node: Option<ontol_hir::Node>,
     prop_depth: PropDepth,
     constraints: Rc<VarSet>,
     deps: VarSet,
@@ -41,6 +43,7 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
     pub fn build_flat_scope(&mut self, node: ontol_hir::Node) -> UnifierResult<FlatScope<'m>> {
         let mut node_set = vec![NextNode {
             node,
+            type_node: None,
             prop_depth: PropDepth(0),
             deps: VarSet::default(),
             constraints: Default::default(),
@@ -67,6 +70,7 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
         &mut self,
         NextNode {
             node,
+            type_node,
             mut deps,
             prop_depth,
             constraints,
@@ -101,20 +105,29 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
                         constraints,
                         defs: [*var].into(),
                         deps,
-                        hir_meta: *self.hir_arena[node].meta(),
+                        hir_meta: if let Some(type_node) = type_node {
+                            *self.hir_arena[type_node].meta()
+                        } else {
+                            *self.hir_arena[node].meta()
+                        },
                     },
                 ));
             }
-            ontol_hir::Kind::Map(inner) => next_node_set.push(NextNode {
-                node: *inner,
-                deps,
-                constraints,
-                prop_depth,
-            }),
+            ontol_hir::Kind::Map(inner) => {
+                next_node_set.push(NextNode {
+                    node: *inner,
+                    // The scope type of the inner node is the type of this map node
+                    type_node: Some(node),
+                    deps,
+                    constraints,
+                    prop_depth,
+                })
+            }
             ontol_hir::Kind::Struct(binder, _flags, nodes) => {
                 for node in nodes {
                     next_node_set.push(NextNode {
                         node: *node,
+                        type_node: None,
                         prop_depth,
                         constraints: constraints.clone(),
                         deps: [].into(),
@@ -248,6 +261,7 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
                     for arg in args {
                         next_node_set.push(NextNode {
                             node: *arg,
+                            type_node: None,
                             prop_depth,
                             constraints: constraints.clone(),
                             deps: [call_var].into(),
@@ -333,6 +347,7 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
             let rel_var = self.var_allocator.alloc();
             next_node_set.push(NextNode {
                 node: rel,
+                type_node: None,
                 prop_depth,
                 constraints: constraints.clone(),
                 deps: [rel_var].into(),
@@ -353,6 +368,7 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
             let val_var = self.var_allocator.alloc();
             next_node_set.push(NextNode {
                 node: val,
+                type_node: None,
                 prop_depth,
                 constraints: constraints.clone(),
                 deps: [val_var].into(),

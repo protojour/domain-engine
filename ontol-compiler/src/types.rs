@@ -8,7 +8,7 @@ use crate::{
     def::{DefKind, Defs},
     mem::{Intern, Mem},
     primitive::{PrimitiveKind, Primitives},
-    type_check::inference::TypeVar,
+    type_check::ena_inference::TypeVar,
 };
 
 pub type TypeRef<'m> = &'m Type<'m>;

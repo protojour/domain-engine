@@ -9,8 +9,8 @@ use crate::{
 };
 
 use super::{
+    ena_inference::{Infer, TypeVar},
     hir_build_ctx::{Arm, VariableMapping},
-    inference::{Infer, TypeVar},
     TypeError,
 };
 

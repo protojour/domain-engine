@@ -35,6 +35,24 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         second_id: PatId,
     ) -> Result<TypeRef<'m>, AggrGroupError> {
         let mut ctx = HirBuildCtx::new(def.span, VarAllocator::from(*var_allocator.peek_next()));
+        ctx.is_scalar_mapping = {
+            let first_pat_kind = self.patterns.table.get(&first_id).map(Pattern::kind);
+            let second_pat_kind = self.patterns.table.get(&second_id).map(Pattern::kind);
+            match (first_pat_kind, second_pat_kind) {
+                (
+                    Some(PatternKind::Unpack {
+                        is_unit_binding: is_unit1,
+                        ..
+                    }),
+                    Some(PatternKind::Unpack {
+                        is_unit_binding: is_unit2,
+                        ..
+                    }),
+                ) => *is_unit1 && *is_unit2,
+                _ => false,
+            }
+        };
+        // ctx.is_scalar_mapping = true;
 
         {
             let mut map_check = MapCheck {
@@ -72,10 +90,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         ctx: &mut HirBuildCtx<'m>,
     ) -> Result<(), AggrGroupError> {
         ctx.arm = Arm::First;
+        debug!("Build first arm");
         let mut first = self.build_root_pattern(first_id, ctx);
         self.infer_hir_arm_types(&mut first, ctx);
 
         ctx.arm = Arm::Second;
+        debug!("Build second arm");
         let mut second = self.build_root_pattern(second_id, ctx);
         self.infer_hir_arm_types(&mut second, ctx);
 
@@ -223,7 +243,7 @@ impl<'c> MapCheck<'c> {
                     group_set.join(self.analyze_arm(arg, parent_aggr_group, ctx)?);
                 }
             }
-            PatternKind::Struct {
+            PatternKind::Unpack {
                 attributes: attrs, ..
             } => {
                 for attr in attrs.iter() {

@@ -14,16 +14,25 @@ pub struct Pattern {
     pub span: SourceSpan,
 }
 
+impl Pattern {
+    pub fn kind(&self) -> &PatternKind {
+        &self.kind
+    }
+}
+
 type PropertyKey = (DefId, SourceSpan);
 
 #[derive(Debug)]
 pub enum PatternKind {
     /// Function call
     Call(DefId, Box<[Pattern]>),
-    Struct {
+    /// Unpack some kind of structure
+    Unpack {
         /// The user-supplied type of the struct, None means anonymous
         type_path: Option<TypePath>,
-        modifier: Option<StructPatternModifier>,
+        modifier: Option<UnpackPatternModifier>,
+        // The single attribute is a unit binding. I.e. `path: x` syntax
+        is_unit_binding: bool,
         attributes: Box<[StructPatternAttr]>,
     },
     /// Expression enclosed in sequence brackets: `[expr]`
@@ -35,7 +44,7 @@ pub enum PatternKind {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum StructPatternModifier {
+pub enum UnpackPatternModifier {
     Match,
 }
 

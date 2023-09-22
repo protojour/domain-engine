@@ -18,8 +18,8 @@ use crate::{
     namespace::Space,
     package::{PackageReference, ONTOL_PKG},
     pattern::{
-        PatId, Pattern, PatternKind, SeqPatternElement, StructPatternAttr, StructPatternModifier,
-        TypePath,
+        PatId, Pattern, PatternKind, SeqPatternElement, StructPatternAttr, TypePath,
+        UnpackPatternModifier,
     },
     regex_util::RegexToPatternLowerer,
     Compiler, Src,
@@ -569,13 +569,13 @@ impl<'s, 'm> Lowering<'s, 'm> {
         let pattern = self.lower_expr_pattern((ast, expr_span), var_table)?;
 
         Ok(self.mk_pattern(
-            // FIXME: This PatternKind shouldn't really be struct..
-            PatternKind::Struct {
+            PatternKind::Unpack {
                 type_path: Some(TypePath {
                     def_id: type_def_id,
                     span: self.src.span(&path.1),
                 }),
                 modifier: None,
+                is_unit_binding: true,
                 attributes: [StructPatternAttr {
                     key,
                     rel: None,
@@ -597,14 +597,15 @@ impl<'s, 'm> Lowering<'s, 'm> {
         let attrs = self.lower_struct_pattern_attrs(ast.attributes, var_table)?;
 
         Ok(self.mk_pattern(
-            PatternKind::Struct {
+            PatternKind::Unpack {
                 type_path: Some(TypePath {
                     def_id: type_def_id,
                     span: self.src.span(&ast.path.1),
                 }),
                 modifier: ast.modifier.map(|(modifier, _span)| match modifier {
-                    ast::StructPatternModifier::Match => StructPatternModifier::Match,
+                    ast::StructPatternModifier::Match => UnpackPatternModifier::Match,
                 }),
+                is_unit_binding: false,
                 attributes: attrs,
             },
             &span,
@@ -634,7 +635,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                         // Inherit modifier from object pattern
                         let modifier = match &object_pattern {
                             Ok(Pattern {
-                                kind: PatternKind::Struct { modifier, .. },
+                                kind: PatternKind::Unpack { modifier, .. },
                                 ..
                             }) => *modifier,
                             _ => None,
@@ -642,9 +643,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                         let attrs = self.lower_struct_pattern_attrs(attrs, var_table)?;
                         Some(self.mk_pattern(
-                            PatternKind::Struct {
+                            PatternKind::Unpack {
                                 type_path: None,
                                 modifier,
+                                is_unit_binding: false,
                                 attributes: attrs,
                             },
                             &span,

@@ -18,7 +18,7 @@ use self::{repr::repr_check::ReprCheck, seal::SealCtx};
 pub mod check_def;
 pub mod check_domain_types;
 pub mod check_union;
-pub mod inference;
+pub mod ena_inference;
 pub mod repr;
 pub mod seal;
 
@@ -26,7 +26,7 @@ mod check_map;
 mod check_relationship;
 mod hir_build;
 mod hir_build_ctx;
-mod hir_build_struct;
+mod hir_build_unpack;
 mod hir_type_inference;
 
 #[derive(Clone, Copy, Debug)]
