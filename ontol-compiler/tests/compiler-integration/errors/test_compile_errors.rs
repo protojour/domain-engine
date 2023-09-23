@@ -71,6 +71,16 @@ fn error_lex_recovery_works() {
 }
 
 #[test]
+fn error_rel_needs_a_triple() {
+    "
+    def a {
+        rel 'b': i64 // ERROR parse error: found `:`, expected one of `(`, `{`, `.`
+    }
+    "
+    .compile_fail();
+}
+
+#[test]
 fn error_rel_type_not_found() {
     "
     def foo {}

@@ -106,7 +106,11 @@ fn rel_statement(
             stmt_parser.clone(),
         )))
         // forward relations:
-        .then(forward_relation(stmt_parser).separated_by(sigil('|')))
+        .then(
+            forward_relation(stmt_parser)
+                .separated_by(sigil('|'))
+                .at_least(1),
+        )
         // colon separator:
         .then_ignore(colon())
         // backward relations:
