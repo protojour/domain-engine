@@ -210,41 +210,33 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
             }
-            ReprKind::Scalar(scalar_def_id, ..) => {
-                let scalar_def_id = *scalar_def_id;
-
-                let scalar_object_ty = self.check_def_sealed(scalar_def_id);
-
+            ReprKind::Scalar(..) => {
                 let mut attributes = pattern_attrs.iter();
                 match attributes.next() {
                     Some(StructPatternAttr {
-                        key: (def_id, _),
+                        key: (attr_def_id, _),
                         rel: _,
                         bind_option: _,
                         value,
                     }) if is_unit_binding => {
-                        assert!(*def_id == DefId::unit());
-
-                        let value_ty = self.check_def_sealed(type_def_id);
-                        debug!("scalar_object_ty({type_def_id:?})={scalar_object_ty:?} value_ty={value_ty:?}");
+                        assert!(*attr_def_id == DefId::unit());
 
                         let inner_node = self.build_node(
                             value,
                             NodeInfo {
-                                expected_ty: Some((value_ty, Strength::Strong)),
+                                expected_ty: Some((ty, Strength::Strong)),
                                 parent_struct_flags,
                             },
                             ctx,
                         );
 
-                        if true {
-                            if ctx.hir_arena[inner_node].ty() != value_ty {
-                                ctx.mk_node(ontol_hir::Kind::Map(inner_node), Meta { ty, span })
-                            } else {
-                                inner_node
-                            }
+                        if ctx.hir_arena[inner_node].ty() != ty {
+                            // The type of the inner node could be a built-in scalar (e.g. i64)
+                            // as a result of being the value of a mathematical expression.
+                            // But at the "unpack-level" here we need the type to be some domain-specific alias.
+                            // So generate a `(map inner)` to type-pun the result.
+                            ctx.mk_node(ontol_hir::Kind::Map(inner_node), Meta { ty, span })
                         } else {
-                            *ctx.hir_arena[inner_node].meta_mut() = Meta { ty, span };
                             inner_node
                         }
                     }
