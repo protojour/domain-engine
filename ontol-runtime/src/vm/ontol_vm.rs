@@ -242,8 +242,12 @@ impl Processor for OntolProcessor {
     }
 
     #[inline(always)]
-    fn type_pun(&mut self, local: Local, def_id: DefId) {
-        self.local_mut(local).type_def_id = def_id;
+    fn type_pun(&mut self, local: Option<Local>, def_id: DefId) {
+        if let Some(local) = local {
+            self.local_mut(local).type_def_id = def_id;
+        } else {
+            self.stack.last_mut().unwrap().type_def_id = def_id;
+        }
     }
 
     fn regex_capture(&mut self, local: Local, text_pattern: &TextPattern, group_filter: &BitVec) {

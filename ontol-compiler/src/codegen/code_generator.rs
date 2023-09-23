@@ -150,7 +150,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 );
                 if ty != &UNIT_TYPE {
                     if let Some(def_id) = ty.get_single_def_id() {
-                        self.gen_pun(block, def_id, span);
+                        block.op(OpCode::TypePunTop(def_id), Delta(0), span, self.builder);
                     }
                 }
             }
@@ -217,7 +217,12 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     (Some(from), Some(to)) => match (from.punned, to.punned) {
                         (Some(from_pun), Some(to_pun)) if from.anonymous && to.anonymous => {
                             if from_pun == to_pun {
-                                self.gen_pun(block, to.key.def_id, span);
+                                block.op(
+                                    OpCode::TypePunTop(to.key.def_id),
+                                    Delta(0),
+                                    span,
+                                    self.builder,
+                                );
                             } else {
                                 let proc = Procedure {
                                     address: self.proc_table.gen_mapping_addr(from_pun, to_pun),
@@ -238,7 +243,12 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     },
                     _ => {
                         if ty.get_single_def_id() != param_ty.get_single_def_id() {
-                            self.gen_pun(block, ty.get_single_def_id().unwrap(), span);
+                            block.op(
+                                OpCode::TypePunTop(ty.get_single_def_id().unwrap()),
+                                Delta(0),
+                                span,
+                                self.builder,
+                            );
                         }
                     }
                 }
@@ -873,11 +883,6 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 Err(())
             }
         }
-    }
-
-    fn gen_pun(&mut self, block: &mut Block, def_id: DefId, span: SourceSpan) {
-        let local = self.builder.top();
-        block.op(OpCode::TypePun(local, def_id), Delta(0), span, self.builder);
     }
 }
 
