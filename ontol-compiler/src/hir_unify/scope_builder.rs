@@ -6,7 +6,8 @@ use smallvec::SmallVec;
 
 use crate::{
     hir_unify::{UnifierError, UnifierResult, VarSet},
-    typed_hir::{self, arena_import, IntoTypedHirData, TypedHir, TypedHirData, UNIT_META},
+    typed_hir::{self, arena_import, IntoTypedHirData, Meta, TypedHir, TypedHirData, UNIT_META},
+    types::TypeRef,
 };
 
 use super::{
@@ -62,7 +63,11 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
         self.var_allocator
     }
 
-    pub fn build_scope_binder(&mut self, node: ontol_hir::Node) -> UnifierResult<ScopeBinder<'m>> {
+    pub fn build_scope_binder(
+        &mut self,
+        node: ontol_hir::Node,
+        mapped_scalar_ty: Option<TypeRef<'m>>,
+    ) -> UnifierResult<ScopeBinder<'m>> {
         let hir_meta = *self.hir_arena[node].meta();
         match self.hir_arena.kind_of(node) {
             ontol_hir::Kind::Var(var) => Ok(ScopeBinder {
@@ -130,14 +135,19 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
                             *proc,
                             args,
                             analysis,
-                            ontol_hir::Binder { var: binder_var }.with_meta(hir_meta),
+                            ontol_hir::Binder { var: binder_var }.with_meta(Meta {
+                                ty: mapped_scalar_ty.unwrap_or(hir_meta.ty),
+                                span: hir_meta.span,
+                            }),
                             next_def,
                             dependencies,
                         )
                     }
                 }
             }
-            ontol_hir::Kind::Map(arg) => self.build_scope_binder(*arg),
+            ontol_hir::Kind::Map(arg) => {
+                self.build_scope_binder(*arg, mapped_scalar_ty.or(Some(self.hir_arena[node].ty())))
+            }
             ontol_hir::Kind::DeclSeq(_label, _attr) => Err(UnifierError::SequenceInputNotSupported),
             ontol_hir::Kind::Struct(binder, _flags, nodes) => self.enter_binder(binder, |zelf| {
                 if zelf.current_prop_analysis_map.is_none() {
@@ -248,14 +258,14 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
                             let mut dep_union = UnionBuilder::default();
 
                             let rel = dep_union
-                                .plus_deps(var_union.plus(
-                                    zelf.enter_child(0, |zelf| zelf.build_scope_binder(attr.rel))?,
-                                ))
+                                .plus_deps(var_union.plus(zelf.enter_child(0, |zelf| {
+                                    zelf.build_scope_binder(attr.rel, None)
+                                })?))
                                 .into_scope_pattern_binding();
                             let val = dep_union
-                                .plus_deps(var_union.plus(
-                                    zelf.enter_child(1, |zelf| zelf.build_scope_binder(attr.val))?,
-                                ))
+                                .plus_deps(var_union.plus(zelf.enter_child(1, |zelf| {
+                                    zelf.build_scope_binder(attr.val, None)
+                                })?))
                                 .into_scope_pattern_binding();
 
                             (
@@ -277,12 +287,12 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
 
                             let rel = zelf
                                 .enter_child(0, |zelf| {
-                                    zelf.build_scope_binder(only_element_attr.rel)
+                                    zelf.build_scope_binder(only_element_attr.rel, None)
                                 })?
                                 .into_scope_pattern_binding();
                             let val = zelf
                                 .enter_child(1, |zelf| {
-                                    zelf.build_scope_binder(only_element_attr.val)
+                                    zelf.build_scope_binder(only_element_attr.val, None)
                                 })?
                                 .into_scope_pattern_binding();
 
@@ -360,20 +370,29 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
 
         match (self.hir_arena.kind_of(args[var_arg_index]), next_analysis) {
             (
-                ontol_hir::Kind::Var(_) | ontol_hir::Kind::Map(_),
+                ontol_hir::Kind::Var(_),
                 ExprAnalysis {
                     kind: ExprAnalysisKind::Var(scoped_var),
                     ..
                 },
             ) => {
-                let scope_binder = ScopeBinder {
+                // Inject a mapping around the entire inverted function application
+                // so that the runtime type of the variable is "coerced" into the expected type.
+                let (mut def_arena, let_def) = next_let_def.split();
+                let map_node = def_arena.add(TypedHirData(
+                    ontol_hir::Kind::Map(let_def),
+                    *self.hir_arena[args[var_arg_index]].meta(),
+                ));
+                let let_def = ontol_hir::RootNode::new(map_node, def_arena);
+
+                Ok(ScopeBinder {
                     binder: Some(outer_binder),
                     scope: scope::Scope(
                         scope::Kind::Let(scope::Let {
                             outer_binder: Some(outer_binder),
                             inner_binder: ontol_hir::Binder { var: scoped_var }
-                                .with_meta(*next_let_def.data().meta()),
-                            def: next_let_def,
+                                .with_meta(*let_def.data().meta()),
+                            def: let_def,
                             sub_scope: Box::new(scope::Scope(
                                 scope::Kind::Const,
                                 scope::Meta::from(UNIT_META),
@@ -385,8 +404,7 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
                             dependencies,
                         },
                     ),
-                };
-                Ok(scope_binder)
+                })
             }
             (ontol_hir::Kind::Call(next_proc, next_args), child_analysis) => self.invert_expr(
                 *next_proc,

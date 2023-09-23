@@ -38,7 +38,7 @@ pub(super) fn const_codegen<'m>(
     let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs, &compiler.seal_ctx);
     let mut errors = CompileErrors::default();
 
-    debug!("Generating code for\n{}", expr);
+    debug!("Generating const code for\n{}", expr);
 
     let expr_meta = *expr.data().meta();
 
@@ -231,22 +231,10 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                             block.op(OpCode::Call(proc), Delta(0), span, self.builder);
                         }
                     },
-                    (Some(from), None) => {
-                        if from.punned.map(|key| key.def_id) == ty.get_single_def_id() {
-                            self.gen_pun(block, ty.get_single_def_id().unwrap(), span);
-                        } else {
-                            self.report_not_mappable(span);
-                        }
-                    }
-                    (None, Some(to)) => {
-                        if param_ty.get_single_def_id() == to.punned.map(|key| key.def_id) {
-                            self.gen_pun(block, param_ty.get_single_def_id().unwrap(), span);
-                        } else {
-                            self.report_not_mappable(span);
-                        }
-                    }
                     _ => {
-                        self.report_not_mappable(span);
+                        if ty.get_single_def_id() != param_ty.get_single_def_id() {
+                            self.gen_pun(block, ty.get_single_def_id().unwrap(), span);
+                        }
                     }
                 }
             }
@@ -885,13 +873,6 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
     fn gen_pun(&mut self, block: &mut Block, def_id: DefId, span: SourceSpan) {
         let local = self.builder.top();
         block.op(OpCode::TypePun(local, def_id), Delta(0), span, self.builder);
-    }
-
-    fn report_not_mappable(&mut self, span: SourceSpan) {
-        self.errors.error(
-            CompileError::TODO(smart_format!("type not mappable")),
-            &span,
-        );
     }
 }
 

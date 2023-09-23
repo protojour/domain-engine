@@ -22,7 +22,7 @@ use crate::{
 
 use super::{hir_build_ctx::HirBuildCtx, TypeCheck};
 
-pub(super) struct UnpackInfo<'m> {
+pub(super) struct UnpackerInfo<'m> {
     pub type_def_id: DefId,
     pub ty: TypeRef<'m>,
     pub modifier: Option<UnpackPatternModifier>,
@@ -39,15 +39,16 @@ struct MatchAttribute {
 }
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
-    pub(super) fn build_property_matcher(
+    /// Build an ontol_hir node that unpacks some higher level compound pattern
+    pub(super) fn build_unpacker(
         &mut self,
-        UnpackInfo {
+        UnpackerInfo {
             type_def_id,
             ty,
             modifier,
             is_unit_binding,
             parent_struct_flags,
-        }: UnpackInfo<'m>,
+        }: UnpackerInfo<'m>,
         pattern_attrs: &[StructPatternAttr],
         span: SourceSpan,
         ctx: &mut HirBuildCtx<'m>,
@@ -167,8 +168,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 debug!("value_object_ty: {value_object_ty:?}");
 
                 match value_object_ty {
-                    Type::Domain(def_id) => self.build_property_matcher(
-                        UnpackInfo {
+                    Type::Domain(def_id) => self.build_unpacker(
+                        UnpackerInfo {
                             type_def_id: *def_id,
                             ty: value_object_ty,
                             modifier,
@@ -236,9 +237,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             ctx,
                         );
 
-                        *ctx.hir_arena[inner_node].meta_mut() = Meta { ty, span };
-
-                        inner_node
+                        if true {
+                            if ctx.hir_arena[inner_node].ty() != value_ty {
+                                ctx.mk_node(ontol_hir::Kind::Map(inner_node), Meta { ty, span })
+                            } else {
+                                inner_node
+                            }
+                        } else {
+                            *ctx.hir_arena[inner_node].meta_mut() = Meta { ty, span };
+                            inner_node
+                        }
                     }
                     _ => self.error_node(CompileError::ExpectedPatternAttribute, &span, ctx),
                 }

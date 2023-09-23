@@ -170,22 +170,25 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 (Some(first_def_id), Some(second_def_id))
                     if actual.0.is_domain_specific() || expected.0.is_domain_specific() =>
                 {
-                    if self.are_distinct_domain_types_weakly_repr_compatible(actual, expected) {
-                        continue;
+                    if let Some(ty) = self
+                        .get_strong_type_for_distinct_weakly_repr_compatible_types(actual, expected)
+                    {
+                        ctx.variable_mapping
+                            .insert(*var, VariableMapping::Overwrite(ty));
+                    } else {
+                        ctx.variable_mapping.insert(
+                            *var,
+                            VariableMapping::Mapping {
+                                first_arm_type: actual.0,
+                                second_arm_type: expected.0,
+                            },
+                        );
+
+                        self.codegen_tasks.add_map_task(
+                            MapKeyPair::new(first_def_id.into(), second_def_id.into()),
+                            MapCodegenTask::Auto,
+                        );
                     }
-
-                    ctx.variable_mapping.insert(
-                        *var,
-                        VariableMapping {
-                            first_arm_type: actual.0,
-                            second_arm_type: expected.0,
-                        },
-                    );
-
-                    self.codegen_tasks.add_map_task(
-                        MapKeyPair::new(first_def_id.into(), second_def_id.into()),
-                        MapCodegenTask::Auto,
-                    );
                 }
                 _ => {
                     self.type_error(
@@ -211,17 +214,18 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     /// Computes whether two scalar types are compatible when one has
     /// a weak type constraint and the other has a strong strong type constraint.
     /// In that case, the variables do not need to be mapped.
-    fn are_distinct_domain_types_weakly_repr_compatible(
-        &mut self,
-        first: KnownType,
-        second: KnownType,
-    ) -> bool {
-        if first.1 == Strength::Strong && second.1 == Strength::Strong {
-            return false;
+    /// If successfull, returns the strong type.
+    fn get_strong_type_for_distinct_weakly_repr_compatible_types(
+        &self,
+        (first_ty, first_strength): KnownType<'m>,
+        (second_ty, second_strength): KnownType<'m>,
+    ) -> Option<TypeRef<'m>> {
+        if first_strength == second_strength {
+            return None;
         }
 
-        let first_def_id = first.0.get_single_def_id().unwrap();
-        let second_def_id = second.0.get_single_def_id().unwrap();
+        let first_def_id = first_ty.get_single_def_id().unwrap();
+        let second_def_id = second_ty.get_single_def_id().unwrap();
         let first_repr = self.seal_ctx.get_repr_kind(&first_def_id).unwrap();
         let second_repr = self.seal_ctx.get_repr_kind(&second_def_id).unwrap();
 
@@ -231,12 +235,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 ReprKind::Scalar(second_sc_def_id, second_kind, _),
             ) => {
                 if first_kind != second_kind {
-                    return false;
+                    return None;
                 }
 
-                first_sc_def_id == second_sc_def_id
+                if first_sc_def_id == second_sc_def_id {
+                    if first_strength == Strength::Strong {
+                        Some(first_ty)
+                    } else {
+                        Some(second_ty)
+                    }
+                } else {
+                    None
+                }
             }
-            _ => false,
+            _ => None,
         }
     }
 

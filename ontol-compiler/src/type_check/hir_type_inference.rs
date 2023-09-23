@@ -55,24 +55,35 @@ impl<'c, 'm> HirVariableMapper<'c, 'm> {
 
         for data in arena.iter_data_mut() {
             if let ontol_hir::Kind::Var(var) = data.hir() {
-                if let Some(var_mapping) = self.variable_mapping.get(var) {
-                    let arm = self.arm;
-                    let mapped_type = match arm {
-                        Arm::First => var_mapping.second_arm_type,
-                        Arm::Second => var_mapping.first_arm_type,
-                    };
+                match self.variable_mapping.get(var) {
+                    Some(VariableMapping::Mapping {
+                        first_arm_type,
+                        second_arm_type,
+                    }) => {
+                        let arm = self.arm;
+                        let mapped_type = match arm {
+                            Arm::First => second_arm_type,
+                            Arm::Second => first_arm_type,
+                        };
 
-                    // Make a new node which is the new var reference
-                    new_var_nodes.push(TypedHirData(
-                        ontol_hir::Kind::Var(*var),
-                        Meta {
-                            ty: mapped_type,
-                            span: data.span(),
-                        },
-                    ));
+                        // Make a new node which is the new var reference
+                        new_var_nodes.push(TypedHirData(
+                            ontol_hir::Kind::Var(*var),
+                            Meta {
+                                ty: mapped_type,
+                                span: data.span(),
+                            },
+                        ));
 
-                    // Replace the old node with a Map expression referencing the new var node
-                    *data.hir_mut() = ontol_hir::Kind::Map(alloc.prealloc_node());
+                        // Replace the old node with a Map expression referencing the new var node
+                        *data.hir_mut() = ontol_hir::Kind::Map(alloc.prealloc_node());
+                    }
+                    Some(VariableMapping::Overwrite(ty)) => {
+                        // Write the type from a strong binding into a weak binding,
+                        // for correctness. The unifier can see the proper type of each variable use.
+                        data.meta_mut().ty = ty;
+                    }
+                    _ => {}
                 }
             }
         }

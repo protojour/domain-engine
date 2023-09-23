@@ -235,6 +235,8 @@ fn generate_map_proc<'m>(
         assert_eq!(func.body.data().ty(), expr.data().ty());
     }
 
+    debug!("body type: {:?}", func.body.data().ty());
+
     let errors = map_codegen(proc_table, &func, compiler);
     compiler.errors.extend(errors);
 }

@@ -12,7 +12,7 @@ use crate::{
     type_check::{
         ena_inference::{InferValue, Strength},
         hir_build_ctx::{ExplicitVariableArm, PatternVariable},
-        hir_build_unpack::UnpackInfo,
+        hir_build_props::UnpackerInfo,
     },
     typed_hir::{IntoTypedHirData, Meta, TypedHir, TypedHirData},
     types::{Type, TypeRef, ERROR_TYPE, UNIT_TYPE},
@@ -146,8 +146,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         )
                     }
                 };
-                let struct_node = self.build_property_matcher(
-                    UnpackInfo {
+                let node = self.build_unpacker(
+                    UnpackerInfo {
                         type_def_id: type_path.def_id,
                         ty: struct_ty,
                         modifier: *modifier,
@@ -159,26 +159,28 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ctx,
                 );
 
-                let struct_meta = *ctx.hir_arena[struct_node].meta();
+                let meta = *ctx.hir_arena[node].meta();
+
+                debug!("property matcher meta: {meta:?}");
                 match expected_ty {
-                    Some((Type::Infer(_), _)) => struct_node,
-                    Some((Type::Domain(_), _)) => struct_node,
+                    Some((Type::Infer(_), _)) => node,
+                    Some((Type::Domain(_), _)) => node,
                     Some((Type::Option(Type::Domain(_)), _)) => {
-                        *ctx.hir_arena[struct_node].meta_mut() = Meta {
-                            ty: self.types.intern(Type::Option(struct_meta.ty)),
-                            span: struct_meta.span,
+                        *ctx.hir_arena[node].meta_mut() = Meta {
+                            ty: self.types.intern(Type::Option(meta.ty)),
+                            span: meta.span,
                         };
-                        struct_node
+                        node
                     }
                     Some((expected_ty, _)) => self.type_error_node(
                         TypeError::Mismatch(TypeEquation {
-                            actual: (struct_meta.ty, Strength::Strong),
+                            actual: (meta.ty, Strength::Strong),
                             expected: (expected_ty, Strength::Strong),
                         }),
                         &pattern.span,
                         ctx,
                     ),
-                    _ => struct_node,
+                    _ => node,
                 }
             }
             (
@@ -202,8 +204,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     );
                 }
 
-                self.build_property_matcher(
-                    UnpackInfo {
+                self.build_unpacker(
+                    UnpackerInfo {
                         type_def_id: *def_id,
                         ty: actual_ty,
                         modifier: *modifier,
@@ -458,20 +460,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             ),
         };
 
-        let typed_node = &ctx.hir_arena[node];
+        let hir_data = &ctx.hir_arena[node];
 
         debug!(
             "expected/meta: {:?} {:?}",
             node_info.expected_ty,
-            typed_node.ty()
+            hir_data.ty()
         );
 
-        match (node_info.expected_ty, typed_node.ty()) {
+        match (node_info.expected_ty, hir_data.ty()) {
             (_, Type::Error | Type::Infer(_)) => {}
             (Some((Type::Infer(type_var), strength)), _) => {
                 ctx.inference
                     .eq_relations
-                    .unify_var_value(*type_var, InferValue::Known((typed_node.ty(), strength)))
+                    .unify_var_value(*type_var, InferValue::Known((hir_data.ty(), strength)))
                     .unwrap();
             }
             _ => {}

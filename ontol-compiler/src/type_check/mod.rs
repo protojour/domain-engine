@@ -26,7 +26,7 @@ mod check_map;
 mod check_relationship;
 mod hir_build;
 mod hir_build_ctx;
-mod hir_build_unpack;
+mod hir_build_props;
 mod hir_type_inference;
 
 #[derive(Clone, Copy, Debug)]

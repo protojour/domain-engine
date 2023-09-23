@@ -92,7 +92,7 @@ fn unify_classic<'m>(
 ) -> UnifierResult<(UnifiedRootNode<'m>, ontol_hir::VarAllocator)> {
     let (scope_binder, var_allocator) = {
         let mut scope_builder = ScopeBuilder::new(var_allocator, scope.arena());
-        let scope_binder = scope_builder.build_scope_binder(scope.node())?;
+        let scope_binder = scope_builder.build_scope_binder(scope.node(), None)?;
         (scope_binder, scope_builder.var_allocator())
     };
 

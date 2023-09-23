@@ -91,9 +91,13 @@ pub struct PatternVariable {
     pub hir_arms: FnvHashMap<Arm, ExplicitVariableArm>,
 }
 
-pub struct VariableMapping<'m> {
-    pub first_arm_type: TypeRef<'m>,
-    pub second_arm_type: TypeRef<'m>,
+pub enum VariableMapping<'m> {
+    Mapping {
+        first_arm_type: TypeRef<'m>,
+        second_arm_type: TypeRef<'m>,
+    },
+    // Just write the type into the ontol-hir metadata, don't perform explicit map
+    Overwrite(TypeRef<'m>),
 }
 
 pub struct ExplicitVariableArm {

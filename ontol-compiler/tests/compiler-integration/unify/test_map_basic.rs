@@ -1,4 +1,4 @@
-use ontol_test_utils::{test_map::IntoKey, SourceName, TestCompile, TestPackages};
+use ontol_test_utils::{test_map::AsKey, SourceName, TestCompile, TestPackages};
 use serde_json::json;
 use test_log::test;
 
