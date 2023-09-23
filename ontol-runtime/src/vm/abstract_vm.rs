@@ -112,12 +112,29 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                     self.program_counter = procedure.address.0 as usize;
                     self.proc_address = procedure.address.0 as usize;
                 }
-                OpCode::Return(local) => {
-                    processor.swap(*local, Local(0));
-                    return0!(self, processor);
-                }
-                OpCode::Return0 => {
-                    return0!(self, processor);
+                OpCode::Return => {
+                    match self.call_stack.pop() {
+                        Some(CallStackFrame {
+                            stack: mut next_stack,
+                            program_counter,
+                            proc_address,
+                        }) => {
+                            self.program_counter = program_counter;
+                            self.proc_address = proc_address;
+                            let returning_stack = processor.stack_mut();
+
+                            // transfer return value to next stack frame
+                            let return_value = returning_stack.pop().unwrap();
+                            next_stack.push(return_value);
+
+                            // swap stacks so that the processor's stack is now `next_stack`
+                            // instead of `returning_stack`.
+                            std::mem::swap(returning_stack, &mut next_stack);
+                        }
+                        None => {
+                            return;
+                        }
+                    }
                 }
                 OpCode::CallBuiltin(builtin_proc, result_type) => {
                     processor.call_builtin(*builtin_proc, *result_type);
@@ -221,37 +238,7 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
     }
 }
 
-/// Return Local(0) from a function, yielding control to the next pushed stack frame,
-/// or returning from the VM if there are no more frames.
-macro_rules! return0 {
-    ($vm:ident, $processor:ident) => {
-        match $vm.call_stack.pop() {
-            Some(CallStackFrame {
-                stack: mut next_stack,
-                program_counter,
-                proc_address,
-            }) => {
-                $vm.program_counter = program_counter;
-                $vm.proc_address = proc_address;
-                let returning_stack = $processor.stack_mut();
-
-                // transfer return value to next stack frame
-                returning_stack.truncate(1);
-                next_stack.push(returning_stack.drain(0..1).next().unwrap());
-
-                // swap stacks so that the processor's stack is now `next_stack`
-                // instead of `returning_stack`.
-                std::mem::swap(returning_stack, &mut next_stack);
-            }
-            None => {
-                return;
-            }
-        }
-    };
-}
-
 use bit_vec::BitVec;
-pub(crate) use return0;
 
 use super::proc::GetAttrFlags;
 

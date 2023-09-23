@@ -53,10 +53,9 @@ pub struct NParams(pub u8);
 /// When the documentation mentions the stack, the _leftmost_ value is the top of the stack.
 #[derive(DebugExtras, Serialize, Deserialize)]
 pub enum OpCode {
-    /// Return a specific local
-    Return(Local),
-    /// Optimization: Return Local(0)
-    Return0,
+    /// Take the top of stack, and push that value onto the previous frame's stack,
+    /// and continue executing at the previous frame's program counter, or exit VM with popped value
+    Return,
     /// Go to address, relative to start_address
     Goto(AddressOffset),
     /// Call a procedure. Its arguments must be top of the value stack.

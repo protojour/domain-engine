@@ -54,7 +54,7 @@ pub(super) fn const_codegen<'m>(
         bug_span: expr_meta.span,
     };
     generator.gen_node(expr.as_ref(), &mut block);
-    block.commit(Terminator::Return(builder.top()), &mut builder);
+    block.commit(Terminator::Return, &mut builder);
 
     proc_table.const_procedures.insert(def_id, builder);
     errors
@@ -91,7 +91,7 @@ pub(super) fn map_codegen<'m>(
     };
     generator.scope.insert(func.arg.0.var, Local(0));
     generator.gen_node(body.as_ref(), &mut root_block);
-    root_block.commit(Terminator::Return(builder.top()), &mut builder);
+    root_block.commit(Terminator::Return, &mut builder);
 
     match (
         type_mapper.find_domain_mapping_info(func.arg.meta().ty),

@@ -31,8 +31,8 @@ pub enum Ir {
 
 #[derive(Clone, Debug)]
 pub enum Terminator {
-    /// The procedure returns a specific local
-    Return(Local),
+    /// Return the top of the stack
+    Return,
     /// Just a "goto", nothing is popped
     Goto(BlockIndex, BlockOffset),
     /// Just enter the next block. No instruction needed.

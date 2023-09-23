@@ -160,8 +160,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 );
 
                 let meta = *ctx.hir_arena[node].meta();
-
-                debug!("property matcher meta: {meta:?}");
                 match expected_ty {
                     Some((Type::Infer(_), _)) => node,
                     Some((Type::Domain(_), _)) => node,

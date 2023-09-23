@@ -88,21 +88,12 @@ impl ProcBuilder {
         let mut block_addr = 0;
         for (block_index, block) in self.blocks.iter_mut().enumerate() {
             let mut terminator_size = 1;
-            match &block.terminator {
-                // Peephole: No need for PopUntil right before return
-                Some(Terminator::Return(_)) => {
-                    if let Some((Ir::Op(OpCode::PopUntil(_)), _)) = block.ir.last() {
-                        block.ir.pop();
-                    }
+            if let Some(Terminator::Goto(dest_index, offset)) = &block.terminator {
+                // If it's just entering the next block, an instruction is not needed:
+                if dest_index.0 as usize == block_index + 1 && offset.0 == 0 {
+                    block.terminator = Some(Terminator::GotoNext);
+                    terminator_size = 0;
                 }
-                Some(Terminator::Goto(dest_index, offset)) => {
-                    // If it's just entering the next block, an instruction is not needed:
-                    if dest_index.0 as usize == block_index + 1 && offset.0 == 0 {
-                        block.terminator = Some(Terminator::GotoNext);
-                        terminator_size = 0;
-                    }
-                }
-                _ => {}
             }
 
             block_addresses.push(block_addr);
@@ -138,8 +129,7 @@ impl ProcBuilder {
 
             let span = block.terminator_span;
             match block.terminator {
-                Some(Terminator::Return(Local(0))) => output.push((OpCode::Return0, span)),
-                Some(Terminator::Return(local)) => output.push((OpCode::Return(local), span)),
+                Some(Terminator::Return) => output.push((OpCode::Return, span)),
                 Some(
                     Terminator::PopGoto(block_index, offset)
                     | Terminator::Goto(block_index, offset),

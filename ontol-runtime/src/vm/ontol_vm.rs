@@ -71,8 +71,8 @@ impl<'o> OntolVm<'o> {
         self.abstract_vm
             .execute(procedure, &mut self.processor, debug);
 
-        let stack = std::mem::take(&mut self.processor.stack);
-        stack.into_iter().next().unwrap()
+        let mut stack = std::mem::take(&mut self.processor.stack);
+        stack.pop().unwrap()
     }
 }
 
@@ -471,7 +471,8 @@ mod tests {
                 OpCode::PutAttr1(Local(1), "S:0:3".parse().unwrap()),
                 OpCode::GetAttr(Local(0), "S:0:2".parse().unwrap(), GetAttrFlags::take2()),
                 OpCode::PutAttr1(Local(1), "S:0:4".parse().unwrap()),
-                OpCode::Return(Local(1)),
+                OpCode::PopUntil(Local(1)),
+                OpCode::Return,
             ],
         );
 
@@ -515,7 +516,7 @@ mod tests {
             [
                 OpCode::Clone(Local(0)),
                 OpCode::CallBuiltin(BuiltinProc::Add, def_id(0)),
-                OpCode::Return0,
+                OpCode::Return,
             ],
         );
         let add_then_double = lib.append_procedure(
@@ -523,7 +524,7 @@ mod tests {
             [
                 OpCode::CallBuiltin(BuiltinProc::Add, def_id(0)),
                 OpCode::Call(double),
-                OpCode::Return0,
+                OpCode::Return,
             ],
         );
         let mapping_proc = lib.append_procedure(
@@ -542,7 +543,8 @@ mod tests {
                 // pop(6, 7):
                 OpCode::Call(add_then_double),
                 OpCode::PutAttr1(Local(1), "S:0:5".parse().unwrap()),
-                OpCode::Return(Local(1)),
+                OpCode::PopUntil(Local(1)),
+                OpCode::Return,
             ],
         );
 
@@ -597,8 +599,9 @@ mod tests {
                 // index counter
                 OpCode::I64(0, def_id(0)),
                 // Offset(2): for each in Local(0)
-                OpCode::Iter(Local(0), Local(2), AddressOffset(4)),
-                OpCode::Return(Local(1)),
+                OpCode::Iter(Local(0), Local(2), AddressOffset(5)),
+                OpCode::PopUntil(Local(1)),
+                OpCode::Return,
                 // Offset(4): map item
                 OpCode::I64(2, def_id(0)),
                 OpCode::CallBuiltin(BuiltinProc::Mul, def_id(0)),
@@ -652,8 +655,9 @@ mod tests {
                 OpCode::I64(0, def_id(0)),
                 // output -> Local(6):
                 OpCode::CallBuiltin(BuiltinProc::NewSeq, def_id(0)),
-                OpCode::Iter(Local(4), Local(5), AddressOffset(6)),
-                OpCode::Return(Local(6)),
+                OpCode::Iter(Local(4), Local(5), AddressOffset(7)),
+                OpCode::PopUntil(Local(6)),
+                OpCode::Return,
                 // Loop
                 // New object -> Local(9)
                 OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id(0)),
@@ -712,16 +716,17 @@ mod tests {
             [
                 OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id(7)),
                 OpCode::GetAttr(Local(0), prop, GetAttrFlags::try_take2()),
-                OpCode::Cond(Predicate::YankTrue(Local(2)), AddressOffset(4)),
+                OpCode::Cond(Predicate::YankTrue(Local(2)), AddressOffset(5)),
                 // AddressOffset(3):
-                OpCode::Return(Local(1)),
+                OpCode::PopUntil(Local(1)),
+                OpCode::Return,
                 // AddressOffset(4):
                 OpCode::Cond(
                     Predicate::MatchesDiscriminant(Local(3), inner_def_id),
-                    AddressOffset(6),
+                    AddressOffset(7),
                 ),
                 OpCode::Goto(AddressOffset(3)),
-                // AddressOffset(6):
+                // AddressOffset(7):
                 OpCode::I64(666, def_id(200)),
                 OpCode::PutAttr1(Local(1), prop),
                 OpCode::Goto(AddressOffset(3)),
