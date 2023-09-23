@@ -13,7 +13,7 @@ fn test_unify_no_op() {
 fn test_unify_expr1() {
     let output = test_unify("(- $a 10)", "$a");
     let expected = indoc! {"
-        |$b| (let ($a (+ $b 10))
+        |$b| (let ($a (map (+ $b 10)))
             $a
         )"
     };
@@ -30,7 +30,7 @@ fn test_unify_expr2() {
 fn test_unify_symmetric_exprs() {
     let output = test_unify("(- $a 10)", "(+ $a 20)");
     let expected = indoc! {"
-        |$b| (let ($a (+ $b 10))
+        |$b| (let ($a (map (+ $b 10)))
             (+ $a 20)
         )"
     };
@@ -266,7 +266,7 @@ fn test_unify_struct_simple_arithmetic() {
         |$b| (struct ($c)
             (match-prop $b S:0:0
                 (($_ $d)
-                    (let ($a (+ $d 10))
+                    (let ($a (map (+ $d 10)))
                         (prop $c S:0:1
                             (#u (+ $a 20))
                         )
@@ -299,13 +299,13 @@ fn test_struct_arithmetic_property_dependency() {
         |$c| (struct ($d)
             (match-prop $c S:0:0
                 (($_ $e)
-                    (let ($a (+ $e 10))
+                    (let ($a (map (+ $e 10)))
                         (prop $d O:0:1
                             (#u (+ $a 20))
                         )
                         (match-prop $c S:0:1
                             (($_ $f)
-                                (let ($b (+ $f 10))
+                                (let ($b (map (+ $f 10)))
                                     (prop $d O:0:0
                                         (#u (+ $a $b))
                                     )
@@ -352,7 +352,7 @@ fn test_struct_arithmetic_property_dependency_within_struct() {
         |$c| (struct ($d)
             (match-prop $c S:0:0
                 (($_ $f)
-                    (let ($a (+ $f 10))
+                    (let ($a (map (+ $f 10)))
                         (prop $d O:0:1
                             (#u (+ $a 20))
                         )
@@ -360,7 +360,7 @@ fn test_struct_arithmetic_property_dependency_within_struct() {
                             (($_ $e)
                                 (match-prop $e S:1:0
                                     (($_ $g)
-                                        (let ($b (+ $g 10))
+                                        (let ($b (map (+ $g 10)))
                                             (prop $d O:0:0
                                                 (#u (+ $a $b))
                                             )
@@ -382,7 +382,7 @@ fn test_struct_arithmetic_property_dependency_within_struct() {
         |$c| (struct ($d)
             (match-prop $c S:0:0
                 (($_ $f)
-                    (let ($a (+ $f 10))
+                    (let ($a (map (+ $f 10)))
                         (prop $d O:0:1
                             (#u (+ $a 20))
                         )
@@ -392,7 +392,7 @@ fn test_struct_arithmetic_property_dependency_within_struct() {
                                     (#u
                                         (match-prop $e S:1:0
                                             (($_ $g)
-                                                (let ($b (+ $g 10))
+                                                (let ($b (map (+ $g 10)))
                                                     (+ $a $b)
                                                 )
                                             )
@@ -403,7 +403,7 @@ fn test_struct_arithmetic_property_dependency_within_struct() {
                                     (#u
                                         (match-prop $e S:1:0
                                             (($_ $g)
-                                                (let ($b (+ $g 10))
+                                                (let ($b (map (+ $g 10)))
                                                     (+ $b 20)
                                                 )
                                             )
@@ -1196,13 +1196,13 @@ mod dependent_scoping {
                         )
                         (match-prop $c S:1:1
                             (($_ $h)
-                                (let ($b (- $a $h))
+                                (let ($b (map (- $a $h)))
                                     (prop $f O:1:1
                                         (#u $b)
                                     )
                                     (match-prop $c S:0:0
                                         (($_ $g)
-                                            (let ($c (- $b $g))
+                                            (let ($c (map (- $b $g)))
                                                 (prop $f O:2:2
                                                     (#u $c)
                                                 )

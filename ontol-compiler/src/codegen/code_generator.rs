@@ -18,7 +18,7 @@ use crate::{
     error::CompileError,
     primitive::Primitives,
     typed_hir::{HirFunc, TypedArena, TypedHir, TypedNodeRef},
-    types::Type,
+    types::{Type, UNIT_TYPE},
     CompileErrors, Compiler, SourceSpan, NO_SPAN,
 };
 
@@ -148,6 +148,11 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     span,
                     self.builder,
                 );
+                if ty != &UNIT_TYPE {
+                    if let Some(def_id) = ty.get_single_def_id() {
+                        self.gen_pun(block, def_id, span);
+                    }
+                }
             }
             ontol_hir::Kind::I64(int) => {
                 block.op(
