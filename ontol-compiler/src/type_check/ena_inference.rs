@@ -39,10 +39,10 @@ pub type KnownType<'m> = (TypeRef<'m>, Strength);
 
 /// If a weak type is unified with a strong type and they are
 /// Repr-compatible, choose the strong type
-#[derive(Clone, Copy, Eq, PartialEq, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub enum Strength {
-    Strong,
     Weak,
+    Strong,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
@@ -54,20 +54,21 @@ pub enum InferValue<'m> {
 impl<'m> ena::unify::UnifyValue for InferValue<'m> {
     type Error = TypeError<'m>;
 
-    fn unify_values(value1: &Self, value2: &Self) -> Result<Self, Self::Error> {
-        match (value1, value2) {
-            (Self::Known((a, a_strength)), Self::Known((b, b_strength))) => {
-                if a == b {
-                    Ok(value1.clone())
+    fn unify_values(value_a: &Self, value_b: &Self) -> Result<Self, Self::Error> {
+        match (value_a, value_b) {
+            (Self::Known((type_a, a_strength)), Self::Known((type_b, b_strength))) => {
+                if type_a == type_b {
+                    let strongest = [*a_strength, *b_strength].into_iter().max().unwrap();
+                    Ok(Self::Known((type_a, strongest)))
                 } else {
                     Err(TypeError::Mismatch(TypeEquation {
-                        actual: (a, *a_strength),
-                        expected: (b, *b_strength),
+                        actual: (type_a, *a_strength),
+                        expected: (type_b, *b_strength),
                     }))
                 }
             }
-            (Self::Known(..), Self::Unknown) => Ok(value1.clone()),
-            (Self::Unknown, Self::Known(..)) => Ok(value2.clone()),
+            (Self::Known(..), Self::Unknown) => Ok(*value_a),
+            (Self::Unknown, Self::Known(..)) => Ok(*value_b),
             (Self::Unknown, Self::Unknown) => Ok(Self::Unknown),
         }
     }
@@ -124,4 +125,13 @@ impl<'c, 'm> Infer<'c, 'm> {
             ty => Ok(ty),
         }
     }
+}
+
+#[test]
+fn strength_cmp() {
+    let strongest = [Strength::Strong, Strength::Weak]
+        .into_iter()
+        .max()
+        .unwrap();
+    assert_eq!(strongest, Strength::Strong);
 }
