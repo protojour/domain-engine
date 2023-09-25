@@ -32,3 +32,19 @@ fn test_map_match_scalar_key() {
     "#
     .compile_then(|_test| {});
 }
+
+#[test]
+fn test_map_match_parameterless_query() {
+    r#"
+    pub def key { rel .is: text }
+    pub def foo {
+        rel .'key'|id: key
+        rel .'prop': text
+    }
+    map q {
+        {}
+        [..foo match {}]
+    }
+    "#
+    .compile_then(|_test| {});
+}

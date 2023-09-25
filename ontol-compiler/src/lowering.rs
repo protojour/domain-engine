@@ -593,15 +593,22 @@ impl<'s, 'm> Lowering<'s, 'm> {
         (ast, span): (ast::StructPattern, Span),
         var_table: &mut MapVarTable,
     ) -> Res<Pattern> {
-        let type_def_id = self.lookup_path(&ast.path.0, &ast.path.1)?;
+        let type_path = ast
+            .path
+            .map(|(path, span)| {
+                let def_id = self.lookup_path(&path, &span)?;
+                Ok(TypePath {
+                    def_id,
+                    span: self.src.span(&span),
+                })
+            })
+            .transpose()?;
+
         let attrs = self.lower_struct_pattern_attrs(ast.attributes, var_table)?;
 
         Ok(self.mk_pattern(
             PatternKind::Unpack {
-                type_path: Some(TypePath {
-                    def_id: type_def_id,
-                    span: self.src.span(&ast.path.1),
-                }),
+                type_path,
                 modifier: ast.modifier.map(|(modifier, _span)| match modifier {
                     ast::StructPatternModifier::Match => UnpackPatternModifier::Match,
                 }),

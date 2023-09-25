@@ -297,6 +297,7 @@ fn braced_struct_pattern(
     pattern: impl AstParser<Pattern> + Clone + 'static,
 ) -> impl AstParser<StructPattern> {
     spanned(path())
+        .or_not()
         .then(struct_pattern_modifier().or_not())
         .then(
             spanned(struct_pattern_attr(pattern))
