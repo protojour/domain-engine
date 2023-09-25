@@ -331,8 +331,8 @@ impl LanguageServer for Backend {
                         }
                         Statement::Fmt(_) => get_signature(&doc.text, range, &state.regex),
                         Statement::Map(stmt) => {
-                            let first = parse_map_arm(&stmt.first.0 .1);
-                            let second = parse_map_arm(&stmt.second.0 .1);
+                            let first = parse_map_arm(&stmt.first.0);
+                            let second = parse_map_arm(&stmt.second.0);
                             format!("map {} {}", first, second)
                         }
                     };

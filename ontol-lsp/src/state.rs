@@ -11,8 +11,8 @@ use ontol_compiler::{
 };
 use ontol_parser::{
     ast::{
-        DefStatement, MapArm, Path, Pattern, Statement, StructPattern, Type, TypeOrPattern,
-        UseStatement,
+        DefStatement, ExprOrStructOrSeqPattern, MapArm, Path, Statement, StructPattern, Type,
+        TypeOrPattern, UseStatement,
     },
     lexer::lexer,
     parse_statements, Spanned, Token,
@@ -331,11 +331,11 @@ impl State {
                     }
                     Statement::Map(stmt) => {
                         if in_range(&stmt.first.1, &cursor) {
-                            if let Some(path) = get_map_arm_path(&stmt.first.0 .1, &cursor) {
+                            if let Some(path) = get_map_arm_path(&stmt.first.0, &cursor) {
                                 return self.get_location_for_path(doc, &path);
                             }
                         } else if in_range(&stmt.second.1, &cursor) {
-                            if let Some(path) = get_map_arm_path(&stmt.second.0 .1, &cursor) {
+                            if let Some(path) = get_map_arm_path(&stmt.second.0, &cursor) {
                                 return self.get_location_for_path(doc, &path);
                             }
                         }
@@ -461,16 +461,16 @@ impl State {
                     }
                     Statement::Map(stmt) => {
                         if stmt.first.1.contains(&cursor) {
-                            if let Some(path) = get_map_arm_path(&stmt.first.0 .1, &cursor) {
+                            if let Some(path) = get_map_arm_path(&stmt.first.0, &cursor) {
                                 return self.get_hoverdoc_for_path(doc, &path);
                             }
                         } else if stmt.second.1.contains(&cursor) {
-                            if let Some(path) = get_map_arm_path(&stmt.second.0 .1, &cursor) {
+                            if let Some(path) = get_map_arm_path(&stmt.second.0, &cursor) {
                                 return self.get_hoverdoc_for_path(doc, &path);
                             }
                         }
-                        let first = parse_map_arm(&stmt.first.0 .1);
-                        let second = parse_map_arm(&stmt.second.0 .1);
+                        let first = parse_map_arm(&stmt.first.0);
+                        let second = parse_map_arm(&stmt.second.0);
                         hover.path = format!("map {} {}", first, second);
                         break;
                     }
@@ -709,8 +709,11 @@ pub fn get_signature(text: &str, range: &std::ops::Range<usize>, regex: &Compile
 /// Parse the identifier or path for a map arm to String
 pub fn parse_map_arm(arm: &MapArm) -> String {
     match arm {
-        MapArm::Struct(s) => parse_path(&s.path.0),
-        MapArm::Binding { path, expr: _ } => parse_path(&path.0),
+        MapArm::Struct(s) => match &s.path {
+            Some(path) => parse_path(&path.0),
+            None => "".into(),
+        },
+        MapArm::Binding { path, pattern: _ } => parse_path(&path.0),
     }
 }
 
@@ -730,7 +733,7 @@ fn parse_path(path: &Path) -> String {
 fn get_map_arm_path(arm: &MapArm, cursor: &usize) -> Option<Path> {
     match arm {
         MapArm::Struct(s) => return get_struct_pattern_path(s, cursor),
-        MapArm::Binding { path, expr: _ } => {
+        MapArm::Binding { path, pattern: _ } => {
             if in_range(&path.1, cursor) {
                 return Some(path.0.to_owned());
             }
@@ -741,9 +744,10 @@ fn get_map_arm_path(arm: &MapArm, cursor: &usize) -> Option<Path> {
 
 /// Try to find a Path in a StructPattern
 fn get_struct_pattern_path(s: &StructPattern, cursor: &usize) -> Option<Path> {
-    let range = &s.path.1;
+    let path = s.path.as_ref()?;
+    let range = &path.1;
     if in_range(range, cursor) {
-        return Some(s.path.0.to_owned());
+        return Some(path.0.to_owned());
     }
     for (attr, range) in &s.attributes {
         if in_range(range, cursor) {
@@ -754,10 +758,10 @@ fn get_struct_pattern_path(s: &StructPattern, cursor: &usize) -> Option<Path> {
 }
 
 /// Try to find a Path in a Pattern
-fn get_pattern_path(pattern: &Pattern, cursor: &usize) -> Option<Path> {
+fn get_pattern_path(pattern: &ExprOrStructOrSeqPattern, cursor: &usize) -> Option<Path> {
     match pattern {
-        Pattern::Struct((s, _)) => get_struct_pattern_path(s, cursor),
-        Pattern::Seq(seq) => {
+        ExprOrStructOrSeqPattern::Struct((s, _)) => get_struct_pattern_path(s, cursor),
+        ExprOrStructOrSeqPattern::Seq(seq) => {
             for (elem, range) in seq {
                 if in_range(range, cursor) {
                     return get_pattern_path(&elem.pattern.0, cursor);
@@ -765,6 +769,6 @@ fn get_pattern_path(pattern: &Pattern, cursor: &usize) -> Option<Path> {
             }
             None
         }
-        Pattern::Expr(_) => None,
+        ExprOrStructOrSeqPattern::Expr(_) => None,
     }
 }

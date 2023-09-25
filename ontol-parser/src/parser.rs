@@ -5,8 +5,9 @@ use either::Either;
 use smartstring::alias::String;
 
 use crate::ast::{
-    Dot, ExprPattern, FmtStatement, MapArm, Path, Pattern, SeqPatternElement, StructPattern,
-    StructPatternAttr, StructPatternModifier, TypeOrPattern, UnitOrSeq, UseStatement, Visibility,
+    Dot, ExprOrSeqPattern, ExprOrStructOrSeqPattern, ExprPattern, FmtStatement, MapArm, Path,
+    SeqPatternElement, StructPattern, StructPatternAttr, StructPatternModifier, TypeOrPattern,
+    UnitOrSeq, UseStatement, Visibility,
 };
 
 use super::{
@@ -246,23 +247,12 @@ fn with_unit_or_seq<T>(inner: impl AstParser<T> + Clone) -> impl AstParser<(Unit
 }
 
 fn map_statement() -> impl AstParser<MapStatement> {
-    fn quantified_arm() -> impl AstParser<(UnitOrSeq, MapArm)> {
-        map_arm()
-            .clone()
-            .map(|arm| (UnitOrSeq::Unit, arm))
-            .or(open('[')
-                .ignore_then(dot_dot())
-                .ignore_then(map_arm())
-                .then_ignore(close(']'))
-                .map(|arm| (UnitOrSeq::Seq, arm)))
-    }
-
     doc_comments()
         .then(keyword(Token::Map))
         .then(spanned(ident()).or_not())
         .then(
-            spanned(quantified_arm())
-                .then(spanned(quantified_arm()))
+            spanned(map_arm())
+                .then(spanned(map_arm()))
                 .delimited_by(open('{'), close('}')),
         )
         .map(|(((docs, kw), ident), (first, second))| MapStatement {
@@ -278,23 +268,27 @@ fn map_arm() -> impl AstParser<MapArm> {
     let struct_arm = braced_struct_pattern(pattern()).map(MapArm::Struct);
     let binding_arm = spanned(path())
         .then_ignore(colon())
-        .then(expr_pattern())
-        .map(|(path, expr)| MapArm::Binding { path, expr });
+        .then(
+            expr_pattern()
+                .map(ExprOrSeqPattern::Expr)
+                .or(seq_pattern(pattern()).map(ExprOrSeqPattern::Seq)),
+        )
+        .map(|(path, pattern)| MapArm::Binding { path, pattern });
 
     struct_arm.or(binding_arm)
 }
 
-fn pattern() -> impl AstParser<Pattern> {
+fn pattern() -> impl AstParser<ExprOrStructOrSeqPattern> {
     recursive(|pattern| {
         spanned(braced_struct_pattern(pattern.clone()))
-            .map(Pattern::Struct)
-            .or(seq_pattern(pattern).map(Pattern::Seq))
-            .or(expr_pattern().map(|(expr, span)| Pattern::Expr((expr, span))))
+            .map(ExprOrStructOrSeqPattern::Struct)
+            .or(seq_pattern(pattern).map(ExprOrStructOrSeqPattern::Seq))
+            .or(expr_pattern().map(|(expr, span)| ExprOrStructOrSeqPattern::Expr((expr, span))))
     })
 }
 
 fn braced_struct_pattern(
-    pattern: impl AstParser<Pattern> + Clone + 'static,
+    pattern: impl AstParser<ExprOrStructOrSeqPattern> + Clone + 'static,
 ) -> impl AstParser<StructPattern> {
     spanned(path())
         .or_not()
@@ -317,7 +311,7 @@ fn struct_pattern_modifier() -> impl AstParser<Spanned<StructPatternModifier>> {
 }
 
 fn struct_pattern_attr(
-    pattern: impl AstParser<Pattern> + Clone + 'static,
+    pattern: impl AstParser<ExprOrStructOrSeqPattern> + Clone + 'static,
 ) -> impl AstParser<StructPatternAttr> {
     recursive(|struct_pattern_attr| {
         spanned(named_type())
@@ -344,7 +338,7 @@ fn struct_pattern_attr(
 }
 
 fn seq_pattern(
-    pattern: impl AstParser<Pattern> + Clone + 'static,
+    pattern: impl AstParser<ExprOrStructOrSeqPattern> + Clone + 'static,
 ) -> impl AstParser<Vec<Spanned<SeqPatternElement>>> {
     spanned(
         spanned(dot_dot())

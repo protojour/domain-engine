@@ -160,8 +160,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
             )?,
             Either::Right(ast::TypeOrPattern::Pattern(ast_pattern)) => {
                 let mut var_table = MapVarTable::default();
-                let pattern =
-                    self.lower_pattern((ast_pattern, object_span.clone()), &mut var_table)?;
+                let pattern = self.lower_expr_or_struct_or_seq_pattern(
+                    (ast_pattern, object_span.clone()),
+                    &mut var_table,
+                )?;
                 let pat_id = self.compiler.patterns.alloc_pat_id();
                 self.compiler.patterns.table.insert(pat_id, pattern);
 
@@ -523,32 +525,21 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
     fn lower_map_arm(
         &mut self,
-        ((unit_or_seq, ast), span): ((ast::UnitOrSeq, ast::MapArm), Span),
+        (ast, span): (ast::MapArm, Span),
         var_table: &mut MapVarTable,
     ) -> Res<PatId> {
-        let unit_pattern = match ast {
+        let pattern = match ast {
             ast::MapArm::Struct(ast) => {
                 self.lower_struct_pattern((ast, span.clone()), var_table)?
             }
-            ast::MapArm::Binding { path, expr: ast } => {
-                self.lower_map_binding(path, ast, span.clone(), var_table)?
-            }
-        };
-        let pattern = match unit_or_seq {
-            ast::UnitOrSeq::Unit => unit_pattern,
-            ast::UnitOrSeq::Seq => {
-                let seq_id = self.compiler.patterns.alloc_pat_id();
-                self.mk_pattern(
-                    PatternKind::Seq(
-                        seq_id,
-                        vec![SeqPatternElement {
-                            iter: true,
-                            pattern: unit_pattern,
-                        }],
-                    ),
-                    &span,
-                )
-            }
+            ast::MapArm::Binding { path, pattern } => match pattern {
+                ast::ExprOrSeqPattern::Expr(ast) => {
+                    self.lower_map_expr_binding(path, ast, span.clone(), var_table)?
+                }
+                ast::ExprOrSeqPattern::Seq(ast_elements) => {
+                    self.lower_seq_pattern(ast_elements, span, var_table)?
+                }
+            },
         };
 
         let pat_id = self.compiler.patterns.alloc_pat_id();
@@ -557,7 +548,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         Ok(pat_id)
     }
 
-    fn lower_map_binding(
+    fn lower_map_expr_binding(
         &mut self,
         path: (ast::Path, Span),
         (ast, expr_span): (ast::ExprPattern, Span),
@@ -642,7 +633,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                 let def = self.resolve_type_reference(relation.0, &relation.1, None)?;
 
-                let object_pattern = self.lower_pattern((object, object_span), var_table);
+                let object_pattern =
+                    self.lower_expr_or_struct_or_seq_pattern((object, object_span), var_table);
                 let rel = match relation_attrs {
                     Some((attrs, span)) => {
                         // Inherit modifier from object pattern
@@ -678,36 +670,51 @@ impl<'s, 'm> Lowering<'s, 'm> {
             .collect()
     }
 
-    fn lower_pattern(
+    fn lower_expr_or_struct_or_seq_pattern(
         &mut self,
-        (ast, span): (ast::Pattern, Span),
+        (ast, span): (ast::ExprOrStructOrSeqPattern, Span),
         var_table: &mut MapVarTable,
     ) -> Res<Pattern> {
         match ast {
-            ast::Pattern::Expr((ast, _)) => self.lower_expr_pattern((ast, span), var_table),
-            ast::Pattern::Struct((ast, span)) => self.lower_struct_pattern((ast, span), var_table),
-            ast::Pattern::Seq(ast_elements) => {
-                if ast_elements.is_empty() {
-                    return Err((
-                        CompileError::TODO(smart_format!("requires at least one element")),
-                        span.clone(),
-                    ));
-                }
-
-                let mut pattern_elements = Vec::with_capacity(ast_elements.len());
-                for (ast_element, _element_span) in ast_elements {
-                    let pattern = self
-                        .lower_pattern((ast_element.pattern.0, ast_element.pattern.1), var_table)?;
-                    pattern_elements.push(SeqPatternElement {
-                        iter: ast_element.spread.is_some(),
-                        pattern,
-                    })
-                }
-
-                let seq_id = self.compiler.patterns.alloc_pat_id();
-                Ok(self.mk_pattern(PatternKind::Seq(seq_id, pattern_elements), &span))
+            ast::ExprOrStructOrSeqPattern::Expr((ast, _)) => {
+                self.lower_expr_pattern((ast, span), var_table)
+            }
+            ast::ExprOrStructOrSeqPattern::Struct((ast, span)) => {
+                self.lower_struct_pattern((ast, span), var_table)
+            }
+            ast::ExprOrStructOrSeqPattern::Seq(ast_elements) => {
+                self.lower_seq_pattern(ast_elements, span, var_table)
             }
         }
+    }
+
+    fn lower_seq_pattern(
+        &mut self,
+        ast_elements: Vec<(ast::SeqPatternElement, Span)>,
+        span: Span,
+        var_table: &mut MapVarTable,
+    ) -> Res<Pattern> {
+        if ast_elements.is_empty() {
+            return Err((
+                CompileError::TODO(smart_format!("requires at least one element")),
+                span.clone(),
+            ));
+        }
+
+        let mut pattern_elements = Vec::with_capacity(ast_elements.len());
+        for (ast_element, _element_span) in ast_elements {
+            let pattern = self.lower_expr_or_struct_or_seq_pattern(
+                (ast_element.pattern.0, ast_element.pattern.1),
+                var_table,
+            )?;
+            pattern_elements.push(SeqPatternElement {
+                iter: ast_element.spread.is_some(),
+                pattern,
+            })
+        }
+
+        let seq_id = self.compiler.patterns.alloc_pat_id();
+        Ok(self.mk_pattern(PatternKind::Seq(seq_id, pattern_elements), &span))
     }
 
     fn lower_expr_pattern(
