@@ -13,7 +13,9 @@ use crate::{
     def::Def,
     error::CompileError,
     mem::Intern,
-    pattern::{PatId, Pattern, PatternKind, Patterns, RegexPatternCaptureNode},
+    pattern::{
+        PatId, Pattern, PatternKind, Patterns, RegexPatternCaptureNode, UnpackPatternModifier,
+    },
     type_check::hir_build_ctx::{Arm, VariableMapping},
     typed_hir::TypedHir,
     types::{Type, TypeRef, ERROR_TYPE},
@@ -274,27 +276,40 @@ pub struct MapCheck<'c> {
     patterns: &'c Patterns,
 }
 
+struct ArmAnalysis {
+    group_set: AggrGroupSet,
+    is_match: bool,
+}
+
 impl<'c> MapCheck<'c> {
     fn analyze_arm(
         &mut self,
         expr: &Pattern,
         parent_aggr_group: Option<CtrlFlowGroup>,
         ctx: &mut HirBuildCtx<'_>,
-    ) -> Result<AggrGroupSet, AggrGroupError> {
+    ) -> Result<ArmAnalysis, AggrGroupError> {
         let mut group_set = AggrGroupSet::new();
+        let mut is_match = false;
 
         match &expr.kind {
             PatternKind::Call(_, args) => {
                 for arg in args.iter() {
-                    group_set.join(self.analyze_arm(arg, parent_aggr_group, ctx)?);
+                    group_set.join(self.analyze_arm(arg, parent_aggr_group, ctx)?.group_set);
                 }
             }
             PatternKind::Unpack {
-                attributes: attrs, ..
+                attributes: attrs,
+                modifier,
+                ..
             } => {
                 for attr in attrs.iter() {
-                    group_set.join(self.analyze_arm(&attr.value, parent_aggr_group, ctx)?);
+                    group_set.join(
+                        self.analyze_arm(&attr.value, parent_aggr_group, ctx)?
+                            .group_set,
+                    );
                 }
+
+                is_match = matches!(modifier, Some(UnpackPatternModifier::Match));
             }
             PatternKind::Seq(pat_id, elements) => {
                 if ctx.arm.is_first() {
@@ -327,13 +342,21 @@ impl<'c> MapCheck<'c> {
 
                     let mut inner_aggr_group = AggrGroupSet::new();
                     let mut iter_element_count = 0;
+                    let mut iter_match_element_count = 0;
 
                     for element in elements {
                         if element.iter {
                             iter_element_count += 1;
                             ctx.enter_ctrl(|ctx| {
-                                let group = self.analyze_arm(&element.pattern, None, ctx).unwrap();
-                                inner_aggr_group.join(group);
+                                let analysis =
+                                    self.analyze_arm(&element.pattern, None, ctx).unwrap();
+                                inner_aggr_group.join(analysis.group_set);
+
+                                if analysis.is_match {
+                                    // A match directly in an iterated element does not require
+                                    // finding an exact aggregation group
+                                    iter_match_element_count += 1;
+                                }
                             });
                         }
                     }
@@ -352,7 +375,9 @@ impl<'c> MapCheck<'c> {
                                 Ok(())
                             }
                             Err(error) => {
-                                if iter_element_count > 0 {
+                                if iter_element_count > 0
+                                    && iter_element_count > iter_match_element_count
+                                {
                                     debug!("Failure: {error:?}");
 
                                     self.error(
@@ -363,7 +388,9 @@ impl<'c> MapCheck<'c> {
                                     );
                                     Err(error)
                                 } else {
-                                    // Since there's no iteration this is considered OK
+                                    // Since there's no iteration (or all the iterations are `match`) this is considered OK.
+                                    // FIXME: But a `match` can still iterate on variables.
+                                    // So the logic here has to be improved.
 
                                     let label = Label(ctx.var_allocator.alloc().0);
                                     debug!("first arm seq: pat_id={pat_id:?}");
@@ -394,7 +421,10 @@ impl<'c> MapCheck<'c> {
             PatternKind::ConstI64(_) | PatternKind::ConstText(_) => {}
         };
 
-        Ok(group_set)
+        Ok(ArmAnalysis {
+            group_set,
+            is_match,
+        })
     }
 
     fn analyze_regex_capture_node(
