@@ -656,21 +656,23 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     }
                 }
 
-                let Some((scope_prop, sub_scoped)) = sub_scoped.sub_trees.into_iter().next() else {
-                    panic!("No sub scoping but free_vars was {ordered_scope_vars:?}")
-                };
+                if let Some((scope_prop, sub_scoped)) = sub_scoped.sub_trees.into_iter().next() {
+                    let node = expr::Expr::unify_match_arm(self, scope_prop, sub_scoped)?.node;
 
-                let node = expr::Expr::unify_match_arm(self, scope_prop, sub_scoped)?.node;
-
-                Ok(UnifiedNode {
-                    typed_binder: scope_binder.map(|binder| {
-                        ontol_hir::Binder {
-                            var: binder.hir().var,
-                        }
-                        .with_meta(scope_meta.hir_meta)
-                    }),
-                    node,
-                })
+                    Ok(UnifiedNode {
+                        typed_binder: scope_binder.map(|binder| {
+                            ontol_hir::Binder {
+                                var: binder.hir().var,
+                            }
+                            .with_meta(scope_meta.hir_meta)
+                        }),
+                        node,
+                    })
+                } else {
+                    // Should be an expression that doesn't use any of the scope parameters
+                    let expr = sub_scoped.expressions.into_iter().next().unwrap();
+                    self.unify(scope::constant(), expr)
+                }
             }
             (expr::Kind::Seq(_label, _attr), _) => {
                 panic!("Seq without gen scope")

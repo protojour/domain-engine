@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use ontol_hir::StructFlags;
 use ontol_runtime::smart_format;
 use tracing::debug;
 
@@ -142,7 +143,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Type::Domain(def_id) => {
                         assert_eq!(*def_id, *path_def_id);
                     }
-                    _ => return self.error_node(CompileError::DomainTypeExpected, &path_span, ctx),
+                    _ => return self.error_node(CompileError::DomainTypeExpected, path_span, ctx),
                 };
                 let node = self.build_unpacker(
                     UnpackerInfo {
@@ -247,8 +248,18 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 // It can be mapped _from_ but never _to_, so a resemblance to `match`.
                 // The difference is that all the field types must be directly inferred.
                 // let lolge = self.defs.alloc_def_id(ONTOL_PKG);
+                let ty = self.check_def_sealed(*infer_def_id);
+                let meta = Meta {
+                    ty,
+                    span: pattern.span,
+                };
+                let struct_binder: TypedHirData<'_, ontol_hir::Binder> =
+                    TypedHirData(ctx.var_allocator.alloc().into(), meta);
 
-                todo!();
+                ctx.mk_node(
+                    ontol_hir::Kind::Struct(struct_binder, StructFlags::MATCH, Default::default()),
+                    meta,
+                )
             }
             (PatternKind::Seq(aggr_pat_id, pat_elements), expected_ty) => {
                 let (rel_ty, val_ty) = match expected_ty {
