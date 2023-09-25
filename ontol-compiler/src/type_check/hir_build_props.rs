@@ -10,7 +10,7 @@ use tracing::debug;
 use crate::{
     def::{DefKind, LookupRelationshipMeta, RelParams},
     mem::Intern,
-    pattern::{PatternKind, StructPatternAttr, UnpackPatternModifier},
+    pattern::{CompoundPatternAttr, CompoundPatternModifier, PatternKind},
     primitive::PrimitiveKind,
     type_check::{
         ena_inference::Strength, hir_build::NodeInfo, repr::repr_model::ReprKind, TypeError,
@@ -25,7 +25,7 @@ use super::{hir_build_ctx::HirBuildCtx, TypeCheck};
 pub(super) struct UnpackerInfo<'m> {
     pub type_def_id: DefId,
     pub ty: TypeRef<'m>,
-    pub modifier: Option<UnpackPatternModifier>,
+    pub modifier: Option<CompoundPatternModifier>,
     pub is_unit_binding: bool,
     pub parent_struct_flags: ontol_hir::StructFlags,
 }
@@ -49,14 +49,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             is_unit_binding,
             parent_struct_flags,
         }: UnpackerInfo<'m>,
-        pattern_attrs: &[StructPatternAttr],
+        pattern_attrs: &[CompoundPatternAttr],
         span: SourceSpan,
         ctx: &mut HirBuildCtx<'m>,
     ) -> ontol_hir::Node {
         let properties = self.relations.properties_by_def_id(type_def_id);
 
         let actual_struct_flags = match modifier {
-            Some(UnpackPatternModifier::Match) => ontol_hir::StructFlags::MATCH,
+            Some(CompoundPatternModifier::Match) => ontol_hir::StructFlags::MATCH,
             None => ontol_hir::StructFlags::empty(),
         } | parent_struct_flags;
 
@@ -183,7 +183,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     _ => {
                         let mut attributes = pattern_attrs.iter();
                         match attributes.next() {
-                            Some(StructPatternAttr {
+                            Some(CompoundPatternAttr {
                                 key: (def_id, _),
                                 rel: _,
                                 bind_option: _,
@@ -213,7 +213,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             ReprKind::Scalar(..) => {
                 let mut attributes = pattern_attrs.iter();
                 match attributes.next() {
-                    Some(StructPatternAttr {
+                    Some(CompoundPatternAttr {
                         key: (attr_def_id, _),
                         rel: _,
                         bind_option: _,
@@ -253,12 +253,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn build_struct_property_node(
         &mut self,
         struct_binder_var: ontol_hir::Var,
-        attr: &StructPatternAttr,
+        attr: &CompoundPatternAttr,
         match_attributes: &mut IndexMap<&'m str, MatchAttribute>,
         actual_struct_flags: StructFlags,
         ctx: &mut HirBuildCtx<'m>,
     ) -> Option<ontol_hir::Node> {
-        let StructPatternAttr {
+        let CompoundPatternAttr {
             key: (def_id, prop_span),
             rel,
             bind_option,

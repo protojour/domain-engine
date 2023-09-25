@@ -14,7 +14,7 @@ use crate::{
     error::CompileError,
     mem::Intern,
     pattern::{
-        PatId, Pattern, PatternKind, Patterns, RegexPatternCaptureNode, UnpackPatternModifier,
+        CompoundPatternModifier, PatId, Pattern, PatternKind, Patterns, RegexPatternCaptureNode,
     },
     type_check::hir_build_ctx::{Arm, VariableMapping},
     typed_hir::TypedHir,
@@ -297,7 +297,7 @@ impl<'c> MapCheck<'c> {
                     group_set.join(self.analyze_arm(arg, parent_aggr_group, ctx)?.group_set);
                 }
             }
-            PatternKind::Unpack {
+            PatternKind::Compound {
                 attributes: attrs,
                 modifier,
                 ..
@@ -309,7 +309,7 @@ impl<'c> MapCheck<'c> {
                     );
                 }
 
-                is_match = matches!(modifier, Some(UnpackPatternModifier::Match));
+                is_match = matches!(modifier, Some(CompoundPatternModifier::Match));
             }
             PatternKind::Seq(pat_id, elements) => {
                 if ctx.arm.is_first() {

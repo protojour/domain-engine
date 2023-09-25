@@ -39,6 +39,7 @@ pub enum TypeError<'m> {
     NotEnoughInformation,
     NotConvertibleFromNumber(TypeRef<'m>),
     NoRelationParametersExpected,
+    StructTypeNotInferrable,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -122,6 +123,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             ),
             TypeError::NoRelationParametersExpected => {
                 self.error(CompileError::NoRelationParametersExpected, span)
+            }
+            TypeError::StructTypeNotInferrable => {
+                self.error(CompileError::ExpectedExplicitStructPath, span)
             }
         }
     }

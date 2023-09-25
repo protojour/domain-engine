@@ -7,7 +7,7 @@ use crate::{
     def::{Def, DefKind},
     error::CompileError,
     mem::Intern,
-    pattern::{PatId, Pattern, PatternKind, RegexPatternCaptureNode},
+    pattern::{PatId, Pattern, PatternKind, RegexPatternCaptureNode, TypePath},
     primitive::PrimitiveKind,
     type_check::{
         ena_inference::{InferValue, Strength},
@@ -125,30 +125,28 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             (
-                PatternKind::Unpack {
-                    type_path: Some(type_path),
+                PatternKind::Compound {
+                    type_path:
+                        TypePath::Specified {
+                            def_id: path_def_id,
+                            span: path_span,
+                        },
                     modifier,
                     is_unit_binding,
                     attributes,
                 },
                 expected_ty,
             ) => {
-                let struct_ty = self.check_def_sealed(type_path.def_id);
+                let struct_ty = self.check_def_sealed(*path_def_id);
                 match struct_ty {
                     Type::Domain(def_id) => {
-                        assert_eq!(*def_id, type_path.def_id);
+                        assert_eq!(*def_id, *path_def_id);
                     }
-                    _ => {
-                        return self.error_node(
-                            CompileError::DomainTypeExpected,
-                            &type_path.span,
-                            ctx,
-                        )
-                    }
+                    _ => return self.error_node(CompileError::DomainTypeExpected, &path_span, ctx),
                 };
                 let node = self.build_unpacker(
                     UnpackerInfo {
-                        type_def_id: type_path.def_id,
+                        type_def_id: *path_def_id,
                         ty: struct_ty,
                         modifier: *modifier,
                         is_unit_binding: *is_unit_binding,
@@ -182,8 +180,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             (
-                PatternKind::Unpack {
-                    type_path: None,
+                PatternKind::Compound {
+                    type_path: TypePath::RelContextual,
                     modifier,
                     is_unit_binding,
                     attributes,
@@ -216,11 +214,42 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 )
             }
             (
-                PatternKind::Unpack {
-                    type_path: None, ..
+                PatternKind::Compound {
+                    type_path:
+                        TypePath::Inferred {
+                            def_id: infer_def_id,
+                        },
+                    attributes,
+                    ..
                 },
-                _,
-            ) => self.type_error_node(TypeError::NoRelationParametersExpected, &pattern.span, ctx),
+                expected_ty,
+            ) => {
+                // ONTOL syntax (currently) requires that the explicit struct type be specified
+                // when being part of a parent expression (the reason why the expected_ty would be defined)
+                if expected_ty.is_some() {
+                    return self.type_error_node(
+                        TypeError::StructTypeNotInferrable,
+                        &pattern.span,
+                        ctx,
+                    );
+                }
+
+                if attributes.len() > 1 {
+                    // TODO: Register types for anonymous struct, with type inference
+                    return self.type_error_node(
+                        TypeError::NoRelationParametersExpected,
+                        &pattern.span,
+                        ctx,
+                    );
+                }
+
+                // Anonymous top-level struct defined _within the map statement_.
+                // It can be mapped _from_ but never _to_, so a resemblance to `match`.
+                // The difference is that all the field types must be directly inferred.
+                // let lolge = self.defs.alloc_def_id(ONTOL_PKG);
+
+                todo!();
+            }
             (PatternKind::Seq(aggr_pat_id, pat_elements), expected_ty) => {
                 let (rel_ty, val_ty) = match expected_ty {
                     Some((Type::Seq(rel_ty, val_ty), _)) => (*rel_ty, *val_ty),

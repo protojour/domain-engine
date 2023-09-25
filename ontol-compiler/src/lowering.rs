@@ -18,8 +18,8 @@ use crate::{
     namespace::Space,
     package::{PackageReference, ONTOL_PKG},
     pattern::{
-        PatId, Pattern, PatternKind, SeqPatternElement, StructPatternAttr, TypePath,
-        UnpackPatternModifier,
+        CompoundPatternAttr, CompoundPatternModifier, PatId, Pattern, PatternKind,
+        SeqPatternElement, TypePath,
     },
     regex_util::RegexToPatternLowerer,
     Compiler, Src,
@@ -569,14 +569,14 @@ impl<'s, 'm> Lowering<'s, 'm> {
         let pattern = self.lower_expr_pattern((ast, expr_span), var_table)?;
 
         Ok(self.mk_pattern(
-            PatternKind::Unpack {
-                type_path: Some(TypePath {
+            PatternKind::Compound {
+                type_path: TypePath::Specified {
                     def_id: type_def_id,
                     span: self.src.span(&path.1),
-                }),
+                },
                 modifier: None,
                 is_unit_binding: true,
-                attributes: [StructPatternAttr {
+                attributes: [CompoundPatternAttr {
                     key,
                     rel: None,
                     bind_option: false,
@@ -593,24 +593,30 @@ impl<'s, 'm> Lowering<'s, 'm> {
         (ast, span): (ast::StructPattern, Span),
         var_table: &mut MapVarTable,
     ) -> Res<Pattern> {
-        let type_path = ast
-            .path
-            .map(|(path, span)| {
-                let def_id = self.lookup_path(&path, &span)?;
-                Ok(TypePath {
-                    def_id,
-                    span: self.src.span(&span),
-                })
-            })
-            .transpose()?;
-
+        let type_path = match ast.path {
+            Some((path, span)) => TypePath::Specified {
+                def_id: self.lookup_path(&path, &span)?,
+                span: self.src.span(&span),
+            },
+            None => TypePath::Inferred {
+                def_id: self.define_anonymous(
+                    TypeDef {
+                        public: true,
+                        ident: None,
+                        rel_type_for: None,
+                        concrete: true,
+                    },
+                    &span,
+                ),
+            },
+        };
         let attrs = self.lower_struct_pattern_attrs(ast.attributes, var_table)?;
 
         Ok(self.mk_pattern(
-            PatternKind::Unpack {
+            PatternKind::Compound {
                 type_path,
                 modifier: ast.modifier.map(|(modifier, _span)| match modifier {
-                    ast::StructPatternModifier::Match => UnpackPatternModifier::Match,
+                    ast::StructPatternModifier::Match => CompoundPatternModifier::Match,
                 }),
                 is_unit_binding: false,
                 attributes: attrs,
@@ -623,7 +629,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         &mut self,
         attributes: Vec<(ast::StructPatternAttr, Range<usize>)>,
         var_table: &mut MapVarTable,
-    ) -> Res<Box<[StructPatternAttr]>> {
+    ) -> Res<Box<[CompoundPatternAttr]>> {
         attributes
             .into_iter()
             .map(|(struct_attr, _span)| {
@@ -642,7 +648,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                         // Inherit modifier from object pattern
                         let modifier = match &object_pattern {
                             Ok(Pattern {
-                                kind: PatternKind::Unpack { modifier, .. },
+                                kind: PatternKind::Compound { modifier, .. },
                                 ..
                             }) => *modifier,
                             _ => None,
@@ -650,8 +656,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                         let attrs = self.lower_struct_pattern_attrs(attrs, var_table)?;
                         Some(self.mk_pattern(
-                            PatternKind::Unpack {
-                                type_path: None,
+                            PatternKind::Compound {
+                                type_path: TypePath::RelContextual,
                                 modifier,
                                 is_unit_binding: false,
                                 attributes: attrs,
@@ -662,7 +668,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     None => None,
                 };
 
-                object_pattern.map(|object_pattern| StructPatternAttr {
+                object_pattern.map(|object_pattern| CompoundPatternAttr {
                     key: (def, self.src.span(&relation.1)),
                     rel,
                     bind_option: option.is_some(),

@@ -26,14 +26,14 @@ type PropertyKey = (DefId, SourceSpan);
 pub enum PatternKind {
     /// Function call
     Call(DefId, Box<[Pattern]>),
-    /// Unpack some kind of structure
-    Unpack {
-        /// The user-supplied type of the struct, None means anonymous
-        type_path: Option<TypePath>,
-        modifier: Option<UnpackPatternModifier>,
+    /// Some kind of compound that is "unpacked" to expose inner variables
+    Compound {
+        /// The user-supplied type of the compound
+        type_path: TypePath,
+        modifier: Option<CompoundPatternModifier>,
         // The single attribute is a unit binding. I.e. `path: x` syntax
         is_unit_binding: bool,
-        attributes: Box<[StructPatternAttr]>,
+        attributes: Box<[CompoundPatternAttr]>,
     },
     /// Expression enclosed in sequence brackets: `[expr]`
     Seq(PatId, Vec<SeqPatternElement>),
@@ -44,12 +44,12 @@ pub enum PatternKind {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum UnpackPatternModifier {
+pub enum CompoundPatternModifier {
     Match,
 }
 
 #[derive(Debug)]
-pub struct StructPatternAttr {
+pub struct CompoundPatternAttr {
     pub key: PropertyKey,
     pub rel: Option<Pattern>,
     pub bind_option: bool,
@@ -138,9 +138,13 @@ impl RegexPatternCaptureNode {
 }
 
 #[derive(Debug)]
-pub struct TypePath {
-    pub def_id: DefId,
-    pub span: SourceSpan,
+pub enum TypePath {
+    // The type path is specified, and resolved to the given DefId
+    Specified { def_id: DefId, span: SourceSpan },
+    // The type path is anonymous and its structure should be inferred by its fields
+    Inferred { def_id: DefId },
+    // The type path is contextual (relation parameter)
+    RelContextual,
 }
 
 impl<'m> Compiler<'m> {
