@@ -544,7 +544,7 @@ fn test_sequence_flat_map1() {
                 'b': b
             }]
         }
-        [bar {
+        [..bar {
             'a': a
             'b': b
         }]

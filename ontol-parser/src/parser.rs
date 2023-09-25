@@ -246,12 +246,23 @@ fn with_unit_or_seq<T>(inner: impl AstParser<T> + Clone) -> impl AstParser<(Unit
 }
 
 fn map_statement() -> impl AstParser<MapStatement> {
+    fn quantified_arm() -> impl AstParser<(UnitOrSeq, MapArm)> {
+        map_arm()
+            .clone()
+            .map(|arm| (UnitOrSeq::Unit, arm))
+            .or(open('[')
+                .ignore_then(dot_dot())
+                .ignore_then(map_arm())
+                .then_ignore(close(']'))
+                .map(|arm| (UnitOrSeq::Seq, arm)))
+    }
+
     doc_comments()
         .then(keyword(Token::Map))
         .then(spanned(ident()).or_not())
         .then(
-            spanned(with_unit_or_seq(map_arm()))
-                .then(spanned(with_unit_or_seq(map_arm())))
+            spanned(quantified_arm())
+                .then(spanned(quantified_arm()))
                 .delimited_by(open('{'), close('}')),
         )
         .map(|(((docs, kw), ident), (first, second))| MapStatement {
