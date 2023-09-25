@@ -209,6 +209,11 @@ mod tests {
         }
     }
 
+    #[track_caller]
+    fn lex_ok(input: &str) -> Vec<Token> {
+        lex(input).unwrap()
+    }
+
     fn number(input: &str) -> Token {
         Token::Number(input.into())
     }
@@ -223,7 +228,7 @@ mod tests {
 
     #[test]
     fn test_comment_at_eof() {
-        lex("foobar // comment ").unwrap();
+        lex_ok("foobar // comment ");
     }
 
     // BUG: We want to support only comments
@@ -236,59 +241,53 @@ mod tests {
     fn test_doc_comment_drops_spaces() {
         let source = "
         ///      Over here
-        pub type PubType
+        pub def PubType {}
         ";
-        let tokens = lex(source).unwrap();
+        let tokens = lex_ok(source);
         let doc_comment = &tokens.first().unwrap();
         assert_matches!(doc_comment, Token::DocComment(_))
     }
 
     #[test]
     fn test_empty() {
-        assert_eq!(&lex("").unwrap(), &[]);
+        assert_eq!(&lex_ok(""), &[]);
     }
 
     #[test]
     fn test_integer() {
-        assert_eq!(&lex("42").unwrap(), &[number("42")]);
-        assert_eq!(&lex("-42").unwrap(), &[number("-42")]);
-        assert_eq!(&lex("--42").unwrap(), &[Sigil('-'), number("-42")]);
-        assert_eq!(&lex("42x").unwrap(), &[number("42"), sym("x")]);
-        assert_eq!(&lex("42 ").unwrap(), &[number("42")]);
-        assert_eq!(&lex("4-2").unwrap(), &[number("4"), number("-2")]);
-        assert_eq!(
-            &lex("4--2").unwrap(),
-            &[number("4"), Sigil('-'), number("-2")]
-        );
+        assert_eq!(&lex_ok("42"), &[number("42")]);
+        assert_eq!(&lex_ok("-42"), &[number("-42")]);
+        assert_eq!(&lex_ok("--42"), &[Sigil('-'), number("-42")]);
+        assert_eq!(&lex_ok("42x"), &[number("42"), sym("x")]);
+        assert_eq!(&lex_ok("42 "), &[number("42")]);
+        assert_eq!(&lex_ok("4-2"), &[number("4"), number("-2")]);
+        assert_eq!(&lex_ok("4--2"), &[number("4"), Sigil('-'), number("-2")]);
     }
 
     #[test]
     fn test_decimal() {
-        assert_eq!(&lex(".42").unwrap(), &[Sigil('.'), number("42")]);
-        assert_eq!(&lex("42.").unwrap(), &[number("42"), Sigil('.')]);
-        assert_eq!(&lex("4.2").unwrap(), &[Number("4.2".into())]);
-        assert_eq!(&lex("42.42").unwrap(), &[number("42.42")]);
-        assert_eq!(&lex("-0.42").unwrap(), &[number("-0.42")]);
-        assert_eq!(
-            &lex("-.42").unwrap(),
-            &[Sigil('-'), Sigil('.'), number("42")]
-        );
-        assert_eq!(&lex("4..2").unwrap(), &[number("4"), DotDot, number("2")]);
+        assert_eq!(&lex_ok(".42"), &[Sigil('.'), number("42")]);
+        assert_eq!(&lex_ok("42."), &[number("42"), Sigil('.')]);
+        assert_eq!(&lex_ok("4.2"), &[Number("4.2".into())]);
+        assert_eq!(&lex_ok("42.42"), &[number("42.42")]);
+        assert_eq!(&lex_ok("-0.42"), &[number("-0.42")]);
+        assert_eq!(&lex_ok("-.42"), &[Sigil('-'), Sigil('.'), number("42")]);
+        assert_eq!(&lex_ok("4..2"), &[number("4"), DotDot, number("2")]);
     }
 
     #[test]
     fn test_regex() {
-        assert_eq!(&lex(r"/").unwrap(), &[Sigil('/')]);
-        assert_eq!(&lex(r"/ ").unwrap(), &[Sigil('/')]);
+        assert_eq!(&lex_ok(r"/"), &[Sigil('/')]);
+        assert_eq!(&lex_ok(r"/ "), &[Sigil('/')]);
         // BUG: comment:
         // assert_eq!(lex("//").unwrap(), &[]);
-        assert_eq!(&lex(r"/ /").unwrap(), &[Sigil('/'), Sigil('/')]);
-        assert_eq!(&lex(r"/\ /").unwrap(), &[regex(" ")]);
-        assert_eq!(&lex(r"/\  /").unwrap(), &[regex("  ")]);
-        assert_eq!(&lex(r"/\//").unwrap(), &[regex("/")]);
-        assert_eq!(&lex(r"/a/").unwrap(), &[regex("a")]);
+        assert_eq!(&lex_ok(r"/ /"), &[Sigil('/'), Sigil('/')]);
+        assert_eq!(&lex_ok(r"/\ /"), &[regex(" ")]);
+        assert_eq!(&lex_ok(r"/\  /"), &[regex("  ")]);
+        assert_eq!(&lex_ok(r"/\//"), &[regex("/")]);
+        assert_eq!(&lex_ok(r"/a/"), &[regex("a")]);
         assert_eq!(
-            &lex(r"/Hello (?<name>\w+)!/").unwrap(),
+            &lex_ok(r"/Hello (?<name>\w+)!/"),
             &[regex("Hello (?<name>\\w+)!")]
         );
     }
