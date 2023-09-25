@@ -18,6 +18,7 @@ pub enum Token {
     Map,
     Pub,
     FatArrow,
+    DotDot,
     Number(String),
     TextLiteral(String),
     Regex(String),
@@ -35,6 +36,7 @@ impl Display for Token {
             Self::Fmt => write!(f, "`fmt`"),
             Self::Map => write!(f, "`map`"),
             Self::Pub => write!(f, "`pub`"),
+            Self::DotDot => write!(f, "`..`"),
             Self::FatArrow => write!(f, "`=>`"),
             Self::Number(_) => write!(f, "`number`"),
             Self::TextLiteral(_) => write!(f, "`string`"),
@@ -65,6 +67,7 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
 
     doc_comment()
         .or(just("=>").map(|_| Token::FatArrow))
+        .or(just("..").map(|_| Token::DotDot))
         .or(one_of(".,:?_+*=<>|").map(Token::Sigil))
         .or(one_of("({[").map(Token::Open))
         .or(one_of(")}]").map(Token::Close))
@@ -270,10 +273,7 @@ mod tests {
             &lex("-.42").unwrap(),
             &[Sigil('-'), Sigil('.'), number("42")]
         );
-        assert_eq!(
-            &lex("4..2").unwrap(),
-            &[number("4"), Sigil('.'), Sigil('.'), number("2")]
-        );
+        assert_eq!(&lex("4..2").unwrap(), &[number("4"), DotDot, number("2")]);
     }
 
     #[test]

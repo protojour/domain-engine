@@ -559,7 +559,7 @@ fn dot() -> impl AstParser<()> {
 }
 
 fn dot_dot() -> impl AstParser<()> {
-    dot().then_ignore(dot())
+    just(Token::DotDot).ignored()
 }
 
 fn colon() -> impl AstParser<()> {
