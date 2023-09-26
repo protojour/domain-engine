@@ -48,6 +48,11 @@ pub mod conduit {
         SourceName("blog_post_public"),
         include_str!("../../examples/conduit/blog_post_public.on"),
     );
+
+    pub const BLOG_POST_QUERY: Example = (
+        SourceName("blog_post_query"),
+        include_str!("../../examples/conduit/blog_post_query.on"),
+    );
 }
 
 pub const ARTIST_AND_INSTRUMENT: Example = (

@@ -38,16 +38,18 @@ map {
         'offset': offset
         'limit': limit
     }
-    db.Article match(offset, limit) {
-        'slug'?: slug
-        'tagged'?: [
-            ..db.TagEntity match { 'tag': filter_tag }
-        ]
-        'author'?: db.User match {
-            'username': author
+    db.Article: [
+        ..db.Article match(offset, limit) {
+            'slug'?: slug
+            'tagged'?: [
+                ..db.TagEntity match { 'tag': filter_tag }
+            ]
+            'author'?: db.User match {
+                'username': author
+            }
+            'favorited'?: [
+                ..db.User match { 'username': favorited }
+            ]
         }
-        'favorited'?: [
-            ..db.User match { 'username': favorited }
-        ]
-    }
+    ]
 }

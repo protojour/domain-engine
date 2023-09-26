@@ -1,0 +1,40 @@
+// Copy of blog_post_public while the query feature is developed
+
+use 'conduit_db' as db
+
+pub def BlogPost {
+    rel .'post_id'|id: { rel .is: uuid }
+    rel .'contents': text
+    rel .'written_by': text
+    rel .'tags': [text]
+}
+
+map {
+    db.Article match {
+        'article_id': id
+        'body': body
+        'author': db.User {
+            'username': author
+        }
+        'tags': [
+            ..db.TagEntity { 'tag': tag }
+        ]
+    }
+    BlogPost {
+        'post_id': id
+        'contents': body
+        'written_by': author
+        'tags': [..tag]
+    }
+}
+
+map BlogPostQuery {
+    {
+        'written_by'?: by
+    }
+    BlogPost: [
+        ..BlogPost match {
+            'written_by'?: by
+        }
+    ]
+}
