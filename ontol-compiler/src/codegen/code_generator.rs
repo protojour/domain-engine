@@ -1,13 +1,13 @@
 use bit_set::BitSet;
 use fnv::FnvHashMap;
-use ontol_hir::{HasDefault, PropPattern, PropVariant};
+use ontol_hir::{HasDefault, PropPattern, PropVariant, StructFlags};
 use ontol_runtime::{
     smart_format,
     value::PropertyId,
     vm::proc::{BuiltinProc, GetAttrFlags, Local, NParams, OpCode, Predicate, Procedure},
     DefId,
 };
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::{
     codegen::{
@@ -253,7 +253,11 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     }
                 }
             }
-            ontol_hir::Kind::Struct(binder, _flags, nodes) => {
+            ontol_hir::Kind::Struct(binder, flags, nodes) => {
+                if flags.contains(StructFlags::MATCH) {
+                    warn!("Skipping match-struct for now");
+                    return;
+                }
                 let def_id = ty.get_single_def_id().unwrap();
                 let local = block.op(
                     OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id),

@@ -34,7 +34,6 @@ fn test_map_match_scalar_key() {
 }
 
 #[test]
-#[should_panic = "Seq without gen scope"]
 fn test_map_match_parameterless_query() {
     r#"
     pub def key { rel .is: text }

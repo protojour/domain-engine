@@ -674,8 +674,20 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     self.unify(scope::constant(), expr)
                 }
             }
-            (expr::Kind::Seq(_label, _attr), _) => {
-                panic!("Seq without gen scope")
+            (expr::Kind::Seq(_label, attr), _) => {
+                // FIXME: This needs to be better
+                let seq_ty = self
+                    .types
+                    .intern(Type::Seq(&UNIT_TYPE, attr.val.hir_meta().ty));
+
+                let val = self.unify(scope::constant(), attr.val)?;
+
+                self.hir_arena[val.node].meta_mut().ty = seq_ty;
+
+                Ok(UnifiedNode {
+                    typed_binder: None,
+                    node: val.node,
+                })
             }
             (expr::Kind::SeqItem(..), _) => {
                 panic!("Only used in flat unifier")

@@ -1736,3 +1736,51 @@ fn test_unify_regex_loop3() {
     };
     assert_eq!(expected, output);
 }
+
+#[test]
+fn test_basic_match_filter1() {
+    let output = test_unify(
+        "
+        (match-struct ($b))
+        ",
+        "
+        (decl-seq (@a) #u
+            (match-struct ($c))
+        )
+        ",
+    );
+    let expected = indoc! {"
+        |$d| (match-struct ($c))"
+    };
+    assert_eq!(expected, output);
+}
+
+#[test]
+fn test_basic_match_filter2() {
+    let output = test_unify(
+        "
+        (match-struct ($b)
+            (prop $b S:0:0 (#u $a))
+        )
+        ",
+        "
+        (decl-seq (@a) #u
+            (match-struct ($c)
+                (prop $c O:0:0 (#u $a))
+            )
+        )
+        ",
+    );
+    let expected = indoc! {"
+        |$b| (match-prop $b S:0:0
+            (($_ $a)
+                (match-struct ($c)
+                    (prop $c O:0:0
+                        (#u $a)
+                    )
+                )
+            )
+        )"
+    };
+    assert_eq!(expected, output);
+}
