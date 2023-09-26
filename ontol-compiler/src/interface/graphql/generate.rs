@@ -21,7 +21,7 @@ use ontol_runtime::{
     smart_format, DefId, PackageId, Role,
 };
 use smartstring::alias::String;
-use tracing::debug;
+use tracing::trace;
 
 use crate::{
     def::{DefKind, Defs, LookupRelationshipMeta, RelParams},
@@ -92,7 +92,7 @@ pub fn generate_graphql_schema<'c>(
         }
 
         if type_info.operator_id.is_some() {
-            debug!("adapt type `{name:?}`", name = type_info.name);
+            trace!("adapt type `{name:?}`", name = type_info.name);
 
             let type_ref = builder.get_def_type_ref(type_info.def_id, QLevel::Node);
 
@@ -189,7 +189,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 };
                 let mut fields = Default::default();
 
-                debug!("Harvest fields for {def_id:?} / {type_index:?}");
+                trace!("Harvest fields for {def_id:?} / {type_index:?}");
 
                 if is_entrypoint {
                     let repr_kind = self.seal_ctx.get_repr_kind(&def_id).expect("NO REPR KIND");
@@ -613,7 +613,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                     .expect("Object property has no name"),
             };
 
-            debug!("    register struct field `{prop_key}`: {property_id}");
+            trace!("    register struct field `{prop_key}`: {property_id}");
 
             let value_properties = self.relations.properties_by_def_id(value_def_id);
 
@@ -695,12 +695,12 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                         RelParams::IndexRange(_) => todo!(),
                     };
 
-                    debug!("    connection/edge rel params {rel_params:?}");
+                    trace!("    connection/edge rel params {rel_params:?}");
 
                     self.get_def_type_ref(value_def_id, QLevel::Connection { rel_params })
                 };
 
-                debug!("Connection `{prop_key}` of prop {property_id:?}");
+                trace!("Connection `{prop_key}` of prop {property_id:?}");
 
                 FieldData::mandatory(
                     FieldKind::Connection {
@@ -720,7 +720,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                     .gen_operator_id(gql_array_serde_key(value_def_id))
                     .unwrap();
 
-                debug!("Array value operator id: {value_operator_id:?}");
+                trace!("Array value operator id: {value_operator_id:?}");
 
                 if let UnitTypeRef::NativeScalar(native) = &mut unit {
                     native.operator_id = value_operator_id;
