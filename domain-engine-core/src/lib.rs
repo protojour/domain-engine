@@ -5,8 +5,8 @@ pub mod system;
 mod domain_engine;
 mod entity_id_utils;
 mod in_memory_store;
-mod query_data_flow;
 mod resolve_path;
+mod select_data_flow;
 mod value_generator;
 
 pub use domain_engine::DomainEngine;

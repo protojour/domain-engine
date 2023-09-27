@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
     ontology::Ontology,
-    query::{EntityQuery, Query},
+    select::{EntitySelect, Select},
     value::{Attribute, Value},
     DefId, PackageId, RelationshipId,
 };
@@ -25,7 +25,7 @@ impl DataStoreAPI for InMemoryDb {
     async fn query(
         &self,
         engine: &DomainEngine,
-        query: EntityQuery,
+        query: EntitySelect,
     ) -> DomainResult<Vec<Attribute>> {
         Ok(self
             .store
@@ -41,7 +41,7 @@ impl DataStoreAPI for InMemoryDb {
         &self,
         engine: &DomainEngine,
         entity: Value,
-        query: Query,
+        query: Select,
     ) -> DomainResult<Value> {
         self.store
             .write()

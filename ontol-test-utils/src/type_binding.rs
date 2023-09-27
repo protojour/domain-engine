@@ -6,7 +6,7 @@ use ontol_runtime::{
     interface::serde::operator::SerdeOperatorId,
     interface::serde::processor::{ProcessorLevel, ProcessorMode},
     ontology::{Ontology, TypeInfo},
-    query::{Query, StructQuery},
+    select::{Select, StructSelect},
     value::{Attribute, Data, PropertyId, Value},
     DefId, PackageId,
 };
@@ -119,11 +119,11 @@ impl<'e> TypeBinding<'e> {
         self.type_info.def_id
     }
 
-    pub fn struct_query(
+    pub fn struct_select(
         &self,
-        properties: impl IntoIterator<Item = (&'static str, Query)>,
-    ) -> StructQuery {
-        StructQuery {
+        properties: impl IntoIterator<Item = (&'static str, Select)>,
+    ) -> StructSelect {
+        StructSelect {
             def_id: self.type_info.def_id,
             properties: FnvHashMap::from_iter(
                 properties

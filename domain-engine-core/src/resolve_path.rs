@@ -1,7 +1,7 @@
 use fnv::{FnvHashMap, FnvHashSet};
 use ontol_runtime::{
     ontology::Ontology,
-    query::{EntityQuery, StructOrUnionQuery},
+    select::{EntitySelect, StructOrUnionSelect},
     DefId, MapKey, PackageId,
 };
 use tracing::trace;
@@ -64,14 +64,14 @@ impl ResolverGraph {
         }
     }
 
-    pub fn probe_path_for_entity_query(
+    pub fn probe_path_for_entity_select(
         &self,
         ontology: &Ontology,
-        query: &EntityQuery,
+        query: &EntitySelect,
         data_store: &DataStore,
     ) -> Option<(DefId, ResolvePath)> {
         match &query.source {
-            StructOrUnionQuery::Struct(struct_query) => self
+            StructOrUnionSelect::Struct(struct_query) => self
                 .probe_path(
                     ontology,
                     struct_query.def_id,
@@ -82,7 +82,7 @@ impl ResolverGraph {
                     },
                 )
                 .map(|path| (struct_query.def_id, path)),
-            StructOrUnionQuery::Union(..) => todo!("Resolve a union"),
+            StructOrUnionSelect::Union(..) => todo!("Resolve a union"),
         }
     }
 

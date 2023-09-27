@@ -1,5 +1,5 @@
 use ontol_runtime::{
-    query::{EntityQuery, Query},
+    select::{EntitySelect, Select},
     value::{Attribute, Value},
     PackageId,
 };
@@ -33,13 +33,13 @@ pub trait DataStoreAPI {
     async fn query(
         &self,
         engine: &DomainEngine,
-        query: EntityQuery,
+        select: EntitySelect,
     ) -> DomainResult<Vec<Attribute>>;
 
     async fn store_new_entity(
         &self,
         engine: &DomainEngine,
         entity: Value,
-        query: Query,
+        select: Select,
     ) -> DomainResult<Value>;
 }

@@ -5,10 +5,11 @@ use derive_debug_extras::DebugExtras;
 
 pub mod cast;
 pub mod config;
+pub mod filter;
 pub mod format_utils;
 pub mod interface;
 pub mod ontology;
-pub mod query;
+pub mod select;
 pub mod text_like_types;
 pub mod text_pattern;
 pub mod value;

@@ -11,8 +11,8 @@ pub mod gql_scalar;
 
 mod look_ahead_utils;
 mod macros;
-mod query_analyzer;
 mod registry_ctx;
+mod select_analyzer;
 mod templates;
 
 pub mod juniper {

@@ -8,7 +8,7 @@ use ontol_runtime::{
         processor::{ProcessorLevel, ProcessorMode},
     },
     ontology::{EntityInfo, EntityRelationship, Ontology, PropertyCardinality, ValueCardinality},
-    query::{EntityQuery, Query, StructOrUnionQuery, StructQuery},
+    select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
     smart_format,
     text_like_types::TextLikeType,
     value::{Attribute, Data, PropertyId, Value, ValueDebug},
@@ -59,32 +59,32 @@ impl InMemoryStore {
     pub fn query_entities(
         &self,
         engine: &DomainEngine,
-        query: &EntityQuery,
+        select: &EntitySelect,
     ) -> DomainResult<Vec<Value>> {
-        match &query.source {
-            StructOrUnionQuery::Struct(struct_query) => {
-                self.query_single_entity_collection(engine, struct_query)
+        match &select.source {
+            StructOrUnionSelect::Struct(struct_select) => {
+                self.query_single_entity_collection(engine, struct_select)
             }
-            StructOrUnionQuery::Union(..) => todo!(),
+            StructOrUnionSelect::Union(..) => todo!(),
         }
     }
 
     fn query_single_entity_collection(
         &self,
         engine: &DomainEngine,
-        struct_query: &StructQuery,
+        struct_select: &StructSelect,
     ) -> DomainResult<Vec<Value>> {
-        debug!("query single entity collection: {struct_query:?}");
+        debug!("query single entity collection: {struct_select:?}");
         let collection = self
             .collections
-            .get(&struct_query.def_id)
+            .get(&struct_select.def_id)
             .ok_or(DomainError::InvalidEntityDefId)?;
 
-        let type_info = engine.ontology().get_type_info(struct_query.def_id);
+        let type_info = engine.ontology().get_type_info(struct_select.def_id);
         let entity_info = type_info
             .entity_info
             .as_ref()
-            .ok_or(DomainError::NotAnEntity(struct_query.def_id))?;
+            .ok_or(DomainError::NotAnEntity(struct_select.def_id))?;
 
         let raw_props_vec: Vec<_> = collection
             .iter()
@@ -94,27 +94,33 @@ impl InMemoryStore {
         raw_props_vec
             .into_iter()
             .map(|(entity_key, properties)| {
-                self.apply_struct_query(engine, entity_info, &entity_key, properties, struct_query)
+                self.apply_struct_select(
+                    engine,
+                    entity_info,
+                    &entity_key,
+                    properties,
+                    struct_select,
+                )
             })
             .collect()
     }
 
-    fn apply_struct_query(
+    fn apply_struct_select(
         &self,
         engine: &DomainEngine,
         entity_info: &EntityInfo,
         entity_key: &DynamicKey,
         mut properties: BTreeMap<PropertyId, Attribute>,
-        struct_query: &StructQuery,
+        struct_select: &StructSelect,
     ) -> DomainResult<Value> {
-        for (property_id, sub_query) in &struct_query.properties {
+        for (property_id, subselect) in &struct_select.properties {
             if properties.contains_key(property_id) {
                 continue;
             }
 
             if let Some(entity_relationship) = entity_info.entity_relationships.get(property_id) {
                 let attributes =
-                    self.sub_query_attributes(engine, entity_key, *property_id, sub_query)?;
+                    self.sub_query_attributes(engine, entity_key, *property_id, subselect)?;
 
                 match entity_relationship.cardinality.1 {
                     ValueCardinality::One => {
@@ -133,7 +139,7 @@ impl InMemoryStore {
             }
         }
 
-        Ok(Value::new(Data::Struct(properties), struct_query.def_id))
+        Ok(Value::new(Data::Struct(properties), struct_select.def_id))
     }
 
     fn sub_query_attributes(
@@ -141,7 +147,7 @@ impl InMemoryStore {
         engine: &DomainEngine,
         parent_key: &DynamicKey,
         property_id: PropertyId,
-        query: &Query,
+        select: &Select,
     ) -> DomainResult<Vec<Attribute>> {
         let relationship_id = property_id.relationship_id;
         let edge_collection = self
@@ -155,7 +161,7 @@ impl InMemoryStore {
                 .iter()
                 .filter(|edge| &edge.from == parent_key)
                 .map(|edge| -> DomainResult<Attribute> {
-                    let entity = self.sub_query_entity(engine, &edge.to, query)?;
+                    let entity = self.sub_query_entity(engine, &edge.to, select)?;
                     Ok(Attribute {
                         value: entity,
                         rel_params: edge.params.clone(),
@@ -167,7 +173,7 @@ impl InMemoryStore {
                 .iter()
                 .filter(|edge| &edge.to == parent_key)
                 .map(|edge| -> DomainResult<Attribute> {
-                    let entity = self.sub_query_entity(engine, &edge.from, query)?;
+                    let entity = self.sub_query_entity(engine, &edge.from, select)?;
                     Ok(Attribute {
                         value: entity,
                         rel_params: edge.params.clone(),
@@ -181,14 +187,14 @@ impl InMemoryStore {
         &self,
         engine: &DomainEngine,
         entity_key: &DynamicKey,
-        query: &Query,
+        select: &Select,
     ) -> DomainResult<Value> {
-        if let Query::Struct(struct_query) = query {
+        if let Select::Struct(struct_select) = select {
             // sanity check
-            if !self.collections.contains_key(&struct_query.def_id) {
+            if !self.collections.contains_key(&struct_select.def_id) {
                 error!(
                     "Store does not contain a collection for {:?}",
-                    struct_query.def_id
+                    struct_select.def_id
                 );
                 return Err(DomainError::InvalidEntityDefId);
             }
@@ -211,44 +217,44 @@ impl InMemoryStore {
             .as_ref()
             .ok_or(DomainError::NotAnEntity(def_id))?;
 
-        match query {
-            Query::Leaf => {
+        match select {
+            Select::Leaf => {
                 // Entity leaf only includes the ID of that entity, not its other fields
                 let id_attribute = properties
                     .get(&PropertyId::subject(entity_info.id_relationship_id))
                     .unwrap();
                 Ok(id_attribute.value.clone())
             }
-            Query::Struct(struct_query) => {
-                let mut query_properties = struct_query.properties.clone();
+            Select::Struct(struct_select) => {
+                let mut select_properties = struct_select.properties.clone();
 
                 // Need to "infer" mandatory entity properties, because JSON serializer expects that
                 for (property_id, entity_relationship) in &entity_info.entity_relationships {
                     if matches!(
                         entity_relationship.cardinality.0,
                         PropertyCardinality::Mandatory
-                    ) && !query_properties.contains_key(property_id)
+                    ) && !select_properties.contains_key(property_id)
                     {
-                        query_properties.insert(*property_id, Query::Leaf);
+                        select_properties.insert(*property_id, Select::Leaf);
                     }
                 }
 
-                self.apply_struct_query(
+                self.apply_struct_select(
                     engine,
                     entity_info,
                     entity_key,
                     properties,
-                    &StructQuery {
+                    &StructSelect {
                         def_id,
-                        properties: query_properties,
+                        properties: select_properties,
                     },
                 )
             }
-            Query::StructUnion(_, _) => todo!(),
-            Query::EntityId => todo!(),
-            Query::Entity(entity) => {
+            Select::StructUnion(_, _) => todo!(),
+            Select::EntityId => todo!(),
+            Select::Entity(entity_select) => {
                 let entity_key = entity_key.clone();
-                let entities = self.query_entities(engine, entity)?;
+                let entities = self.query_entities(engine, entity_select)?;
                 for entity in entities {
                     let id = find_inherent_entity_id(engine.ontology(), &entity)?;
                     if let Some(id) = id {
@@ -269,18 +275,18 @@ impl InMemoryStore {
         &mut self,
         engine: &DomainEngine,
         entity: Value,
-        query: Query,
+        select: Select,
     ) -> DomainResult<Value> {
         let entity_id = self.write_new_entity_inner(engine, entity)?;
 
-        match query {
-            Query::EntityId => Ok(entity_id),
-            Query::Struct(struct_query) => {
+        match select {
+            Select::EntityId => Ok(entity_id),
+            Select::Struct(struct_select) => {
                 let target_dynamic_key = Self::extract_dynamic_key(&entity_id.data)?;
                 let entities = self.query_entities(
                     engine,
-                    &EntityQuery {
-                        source: StructOrUnionQuery::Struct(struct_query),
+                    &EntitySelect {
+                        source: StructOrUnionSelect::Struct(struct_select),
                         limit: u32::MAX,
                         cursor: None,
                     },

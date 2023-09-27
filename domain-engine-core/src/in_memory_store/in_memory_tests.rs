@@ -1,4 +1,4 @@
-use ontol_runtime::{config::DataStoreConfig, query::Query};
+use ontol_runtime::{config::DataStoreConfig, select::Select};
 use ontol_test_utils::{
     assert_error_msg,
     examples::{conduit::CONDUIT_DB, Root, ARTIST_AND_INSTRUMENT},
@@ -39,7 +39,7 @@ async fn test_conduit_db_in_memory_id_generation() {
                     "password_hash": "s3cr3t",
                 }))
                 .unwrap(),
-            Query::EntityId,
+            Select::EntityId,
         )
         .await
         .unwrap();
@@ -55,7 +55,7 @@ async fn test_conduit_db_in_memory_id_generation() {
                     "password_hash": "s3cr3t",
                 }))
                 .unwrap(),
-            Query::EntityId,
+            Select::EntityId,
         )
         .await
         .unwrap();
@@ -78,7 +78,7 @@ async fn test_conduit_db_in_memory_id_generation() {
                     }
                 }))
                 .unwrap(),
-            Query::EntityId,
+            Select::EntityId,
         )
         .await
         .unwrap()
@@ -97,7 +97,7 @@ async fn test_conduit_db_in_memory_id_generation() {
                     }
                 }))
                 .unwrap(),
-            Query::EntityId,
+            Select::EntityId,
         )
         .await
         .unwrap();
@@ -107,7 +107,7 @@ async fn test_conduit_db_in_memory_id_generation() {
             create_de(&tag_entity)
                 .value(json!({ "tag": "foo" }))
                 .unwrap(),
-            Query::EntityId,
+            Select::EntityId,
         )
         .await
         .unwrap();
@@ -128,7 +128,7 @@ async fn test_conduit_db_store_entity_tree() {
                     "password_hash": "s3cr3t",
                 }))
                 .unwrap(),
-            Query::EntityId,
+            Select::EntityId,
         )
         .await
         .unwrap()
@@ -163,14 +163,14 @@ async fn test_conduit_db_store_entity_tree() {
                     ]
                 }))
                 .unwrap(),
-            Query::EntityId,
+            Select::EntityId,
         )
         .await
         .unwrap()
         .cast_into();
 
     let users = domain_engine
-        .query_entities(user_type.struct_query([]).into())
+        .query_entities(user_type.struct_select([]).into())
         .await
         .unwrap();
 
@@ -187,7 +187,7 @@ async fn test_conduit_db_store_entity_tree() {
             &domain_engine
                 .query_entities(
                     user_type
-                        .struct_query([("authored_articles", Query::Leaf)])
+                        .struct_select([("authored_articles", Select::Leaf)])
                         .into(),
                 )
                 .await
@@ -211,10 +211,13 @@ async fn test_conduit_db_store_entity_tree() {
             &domain_engine
                 .query_entities(
                     user_type
-                        .struct_query([(
+                        .struct_select([(
                             "authored_articles",
                             article_type
-                                .struct_query([("comments", comment_type.struct_query([]).into())])
+                                .struct_select([(
+                                    "comments",
+                                    comment_type.struct_select([]).into()
+                                )])
                                 .into()
                         )])
                         .into(),
@@ -275,7 +278,7 @@ async fn test_conduit_db_unresolved_foreign_key() {
                         }
                     }))
                     .unwrap(),
-                Query::EntityId
+                Select::EntityId
             )
             .await,
         r#"Unresolved foreign key: "67e55044-10b1-426f-9247-bb680e5fe0c8""#
@@ -302,7 +305,7 @@ async fn test_artist_and_instrument_fmt_id_generation() {
             create_de(&artist)
                 .value(json!({"name": "Igor Stravinskij" }))
                 .unwrap(),
-            Query::EntityId,
+            Select::EntityId,
         )
         .await
         .unwrap();
@@ -318,7 +321,7 @@ async fn test_artist_and_instrument_fmt_id_generation() {
                     "name": "Karlheinz Stockhausen"
                 }))
                 .unwrap(),
-            Query::EntityId,
+            Select::EntityId,
         )
         .await
         .unwrap();

@@ -1,7 +1,7 @@
 use juniper::LookAheadMethods;
 use ontol_runtime::interface::graphql::data::FieldKind;
 use ontol_runtime::interface::graphql::schema::TypingPurpose;
-use ontol_runtime::query::{Query, StructOrUnionQuery};
+use ontol_runtime::select::{Select, StructOrUnionSelect};
 use ontol_runtime::value::ValueDebug;
 use tracing::trace;
 
@@ -10,8 +10,8 @@ use crate::{
     gql_scalar::GqlScalar,
     look_ahead_utils::ArgsWrapper,
     macros::impl_graphql_value,
-    query_analyzer::QueryAnalyzer,
     registry_ctx::RegistryCtx,
+    select_analyzer::SelectAnalyzer,
     templates::{attribute_type::AttributeType, resolve_schema_type_field},
 };
 
@@ -53,7 +53,7 @@ impl juniper::GraphQLValueAsync<GqlScalar> for MutationType {
             let schema_ctx = &info.schema_ctx;
             let look_ahead = executor.look_ahead();
             let args_wrapper = ArgsWrapper::new(look_ahead.arguments());
-            let query_analyzer = QueryAnalyzer::new(schema_ctx, executor.context());
+            let query_analyzer = SelectAnalyzer::new(schema_ctx, executor.context());
 
             let field_data = info.type_data().fields().unwrap().get(field_name).unwrap();
 
@@ -61,11 +61,12 @@ impl juniper::GraphQLValueAsync<GqlScalar> for MutationType {
                 FieldKind::CreateMutation { input } => {
                     let input_attribute = args_wrapper
                         .deserialize_domain_field_arg_as_attribute(input, info.ontology())?;
-                    let struct_query = query_analyzer.analyze_struct_query(&look_ahead, field_data);
+                    let struct_query =
+                        query_analyzer.analyze_struct_select(&look_ahead, field_data);
                     let query = match struct_query {
-                        StructOrUnionQuery::Struct(struct_query) => Query::Struct(struct_query),
-                        StructOrUnionQuery::Union(def_id, structs) => {
-                            Query::StructUnion(def_id, structs)
+                        StructOrUnionSelect::Struct(struct_query) => Select::Struct(struct_query),
+                        StructOrUnionSelect::Union(def_id, structs) => {
+                            Select::StructUnion(def_id, structs)
                         }
                     };
 
@@ -99,7 +100,7 @@ impl juniper::GraphQLValueAsync<GqlScalar> for MutationType {
                     let input_attribute = args_wrapper
                         .deserialize_domain_field_arg_as_attribute(input, info.ontology())?;
 
-                    let query = query_analyzer.analyze_struct_query(&look_ahead, field_data);
+                    let query = query_analyzer.analyze_struct_select(&look_ahead, field_data);
 
                     trace!(
                         "UPDATE {} -> {} -> {query:#?}",

@@ -5,7 +5,7 @@ use ontol_runtime::{
         argument::FieldArg,
         data::{FieldData, FieldKind, NodeData, ObjectData, ObjectKind, TypeData, TypeKind},
     },
-    query::{EntityQuery, Query, StructOrUnionQuery, StructQuery},
+    select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
     value::PropertyId,
     DefId, RelationshipId,
 };
@@ -16,15 +16,15 @@ use crate::{context::SchemaCtx, gql_scalar::GqlScalar, look_ahead_utils::ArgsWra
 
 pub struct KeyedPropertySelection {
     pub key: PropertyId,
-    pub selection: Query,
+    pub selection: Select,
 }
 
-pub struct QueryAnalyzer<'a> {
+pub struct SelectAnalyzer<'a> {
     schema_ctx: &'a SchemaCtx,
     gql_ctx: &'a ServiceCtx,
 }
 
-impl<'a> QueryAnalyzer<'a> {
+impl<'a> SelectAnalyzer<'a> {
     pub fn new(schema_ctx: &'a SchemaCtx, gql_ctx: &'a ServiceCtx) -> Self {
         Self {
             schema_ctx,
@@ -32,26 +32,26 @@ impl<'a> QueryAnalyzer<'a> {
         }
     }
 
-    pub fn analyze_entity_query(
+    pub fn analyze_entity_select(
         &self,
         look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
         field_data: &FieldData,
-    ) -> EntityQuery {
+    ) -> EntitySelect {
         match self.analyze(look_ahead, field_data).selection {
-            Query::Entity(entity_query) => entity_query,
-            query => panic!("BUG: not an entity query: {query:?}"),
+            Select::Entity(entity_select) => entity_select,
+            select => panic!("BUG: not an entity select: {select:?}"),
         }
     }
 
-    pub fn analyze_struct_query(
+    pub fn analyze_struct_select(
         &self,
         look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
         field_data: &FieldData,
-    ) -> StructOrUnionQuery {
+    ) -> StructOrUnionSelect {
         match self.analyze(look_ahead, field_data).selection {
-            Query::Struct(struct_) => StructOrUnionQuery::Struct(struct_),
-            Query::StructUnion(def_id, variants) => StructOrUnionQuery::Union(def_id, variants),
-            query => panic!("BUG: not a struct query: {query:?}"),
+            Select::Struct(struct_) => StructOrUnionSelect::Struct(struct_),
+            Select::StructUnion(def_id, variants) => StructOrUnionSelect::Union(def_id, variants),
+            select => panic!("BUG: not a struct select: {select:?}"),
         }
     }
 
@@ -97,18 +97,20 @@ impl<'a> QueryAnalyzer<'a> {
                 KeyedPropertySelection {
                     key: property_id.unwrap_or(unit_property()),
                     selection: match selection {
-                        Some(Query::Struct(object)) => Query::Entity(EntityQuery {
-                            source: StructOrUnionQuery::Struct(object),
+                        Some(Select::Struct(object)) => Select::Entity(EntitySelect {
+                            source: StructOrUnionSelect::Struct(object),
                             limit,
                             cursor,
                         }),
-                        Some(Query::StructUnion(def_id, variants)) => Query::Entity(EntityQuery {
-                            source: StructOrUnionQuery::Union(def_id, variants),
-                            limit,
-                            cursor,
-                        }),
-                        Some(Query::Entity(_) | Query::EntityId) => panic!("Query in query"),
-                        Some(Query::Leaf) | None => Query::Leaf,
+                        Some(Select::StructUnion(def_id, variants)) => {
+                            Select::Entity(EntitySelect {
+                                source: StructOrUnionSelect::Union(def_id, variants),
+                                limit,
+                                cursor,
+                            })
+                        }
+                        Some(Select::Entity(_) | Select::EntityId) => panic!("Select in select"),
+                        Some(Select::Leaf) | None => Select::Leaf,
                     },
                 }
             }
@@ -132,7 +134,7 @@ impl<'a> QueryAnalyzer<'a> {
 
                 selection.unwrap_or_else(|| KeyedPropertySelection {
                     key: unit_property(),
-                    selection: Query::Leaf,
+                    selection: Select::Leaf,
                 })
             }
             (
@@ -150,11 +152,11 @@ impl<'a> QueryAnalyzer<'a> {
             },
             (FieldKind::Property(property_data), Err(_scalar_ref)) => KeyedPropertySelection {
                 key: property_data.property_id,
-                selection: Query::Leaf,
+                selection: Select::Leaf,
             },
             (FieldKind::Id(id_property_data), Err(_scalar_ref)) => KeyedPropertySelection {
                 key: PropertyId::subject(id_property_data.relationship_id),
-                selection: Query::Leaf,
+                selection: Select::Leaf,
             },
             (kind, res) => panic!("unhandled: {kind:?} res is ok: {}", res.is_ok()),
         }
@@ -164,11 +166,11 @@ impl<'a> QueryAnalyzer<'a> {
         &self,
         look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
         type_data: &TypeData,
-    ) -> Query {
+    ) -> Select {
         match &type_data.kind {
             TypeKind::Object(object_data) => match &object_data.kind {
                 ObjectKind::Node(node_data) => {
-                    let mut properties: FnvHashMap<PropertyId, Query> = FnvHashMap::default();
+                    let mut properties: FnvHashMap<PropertyId, Select> = FnvHashMap::default();
 
                     for field_look_ahead in look_ahead.children() {
                         let field_name = field_look_ahead.field_name();
@@ -182,7 +184,7 @@ impl<'a> QueryAnalyzer<'a> {
                         properties.insert(property_id, selection);
                     }
 
-                    Query::Struct(StructQuery {
+                    Select::Struct(StructSelect {
                         def_id: node_data.def_id,
                         properties,
                     })
@@ -193,7 +195,7 @@ impl<'a> QueryAnalyzer<'a> {
                 | ObjectKind::Mutation => panic!("Bug in ONTOL interface schema"),
             },
             TypeKind::Union(union_data) => {
-                let mut union_map: FnvHashMap<DefId, FnvHashMap<PropertyId, Query>> =
+                let mut union_map: FnvHashMap<DefId, FnvHashMap<PropertyId, Select>> =
                     FnvHashMap::default();
 
                 for field_look_ahead in look_ahead.children() {
@@ -240,17 +242,17 @@ impl<'a> QueryAnalyzer<'a> {
                     }
                 }
 
-                Query::StructUnion(
+                Select::StructUnion(
                     union_data.union_def_id,
                     union_map
                         .into_iter()
-                        .map(|(def_id, properties)| StructQuery { def_id, properties })
+                        .map(|(def_id, properties)| StructSelect { def_id, properties })
                         .collect(),
                 )
             }
             TypeKind::CustomScalar(_) => {
                 assert!(look_ahead.children().is_empty());
-                Query::Leaf
+                Select::Leaf
             }
         }
     }

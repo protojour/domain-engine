@@ -9,8 +9,8 @@ use crate::{
     context::SchemaType,
     gql_scalar::GqlScalar,
     macros::impl_graphql_value,
-    query_analyzer::QueryAnalyzer,
     registry_ctx::RegistryCtx,
+    select_analyzer::SelectAnalyzer,
     templates::{attribute_type::AttributeType, resolve_schema_type_field},
 };
 
@@ -52,8 +52,8 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
             let schema_ctx = &info.schema_ctx;
             let query_field = info.type_data().fields().unwrap().get(field_name).unwrap();
 
-            let entity_query = QueryAnalyzer::new(schema_ctx, executor.context())
-                .analyze_entity_query(&executor.look_ahead(), query_field);
+            let entity_query = SelectAnalyzer::new(schema_ctx, executor.context())
+                .analyze_entity_select(&executor.look_ahead(), query_field);
 
             debug!("Executing query {field_name}: {entity_query:#?}");
 

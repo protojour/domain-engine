@@ -118,6 +118,8 @@ pub enum Data {
     /// Some sequences will be uniform (all elements have the same type).
     /// Other sequences will behave more like tuples.
     Sequence(Vec<Attribute>),
+
+    Filter,
 }
 
 impl Data {
@@ -288,6 +290,7 @@ impl<'v> Display for ValueDebug<'v> {
                 }
                 write!(f, "]")
             }
+            Data::Filter => write!(f, "filter"),
         }
     }
 }

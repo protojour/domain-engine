@@ -4,7 +4,7 @@ use fnv::FnvHashMap;
 use itertools::Itertools;
 use ontol_runtime::{
     ontology::{Ontology, PropertyCardinality, PropertyFlow, PropertyFlowData, ValueCardinality},
-    query::{EntityQuery, Query, StructOrUnionQuery, StructQuery},
+    select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
     value::PropertyId,
     DefId, MapKey, PackageId,
 };
@@ -13,61 +13,61 @@ use tracing::{debug, trace};
 #[derive(Clone, Copy)]
 struct IsDep(bool);
 
-pub fn translate_entity_query(
-    query: &mut EntityQuery,
+pub fn translate_entity_select(
+    select: &mut EntitySelect,
     from: MapKey,
     to: MapKey,
     ontology: &Ontology,
 ) {
     let map_meta = ontology
         .get_map_meta(to, from)
-        .expect("No mapping procedure for query transformer");
+        .expect("No mapping procedure for select transformer");
     let prop_flow_slice = ontology.get_prop_flow_slice(map_meta);
 
-    trace!("translate_entity_query flow props: {:#?}", prop_flow_slice);
+    trace!("translate_entity_select flow props: {:#?}", prop_flow_slice);
 
-    match &mut query.source {
-        StructOrUnionQuery::Struct(struct_query) => {
-            let processor = QueryFlowProcessor {
+    match &mut select.source {
+        StructOrUnionSelect::Struct(struct_select) => {
+            let processor = SelectFlowProcessor {
                 ontology,
                 prop_flow_slice,
             };
 
             processor.autoselect_output_properties(
-                struct_query.def_id.package_id(),
-                &mut struct_query.properties,
+                struct_select.def_id.package_id(),
+                &mut struct_select.properties,
             );
 
-            debug!("Input query (after auto select): {struct_query:#?}");
+            debug!("Input select (after auto select): {struct_select:#?}");
 
-            struct_query.def_id = to.def_id;
+            struct_select.def_id = to.def_id;
 
-            let query_props = std::mem::take(&mut struct_query.properties);
-            for (property_id, query) in query_props {
+            let select_props = std::mem::take(&mut struct_select.properties);
+            for (property_id, select) in select_props {
                 processor.translate_property(
                     property_id,
-                    query,
+                    select,
                     IsDep(false),
-                    &mut struct_query.properties,
+                    &mut struct_select.properties,
                 )
             }
 
-            debug!("Translated query: {struct_query:#?}");
+            debug!("Translated select: {struct_select:#?}");
         }
         _ => todo!(),
     }
 }
 
-struct QueryFlowProcessor<'e> {
+struct SelectFlowProcessor<'e> {
     ontology: &'e Ontology,
     prop_flow_slice: &'e [PropertyFlow],
 }
 
-impl<'e> QueryFlowProcessor<'e> {
+impl<'e> SelectFlowProcessor<'e> {
     fn autoselect_output_properties(
         &self,
         output_package_id: PackageId,
-        target: &mut FnvHashMap<PropertyId, Query>,
+        target: &mut FnvHashMap<PropertyId, Select>,
     ) {
         for (property_id, flows) in &self.prop_flow_slice.iter().group_by(|flow| flow.id) {
             // Only consider output properties:
@@ -77,19 +77,19 @@ impl<'e> QueryFlowProcessor<'e> {
 
             for property_flow in flows {
                 match &property_flow.data {
-                    PropertyFlowData::ChildOf(parent_property_id) => self.with_parent_query(
+                    PropertyFlowData::ChildOf(parent_property_id) => self.with_parent_select(
                         *parent_property_id,
                         target,
                         &|parent_property_id| {
                             self.depends_on_mandatory_entity(parent_property_id, IsDep(false))
                         },
                         &|target| {
-                            target.insert(property_flow.id, Query::Leaf);
+                            target.insert(property_flow.id, Select::Leaf);
                         },
                     ),
                     PropertyFlowData::Type(_) | PropertyFlowData::DependentOn(_) => {
                         if self.depends_on_mandatory_entity(property_id, IsDep(false)) {
-                            target.insert(property_flow.id, Query::Leaf);
+                            target.insert(property_flow.id, Select::Leaf);
                         }
                     }
                     _ => {}
@@ -101,9 +101,9 @@ impl<'e> QueryFlowProcessor<'e> {
     fn translate_property(
         &self,
         property_id: PropertyId,
-        query: Query,
+        select: Select,
         is_dep: IsDep,
-        target: &mut FnvHashMap<PropertyId, Query>,
+        target: &mut FnvHashMap<PropertyId, Select>,
     ) {
         let mut has_parent = false;
 
@@ -116,7 +116,7 @@ impl<'e> QueryFlowProcessor<'e> {
                         // change to dep mode
                         self.translate_property(
                             *dependent_property_id,
-                            query.clone(),
+                            select.clone(),
                             IsDep(true),
                             target,
                         );
@@ -124,14 +124,19 @@ impl<'e> QueryFlowProcessor<'e> {
                 }
                 PropertyFlowData::ChildOf(parent_property_id) => {
                     if is_dep.0 {
-                        self.with_parent_query(*parent_property_id, target, &|_| true, &|target| {
-                            target.insert(property_flow.id, Query::Leaf);
-                        });
+                        self.with_parent_select(
+                            *parent_property_id,
+                            target,
+                            &|_| true,
+                            &|target| {
+                                target.insert(property_flow.id, Select::Leaf);
+                            },
+                        );
                         has_parent = true;
                     } else {
                         self.translate_property(
                             *parent_property_id,
-                            query.clone(),
+                            select.clone(),
                             IsDep(false),
                             target,
                         );
@@ -143,36 +148,36 @@ impl<'e> QueryFlowProcessor<'e> {
         }
 
         if !has_parent && is_dep.0 {
-            target.insert(property_id, Query::Leaf);
+            target.insert(property_id, Select::Leaf);
         }
     }
 
-    fn with_parent_query(
+    fn with_parent_select(
         &self,
         property_id: PropertyId,
-        target: &mut FnvHashMap<PropertyId, Query>,
+        target: &mut FnvHashMap<PropertyId, Select>,
         parent_predicate: &dyn Fn(PropertyId) -> bool,
-        child_func: &dyn Fn(&mut FnvHashMap<PropertyId, Query>),
+        child_func: &dyn Fn(&mut FnvHashMap<PropertyId, Select>),
     ) {
-        fn handle_child_query(
-            target: &mut FnvHashMap<PropertyId, Query>,
+        fn handle_child_select(
+            target: &mut FnvHashMap<PropertyId, Select>,
             property_id: PropertyId,
             parent_def_id: DefId,
             parent_predicate: impl Fn(PropertyId) -> bool,
-            child_func: impl Fn(&mut FnvHashMap<PropertyId, Query>),
+            child_func: impl Fn(&mut FnvHashMap<PropertyId, Select>),
         ) {
             if !parent_predicate(property_id) {
                 return;
             }
 
-            let child_query = target.entry(property_id).or_insert_with(|| {
-                Query::Struct(StructQuery {
+            let child_select = target.entry(property_id).or_insert_with(|| {
+                Select::Struct(StructSelect {
                     def_id: parent_def_id,
                     properties: Default::default(),
                 })
             });
-            child_func(match child_query {
-                Query::Struct(struct_query) => &mut struct_query.properties,
+            child_func(match child_select {
+                Select::Struct(struct_select) => &mut struct_select.properties,
                 _ => todo!(),
             });
         }
@@ -183,12 +188,12 @@ impl<'e> QueryFlowProcessor<'e> {
         for property_flow in self.property_flows_for(property_id) {
             if let PropertyFlowData::ChildOf(parent_property_id) = &property_flow.data {
                 is_root = false;
-                self.with_parent_query(
+                self.with_parent_select(
                     *parent_property_id,
                     target,
                     parent_predicate,
                     &|child_properties| {
-                        handle_child_query(
+                        handle_child_select(
                             child_properties,
                             property_id,
                             def_id,
@@ -201,7 +206,7 @@ impl<'e> QueryFlowProcessor<'e> {
         }
 
         if is_root {
-            handle_child_query(target, property_id, def_id, parent_predicate, child_func);
+            handle_child_select(target, property_id, def_id, parent_predicate, child_func);
         }
     }
 

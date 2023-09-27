@@ -6,7 +6,7 @@ use fnv::FnvHashMap;
 use juniper::{graphql_value, InputValue};
 use ontol_runtime::{
     config::DataStoreConfig,
-    query::{EntityQuery, Query, StructOrUnionQuery, StructQuery},
+    select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
     DefId, PackageId,
 };
 use ontol_test_utils::{
@@ -399,21 +399,21 @@ async fn test_graphql_in_memory_blog_post_conduit_no_join_mocked() {
                         // Note: The hard coded PropertyIds used below are unstable
                         // and will likely change if the ONTOL files change.
                         // Just update as necessary, the point is the structure, not the property IDs.
-                        eq!(&EntityQuery {
-                            source: StructOrUnionQuery::Struct(StructQuery {
+                        eq!(&EntitySelect {
+                            source: StructOrUnionSelect::Struct(StructSelect {
                                 def_id: DefId(PackageId(2), 21),
                                 properties: FnvHashMap::from_iter([
                                     // This is the "body" property:
-                                    ("S:2:31".parse().unwrap(), Query::Leaf),
+                                    ("S:2:31".parse().unwrap(), Select::Leaf),
                                     (
                                         // This is the `author` property:
                                         "S:2:55".parse().unwrap(),
-                                        Query::Struct(StructQuery {
+                                        Select::Struct(StructSelect {
                                             def_id: DefId(PackageId(2), 7),
                                             properties: FnvHashMap::from_iter([(
                                                 // This is the `username` property:
                                                 "S:2:12".parse().unwrap(),
-                                                Query::Leaf
+                                                Select::Leaf
                                             )])
                                         })
                                     )

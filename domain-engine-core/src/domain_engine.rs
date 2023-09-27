@@ -4,7 +4,7 @@ use ontol_runtime::{
     config::DataStoreConfig,
     interface::serde::processor::ProcessorMode,
     ontology::Ontology,
-    query::{EntityQuery, Query},
+    select::{EntitySelect, Select},
     value::{Attribute, Value},
     PackageId,
 };
@@ -14,8 +14,8 @@ use crate::{
     data_store::DataStore,
     domain_error::DomainResult,
     in_memory_store::api::InMemoryDb,
-    query_data_flow::translate_entity_query,
     resolve_path::ResolverGraph,
+    select_data_flow::translate_entity_select,
     system::{SystemAPI, TestSystem},
     value_generator::Generator,
     Config, DomainError,
@@ -63,20 +63,20 @@ impl DomainEngine {
         self.data_store.as_ref().ok_or(DomainError::NoDataStore)
     }
 
-    pub async fn query_entities(&self, mut query: EntityQuery) -> DomainResult<Vec<Attribute>> {
+    pub async fn query_entities(&self, mut select: EntitySelect) -> DomainResult<Vec<Attribute>> {
         let data_store = self.get_data_store()?;
         let ontology = self.ontology();
 
         let (mut cur_def_id, resolve_path) = self
             .resolver_graph
-            .probe_path_for_entity_query(ontology, &query, data_store)
+            .probe_path_for_entity_select(ontology, &select, data_store)
             .ok_or(DomainError::NoResolvePathToDataStore)?;
 
         let original_def_id = cur_def_id;
 
-        // Transform query
+        // Transform select
         for next_def_id in resolve_path.iter() {
-            translate_entity_query(&mut query, cur_def_id.into(), next_def_id.into(), ontology);
+            translate_entity_select(&mut select, cur_def_id.into(), next_def_id.into(), ontology);
             cur_def_id = next_def_id;
         }
 
@@ -85,7 +85,7 @@ impl DomainEngine {
             ontology.get_type_info(cur_def_id)
         );
 
-        let mut edges = data_store.api().query(self, query).await?;
+        let mut edges = data_store.api().query(self, select).await?;
 
         if resolve_path.is_empty() {
             return Ok(edges);
@@ -109,14 +109,14 @@ impl DomainEngine {
         Ok(edges)
     }
 
-    pub async fn store_new_entity(&self, mut entity: Value, query: Query) -> DomainResult<Value> {
+    pub async fn store_new_entity(&self, mut entity: Value, select: Select) -> DomainResult<Value> {
         // TODO: Domain translation by finding optimal mapping path
 
         Generator::new(self, ProcessorMode::Create).generate_values(&mut entity);
 
         self.get_data_store()?
             .api()
-            .store_new_entity(self, entity, query)
+            .store_new_entity(self, entity, select)
             .await
     }
 }
