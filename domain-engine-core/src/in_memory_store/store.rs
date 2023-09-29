@@ -36,7 +36,7 @@ pub struct InMemoryStore {
     pub int_id_counter: i64,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum DynamicKey {
     Text(String),
     Octets(SmallVec<[u8; 16]>),

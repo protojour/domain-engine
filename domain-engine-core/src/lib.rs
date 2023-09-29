@@ -4,6 +4,7 @@ pub mod system;
 
 mod domain_engine;
 mod entity_id_utils;
+mod filter;
 mod in_memory_store;
 mod resolve_path;
 mod select_data_flow;

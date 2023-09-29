@@ -4,8 +4,8 @@ use ::serde::{Deserialize, Serialize};
 use derive_debug_extras::DebugExtras;
 
 pub mod cast;
+pub mod condition;
 pub mod config;
-pub mod filter;
 pub mod format_utils;
 pub mod interface;
 pub mod ontology;
