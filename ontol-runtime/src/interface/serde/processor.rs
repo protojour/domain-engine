@@ -97,20 +97,20 @@ pub struct SubProcessorContext {
 /// Each serde-enabled type has its own operator, which is cached
 /// in the runtime ontology.
 #[derive(Clone, Copy)]
-pub struct SerdeProcessor<'e> {
+pub struct SerdeProcessor<'on> {
     /// The operator used for (de)serializing this value
-    pub value_operator: &'e SerdeOperator,
+    pub value_operator: &'on SerdeOperator,
 
     pub ctx: SubProcessorContext,
 
     /// The ontology, via which new SerdeOperators can be created.
-    pub(crate) ontology: &'e Ontology,
+    pub(crate) ontology: &'on Ontology,
 
     pub(crate) mode: ProcessorMode,
     pub(crate) level: ProcessorLevel,
 }
 
-impl<'e> SerdeProcessor<'e> {
+impl<'on> SerdeProcessor<'on> {
     pub fn level(&self) -> ProcessorLevel {
         self.level
     }
@@ -169,7 +169,7 @@ impl<'e> SerdeProcessor<'e> {
         self.search_property(prop, self.value_operator)
     }
 
-    fn search_property(&self, prop: &str, operator: &'e SerdeOperator) -> Option<PropertyId> {
+    fn search_property(&self, prop: &str, operator: &'on SerdeOperator) -> Option<PropertyId> {
         match operator {
             SerdeOperator::Union(union_op) => match union_op.variants(self.mode, self.level) {
                 FilteredVariants::Single(operator_id) => {
@@ -196,7 +196,7 @@ impl<'e> SerdeProcessor<'e> {
     }
 }
 
-impl<'e> Debug for SerdeProcessor<'e> {
+impl<'on> Debug for SerdeProcessor<'on> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // This structure might contain cycles (through operator id),
         // so just print the topmost level.
@@ -207,7 +207,7 @@ impl<'e> Debug for SerdeProcessor<'e> {
     }
 }
 
-impl<'e> Display for SerdeProcessor<'e> {
+impl<'on> Display for SerdeProcessor<'on> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.value_operator {
             SerdeOperator::Unit => write!(f, "unit"),

@@ -40,15 +40,15 @@ struct DeserializedMap {
     rel_params: Value,
 }
 
-pub(super) struct MatcherVisitor<'e, M> {
-    processor: SerdeProcessor<'e>,
+pub(super) struct MatcherVisitor<'on, M> {
+    processor: SerdeProcessor<'on>,
     matcher: M,
 }
 
-struct StructVisitor<'e> {
-    processor: SerdeProcessor<'e>,
+struct StructVisitor<'on> {
+    processor: SerdeProcessor<'on>,
     buffered_attrs: Vec<(String, serde_value::Value)>,
-    struct_op: &'e StructOperator,
+    struct_op: &'on StructOperator,
     ctx: SubProcessorContext,
 }
 
@@ -82,7 +82,7 @@ impl<'s> PropertySet<'s> {
     }
 }
 
-impl<'e> SerdeProcessor<'e> {
+impl<'on> SerdeProcessor<'on> {
     fn assert_no_rel_params(&self) {
         assert!(
             self.ctx.rel_params_operator_id.is_none(),
@@ -117,7 +117,7 @@ impl<M: ValueMatcher + Sized> IntoVisitor for M {}
 ///
 /// This is also the reason that only map types may be related through parameterized relationships.
 /// Other types only support unparameterized relationships.
-impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
+impl<'on, 'de> DeserializeSeed<'de> for SerdeProcessor<'on> {
     type Value = Attribute;
 
     fn deserialize<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
@@ -233,7 +233,7 @@ impl<'e, 'de> DeserializeSeed<'de> for SerdeProcessor<'e> {
     }
 }
 
-impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
+impl<'on, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, M> {
     type Value = Attribute;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -419,7 +419,7 @@ impl<'e, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'e, M> {
     }
 }
 
-impl<'e, 'de> Visitor<'de> for StructVisitor<'e> {
+impl<'on, 'de> Visitor<'de> for StructVisitor<'on> {
     type Value = Attribute;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -450,8 +450,8 @@ impl<'e, 'de> Visitor<'de> for StructVisitor<'e> {
     }
 }
 
-fn deserialize_map<'e, 'de, A: MapAccess<'de>>(
-    processor: SerdeProcessor<'e>,
+fn deserialize_map<'on, 'de, A: MapAccess<'de>>(
+    processor: SerdeProcessor<'on>,
     mut map: A,
     buffered_attrs: Vec<(String, serde_value::Value)>,
     properties: &IndexMap<String, SerdeProperty>,

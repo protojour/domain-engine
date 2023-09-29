@@ -19,14 +19,14 @@ use crate::{serde_utils::create_de, OntolTest};
 /// ONTOL's own deserializer does.
 pub(crate) const TEST_JSON_SCHEMA_VALIDATION: bool = true;
 
-pub struct TypeBinding<'e> {
+pub struct TypeBinding<'on> {
     pub type_info: TypeInfo,
     json_schema: Option<JSONSchema>,
-    ontology: &'e Ontology,
+    ontology: &'on Ontology,
 }
 
-impl<'e> TypeBinding<'e> {
-    pub(crate) fn new(ontol_test: &'e OntolTest, type_name: &str) -> Self {
+impl<'on> TypeBinding<'on> {
+    pub(crate) fn new(ontol_test: &'on OntolTest, type_name: &str) -> Self {
         if type_name.contains('.') {
             let vector: Vec<&str> = type_name.split('.').collect();
             let source_name = vector.first().unwrap();
@@ -42,7 +42,11 @@ impl<'e> TypeBinding<'e> {
         }
     }
 
-    fn new_with_package(ontol_test: &'e OntolTest, package_id: PackageId, type_name: &str) -> Self {
+    fn new_with_package(
+        ontol_test: &'on OntolTest,
+        package_id: PackageId,
+        type_name: &str,
+    ) -> Self {
         let ontology = &ontol_test.ontology;
         let domain = ontology.find_domain(package_id).unwrap();
         let def_id = domain
@@ -78,7 +82,7 @@ impl<'e> TypeBinding<'e> {
         }
     }
 
-    pub fn from_def_id(def_id: DefId, ontology: &'e Ontology) -> Self {
+    pub fn from_def_id(def_id: DefId, ontology: &'on Ontology) -> Self {
         Self {
             type_info: ontology.get_type_info(def_id).clone(),
             json_schema: None,
@@ -90,7 +94,7 @@ impl<'e> TypeBinding<'e> {
         self.ontology
     }
 
-    pub fn value_builder(&self, data: serde_json::Value) -> ValueBuilder<'_, 'e> {
+    pub fn value_builder(&self, data: serde_json::Value) -> ValueBuilder<'_, 'on> {
         ValueBuilder {
             binding: self,
             value: Value::unit(),
@@ -106,7 +110,7 @@ impl<'e> TypeBinding<'e> {
         &self,
         id: serde_json::Value,
         data: serde_json::Value,
-    ) -> ValueBuilder<'_, 'e> {
+    ) -> ValueBuilder<'_, 'on> {
         ValueBuilder {
             binding: self,
             value: Value::unit(),
@@ -174,24 +178,24 @@ fn compile_json_schema(ontology: &Ontology, type_info: &TypeInfo) -> JSONSchema 
 }
 
 #[derive(Clone)]
-pub struct ValueBuilder<'t, 'e> {
-    binding: &'t TypeBinding<'e>,
+pub struct ValueBuilder<'t, 'on> {
+    binding: &'t TypeBinding<'on>,
     value: Value,
 }
 
-impl<'t, 'e> From<ValueBuilder<'t, 'e>> for Value {
-    fn from(b: ValueBuilder<'t, 'e>) -> Self {
+impl<'t, 'on> From<ValueBuilder<'t, 'on>> for Value {
+    fn from(b: ValueBuilder<'t, 'on>) -> Self {
         b.value
     }
 }
 
-impl<'t, 'e> From<ValueBuilder<'t, 'e>> for Attribute {
-    fn from(b: ValueBuilder<'t, 'e>) -> Attribute {
+impl<'t, 'on> From<ValueBuilder<'t, 'on>> for Attribute {
+    fn from(b: ValueBuilder<'t, 'on>) -> Attribute {
         b.to_unit_attr()
     }
 }
 
-impl<'t, 'e> ValueBuilder<'t, 'e> {
+impl<'t, 'on> ValueBuilder<'t, 'on> {
     pub fn relationship(self, name: &str, attribute: Attribute) -> Self {
         let property_id = self.binding.find_property(name).expect("unknown property");
         self.merge_attribute(property_id, attribute)

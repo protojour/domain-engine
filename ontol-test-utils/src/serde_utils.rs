@@ -10,13 +10,13 @@ use tracing::error;
 
 use crate::type_binding::{TypeBinding, TEST_JSON_SCHEMA_VALIDATION};
 
-pub struct Deserializer<'b, 'e> {
-    binding: &'b TypeBinding<'e>,
+pub struct Deserializer<'b, 'on> {
+    binding: &'b TypeBinding<'on>,
     mode: ProcessorMode,
     level: ProcessorLevel,
 }
 
-impl<'b, 'e> Deserializer<'b, 'e> {
+impl<'b, 'on> Deserializer<'b, 'on> {
     pub fn data(&self, json: serde_json::Value) -> Result<Data, serde_json::Error> {
         let value = self.value(json)?;
         assert_eq!(value.type_def_id, self.binding.type_info.def_id);
@@ -86,13 +86,13 @@ impl<'b, 'e> Deserializer<'b, 'e> {
     }
 }
 
-pub struct Serializer<'b, 'e> {
-    binding: &'b TypeBinding<'e>,
+pub struct Serializer<'b, 'on> {
+    binding: &'b TypeBinding<'on>,
     mode: ProcessorMode,
     level: ProcessorLevel,
 }
 
-impl<'b, 'e> Serializer<'b, 'e> {
+impl<'b, 'on> Serializer<'b, 'on> {
     pub fn json(&self, value: &Value) -> serde_json::Value {
         self.serialize_json(value, false)
     }
@@ -125,7 +125,7 @@ impl<'b, 'e> Serializer<'b, 'e> {
 }
 
 /// Make a deserializer for the data creation processor mode
-pub fn create_de<'b, 'e>(binding: &'b TypeBinding<'e>) -> Deserializer<'b, 'e> {
+pub fn create_de<'b, 'on>(binding: &'b TypeBinding<'on>) -> Deserializer<'b, 'on> {
     Deserializer {
         binding,
         mode: ProcessorMode::Create,
@@ -134,7 +134,7 @@ pub fn create_de<'b, 'e>(binding: &'b TypeBinding<'e>) -> Deserializer<'b, 'e> {
 }
 
 /// Make a deserializer for the `Read` processor mode
-pub fn read_de<'b, 'e>(binding: &'b TypeBinding<'e>) -> Deserializer<'b, 'e> {
+pub fn read_de<'b, 'on>(binding: &'b TypeBinding<'on>) -> Deserializer<'b, 'on> {
     Deserializer {
         binding,
         mode: ProcessorMode::Read,
@@ -143,7 +143,7 @@ pub fn read_de<'b, 'e>(binding: &'b TypeBinding<'e>) -> Deserializer<'b, 'e> {
 }
 
 /// Make a deserializer for the `Inspect` processor mode
-pub fn inspect_de<'b, 'e>(binding: &'b TypeBinding<'e>) -> Deserializer<'b, 'e> {
+pub fn inspect_de<'b, 'on>(binding: &'b TypeBinding<'on>) -> Deserializer<'b, 'on> {
     Deserializer {
         binding,
         mode: ProcessorMode::Inspect,
@@ -152,7 +152,7 @@ pub fn inspect_de<'b, 'e>(binding: &'b TypeBinding<'e>) -> Deserializer<'b, 'e> 
 }
 
 /// Make a serializer for the data creation processor mode
-pub fn create_ser<'b, 'e>(binding: &'b TypeBinding<'e>) -> Serializer<'b, 'e> {
+pub fn create_ser<'b, 'on>(binding: &'b TypeBinding<'on>) -> Serializer<'b, 'on> {
     Serializer {
         binding,
         mode: ProcessorMode::Create,
@@ -161,7 +161,7 @@ pub fn create_ser<'b, 'e>(binding: &'b TypeBinding<'e>) -> Serializer<'b, 'e> {
 }
 
 /// Make a serializer for the `Read` processor mode
-pub fn read_ser<'b, 'e>(binding: &'b TypeBinding<'e>) -> Serializer<'b, 'e> {
+pub fn read_ser<'b, 'on>(binding: &'b TypeBinding<'on>) -> Serializer<'b, 'on> {
     Serializer {
         binding,
         mode: ProcessorMode::Read,
@@ -170,7 +170,7 @@ pub fn read_ser<'b, 'e>(binding: &'b TypeBinding<'e>) -> Serializer<'b, 'e> {
 }
 
 /// Make a serializer for the `Inspect` processor mode
-pub fn inspect_ser<'b, 'e>(binding: &'b TypeBinding<'e>) -> Serializer<'b, 'e> {
+pub fn inspect_ser<'b, 'on>(binding: &'b TypeBinding<'on>) -> Serializer<'b, 'on> {
     Serializer {
         binding,
         mode: ProcessorMode::Inspect,

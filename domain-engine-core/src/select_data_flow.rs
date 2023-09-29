@@ -58,12 +58,12 @@ pub fn translate_entity_select(
     }
 }
 
-struct SelectFlowProcessor<'e> {
-    ontology: &'e Ontology,
-    prop_flow_slice: &'e [PropertyFlow],
+struct SelectFlowProcessor<'on> {
+    ontology: &'on Ontology,
+    prop_flow_slice: &'on [PropertyFlow],
 }
 
-impl<'e> SelectFlowProcessor<'e> {
+impl<'on> SelectFlowProcessor<'on> {
     fn autoselect_output_properties(
         &self,
         output_package_id: PackageId,

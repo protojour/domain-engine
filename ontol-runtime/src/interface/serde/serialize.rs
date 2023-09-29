@@ -27,7 +27,7 @@ const UNIT_ATTR: Attribute = Attribute {
     rel_params: Value::unit(),
 };
 
-impl<'e> SerdeProcessor<'e> {
+impl<'on> SerdeProcessor<'on> {
     /// Serialize a value using this processor.
     pub fn serialize_value<S: Serializer>(
         &self,
@@ -158,7 +158,7 @@ impl<'e> SerdeProcessor<'e> {
     }
 }
 
-impl<'e> SerdeProcessor<'e> {
+impl<'on> SerdeProcessor<'on> {
     fn serialize_sequence<S: Serializer>(
         &self,
         elements: &[Attribute],
@@ -330,13 +330,13 @@ fn option_len<T>(opt: &Option<T>) -> usize {
     }
 }
 
-struct Proxy<'v, 'e> {
+struct Proxy<'v, 'on> {
     value: &'v Value,
     rel_params: Option<&'v Value>,
-    processor: SerdeProcessor<'e>,
+    processor: SerdeProcessor<'on>,
 }
 
-impl<'v, 'e> serde::Serialize for Proxy<'v, 'e> {
+impl<'v, 'on> serde::Serialize for Proxy<'v, 'on> {
     fn serialize<S>(&self, serializer: S) -> Res<S>
     where
         S: serde::Serializer,

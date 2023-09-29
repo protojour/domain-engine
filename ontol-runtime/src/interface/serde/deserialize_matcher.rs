@@ -185,12 +185,12 @@ impl ValueMatcher for NumberMatcher<f64> {
 }
 
 /// match any string
-pub struct StringMatcher<'e> {
+pub struct StringMatcher<'on> {
     pub def_id: DefId,
-    pub ontology: &'e Ontology,
+    pub ontology: &'on Ontology,
 }
 
-impl<'e> ValueMatcher for StringMatcher<'e> {
+impl<'on> ValueMatcher for StringMatcher<'on> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         // Even though it's called "text" in ONTOL, we can call it "string" in domain interfaces
         write!(f, "string")
@@ -202,12 +202,12 @@ impl<'e> ValueMatcher for StringMatcher<'e> {
 }
 
 /// match a constant text
-pub struct ConstantStringMatcher<'e> {
-    pub literal: &'e str,
+pub struct ConstantStringMatcher<'on> {
+    pub literal: &'on str,
     pub def_id: DefId,
 }
 
-impl<'e> ValueMatcher for ConstantStringMatcher<'e> {
+impl<'on> ValueMatcher for ConstantStringMatcher<'on> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "\"{}\"", self.literal)
     }
@@ -221,13 +221,13 @@ impl<'e> ValueMatcher for ConstantStringMatcher<'e> {
     }
 }
 
-pub struct TextPatternMatcher<'e> {
-    pub pattern: &'e TextPattern,
+pub struct TextPatternMatcher<'on> {
+    pub pattern: &'on TextPattern,
     pub def_id: DefId,
-    pub ontology: &'e Ontology,
+    pub ontology: &'on Ontology,
 }
 
-impl<'e> ValueMatcher for TextPatternMatcher<'e> {
+impl<'on> ValueMatcher for TextPatternMatcher<'on> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         expecting_custom_string(self.ontology, self.def_id, f)
             .unwrap_or_else(|| write!(f, "string matching /{}/", self.pattern.regex))
@@ -245,13 +245,13 @@ impl<'e> ValueMatcher for TextPatternMatcher<'e> {
 /// This is a matcher that doesn't necessarily
 /// deserialize to a string, but can use capture groups
 /// extract various data.
-pub struct CapturingTextPatternMatcher<'e> {
-    pub pattern: &'e TextPattern,
+pub struct CapturingTextPatternMatcher<'on> {
+    pub pattern: &'on TextPattern,
     pub def_id: DefId,
-    pub ontology: &'e Ontology,
+    pub ontology: &'on Ontology,
 }
 
-impl<'e> ValueMatcher for CapturingTextPatternMatcher<'e> {
+impl<'on> ValueMatcher for CapturingTextPatternMatcher<'on> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "string matching /{}/", self.pattern.regex)
     }
@@ -266,8 +266,8 @@ impl<'e> ValueMatcher for CapturingTextPatternMatcher<'e> {
 }
 
 #[derive(Clone)]
-pub struct SequenceMatcher<'e> {
-    ranges: &'e [SequenceRange],
+pub struct SequenceMatcher<'on> {
+    ranges: &'on [SequenceRange],
     range_cursor: usize,
     repetition_cursor: u16,
 
@@ -275,7 +275,7 @@ pub struct SequenceMatcher<'e> {
     pub ctx: SubProcessorContext,
 }
 
-impl<'e> ValueMatcher for SequenceMatcher<'e> {
+impl<'on> ValueMatcher for SequenceMatcher<'on> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let mut len: usize = 0;
         let mut finite = true;
@@ -300,8 +300,8 @@ impl<'e> ValueMatcher for SequenceMatcher<'e> {
     }
 }
 
-impl<'e> SequenceMatcher<'e> {
-    pub fn new(ranges: &'e [SequenceRange], type_def_id: DefId, ctx: SubProcessorContext) -> Self {
+impl<'on> SequenceMatcher<'on> {
+    pub fn new(ranges: &'on [SequenceRange], type_def_id: DefId, ctx: SubProcessorContext) -> Self {
         Self {
             ranges,
             range_cursor: 0,
@@ -363,16 +363,16 @@ impl<'e> SequenceMatcher<'e> {
     }
 }
 
-pub struct UnionMatcher<'e> {
-    pub typename: &'e str,
-    pub variants: &'e [ValueUnionVariant],
+pub struct UnionMatcher<'on> {
+    pub typename: &'on str,
+    pub variants: &'on [ValueUnionVariant],
     pub ctx: SubProcessorContext,
-    pub ontology: &'e Ontology,
+    pub ontology: &'on Ontology,
     pub mode: ProcessorMode,
     pub level: ProcessorLevel,
 }
 
-impl<'e> ValueMatcher for UnionMatcher<'e> {
+impl<'on> ValueMatcher for UnionMatcher<'on> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
@@ -494,7 +494,7 @@ impl<'e> ValueMatcher for UnionMatcher<'e> {
     }
 }
 
-impl<'e> UnionMatcher<'e> {
+impl<'on> UnionMatcher<'on> {
     fn match_discriminant(&self, discriminant: Discriminant) -> Result<DefId, ()> {
         for variant in self.variants {
             if variant.discriminator.discriminant == discriminant {
@@ -507,33 +507,37 @@ impl<'e> UnionMatcher<'e> {
 }
 
 #[derive(Clone)]
-pub struct MapMatcher<'e> {
-    variants: &'e [ValueUnionVariant],
-    ontology: &'e Ontology,
+pub struct MapMatcher<'on> {
+    variants: &'on [ValueUnionVariant],
+    ontology: &'on Ontology,
     pub ctx: SubProcessorContext,
     mode: ProcessorMode,
     level: ProcessorLevel,
 }
 
-pub enum MapMatchResult<'e> {
-    Match(MapMatch<'e>),
-    Indecisive(MapMatcher<'e>),
+pub enum MapMatchResult<'on> {
+    Match(MapMatch<'on>),
+    Indecisive(MapMatcher<'on>),
 }
 
 #[derive(Debug)]
-pub struct MapMatch<'e> {
-    pub kind: MapMatchKind<'e>,
+pub struct MapMatch<'on> {
+    pub kind: MapMatchKind<'on>,
     pub ctx: SubProcessorContext,
 }
 
 #[derive(Debug)]
-pub enum MapMatchKind<'e> {
-    StructType(&'e StructOperator),
-    IdType(&'e str, SerdeOperatorId),
+pub enum MapMatchKind<'on> {
+    StructType(&'on StructOperator),
+    IdType(&'on str, SerdeOperatorId),
 }
 
-impl<'e> MapMatcher<'e> {
-    pub fn match_attribute(self, property: &str, value: &serde_value::Value) -> MapMatchResult<'e> {
+impl<'on> MapMatcher<'on> {
+    pub fn match_attribute(
+        self,
+        property: &str,
+        value: &serde_value::Value,
+    ) -> MapMatchResult<'on> {
         // debug!("match_attribute '{property}': {:#?}", self.variants);
 
         let match_fn = |discriminant: &Discriminant| -> bool {
@@ -593,7 +597,7 @@ impl<'e> MapMatcher<'e> {
         }
     }
 
-    pub fn match_fallback(self) -> MapMatchResult<'e> {
+    pub fn match_fallback(self) -> MapMatchResult<'on> {
         // debug!("match_fallback");
 
         for variant in self.variants {
@@ -620,7 +624,7 @@ impl<'e> MapMatcher<'e> {
         MapMatchResult::Indecisive(self)
     }
 
-    fn new_match(&self, kind: MapMatchKind<'e>) -> MapMatch<'e> {
+    fn new_match(&self, kind: MapMatchKind<'on>) -> MapMatch<'on> {
         MapMatch {
             kind,
             ctx: self.ctx,

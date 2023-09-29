@@ -116,16 +116,16 @@ impl ResolverGraph {
     }
 }
 
-struct Probe<'e, 'a> {
-    ontology: &'e Ontology,
-    graph: &'e FnvHashMap<MapKey, Vec<MapKey>>,
-    options: &'e ProbeOptions,
+struct Probe<'on, 'a> {
+    ontology: &'on Ontology,
+    graph: &'on FnvHashMap<MapKey, Vec<MapKey>>,
+    options: &'on ProbeOptions,
     path: &'a mut Vec<DefId>,
     visited: &'a mut FnvHashSet<DefId>,
     target_package: PackageId,
 }
 
-impl<'e, 'a> Probe<'e, 'a> {
+impl<'on, 'a> Probe<'on, 'a> {
     fn probe_rec(&mut self, def_id: DefId) -> bool {
         trace!("probe {def_id:?} path={:?}", self.path);
 
