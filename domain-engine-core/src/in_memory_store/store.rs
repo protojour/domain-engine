@@ -7,7 +7,10 @@ use ontol_runtime::{
         operator::{AliasOperator, SerdeOperator, SerdeOperatorId},
         processor::{ProcessorLevel, ProcessorMode},
     },
-    ontology::{EntityInfo, EntityRelationship, Ontology, PropertyCardinality, ValueCardinality},
+    ontology::{
+        DataRelationshipInfo, DataRelationshipKind, Ontology, PropertyCardinality, TypeInfo,
+        ValueCardinality,
+    },
     select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
     smart_format,
     text_like_types::TextLikeType,
@@ -81,7 +84,7 @@ impl InMemoryStore {
             .ok_or(DomainError::InvalidEntityDefId)?;
 
         let type_info = engine.ontology().get_type_info(struct_select.def_id);
-        let entity_info = type_info
+        let _entity_info = type_info
             .entity_info
             .as_ref()
             .ok_or(DomainError::NotAnEntity(struct_select.def_id))?;
@@ -94,13 +97,7 @@ impl InMemoryStore {
         raw_props_vec
             .into_iter()
             .map(|(entity_key, properties)| {
-                self.apply_struct_select(
-                    engine,
-                    entity_info,
-                    &entity_key,
-                    properties,
-                    struct_select,
-                )
+                self.apply_struct_select(engine, type_info, &entity_key, properties, struct_select)
             })
             .collect()
     }
@@ -108,7 +105,7 @@ impl InMemoryStore {
     fn apply_struct_select(
         &self,
         engine: &DomainEngine,
-        entity_info: &EntityInfo,
+        type_info: &TypeInfo,
         entity_key: &DynamicKey,
         mut properties: BTreeMap<PropertyId, Attribute>,
         struct_select: &StructSelect,
@@ -118,11 +115,15 @@ impl InMemoryStore {
                 continue;
             }
 
-            if let Some(entity_relationship) = entity_info.entity_relationships.get(property_id) {
+            if let Some(data_relationship) = type_info.data_relationships.get(property_id) {
+                if !matches!(data_relationship.kind, DataRelationshipKind::EntityGraph) {
+                    continue;
+                }
+
                 let attributes =
                     self.sub_query_attributes(engine, entity_key, *property_id, subselect)?;
 
-                match entity_relationship.cardinality.1 {
+                match data_relationship.cardinality.1 {
                     ValueCardinality::One => {
                         if let Some(attribute) = attributes.into_iter().next() {
                             properties.insert(*property_id, attribute);
@@ -131,8 +132,7 @@ impl InMemoryStore {
                     ValueCardinality::Many => {
                         properties.insert(
                             *property_id,
-                            Value::new(Data::Sequence(attributes), entity_relationship.target)
-                                .into(),
+                            Value::new(Data::Sequence(attributes), data_relationship.target).into(),
                         );
                     }
                 }
@@ -229,9 +229,9 @@ impl InMemoryStore {
                 let mut select_properties = struct_select.properties.clone();
 
                 // Need to "infer" mandatory entity properties, because JSON serializer expects that
-                for (property_id, entity_relationship) in &entity_info.entity_relationships {
+                for (property_id, data_relationship) in type_info.entity_relationships() {
                     if matches!(
-                        entity_relationship.cardinality.0,
+                        data_relationship.cardinality.0,
                         PropertyCardinality::Mandatory
                     ) && !select_properties.contains_key(property_id)
                     {
@@ -241,7 +241,7 @@ impl InMemoryStore {
 
                 self.apply_struct_select(
                     engine,
-                    entity_info,
+                    type_info,
                     entity_key,
                     properties,
                     &StructSelect {
@@ -359,36 +359,39 @@ impl InMemoryStore {
         let entity_key = Self::extract_dynamic_key(&id.data)?;
 
         for (property_id, attribute) in struct_map {
-            if let Some(entity_relationship) = entity_info.entity_relationships.get(&property_id) {
-                match entity_relationship.cardinality.1 {
-                    ValueCardinality::One => {
-                        self.insert_entity_relationship(
-                            engine,
-                            &entity_key,
-                            property_id,
-                            attribute,
-                            entity_relationship,
-                        )?;
+            if let Some(data_relationship) = type_info.data_relationships.get(&property_id) {
+                match data_relationship.kind {
+                    DataRelationshipKind::Tree => {
+                        raw_props.insert(property_id, attribute);
                     }
-                    ValueCardinality::Many => {
-                        let attributes = match attribute.value.data {
-                            Data::Sequence(attributes) => attributes,
-                            _ => panic!("Expected sequence for ValueCardinality::Many"),
-                        };
-
-                        for attribute in attributes {
+                    DataRelationshipKind::EntityGraph => match data_relationship.cardinality.1 {
+                        ValueCardinality::One => {
                             self.insert_entity_relationship(
                                 engine,
                                 &entity_key,
                                 property_id,
                                 attribute,
-                                entity_relationship,
+                                data_relationship,
                             )?;
                         }
-                    }
+                        ValueCardinality::Many => {
+                            let attributes = match attribute.value.data {
+                                Data::Sequence(attributes) => attributes,
+                                _ => panic!("Expected sequence for ValueCardinality::Many"),
+                            };
+
+                            for attribute in attributes {
+                                self.insert_entity_relationship(
+                                    engine,
+                                    &entity_key,
+                                    property_id,
+                                    attribute,
+                                    data_relationship,
+                                )?;
+                            }
+                        }
+                    },
                 }
-            } else {
-                raw_props.insert(property_id, attribute);
             }
         }
 
@@ -404,7 +407,7 @@ impl InMemoryStore {
         entity_key: &DynamicKey,
         property_id: PropertyId,
         attribute: Attribute,
-        entity_relationship: &EntityRelationship,
+        data_relationship: &DataRelationshipInfo,
     ) -> DomainResult<()> {
         debug!("entity rel attribute: {attribute:?}");
 
@@ -412,15 +415,15 @@ impl InMemoryStore {
         let value = attribute.value;
         let rel_params = attribute.rel_params;
 
-        let foreign_key = if value.type_def_id == entity_relationship.target {
+        let foreign_key = if value.type_def_id == data_relationship.target {
             let foreign_id = self.write_new_entity_inner(engine, value)?;
             Self::extract_dynamic_key(&foreign_id.data)?
         } else {
-            let type_info = ontology.get_type_info(entity_relationship.target);
+            let type_info = ontology.get_type_info(data_relationship.target);
             let entity_info = type_info.entity_info.as_ref().unwrap();
 
             let foreign_key = Self::extract_dynamic_key(&value.data)?;
-            let entity_data = self.look_up_entity(entity_relationship.target, &foreign_key);
+            let entity_data = self.look_up_entity(data_relationship.target, &foreign_key);
 
             if entity_data.is_none() && entity_info.is_self_identifying {
                 // This type has UPSERT semantics.
@@ -432,7 +435,7 @@ impl InMemoryStore {
                 )]);
                 self.write_new_entity_inner(
                     engine,
-                    Value::new(Data::Struct(entity_data), entity_relationship.target),
+                    Value::new(Data::Struct(entity_data), data_relationship.target),
                 )?;
             } else if entity_data.is_none() {
                 let type_info = ontology.get_type_info(value.type_def_id);

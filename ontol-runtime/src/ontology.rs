@@ -221,6 +221,7 @@ impl Domain {
             name: None,
             entity_info: None,
             operator_id: None,
+            data_relationships: Default::default(),
         });
 
         self.info[index] = type_info;
@@ -237,6 +238,18 @@ pub struct TypeInfo {
     /// The SerdeOperatorId used for JSON.
     /// FIXME: This should really be connected to a DomainInterface.
     pub operator_id: Option<SerdeOperatorId>,
+
+    pub data_relationships: IndexMap<PropertyId, DataRelationshipInfo>,
+}
+
+impl TypeInfo {
+    pub fn entity_relationships(
+        &self,
+    ) -> impl Iterator<Item = (&PropertyId, &DataRelationshipInfo)> {
+        self.data_relationships
+            .iter()
+            .filter(|(_, info)| matches!(info.kind, DataRelationshipKind::EntityGraph))
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -248,13 +261,25 @@ pub struct EntityInfo {
     /// In other words: The entity has only one field, its ID.
     pub is_self_identifying: bool,
     pub id_value_generator: Option<ValueGenerator>,
-    pub entity_relationships: IndexMap<PropertyId, EntityRelationship>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct EntityRelationship {
+pub struct DataRelationshipInfo {
+    pub kind: DataRelationshipKind,
     pub cardinality: Cardinality,
+    pub subject_name: String,
+    pub object_name: Option<String>,
     pub target: DefId,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub enum DataRelationshipKind {
+    /// A Tree data relationship that can never be circular.
+    /// It expresses a simple composition of a composite (the parent) and the component (the child).
+    Tree,
+    /// Graph data relationships can be circular and involves entities.
+    /// The Graph relationship kind must go from one entity to another entity.
+    EntityGraph,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -58,10 +58,10 @@ impl InMemoryDb {
         let mut edge_collections: FnvHashMap<RelationshipId, EdgeCollection> = Default::default();
 
         for type_info in domain.type_infos() {
-            if let Some(entity_info) = &type_info.entity_info {
+            if type_info.entity_info.is_some() {
                 collections.insert(type_info.def_id, Default::default());
 
-                for (property_id, _entity_relationship) in &entity_info.entity_relationships {
+                for (property_id, _entity_relationship) in type_info.entity_relationships() {
                     let relationship_id = property_id.relationship_id;
                     edge_collections
                         .entry(relationship_id)

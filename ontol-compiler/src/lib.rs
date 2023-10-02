@@ -18,7 +18,9 @@ use ontol_runtime::{
         serde::{SerdeDef, SerdeKey, SerdeModifier},
         DomainInterface,
     },
-    ontology::{Domain, EntityInfo, EntityRelationship, MapMeta, Ontology, TypeInfo},
+    ontology::{
+        DataRelationshipInfo, DataRelationshipKind, Domain, EntityInfo, MapMeta, Ontology, TypeInfo,
+    },
     value::PropertyId,
     DefId, PackageId,
 };
@@ -229,6 +231,8 @@ impl<'m> Compiler<'m> {
             }
 
             for (type_name, type_def_id) in type_namespace {
+                let data_relationships = self.get_data_relationships(type_def_id);
+
                 domain.add_type(TypeInfo {
                     def_id: type_def_id,
                     public: match self.defs.def_kind(type_def_id) {
@@ -236,11 +240,16 @@ impl<'m> Compiler<'m> {
                         _ => true,
                     },
                     name: Some(type_name),
-                    entity_info: self.entity_info(type_def_id, &mut serde_generator),
+                    entity_info: self.entity_info(
+                        type_def_id,
+                        &mut serde_generator,
+                        &data_relationships,
+                    ),
                     operator_id: serde_generator.gen_operator_id(SerdeKey::Def(SerdeDef::new(
                         type_def_id,
                         SerdeModifier::json_default(),
                     ))),
+                    data_relationships,
                 });
             }
 
@@ -254,6 +263,7 @@ impl<'m> Compiler<'m> {
                         type_def_id,
                         SerdeModifier::json_default(),
                     ))),
+                    data_relationships: self.get_data_relationships(type_def_id),
                 });
             }
 
@@ -327,31 +337,77 @@ impl<'m> Compiler<'m> {
             .build()
     }
 
+    fn get_data_relationships(
+        &self,
+        type_def_id: DefId,
+    ) -> IndexMap<PropertyId, DataRelationshipInfo> {
+        let Some(properties) = self.relations.properties_by_def_id(type_def_id) else {
+            return Default::default();
+        };
+        let mut data_relationships = IndexMap::default();
+
+        if let Some(table) = &properties.table {
+            for (property_id, property) in table {
+                if let Some(data_relationship) =
+                    self.get_data_relationship_info(*property_id, property)
+                {
+                    data_relationships.insert(*property_id, data_relationship);
+                }
+            }
+        }
+
+        data_relationships
+    }
+
+    fn get_data_relationship_info(
+        &self,
+        property_id: PropertyId,
+        property: &Property,
+    ) -> Option<DataRelationshipInfo> {
+        let meta = self.defs.relationship_meta(property_id.relationship_id);
+
+        let (target_def_id, _, _) = meta.relationship.by(property_id.role.opposite());
+
+        let DefKind::TextLiteral(subject_name) = meta.relation_def_kind.value else {
+            return None;
+        };
+
+        if let Some(target_properties) = self.relations.properties_by_def_id(target_def_id) {
+            let kind = if target_properties.identified_by.is_some() {
+                DataRelationshipKind::EntityGraph
+            } else {
+                DataRelationshipKind::Tree
+            };
+
+            Some(DataRelationshipInfo {
+                kind,
+                cardinality: property.cardinality,
+                subject_name: (*subject_name).into(),
+                object_name: meta.relationship.object_prop.map(|prop| prop.into()),
+                target: target_def_id,
+            })
+        } else {
+            None
+        }
+    }
+
     fn entity_info(
         &self,
         type_def_id: DefId,
         serde_generator: &mut SerdeGenerator,
+        data_relationships: &IndexMap<PropertyId, DataRelationshipInfo>,
     ) -> Option<EntityInfo> {
         let properties = self.relations.properties_by_def_id(type_def_id)?;
         let id_relationship_id = properties.identified_by?;
 
         let identifies_meta = self.defs.relationship_meta(id_relationship_id);
 
-        let mut entity_relationships: IndexMap<PropertyId, EntityRelationship> =
-            IndexMap::default();
-
         // inherent properties are the properties that are _not_ entity relationships:
         let mut inherent_property_count = 0;
 
-        if let Some(table) = &properties.table {
-            for (property_id, property) in table {
-                if let Some(entity_relationship) =
-                    self.get_entity_relationship(*property_id, property)
-                {
-                    entity_relationships.insert(*property_id, entity_relationship);
-                } else {
-                    inherent_property_count += 1;
-                }
+        for data_relationship in data_relationships.values() {
+            if matches!(data_relationship.kind, DataRelationshipKind::Tree) {
+                inherent_property_count += 1;
             }
         }
 
@@ -382,31 +438,7 @@ impl<'m> Compiler<'m> {
                     SerdeModifier::NONE,
                 )))
                 .unwrap(),
-            entity_relationships,
         })
-    }
-
-    fn get_entity_relationship(
-        &self,
-        property_id: PropertyId,
-        property: &Property,
-    ) -> Option<EntityRelationship> {
-        let meta = self.defs.relationship_meta(property_id.relationship_id);
-
-        let (target_def_id, _, _) = meta.relationship.by(property_id.role.opposite());
-
-        if let Some(target_properties) = self.relations.properties_by_def_id(target_def_id) {
-            if target_properties.identified_by.is_some() {
-                Some(EntityRelationship {
-                    cardinality: property.cardinality,
-                    target: target_def_id,
-                })
-            } else {
-                None
-            }
-        } else {
-            None
-        }
     }
 
     fn find_inherent_primary_id(
