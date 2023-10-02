@@ -374,7 +374,12 @@ impl<'m> Compiler<'m> {
 
         if let Some(target_properties) = self.relations.properties_by_def_id(target_def_id) {
             let kind = if target_properties.identified_by.is_some() {
-                DataRelationshipKind::EntityGraph
+                DataRelationshipKind::EntityGraph {
+                    rel_params: match meta.relationship.rel_params {
+                        RelParams::Type(def_id) => Some(def_id),
+                        RelParams::Unit | RelParams::IndexRange(_) => None,
+                    },
+                }
             } else {
                 DataRelationshipKind::Tree
             };

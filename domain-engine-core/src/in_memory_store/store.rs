@@ -116,7 +116,10 @@ impl InMemoryStore {
             }
 
             if let Some(data_relationship) = type_info.data_relationships.get(property_id) {
-                if !matches!(data_relationship.kind, DataRelationshipKind::EntityGraph) {
+                if !matches!(
+                    data_relationship.kind,
+                    DataRelationshipKind::EntityGraph { .. }
+                ) {
                     continue;
                 }
 
@@ -364,23 +367,9 @@ impl InMemoryStore {
                     DataRelationshipKind::Tree => {
                         raw_props.insert(property_id, attribute);
                     }
-                    DataRelationshipKind::EntityGraph => match data_relationship.cardinality.1 {
-                        ValueCardinality::One => {
-                            self.insert_entity_relationship(
-                                engine,
-                                &entity_key,
-                                property_id,
-                                attribute,
-                                data_relationship,
-                            )?;
-                        }
-                        ValueCardinality::Many => {
-                            let attributes = match attribute.value.data {
-                                Data::Sequence(attributes) => attributes,
-                                _ => panic!("Expected sequence for ValueCardinality::Many"),
-                            };
-
-                            for attribute in attributes {
+                    DataRelationshipKind::EntityGraph { .. } => {
+                        match data_relationship.cardinality.1 {
+                            ValueCardinality::One => {
                                 self.insert_entity_relationship(
                                     engine,
                                     &entity_key,
@@ -389,8 +378,24 @@ impl InMemoryStore {
                                     data_relationship,
                                 )?;
                             }
+                            ValueCardinality::Many => {
+                                let attributes = match attribute.value.data {
+                                    Data::Sequence(attributes) => attributes,
+                                    _ => panic!("Expected sequence for ValueCardinality::Many"),
+                                };
+
+                                for attribute in attributes {
+                                    self.insert_entity_relationship(
+                                        engine,
+                                        &entity_key,
+                                        property_id,
+                                        attribute,
+                                        data_relationship,
+                                    )?;
+                                }
+                            }
                         }
-                    },
+                    }
                 }
             }
         }

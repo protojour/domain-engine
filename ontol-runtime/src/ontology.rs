@@ -248,7 +248,7 @@ impl TypeInfo {
     ) -> impl Iterator<Item = (&PropertyId, &DataRelationshipInfo)> {
         self.data_relationships
             .iter()
-            .filter(|(_, info)| matches!(info.kind, DataRelationshipKind::EntityGraph))
+            .filter(|(_, info)| matches!(info.kind, DataRelationshipKind::EntityGraph { .. }))
     }
 }
 
@@ -279,7 +279,11 @@ pub enum DataRelationshipKind {
     Tree,
     /// Graph data relationships can be circular and involves entities.
     /// The Graph relationship kind must go from one entity to another entity.
-    EntityGraph,
+    EntityGraph {
+        /// EntityGraph data relationships are allowed to be parametric.
+        /// i.e. the relation itself has parameters.
+        rel_params: Option<DefId>,
+    },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
