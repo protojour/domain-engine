@@ -3,7 +3,7 @@ use fnv::FnvHashMap;
 use itertools::Itertools;
 use ontol_runtime::condition::{Clause, UniVar};
 
-use super::condition_utils::get_clause_vars;
+use super::condition_utils::{get_clause_vars, AllVars};
 
 /// Finds the disjoint clauses.
 /// Disjoint clauses are groups with no variable "leakage" to other groups.
@@ -12,9 +12,9 @@ pub fn disjoint_clause_sets(clauses: &[Clause]) -> Vec<Vec<usize>> {
     let mut forest = ClauseForest::default();
 
     for (index, clause) in clauses.iter().enumerate() {
-        let mut var_set = BitSet::new();
-        get_clause_vars(clause, &mut var_set);
-        forest.union_clause(index, var_set);
+        let mut all_vars = AllVars(BitSet::new());
+        get_clause_vars(clause, &mut all_vars);
+        forest.union_clause(index, all_vars.0);
     }
 
     compute_disjoint_sets(&forest)
@@ -129,9 +129,9 @@ mod tests {
     #[test]
     fn disjoint_clause_set() {
         let disjoint_sets = disjoint_clause_sets(&[
-            Clause::Prop(var(6), PROP, (CondTerm::Var(var(7)), CondTerm::Var(var(8)))),
-            Clause::Prop(var(3), PROP, (CondTerm::Var(var(4)), CondTerm::Var(var(5)))),
-            Clause::Prop(var(1), PROP, (CondTerm::Var(var(2)), CondTerm::Var(var(3)))),
+            Clause::Attr(var(6), PROP, (CondTerm::Var(var(7)), CondTerm::Var(var(8)))),
+            Clause::Attr(var(3), PROP, (CondTerm::Var(var(4)), CondTerm::Var(var(5)))),
+            Clause::Attr(var(1), PROP, (CondTerm::Var(var(2)), CondTerm::Var(var(3)))),
             Clause::IsEntity(CondTerm::Var(var(7)), DefId::unit()),
         ]);
         assert_eq!(disjoint_sets, vec![vec![0, 3], vec![1, 2]]);

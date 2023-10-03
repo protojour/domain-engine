@@ -20,6 +20,8 @@ pub enum DomainError {
     TypeCannotBeUsedForIdGeneration,
     #[error("Unresolved foreign key: {0}")]
     UnresolvedForeignKey(String),
+    #[error("Not implemented")]
+    NotImplemented,
 }
 
 pub type DomainResult<T> = Result<T, DomainError>;

@@ -38,6 +38,7 @@ bitflags = { version = "2", features = ["serde"] }
 bincode = "1"
 chumsky = "0.9"
 either = "1"
+bit-set = "0.5"
 
 [profile.release]
 strip = true
