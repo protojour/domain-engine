@@ -15,6 +15,7 @@ use super::condition_utils::{get_clause_vars, TermVars};
 
 /// A concrete "execution plan" for filtering
 #[derive(Debug, PartialEq, Eq)]
+#[allow(unused)]
 pub enum Plan {
     /// A root plan that filters specific entities
     EntitiesOf(DefId, Vec<Plan>),
@@ -162,7 +163,7 @@ fn sub_plans(origin: Origin, clauses: &[&Clause], builder: &mut PlanBuilder) -> 
                             rel: rel_params
                                 .as_ref()
                                 .map(|rel_params| term_plans(rel, *rel_params, clauses, builder))
-                                .unwrap_or_else(|| vec![]),
+                                .unwrap_or_else(Vec::new),
                             val: val_plans,
                         };
 
