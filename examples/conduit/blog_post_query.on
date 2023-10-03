@@ -33,8 +33,10 @@ map BlogPostQuery {
         'written_by'?: by
     }
     BlogPost: [
-        ..BlogPost match {
-            'written_by'?: by
+        ..db.Article match {
+            'author': db.User match {
+                'username'?: by
+            }
         }
     ]
 }
