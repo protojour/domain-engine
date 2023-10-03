@@ -10,6 +10,7 @@ use crate::PackageId;
 pub enum Space {
     Type,
     Rel,
+    Map,
 }
 
 /// The reason that IndexMap is used here is determinism.
@@ -19,6 +20,7 @@ pub enum Space {
 pub struct Namespace {
     pub(crate) types: IndexMap<String, DefId>,
     pub(crate) relations: IndexMap<String, DefId>,
+    pub(crate) maps: IndexMap<String, DefId>,
     pub(crate) anonymous: Vec<DefId>,
 }
 
@@ -27,6 +29,7 @@ impl Namespace {
         match space {
             Space::Type => &self.types,
             Space::Rel => &self.relations,
+            Space::Map => &self.maps,
         }
     }
 
@@ -34,6 +37,7 @@ impl Namespace {
         match space {
             Space::Type => &mut self.types,
             Space::Rel => &mut self.relations,
+            Space::Map => &mut self.maps,
         }
     }
 }

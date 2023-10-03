@@ -104,6 +104,21 @@ fn error_rel_duplicate_anonymous_relation() {
 }
 
 #[test]
+fn error_duplicate_map_identifier() {
+    "
+    def t1 {}
+    def t2 {}
+    def t3 {}
+    // note: map has a separate namespace:
+    map t1 { t1 {} t2 {}}
+    map t1 { // ERROR duplicate map identifier
+        t2 {} t3 {}
+    }
+    "
+    .compile_fail();
+}
+
+#[test]
 fn error_map_union_unit_type() {
     "
     def foo {}

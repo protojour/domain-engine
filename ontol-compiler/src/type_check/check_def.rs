@@ -59,15 +59,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.check_relationship(def_id, relationship, &def.span)
             }
             DefKind::Primitive(kind, _ident) => self.types.intern(Type::Primitive(*kind, def_id)),
-            DefKind::Mapping(var_allocator, first_id, second_id) => {
-                match self.check_map(def, var_allocator, *first_id, *second_id) {
-                    Ok(ty) => ty,
-                    Err(error) => {
-                        debug!("Aggregation group error: {error:?}");
-                        self.types.intern(Type::Error)
-                    }
+            DefKind::Mapping {
+                arms: (first_id, second_id),
+                var_alloc,
+                ident: _,
+            } => match self.check_map(def, var_alloc, *first_id, *second_id) {
+                Ok(ty) => ty,
+                Err(error) => {
+                    debug!("Aggregation group error: {error:?}");
+                    self.types.intern(Type::Error)
                 }
-            }
+            },
             DefKind::Constant(pat_id) => {
                 let pattern = self.patterns.table.remove(pat_id).unwrap();
                 let ty = match self.expected_constant_types.remove(&def_id) {

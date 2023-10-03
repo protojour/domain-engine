@@ -86,6 +86,7 @@ pub enum CompileError {
     AmbiguousNumberResolution,
     DuplicateTypeParam(String),
     RequiresSpreading,
+    DuplicateMapIdentifier,
     BUG(String),
     TODO(String),
 }
@@ -215,6 +216,7 @@ impl std::fmt::Display for CompileError {
             Self::AmbiguousNumberResolution => write!(f, "ambiguous number resolution"),
             Self::DuplicateTypeParam(ident) => write!(f, "duplicate type param `{ident}`"),
             Self::RequiresSpreading => write!(f, "requires spreading (`..`)"),
+            Self::DuplicateMapIdentifier => write!(f, "duplicate map identifier"),
             Self::BUG(msg) => write!(f, "BUG: {msg}"),
             Self::TODO(msg) => write!(f, "TODO: {msg}"),
         }

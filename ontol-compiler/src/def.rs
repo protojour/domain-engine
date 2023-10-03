@@ -41,7 +41,11 @@ pub enum DefKind<'m> {
     // if there are different variants per type.
     Fn(BuiltinProc),
     Constant(PatId),
-    Mapping(ontol_hir::VarAllocator, PatId, PatId),
+    Mapping {
+        ident: Option<&'m str>,
+        arms: (PatId, PatId),
+        var_alloc: ontol_hir::VarAllocator,
+    },
 }
 
 impl<'m> DefKind<'m> {
@@ -59,7 +63,7 @@ impl<'m> DefKind<'m> {
             Self::FmtTransition(..) => None,
             Self::Relationship(_) => None,
             Self::Constant(_) => None,
-            Self::Mapping(..) => None,
+            Self::Mapping { .. } => None,
         }
     }
 }

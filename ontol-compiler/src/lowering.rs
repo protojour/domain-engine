@@ -110,16 +110,38 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ast::Statement::Map(ast::MapStatement {
                 docs: _,
                 kw: _,
-                ident: _,
+                ident,
                 first,
                 second,
             }) => {
                 let mut var_table = MapVarTable::default();
                 let first = self.lower_map_arm(first, &mut var_table)?;
                 let second = self.lower_map_arm(second, &mut var_table)?;
-                let var_allocator = var_table.into_allocator();
+                let var_alloc = var_table.into_allocator();
 
-                Ok([self.define(DefKind::Mapping(var_allocator, first, second), &span)].into())
+                let (def_id, ident) = match ident {
+                    Some((ident, span)) => {
+                        let (def_id, coinage) = self.named_def_id(Space::Map, &ident, &span)?;
+                        if matches!(coinage, Coinage::Used) {
+                            return Err((CompileError::DuplicateMapIdentifier, span.clone()));
+                        }
+                        let ident = self.compiler.strings.intern(&ident);
+                        (def_id, Some(ident))
+                    }
+                    None => (self.compiler.defs.alloc_def_id(self.src.package_id), None),
+                };
+
+                self.set_def_kind(
+                    def_id,
+                    DefKind::Mapping {
+                        ident,
+                        arms: (first, second),
+                        var_alloc,
+                    },
+                    &span,
+                );
+
+                Ok([def_id].into())
             }
         }
     }
@@ -167,7 +189,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let pat_id = self.compiler.patterns.alloc_pat_id();
                 self.compiler.patterns.table.insert(pat_id, pattern);
 
-                self.define(DefKind::Constant(pat_id), &object_span)
+                self.define_anonymous(DefKind::Constant(pat_id), &object_span)
             }
         };
 
@@ -241,7 +263,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
             RelParams::IndexRange(index_range_rel_params)
         } else if let Some((ctx_block, _)) = ctx_block {
-            let rel_def_id = self.define_anonymous(
+            let rel_def_id = self.define_anonymous_type(
                 TypeDef {
                     public: false,
                     ident: None,
@@ -357,7 +379,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 _ => return Err((CompileError::FmtTooFewTransitions, span)),
             };
 
-            let target_def_id = self.define_anonymous(
+            let target_def_id = self.define_anonymous_type(
                 TypeDef {
                     public: false,
                     ident: None,
@@ -415,7 +437,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
         debug!("{:?}: <transition>", relation_def_id.0);
 
-        Ok(self.define(
+        Ok(self.define_anonymous(
             DefKind::Relationship(Relationship {
                 relation_def_id,
                 subject: (from.0, self.src.span(from.1)),
@@ -454,7 +476,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ast::Type::Path(path) => Ok(self.lookup_path(&path, span)?),
             ast::Type::AnonymousStruct((ctx_block, _block_span)) => {
                 if let Some(root_defs) = root_defs {
-                    let def_id = self.define_anonymous(
+                    let def_id = self.define_anonymous_type(
                         TypeDef {
                             public: false,
                             ident: None,
@@ -590,7 +612,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 span: self.src.span(&span),
             },
             None => TypePath::Inferred {
-                def_id: self.define_anonymous(
+                def_id: self.define_anonymous_type(
                     TypeDef {
                         public: true,
                         ident: None,
@@ -908,13 +930,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
         Ok(root_defs)
     }
 
-    fn define_anonymous(&mut self, type_def: TypeDef<'m>, span: &Span) -> DefId {
-        let anonymous_def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
-        self.set_def_kind(anonymous_def_id, DefKind::Type(type_def), span);
-        debug!("{anonymous_def_id:?}: <anonymous>");
-        anonymous_def_id
-    }
-
     fn define_relation_if_undefined(&mut self, key: RelationKey, span: &Range<usize>) -> DefId {
         match key {
             RelationKey::Named(def_id) => def_id,
@@ -958,7 +973,14 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn define(&mut self, kind: DefKind<'m>, span: &Span) -> DefId {
+    fn define_anonymous_type(&mut self, type_def: TypeDef<'m>, span: &Span) -> DefId {
+        let anonymous_def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
+        self.set_def_kind(anonymous_def_id, DefKind::Type(type_def), span);
+        debug!("{anonymous_def_id:?}: <anonymous>");
+        anonymous_def_id
+    }
+
+    fn define_anonymous(&mut self, kind: DefKind<'m>, span: &Span) -> DefId {
         let def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
         self.set_def_kind(def_id, kind, span);
         def_id
