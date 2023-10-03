@@ -9,13 +9,13 @@ use crate::{
     Compiler,
 };
 
-pub struct OntologyGraph<'c, 'm> {
-    state: State,
-    compiler: &'c Compiler<'m>,
+pub struct OntologyGraph<'cmp, 'm> {
+    state: State<'m>,
+    compiler: &'cmp Compiler<'m>,
 }
 
-impl<'c, 'm> From<&'c Compiler<'m>> for OntologyGraph<'c, 'm> {
-    fn from(compiler: &'c Compiler<'m>) -> Self {
+impl<'cmp, 'm> From<&'cmp Compiler<'m>> for OntologyGraph<'cmp, 'm> {
+    fn from(compiler: &'cmp Compiler<'m>) -> Self {
         Self {
             state: State::new(compiler),
             compiler,
@@ -23,16 +23,16 @@ impl<'c, 'm> From<&'c Compiler<'m>> for OntologyGraph<'c, 'm> {
     }
 }
 
-struct State {
-    node_meta_table: FnvHashMap<DefId, NodeMeta>,
+struct State<'m> {
+    node_meta_table: FnvHashMap<DefId, NodeMeta<'m>>,
     edge_meta_vec: Vec<EdgeMeta>,
 }
 
-struct NodeMeta {
+struct NodeMeta<'m> {
     /// The node id in the graph structure
     node_id: String,
     /// The ONTOL identifier of the type
-    ident: Option<String>,
+    ident: Option<&'m str>,
     ref_count: usize,
 }
 
@@ -47,8 +47,8 @@ enum EdgeKind {
     Map,
 }
 
-impl State {
-    fn new(compiler: &Compiler) -> Self {
+impl<'m> State<'m> {
+    fn new(compiler: &Compiler<'m>) -> Self {
         let mut node_meta_table = FnvHashMap::default();
         let mut edge_meta_vec = vec![];
 
@@ -64,7 +64,7 @@ impl State {
                     *type_def_id,
                     NodeMeta {
                         node_id: smart_format!("{}_{type_name}", package_id.0),
-                        ident: Some(type_name.clone()),
+                        ident: Some(type_name),
                         ref_count: 0,
                     },
                 );
@@ -127,19 +127,19 @@ impl State {
     }
 }
 
-struct Nodes<'g, 'm>(&'g State, &'g Compiler<'m>);
-struct Edges<'g, 'm>(&'g State, &'g Compiler<'m>);
-struct Node<'g> {
+struct Nodes<'graph, 'm>(&'graph State<'m>, &'graph Compiler<'m>);
+struct Edges<'graph, 'm>(&'graph State<'m>, &'graph Compiler<'m>);
+struct Node<'g, 'm> {
     def_id: DefId,
-    node_meta: &'g NodeMeta,
+    node_meta: &'g NodeMeta<'m>,
 }
-struct Edge<'g, 'm> {
-    source_meta: &'g NodeMeta,
-    target_meta: &'g NodeMeta,
-    relation_def_kind: Option<&'g DefKind<'m>>,
+struct Edge<'graph, 'm> {
+    source_meta: &'graph NodeMeta<'m>,
+    target_meta: &'graph NodeMeta<'m>,
+    relation_def_kind: Option<&'graph DefKind<'m>>,
 }
 
-impl<'g, 'm> serde::Serialize for OntologyGraph<'g, 'm> {
+impl<'graph, 'm> serde::Serialize for OntologyGraph<'graph, 'm> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -151,7 +151,7 @@ impl<'g, 'm> serde::Serialize for OntologyGraph<'g, 'm> {
     }
 }
 
-impl<'g, 'm> serde::Serialize for Nodes<'g, 'm> {
+impl<'graph, 'm> serde::Serialize for Nodes<'graph, 'm> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -175,7 +175,7 @@ impl<'g, 'm> serde::Serialize for Nodes<'g, 'm> {
     }
 }
 
-impl<'g> serde::Serialize for Node<'g> {
+impl<'graph, 'm> serde::Serialize for Node<'graph, 'm> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -189,7 +189,7 @@ impl<'g> serde::Serialize for Node<'g> {
     }
 }
 
-impl<'g, 'm> serde::Serialize for Edges<'g, 'm> {
+impl<'graph, 'm> serde::Serialize for Edges<'graph, 'm> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -227,7 +227,7 @@ impl<'g, 'm> serde::Serialize for Edges<'g, 'm> {
     }
 }
 
-impl<'g, 'm> serde::Serialize for Edge<'g, 'm> {
+impl<'graph, 'm> serde::Serialize for Edge<'graph, 'm> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,

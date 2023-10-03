@@ -17,15 +17,15 @@ pub enum Space {
 /// The keys will then be sorted in the order written in ONTOL, so that
 /// each compile behaves similar to the previous compile, easing debugging.
 #[derive(Default, Debug)]
-pub struct Namespace {
-    pub(crate) types: IndexMap<String, DefId>,
-    pub(crate) relations: IndexMap<String, DefId>,
-    pub(crate) maps: IndexMap<String, DefId>,
+pub struct Namespace<'m> {
+    pub(crate) types: IndexMap<&'m str, DefId>,
+    pub(crate) relations: IndexMap<&'m str, DefId>,
+    pub(crate) maps: IndexMap<&'m str, DefId>,
     pub(crate) anonymous: Vec<DefId>,
 }
 
-impl Namespace {
-    pub fn space(&self, space: Space) -> &IndexMap<String, DefId> {
+impl<'m> Namespace<'m> {
+    pub fn space(&self, space: Space) -> &IndexMap<&'m str, DefId> {
         match space {
             Space::Type => &self.types,
             Space::Rel => &self.relations,
@@ -33,7 +33,7 @@ impl Namespace {
         }
     }
 
-    pub fn space_mut(&mut self, space: Space) -> &mut IndexMap<String, DefId> {
+    pub fn space_mut(&mut self, space: Space) -> &mut IndexMap<&'m str, DefId> {
         match space {
             Space::Type => &mut self.types,
             Space::Rel => &mut self.relations,
@@ -43,12 +43,12 @@ impl Namespace {
 }
 
 #[derive(Default, Debug)]
-pub struct Namespaces {
-    pub(crate) namespaces: FnvHashMap<PackageId, Namespace>,
+pub struct Namespaces<'m> {
+    pub(crate) namespaces: FnvHashMap<PackageId, Namespace<'m>>,
     pub(crate) docs: FnvHashMap<DefId, Vec<String>>,
 }
 
-impl Namespaces {
+impl<'m> Namespaces<'m> {
     pub fn lookup(&self, search_path: &[PackageId], space: Space, ident: &str) -> Option<DefId> {
         for package in search_path {
             let Some(namespace) = self.namespaces.get(package) else {
@@ -66,7 +66,7 @@ impl Namespaces {
         &mut self,
         package: PackageId,
         space: Space,
-    ) -> &mut IndexMap<String, DefId> {
+    ) -> &mut IndexMap<&'m str, DefId> {
         self.namespaces.entry(package).or_default().space_mut(space)
     }
 

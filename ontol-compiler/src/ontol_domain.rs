@@ -32,7 +32,7 @@ impl<'m> Compiler<'m> {
                     if let Some(ident) = *ident {
                         self.namespaces
                             .get_namespace_mut(ONTOL_PKG, Space::Type)
-                            .insert(ident.into(), def_id);
+                            .insert(ident, def_id);
                     }
                     self.def_types.table.insert(def_id, ty);
                 }
@@ -246,18 +246,18 @@ impl<'m> Compiler<'m> {
     fn register_named_type(
         &mut self,
         def_id: DefId,
-        ident: &str,
+        ident: &'m str,
         ty_fn: impl Fn(DefId) -> Type<'m>,
     ) -> TypeRef<'m> {
         let ty = self.types.intern(ty_fn(def_id));
         self.namespaces
             .get_namespace_mut(ONTOL_PKG, Space::Type)
-            .insert(ident.into(), def_id);
+            .insert(ident, def_id);
         self.def_types.table.insert(def_id, ty);
         ty
     }
 
-    fn def_proc(&mut self, ident: &str, def_kind: DefKind<'m>, ty: TypeRef<'m>) -> DefId {
+    fn def_proc(&mut self, ident: &'static str, def_kind: DefKind<'m>, ty: TypeRef<'m>) -> DefId {
         let def_id = self.add_named_def(ident, Space::Type, def_kind, ONTOL_PKG, NO_SPAN);
         self.def_types.table.insert(def_id, ty);
 

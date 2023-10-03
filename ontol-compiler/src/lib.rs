@@ -71,7 +71,7 @@ pub struct Compiler<'m> {
     pub(crate) packages: Packages,
     pub(crate) package_names: Vec<(PackageId, Arc<String>)>,
 
-    pub(crate) namespaces: Namespaces,
+    pub(crate) namespaces: Namespaces<'m>,
     pub(crate) defs: Defs<'m>,
     pub(crate) package_config_table: FnvHashMap<PackageId, PackageConfig>,
     pub(crate) primitives: Primitives,
@@ -240,7 +240,7 @@ impl<'m> Compiler<'m> {
                         DefKind::Type(TypeDef { public, .. }) => *public,
                         _ => true,
                     },
-                    name: Some(type_name),
+                    name: Some(type_name.into()),
                     entity_info: self.entity_info(
                         type_def_id,
                         &mut serde_generator,

@@ -306,7 +306,7 @@ impl<'m> LookupRelationshipMeta<'m> for Defs<'m> {
 impl<'m> Compiler<'m> {
     pub fn add_named_def(
         &mut self,
-        name: &str,
+        name: &'m str,
         space: Space,
         kind: DefKind<'m>,
         package: PackageId,
@@ -315,7 +315,7 @@ impl<'m> Compiler<'m> {
         let def_id = self.defs.alloc_def_id(package);
         self.namespaces
             .get_namespace_mut(package, space)
-            .insert(name.into(), def_id);
+            .insert(name, def_id);
         self.defs.table.insert(
             def_id,
             Def {
@@ -347,7 +347,7 @@ impl<'m> Compiler<'m> {
         let namespace = self.namespaces.get_namespace_mut(package_id, Space::Type);
 
         // The name `ontol` is always defined, and refers to the ontol domain
-        namespace.insert("ontol".into(), self.primitives.ontol_domain);
+        namespace.insert("ontol", self.primitives.ontol_domain);
 
         package_def_id
     }

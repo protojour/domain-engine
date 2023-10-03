@@ -93,7 +93,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     .namespaces
                     .get_namespace_mut(self_package_def_id, Space::Type);
 
-                type_namespace.insert(use_stmt.as_ident.0, *used_package_def_id);
+                let as_ident = self.compiler.strings.intern(&use_stmt.as_ident.0);
+                type_namespace.insert(as_ident, *used_package_def_id);
 
                 Ok(Default::default())
             }
@@ -843,6 +844,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let mut def_id = None;
 
                 while let Some((segment, segment_span)) = segment_iter.next() {
+                    let segment = self.compiler.strings.intern(segment);
                     def_id = namespace.space(Space::Type).get(segment);
                     if segment_iter.peek().is_some() {
                         match def_id {
@@ -948,12 +950,13 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn named_def_id(&mut self, space: Space, ident: &String, span: &Span) -> Res<(DefId, Coinage)> {
+    fn named_def_id(&mut self, space: Space, ident: &str, span: &Span) -> Res<(DefId, Coinage)> {
+        let ident = self.compiler.strings.intern(ident);
         match self
             .compiler
             .namespaces
             .get_namespace_mut(self.src.package_id, space)
-            .entry(ident.clone())
+            .entry(ident)
         {
             Entry::Occupied(occupied) => {
                 if occupied.get().package_id() == self.src.package_id {
