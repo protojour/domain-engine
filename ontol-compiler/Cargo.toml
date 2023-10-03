@@ -21,7 +21,6 @@ thiserror.workspace = true
 tracing.workspace = true
 chumsky.workspace = true
 either.workspace = true
-fraction = "0.13"
 ena = "0.14"
 bumpalo = "3"
 regex-syntax = "0.7"
@@ -29,7 +28,7 @@ regex = "1"
 patricia_tree = "0.6"
 bit-set = "0.5"
 derive-debug-extras = { version = "0.2", features = ["auto-debug-single-tuple-inline"] }
-ordered-float = "3"
+ordered-float = "4"
 convert_case = "0.6"
 
 [dev-dependencies]
