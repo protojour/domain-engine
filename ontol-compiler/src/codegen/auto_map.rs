@@ -4,13 +4,14 @@ use ontol_hir::VarAllocator;
 use ontol_runtime::DefId;
 
 use crate::{
+    map::{MapArm, MapKeyPair, MapOutputClass},
     relation::Constructor,
     text_patterns::TextPatternSegment,
     typed_hir::{IntoTypedHirData, Meta, TypedArena, TypedHir, TypedHirData, UNIT_META},
     Compiler, NO_SPAN,
 };
 
-use super::task::{ExplicitMapCodegenTask, MapArm, MapKeyPair};
+use super::task::ExplicitMapCodegenTask;
 
 pub fn autogenerate_mapping<'m>(
     key_pair: MapKeyPair,
@@ -60,12 +61,12 @@ fn autogenerate_fmt_to_fmt<'m>(
 
     Some(ExplicitMapCodegenTask {
         first: MapArm {
-            is_match: false,
             node: first_node,
+            class: MapOutputClass::Pure,
         },
         second: MapArm {
-            is_match: false,
             node: second_node,
+            class: MapOutputClass::Pure,
         },
         span: NO_SPAN,
     })

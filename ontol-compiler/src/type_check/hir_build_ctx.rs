@@ -34,7 +34,7 @@ pub struct HirBuildCtx<'m> {
     pub var_allocator: ontol_hir::VarAllocator,
 
     /// Which Arm is currently processed in a map statement:
-    pub arm: Arm,
+    pub current_arm: Arm,
 
     ctrl_flow_depth: CtrlFlowDepth,
 
@@ -53,7 +53,7 @@ impl<'m> HirBuildCtx<'m> {
             variable_mapping: Default::default(),
             object_to_edge_var_table: Default::default(),
             partial: false,
-            arm: Arm::First,
+            current_arm: Arm::First,
             ctrl_flow_depth: CtrlFlowDepth(0),
             var_allocator,
             missing_properties: FnvHashMap::default(),

@@ -11,8 +11,12 @@ use ontol_runtime::{
 use tracing::{debug, debug_span, warn};
 
 use crate::{
-    codegen::code_generator::map_codegen, hir_unify::unify_to_function, typed_hir::TypedHir,
-    types::Type, Compiler, SourceSpan,
+    codegen::code_generator::map_codegen,
+    hir_unify::unify_to_function,
+    map::{MapArm, MapKeyPair, MapOutputClass},
+    typed_hir::TypedHir,
+    types::Type,
+    Compiler, SourceSpan,
 };
 
 use super::{
@@ -77,11 +81,6 @@ pub struct ExplicitMapCodegenTask<'m> {
     pub span: SourceSpan,
 }
 
-pub struct MapArm<'m> {
-    pub node: ontol_hir::RootNode<'m, TypedHir>,
-    pub is_match: bool,
-}
-
 impl<'m> Debug for ConstCodegenTask<'m> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ConstCodegenTask")
@@ -96,36 +95,6 @@ impl<'m> Debug for ExplicitMapCodegenTask<'m> {
             .field("first", &DebugViaDisplay(&self.first.node))
             .field("second", &DebugViaDisplay(&self.second.node))
             .finish()
-    }
-}
-
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub struct MapKeyPair {
-    first: MapKey,
-    second: MapKey,
-}
-
-impl MapKeyPair {
-    pub fn new(a: MapKey, b: MapKey) -> Self {
-        if a < b {
-            Self {
-                first: a,
-                second: b,
-            }
-        } else {
-            Self {
-                first: b,
-                second: a,
-            }
-        }
-    }
-
-    pub fn first(&self) -> MapKey {
-        self.first
-    }
-
-    pub fn second(&self) -> MapKey {
-        self.second
     }
 }
 
@@ -188,12 +157,12 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
         debug!("1st (ty={:?}):\n{}", first.node.data().ty(), first.node);
         debug!("2nd (ty={:?}):\n{}", second.node.data().ty(), second.node);
 
-        if !second.is_match {
+        if matches!(second.class, MapOutputClass::Pure) {
             let _entered = debug_span!("forward").entered();
             generate_map_proc(&first.node, &second.node, &mut proc_table, compiler);
         }
 
-        if !first.is_match {
+        if matches!(first.class, MapOutputClass::Pure) {
             let _entered = debug_span!("backward").entered();
             generate_map_proc(&second.node, &first.node, &mut proc_table, compiler);
         }

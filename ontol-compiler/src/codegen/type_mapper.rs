@@ -3,12 +3,11 @@ use tracing::warn;
 
 use crate::{
     def::Defs,
+    map::MapKeyPair,
     relation::Relations,
     type_check::{repr::repr_model::ReprKind, seal::SealCtx},
     types::{Type, TypeRef},
 };
-
-use super::task::MapKeyPair;
 
 #[derive(Debug)]
 pub struct MapInfo {

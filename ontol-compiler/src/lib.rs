@@ -51,6 +51,7 @@ mod codegen;
 mod compiler_queries;
 mod def;
 mod lowering;
+mod map;
 mod namespace;
 mod ontol_domain;
 mod pattern;

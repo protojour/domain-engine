@@ -7,11 +7,12 @@ use tracing::{debug, debug_span};
 
 use crate::{
     codegen::{
-        task::{ExplicitMapCodegenTask, MapArm, MapCodegenTask, MapKeyPair},
+        task::{ExplicitMapCodegenTask, MapCodegenTask},
         type_mapper::TypeMapper,
     },
     def::Def,
     error::CompileError,
+    map::{MapArm, MapKeyPair, MapOutputClass},
     mem::Intern,
     pattern::{
         CompoundPatternModifier, PatId, Pattern, PatternKind, Patterns, RegexPatternCaptureNode,
@@ -40,34 +41,24 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     ) -> Result<TypeRef<'m>, AggrGroupError> {
         let mut ctx = HirBuildCtx::new(def.span, VarAllocator::from(*var_allocator.peek_next()));
 
-        {
+        let (first_class, second_class) = {
             let mut map_check = MapCheck {
                 errors: self.errors,
                 patterns: self.patterns,
             };
 
-            {
-                let _entered = debug_span!("1st").entered();
-                ctx.arm = Arm::First;
-                map_check.analyze_arm(
-                    map_check.patterns.table.get(&first_id).unwrap(),
-                    None,
-                    &mut ctx,
-                )?;
-            }
+            let first_class = map_check.analyze_arm_entry(first_id, Arm::First, &mut ctx)?;
+            let second_class = map_check.analyze_arm_entry(second_id, Arm::Second, &mut ctx)?;
 
-            {
-                let _entered = debug_span!("2nd").entered();
-                ctx.arm = Arm::Second;
-                map_check.analyze_arm(
-                    map_check.patterns.table.get(&second_id).unwrap(),
-                    None,
-                    &mut ctx,
-                )?;
-            }
-        }
+            (first_class, second_class)
+        };
 
-        self.build_arms(def, first_id, second_id, &mut ctx)?;
+        self.build_arms(
+            def,
+            (first_id, first_class),
+            (second_id, second_class),
+            &mut ctx,
+        )?;
 
         self.report_missing_prop_errors(&mut ctx);
 
@@ -77,47 +68,43 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn build_arms(
         &mut self,
         def: &Def,
-        first_id: PatId,
-        second_id: PatId,
+        first: (PatId, MapOutputClass),
+        second: (PatId, MapOutputClass),
         ctx: &mut HirBuildCtx<'m>,
     ) -> Result<(), AggrGroupError> {
-        let mut first = {
+        let mut first_node = {
             let _entered = debug_span!("1st").entered();
-            ctx.arm = Arm::First;
-            let mut root_node = self.build_root_pattern(first_id, ctx);
+            ctx.current_arm = Arm::First;
+            let mut root_node = self.build_root_pattern(first.0, ctx);
             self.infer_hir_arm_types(&mut root_node, ctx);
             root_node
         };
 
-        let mut second = {
+        let mut second_node = {
             let _entered = debug_span!("2nd").entered();
-            ctx.arm = Arm::Second;
-            let mut root_node = self.build_root_pattern(second_id, ctx);
+            ctx.current_arm = Arm::Second;
+            let mut root_node = self.build_root_pattern(second.0, ctx);
             self.infer_hir_arm_types(&mut root_node, ctx);
             root_node
         };
 
         // unify the type of variables on either side:
-        self.infer_hir_unify_arms(&mut first, &mut second, ctx);
-
-        fn mk_map_arm(node: ontol_hir::RootNode<TypedHir>) -> MapArm {
-            let is_match = match node.kind() {
-                ontol_hir::Kind::Struct(_, flags, _) => {
-                    flags.contains(ontol_hir::StructFlags::MATCH)
-                }
-                _ => false,
-            };
-            MapArm { node, is_match }
-        }
+        self.infer_hir_unify_arms(&mut first_node, &mut second_node, ctx);
 
         if let Some(key_pair) = TypeMapper::new(self.relations, self.defs, self.seal_ctx)
-            .find_map_key_pair(first.data().ty(), second.data().ty())
+            .find_map_key_pair(first_node.data().ty(), second_node.data().ty())
         {
             self.codegen_tasks.add_map_task(
                 key_pair,
                 crate::codegen::task::MapCodegenTask::Explicit(ExplicitMapCodegenTask {
-                    first: mk_map_arm(first),
-                    second: mk_map_arm(second),
+                    first: MapArm {
+                        node: first_node,
+                        class: first.1,
+                    },
+                    second: MapArm {
+                        node: second_node,
+                        class: second.1,
+                    },
                     span: def.span,
                 }),
             );
@@ -278,10 +265,28 @@ pub struct MapCheck<'c> {
 
 struct ArmAnalysis {
     group_set: AggrGroupSet,
-    is_match: bool,
+    class: MapOutputClass,
 }
 
 impl<'c> MapCheck<'c> {
+    fn analyze_arm_entry(
+        &mut self,
+        pat_id: PatId,
+        arm: Arm,
+        ctx: &mut HirBuildCtx<'_>,
+    ) -> Result<MapOutputClass, AggrGroupError> {
+        let _entered = match arm {
+            Arm::First => debug_span!("1st"),
+            Arm::Second => debug_span!("2nd"),
+        }
+        .entered();
+
+        ctx.current_arm = arm;
+        Ok(self
+            .analyze_arm(self.patterns.table.get(&pat_id).unwrap(), None, ctx)?
+            .class)
+    }
+
     fn analyze_arm(
         &mut self,
         expr: &Pattern,
@@ -289,7 +294,7 @@ impl<'c> MapCheck<'c> {
         ctx: &mut HirBuildCtx<'_>,
     ) -> Result<ArmAnalysis, AggrGroupError> {
         let mut group_set = AggrGroupSet::new();
-        let mut is_match = false;
+        let mut arm_class = MapOutputClass::Pure;
 
         match &expr.kind {
             PatternKind::Call(_, args) => {
@@ -309,10 +314,12 @@ impl<'c> MapCheck<'c> {
                     );
                 }
 
-                is_match = matches!(modifier, Some(CompoundPatternModifier::Match));
+                if matches!(modifier, Some(CompoundPatternModifier::Match)) {
+                    arm_class = MapOutputClass::FindMatch;
+                }
             }
             PatternKind::Seq(pat_id, elements) => {
-                if ctx.arm.is_first() {
+                if ctx.current_arm.is_first() {
                     group_set.add(parent_aggr_group);
 
                     // Register aggregation body
@@ -352,10 +359,12 @@ impl<'c> MapCheck<'c> {
                                     self.analyze_arm(&element.pattern, None, ctx).unwrap();
                                 inner_aggr_group.join(analysis.group_set);
 
-                                if analysis.is_match {
+                                if !matches!(analysis.class, MapOutputClass::Pure) {
                                     // A match directly in an iterated element does not require
                                     // finding an exact aggregation group
                                     iter_match_element_count += 1;
+
+                                    arm_class = MapOutputClass::FilterMatch;
                                 }
                             });
                         }
@@ -423,7 +432,7 @@ impl<'c> MapCheck<'c> {
 
         Ok(ArmAnalysis {
             group_set,
-            is_match,
+            class: arm_class,
         })
     }
 
@@ -464,7 +473,7 @@ impl<'c> MapCheck<'c> {
                 node: inner_node,
                 ..
             } => {
-                if ctx.arm.is_first() {
+                if ctx.current_arm.is_first() {
                     group_set.add(parent_aggr_group);
 
                     // Register aggregation body
@@ -545,7 +554,7 @@ impl<'c> MapCheck<'c> {
     ) {
         if let Some(explicit_variable) = ctx.pattern_variables.get(&var) {
             // Variable is used more than once
-            if ctx.arm.is_first() && explicit_variable.ctrl_group != parent_aggr_group {
+            if ctx.current_arm.is_first() && explicit_variable.ctrl_group != parent_aggr_group {
                 self.error(
                     CompileError::TODO(smart_format!("Incompatible aggregation group")),
                     span,
@@ -555,7 +564,7 @@ impl<'c> MapCheck<'c> {
             debug!("Join existing bound variable");
 
             group_set.add(explicit_variable.ctrl_group);
-        } else if ctx.arm.is_first() {
+        } else if ctx.current_arm.is_first() {
             ctx.pattern_variables.insert(
                 var,
                 PatternVariable {

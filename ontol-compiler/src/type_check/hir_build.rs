@@ -403,7 +403,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 _ => self.error_node(CompileError::IncompatibleLiteral, &pattern.span, ctx),
             },
             (PatternKind::Variable(var), expected_ty) => {
-                let arm = ctx.arm;
+                let arm = ctx.current_arm;
                 let pattern_variable = ctx
                     .pattern_variables
                     .get_mut(var)
@@ -612,7 +612,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 capture_index,
                 name_span,
             } => {
-                let arm = ctx.arm;
+                let arm = ctx.current_arm;
                 let pattern_variable = ctx
                     .pattern_variables
                     .get_mut(var)

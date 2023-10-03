@@ -494,7 +494,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
 
             ctx.missing_properties
-                .entry(ctx.arm)
+                .entry(ctx.current_arm)
                 .or_default()
                 .entry(struct_span)
                 .or_default()
