@@ -23,10 +23,14 @@ mod flat_level_builder;
 mod flat_scope;
 mod flat_scope_builder;
 mod flat_unifier;
+mod flat_unifier_expr_to_node;
+mod flat_unifier_impl;
+mod flat_unifier_scope_assign;
 mod flat_unifier_table;
 mod regroup_match_prop;
 mod scope;
 mod scope_builder;
+mod seq_type_infer;
 mod unifier;
 mod unify_props;
 
