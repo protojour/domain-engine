@@ -46,6 +46,13 @@ pub enum Scalar {
     F64(NotNan<f64>),
 }
 
+#[derive(Debug)]
+pub enum PlanError {
+    InvalidScalar,
+}
+
+type PlanResult<T> = Result<T, PlanError>;
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct EdgeAttr<T> {
     pub rel: T,
@@ -58,7 +65,7 @@ struct PlanBuilder<'on> {
     current_join_roots: FnvHashMap<Var, DefId>,
 }
 
-pub fn compute_plans(condition: &Condition, ontology: &Ontology) -> Vec<Plan> {
+pub fn compute_plans(condition: &Condition, ontology: &Ontology) -> PlanResult<Vec<Plan>> {
     let clauses = &condition.clauses;
     let mut output = vec![];
 
@@ -78,8 +85,8 @@ pub fn compute_plans(condition: &Condition, ontology: &Ontology) -> Vec<Plan> {
 
     for group in disjoint_clause_sets(clauses) {
         let clauses = group.into_iter().map(|index| &clauses[index]).collect_vec();
-        if let Some(plan) = compute_plan(&clauses, &mut plan_builder) {
-            output.push(plan);
+        if let Some(result) = compute_plan(&clauses, &mut plan_builder) {
+            output.push(result?);
         }
 
         while !plan_builder.current_join_roots.is_empty() {
@@ -91,17 +98,17 @@ pub fn compute_plans(condition: &Condition, ontology: &Ontology) -> Vec<Plan> {
                     },
                     &clauses,
                     &mut plan_builder,
-                );
+                )?;
 
                 output.push(Plan::JoinRoot(var, join_plans));
             }
         }
     }
 
-    output
+    Ok(output)
 }
 
-fn compute_plan(clauses: &[&Clause], builder: &mut PlanBuilder) -> Option<Plan> {
+fn compute_plan(clauses: &[&Clause], builder: &mut PlanBuilder) -> Option<PlanResult<Plan>> {
     let root_var = clauses.iter().find_map(|clause| match clause {
         Clause::Root(var) => Some(*var),
         _ => None,
@@ -111,16 +118,17 @@ fn compute_plan(clauses: &[&Clause], builder: &mut PlanBuilder) -> Option<Plan> 
         _ => None,
     })?;
 
-    let sub_plans = sub_plans(
+    match sub_plans(
         Origin {
             def_id: entity_def_id,
             binder: root_var,
         },
         clauses,
         builder,
-    );
-
-    Some(Plan::EntitiesOf(entity_def_id, sub_plans))
+    ) {
+        Ok(sub_plans) => Some(Ok(Plan::EntitiesOf(entity_def_id, sub_plans))),
+        Err(error) => Some(Err(error)),
+    }
 }
 
 struct Origin {
@@ -128,7 +136,11 @@ struct Origin {
     binder: Var,
 }
 
-fn sub_plans(origin: Origin, clauses: &[&Clause], builder: &mut PlanBuilder) -> Vec<Plan> {
+fn sub_plans(
+    origin: Origin,
+    clauses: &[&Clause],
+    builder: &mut PlanBuilder,
+) -> PlanResult<Vec<Plan>> {
     let mut plans: Vec<Plan> = vec![];
 
     let type_info = builder.ontology.get_type_info(origin.def_id);
@@ -146,7 +158,7 @@ fn sub_plans(origin: Origin, clauses: &[&Clause], builder: &mut PlanBuilder) -> 
                     continue;
                 };
 
-                let val_plans = term_plans(val, data_relationship.target, clauses, builder);
+                let val_plans = term_plans(val, data_relationship.target, clauses, builder)?;
 
                 match data_relationship.kind {
                     DataRelationshipKind::Tree => match data_relationship.cardinality.1 {
@@ -162,7 +174,8 @@ fn sub_plans(origin: Origin, clauses: &[&Clause], builder: &mut PlanBuilder) -> 
                             rel: rel_params
                                 .as_ref()
                                 .map(|rel_params| term_plans(rel, *rel_params, clauses, builder))
-                                .unwrap_or_else(Vec::new),
+                                .transpose()?
+                                .unwrap_or_default(),
                             val: val_plans,
                         };
 
@@ -186,7 +199,7 @@ fn sub_plans(origin: Origin, clauses: &[&Clause], builder: &mut PlanBuilder) -> 
                     CondTerm::Wildcard => {}
                     CondTerm::Var(_) => todo!(),
                     CondTerm::Value(value) => {
-                        plans.push(Plan::Eq(value_to_scalar(value)));
+                        plans.push(Plan::Eq(value_to_scalar(value)?));
                     }
                 }
             }
@@ -194,7 +207,7 @@ fn sub_plans(origin: Origin, clauses: &[&Clause], builder: &mut PlanBuilder) -> 
         }
     }
 
-    plans
+    Ok(plans)
 }
 
 fn term_plans(
@@ -202,7 +215,7 @@ fn term_plans(
     target: DefId,
     clauses: &[&Clause],
     builder: &mut PlanBuilder,
-) -> Vec<Plan> {
+) -> PlanResult<Vec<Plan>> {
     let mut plans = vec![];
     match term {
         CondTerm::Wildcard => {}
@@ -224,22 +237,24 @@ fn term_plans(
                     },
                     clauses,
                     builder,
-                ))
+                )?)
             }
         }
         CondTerm::Value(value) => {
-            plans.push(Plan::Eq(value_to_scalar(value)));
+            plans.push(Plan::Eq(value_to_scalar(value)?));
         }
     }
-    plans
+    Ok(plans)
 }
 
-fn value_to_scalar(value: &Value) -> Scalar {
+fn value_to_scalar(value: &Value) -> PlanResult<Scalar> {
     match &value.data {
-        Data::Text(text) => Scalar::Text(text.as_str().into()),
-        Data::I64(int) => Scalar::I64(*int),
-        Data::F64(float) => Scalar::F64((*float).try_into().expect("NaN")),
-        _ => panic!(),
+        Data::Text(text) => Ok(Scalar::Text(text.as_str().into())),
+        Data::I64(int) => Ok(Scalar::I64(*int)),
+        Data::F64(float) => Ok(Scalar::F64(
+            (*float).try_into().map_err(|_| PlanError::InvalidScalar)?,
+        )),
+        _ => Err(PlanError::InvalidScalar),
     }
 }
 
@@ -310,7 +325,8 @@ mod tests {
                     ],
                 },
                 &test.ontology,
-            );
+            )
+            .unwrap();
 
             expect_eq!(
                 actual = plan,
@@ -373,7 +389,8 @@ mod tests {
                     ],
                 },
                 &test.ontology,
-            );
+            )
+            .unwrap();
 
             expect_eq!(
                 actual = plan,
