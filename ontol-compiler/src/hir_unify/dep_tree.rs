@@ -2,6 +2,7 @@ use std::{collections::BTreeMap, fmt::Debug};
 
 use bit_set::BitSet;
 use fnv::FnvHashMap;
+use ontol_runtime::var::Var;
 use tracing::debug;
 
 use crate::hir_unify::{UnifierError, UnifierResult, VarSet};
@@ -41,7 +42,7 @@ pub struct DepTreeBuilder<S> {
     scopes: Vec<S>,
     scoped_vars: BitSet,
     seq_labels: BitSet,
-    scope_index_by_var: FnvHashMap<ontol_hir::Var, usize>,
+    scope_index_by_var: FnvHashMap<Var, usize>,
 }
 
 #[derive(Debug)]
@@ -84,8 +85,7 @@ impl<S: Scope + Debug> DepTreeBuilder<S> {
         // retain scope order by using BTreeMap:
         let mut scope_assignments: BTreeMap<usize, Vec<E>> = Default::default();
 
-        let mut scope_routing_table: FnvHashMap<ontol_hir::Var, usize> =
-            self.scope_index_by_var.clone();
+        let mut scope_routing_table: FnvHashMap<Var, usize> = self.scope_index_by_var.clone();
 
         let mut escape_exprs: Vec<(Vec<S>, E)> = vec![];
         let mut constants: Vec<E> = vec![];
@@ -168,7 +168,7 @@ impl<S: Scope + Debug> DepTreeBuilder<S> {
     fn register_scope_routing<E: Expression>(
         &self,
         expression: &E,
-        scope_routing_table: &mut FnvHashMap<ontol_hir::Var, usize>,
+        scope_routing_table: &mut FnvHashMap<Var, usize>,
     ) -> Option<usize> {
         let mut free_var_iter = expression.free_vars().iter();
 
@@ -198,11 +198,7 @@ impl<S: Scope + Debug> DepTreeBuilder<S> {
         }
     }
 
-    fn reroute(
-        scope_routing_table: &mut FnvHashMap<ontol_hir::Var, usize>,
-        free_var: ontol_hir::Var,
-        scope_idx: usize,
-    ) {
+    fn reroute(scope_routing_table: &mut FnvHashMap<Var, usize>, free_var: Var, scope_idx: usize) {
         debug!("    routing all {free_var:?} to {scope_idx}");
 
         if let Some(existing_scope_idx) = scope_routing_table.insert(free_var, scope_idx) {
@@ -227,17 +223,17 @@ impl<S: Scope + Debug> DepTreeBuilder<S> {
         // expressions in scope:
         let mut in_scope_exprs = vec![];
         // expressions not in scope (yet), needs to use a sub-group (tree level) to put into scope
-        let mut sub_groups: FnvHashMap<ontol_hir::Var, Vec<E>> = Default::default();
+        let mut sub_groups: FnvHashMap<Var, Vec<E>> = Default::default();
 
         for expression in expressions {
             let mut difference = expression
                 .free_vars()
                 .0
                 .difference(&in_scope.0)
-                .map(|var| ontol_hir::Var(var as u32));
+                .map(|var| Var(var as u32));
 
             if let Some(first_unscoped_var) = self.next_unscoped_var(&mut difference) {
-                let mut next_non_seq_label: Option<ontol_hir::Var> = None;
+                let mut next_non_seq_label: Option<Var> = None;
 
                 // Needs to assign to a subgroup. Algorithm:
                 // For all unscoped vars, check if there already exists a subgroup already assigned to
@@ -314,10 +310,7 @@ impl<S: Scope + Debug> DepTreeBuilder<S> {
         }
     }
 
-    fn next_unscoped_var(
-        &self,
-        iterator: &mut impl Iterator<Item = ontol_hir::Var>,
-    ) -> Option<ontol_hir::Var> {
+    fn next_unscoped_var(&self, iterator: &mut impl Iterator<Item = Var>) -> Option<Var> {
         iterator.find(|var| self.scoped_vars.contains(var.0 as usize))
     }
 

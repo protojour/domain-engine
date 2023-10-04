@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use ontol_hir::{visitor::HirVisitor, SeqPropertyVariant};
-use ontol_runtime::vm::proc::BuiltinProc;
+use ontol_runtime::{var::Var, vm::proc::BuiltinProc};
 use smallvec::SmallVec;
 
 use crate::{
@@ -475,17 +475,17 @@ struct ExprAnalysis<'m> {
 #[derive(Debug)]
 enum ExprAnalysisKind<'m> {
     Const,
-    Var(ontol_hir::Var),
+    Var(Var),
     FnCall {
         var_arg_index: usize,
-        defining_var: ontol_hir::Var,
+        defining_var: Var,
         child: Box<ExprAnalysis<'m>>,
     },
 }
 
 fn analyze_expr<'m>(
     node: ontol_hir::Node,
-    defining_var_hint: Option<ontol_hir::Var>,
+    defining_var_hint: Option<Var>,
     hir_arena: &ontol_hir::arena::Arena<'m, TypedHir>,
 ) -> UnifierResult<ExprAnalysis<'m>> {
     match hir_arena.kind_of(node) {

@@ -1,7 +1,7 @@
 use std::{fmt::Debug, ops::Index};
 
 use arena::{Arena, NodeRef};
-use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc, DefId};
+use ontol_runtime::{value::PropertyId, var::Var, vm::proc::BuiltinProc, DefId};
 use smallvec::SmallVec;
 use smartstring::alias::String;
 
@@ -28,15 +28,6 @@ pub trait Lang: Sized + Copy {
 
     /// Extract the ontol-hir part of the data
     fn as_hir<'a, H: Clone>(data: &'a Self::Data<'_, H>) -> &'a H;
-}
-
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct Var(pub u32);
-
-impl From<u32> for Var {
-    fn from(value: u32) -> Self {
-        Self(value)
-    }
 }
 
 impl From<Label> for Var {

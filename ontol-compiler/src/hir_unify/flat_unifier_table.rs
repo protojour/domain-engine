@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 
+use ontol_runtime::var::Var;
 use tracing::debug;
 
 use crate::typed_hir::{IntoTypedHirData, TypedHir};
@@ -20,7 +21,7 @@ pub(super) struct Table<'m> {
 
 #[derive(Clone, Copy, Debug)]
 pub enum ExprSelector {
-    Struct(ontol_hir::Var, ScopeVar),
+    Struct(Var, ScopeVar),
     SeqItem,
 }
 
@@ -226,7 +227,7 @@ impl<'m> Table<'m> {
             })
     }
 
-    pub fn find_data_point(&self, var: ontol_hir::Var) -> Option<usize> {
+    pub fn find_data_point(&self, var: Var) -> Option<usize> {
         self.table
             .iter()
             .enumerate()

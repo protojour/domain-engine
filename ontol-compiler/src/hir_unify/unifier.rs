@@ -1,5 +1,6 @@
 use fnv::FnvHashMap;
 use indexmap::IndexSet;
+use ontol_runtime::var::Var;
 use tracing::{debug, trace};
 
 use crate::{
@@ -183,7 +184,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         let push_unified = self.unify(
                             scope::constant(),
                             expr::Expr(
-                                expr::Kind::Push(ontol_hir::Var(label.0), Box::new(attr)),
+                                expr::Kind::Push(Var(label.0), Box::new(attr)),
                                 expr::Meta {
                                     hir_meta: UNIT_META,
                                     free_vars,
@@ -196,10 +197,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
                     let sequence_node = self.mk_node(
                         ontol_hir::Kind::Sequence(
-                            ontol_hir::Binder {
-                                var: ontol_hir::Var(label.0),
-                            }
-                            .with_meta(Meta {
+                            ontol_hir::Binder { var: Var(label.0) }.with_meta(Meta {
                                 ty: seq_ty,
                                 span: NO_SPAN,
                             }),
@@ -612,11 +610,11 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 // it's important that the scoping is expanded in the correct
                 // order. I.e. the variable representing the expression itself
                 // should be the innermost scope expansion.
-                let mut ordered_scope_vars: IndexSet<ontol_hir::Var> = Default::default();
+                let mut ordered_scope_vars: IndexSet<Var> = Default::default();
 
                 if let expr::Kind::Seq(label, _) = &expr_kind {
                     // label is the primary scope locator for a sequence
-                    ordered_scope_vars.insert(ontol_hir::Var(label.0));
+                    ordered_scope_vars.insert(Var(label.0));
                 }
 
                 for free_var in &expr_meta.free_vars {
@@ -633,7 +631,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     sub_trees: vec![],
                 };
 
-                let mut scope_idx_by_var: FnvHashMap<ontol_hir::Var, usize> = Default::default();
+                let mut scope_idx_by_var: FnvHashMap<Var, usize> = Default::default();
 
                 for (scope_idx, prop_scope) in scope_props.iter().enumerate() {
                     for var in &prop_scope.vars {

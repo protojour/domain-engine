@@ -1,5 +1,6 @@
 use crate::{value::PropertyId, DefId};
 
+#[derive(Clone, Debug)]
 pub struct Condition {
     pub clauses: Vec<Clause>,
 }
@@ -25,6 +26,7 @@ impl From<usize> for UniVar {
     }
 }
 
+#[derive(Clone, Debug)]
 pub enum Clause {
     Root(UniVar),
     IsEntity(CondTerm, DefId),
@@ -33,6 +35,7 @@ pub enum Clause {
     Or(Vec<Clause>),
 }
 
+#[derive(Clone, Debug)]
 pub enum CondTerm {
     Wildcard,
     Var(UniVar),

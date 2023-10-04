@@ -1,17 +1,6 @@
-use std::str::FromStr;
-
 use ontol_runtime::{vm::proc::BuiltinProc, PackageId};
 
 use crate::*;
-
-impl FromStr for Var {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let next = s.strip_prefix('$').ok_or(())?;
-        try_alpha_to_u32(next).map(Var).map_err(|_| ())
-    }
-}
 
 #[derive(Debug)]
 pub enum Error<'s> {
@@ -85,9 +74,10 @@ impl<'a, L: Lang> Parser<'a, L> {
                 Ok((node, next))
             }
             (Token::Dollar, next) => match parse_token(next)? {
-                (Token::Symbol(sym), next) => {
-                    Ok((self.make_node(Kind::Var(Var(try_alpha_to_u32(sym)?))), next))
-                }
+                (Token::Symbol(sym), next) => Ok((
+                    self.make_node(Kind::Var(Var(parse_alpha_to_u32(sym)?))),
+                    next,
+                )),
                 (token, _) => Err(Error::InvalidToken(token)),
             },
             (Token::Hash, next) => match parse_token(next)? {
@@ -395,7 +385,7 @@ impl<'a, L: Lang> Parser<'a, L> {
         let (_, next) = parse_dollar(next)?;
         match parse_token(next)? {
             (Token::Symbol(sym), next) => Ok((
-                Binding::Binder(self.make_binder(Var(try_alpha_to_u32(sym)?))),
+                Binding::Binder(self.make_binder(Var(parse_alpha_to_u32(sym)?))),
                 next,
             )),
             (Token::Underscore, next) => Ok((Binding::Wildcard, next)),
@@ -448,7 +438,7 @@ fn parse_dollar(next: &str) -> ParseResult<()> {
 fn parse_dollar_var(next: &str) -> ParseResult<Var> {
     let (_, next) = parse_dollar(next)?;
     match parse_token(next)? {
-        (Token::Symbol(sym), next) => Ok((Var(try_alpha_to_u32(sym)?), next)),
+        (Token::Symbol(sym), next) => Ok((Var(parse_alpha_to_u32(sym)?), next)),
         (token, _) => Err(Error::InvalidToken(token)),
     }
 }
@@ -470,9 +460,13 @@ fn parse_at_label(next: &str) -> ParseResult<Label> {
         (token, _) => return Err(Error::Expected(Class::At, Found(token))),
     };
     match parse_token(next)? {
-        (Token::Symbol(sym), next) => Ok((Label(try_alpha_to_u32(sym)?), next)),
+        (Token::Symbol(sym), next) => Ok((Label(parse_alpha_to_u32(sym)?), next)),
         (token, _) => Err(Error::InvalidToken(token)),
     }
+}
+
+fn parse_alpha_to_u32(next: &str) -> Result<u32, Error<'_>> {
+    ontol_runtime::format_utils::try_alpha_to_u32(next).map_err(|_| Error::InvalidVariableNumber)
 }
 
 fn parse_def_id(next: &str) -> ParseResult<DefId> {
@@ -575,28 +569,4 @@ fn interpret_number(num: &str) -> Result<Token, Error> {
             Err(_) => Err(Error::InvalidNumber),
         }
     }
-}
-
-pub(super) fn try_alpha_to_u32(sym: &str) -> Result<u32, Error> {
-    if sym.is_empty() {
-        return Err(Error::InvalidSymbol(sym));
-    }
-
-    let mut num: u32 = 0;
-    let mut iterator = sym.chars().peekable();
-
-    while let Some(char) = iterator.next() {
-        if !char.is_ascii_lowercase() {
-            return Err(Error::InvalidVariableNumber);
-        }
-
-        let value = u32::from(char) - u32::from('a');
-        num += value;
-
-        if iterator.peek().is_some() {
-            num = (num + 1) * 26;
-        }
-    }
-
-    Ok(num)
 }

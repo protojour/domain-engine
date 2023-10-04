@@ -1,5 +1,5 @@
 use fnv::FnvHashMap;
-use ontol_runtime::smart_format;
+use ontol_runtime::{smart_format, var::Var};
 
 use crate::{
     error::CompileError,
@@ -44,7 +44,7 @@ impl<'c, 'm> HirArmTypeInference<'c, 'm> {
 /// Unify the types of variables in both map arms.
 /// If the types do not match, the variable expression gets changed to a map expression.
 pub(super) struct HirVariableMapper<'c, 'm> {
-    pub variable_mapping: &'c FnvHashMap<ontol_hir::Var, VariableMapping<'m>>,
+    pub variable_mapping: &'c FnvHashMap<Var, VariableMapping<'m>>,
     pub arm: Arm,
 }
 

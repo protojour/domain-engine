@@ -4,6 +4,7 @@ use ontol_hir::{HasDefault, PropPattern, PropVariant, StructFlags};
 use ontol_runtime::{
     smart_format,
     value::PropertyId,
+    var::Var,
     vm::proc::{BuiltinProc, GetAttrFlags, Local, NParams, OpCode, Predicate, Procedure},
     DefId,
 };
@@ -124,7 +125,7 @@ pub(super) struct CodeGenerator<'a, 'm> {
     pub type_mapper: TypeMapper<'a, 'm>,
     bug_span: SourceSpan,
 
-    scope: FnvHashMap<ontol_hir::Var, Local>,
+    scope: FnvHashMap<Var, Local>,
 }
 
 impl<'a, 'm> CodeGenerator<'a, 'm> {
@@ -717,7 +718,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
     fn gen_attribute(
         &mut self,
-        struct_var: ontol_hir::Var,
+        struct_var: Var,
         prop_id: PropertyId,
         ontol_hir::Attribute { rel, val }: ontol_hir::Attribute<ontol_hir::Node>,
         arena: &TypedArena<'m>,
@@ -804,7 +805,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
             struct ArmCapture {
                 local: Local,
-                var: ontol_hir::Var,
+                var: Var,
                 def_id: DefId,
             }
 
@@ -878,7 +879,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
         }
     }
 
-    fn var_local(&mut self, var: ontol_hir::Var) -> Result<Local, ()> {
+    fn var_local(&mut self, var: Var) -> Result<Local, ()> {
         match self.scope.get(&var) {
             Some(local) => Ok(*local),
             None => {

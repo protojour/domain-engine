@@ -3,7 +3,7 @@ use std::{
     rc::Rc,
 };
 
-use ontol_runtime::{value::PropertyId, vm::proc::BuiltinProc, DefId};
+use ontol_runtime::{value::PropertyId, var::Var, vm::proc::BuiltinProc, DefId};
 
 use crate::typed_hir::{self, TypedHir, TypedHirData};
 
@@ -50,7 +50,7 @@ impl<'m> Display for ScopeNode<'m> {
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
-pub struct ScopeVar(pub ontol_hir::Var);
+pub struct ScopeVar(pub Var);
 
 #[derive(Clone)]
 pub struct Meta<'m> {
@@ -93,7 +93,7 @@ pub enum Kind<'m> {
     Var,
     Const(ontol_hir::RootNode<'m, TypedHir>),
     Struct,
-    PropVariant(PropDepth, ontol_hir::Optional, ontol_hir::Var, PropertyId),
+    PropVariant(PropDepth, ontol_hir::Optional, Var, PropertyId),
     PropRelParam,
     PropValue,
     SeqPropVariant(
@@ -101,7 +101,7 @@ pub enum Kind<'m> {
         OutputVar,
         ontol_hir::Optional,
         ontol_hir::HasDefault,
-        ontol_hir::Var,
+        Var,
         PropertyId,
     ),
     IterElement(ontol_hir::Label, OutputVar),
@@ -112,4 +112,4 @@ pub enum Kind<'m> {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct OutputVar(pub ontol_hir::Var);
+pub struct OutputVar(pub Var);

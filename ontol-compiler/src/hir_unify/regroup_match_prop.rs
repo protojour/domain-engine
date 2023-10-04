@@ -1,6 +1,6 @@
 use fnv::FnvHashMap;
 use indexmap::{map::Entry, IndexMap};
-use ontol_runtime::value::PropertyId;
+use ontol_runtime::{value::PropertyId, var::Var};
 
 use crate::typed_hir::{Meta, TypedHir, TypedHirData};
 
@@ -12,7 +12,7 @@ pub fn regroup_match_prop<'m>(
         return nodes;
     }
 
-    let mut regroup_map: IndexMap<(ontol_hir::Var, PropertyId), Regrouped<'m>> = Default::default();
+    let mut regroup_map: IndexMap<(Var, PropertyId), Regrouped<'m>> = Default::default();
     let mut other_nodes: Vec<ontol_hir::Node> = vec![];
 
     for node in nodes {
@@ -78,7 +78,7 @@ impl<'m> Regrouped<'m> {
 }
 
 fn needs_regroup(nodes: &[ontol_hir::Node], arena: &ontol_hir::arena::Arena<TypedHir>) -> bool {
-    let mut variant_counter: FnvHashMap<(ontol_hir::Var, PropertyId), usize> = Default::default();
+    let mut variant_counter: FnvHashMap<(Var, PropertyId), usize> = Default::default();
 
     for node in nodes {
         if let ontol_hir::Kind::MatchProp(struct_var, prop_id, _) = arena.kind_of(*node) {

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use ontol_hir::VarAllocator;
-use ontol_runtime::{DefId, PackageId};
+use ontol_runtime::{var::Var, DefId, PackageId};
 
 use crate::{
     def::DefKind,
@@ -77,9 +77,9 @@ fn autogenerate_fmt_to_fmt<'m>(
 fn autogenerate_fmt_hir_struct<'m>(
     mut var_allocator: Option<&mut VarAllocator>,
     def_id: DefId,
-    binder_var: ontol_hir::Var,
+    binder_var: Var,
     segment: &TextPatternSegment,
-    var_map: &mut HashMap<DefId, ontol_hir::Var>,
+    var_map: &mut HashMap<DefId, Var>,
     compiler: &Compiler<'m>,
 ) -> Option<ontol_hir::RootNode<'m, TypedHir>> {
     let mut arena: TypedArena<'m> = Default::default();
@@ -119,9 +119,9 @@ fn autogenerate_fmt_hir_struct<'m>(
 
 fn autogenerate_fmt_segment_property<'m>(
     mut var_allocator: &mut Option<&mut VarAllocator>,
-    binder_var: ontol_hir::Var,
+    binder_var: Var,
     segment: &TextPatternSegment,
-    var_map: &mut HashMap<DefId, ontol_hir::Var>,
+    var_map: &mut HashMap<DefId, Var>,
     compiler: &Compiler<'m>,
     arena: &mut TypedArena<'m>,
 ) -> Option<ontol_hir::Node> {

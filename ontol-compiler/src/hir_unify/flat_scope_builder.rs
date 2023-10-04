@@ -1,6 +1,7 @@
 use std::rc::Rc;
 
 use ontol_hir::{visitor::HirVisitor, SeqPropertyVariant};
+use ontol_runtime::var::Var;
 
 use crate::typed_hir::{arena_import_root, TypedArena, TypedHir};
 
@@ -190,7 +191,7 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
                             has_default,
                             elements,
                         }) => {
-                            let label_var = ontol_hir::Var(label.hir().0);
+                            let label_var = Var(label.hir().0);
                             let output_var = OutputVar(self.var_allocator.alloc());
 
                             self.scope_nodes.push(ScopeNode(
@@ -282,7 +283,7 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
             }
             ontol_hir::Kind::Regex(opt_seq_label, regex_def_id, capture_group_alternations) => {
                 let (scope_var, opt_label) = match opt_seq_label {
-                    Some(seq_label) => (ontol_hir::Var(seq_label.hir().0), Some(seq_label.hir())),
+                    Some(seq_label) => (Var(seq_label.hir().0), Some(seq_label.hir())),
                     None => (self.var_allocator.alloc(), None),
                 };
 
@@ -397,7 +398,7 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
         }
 
         impl<'h, 'm: 'h> ontol_hir::visitor::HirVisitor<'h, 'm, TypedHir> for ConstChecker {
-            fn visit_var(&mut self, _: ontol_hir::Var) {
+            fn visit_var(&mut self, _: Var) {
                 self.has_var = true;
             }
         }

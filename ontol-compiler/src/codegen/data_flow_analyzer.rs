@@ -7,6 +7,7 @@ use ontol_hir::{PropVariant, SeqPropertyVariant};
 use ontol_runtime::{
     ontology::{PropertyFlow, PropertyFlowData},
     value::PropertyId,
+    var::Var,
     DefId,
 };
 
@@ -15,9 +16,9 @@ use crate::{def::LookupRelationshipMeta, hir_unify::VarSet, typed_hir::TypedNode
 pub struct DataFlowAnalyzer<'c, R> {
     defs: &'c R,
     /// A table of which variable produce which properties
-    var_to_property: FnvHashMap<ontol_hir::Var, FnvHashSet<PropertyId>>,
+    var_to_property: FnvHashMap<Var, FnvHashSet<PropertyId>>,
     /// A mapping from variable to its dependencies
-    var_dependencies: FnvHashMap<ontol_hir::Var, VarSet>,
+    var_dependencies: FnvHashMap<Var, VarSet>,
     property_flow: BTreeSet<PropertyFlow>,
 }
 
@@ -43,11 +44,7 @@ where
         }
     }
 
-    pub fn analyze(
-        &mut self,
-        arg: ontol_hir::Var,
-        body: TypedNodeRef<'_, 'm>,
-    ) -> Option<Vec<PropertyFlow>> {
+    pub fn analyze(&mut self, arg: Var, body: TypedNodeRef<'_, 'm>) -> Option<Vec<PropertyFlow>> {
         match body.kind() {
             ontol_hir::Kind::Struct(struct_binder, _flags, nodes) => {
                 self.var_dependencies.insert(arg, VarSet::default());
@@ -223,13 +220,13 @@ where
         }
     }
 
-    fn add_dep(&mut self, var: ontol_hir::Var, dep: ontol_hir::Var) {
+    fn add_dep(&mut self, var: Var, dep: Var) {
         self.var_dependencies.entry(var).or_default().insert(dep);
     }
 
     fn reg_output_prop(
         &mut self,
-        _struct_var: ontol_hir::Var,
+        _struct_var: Var,
         property_id: PropertyId,
         mut var_dependencies: VarSet,
     ) {
@@ -256,12 +253,7 @@ where
     /// The purpose of the value_def_id is for the query engine
     /// to understand which entity must be looked up.
     /// rel_params is ignored here.
-    fn reg_scope_prop(
-        &mut self,
-        struct_var: ontol_hir::Var,
-        property_id: PropertyId,
-        value_def_id: DefId,
-    ) {
+    fn reg_scope_prop(&mut self, struct_var: Var, property_id: PropertyId, value_def_id: DefId) {
         let meta = self.defs.relationship_meta(property_id.relationship_id);
         let (_, cardinality, _) = meta.relationship.by(property_id.role);
 
@@ -285,10 +277,10 @@ where
 }
 
 fn register_children_recursive(
-    var: ontol_hir::Var,
+    var: Var,
     property_id: PropertyId,
-    var_dependencies: &FnvHashMap<ontol_hir::Var, VarSet>,
-    var_to_property: &FnvHashMap<ontol_hir::Var, FnvHashSet<PropertyId>>,
+    var_dependencies: &FnvHashMap<Var, VarSet>,
+    var_to_property: &FnvHashMap<Var, FnvHashSet<PropertyId>>,
     output: &mut BTreeSet<PropertyFlow>,
 ) {
     if let Some(dependencies) = var_dependencies.get(&var) {

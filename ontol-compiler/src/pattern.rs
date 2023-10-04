@@ -1,5 +1,5 @@
 use fnv::FnvHashMap;
-use ontol_runtime::DefId;
+use ontol_runtime::{var::Var, DefId};
 use smartstring::alias::String;
 
 use crate::{source::SourceSpan, Compiler};
@@ -37,7 +37,7 @@ pub enum PatternKind {
     },
     /// Expression enclosed in sequence brackets: `[expr]`
     Seq(PatId, Vec<SeqPatternElement>),
-    Variable(ontol_hir::Var),
+    Variable(Var),
     ConstI64(i64),
     ConstText(String),
     Regex(RegexPattern),
@@ -72,7 +72,7 @@ pub struct RegexPattern {
 pub enum RegexPatternCaptureNode {
     // Capture: Leaf node
     Capture {
-        var: ontol_hir::Var,
+        var: Var,
         capture_index: u32,
         name_span: SourceSpan,
     },

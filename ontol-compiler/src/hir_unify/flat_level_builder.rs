@@ -1,5 +1,5 @@
 use indexmap::IndexMap;
-use ontol_runtime::value::PropertyId;
+use ontol_runtime::{value::PropertyId, var::Var};
 
 use crate::{
     hir_unify::flat_scope,
@@ -15,7 +15,7 @@ use super::{
 #[derive(Default)]
 pub(super) struct LevelBuilder<'m> {
     pub output: Vec<ontol_hir::Node>,
-    merged_match_arms_table: IndexMap<(ontol_hir::Var, PropertyId), MergedMatchArms<'m>>,
+    merged_match_arms_table: IndexMap<(Var, PropertyId), MergedMatchArms<'m>>,
 }
 
 #[derive(Default)]
@@ -50,7 +50,7 @@ impl<'m> LevelBuilder<'m> {
 
     pub fn add_prop_variant_scope(
         &mut self,
-        (optional, struct_var, property_id): (ontol_hir::Optional, ontol_hir::Var, PropertyId),
+        (optional, struct_var, property_id): (ontol_hir::Optional, Var, PropertyId),
         bindings: RelValBindings<'m>,
         body: Vec<ontol_hir::Node>,
     ) {
@@ -77,7 +77,7 @@ impl<'m> LevelBuilder<'m> {
         (optional, has_default, struct_var, property_id): (
             ontol_hir::Optional,
             ontol_hir::HasDefault,
-            ontol_hir::Var,
+            Var,
             PropertyId,
         ),
         body: Vec<ontol_hir::Node>,

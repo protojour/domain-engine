@@ -1,5 +1,8 @@
 use fnv::FnvHashMap;
-use ontol_runtime::vm::proc::{AddressOffset, Local, NParams, OpCode};
+use ontol_runtime::{
+    var::Var,
+    vm::proc::{AddressOffset, Local, NParams, OpCode},
+};
 use smallvec::{smallvec, SmallVec};
 use tracing::{debug, trace, Level};
 
@@ -12,7 +15,7 @@ pub struct Delta(pub i32);
 
 #[derive(Default)]
 pub struct Scope {
-    pub in_scope: FnvHashMap<ontol_hir::Var, Local>,
+    pub in_scope: FnvHashMap<Var, Local>,
 }
 
 pub struct ProcBuilder {

@@ -2,7 +2,7 @@ use std::collections::hash_map::Entry;
 
 use fnv::FnvHashSet;
 use ontol_hir::{Label, VarAllocator};
-use ontol_runtime::smart_format;
+use ontol_runtime::{smart_format, var::Var};
 use tracing::debug;
 
 use crate::{
@@ -508,7 +508,7 @@ impl<'c> MapCheck<'c> {
 
     fn register_variable(
         &mut self,
-        var: ontol_hir::Var,
+        var: Var,
         span: &SourceSpan,
         parent_aggr_group: Option<CtrlFlowGroup>,
         group_set: &mut AggrGroupSet,

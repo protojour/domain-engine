@@ -1,4 +1,5 @@
 use fnv::FnvHashMap;
+use ontol_runtime::var::Var;
 use smartstring::alias::String;
 use tracing::debug_span;
 
@@ -19,16 +20,16 @@ pub struct HirBuildCtx<'m> {
     pub hir_arena: ontol_hir::arena::Arena<'m, TypedHir>,
     pub map_kw_span: SourceSpan,
     pub inference: Inference<'m>,
-    pub pattern_variables: FnvHashMap<ontol_hir::Var, PatternVariable>,
+    pub pattern_variables: FnvHashMap<Var, PatternVariable>,
     pub label_map: FnvHashMap<PatId, ontol_hir::Label>,
 
     pub ctrl_flow_forest: CtrlFlowForest,
 
-    pub variable_mapping: FnvHashMap<ontol_hir::Var, VariableMapping<'m>>,
+    pub variable_mapping: FnvHashMap<Var, VariableMapping<'m>>,
 
     /// Used for implicit edge/rel param mapping.
     /// Given an object variable, get its corresponding edge variable
-    pub object_to_edge_var_table: FnvHashMap<ontol_hir::Var, ontol_hir::Var>,
+    pub object_to_edge_var_table: FnvHashMap<Var, Var>,
 
     pub partial: bool,
 

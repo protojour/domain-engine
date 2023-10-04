@@ -5,7 +5,9 @@ use indexmap::map::Entry;
 use ontol_parser::{ast, Span};
 use ontol_runtime::{
     ontology::{PropertyCardinality, ValueCardinality},
-    smart_format, DefId, RelationshipId,
+    smart_format,
+    var::Var,
+    DefId, RelationshipId,
 };
 
 use smallvec::SmallVec;
@@ -1030,23 +1032,23 @@ enum BlockContext<'a> {
 
 #[derive(Default)]
 pub struct MapVarTable {
-    variables: HashMap<String, ontol_hir::Var>,
+    variables: HashMap<String, Var>,
 }
 
 impl MapVarTable {
-    pub fn get_or_create_var(&mut self, ident: String) -> ontol_hir::Var {
+    pub fn get_or_create_var(&mut self, ident: String) -> Var {
         let length = self.variables.len();
 
         *self
             .variables
             .entry(ident)
-            .or_insert_with(|| ontol_hir::Var(length as u32))
+            .or_insert_with(|| Var(length as u32))
     }
 
     /// Create an allocator for allocating the successive variables
     /// after the explicit ones
     fn into_allocator(self) -> ontol_hir::VarAllocator {
-        ontol_hir::VarAllocator::from(ontol_hir::Var(self.variables.len() as u32))
+        ontol_hir::VarAllocator::from(Var(self.variables.len() as u32))
     }
 }
 

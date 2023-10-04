@@ -3,6 +3,7 @@ use ontol_hir::StructFlags;
 use ontol_runtime::{
     ontology::{Cardinality, PropertyCardinality, ValueCardinality},
     value::PropertyId,
+    var::Var,
     DefId, Role,
 };
 use tracing::debug;
@@ -252,7 +253,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn build_struct_property_node(
         &mut self,
-        struct_binder_var: ontol_hir::Var,
+        struct_binder_var: Var,
         attr: &CompoundPatternAttr,
         match_attributes: &mut IndexMap<&'m str, MatchAttribute>,
         actual_struct_flags: StructFlags,
@@ -427,7 +428,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn handle_missing_struct_attributes(
         &mut self,
-        struct_binder_var: ontol_hir::Var,
+        struct_binder_var: Var,
         struct_span: SourceSpan,
         match_attributes: IndexMap<&'m str, MatchAttribute>,
         hir_props: &mut Vec<ontol_hir::Node>,

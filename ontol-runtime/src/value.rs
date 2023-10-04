@@ -8,7 +8,9 @@ use ::serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use smartstring::alias::String;
 
-use crate::{cast::Cast, ontology::Ontology, DefId, PackageId, RelationshipId, Role};
+use crate::{
+    cast::Cast, condition::Condition, ontology::Ontology, DefId, PackageId, RelationshipId, Role,
+};
 
 #[derive(Clone, Debug)]
 pub struct Value {
@@ -119,7 +121,7 @@ pub enum Data {
     /// Other sequences will behave more like tuples.
     Sequence(Vec<Attribute>),
 
-    Filter,
+    Condition(Condition),
 }
 
 impl Data {
@@ -290,7 +292,7 @@ impl<'v> Display for ValueDebug<'v> {
                 }
                 write!(f, "]")
             }
-            Data::Filter => write!(f, "filter"),
+            Data::Condition(_) => write!(f, "condition"),
         }
     }
 }

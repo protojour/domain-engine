@@ -1,4 +1,4 @@
-use ontol_runtime::{smart_format, value::PropertyId, vm::proc::BuiltinProc, DefId};
+use ontol_runtime::{smart_format, value::PropertyId, var::Var, vm::proc::BuiltinProc, DefId};
 use smartstring::alias::String;
 
 use crate::{
@@ -35,7 +35,7 @@ pub struct Meta<'m> {
 
 #[derive(Debug)]
 pub enum Kind<'m> {
-    Var(ontol_hir::Var),
+    Var(Var),
     Unit,
     Struct {
         binder: TypedHirData<'m, ontol_hir::Binder>,
@@ -56,7 +56,7 @@ pub enum Kind<'m> {
         ontol_hir::Iter,
         Box<ontol_hir::Attribute<Expr<'m>>>,
     ),
-    Push(ontol_hir::Var, Box<ontol_hir::Attribute<Expr<'m>>>),
+    Push(Var, Box<ontol_hir::Attribute<Expr<'m>>>),
     StringInterpolation(
         TypedHirData<'m, ontol_hir::Binder>,
         Vec<StringInterpolationComponent>,
@@ -111,7 +111,7 @@ pub struct Struct<'m>(
 #[derive(Debug)]
 pub struct Prop<'m> {
     pub optional: ontol_hir::Optional,
-    pub struct_var: ontol_hir::Var,
+    pub struct_var: Var,
     pub prop_id: PropertyId,
     pub seq: Option<ontol_hir::Label>,
     // pub attr: ontol_hir::Attribute<Expr<'m>>,
@@ -131,7 +131,7 @@ pub enum PropVariant<'m> {
 #[derive(Debug)]
 pub enum StringInterpolationComponent {
     Const(String),
-    Var(ontol_hir::Var, SourceSpan),
+    Var(Var, SourceSpan),
 }
 
 #[derive(Debug)]

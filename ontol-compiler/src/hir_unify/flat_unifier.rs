@@ -5,7 +5,7 @@ use std::fmt::Display;
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_hir::{visitor::HirVisitor, StructFlags};
-use ontol_runtime::{smart_format, DefId};
+use ontol_runtime::{smart_format, var::Var, DefId};
 use smallvec::SmallVec;
 use smartstring::alias::String;
 use tracing::{debug, warn};
@@ -203,7 +203,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
 
                 // Provide the sequence label to the assignment slot search
                 let seq_label = match &variant {
-                    expr::PropVariant::Seq { label, .. } => Some(ScopeVar(ontol_hir::Var(label.0))),
+                    expr::PropVariant::Seq { label, .. } => Some(ScopeVar(Var(label.0))),
                     expr::PropVariant::Singleton(..) => None,
                 };
 
@@ -216,8 +216,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                         mut label,
                         elements,
                     } => {
-                        let label_filter =
-                            filter.with_constraint(ScopeVar(ontol_hir::Var(label.0)));
+                        let label_filter = filter.with_constraint(ScopeVar(Var(label.0)));
 
                         // recursively assign seq elements
                         // The elements are consumed here and assigned to the scope table.
@@ -280,7 +279,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                 }
 
                 // Find the scope var that matches the label
-                let label_scope_var = ScopeVar(ontol_hir::Var(label.0));
+                let label_scope_var = ScopeVar(Var(label.0));
                 let (assignment_idx, final_label) =
                     self.find_iter_assignment_slot(label_scope_var, &meta.free_vars, table)?;
 
@@ -695,7 +694,7 @@ fn unify_scope_structural<'m>(
                         level.next(),
                     )?);
 
-                    if !in_scope.contains(ontol_hir::Var(label.hir().0)) {
+                    if !in_scope.contains(Var(label.hir().0)) {
                         body.extend(unify_scope_structural(
                             main_scope,
                             selector,
@@ -743,7 +742,7 @@ fn unify_scope_structural<'m>(
                         if !push_nodes.is_empty() {
                             builder.output.push(unifier.mk_node(
                                 ontol_hir::Kind::ForEach(
-                                    ontol_hir::Var(label.0),
+                                    Var(label.0),
                                     (bindings.rel, bindings.val),
                                     push_nodes.into(),
                                 ),
@@ -923,10 +922,8 @@ fn unify_scope_structural<'m>(
 
                             let let_def = unifier.mk_node(
                                 ontol_hir::Kind::Sequence(
-                                    ontol_hir::Binder {
-                                        var: ontol_hir::Var(label.0),
-                                    }
-                                    .with_meta(sequence_meta),
+                                    ontol_hir::Binder { var: Var(label.0) }
+                                        .with_meta(sequence_meta),
                                     ontol_hir::Nodes::default(),
                                 ),
                                 sequence_meta,
@@ -1053,15 +1050,13 @@ fn apply_lateral_scope<'m>(
             );
             ungrouped.push(assignment);
         } else {
-            let introduced_var = ontol_hir::Var(
-                assignment
-                    .expr
-                    .free_vars()
-                    .0
-                    .difference(&in_scope.0)
-                    .next()
-                    .unwrap() as u32,
-            );
+            let introduced_var = Var(assignment
+                .expr
+                .free_vars()
+                .0
+                .difference(&in_scope.0)
+                .next()
+                .unwrap() as u32);
 
             if let Some(data_point_index) = table.find_data_point(introduced_var) {
                 let scope_map = &mut table.scope_map_mut(data_point_index);
@@ -1350,10 +1345,10 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                 let (scope_var, output_var) = match main_scope {
                     MainScope::Sequence(scope_var, output_var) => (scope_var, output_var),
                     MainScope::MultiSequence(table) => {
-                        let scope_var = ScopeVar(ontol_hir::Var(label.0));
+                        let scope_var = ScopeVar(Var(label.0));
                         (scope_var, table.get(&label).unwrap().output_seq_var)
                     }
-                    _ => (ScopeVar(ontol_hir::Var(0)), OutputVar(ontol_hir::Var(0))), // _ => panic!("Unsupported context for seq-item: {main_scope:?}"),
+                    _ => (ScopeVar(Var(0)), OutputVar(Var(0))), // _ => panic!("Unsupported context for seq-item: {main_scope:?}"),
                 };
                 let next_main_scope = MainScope::Value(scope_var);
 
@@ -1376,7 +1371,7 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
 }
 
 fn find_and_unify_sequence<'m>(
-    struct_var: ontol_hir::Var,
+    struct_var: Var,
     label: ontol_hir::Label,
     in_scope: &VarSet,
     table: &mut Table<'m>,
@@ -1384,7 +1379,7 @@ fn find_and_unify_sequence<'m>(
     level: Level,
 ) -> UnifierResult<ontol_hir::Node> {
     let output_seq_var = table
-        .find_scope_map_by_scope_var(ScopeVar(ontol_hir::Var(label.0)))
+        .find_scope_map_by_scope_var(ScopeVar(Var(label.0)))
         .and_then(|(_, scope_map)| match scope_map.scope.kind() {
             flat_scope::Kind::SeqPropVariant(_, output_var, _, _, _, _) => Some(*output_var),
             _ => None,
@@ -1393,7 +1388,7 @@ fn find_and_unify_sequence<'m>(
 
     let next_in_scope = in_scope.union_one(output_seq_var.0);
 
-    let scope_var = ScopeVar(ontol_hir::Var(label.0));
+    let scope_var = ScopeVar(Var(label.0));
 
     let sequence_body = unify_scope_structural(
         MainScope::Value(scope_var),

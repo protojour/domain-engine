@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use bit_set::BitSet;
 use ontol_hir::visitor::HirVisitor;
-use ontol_runtime::format_utils::DebugViaDisplay;
+use ontol_runtime::{format_utils::DebugViaDisplay, var::Var};
 use smartstring::alias::String;
 use tracing::{info, warn};
 
@@ -146,7 +146,7 @@ fn unify_flat<'m>(
 }
 
 struct VariableTracker {
-    largest: ontol_hir::Var,
+    largest: Var,
 }
 
 impl VariableTracker {
@@ -160,14 +160,14 @@ impl VariableTracker {
         impl<'h, 'm: 'h, L: ontol_hir::Lang + 'h> ontol_hir::visitor::HirVisitor<'h, 'm, L>
             for Visitor<'h>
         {
-            fn visit_var(&mut self, var: ontol_hir::Var) {
+            fn visit_var(&mut self, var: Var) {
                 self.tracker.observe(var);
             }
-            fn visit_binder(&mut self, var: ontol_hir::Var) {
+            fn visit_binder(&mut self, var: Var) {
                 self.tracker.observe(var);
             }
             fn visit_label(&mut self, label: ontol_hir::Label) {
-                self.tracker.observe(ontol_hir::Var(label.0));
+                self.tracker.observe(Var(label.0));
             }
         }
 
@@ -177,14 +177,12 @@ impl VariableTracker {
 
 impl Default for VariableTracker {
     fn default() -> Self {
-        Self {
-            largest: ontol_hir::Var(0),
-        }
+        Self { largest: Var(0) }
     }
 }
 
 impl VariableTracker {
-    fn observe(&mut self, var: ontol_hir::Var) {
+    fn observe(&mut self, var: Var) {
         if var.0 > self.largest.0 {
             self.largest.0 = var.0;
         }
@@ -192,7 +190,7 @@ impl VariableTracker {
 
     fn var_allocator(&self) -> ontol_hir::VarAllocator {
         let idx = self.largest.0 + 1;
-        ontol_hir::Var(idx).into()
+        Var(idx).into()
     }
 }
 
@@ -205,17 +203,17 @@ impl VarSet {
     }
 
     #[inline]
-    pub fn contains(&self, var: ontol_hir::Var) -> bool {
+    pub fn contains(&self, var: Var) -> bool {
         self.0.contains(var.0 as usize)
     }
 
     #[inline]
-    pub fn insert(&mut self, var: ontol_hir::Var) -> bool {
+    pub fn insert(&mut self, var: Var) -> bool {
         self.0.insert(var.0 as usize)
     }
 
     #[inline]
-    pub fn remove(&mut self, var: ontol_hir::Var) -> bool {
+    pub fn remove(&mut self, var: Var) -> bool {
         self.0.remove(var.0 as usize)
     }
 
@@ -230,15 +228,15 @@ impl VarSet {
     }
 
     #[inline]
-    pub fn union_one(&self, var: ontol_hir::Var) -> Self {
+    pub fn union_one(&self, var: Var) -> Self {
         let mut clone = self.clone();
         clone.insert(var);
         clone
     }
 }
 
-impl FromIterator<ontol_hir::Var> for VarSet {
-    fn from_iter<T: IntoIterator<Item = ontol_hir::Var>>(iter: T) -> Self {
+impl FromIterator<Var> for VarSet {
+    fn from_iter<T: IntoIterator<Item = Var>>(iter: T) -> Self {
         Self(iter.into_iter().map(|var| var.0 as usize).collect())
     }
 }
@@ -247,7 +245,7 @@ impl Debug for VarSet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut set = f.debug_set();
         for bit in &self.0 {
-            set.entry(&DebugViaDisplay(&ontol_hir::Var(bit as u32)));
+            set.entry(&DebugViaDisplay(&Var(bit as u32)));
         }
 
         set.finish()
@@ -256,7 +254,7 @@ impl Debug for VarSet {
 
 impl<I> From<I> for VarSet
 where
-    I: IntoIterator<Item = ontol_hir::Var>,
+    I: IntoIterator<Item = Var>,
 {
     fn from(value: I) -> Self {
         Self(value.into_iter().map(|var| var.0 as usize).collect())
@@ -264,7 +262,7 @@ where
 }
 
 impl<'a> IntoIterator for &'a VarSet {
-    type Item = ontol_hir::Var;
+    type Item = Var;
     type IntoIter = VarSetIter<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -275,11 +273,11 @@ impl<'a> IntoIterator for &'a VarSet {
 pub struct VarSetIter<'b>(bit_set::Iter<'b, u32>);
 
 impl<'b> Iterator for VarSetIter<'b> {
-    type Item = ontol_hir::Var;
+    type Item = Var;
 
     fn next(&mut self) -> Option<Self::Item> {
         let next = self.0.next()?;
-        Some(ontol_hir::Var(next.try_into().unwrap()))
+        Some(Var(next.try_into().unwrap()))
     }
 }
 

@@ -14,6 +14,7 @@ pub mod text_like_types;
 pub mod text_pattern;
 pub mod value;
 pub mod value_generator;
+pub mod var;
 pub mod vm;
 
 /// Identifies one "package" of ONTOL code.

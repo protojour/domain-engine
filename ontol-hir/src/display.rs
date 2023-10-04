@@ -1,11 +1,11 @@
 use std::fmt::{Debug, Display};
 
-use ontol_runtime::vm::proc::BuiltinProc;
+use ontol_runtime::{format_utils::AsAlpha, vm::proc::BuiltinProc};
 
 use crate::{
     arena::{Arena, NodeRef},
     Attribute, Binding, CaptureGroup, CaptureMatchArm, HasDefault, Iter, Kind, Label, Lang, Node,
-    Nodes, PropPattern, PropVariant, RootNode, StructFlags, Var,
+    Nodes, PropPattern, PropVariant, RootNode, StructFlags,
 };
 
 impl<'h, 'a, L: Lang> std::fmt::Display for NodeRef<'h, 'a, L> {
@@ -454,37 +454,12 @@ impl std::fmt::Display for Indent {
     }
 }
 
-pub struct AsAlpha(pub u32);
-
-impl Display for AsAlpha {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.0 >= 26 {
-            write!(f, "{}", AsAlpha((self.0 / 26) - 1))?;
-        }
-
-        let rem = self.0 % 26;
-        write!(f, "{}", char::from_u32(u32::from('a') + rem).unwrap())
-    }
-}
-
 impl<'a, L: Lang> Display for Binding<'a, L> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Wildcard => write!(f, "$_"),
             Self::Binder(binder) => write!(f, "{}", L::as_hir(binder).var),
         }
-    }
-}
-
-impl Debug for Var {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Var({})", AsAlpha(self.0))
-    }
-}
-
-impl Display for Var {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "${}", AsAlpha(self.0))
     }
 }
 
@@ -498,14 +473,4 @@ impl Display for Label {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "@{}", AsAlpha(self.0))
     }
-}
-
-#[test]
-fn test_as_alpha() {
-    assert_eq!("a", format!("{}", AsAlpha(0)));
-    assert_eq!("z", format!("{}", AsAlpha(25)));
-    assert_eq!("aa", format!("{}", AsAlpha(26)));
-    assert_eq!("az", format!("{}", AsAlpha(51)));
-    assert_eq!("ba", format!("{}", AsAlpha(52)));
-    assert_eq!("yq", format!("{}", AsAlpha(666)));
 }

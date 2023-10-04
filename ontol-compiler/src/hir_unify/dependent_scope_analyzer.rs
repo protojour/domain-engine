@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use ontol_runtime::var::Var;
 use smallvec::SmallVec;
 use tracing::debug;
 
@@ -14,7 +15,7 @@ pub type Path = SmallVec<[u16; 32]>;
 
 #[derive(Debug)]
 pub struct PropAnalysis {
-    pub defined_var: Option<ontol_hir::Var>,
+    pub defined_var: Option<Var>,
     pub dependencies: VarSet,
 }
 
@@ -63,7 +64,7 @@ impl DepScopeAnalyzer {
                         // more than one unscoped variable, put this one back into pending for later processing
                         next_pending_map.insert(path, pending);
                     } else {
-                        let defined_var = ontol_hir::Var(next_unscoped.try_into().unwrap());
+                        let defined_var = Var(next_unscoped.try_into().unwrap());
                         in_scope.0.insert(next_unscoped);
                         let mut dependencies = pending.var_set;
                         dependencies.0.remove(next_unscoped);
@@ -159,13 +160,13 @@ impl<'h, 'm: 'h> ontol_hir::visitor::HirVisitor<'h, 'm, TypedHir> for DepScopeAn
         self.stack.pop();
     }
 
-    fn visit_var(&mut self, var: ontol_hir::Var) {
+    fn visit_var(&mut self, var: Var) {
         if !self.bound_variables.0.contains(var.0 as usize) {
             self.prop_variables.0.insert(var.0 as usize);
         }
     }
 
-    fn visit_binder(&mut self, var: ontol_hir::Var) {
+    fn visit_binder(&mut self, var: Var) {
         self.bound_variables.0.insert(var.0 as usize);
     }
 

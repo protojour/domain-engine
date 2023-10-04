@@ -1,3 +1,5 @@
+use ontol_runtime::var::Var;
+
 use crate::{
     typed_hir::{arena_import, IntoTypedHirData, Meta, UNIT_META},
     types::UNIT_TYPE,
@@ -60,7 +62,7 @@ pub(super) trait UnifyProps<'m>: Sized {
             scope::PropKind::Seq(typed_label, has_default, rel_binding, val_binding) => {
                 let gen_scope = scope::Scope(
                     scope::Kind::Gen(scope::Gen {
-                        input_seq: ontol_hir::Var(typed_label.hir().0),
+                        input_seq: Var(typed_label.hir().0),
                         output_seq: unifier.var_allocator.alloc(),
                         bindings: Box::new((rel_binding, val_binding)),
                     }),
@@ -82,7 +84,7 @@ pub(super) trait UnifyProps<'m>: Sized {
                         ontol_hir::PropPattern::Seq(
                             ontol_hir::Binding::Binder(
                                 ontol_hir::Binder {
-                                    var: ontol_hir::Var(typed_label.hir().0),
+                                    var: Var(typed_label.hir().0),
                                 }
                                 .with_meta(Meta {
                                     ty: typed_label.ty(),

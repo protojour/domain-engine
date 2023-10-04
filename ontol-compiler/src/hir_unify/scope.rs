@@ -1,4 +1,4 @@
-use ontol_runtime::{value::PropertyId, DefId};
+use ontol_runtime::{value::PropertyId, var::Var, DefId};
 
 use crate::{
     hir_unify::VarSet,
@@ -48,7 +48,7 @@ pub enum Kind<'m> {
     /// Constant scope - this node puts no variables into scope.
     Const,
     /// Puts one variable into scope
-    Var(ontol_hir::Var),
+    Var(Var),
     /// Puts a set of properties into scope - typically a struct or merged structs
     PropSet(PropSet<'m>),
     /// Puts a function of another (in scope) variable into scope, binding its result to a new binder
@@ -56,7 +56,7 @@ pub enum Kind<'m> {
     /// Puts a sequence generator into scope
     Gen(Gen<'m>),
     /// Puts the result of a regex match into scope
-    Regex(ontol_hir::Var, DefId, Box<[ScopeCaptureGroup<'m>]>),
+    Regex(Var, DefId, Box<[ScopeCaptureGroup<'m>]>),
     /// Escape one level of scope
     Escape(Box<Self>),
 }
@@ -123,14 +123,14 @@ pub struct Let<'m> {
 
 #[derive(Clone, Debug)]
 pub struct Gen<'m> {
-    pub input_seq: ontol_hir::Var,
-    pub output_seq: ontol_hir::Var,
+    pub input_seq: Var,
+    pub output_seq: Var,
     pub bindings: Box<(PatternBinding<'m>, PatternBinding<'m>)>,
 }
 
 #[derive(Clone, Debug)]
 pub struct Prop<'m> {
-    pub struct_var: ontol_hir::Var,
+    pub struct_var: Var,
     pub optional: ontol_hir::Optional,
     pub prop_id: PropertyId,
     pub disjoint_group: usize,
@@ -143,7 +143,7 @@ impl<'m> Prop<'m> {
     fn collect_seq_labels(&self, output: &mut VarSet) {
         match &self.kind {
             PropKind::Seq(label, _, rel, val) => {
-                output.insert(ontol_hir::Var(label.hir().0));
+                output.insert(Var(label.hir().0));
                 rel.collect_seq_labels(output);
                 val.collect_seq_labels(output);
             }
