@@ -3,7 +3,7 @@ use itertools::Itertools;
 use ontol_runtime::{
     condition::{Clause, CondTerm, Condition},
     ontology::{DataRelationshipKind, Ontology, ValueCardinality},
-    value::PropertyId,
+    value::{Data, PropertyId, Value},
     var::{Var, VarSet},
     DefId,
 };
@@ -39,7 +39,7 @@ pub enum Plan {
     Join(Var),
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Scalar {
     Text(Box<str>),
     I64(i64),
@@ -185,14 +185,8 @@ fn sub_plans(origin: Origin, clauses: &[&Clause], builder: &mut PlanBuilder) -> 
                 match term {
                     CondTerm::Wildcard => {}
                     CondTerm::Var(_) => todo!(),
-                    CondTerm::Text(scalar) => {
-                        plans.push(Plan::Eq(Scalar::Text(scalar.clone())));
-                    }
-                    CondTerm::F64(scalar) => {
-                        plans.push(Plan::Eq(Scalar::F64((*scalar).try_into().unwrap())))
-                    }
-                    CondTerm::I64(scalar) => {
-                        plans.push(Plan::Eq(Scalar::I64(*scalar)));
+                    CondTerm::Value(value) => {
+                        plans.push(Plan::Eq(value_to_scalar(value)));
                     }
                 }
             }
@@ -233,15 +227,20 @@ fn term_plans(
                 ))
             }
         }
-        CondTerm::Text(scalar) => {
-            plans.push(Plan::Eq(Scalar::Text(scalar.clone())));
-        }
-        CondTerm::F64(scalar) => plans.push(Plan::Eq(Scalar::F64((*scalar).try_into().unwrap()))),
-        CondTerm::I64(scalar) => {
-            plans.push(Plan::Eq(Scalar::I64(*scalar)));
+        CondTerm::Value(value) => {
+            plans.push(Plan::Eq(value_to_scalar(value)));
         }
     }
     plans
+}
+
+fn value_to_scalar(value: &Value) -> Scalar {
+    match &value.data {
+        Data::Text(text) => Scalar::Text(text.as_str().into()),
+        Data::I64(int) => Scalar::I64(*int),
+        Data::F64(float) => Scalar::F64((*float).try_into().expect("NaN")),
+        _ => panic!(),
+    }
 }
 
 #[cfg(test)]
@@ -249,6 +248,10 @@ mod tests {
     use ontol_test_utils::{expect_eq, TestCompile};
 
     use super::*;
+
+    fn var(str: &str) -> Var {
+        format!("${str}").parse().unwrap()
+    }
 
     fn wild() -> CondTerm {
         CondTerm::Wildcard
@@ -258,34 +261,52 @@ mod tests {
         Scalar::Text(text.into())
     }
 
+    impl From<Scalar> for Value {
+        fn from(scalar: Scalar) -> Self {
+            match scalar {
+                Scalar::Text(text) => Value::new(Data::Text(text.into()), DefId::unit()),
+                Scalar::I64(int) => Value::new(Data::I64(int), DefId::unit()),
+                Scalar::F64(float) => Value::new(Data::F64(*float), DefId::unit()),
+            }
+        }
+    }
+
+    impl Scalar {
+        fn to_term(&self) -> CondTerm {
+            CondTerm::Value(self.clone().into())
+        }
+    }
+
     #[test]
     fn basic_tree() {
         "
         pub def foo {
             rel .id: { rel .is: text }
-            rel .'a': text
+            rel .'x': text
         }
         pub def bar {
             rel .id: { rel .is: text }
-            rel .'b': text
+            rel .'y': text
             rel [.] 'foos'::'bars' [foo]
         }
         "
         .compile_then(|test| {
             let [foo, bar] = test.bind(["foo", "bar"]);
-            let a = foo.find_property("a").unwrap();
+            let x = foo.find_property("x").unwrap();
             let bars = foo.find_property("bars").unwrap();
-            let b = bar.find_property("b").unwrap();
+            let y = bar.find_property("y").unwrap();
+
+            use CondTerm::*;
 
             let plan = compute_plans(
                 &Condition {
                     clauses: vec![
-                        Clause::Root(Var(0)),
-                        Clause::IsEntity(CondTerm::Var(Var(0)), foo.def_id()),
-                        Clause::Attr(Var(0), a, (CondTerm::Wildcard, CondTerm::Var(Var(1)))),
-                        Clause::Eq(Var(1), CondTerm::Text("match1".into())),
-                        Clause::Attr(Var(0), bars, (CondTerm::Wildcard, CondTerm::Var(Var(2)))),
-                        Clause::Attr(Var(2), b, (wild(), CondTerm::Text("match2".into()))),
+                        Clause::Root(var("a")),
+                        Clause::IsEntity(Var(var("a")), foo.def_id()),
+                        Clause::Attr(var("a"), x, (Wildcard, Var(var("b")))),
+                        Clause::Eq(var("b"), text("match1").to_term()),
+                        Clause::Attr(var("a"), bars, (CondTerm::Wildcard, Var(var("c")))),
+                        Clause::Attr(var("c"), y, (wild(), text("match2").to_term())),
                     ],
                 },
                 &test.ontology,
@@ -296,13 +317,13 @@ mod tests {
                 expected = vec![Plan::EntitiesOf(
                     foo.def_id(),
                     vec![
-                        Plan::Attr(a, vec![Plan::Eq(Scalar::Text("match1".into()))]),
+                        Plan::Attr(x, vec![Plan::Eq(Scalar::Text("match1".into()))]),
                         Plan::AllEdges(
                             bars,
                             EdgeAttr {
                                 rel: vec![],
                                 val: vec![Plan::Attr(
-                                    b,
+                                    y,
                                     vec![Plan::Eq(Scalar::Text("match2".into()))]
                                 )],
                             }
@@ -318,35 +339,37 @@ mod tests {
         "
         pub def foo {
             rel .id: { rel .is: text }
-            rel .'a': text
+            rel .'x': text
         }
         pub def bar {
             rel .id: { rel .is: text }
-            rel .'b': text
+            rel .'y': text
         }
-        rel [foo] 'bars_a'::'foos' [bar]
-        rel [foo] 'bars_b': [bar]
+        rel [foo] 'bars_x'::'foos' [bar]
+        rel [foo] 'bars_y': [bar]
         "
         .compile_then(|test| {
             let [foo, bar] = test.bind(["foo", "bar"]);
-            let a = foo.find_property("a").unwrap();
-            let b = bar.find_property("b").unwrap();
-            let bars_a = foo.find_property("bars_a").unwrap();
-            let bars_b = foo.find_property("bars_b").unwrap();
+            let x = foo.find_property("x").unwrap();
+            let y = bar.find_property("y").unwrap();
+            let bars_x = foo.find_property("bars_x").unwrap();
+            let bars_y = foo.find_property("bars_y").unwrap();
             let foos = bar.find_property("foos").unwrap();
+
+            use CondTerm::*;
 
             let plan = compute_plans(
                 &Condition {
                     clauses: vec![
-                        Clause::Root(Var(0)),
-                        Clause::IsEntity(CondTerm::Var(Var(0)), foo.def_id()),
-                        Clause::Attr(Var(0), bars_a, (wild(), CondTerm::Var(Var(1)))),
-                        Clause::Attr(Var(0), bars_b, (wild(), CondTerm::Var(Var(2)))),
-                        Clause::Attr(Var(1), b, (wild(), CondTerm::Text("match1".into()))),
-                        Clause::Attr(Var(2), b, (wild(), CondTerm::Text("match2".into()))),
-                        Clause::Attr(Var(1), foos, (wild(), CondTerm::Var(Var(3)))),
-                        Clause::Attr(Var(2), foos, (wild(), CondTerm::Var(Var(3)))),
-                        Clause::Attr(Var(3), a, (wild(), CondTerm::Text("match3".into()))),
+                        Clause::Root(var("a")),
+                        Clause::IsEntity(Var(var("a")), foo.def_id()),
+                        Clause::Attr(var("a"), bars_x, (wild(), Var(var("b")))),
+                        Clause::Attr(var("a"), bars_y, (wild(), Var(var("c")))),
+                        Clause::Attr(var("b"), y, (wild(), text("match1").to_term())),
+                        Clause::Attr(var("c"), y, (wild(), text("match2").to_term())),
+                        Clause::Attr(var("b"), foos, (wild(), Var(var("d")))),
+                        Clause::Attr(var("c"), foos, (wild(), Var(var("d")))),
+                        Clause::Attr(var("d"), x, (wild(), text("match3").to_term())),
                     ],
                 },
                 &test.ontology,
@@ -359,32 +382,32 @@ mod tests {
                         foo.def_id(),
                         vec![
                             Plan::AllEdges(
-                                bars_a,
+                                bars_x,
                                 EdgeAttr {
                                     rel: vec![],
                                     val: vec![
-                                        Plan::Attr(b, vec![Plan::Eq(text("match1"))]),
+                                        Plan::Attr(y, vec![Plan::Eq(text("match1"))]),
                                         Plan::AllEdges(
                                             foos,
                                             EdgeAttr {
                                                 rel: vec![],
-                                                val: vec![Plan::Join(Var(3))]
+                                                val: vec![Plan::Join(var("d"))]
                                             }
                                         )
                                     ],
                                 }
                             ),
                             Plan::AllEdges(
-                                bars_b,
+                                bars_y,
                                 EdgeAttr {
                                     rel: vec![],
                                     val: vec![
-                                        Plan::Attr(b, vec![Plan::Eq(text("match2"))]),
+                                        Plan::Attr(y, vec![Plan::Eq(text("match2"))]),
                                         Plan::AllEdges(
                                             foos,
                                             EdgeAttr {
                                                 rel: vec![],
-                                                val: vec![Plan::Join(Var(3))]
+                                                val: vec![Plan::Join(var("d"))]
                                             }
                                         )
                                     ],
@@ -392,7 +415,10 @@ mod tests {
                             ),
                         ]
                     ),
-                    Plan::JoinRoot(Var(3), vec![Plan::Attr(a, vec![Plan::Eq(text("match3"))])])
+                    Plan::JoinRoot(
+                        var("d"),
+                        vec![Plan::Attr(x, vec![Plan::Eq(text("match3"))])]
+                    )
                 ]
             );
         });

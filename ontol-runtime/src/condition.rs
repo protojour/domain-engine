@@ -1,4 +1,8 @@
-use crate::{value::PropertyId, var::Var, DefId};
+use crate::{
+    value::{PropertyId, Value},
+    var::Var,
+    DefId,
+};
 
 #[derive(Clone, Debug)]
 pub struct Condition {
@@ -18,7 +22,11 @@ pub enum Clause {
 pub enum CondTerm {
     Wildcard,
     Var(Var),
-    Text(Box<str>),
-    I64(i64),
-    F64(f64),
+    Value(Value),
+}
+
+impl From<Value> for CondTerm {
+    fn from(value: Value) -> Self {
+        Self::Value(value)
+    }
 }
