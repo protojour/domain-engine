@@ -238,6 +238,7 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                     panic!("{message}");
                 }
                 OpCode::MatchCondition => {
+                    self.program_counter += 1;
                     return Some(processor.yield_condition());
                 }
             }

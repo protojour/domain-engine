@@ -95,7 +95,7 @@ fn main() -> anyhow::Result<()> {
             .deserialize(serde_yaml::Deserializer::from_str(&args.input))
             .expect("Deserialization failed"),
     };
-    let value = match ontology.new_vm(proc, [data.value]).run() {
+    let value = match ontology.new_vm(proc).run([data.value]) {
         VmState::Complete(value) => value,
         VmState::Yielded(_) => return Err(anyhow!("ONTOL-VM yielded!")),
     };

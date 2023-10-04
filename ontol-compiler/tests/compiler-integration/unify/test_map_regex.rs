@@ -23,12 +23,12 @@ fn test_map_regex_duplex1() {
     }
     "#
     .compile_then(|test| {
-        test.assert_domain_map(
+        test.mapper().assert_map_eq(
             ("foo", "bar"),
             json!({ "input": "Hello world!"}),
             json!({ "first": "Hello", "second": "world"}),
         );
-        test.assert_domain_map(
+        test.mapper().assert_map_eq(
             ("bar", "foo"),
             json!({ "first": "Get", "second": "outtahere"}),
             json!({ "input": "Get outtahere!"}),
@@ -60,12 +60,12 @@ fn test_map_regex_alternation1() {
     }
     "#
     .compile_then(|test| {
-        test.assert_domain_map(
+        test.mapper().assert_map_eq(
             ("foo", "bar"),
             json!({ "input": "first=FOO!"}),
             json!({ "first": "FOO" }),
         );
-        test.assert_domain_map(
+        test.mapper().assert_map_eq(
             ("foo", "bar"),
             json!({ "input": "second=BAR!"}),
             json!({ "second": "BAR" }),
@@ -104,12 +104,12 @@ fn test_map_regex_loop_pattern() {
     }
     "#
     .compile_then(|test| {
-        test.assert_domain_map(
+        test.mapper().assert_map_eq(
             ("in", "out"),
             json!({ "input": "" }),
             json!({ "captures": [] }),
         );
-        test.assert_domain_map(
+        test.mapper().assert_map_eq(
             ("in", "out"),
             json!({ "input": "a b, c d"}),
             json!({ "captures": [
@@ -146,12 +146,12 @@ fn test_map_regex_loop_alternation() {
     }
     "#
     .compile_then(|test| {
-        test.assert_domain_map(
+        test.mapper().assert_map_eq(
             ("in", "out"),
             json!({ "input": "" }),
             json!({ "foo": [], "bar": [] }),
         );
-        test.assert_domain_map(
+        test.mapper().assert_map_eq(
             ("in", "out"),
             json!({ "input": "junkjunk FOO=1 BAR=2 FOO=3 junkjunkjunk" }),
             json!({

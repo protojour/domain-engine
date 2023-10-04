@@ -1,6 +1,8 @@
-use ontol_test_utils::TestCompile;
+use ontol_runtime::value::{Data, Value};
+use ontol_test_utils::{test_map::TestYieldMock, TestCompile};
 use serde_json::json;
 use test_log::test;
+use unimock::{matching, MockFn};
 
 // BUG: This should work somehow
 #[test]
@@ -35,8 +37,6 @@ fn test_map_match_scalar_key() {
 }
 
 #[test]
-// BUG
-#[should_panic = "No serde operator id"]
 fn test_map_match_parameterless_query() {
     r#"
     pub def key { rel .is: text }
@@ -50,6 +50,28 @@ fn test_map_match_parameterless_query() {
     }
     "#
     .compile_then(|test| {
-        test.assert_named_forward_map("q", json!({}), json!({}));
+        let [foo] = test.bind(["foo"]);
+        let output: Value = foo
+            .entity_builder(json!("key"), json!({"key": "key", "prop": "test"}))
+            .into();
+
+        test.yielding_mapper(
+            TestYieldMock::process_yield
+                .next_call(matching!(_))
+                .returns(Value::new(
+                    Data::Sequence(vec![output.into()]),
+                    foo.def_id(),
+                )),
+        )
+        .assert_named_forward_map(
+            "q",
+            json!({}),
+            json!([
+                {
+                    "key": "key",
+                    "prop": "test"
+                }
+            ]),
+        );
     });
 }

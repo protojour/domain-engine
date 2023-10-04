@@ -614,8 +614,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 def_id: self.lookup_path(&path, &span)?,
                 span: self.src.span(&span),
             },
-            None => TypePath::Inferred {
-                def_id: self.define_anonymous_type(
+            None => {
+                let def_id = self.define_anonymous_type(
                     TypeDef {
                         public: true,
                         ident: None,
@@ -623,8 +623,13 @@ impl<'s, 'm> Lowering<'s, 'm> {
                         concrete: true,
                     },
                     &span,
-                ),
-            },
+                );
+                self.compiler
+                    .namespaces
+                    .add_anonymous(self.src.package_id, def_id);
+
+                TypePath::Inferred { def_id }
+            }
         };
         let attrs = self.lower_struct_pattern_attrs(ast.attributes, var_table)?;
 

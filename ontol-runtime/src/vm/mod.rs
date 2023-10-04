@@ -12,7 +12,7 @@ impl<C, Y> VmState<C, Y> {
     pub fn unwrap(self) -> C {
         match self {
             Self::Complete(complete) => complete,
-            Self::Yielded(_) => panic!(),
+            Self::Yielded(_) => panic!("VM yielded"),
         }
     }
 }

@@ -568,7 +568,7 @@ fn deserialize_map<'on, 'de, A: MapAccess<'de>>(
                         address,
                         n_params: NParams(0),
                     };
-                    let value = processor.ontology.new_vm(procedure, []).run().unwrap();
+                    let value = processor.ontology.new_vm(procedure).run([]).unwrap();
 
                     // BUG: No support for rel_params:
                     attributes.insert(property.property_id, value.into());

@@ -23,7 +23,7 @@ fn test_compile_conduit_db() {
 #[test]
 fn test_map_conduit_blog_post() {
     let test = TestPackages::with_sources([CONDUIT_DB, BLOG_POST_PUBLIC.root()]).compile();
-    test.assert_domain_map(
+    test.mapper().assert_map_eq(
         ("conduit_db.Article", "BlogPost"),
         json!({
             "article_id": "11111111-1111-1111-1111-111111111111",
@@ -54,7 +54,7 @@ fn test_map_conduit_blog_post() {
 #[test]
 fn test_map_conduit_no_tags_in_db_object() {
     let test = TestPackages::with_sources([CONDUIT_DB, BLOG_POST_PUBLIC.root()]).compile();
-    test.assert_domain_map(
+    test.mapper().assert_map_eq(
         ("conduit_db.Article", "BlogPost"),
         json!({
             "article_id": "11111111-1111-1111-1111-111111111111",

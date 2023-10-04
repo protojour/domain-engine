@@ -5,7 +5,7 @@ use test_log::test;
 #[test]
 fn test_demo() {
     let test = DEMO.1.compile();
-    test.assert_domain_map(
+    test.mapper().assert_map_eq(
         ("archive_group", "ArchiveCollection"),
         json!({
             "id": "archive_group/a27214f3-1bde-492f-9dc0-a47b57b4b6d3",

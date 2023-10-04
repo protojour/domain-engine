@@ -182,7 +182,7 @@ impl WasmMapper {
 
     pub fn map(&self, input: &WasmValue) -> Result<WasmValue, WasmError> {
         let proc = self.ontology.get_mapper_proc(self.key).unwrap();
-        let vm_state = self.ontology.new_vm(proc, [input.value.clone()]).run();
+        let vm_state = self.ontology.new_vm(proc).run([input.value.clone()]);
 
         match vm_state {
             VmState::Complete(value) => Ok(WasmValue {

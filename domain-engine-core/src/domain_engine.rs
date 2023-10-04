@@ -99,10 +99,11 @@ impl DomainEngine {
                 .expect("No mapping procedure for query output");
 
             for attr in edges.iter_mut() {
-                let mut vm = ontology.new_vm(procedure, [attr.value.take()]);
+                let mut vm = ontology.new_vm(procedure);
+                let param = attr.value.take();
 
                 attr.value = loop {
-                    match vm.run() {
+                    match vm.run([param]) {
                         VmState::Complete(value) => {
                             break value;
                         }
