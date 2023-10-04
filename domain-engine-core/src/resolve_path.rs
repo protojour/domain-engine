@@ -50,7 +50,7 @@ impl ResolverGraph {
         let mut map_graph: FnvHashMap<MapKey, Vec<MapKey>> = Default::default();
         let mut inverted_map_graph: FnvHashMap<MapKey, Vec<MapKey>> = Default::default();
 
-        for ((source_key, target_key), _) in ontology.iter_map_meta() {
+        for ([source_key, target_key], _) in ontology.iter_map_meta() {
             map_graph.entry(source_key).or_default().push(target_key);
             inverted_map_graph
                 .entry(target_key)

@@ -1,18 +1,21 @@
-use std::fmt::Debug;
+use std::{collections::HashMap, fmt::Debug};
 
 use fnv::FnvHashMap;
 use indexmap::{map::Entry, IndexMap};
 use ontol_runtime::{
     format_utils::DebugViaDisplay,
     ontology::PropertyFlow,
+    smart_format,
     vm::proc::{Address, Lib, Procedure},
     DefId, MapKey, PackageId,
 };
+use smartstring::alias::String;
 use tracing::{debug, debug_span, warn};
 
 use crate::{
     codegen::code_generator::map_codegen, def::DefKind, hir_unify::unify_to_function,
-    map::MapKeyPair, typed_hir::TypedRootNode, types::Type, Compiler, SourceSpan,
+    map::MapKeyPair, typed_hir::TypedRootNode, types::Type, CompileError, CompileErrors, Compiler,
+    SourceSpan, SpannedCompileError,
 };
 
 use super::{
@@ -28,8 +31,9 @@ pub struct CodegenTasks<'m> {
     pub map_tasks: IndexMap<MapKeyPair, MapCodegenTask<'m>>,
     pub result_lib: Lib,
     pub result_const_procs: FnvHashMap<DefId, Procedure>,
-    pub result_map_proc_table: FnvHashMap<(MapKey, MapKey), Procedure>,
-    pub result_propflow_table: FnvHashMap<(MapKey, MapKey), Vec<PropertyFlow>>,
+    pub result_map_proc_table: FnvHashMap<[MapKey; 2], Procedure>,
+    pub result_named_forward_maps: HashMap<(PackageId, String), [MapKey; 2]>,
+    pub result_propflow_table: FnvHashMap<[MapKey; 2], Vec<PropertyFlow>>,
 }
 
 impl<'m> Debug for CodegenTasks<'m> {
@@ -97,10 +101,11 @@ impl<'m> Debug for ExplicitMapCodegenTask<'m> {
 
 #[derive(Default)]
 pub(super) struct ProcTable {
-    pub map_procedures: FnvHashMap<(MapKey, MapKey), ProcBuilder>,
+    pub map_procedures: FnvHashMap<[MapKey; 2], ProcBuilder>,
     pub const_procedures: FnvHashMap<DefId, ProcBuilder>,
     pub procedure_calls: Vec<ProcedureCall>,
-    pub propflow_table: FnvHashMap<(MapKey, MapKey), Vec<PropertyFlow>>,
+    pub propflow_table: FnvHashMap<[MapKey; 2], Vec<PropertyFlow>>,
+    pub named_forward_maps: HashMap<(PackageId, String), [MapKey; 2]>,
 }
 
 impl ProcTable {
@@ -108,7 +113,7 @@ impl ProcTable {
     /// This will be resolved to final "physical" ID in the link phase.
     pub(super) fn gen_mapping_addr(&mut self, from: MapKey, to: MapKey) -> Address {
         let address = Address(self.procedure_calls.len() as u32);
-        self.procedure_calls.push(ProcedureCall::Map(from, to));
+        self.procedure_calls.push(ProcedureCall::Map([from, to]));
         address
     }
 
@@ -121,7 +126,7 @@ impl ProcTable {
 }
 
 pub(super) enum ProcedureCall {
-    Map(MapKey, MapKey),
+    Map([MapKey; 2]),
     Const(DefId),
 }
 
@@ -146,7 +151,8 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
 
     for ConstCodegenTask { def_id, node } in std::mem::take(&mut compiler.codegen_tasks.const_tasks)
     {
-        let errors = const_codegen(node, def_id, &mut proc_table, compiler);
+        let mut errors = CompileErrors::default();
+        const_codegen(node, def_id, &mut proc_table, compiler, &mut errors);
         compiler.errors.extend(errors);
     }
 
@@ -163,30 +169,43 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
     compiler.codegen_tasks.result_lib = lib;
     compiler.codegen_tasks.result_const_procs = const_procs;
     compiler.codegen_tasks.result_map_proc_table = map_proc_table;
+    compiler.codegen_tasks.result_named_forward_maps = proc_table.named_forward_maps;
     compiler.codegen_tasks.result_propflow_table = proc_table.propflow_table;
 }
 
 fn generate_explicit_map<'m>(
-    ExplicitMapCodegenTask { def_id, arms, .. }: ExplicitMapCodegenTask<'m>,
+    ExplicitMapCodegenTask { def_id, arms, span }: ExplicitMapCodegenTask<'m>,
     proc_table: &mut ProcTable,
     compiler: &mut Compiler<'m>,
 ) {
     debug!("1st (ty={:?}):\n{}", arms[0].data().ty(), arms[0]);
     debug!("2nd (ty={:?}):\n{}", arms[1].data().ty(), arms[1]);
 
-    {
-        {
-            let _entered = debug_span!("forward").entered();
-            generate_map_proc(&arms[0], &arms[1], proc_table, compiler);
-        }
+    let forward_key = {
+        let _entered = debug_span!("forward").entered();
+        generate_map_proc(&arms[0], &arms[1], proc_table, compiler)
+    };
 
-        {
-            let _entered = debug_span!("backward").entered();
-            generate_map_proc(&arms[1], &arms[0], proc_table, compiler);
-        }
+    {
+        let _entered = debug_span!("backward").entered();
+        generate_map_proc(&arms[1], &arms[0], proc_table, compiler);
     }
 
-    if let Some(_ident) = compiler.map_ident(def_id) {}
+    match (compiler.map_ident(def_id), forward_key) {
+        (Some(ident), Some(forward_key)) => {
+            proc_table
+                .named_forward_maps
+                .insert((def_id.package_id(), ident.into()), forward_key);
+        }
+        (Some(_), None) => {
+            compiler.errors.push(SpannedCompileError {
+                error: CompileError::BUG(smart_format!("Failed to generate forward mapping")),
+                span,
+                notes: vec![],
+            });
+        }
+        _ => {}
+    }
 }
 
 fn generate_map_proc<'m>(
@@ -194,12 +213,12 @@ fn generate_map_proc<'m>(
     expr: &TypedRootNode<'m>,
     proc_table: &mut ProcTable,
     compiler: &mut Compiler<'m>,
-) {
+) -> Option<[MapKey; 2]> {
     let func = match unify_to_function(scope, expr, compiler) {
         Ok(func) => func,
         Err(err) => {
             warn!("unifier error: {err:?}");
-            return;
+            return None;
         }
     };
 
@@ -215,8 +234,11 @@ fn generate_map_proc<'m>(
 
     debug!("body type: {:?}", func.body.data().ty());
 
-    let errors = map_codegen(proc_table, &func, compiler);
+    let mut errors = CompileErrors::default();
+    let keys = map_codegen(proc_table, &func, compiler, &mut errors);
     compiler.errors.extend(errors);
+
+    Some(keys)
 }
 
 impl<'m> Compiler<'m> {

@@ -157,8 +157,7 @@ impl WasmValue {
 
 #[wasm_bindgen]
 pub struct WasmMapper {
-    pub(crate) from: MapKey,
-    pub(crate) to: MapKey,
+    pub(crate) key: [MapKey; 2],
     pub(crate) map_info: MapMeta,
     pub(crate) ontology: Arc<Ontology>,
 }
@@ -166,7 +165,7 @@ pub struct WasmMapper {
 #[wasm_bindgen]
 impl WasmMapper {
     pub fn from(&self) -> WasmTypeInfo {
-        let type_info = self.ontology.get_type_info(self.from.def_id);
+        let type_info = self.ontology.get_type_info(self.key[0].def_id);
         WasmTypeInfo {
             inner: type_info.clone(),
             ontology: self.ontology.clone(),
@@ -174,7 +173,7 @@ impl WasmMapper {
     }
 
     pub fn to(&self) -> WasmTypeInfo {
-        let type_info = self.ontology.get_type_info(self.to.def_id);
+        let type_info = self.ontology.get_type_info(self.key[1].def_id);
         WasmTypeInfo {
             inner: type_info.clone(),
             ontology: self.ontology.clone(),
@@ -182,7 +181,7 @@ impl WasmMapper {
     }
 
     pub fn map(&self, input: &WasmValue) -> Result<WasmValue, WasmError> {
-        let proc = self.ontology.get_mapper_proc(self.from, self.to).unwrap();
+        let proc = self.ontology.get_mapper_proc(self.key).unwrap();
         let vm_state = self.ontology.new_vm(proc, [input.value.clone()]).run();
 
         match vm_state {

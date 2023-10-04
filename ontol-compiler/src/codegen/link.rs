@@ -14,11 +14,11 @@ use super::task::{ProcTable, ProcedureCall};
 pub struct LinkResult {
     pub lib: Lib,
     pub const_procs: FnvHashMap<DefId, Procedure>,
-    pub map_proc_table: FnvHashMap<(MapKey, MapKey), Procedure>,
+    pub map_proc_table: FnvHashMap<[MapKey; 2], Procedure>,
 }
 
 pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkResult {
-    let mut map_proc_table: FnvHashMap<(MapKey, MapKey), Procedure> = Default::default();
+    let mut map_proc_table: FnvHashMap<[MapKey; 2], Procedure> = Default::default();
     let mut const_proc_table: FnvHashMap<DefId, Procedure> = Default::default();
     let mut lib = Lib::default();
     // All the spans for each opcode
@@ -34,8 +34,8 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
         const_proc_table.insert(def_id, procedure);
     }
 
-    for ((from, to), proc_builder) in std::mem::take(&mut proc_table.map_procedures) {
-        debug!("{:?} -> {:?}", from, to);
+    for (key, proc_builder) in std::mem::take(&mut proc_table.map_procedures) {
+        debug!("{:?} -> {:?}", key[0], key[1]);
 
         let n_params = proc_builder.n_params;
         let opcodes = proc_builder.build();
@@ -44,14 +44,14 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
         let procedure =
             lib.append_procedure(n_params, opcodes.into_iter().map(|(opcode, _span)| opcode));
         debug!("got procedure {procedure:?}");
-        map_proc_table.insert((from, to), procedure);
+        map_proc_table.insert(key, procedure);
     }
 
     // correct "call" opcodes to point to correct address
     for (index, opcode) in lib.opcodes.iter_mut().enumerate() {
         if let OpCode::Call(call_procedure) = opcode {
             match &proc_table.procedure_calls[call_procedure.address.0 as usize] {
-                ProcedureCall::Map(from, to) => match map_proc_table.get(&(*from, *to)) {
+                ProcedureCall::Map(key) => match map_proc_table.get(key) {
                     Some(procedure) => {
                         call_procedure.address = procedure.address;
                     }
@@ -59,8 +59,8 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
                         call_procedure.address = Address(0);
                         compiler.push_error(
                             CompileError::CannotConvertMissingMapping {
-                                input: format_map_key(compiler, *from),
-                                output: format_map_key(compiler, *to),
+                                input: format_map_key(compiler, key[0]),
+                                output: format_map_key(compiler, key[1]),
                             }
                             .spanned(&spans[index]),
                         );

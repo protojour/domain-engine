@@ -79,6 +79,18 @@ pub struct OntolTest {
 }
 
 impl OntolTest {
+    pub fn parse_test_ident<'s>(&self, ident: &'s str) -> (PackageId, &'s str) {
+        if ident.contains('.') {
+            let vector: Vec<&str> = ident.split('.').collect();
+            let source_name = vector.first().unwrap();
+            let local_ident = vector.get(1).unwrap();
+
+            (self.get_package_id(source_name), local_ident)
+        } else {
+            (self.root_package, ident)
+        }
+    }
+
     pub fn get_package_id(&self, source_name: &str) -> PackageId {
         self.packages_by_source_name
             .get(source_name)

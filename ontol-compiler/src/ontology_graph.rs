@@ -102,7 +102,7 @@ impl<'m> State<'m> {
             }
         }
 
-        for (source_key, target_key) in compiler.codegen_tasks.result_map_proc_table.keys() {
+        for [source_key, target_key] in compiler.codegen_tasks.result_map_proc_table.keys() {
             let source = source_key.def_id;
             let target = target_key.def_id;
 

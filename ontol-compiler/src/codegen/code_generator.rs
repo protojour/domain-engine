@@ -6,7 +6,7 @@ use ontol_runtime::{
     value::PropertyId,
     var::Var,
     vm::proc::{BuiltinProc, GetAttrFlags, Local, NParams, OpCode, Predicate, Procedure},
-    DefId,
+    DefId, MapKey,
 };
 use tracing::{debug, warn};
 
@@ -35,9 +35,9 @@ pub(super) fn const_codegen<'m>(
     def_id: DefId,
     proc_table: &mut ProcTable,
     compiler: &Compiler<'m>,
-) -> CompileErrors {
+    errors: &mut CompileErrors,
+) {
     let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs, &compiler.seal_ctx);
-    let mut errors = CompileErrors::default();
 
     debug!("Generating const code for\n{}", expr);
 
@@ -49,7 +49,7 @@ pub(super) fn const_codegen<'m>(
         proc_table,
         builder: &mut builder,
         scope: Default::default(),
-        errors: &mut errors,
+        errors,
         primitives: &compiler.primitives,
         type_mapper,
         bug_span: expr_meta.span,
@@ -58,7 +58,6 @@ pub(super) fn const_codegen<'m>(
     block.commit(Terminator::Return, &mut builder);
 
     proc_table.const_procedures.insert(def_id, builder);
-    errors
 }
 
 /// The intention for this is to be parallelizable,
@@ -68,14 +67,14 @@ pub(super) fn map_codegen<'m>(
     proc_table: &mut ProcTable,
     func: &HirFunc<'m>,
     compiler: &Compiler<'m>,
-) -> CompileErrors {
+    errors: &mut CompileErrors,
+) -> [MapKey; 2] {
     let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs, &compiler.seal_ctx);
 
     let body = &func.body;
     let body_span = body.data().span();
 
     let data_flow = DataFlowAnalyzer::new(&compiler.defs).analyze(func.arg.0.var, body.as_ref());
-    let mut errors = CompileErrors::default();
 
     let return_ty = body.data().ty();
 
@@ -85,7 +84,7 @@ pub(super) fn map_codegen<'m>(
         proc_table,
         builder: &mut builder,
         scope: Default::default(),
-        errors: &mut errors,
+        errors,
         primitives: &compiler.primitives,
         type_mapper,
         bug_span: body_span,
@@ -101,15 +100,15 @@ pub(super) fn map_codegen<'m>(
         (Some(from_info), Some(to_info)) => {
             proc_table
                 .map_procedures
-                .insert((from_info.key, to_info.key), builder);
+                .insert([from_info.key, to_info.key], builder);
 
             if let Some(data_flow) = data_flow {
                 proc_table
                     .propflow_table
-                    .insert((from_info.key, to_info.key), data_flow);
+                    .insert([from_info.key, to_info.key], data_flow);
             }
 
-            errors
+            [from_info.key, to_info.key]
         }
         (from_info, to_info) => {
             panic!("Problem finding def ids: ({from_info:?}, {to_info:?})");

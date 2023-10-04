@@ -20,7 +20,7 @@ pub fn translate_entity_select(
     ontology: &Ontology,
 ) {
     let map_meta = ontology
-        .get_map_meta(to, from)
+        .get_map_meta([to, from])
         .expect("No mapping procedure for select transformer");
     let prop_flow_slice = ontology.get_prop_flow_slice(map_meta);
 

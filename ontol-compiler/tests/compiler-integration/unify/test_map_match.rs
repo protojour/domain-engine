@@ -1,4 +1,5 @@
 use ontol_test_utils::TestCompile;
+use serde_json::json;
 use test_log::test;
 
 // BUG: This should work somehow
@@ -34,6 +35,8 @@ fn test_map_match_scalar_key() {
 }
 
 #[test]
+// BUG
+#[should_panic = "No serde operator id"]
 fn test_map_match_parameterless_query() {
     r#"
     pub def key { rel .is: text }
@@ -46,5 +49,7 @@ fn test_map_match_parameterless_query() {
         foo: [..foo match {}]
     }
     "#
-    .compile_then(|_test| {});
+    .compile_then(|test| {
+        test.assert_named_forward_map("q", json!({}), json!({}));
+    });
 }

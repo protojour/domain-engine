@@ -95,7 +95,7 @@ impl DomainEngine {
         // Transform result
         for next_def_id in resolve_path.reverse(original_def_id) {
             let procedure = ontology
-                .get_mapper_proc(cur_def_id.into(), (next_def_id).into())
+                .get_mapper_proc([cur_def_id.into(), (next_def_id).into()])
                 .expect("No mapping procedure for query output");
 
             for attr in edges.iter_mut() {

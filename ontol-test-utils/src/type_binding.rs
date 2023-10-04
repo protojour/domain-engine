@@ -27,19 +27,8 @@ pub struct TypeBinding<'on> {
 
 impl<'on> TypeBinding<'on> {
     pub(crate) fn new(ontol_test: &'on OntolTest, type_name: &str) -> Self {
-        if type_name.contains('.') {
-            let vector: Vec<&str> = type_name.split('.').collect();
-            let source_name = vector.first().unwrap();
-            let type_name = vector.get(1).unwrap();
-
-            Self::new_with_package(
-                ontol_test,
-                ontol_test.get_package_id(source_name),
-                type_name,
-            )
-        } else {
-            Self::new_with_package(ontol_test, ontol_test.root_package, type_name)
-        }
+        let (package_id, type_name) = ontol_test.parse_test_ident(type_name);
+        Self::new_with_package(ontol_test, package_id, type_name)
     }
 
     fn new_with_package(

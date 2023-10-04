@@ -77,7 +77,7 @@ impl OntolTest {
         let from_key = get_map_key(&from, &input_binding);
         let to_key = get_map_key(&to, &output_binding);
 
-        let procedure = match self.ontology.get_mapper_proc(from_key, to_key) {
+        let procedure = match self.ontology.get_mapper_proc([from_key, to_key]) {
             Some(procedure) => procedure,
             None => panic!(
                 "No mapping procedure found for ({:?}, {:?})",
@@ -112,5 +112,32 @@ impl OntolTest {
         };
 
         expect_eq!(actual = output_json, expected = expected);
+    }
+
+    #[track_caller]
+    pub fn assert_named_forward_map(
+        &self,
+        name: &str,
+        input: serde_json::Value,
+        _expected: serde_json::Value,
+    ) {
+        let (package_id, name) = self.parse_test_ident(name);
+        let key = self
+            .ontology
+            .get_named_forward_map_meta(package_id, name)
+            .unwrap();
+
+        let input_binding = TypeBinding::from_def_id(key[0].def_id, &self.ontology);
+        let _output_binding = TypeBinding::from_def_id(key[1].def_id, &self.ontology);
+
+        let procedure = match self.ontology.get_mapper_proc(key) {
+            Some(procedure) => procedure,
+            None => panic!("named map not found"),
+        };
+        let value = inspect_de(&input_binding).value(input).unwrap();
+        let value = self.ontology.new_vm(procedure, [value]).run().unwrap();
+
+        // The resulting value must have the runtime def_id of the requested to_key.
+        expect_eq!(actual = value.type_def_id, expected = key[1].def_id);
     }
 }

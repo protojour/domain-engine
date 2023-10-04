@@ -328,6 +328,7 @@ impl<'m> Compiler<'m> {
             .docs(docs)
             .const_procs(self.codegen_tasks.result_const_procs)
             .map_meta_table(map_meta_table)
+            .named_forward_maps(self.codegen_tasks.result_named_forward_maps)
             .serde_operators(serde_operators, serde_operators_per_def)
             .dynamic_sequence_operator_id(dynamic_sequence_operator_id)
             .property_flows(property_flows)

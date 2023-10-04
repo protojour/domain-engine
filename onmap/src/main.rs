@@ -78,7 +78,7 @@ fn main() -> anyhow::Result<()> {
         seq: false,
     };
     let proc = ontology
-        .get_mapper_proc(from, to)
+        .get_mapper_proc([from, to])
         .ok_or_else(|| anyhow!(format!("No map from {} to {}", args.from, args.to)))?;
 
     let from_type = ontology.get_type_info(from.def_id);

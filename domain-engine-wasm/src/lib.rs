@@ -52,9 +52,8 @@ impl WasmOntology {
     pub fn mappers(&self) -> Vec<JsValue> {
         self.ontology
             .iter_map_meta()
-            .map(|((from, to), map_info)| WasmMapper {
-                from,
-                to,
+            .map(|(key, map_info)| WasmMapper {
+                key,
                 map_info: map_info.clone(),
                 ontology: self.ontology.clone(),
             })
