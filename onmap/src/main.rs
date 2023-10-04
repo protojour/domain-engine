@@ -8,6 +8,7 @@ use domain_engine_core::system::SystemAPI;
 use ontol_runtime::{
     interface::serde::processor::{ProcessorLevel, ProcessorMode},
     ontology::Ontology,
+    vm::ontol_vm::VmState,
     MapKey, PackageId,
 };
 use serde::de::DeserializeSeed;
@@ -79,7 +80,6 @@ fn main() -> anyhow::Result<()> {
     let proc = ontology
         .get_mapper_proc(from, to)
         .ok_or_else(|| anyhow!(format!("No map from {} to {}", args.from, args.to)))?;
-    let mut vm = ontology.new_vm();
 
     let from_type = ontology.get_type_info(from.def_id);
     let from_processor = ontology.new_serde_processor(
@@ -95,7 +95,10 @@ fn main() -> anyhow::Result<()> {
             .deserialize(serde_yaml::Deserializer::from_str(&args.input))
             .expect("Deserialization failed"),
     };
-    let value = vm.eval(proc, [data.value]);
+    let value = match ontology.new_vm(proc, [data.value]).run() {
+        VmState::Complete(value) => value,
+        VmState::Yielded(_) => return Err(anyhow!("ONTOL-VM yielded!")),
+    };
     let to_type = ontology.get_type_info(to.def_id);
     let to_processor = ontology.new_serde_processor(
         to_type.operator_id.expect("No deserializer found"),

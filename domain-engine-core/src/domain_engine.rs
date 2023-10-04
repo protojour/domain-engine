@@ -6,6 +6,7 @@ use ontol_runtime::{
     ontology::Ontology,
     select::{EntitySelect, Select},
     value::{Attribute, Value},
+    vm::ontol_vm::VmState,
     PackageId,
 };
 use tracing::debug;
@@ -98,7 +99,18 @@ impl DomainEngine {
                 .expect("No mapping procedure for query output");
 
             for attr in edges.iter_mut() {
-                attr.value = ontology.new_vm().eval(procedure, [attr.value.take()]);
+                let mut vm = ontology.new_vm(procedure, [attr.value.take()]);
+
+                attr.value = loop {
+                    match vm.run() {
+                        VmState::Complete(value) => {
+                            break value;
+                        }
+                        VmState::Yielded(_yield) => {
+                            todo!()
+                        }
+                    }
+                };
             }
 
             cur_def_id = next_def_id;

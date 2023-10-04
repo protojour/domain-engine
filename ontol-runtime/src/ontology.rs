@@ -17,7 +17,7 @@ use crate::{
     },
     text_like_types::TextLikeType,
     text_pattern::TextPattern,
-    value::PropertyId,
+    value::{PropertyId, Value},
     value_generator::ValueGenerator,
     vm::{
         ontol_vm::OntolVm,
@@ -69,8 +69,8 @@ impl Ontology {
         }
     }
 
-    pub fn new_vm(&self) -> OntolVm<'_> {
-        OntolVm::new(self)
+    pub fn new_vm(&self, proc: Procedure, params: impl IntoIterator<Item = Value>) -> OntolVm<'_> {
+        OntolVm::new(self, proc, params)
     }
 
     pub fn get_type_info(&self, def_id: DefId) -> &TypeInfo {

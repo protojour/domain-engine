@@ -162,3 +162,7 @@ impl GetAttrFlags {
         Self::TRY | Self::TAKE | Self::REL | Self::VAL
     }
 }
+
+pub enum Yield {
+    Query,
+}

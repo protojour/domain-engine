@@ -9,6 +9,7 @@ use ontol_runtime::{
     },
     ontology::{MapMeta, Ontology, TypeInfo},
     value::Value,
+    vm::ontol_vm::VmState,
     MapKey, PackageId,
 };
 use serde::de::DeserializeSeed;
@@ -182,14 +183,15 @@ impl WasmMapper {
 
     pub fn map(&self, input: &WasmValue) -> Result<WasmValue, WasmError> {
         let proc = self.ontology.get_mapper_proc(self.from, self.to).unwrap();
-        let mut mapper = self.ontology.new_vm();
+        let vm_state = self.ontology.new_vm(proc, [input.value.clone()]).run();
 
-        let value = mapper.eval(proc, [input.value.clone()]);
-
-        Ok(WasmValue {
-            value,
-            ontology: self.ontology.clone(),
-        })
+        match vm_state {
+            VmState::Complete(value) => Ok(WasmValue {
+                value,
+                ontology: self.ontology.clone(),
+            }),
+            VmState::Yielded(_) => Err(WasmError::Generic("ONTOL-VM yielded".into())),
+        }
     }
 }
 

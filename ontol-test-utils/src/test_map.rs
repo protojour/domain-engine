@@ -85,7 +85,7 @@ impl OntolTest {
             ),
         };
 
-        let value = self.ontology.new_vm().eval(procedure, [value]);
+        let value = self.ontology.new_vm(procedure, [value]).run().unwrap();
 
         // The resulting value must have the runtime def_id of the requested to_key.
         expect_eq!(actual = value.type_def_id, expected = to_key.def_id);

@@ -564,13 +564,11 @@ fn deserialize_map<'on, 'de, A: MapAccess<'de>>(
             // Only _default values_ are handled in the deserializer:
             if let Some(ValueGenerator::DefaultProc(address)) = property.value_generator {
                 if !property.is_optional() && !attributes.contains_key(&property.property_id) {
-                    let value = processor.ontology.new_vm().eval(
-                        Procedure {
-                            address,
-                            n_params: NParams(0),
-                        },
-                        [],
-                    );
+                    let procedure = Procedure {
+                        address,
+                        n_params: NParams(0),
+                    };
+                    let value = processor.ontology.new_vm(procedure, []).run().unwrap();
 
                     // BUG: No support for rel_params:
                     attributes.insert(property.property_id, value.into());

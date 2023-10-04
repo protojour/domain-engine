@@ -69,10 +69,11 @@ pub trait Processor {
 }
 
 impl<'o, P: Processor> AbstractVm<'o, P> {
-    pub fn new(ontology: &'o Ontology) -> Self {
+    pub fn new(ontology: &'o Ontology, procedure: Procedure) -> Self {
+        debug!("AbstractVm::new({procedure:?})");
         Self {
-            program_counter: 0,
-            proc_address: 0,
+            program_counter: procedure.address.0 as usize,
+            proc_address: procedure.address.0 as usize,
             ontology,
             call_stack: vec![],
         }
@@ -82,10 +83,7 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
         &self.ontology.lib.opcodes[self.program_counter]
     }
 
-    pub fn execute(&mut self, procedure: Procedure, processor: &mut P, debug: &mut dyn VmDebug<P>) {
-        self.program_counter = procedure.address.0 as usize;
-        self.proc_address = procedure.address.0 as usize;
-
+    pub fn run(&mut self, processor: &mut P, debug: &mut dyn VmDebug<P>) -> Option<Yield> {
         let opcodes = self.ontology.lib.opcodes.as_slice();
 
         loop {
@@ -132,7 +130,7 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                             std::mem::swap(returning_stack, &mut next_stack);
                         }
                         None => {
-                            return;
+                            return None;
                         }
                     }
                 }
@@ -239,8 +237,9 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
 }
 
 use bit_vec::BitVec;
+use tracing::debug;
 
-use super::proc::GetAttrFlags;
+use super::proc::{GetAttrFlags, Yield};
 
 pub trait VmDebug<P: Processor> {
     fn tick(&mut self, vm: &AbstractVm<P>, processor: &P);

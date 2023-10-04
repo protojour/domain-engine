@@ -3,7 +3,7 @@ use std::{array, collections::BTreeMap};
 use bit_vec::BitVec;
 use regex::Captures;
 use smartstring::alias::String;
-use tracing::{debug, trace, Level};
+use tracing::{trace, Level};
 
 use crate::{
     cast::Cast,
@@ -15,7 +15,21 @@ use crate::{
     DefId, PackageId,
 };
 
-use super::proc::{GetAttrFlags, Predicate};
+use super::proc::{GetAttrFlags, Predicate, Yield};
+
+pub enum VmState {
+    Yielded(Yield),
+    Complete(Value),
+}
+
+impl VmState {
+    pub fn unwrap(self) -> Value {
+        match self {
+            Self::Complete(value) => value,
+            Self::Yielded(_) => panic!(),
+        }
+    }
+}
 
 /// Virtual machine for executing ONTOL procedures
 pub struct OntolVm<'l> {
@@ -24,55 +38,54 @@ pub struct OntolVm<'l> {
 }
 
 impl<'o> OntolVm<'o> {
-    pub fn new(ontology: &'o Ontology) -> Self {
+    pub fn new(
+        ontology: &'o Ontology,
+        proc: Procedure,
+        params: impl IntoIterator<Item = Value>,
+    ) -> Self {
         let ontol_domain = ontology.find_domain(PackageId(0)).unwrap();
 
         // TODO: In the future, information about primitive types could be cached inside Ontology:
         let text_def_id = ontol_domain.type_info_by_identifier("text").unwrap().def_id;
 
         Self {
-            abstract_vm: AbstractVm::new(ontology),
+            abstract_vm: AbstractVm::new(ontology, proc),
             processor: OntolProcessor {
-                stack: Default::default(),
+                stack: params.into_iter().collect(),
                 text_def_id,
             },
         }
     }
 
     #[cfg(test)]
-    pub fn new_domainless(ontology: &'o Ontology) -> Self {
+    pub fn new_domainless(
+        ontology: &'o Ontology,
+        proc: Procedure,
+        params: impl IntoIterator<Item = Value>,
+    ) -> Self {
         Self {
-            abstract_vm: AbstractVm::new(ontology),
+            abstract_vm: AbstractVm::new(ontology, proc),
             processor: OntolProcessor {
-                stack: Default::default(),
+                stack: params.into_iter().collect(),
                 text_def_id: DefId::unit(),
             },
         }
     }
 
-    pub fn eval(&mut self, proc: Procedure, params: impl IntoIterator<Item = Value>) -> Value {
-        self.processor.stack.extend(params);
-
-        if tracing::enabled!(Level::TRACE) {
-            self.internal_eval(proc, &mut Tracer)
+    pub fn run(&mut self) -> VmState {
+        let result = if tracing::enabled!(Level::TRACE) {
+            self.abstract_vm.run(&mut self.processor, &mut Tracer)
         } else {
-            self.internal_eval(proc, &mut ())
+            self.abstract_vm.run(&mut self.processor, &mut ())
+        };
+
+        match result {
+            Some(yield_) => VmState::Yielded(yield_),
+            None => {
+                let mut stack = std::mem::take(&mut self.processor.stack);
+                VmState::Complete(stack.pop().unwrap())
+            }
         }
-    }
-
-    #[inline(never)]
-    pub fn internal_eval(
-        &mut self,
-        procedure: Procedure,
-        debug: &mut dyn VmDebug<OntolProcessor>,
-    ) -> Value {
-        debug!("evaluating {procedure:?}");
-
-        self.abstract_vm
-            .execute(procedure, &mut self.processor, debug);
-
-        let mut stack = std::mem::take(&mut self.processor.stack);
-        stack.pop().unwrap()
     }
 }
 
@@ -477,8 +490,8 @@ mod tests {
         );
 
         let ontology = Ontology::builder().lib(lib).build();
-        let mut vm = OntolVm::new_domainless(&ontology);
-        let output = vm.eval(
+        let output = OntolVm::new_domainless(
+            &ontology,
             proc,
             [Value::new(
                 Data::Struct(
@@ -496,7 +509,9 @@ mod tests {
                 ),
                 def_id(0),
             )],
-        );
+        )
+        .run()
+        .unwrap();
 
         let Data::Struct(attrs) = output.data else {
             panic!();
@@ -549,8 +564,8 @@ mod tests {
         );
 
         let ontology = Ontology::builder().lib(lib).build();
-        let mut vm = OntolVm::new_domainless(&ontology);
-        let output = vm.eval(
+        let output = OntolVm::new_domainless(
+            &ontology,
             mapping_proc,
             [Value::new(
                 Data::Struct(
@@ -572,7 +587,9 @@ mod tests {
                 ),
                 def_id(0),
             )],
-        );
+        )
+        .run()
+        .unwrap();
 
         let Data::Struct(mut attrs) = output.data else {
             panic!();
@@ -614,8 +631,8 @@ mod tests {
         );
 
         let ontology = Ontology::builder().lib(lib).build();
-        let mut vm = OntolVm::new_domainless(&ontology);
-        let output = vm.eval(
+        let output = OntolVm::new_domainless(
+            &ontology,
             proc,
             [Value::new(
                 Data::Sequence(vec![
@@ -624,7 +641,9 @@ mod tests {
                 ]),
                 def_id(0),
             )],
-        );
+        )
+        .run()
+        .unwrap();
 
         let Data::Sequence(seq) = output.data else {
             panic!();
@@ -673,8 +692,8 @@ mod tests {
         );
 
         let ontology = Ontology::builder().lib(lib).build();
-        let mut vm = OntolVm::new_domainless(&ontology);
-        let output = vm.eval(
+        let output = OntolVm::new_domainless(
+            &ontology,
             proc,
             [Value::new(
                 Data::Struct(
@@ -696,7 +715,9 @@ mod tests {
                 ),
                 def_id(0),
             )],
-        );
+        )
+        .run()
+        .unwrap();
 
         assert_eq!(
             "[{S:0:0 -> 'a', S:0:1 -> 'b0'}, {S:0:0 -> 'a', S:0:1 -> 'b1'}]",
@@ -734,13 +755,20 @@ mod tests {
         );
 
         let ontology = Ontology::builder().lib(lib).build();
-        let mut vm = OntolVm::new_domainless(&ontology);
 
         assert_eq!(
             "{}",
             format!(
                 "{}",
-                ValueDebug(&vm.eval(proc, [Value::new(Data::Struct([].into()), def_id(0))]))
+                ValueDebug(
+                    &OntolVm::new_domainless(
+                        &ontology,
+                        proc,
+                        [Value::new(Data::Struct([].into()), def_id(0))]
+                    )
+                    .run()
+                    .unwrap()
+                )
             )
         );
 
@@ -748,13 +776,18 @@ mod tests {
             "{}",
             format!(
                 "{}",
-                ValueDebug(&vm.eval(
-                    proc,
-                    [Value::new(
-                        Data::Struct([(prop, Value::unit().into())].into()),
-                        def_id(0)
-                    )]
-                ))
+                ValueDebug(
+                    &OntolVm::new_domainless(
+                        &ontology,
+                        proc,
+                        [Value::new(
+                            Data::Struct([(prop, Value::unit().into())].into()),
+                            def_id(0)
+                        )]
+                    )
+                    .run()
+                    .unwrap()
+                )
             )
         );
 
@@ -763,7 +796,8 @@ mod tests {
             format!(
                 "{}",
                 ValueDebug(
-                    &vm.eval(
+                    &OntolVm::new_domainless(
+                        &ontology,
                         proc,
                         [Value::new(
                             Data::Struct(
@@ -776,6 +810,8 @@ mod tests {
                             def_id(0)
                         )]
                     )
+                    .run()
+                    .unwrap()
                 )
             )
         );
