@@ -38,6 +38,14 @@ pub struct FlatUnifier<'a, 'm> {
     pub(super) relations: &'a Relations,
     pub(super) var_allocator: ontol_hir::VarAllocator,
     pub(super) hir_arena: ontol_hir::arena::Arena<'m, TypedHir>,
+
+    match_struct_depth: usize,
+    expr_mode: ExprMode,
+}
+
+enum ExprMode {
+    Expr,
+    Condition,
 }
 
 enum AssignResult<'m> {
@@ -96,6 +104,8 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
             relations,
             var_allocator,
             hir_arena: Default::default(),
+            match_struct_depth: 0,
+            expr_mode: ExprMode::Expr,
         }
     }
 
@@ -139,15 +149,26 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
         self.hir_arena.add(TypedHirData(kind, meta))
     }
 
-    fn verify_struct_expr_flags(&self, flags: StructFlags, ty: TypeRef) -> UnifierResult<()> {
+    fn push_struct_expr_flags(&mut self, flags: StructFlags, ty: TypeRef) -> UnifierResult<()> {
         if flags.contains(StructFlags::MATCH) {
             let def_id = ty.get_single_def_id().ok_or(UnifierError::NonEntityQuery)?;
             let _ = self
                 .relations
                 .identified_by(def_id)
                 .ok_or(UnifierError::NonEntityQuery)?;
+            self.match_struct_depth += 1;
+            self.expr_mode = ExprMode::Condition;
         }
         Ok(())
+    }
+
+    fn pop_struct_expr_flags(&mut self, flags: StructFlags) {
+        if flags.contains(StructFlags::MATCH) {
+            self.match_struct_depth -= 1;
+            if self.match_struct_depth == 0 {
+                self.expr_mode = ExprMode::Expr;
+            }
+        }
     }
 
     fn assign_to_scope(
@@ -513,6 +534,9 @@ fn unify_single<'m>(
         ) => {
             // FIXME/DRY: This looks a lot like the expr code
             let next_in_scope = in_scope.union_one(scope_meta.scope_var.0);
+
+            unifier.push_struct_expr_flags(flags, meta.hir_meta.ty)?;
+
             let mut body = unify_scope_structural(
                 MainScope::Value(scope_meta.scope_var),
                 ExprSelector::Struct(binder.hir().var, scope_var),
@@ -546,8 +570,6 @@ fn unify_single<'m>(
                 body.push(prop_node);
             }
 
-            unifier.verify_struct_expr_flags(flags, meta.hir_meta.ty)?;
-
             let node = UnifiedNode {
                 typed_binder: Some(
                     ontol_hir::Binder {
@@ -560,6 +582,8 @@ fn unify_single<'m>(
                     meta.hir_meta,
                 ),
             };
+
+            unifier.pop_struct_expr_flags(flags);
 
             Ok(node)
         }
@@ -1280,7 +1304,7 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                 let mut body = ontol_hir::Nodes::default();
 
                 self.unifier
-                    .verify_struct_expr_flags(flags, meta.hir_meta.ty)?;
+                    .push_struct_expr_flags(flags, meta.hir_meta.ty)?;
 
                 debug!(
                     "{level}Make struct {} scope_var={:?} in_scope={:?} main_scope={main_scope:?}",
@@ -1310,7 +1334,6 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                     )?);
                 }
 
-                // let mut body = Vec::with_capacity(props.len());
                 for prop in props {
                     match prop.variant {
                         expr::PropVariant::Singleton(attr) => {
@@ -1339,6 +1362,8 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                         }
                     }
                 }
+
+                self.unifier.pop_struct_expr_flags(flags);
                 Ok(self.mk_node(ontol_hir::Kind::Struct(binder, flags, body), meta.hir_meta))
             }
             expr::Kind::SeqItem(label, _index, _iter, attr) => {
