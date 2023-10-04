@@ -28,6 +28,24 @@ impl Value {
         Self { data, type_def_id }
     }
 
+    pub fn sequence_of(values: impl IntoIterator<Item = Value>) -> Self {
+        let attributes: Vec<_> = values
+            .into_iter()
+            .map(|value| Attribute {
+                value,
+                rel_params: Self::unit(),
+            })
+            .collect();
+        let type_def_id = attributes
+            .first()
+            .map(|attr| attr.value.type_def_id)
+            .unwrap_or(DefId::unit());
+        Self {
+            data: Data::Sequence(attributes),
+            type_def_id,
+        }
+    }
+
     #[inline]
     pub const fn unit() -> Self {
         Self {

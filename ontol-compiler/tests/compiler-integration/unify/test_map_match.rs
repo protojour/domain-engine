@@ -1,5 +1,5 @@
-use ontol_runtime::value::{Data, Value};
-use ontol_test_utils::{test_map::TestYieldMock, TestCompile};
+use ontol_runtime::value::Value;
+use ontol_test_utils::{test_map::YielderMock, TestCompile};
 use serde_json::json;
 use test_log::test;
 use unimock::{matching, MockFn};
@@ -28,12 +28,30 @@ fn test_map_match_scalar_key() {
         rel .'key'|id: key
         rel .'prop': text
     }
-    map {
+    map query {
         key: key
         foo match { 'key': key }
     }
     "#
-    .compile_then(|_test| {});
+    .compile_then(|test| {
+        let [foo] = test.bind(["foo"]);
+        test.mapper(
+            YielderMock::yield_match
+                // BUG: Should have condition clauses here:
+                .next_call(matching!(eq!("")))
+                .returns(Value::from(
+                    foo.value_builder(json!({ "key": "x", "prop": "y" })),
+                )),
+        )
+        .assert_named_forward_map(
+            "query",
+            json!("input"),
+            json!({
+                "key": "x",
+                "prop": "y"
+            }),
+        );
+    });
 }
 
 #[test]
@@ -44,27 +62,22 @@ fn test_map_match_parameterless_query() {
         rel .'key'|id: key
         rel .'prop': text
     }
-    map q {
+    map query {
         {}
         foo: [..foo match {}]
     }
     "#
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
-        let output: Value = foo
-            .entity_builder(json!("key"), json!({"key": "key", "prop": "test"}))
-            .into();
-
-        test.yielding_mapper(
-            TestYieldMock::process_yield
-                .next_call(matching!(_))
-                .returns(Value::new(
-                    Data::Sequence(vec![output.into()]),
-                    foo.def_id(),
-                )),
+        test.mapper(
+            YielderMock::yield_match
+                .next_call(matching!(eq!("")))
+                .returns(Value::sequence_of([foo
+                    .value_builder(json!({ "key": "key", "prop": "test" }))
+                    .into()])),
         )
         .assert_named_forward_map(
-            "q",
+            "query",
             json!({}),
             json!([
                 {

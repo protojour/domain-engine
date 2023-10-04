@@ -1,10 +1,12 @@
 use ontol_runtime::{
-    value::Value,
+    condition::{Clause, CondTerm, Condition},
+    value::{PropertyId, Value},
+    var::Var,
     vm::{
         proc::{Procedure, Yield},
         VmState,
     },
-    MapKey,
+    DefId, MapKey,
 };
 use unimock::{unimock, Unimock};
 
@@ -61,29 +63,22 @@ impl Key {
 }
 
 impl OntolTest {
-    pub fn mapper(&self) -> TestMapper<'_> {
+    pub fn mapper(&self, yielder_mock_clause: impl unimock::Clause) -> TestMapper<'_> {
         TestMapper {
             test: self,
-            test_yield: Box::new(Unimock::new(())),
-        }
-    }
-
-    pub fn yielding_mapper(&self, yield_mock: impl unimock::Clause) -> TestMapper<'_> {
-        TestMapper {
-            test: self,
-            test_yield: Box::new(Unimock::new(yield_mock)),
+            yielder: Box::new(Unimock::new(yielder_mock_clause)),
         }
     }
 }
 
-#[unimock(api = TestYieldMock)]
-pub trait TestYield {
-    fn process_yield(&self, vm_yield: Yield) -> Value;
+#[unimock(api = YielderMock)]
+pub trait Yielder {
+    fn yield_match(&self, condition: Condition) -> Value;
 }
 
 pub struct TestMapper<'on> {
     test: &'on OntolTest,
-    test_yield: Box<dyn TestYield>,
+    yielder: Box<dyn Yielder>,
 }
 
 impl<'on> TestMapper<'on> {
@@ -189,10 +184,18 @@ impl<'on> TestMapper<'on> {
         loop {
             match vm.run([param]) {
                 VmState::Complete(value) => return value,
-                VmState::Yielded(vm_yield) => {
-                    param = self.test_yield.process_yield(vm_yield);
+                VmState::Yielded(Yield::Match(condition)) => {
+                    param = self.yielder.yield_match(condition);
                 }
             }
         }
     }
+}
+
+pub enum TestClause {
+    Root(Var),
+    IsEntity(CondTerm, DefId),
+    Attr(Var, PropertyId, (CondTerm, CondTerm)),
+    Eq(Var, CondTerm),
+    Or(Vec<Clause>),
 }

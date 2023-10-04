@@ -21,7 +21,7 @@ fn should_map_inherent_capturing_pattern_id() {
     }
     "
     .compile_then(|test| {
-        test.mapper().assert_map_eq(
+        test.mapper(()).assert_map_eq(
             ("foo", "bar"),
             json!({ "id": "foo/67e55044-10b1-426f-9247-bb680e5fe0c8" }),
             json!({ "id": "bar/67e55044-10b1-426f-9247-bb680e5fe0c8" }),
@@ -75,7 +75,7 @@ fn test_extract_rel_params() {
     }
     "
     .compile_then(|test| {
-        test.mapper().assert_map_eq(
+        test.mapper(()).assert_map_eq(
             ("a1", "b1"),
             json!({
                 "foreign": {
@@ -93,7 +93,7 @@ fn test_extract_rel_params() {
             }),
         );
 
-        test.mapper().assert_map_eq(
+        test.mapper(()).assert_map_eq(
             ("b1", "a1"),
             json!({
                 "foreign": {
@@ -156,7 +156,7 @@ fn test_rel_params_implicit_map() {
     }
     "
     .compile_then(|test| {
-        test.mapper().assert_map_eq(
+        test.mapper(()).assert_map_eq(
             ("a", "b"),
             json!({
                 "foreign": {
@@ -205,12 +205,12 @@ fn test_map_relation_sequence_default_fallback() {
         // The point of this test is to show that a
         // "foos" in input is not needed to produce a "foo" in output,
         // since the input "foo" is an inverted/object relation sequence property:
-        test.mapper().assert_map_eq(
+        test.mapper(()).assert_map_eq(
             ("bar_inner", "bar"),
             json!({ "bar_id": "B" }),
             json!({ "id": "B", "foos": [] }),
         );
-        test.mapper().assert_map_eq(
+        test.mapper(()).assert_map_eq(
             ("bar_inner", "bar"),
             json!({ "bar_id": "B", "foos": [{ "foo_id": "F" }]}),
             json!({ "id": "B", "foos": ["F"] }),
