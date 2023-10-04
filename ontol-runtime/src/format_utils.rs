@@ -144,9 +144,9 @@ where
     }
 }
 
-pub fn try_alpha_to_u32(sym: &str) -> Result<u32, ()> {
+pub fn try_alpha_to_u32(sym: &str) -> Option<u32> {
     if sym.is_empty() {
-        return Err(());
+        return None;
     }
 
     let mut num: u32 = 0;
@@ -154,7 +154,7 @@ pub fn try_alpha_to_u32(sym: &str) -> Result<u32, ()> {
 
     while let Some(char) = iterator.next() {
         if !char.is_ascii_lowercase() {
-            return Err(());
+            return None;
         }
 
         let value = u32::from(char) - u32::from('a');
@@ -165,7 +165,7 @@ pub fn try_alpha_to_u32(sym: &str) -> Result<u32, ()> {
         }
     }
 
-    Ok(num)
+    Some(num)
 }
 
 pub struct AsAlpha(pub u32);

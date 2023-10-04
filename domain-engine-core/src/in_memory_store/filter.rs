@@ -3,7 +3,7 @@
 use bit_set::BitSet;
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    condition::{Clause, CondTerm, Condition, UniVar},
+    condition::{Clause, CondTerm, Condition},
     ontology::Ontology,
     DefId,
 };

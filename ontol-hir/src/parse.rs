@@ -466,7 +466,7 @@ fn parse_at_label(next: &str) -> ParseResult<Label> {
 }
 
 fn parse_alpha_to_u32(next: &str) -> Result<u32, Error<'_>> {
-    ontol_runtime::format_utils::try_alpha_to_u32(next).map_err(|_| Error::InvalidVariableNumber)
+    ontol_runtime::format_utils::try_alpha_to_u32(next).ok_or(Error::InvalidVariableNumber)
 }
 
 fn parse_def_id(next: &str) -> ParseResult<DefId> {

@@ -1,10 +1,10 @@
-use bit_set::BitSet;
 use fnv::FnvHashMap;
 use itertools::Itertools;
 use ontol_runtime::{
-    condition::{Clause, CondTerm, Condition, UniVar},
+    condition::{Clause, CondTerm, Condition},
     ontology::{DataRelationshipKind, Ontology, ValueCardinality},
     value::PropertyId,
+    var::{Var, VarSet},
     DefId,
 };
 use ordered_float::NotNan;
@@ -22,7 +22,7 @@ pub enum Plan {
     /// A root plan that is the output edge of a Join (many input edges).
     /// The UniVar specifies the id of the join.
     /// The semantics is that the match must be for the _same entity_, but from different input paths.
-    JoinRoot(UniVar, Vec<Plan>),
+    JoinRoot(Var, Vec<Plan>),
     /// An scalar attribute that matches the given plans
     Attr(PropertyId, Vec<Plan>),
     /// A scalar multi-attribute where every attribute matches the given plans
@@ -36,7 +36,7 @@ pub enum Plan {
     /// Expression must be an element in the given set of scalars
     In(Vec<Scalar>),
     /// A Join for which the same entity must match in several branches.
-    Join(UniVar),
+    Join(Var),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -54,8 +54,8 @@ pub struct EdgeAttr<T> {
 
 struct PlanBuilder<'on> {
     ontology: &'on Ontology,
-    term_var_counts: FnvHashMap<UniVar, usize>,
-    current_join_roots: FnvHashMap<UniVar, DefId>,
+    term_var_counts: FnvHashMap<Var, usize>,
+    current_join_roots: FnvHashMap<Var, DefId>,
 }
 
 pub fn compute_plans(condition: &Condition, ontology: &Ontology) -> Vec<Plan> {
@@ -69,11 +69,10 @@ pub fn compute_plans(condition: &Condition, ontology: &Ontology) -> Vec<Plan> {
     };
 
     for clause in &condition.clauses {
-        let mut term_vars = TermVars(BitSet::new());
+        let mut term_vars = TermVars(VarSet::default());
         get_clause_vars(clause, &mut term_vars);
         for var in &term_vars.0 {
-            let uni_var: UniVar = var.into();
-            *plan_builder.term_var_counts.entry(uni_var).or_default() += 1;
+            *plan_builder.term_var_counts.entry(var).or_default() += 1;
         }
     }
 
@@ -126,7 +125,7 @@ fn compute_plan(clauses: &[&Clause], builder: &mut PlanBuilder) -> Option<Plan> 
 
 struct Origin {
     def_id: DefId,
-    binder: UniVar,
+    binder: Var,
 }
 
 fn sub_plans(origin: Origin, clauses: &[&Clause], builder: &mut PlanBuilder) -> Vec<Plan> {
@@ -281,16 +280,12 @@ mod tests {
             let plan = compute_plans(
                 &Condition {
                     clauses: vec![
-                        Clause::Root(UniVar(0)),
-                        Clause::IsEntity(CondTerm::Var(UniVar(0)), foo.def_id()),
-                        Clause::Attr(UniVar(0), a, (CondTerm::Wildcard, CondTerm::Var(UniVar(1)))),
-                        Clause::Eq(UniVar(1), CondTerm::Text("match1".into())),
-                        Clause::Attr(
-                            UniVar(0),
-                            bars,
-                            (CondTerm::Wildcard, CondTerm::Var(UniVar(2))),
-                        ),
-                        Clause::Attr(UniVar(2), b, (wild(), CondTerm::Text("match2".into()))),
+                        Clause::Root(Var(0)),
+                        Clause::IsEntity(CondTerm::Var(Var(0)), foo.def_id()),
+                        Clause::Attr(Var(0), a, (CondTerm::Wildcard, CondTerm::Var(Var(1)))),
+                        Clause::Eq(Var(1), CondTerm::Text("match1".into())),
+                        Clause::Attr(Var(0), bars, (CondTerm::Wildcard, CondTerm::Var(Var(2)))),
+                        Clause::Attr(Var(2), b, (wild(), CondTerm::Text("match2".into()))),
                     ],
                 },
                 &test.ontology,
@@ -343,15 +338,15 @@ mod tests {
             let plan = compute_plans(
                 &Condition {
                     clauses: vec![
-                        Clause::Root(UniVar(0)),
-                        Clause::IsEntity(CondTerm::Var(UniVar(0)), foo.def_id()),
-                        Clause::Attr(UniVar(0), bars_a, (wild(), CondTerm::Var(UniVar(1)))),
-                        Clause::Attr(UniVar(0), bars_b, (wild(), CondTerm::Var(UniVar(2)))),
-                        Clause::Attr(UniVar(1), b, (wild(), CondTerm::Text("match1".into()))),
-                        Clause::Attr(UniVar(2), b, (wild(), CondTerm::Text("match2".into()))),
-                        Clause::Attr(UniVar(1), foos, (wild(), CondTerm::Var(UniVar(3)))),
-                        Clause::Attr(UniVar(2), foos, (wild(), CondTerm::Var(UniVar(3)))),
-                        Clause::Attr(UniVar(3), a, (wild(), CondTerm::Text("match3".into()))),
+                        Clause::Root(Var(0)),
+                        Clause::IsEntity(CondTerm::Var(Var(0)), foo.def_id()),
+                        Clause::Attr(Var(0), bars_a, (wild(), CondTerm::Var(Var(1)))),
+                        Clause::Attr(Var(0), bars_b, (wild(), CondTerm::Var(Var(2)))),
+                        Clause::Attr(Var(1), b, (wild(), CondTerm::Text("match1".into()))),
+                        Clause::Attr(Var(2), b, (wild(), CondTerm::Text("match2".into()))),
+                        Clause::Attr(Var(1), foos, (wild(), CondTerm::Var(Var(3)))),
+                        Clause::Attr(Var(2), foos, (wild(), CondTerm::Var(Var(3)))),
+                        Clause::Attr(Var(3), a, (wild(), CondTerm::Text("match3".into()))),
                     ],
                 },
                 &test.ontology,
@@ -373,7 +368,7 @@ mod tests {
                                             foos,
                                             EdgeAttr {
                                                 rel: vec![],
-                                                val: vec![Plan::Join(UniVar(3))]
+                                                val: vec![Plan::Join(Var(3))]
                                             }
                                         )
                                     ],
@@ -389,7 +384,7 @@ mod tests {
                                             foos,
                                             EdgeAttr {
                                                 rel: vec![],
-                                                val: vec![Plan::Join(UniVar(3))]
+                                                val: vec![Plan::Join(Var(3))]
                                             }
                                         )
                                     ],
@@ -397,10 +392,7 @@ mod tests {
                             ),
                         ]
                     ),
-                    Plan::JoinRoot(
-                        UniVar(3),
-                        vec![Plan::Attr(a, vec![Plan::Eq(text("match3"))])]
-                    )
+                    Plan::JoinRoot(Var(3), vec![Plan::Attr(a, vec![Plan::Eq(text("match3"))])])
                 ]
             );
         });

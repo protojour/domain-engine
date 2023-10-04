@@ -21,7 +21,7 @@ impl FromStr for Var {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let next = s.strip_prefix('$').ok_or(())?;
-        try_alpha_to_u32(next).map(Var)
+        try_alpha_to_u32(next).map(Var).ok_or(())
     }
 }
 

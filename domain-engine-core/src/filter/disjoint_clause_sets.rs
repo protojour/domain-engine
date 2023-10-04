@@ -1,7 +1,9 @@
-use bit_set::BitSet;
 use fnv::FnvHashMap;
 use itertools::Itertools;
-use ontol_runtime::condition::{Clause, UniVar};
+use ontol_runtime::{
+    condition::Clause,
+    var::{Var, VarSet},
+};
 
 use super::condition_utils::{get_clause_vars, AllVars};
 
@@ -12,7 +14,7 @@ pub fn disjoint_clause_sets(clauses: &[Clause]) -> Vec<Vec<usize>> {
     let mut forest = ClauseForest::default();
 
     for (index, clause) in clauses.iter().enumerate() {
-        let mut all_vars = AllVars(BitSet::new());
+        let mut all_vars = AllVars(VarSet::default());
         get_clause_vars(clause, &mut all_vars);
         forest.union_clause(index, all_vars.0);
     }
@@ -21,7 +23,7 @@ pub fn disjoint_clause_sets(clauses: &[Clause]) -> Vec<Vec<usize>> {
 }
 
 fn compute_disjoint_sets(forest: &ClauseForest) -> Vec<Vec<usize>> {
-    let mut by_root: FnvHashMap<Option<UniVar>, Vec<usize>> = Default::default();
+    let mut by_root: FnvHashMap<Option<Var>, Vec<usize>> = Default::default();
 
     for (index, local_root) in forest.clause_roots.iter().enumerate() {
         let root = local_root.map(|local_root| forest.find_global_root(local_root));
@@ -35,22 +37,22 @@ fn compute_disjoint_sets(forest: &ClauseForest) -> Vec<Vec<usize>> {
 
 #[derive(Default)]
 struct ClauseForest {
-    /// Union-Find for finding disjoint sets of UniVars.
+    /// Union-Find for finding disjoint sets of vars.
     /// Maps a variable to its root.
     /// The root of a variable is the lowest variable of the variables it's unioned together with.
-    forest: FnvHashMap<UniVar, Option<UniVar>>,
+    forest: FnvHashMap<Var, Option<Var>>,
 
     /// Map from a clause index to its local variable root
-    clause_roots: Vec<Option<UniVar>>,
+    clause_roots: Vec<Option<Var>>,
 }
 
 impl ClauseForest {
-    fn union_clause(&mut self, index: usize, var_set: BitSet) {
-        let local_root: Option<UniVar> = var_set.iter().min().map(|var| var.into());
+    fn union_clause(&mut self, index: usize, var_set: VarSet) {
+        let local_root = var_set.iter().min();
 
         if let Some(local_root) = &local_root {
             for var in &var_set {
-                self.union_with_root(var.into(), *local_root);
+                self.union_with_root(var, *local_root);
             }
         }
 
@@ -59,7 +61,7 @@ impl ClauseForest {
         self.clause_roots[index] = local_root;
     }
 
-    fn union_with_root(&mut self, mut var: UniVar, union_root: UniVar) {
+    fn union_with_root(&mut self, mut var: Var, union_root: Var) {
         loop {
             let root_entry = self.forest.entry(var).or_default();
             match root_entry {
@@ -79,7 +81,7 @@ impl ClauseForest {
         }
     }
 
-    fn find_global_root(&self, mut var: UniVar) -> UniVar {
+    fn find_global_root(&self, mut var: Var) -> Var {
         loop {
             match self.forest.get(&var) {
                 Some(Some(root)) => {
@@ -100,8 +102,9 @@ impl ClauseForest {
 mod tests {
     use bit_set::BitSet;
     use ontol_runtime::{
-        condition::{Clause, CondTerm, UniVar},
+        condition::{Clause, CondTerm},
         value::PropertyId,
+        var::{Var, VarSet},
         DefId, RelationshipId, Role,
     };
 
@@ -114,25 +117,37 @@ mod tests {
         relationship_id: RelationshipId(DefId::unit()),
     };
 
-    fn var(value: usize) -> UniVar {
-        value.into()
+    fn var(str: &str) -> Var {
+        format!("${str}").parse().unwrap()
     }
 
     #[test]
     fn forest_join() {
         let mut forest = ClauseForest::default();
-        forest.union_clause(0, BitSet::from_iter([2, 0, 1]));
-        forest.union_clause(1, BitSet::from_iter([3, 1, 2]));
+        forest.union_clause(0, VarSet(BitSet::from_iter([2, 0, 1])));
+        forest.union_clause(1, VarSet(BitSet::from_iter([3, 1, 2])));
         assert_eq!(compute_disjoint_sets(&forest), vec![vec![0, 1]]);
     }
 
     #[test]
     fn disjoint_clause_set() {
         let disjoint_sets = disjoint_clause_sets(&[
-            Clause::Attr(var(6), PROP, (CondTerm::Var(var(7)), CondTerm::Var(var(8)))),
-            Clause::Attr(var(3), PROP, (CondTerm::Var(var(4)), CondTerm::Var(var(5)))),
-            Clause::Attr(var(1), PROP, (CondTerm::Var(var(2)), CondTerm::Var(var(3)))),
-            Clause::IsEntity(CondTerm::Var(var(7)), DefId::unit()),
+            Clause::Attr(
+                var("f"),
+                PROP,
+                (CondTerm::Var(var("g")), CondTerm::Var(var("h"))),
+            ),
+            Clause::Attr(
+                var("c"),
+                PROP,
+                (CondTerm::Var(var("d")), CondTerm::Var(var("e"))),
+            ),
+            Clause::Attr(
+                var("a"),
+                PROP,
+                (CondTerm::Var(var("b")), CondTerm::Var(var("c"))),
+            ),
+            Clause::IsEntity(CondTerm::Var(var("g")), DefId::unit()),
         ]);
         assert_eq!(disjoint_sets, vec![vec![0, 3], vec![1, 2]]);
     }

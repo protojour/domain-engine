@@ -1,30 +1,32 @@
-use bit_set::BitSet;
-use ontol_runtime::condition::{Clause, CondTerm, UniVar};
+use ontol_runtime::{
+    condition::{Clause, CondTerm},
+    var::{Var, VarSet},
+};
 
 pub trait Collector {
-    fn collect_input_var(&mut self, var: UniVar);
-    fn collect_term_var(&mut self, var: UniVar);
+    fn collect_input_var(&mut self, var: Var);
+    fn collect_term_var(&mut self, var: Var);
 }
 
-pub struct AllVars(pub BitSet);
+pub struct AllVars(pub VarSet);
 
 impl Collector for AllVars {
-    fn collect_input_var(&mut self, var: UniVar) {
-        self.0.insert(var.into());
+    fn collect_input_var(&mut self, var: Var) {
+        self.0.insert(var);
     }
 
-    fn collect_term_var(&mut self, var: UniVar) {
-        self.0.insert(var.into());
+    fn collect_term_var(&mut self, var: Var) {
+        self.0.insert(var);
     }
 }
 
-pub struct TermVars(pub BitSet);
+pub struct TermVars(pub VarSet);
 
 impl Collector for TermVars {
-    fn collect_input_var(&mut self, _var: UniVar) {}
+    fn collect_input_var(&mut self, _var: Var) {}
 
-    fn collect_term_var(&mut self, var: UniVar) {
-        self.0.insert(var.into());
+    fn collect_term_var(&mut self, var: Var) {
+        self.0.insert(var);
     }
 }
 
