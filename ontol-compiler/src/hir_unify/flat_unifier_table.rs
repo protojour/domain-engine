@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use ontol_runtime::var::Var;
+use ontol_runtime::var::{Var, VarSet};
 use tracing::debug;
 
 use crate::typed_hir::{IntoTypedHirData, TypedHir};
@@ -8,7 +8,6 @@ use crate::typed_hir::{IntoTypedHirData, TypedHir};
 use super::{
     expr,
     flat_scope::{self, ScopeVar},
-    VarSet,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash)]

@@ -3,11 +3,14 @@ use std::{
     rc::Rc,
 };
 
-use ontol_runtime::{value::PropertyId, var::Var, vm::proc::BuiltinProc, DefId};
+use ontol_runtime::{
+    value::PropertyId,
+    var::{Var, VarSet},
+    vm::proc::BuiltinProc,
+    DefId,
+};
 
 use crate::typed_hir::{self, TypedHir, TypedHirData};
-
-use super::VarSet;
 
 pub struct FlatScope<'m> {
     pub scope_nodes: Vec<ScopeNode<'m>>,

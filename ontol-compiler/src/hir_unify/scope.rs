@@ -1,9 +1,10 @@
-use ontol_runtime::{value::PropertyId, var::Var, DefId};
-
-use crate::{
-    hir_unify::VarSet,
-    typed_hir::{self, TypedHir, TypedHirData, UNIT_META},
+use ontol_runtime::{
+    value::PropertyId,
+    var::{Var, VarSet},
+    DefId,
 };
+
+use crate::typed_hir::{self, TypedHir, TypedHirData, UNIT_META};
 
 #[derive(Clone, Debug)]
 pub struct Scope<'m>(pub Kind<'m>, pub Meta<'m>);

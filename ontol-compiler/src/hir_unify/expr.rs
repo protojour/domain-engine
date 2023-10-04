@@ -1,8 +1,13 @@
-use ontol_runtime::{smart_format, value::PropertyId, var::Var, vm::proc::BuiltinProc, DefId};
+use ontol_runtime::{
+    smart_format,
+    value::PropertyId,
+    var::{Var, VarSet},
+    vm::proc::BuiltinProc,
+    DefId,
+};
 use smartstring::alias::String;
 
 use crate::{
-    hir_unify::VarSet,
     typed_hir::{self, TypedHirData},
     SourceSpan,
 };

@@ -7,11 +7,11 @@ use ontol_hir::{PropVariant, SeqPropertyVariant};
 use ontol_runtime::{
     ontology::{PropertyFlow, PropertyFlowData},
     value::PropertyId,
-    var::Var,
+    var::{Var, VarSet},
     DefId,
 };
 
-use crate::{def::LookupRelationshipMeta, hir_unify::VarSet, typed_hir::TypedNodeRef, types::Type};
+use crate::{def::LookupRelationshipMeta, typed_hir::TypedNodeRef, types::Type};
 
 pub struct DataFlowAnalyzer<'c, R> {
     defs: &'c R,

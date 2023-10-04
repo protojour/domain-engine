@@ -1,13 +1,13 @@
 use std::rc::Rc;
 
 use ontol_hir::{visitor::HirVisitor, SeqPropertyVariant};
-use ontol_runtime::var::Var;
+use ontol_runtime::var::{Var, VarSet};
 
 use crate::typed_hir::{arena_import_root, TypedArena, TypedHir};
 
 use super::{
     flat_scope::{self, FlatScope, OutputVar, PropDepth, ScopeNode, ScopeVar},
-    UnifierError, UnifierResult, VarSet,
+    UnifierError, UnifierResult,
 };
 
 struct NextNode {

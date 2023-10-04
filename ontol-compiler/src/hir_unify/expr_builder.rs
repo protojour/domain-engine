@@ -1,9 +1,9 @@
 use ontol_hir::{PropVariant, SeqPropertyVariant};
+use ontol_runtime::var::VarSet;
 
 use super::expr;
 use crate::{
     def::Defs,
-    hir_unify::VarSet,
     typed_hir::{IntoTypedHirData, TypedHirData, TypedNodeRef},
 };
 
