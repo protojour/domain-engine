@@ -32,11 +32,11 @@ impl<'c, 'm> TypeMapper<'c, 'm> {
         }
     }
 
-    pub fn find_map_key_pair(&self, first: TypeRef, second: TypeRef) -> Option<MapKeyPair> {
-        let first = self.find_domain_mapping_info(first)?;
-        let second = self.find_domain_mapping_info(second)?;
+    pub fn find_map_key_pair(&self, types: [TypeRef; 2]) -> Option<MapKeyPair> {
+        let first = self.find_domain_mapping_info(types[0])?;
+        let second = self.find_domain_mapping_info(types[1])?;
 
-        Some(MapKeyPair::new(first.key, second.key))
+        Some(MapKeyPair::new([first.key, second.key]))
     }
 
     pub fn find_domain_mapping_info(&self, ty: TypeRef) -> Option<MapInfo> {

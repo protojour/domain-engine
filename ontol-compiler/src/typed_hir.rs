@@ -27,6 +27,7 @@ pub type TypedHirKind<'m> = ontol_hir::Kind<'m, TypedHir>;
 
 pub type TypedArena<'m> = ontol_hir::arena::Arena<'m, TypedHir>;
 pub type TypedNodeRef<'h, 'm> = ontol_hir::arena::NodeRef<'h, 'm, TypedHir>;
+pub type TypedRootNode<'m> = ontol_hir::RootNode<'m, TypedHir>;
 
 /// Data structure for associating ontol-hir data with the compiler's metadata attached to each hir node.
 #[derive(Clone, Copy)]

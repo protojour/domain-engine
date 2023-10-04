@@ -1082,7 +1082,9 @@ fn apply_lateral_scope<'m>(
 
                         needs_regroup_check = true;
                     } else {
-                        unreachable!()
+                        return Err(UnifierError::NonUniqueVariableDatapoints(
+                            [scope_var.0].into(),
+                        ));
                     }
                 }
                 other => return Err(unifier_todo(smart_format!("{other:?}"))),

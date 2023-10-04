@@ -15,7 +15,7 @@ use crate::{
         hir_build_ctx::{ExplicitVariableArm, PatternVariable},
         hir_build_props::UnpackerInfo,
     },
-    typed_hir::{IntoTypedHirData, Meta, TypedHir, TypedHirData},
+    typed_hir::{IntoTypedHirData, Meta, TypedHir, TypedHirData, TypedRootNode},
     types::{Type, TypeRef, ERROR_TYPE, UNIT_TYPE},
     SourceSpan, NO_SPAN,
 };
@@ -36,7 +36,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &mut self,
         pat_id: PatId,
         ctx: &mut HirBuildCtx<'m>,
-    ) -> ontol_hir::RootNode<'m, TypedHir> {
+    ) -> TypedRootNode<'m> {
         let pattern = self.patterns.table.remove(&pat_id).unwrap();
 
         let node = self.build_node(

@@ -1,13 +1,16 @@
 use std::collections::HashMap;
 
 use ontol_hir::VarAllocator;
-use ontol_runtime::DefId;
+use ontol_runtime::{DefId, PackageId};
 
 use crate::{
-    map::{MapArm, MapKeyPair, MapOutputClass},
+    def::DefKind,
+    map::MapKeyPair,
     relation::Constructor,
     text_patterns::TextPatternSegment,
-    typed_hir::{IntoTypedHirData, Meta, TypedArena, TypedHir, TypedHirData, UNIT_META},
+    typed_hir::{
+        IntoTypedHirData, Meta, TypedArena, TypedHir, TypedHirData, TypedRootNode, UNIT_META,
+    },
     Compiler, NO_SPAN,
 };
 
@@ -15,10 +18,11 @@ use super::task::ExplicitMapCodegenTask;
 
 pub fn autogenerate_mapping<'m>(
     key_pair: MapKeyPair,
+    package_id: PackageId,
     compiler: &mut Compiler<'m>,
 ) -> Option<ExplicitMapCodegenTask<'m>> {
-    let first_def_id = key_pair.first().def_id;
-    let second_def_id = key_pair.second().def_id;
+    let first_def_id = key_pair[0].def_id;
+    let second_def_id = key_pair[1].def_id;
 
     let first_properties = compiler.relations.properties_by_def_id(first_def_id)?;
     let second_properties = compiler.relations.properties_by_def_id(second_def_id)?;
@@ -28,21 +32,29 @@ pub fn autogenerate_mapping<'m>(
         &second_properties.constructor,
     ) {
         (Constructor::TextFmt(first_fmt), Constructor::TextFmt(second_fmt)) => {
-            autogenerate_fmt_to_fmt(
-                compiler,
+            let arms = autogenerate_fmt_to_fmt(
                 (first_def_id, first_fmt),
                 (second_def_id, second_fmt),
-            )
+                compiler,
+            )?;
+
+            Some(ExplicitMapCodegenTask {
+                def_id: compiler
+                    .defs
+                    .add_def(DefKind::AutoMapping, package_id, NO_SPAN),
+                arms,
+                span: NO_SPAN,
+            })
         }
         _ => None,
     }
 }
 
 fn autogenerate_fmt_to_fmt<'m>(
-    compiler: &Compiler<'m>,
     first: (DefId, &TextPatternSegment),
     second: (DefId, &TextPatternSegment),
-) -> Option<ExplicitMapCodegenTask<'m>> {
+    compiler: &Compiler<'m>,
+) -> Option<[TypedRootNode<'m>; 2]> {
     let mut var_allocator = VarAllocator::default();
     let first_var = var_allocator.alloc();
     let second_var = var_allocator.alloc();
@@ -59,17 +71,7 @@ fn autogenerate_fmt_to_fmt<'m>(
     let second_node =
         autogenerate_fmt_hir_struct(None, second.0, second_var, second.1, &mut var_map, compiler)?;
 
-    Some(ExplicitMapCodegenTask {
-        first: MapArm {
-            node: first_node,
-            class: MapOutputClass::Pure,
-        },
-        second: MapArm {
-            node: second_node,
-            class: MapOutputClass::Pure,
-        },
-        span: NO_SPAN,
-    })
+    Some([first_node, second_node])
 }
 
 fn autogenerate_fmt_hir_struct<'m>(

@@ -3,7 +3,7 @@ use std::collections::hash_map::Entry;
 use fnv::FnvHashSet;
 use ontol_hir::{Label, VarAllocator};
 use ontol_runtime::smart_format;
-use tracing::{debug, debug_span};
+use tracing::debug;
 
 use crate::{
     codegen::{
@@ -12,20 +12,18 @@ use crate::{
     },
     def::Def,
     error::CompileError,
-    map::{MapArm, MapKeyPair, MapOutputClass},
+    map::MapKeyPair,
     mem::Intern,
-    pattern::{
-        CompoundPatternModifier, PatId, Pattern, PatternKind, Patterns, RegexPatternCaptureNode,
-    },
+    pattern::{CompoundPatternModifier, PatId, Pattern, PatternKind, RegexPatternCaptureNode},
     type_check::hir_build_ctx::{Arm, VariableMapping},
-    typed_hir::TypedHir,
+    typed_hir::TypedRootNode,
     types::{Type, TypeRef, ERROR_TYPE},
     CompileErrors, Note, SourceSpan, SpannedNote,
 };
 
 use super::{
     ena_inference::{KnownType, Strength},
-    hir_build_ctx::{CtrlFlowDepth, CtrlFlowGroup, HirBuildCtx, PatternVariable},
+    hir_build_ctx::{CtrlFlowDepth, CtrlFlowGroup, HirBuildCtx, PatternVariable, ARMS},
     hir_type_inference::{HirArmTypeInference, HirVariableMapper},
     repr::repr_model::ReprKind,
     TypeCheck, TypeEquation, TypeError,
@@ -36,27 +34,23 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &mut self,
         def: &Def,
         var_allocator: &VarAllocator,
-        first_id: PatId,
-        second_id: PatId,
+        pat_ids: [PatId; 2],
     ) -> Result<TypeRef<'m>, AggrGroupError> {
         let mut ctx = HirBuildCtx::new(def.span, VarAllocator::from(*var_allocator.peek_next()));
 
-        let (first_class, second_class) = {
-            let mut map_check = MapCheck {
-                errors: self.errors,
-                patterns: self.patterns,
-            };
-
-            let first_class = map_check.analyze_arm_entry(first_id, Arm::First, &mut ctx)?;
-            let second_class = map_check.analyze_arm_entry(second_id, Arm::Second, &mut ctx)?;
-
-            (first_class, second_class)
+        let mut map_check = MapCheck {
+            errors: self.errors,
         };
+        for (pat_id, arm) in pat_ids.iter().zip(ARMS) {
+            let _entered = arm.tracing_debug_span().entered();
+
+            ctx.current_arm = arm;
+            map_check.analyze_arm(self.patterns.table.get(pat_id).unwrap(), None, &mut ctx)?;
+        }
 
         self.build_arms(
             def,
-            (first_id, first_class),
-            (second_id, second_class),
+            [(pat_ids[0], Arm::First), (pat_ids[1], Arm::Second)],
             &mut ctx,
         )?;
 
@@ -68,43 +62,29 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn build_arms(
         &mut self,
         def: &Def,
-        first: (PatId, MapOutputClass),
-        second: (PatId, MapOutputClass),
+        input: [(PatId, Arm); 2],
         ctx: &mut HirBuildCtx<'m>,
     ) -> Result<(), AggrGroupError> {
-        let mut first_node = {
-            let _entered = debug_span!("1st").entered();
-            ctx.current_arm = Arm::First;
-            let mut root_node = self.build_root_pattern(first.0, ctx);
-            self.infer_hir_arm_types(&mut root_node, ctx);
-            root_node
-        };
+        let mut arm_nodes = input.map(|(pat_id, arm)| {
+            let _entered = arm.tracing_debug_span().entered();
 
-        let mut second_node = {
-            let _entered = debug_span!("2nd").entered();
-            ctx.current_arm = Arm::Second;
-            let mut root_node = self.build_root_pattern(second.0, ctx);
+            ctx.current_arm = arm;
+            let mut root_node = self.build_root_pattern(pat_id, ctx);
             self.infer_hir_arm_types(&mut root_node, ctx);
             root_node
-        };
+        });
 
         // unify the type of variables on either side:
-        self.infer_hir_unify_arms(&mut first_node, &mut second_node, ctx);
+        self.infer_hir_unify_arms(def, &mut arm_nodes, ctx);
 
         if let Some(key_pair) = TypeMapper::new(self.relations, self.defs, self.seal_ctx)
-            .find_map_key_pair(first_node.data().ty(), second_node.data().ty())
+            .find_map_key_pair([arm_nodes[0].data().ty(), arm_nodes[1].data().ty()])
         {
             self.codegen_tasks.add_map_task(
                 key_pair,
                 crate::codegen::task::MapCodegenTask::Explicit(ExplicitMapCodegenTask {
-                    first: MapArm {
-                        node: first_node,
-                        class: first.1,
-                    },
-                    second: MapArm {
-                        node: second_node,
-                        class: second.1,
-                    },
+                    def_id: def.id,
+                    arms: arm_nodes,
                     span: def.span,
                 }),
             );
@@ -115,7 +95,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn infer_hir_arm_types(
         &mut self,
-        hir_root_node: &mut ontol_hir::RootNode<'m, TypedHir>,
+        hir_root_node: &mut TypedRootNode<'m>,
         ctx: &mut HirBuildCtx<'m>,
     ) {
         let mut inference = HirArmTypeInference {
@@ -130,24 +110,21 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn infer_hir_unify_arms(
         &mut self,
-        first: &mut ontol_hir::RootNode<'m, TypedHir>,
-        second: &mut ontol_hir::RootNode<'m, TypedHir>,
+        def: &Def,
+        arm_nodes: &mut [TypedRootNode<'m>; 2],
         ctx: &mut HirBuildCtx<'m>,
     ) {
         for (var, explicit_var) in &mut ctx.pattern_variables {
-            let first_arm = explicit_var.hir_arms.get(&Arm::First);
-            let second_arm = explicit_var.hir_arms.get(&Arm::Second);
-
-            let (Some(first_arm), Some(second_arm)) = (first_arm, second_arm) else {
-                continue;
+            let var_arms = match ARMS.map(|arm| explicit_var.hir_arms.get(&arm)) {
+                [Some(first), Some(second)] => [first, second],
+                _ => continue,
             };
-            let first_type_var = ctx.inference.new_type_variable(first_arm.pat_id);
-            let second_type_var = ctx.inference.new_type_variable(second_arm.pat_id);
+            let type_vars = var_arms.map(|var_arm| ctx.inference.new_type_variable(var_arm.pat_id));
 
             let Err(type_error) = ctx
                 .inference
                 .eq_relations
-                .unify_var_var(first_type_var, second_type_var)
+                .unify_var_var(type_vars[0], type_vars[1])
             else {
                 continue;
             };
@@ -165,39 +142,31 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         ctx.variable_mapping
                             .insert(*var, VariableMapping::Overwrite(ty));
                     } else {
-                        ctx.variable_mapping.insert(
-                            *var,
-                            VariableMapping::Mapping {
-                                first_arm_type: actual.0,
-                                second_arm_type: expected.0,
-                            },
-                        );
+                        ctx.variable_mapping
+                            .insert(*var, VariableMapping::Mapping([actual.0, expected.0]));
 
                         self.codegen_tasks.add_map_task(
-                            MapKeyPair::new(first_def_id.into(), second_def_id.into()),
-                            MapCodegenTask::Auto,
+                            MapKeyPair::new([first_def_id.into(), second_def_id.into()]),
+                            MapCodegenTask::Auto(def.id.package_id()),
                         );
                     }
                 }
                 _ => {
                     self.type_error(
                         TypeError::Mismatch(TypeEquation { actual, expected }),
-                        &second_arm.span,
+                        &var_arms[1].span,
                     );
                 }
             }
         }
 
-        HirVariableMapper {
-            variable_mapping: &ctx.variable_mapping,
-            arm: Arm::First,
+        for (node, arm) in arm_nodes.iter_mut().zip(ARMS) {
+            HirVariableMapper {
+                variable_mapping: &ctx.variable_mapping,
+                arm,
+            }
+            .map_vars(node.arena_mut());
         }
-        .map_vars(first.arena_mut());
-        HirVariableMapper {
-            variable_mapping: &ctx.variable_mapping,
-            arm: Arm::Second,
-        }
-        .map_vars(second.arena_mut());
     }
 
     /// Computes whether two scalar types are compatible when one has
@@ -258,9 +227,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     }
 }
 
+enum MapOutputClass {
+    /// The output is interpreted as a function of the opposing arm.
+    /// All output data can be derived and computed from from input data.
+    Data,
+    /// The output is interpreted as match on some entity storage, meant to produce one value.
+    /// Requires some form of runtime datastore to be computed.
+    FindMatch,
+    /// The output is interpreted as a match on some entity store meant to produce several values.
+    /// Requires some form of runtime datastore to be computed.
+    FilterMatch,
+}
+
 pub struct MapCheck<'c> {
     errors: &'c mut CompileErrors,
-    patterns: &'c Patterns,
 }
 
 struct ArmAnalysis {
@@ -269,24 +249,6 @@ struct ArmAnalysis {
 }
 
 impl<'c> MapCheck<'c> {
-    fn analyze_arm_entry(
-        &mut self,
-        pat_id: PatId,
-        arm: Arm,
-        ctx: &mut HirBuildCtx<'_>,
-    ) -> Result<MapOutputClass, AggrGroupError> {
-        let _entered = match arm {
-            Arm::First => debug_span!("1st"),
-            Arm::Second => debug_span!("2nd"),
-        }
-        .entered();
-
-        ctx.current_arm = arm;
-        Ok(self
-            .analyze_arm(self.patterns.table.get(&pat_id).unwrap(), None, ctx)?
-            .class)
-    }
-
     fn analyze_arm(
         &mut self,
         expr: &Pattern,
@@ -294,7 +256,7 @@ impl<'c> MapCheck<'c> {
         ctx: &mut HirBuildCtx<'_>,
     ) -> Result<ArmAnalysis, AggrGroupError> {
         let mut group_set = AggrGroupSet::new();
-        let mut arm_class = MapOutputClass::Pure;
+        let mut arm_class = MapOutputClass::Data;
 
         match &expr.kind {
             PatternKind::Call(_, args) => {
@@ -359,7 +321,7 @@ impl<'c> MapCheck<'c> {
                                     self.analyze_arm(&element.pattern, None, ctx).unwrap();
                                 inner_aggr_group.join(analysis.group_set);
 
-                                if !matches!(analysis.class, MapOutputClass::Pure) {
+                                if !matches!(analysis.class, MapOutputClass::Data) {
                                     // A match directly in an iterated element does not require
                                     // finding an exact aggregation group
                                     iter_match_element_count += 1;

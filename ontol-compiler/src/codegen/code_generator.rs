@@ -30,9 +30,9 @@ use super::{
 };
 
 pub(super) fn const_codegen<'m>(
-    proc_table: &mut ProcTable,
     expr: ontol_hir::RootNode<'m, TypedHir>,
     def_id: DefId,
+    proc_table: &mut ProcTable,
     compiler: &Compiler<'m>,
 ) -> CompileErrors {
     let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs, &compiler.seal_ctx);

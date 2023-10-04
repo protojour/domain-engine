@@ -6,17 +6,13 @@ use ontol_runtime::{
     format_utils::DebugViaDisplay,
     ontology::PropertyFlow,
     vm::proc::{Address, Lib, Procedure},
-    DefId, MapKey,
+    DefId, MapKey, PackageId,
 };
 use tracing::{debug, debug_span, warn};
 
 use crate::{
-    codegen::code_generator::map_codegen,
-    hir_unify::unify_to_function,
-    map::{MapArm, MapKeyPair, MapOutputClass},
-    typed_hir::TypedHir,
-    types::Type,
-    Compiler, SourceSpan,
+    codegen::code_generator::map_codegen, def::DefKind, hir_unify::unify_to_function,
+    map::MapKeyPair, typed_hir::TypedRootNode, types::Type, Compiler, SourceSpan,
 };
 
 use super::{
@@ -48,7 +44,8 @@ impl<'m> CodegenTasks<'m> {
     pub fn add_map_task(&mut self, pair: MapKeyPair, task: MapCodegenTask<'m>) {
         match self.map_tasks.entry(pair) {
             Entry::Occupied(mut occupied) => {
-                if let (MapCodegenTask::Auto, MapCodegenTask::Explicit(_)) = (occupied.get(), &task)
+                if let (MapCodegenTask::Auto(_), MapCodegenTask::Explicit(_)) =
+                    (occupied.get(), &task)
                 {
                     // Explicit maps may overwrite auto-generated maps
                     occupied.insert(task);
@@ -67,17 +64,17 @@ impl<'m> CodegenTasks<'m> {
 
 pub struct ConstCodegenTask<'m> {
     pub def_id: DefId,
-    pub node: ontol_hir::RootNode<'m, TypedHir>,
+    pub node: TypedRootNode<'m>,
 }
 
 pub enum MapCodegenTask<'m> {
-    Auto,
+    Auto(PackageId),
     Explicit(ExplicitMapCodegenTask<'m>),
 }
 
 pub struct ExplicitMapCodegenTask<'m> {
-    pub first: MapArm<'m>,
-    pub second: MapArm<'m>,
+    pub def_id: DefId,
+    pub arms: [TypedRootNode<'m>; 2],
     pub span: SourceSpan,
 }
 
@@ -92,8 +89,8 @@ impl<'m> Debug for ConstCodegenTask<'m> {
 impl<'m> Debug for ExplicitMapCodegenTask<'m> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MapCodegenTask")
-            .field("first", &DebugViaDisplay(&self.first.node))
-            .field("second", &DebugViaDisplay(&self.second.node))
+            .field("first", &DebugViaDisplay(&self.arms[0]))
+            .field("second", &DebugViaDisplay(&self.arms[1]))
             .finish()
     }
 }
@@ -134,8 +131,8 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
 
     for (def_pair, map_task) in std::mem::take(&mut compiler.codegen_tasks.map_tasks) {
         match map_task {
-            MapCodegenTask::Auto => {
-                if let Some(task) = autogenerate_mapping(def_pair, compiler) {
+            MapCodegenTask::Auto(package_id) => {
+                if let Some(task) = autogenerate_mapping(def_pair, package_id, compiler) {
                     explicit_map_tasks.push(task);
                 }
             }
@@ -149,23 +146,12 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
 
     for ConstCodegenTask { def_id, node } in std::mem::take(&mut compiler.codegen_tasks.const_tasks)
     {
-        let errors = const_codegen(&mut proc_table, node, def_id, compiler);
+        let errors = const_codegen(node, def_id, &mut proc_table, compiler);
         compiler.errors.extend(errors);
     }
 
-    for ExplicitMapCodegenTask { first, second, .. } in explicit_map_tasks {
-        debug!("1st (ty={:?}):\n{}", first.node.data().ty(), first.node);
-        debug!("2nd (ty={:?}):\n{}", second.node.data().ty(), second.node);
-
-        if matches!(second.class, MapOutputClass::Pure) {
-            let _entered = debug_span!("forward").entered();
-            generate_map_proc(&first.node, &second.node, &mut proc_table, compiler);
-        }
-
-        if matches!(first.class, MapOutputClass::Pure) {
-            let _entered = debug_span!("backward").entered();
-            generate_map_proc(&second.node, &first.node, &mut proc_table, compiler);
-        }
+    for task in explicit_map_tasks {
+        generate_explicit_map(task, &mut proc_table, compiler);
     }
 
     let LinkResult {
@@ -180,9 +166,32 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
     compiler.codegen_tasks.result_propflow_table = proc_table.propflow_table;
 }
 
+fn generate_explicit_map<'m>(
+    ExplicitMapCodegenTask { def_id, arms, .. }: ExplicitMapCodegenTask<'m>,
+    proc_table: &mut ProcTable,
+    compiler: &mut Compiler<'m>,
+) {
+    debug!("1st (ty={:?}):\n{}", arms[0].data().ty(), arms[0]);
+    debug!("2nd (ty={:?}):\n{}", arms[1].data().ty(), arms[1]);
+
+    {
+        {
+            let _entered = debug_span!("forward").entered();
+            generate_map_proc(&arms[0], &arms[1], proc_table, compiler);
+        }
+
+        {
+            let _entered = debug_span!("backward").entered();
+            generate_map_proc(&arms[1], &arms[0], proc_table, compiler);
+        }
+    }
+
+    if let Some(_ident) = compiler.map_ident(def_id) {}
+}
+
 fn generate_map_proc<'m>(
-    scope: &ontol_hir::RootNode<'m, TypedHir>,
-    expr: &ontol_hir::RootNode<'m, TypedHir>,
+    scope: &TypedRootNode<'m>,
+    expr: &TypedRootNode<'m>,
     proc_table: &mut ProcTable,
     compiler: &mut Compiler<'m>,
 ) {
@@ -208,4 +217,14 @@ fn generate_map_proc<'m>(
 
     let errors = map_codegen(proc_table, &func, compiler);
     compiler.errors.extend(errors);
+}
+
+impl<'m> Compiler<'m> {
+    fn map_ident(&self, def_id: DefId) -> Option<&'m str> {
+        if let DefKind::Mapping { ident, .. } = self.defs.def_kind(def_id) {
+            *ident
+        } else {
+            None
+        }
+    }
 }

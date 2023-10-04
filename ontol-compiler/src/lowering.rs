@@ -136,7 +136,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     def_id,
                     DefKind::Mapping {
                         ident,
-                        arms: (first, second),
+                        arms: [first, second],
                         var_alloc,
                     },
                     &span,

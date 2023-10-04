@@ -43,9 +43,10 @@ pub enum DefKind<'m> {
     Constant(PatId),
     Mapping {
         ident: Option<&'m str>,
-        arms: (PatId, PatId),
+        arms: [PatId; 2],
         var_alloc: ontol_hir::VarAllocator,
     },
+    AutoMapping,
 }
 
 impl<'m> DefKind<'m> {
@@ -63,7 +64,8 @@ impl<'m> DefKind<'m> {
             Self::FmtTransition(..) => None,
             Self::Relationship(_) => None,
             Self::Constant(_) => None,
-            Self::Mapping { .. } => None,
+            Self::Mapping { ident, .. } => ident.map(|ident| ident.into()),
+            Self::AutoMapping => None,
         }
     }
 }

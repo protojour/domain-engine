@@ -56,14 +56,11 @@ impl<'c, 'm> HirVariableMapper<'c, 'm> {
         for data in arena.iter_data_mut() {
             if let ontol_hir::Kind::Var(var) = data.hir() {
                 match self.variable_mapping.get(var) {
-                    Some(VariableMapping::Mapping {
-                        first_arm_type,
-                        second_arm_type,
-                    }) => {
+                    Some(VariableMapping::Mapping(types)) => {
                         let arm = self.arm;
                         let mapped_type = match arm {
-                            Arm::First => second_arm_type,
-                            Arm::Second => first_arm_type,
+                            Arm::First => types[1],
+                            Arm::Second => types[0],
                         };
 
                         // Make a new node which is the new var reference

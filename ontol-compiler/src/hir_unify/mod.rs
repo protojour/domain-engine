@@ -59,7 +59,7 @@ pub fn unify_to_function<'m>(
     } else {
         match unify_flat(scope, expr, var_tracker.var_allocator(), compiler) {
             Err(err) => {
-                if !CLASSIC_UNIFIER_FALLBACK {
+                if !CLASSIC_UNIFIER_FALLBACK || !matches!(&err, UnifierError::TODO(_)) {
                     return Err(err);
                 }
 

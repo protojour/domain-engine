@@ -60,10 +60,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             DefKind::Primitive(kind, _ident) => self.types.intern(Type::Primitive(*kind, def_id)),
             DefKind::Mapping {
-                arms: (first_id, second_id),
+                arms,
                 var_alloc,
                 ident: _,
-            } => match self.check_map(def, var_alloc, *first_id, *second_id) {
+            } => match self.check_map(def, var_alloc, *arms) {
                 Ok(ty) => ty,
                 Err(error) => {
                     debug!("Aggregation group error: {error:?}");

@@ -1,5 +1,6 @@
 use fnv::FnvHashMap;
 use smartstring::alias::String;
+use tracing::debug_span;
 
 use crate::{
     pattern::PatId,
@@ -92,11 +93,9 @@ pub struct PatternVariable {
 }
 
 pub enum VariableMapping<'m> {
-    Mapping {
-        first_arm_type: TypeRef<'m>,
-        second_arm_type: TypeRef<'m>,
-    },
-    // Just write the type into the ontol-hir metadata, don't perform explicit map
+    /// A mapping from the type in the first arm to the type in the second arm
+    Mapping([TypeRef<'m>; 2]),
+    /// Just write the type into the ontol-hir metadata, don't perform explicit map
     Overwrite(TypeRef<'m>),
 }
 
@@ -150,8 +149,17 @@ pub enum Arm {
     Second,
 }
 
+pub const ARMS: [Arm; 2] = [Arm::First, Arm::Second];
+
 impl Arm {
     pub fn is_first(&self) -> bool {
         matches!(self, Self::First)
+    }
+
+    pub fn tracing_debug_span(&self) -> tracing::Span {
+        match self {
+            Self::First => debug_span!("1st"),
+            Self::Second => debug_span!("2nd"),
+        }
     }
 }
