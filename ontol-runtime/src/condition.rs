@@ -4,7 +4,7 @@ use crate::{
     DefId,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct Condition {
     pub clauses: Vec<Clause>,
 }

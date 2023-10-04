@@ -7,6 +7,7 @@ use tracing::{trace, Level};
 
 use crate::{
     cast::Cast,
+    condition::Condition,
     ontology::Ontology,
     text_pattern::TextPattern,
     value::{Attribute, Data, PropertyId, Value, ValueDebug},
@@ -15,21 +16,10 @@ use crate::{
     DefId, PackageId,
 };
 
-use super::proc::{GetAttrFlags, Predicate, Yield};
-
-pub enum VmState {
-    Yielded(Yield),
-    Complete(Value),
-}
-
-impl VmState {
-    pub fn unwrap(self) -> Value {
-        match self {
-            Self::Complete(value) => value,
-            Self::Yielded(_) => panic!(),
-        }
-    }
-}
+use super::{
+    proc::{GetAttrFlags, Predicate, Yield},
+    VmState,
+};
 
 /// Virtual machine for executing ONTOL procedures
 pub struct OntolVm<'l> {
@@ -72,7 +62,7 @@ impl<'o> OntolVm<'o> {
         }
     }
 
-    pub fn run(&mut self) -> VmState {
+    pub fn run(&mut self) -> VmState<Value, Yield> {
         let result = if tracing::enabled!(Level::TRACE) {
             self.abstract_vm.run(&mut self.processor, &mut Tracer)
         } else {
@@ -80,7 +70,7 @@ impl<'o> OntolVm<'o> {
         };
 
         match result {
-            Some(yield_) => VmState::Yielded(yield_),
+            Some(y) => VmState::Yielded(y),
             None => {
                 let mut stack = std::mem::take(&mut self.processor.stack);
                 VmState::Complete(stack.pop().unwrap())
@@ -96,6 +86,7 @@ pub struct OntolProcessor {
 
 impl Processor for OntolProcessor {
     type Value = Value;
+    type Yield = Yield;
 
     #[inline(always)]
     fn size(&self) -> usize {
@@ -317,6 +308,13 @@ impl Processor for OntolProcessor {
             panic!("Assertion failed");
         }
     }
+
+    fn yield_condition(&mut self) -> Self::Yield {
+        match self.stack.pop().unwrap().data {
+            Data::Condition(condition) => Yield::Match(condition),
+            _ => panic!("Top of stack is not a condition"),
+        }
+    }
 }
 
 impl OntolProcessor {
@@ -345,6 +343,7 @@ impl OntolProcessor {
             BuiltinProc::NewStruct => Data::Struct([].into()),
             BuiltinProc::NewSeq => Data::Sequence(vec![]),
             BuiltinProc::NewUnit => Data::Unit,
+            BuiltinProc::NewCondition => Data::Condition(Condition::default()),
         }
     }
 

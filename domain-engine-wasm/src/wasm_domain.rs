@@ -9,7 +9,7 @@ use ontol_runtime::{
     },
     ontology::{MapMeta, Ontology, TypeInfo},
     value::Value,
-    vm::ontol_vm::VmState,
+    vm::VmState,
     MapKey, PackageId,
 };
 use serde::de::DeserializeSeed;

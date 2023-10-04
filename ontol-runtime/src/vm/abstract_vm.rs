@@ -1,3 +1,7 @@
+use bit_vec::BitVec;
+use tracing::debug;
+
+use super::proc::GetAttrFlags;
 use crate::{
     ontology::Ontology,
     text_pattern::TextPattern,
@@ -37,6 +41,7 @@ struct CallStackFrame<P: Processor> {
 /// Trait for implementing stacks.
 pub trait Processor {
     type Value: Sized;
+    type Yield: Sized;
 
     fn size(&self) -> usize;
     fn stack_mut(&mut self) -> &mut Vec<Self::Value>;
@@ -66,6 +71,7 @@ pub trait Processor {
         index_filter: &BitVec,
     );
     fn assert_true(&mut self);
+    fn yield_condition(&mut self) -> Self::Yield;
 }
 
 impl<'o, P: Processor> AbstractVm<'o, P> {
@@ -83,7 +89,7 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
         &self.ontology.lib.opcodes[self.program_counter]
     }
 
-    pub fn run(&mut self, processor: &mut P, debug: &mut dyn VmDebug<P>) -> Option<Yield> {
+    pub fn run(&mut self, processor: &mut P, debug: &mut dyn VmDebug<P>) -> Option<P::Yield> {
         let opcodes = self.ontology.lib.opcodes.as_slice();
 
         loop {
@@ -231,15 +237,13 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                 OpCode::Panic(message) => {
                     panic!("{message}");
                 }
+                OpCode::MatchCondition => {
+                    return Some(processor.yield_condition());
+                }
             }
         }
     }
 }
-
-use bit_vec::BitVec;
-use tracing::debug;
-
-use super::proc::{GetAttrFlags, Yield};
 
 pub trait VmDebug<P: Processor> {
     fn tick(&mut self, vm: &AbstractVm<P>, processor: &P);

@@ -3,7 +3,7 @@ use bit_vec::BitVec;
 use derive_debug_extras::DebugExtras;
 use smartstring::alias::String;
 
-use crate::{value::PropertyId, DefId};
+use crate::{condition::Condition, value::PropertyId, DefId};
 
 /// A complete ONTOL code library consisting of procedures.
 /// This structure only stores opcodes.
@@ -108,6 +108,8 @@ pub enum OpCode {
     RegexCaptureIndexes(BitVec),
     /// Yanks True from the stack and crashes unless true
     AssertTrue,
+    /// Execute a match on a datastore, using the condition at top of stack
+    MatchCondition,
     Panic(String),
 }
 
@@ -126,6 +128,7 @@ pub enum BuiltinProc {
     NewStruct,
     NewSeq,
     NewUnit,
+    NewCondition,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -164,5 +167,5 @@ impl GetAttrFlags {
 }
 
 pub enum Yield {
-    Query,
+    Match(Condition),
 }

@@ -256,24 +256,41 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
             }
             ontol_hir::Kind::Struct(binder, flags, nodes) => {
                 if flags.contains(StructFlags::MATCH) {
-                    warn!("Skipping match-struct for now");
-                    return;
+                    // warn!("Skipping match-struct for now");
+
+                    let condition_local = block.op(
+                        OpCode::CallBuiltin(BuiltinProc::NewCondition, DefId::unit()),
+                        Delta(1),
+                        span,
+                        self.builder,
+                    );
+                    self.scope.insert(binder.hir().var, condition_local);
+                    for _node_ref in arena.refs(nodes) {
+                        warn!("Not generating condition clauses yet");
+                        // self.gen_node(node_ref, block);
+
+                        block.pop_until(condition_local, span, self.builder);
+                    }
+                    self.scope.remove(&binder.hir().var);
+                    block.pop_until(condition_local, span, self.builder);
+                    block.op(OpCode::MatchCondition, Delta(0), span, self.builder);
+                } else {
+                    let Some(def_id) = ty.get_single_def_id() else {
+                        panic!("No def_id for {ty:?}");
+                    };
+                    let local = block.op(
+                        OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id),
+                        Delta(1),
+                        span,
+                        self.builder,
+                    );
+                    self.scope.insert(binder.hir().var, local);
+                    for node_ref in arena.refs(nodes) {
+                        self.gen_node(node_ref, block);
+                        block.pop_until(local, span, self.builder);
+                    }
+                    self.scope.remove(&binder.hir().var);
                 }
-                let Some(def_id) = ty.get_single_def_id() else {
-                    panic!("No def_id for {ty:?}");
-                };
-                let local = block.op(
-                    OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id),
-                    Delta(1),
-                    span,
-                    self.builder,
-                );
-                self.scope.insert(binder.hir().var, local);
-                for node_ref in arena.refs(nodes) {
-                    self.gen_node(node_ref, block);
-                    block.pop_until(local, span, self.builder);
-                }
-                self.scope.remove(&binder.hir().var);
             }
             ontol_hir::Kind::Prop(_, struct_var, prop_id, variants) => {
                 if let Some(variant) = variants.into_iter().next() {

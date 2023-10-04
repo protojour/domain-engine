@@ -8,7 +8,7 @@ use domain_engine_core::system::SystemAPI;
 use ontol_runtime::{
     interface::serde::processor::{ProcessorLevel, ProcessorMode},
     ontology::Ontology,
-    vm::ontol_vm::VmState,
+    vm::VmState,
     MapKey, PackageId,
 };
 use serde::de::DeserializeSeed;

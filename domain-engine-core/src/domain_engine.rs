@@ -6,7 +6,7 @@ use ontol_runtime::{
     ontology::Ontology,
     select::{EntitySelect, Select},
     value::{Attribute, Value},
-    vm::ontol_vm::VmState,
+    vm::VmState,
     PackageId,
 };
 use tracing::debug;
