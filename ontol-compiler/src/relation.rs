@@ -42,6 +42,11 @@ impl Relations {
     pub fn properties_by_def_id_mut(&mut self, domain_type_id: DefId) -> &mut Properties {
         self.properties_by_def_id.entry(domain_type_id).or_default()
     }
+
+    pub fn identified_by(&self, domain_type_id: DefId) -> Option<RelationshipId> {
+        let properties = self.properties_by_def_id(domain_type_id)?;
+        properties.identified_by
+    }
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]

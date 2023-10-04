@@ -4,7 +4,7 @@ use std::fmt::Display;
 
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
-use ontol_hir::visitor::HirVisitor;
+use ontol_hir::{visitor::HirVisitor, StructFlags};
 use ontol_runtime::{smart_format, DefId};
 use smallvec::SmallVec;
 use smartstring::alias::String;
@@ -14,6 +14,7 @@ use crate::{
     hir_unify::{flat_unifier_table::IsInScope, CLASSIC_UNIFIER_FALLBACK},
     mem::Intern,
     primitive::PrimitiveKind,
+    relation::Relations,
     typed_hir::{self, IntoTypedHirData, Meta, TypedHir, TypedHirData, TypedNodeRef, UNIT_META},
     types::{Type, TypeRef, Types},
     NO_SPAN,
@@ -34,6 +35,7 @@ use super::{
 pub struct FlatUnifier<'a, 'm> {
     #[allow(unused)]
     pub(super) types: &'a mut Types<'m>,
+    pub(super) relations: &'a Relations,
     pub(super) var_allocator: ontol_hir::VarAllocator,
     pub(super) hir_arena: ontol_hir::arena::Arena<'m, TypedHir>,
 }
@@ -84,9 +86,14 @@ impl Display for Level {
 }
 
 impl<'a, 'm> FlatUnifier<'a, 'm> {
-    pub fn new(types: &'a mut Types<'m>, var_allocator: ontol_hir::VarAllocator) -> Self {
+    pub fn new(
+        types: &'a mut Types<'m>,
+        relations: &'a Relations,
+        var_allocator: ontol_hir::VarAllocator,
+    ) -> Self {
         Self {
             types,
+            relations,
             var_allocator,
             hir_arena: Default::default(),
         }
@@ -130,6 +137,17 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
         meta: Meta<'m>,
     ) -> ontol_hir::Node {
         self.hir_arena.add(TypedHirData(kind, meta))
+    }
+
+    fn verify_struct_expr_flags(&self, flags: StructFlags, ty: TypeRef) -> UnifierResult<()> {
+        if flags.contains(StructFlags::MATCH) {
+            let def_id = ty.get_single_def_id().ok_or(UnifierError::NonEntityQuery)?;
+            let _ = self
+                .relations
+                .identified_by(def_id)
+                .ok_or(UnifierError::NonEntityQuery)?;
+        }
+        Ok(())
     }
 
     fn assign_to_scope(
@@ -528,6 +546,8 @@ fn unify_single<'m>(
 
                 body.push(prop_node);
             }
+
+            unifier.verify_struct_expr_flags(flags, meta.hir_meta.ty)?;
 
             let node = UnifiedNode {
                 typed_binder: Some(
@@ -1263,6 +1283,9 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                 let level = self.level;
                 let next_in_scope = in_scope.union_one(binder.hir().var);
                 let mut body = ontol_hir::Nodes::default();
+
+                self.unifier
+                    .verify_struct_expr_flags(flags, meta.hir_meta.ty)?;
 
                 debug!(
                     "{level}Make struct {} scope_var={:?} in_scope={:?} main_scope={main_scope:?}",

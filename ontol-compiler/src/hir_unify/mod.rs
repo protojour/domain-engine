@@ -37,6 +37,7 @@ pub enum UnifierError {
     NoInputBinder,
     SequenceInputNotSupported,
     MultipleVariablesInExpression(SourceSpan),
+    NonEntityQuery,
     TODO(String),
 }
 
@@ -132,7 +133,7 @@ fn unify_flat<'m>(
         (expr, expr_builder.var_allocator())
     };
 
-    let mut unifier = FlatUnifier::new(&mut compiler.types, var_allocator);
+    let mut unifier = FlatUnifier::new(&mut compiler.types, &compiler.relations, var_allocator);
     let unified = unifier.unify(flat_scope, expr)?;
 
     Ok((

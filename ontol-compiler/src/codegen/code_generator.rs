@@ -258,7 +258,9 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     warn!("Skipping match-struct for now");
                     return;
                 }
-                let def_id = ty.get_single_def_id().unwrap();
+                let Some(def_id) = ty.get_single_def_id() else {
+                    panic!("No def_id for {ty:?}");
+                };
                 let local = block.op(
                     OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id),
                     Delta(1),
