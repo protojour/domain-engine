@@ -25,6 +25,7 @@ mod flat_scope_builder;
 mod flat_unifier;
 mod flat_unifier_expr_to_node;
 mod flat_unifier_impl;
+mod flat_unifier_regex;
 mod flat_unifier_scope_assign;
 mod flat_unifier_table;
 mod regroup_match_prop;

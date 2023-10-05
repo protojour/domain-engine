@@ -113,22 +113,24 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
 
                 if self.scope_var.is_some() {
                     body.extend(unify_scope_structural(
-                        main_scope.next(),
-                        match main_scope {
-                            MainScope::Const => unreachable!(),
-                            MainScope::Value(scope_var) => {
-                                ExprSelector::Struct(binder.hir().var, scope_var)
-                            }
-                            MainScope::Sequence(scope_var, _) => {
-                                ExprSelector::Struct(binder.hir().var, scope_var)
-                            }
-                            MainScope::MultiSequence(_) => panic!(),
-                        },
+                        (
+                            main_scope.next(),
+                            match main_scope {
+                                MainScope::Const => unreachable!(),
+                                MainScope::Value(scope_var) => {
+                                    ExprSelector::Struct(binder.hir().var, scope_var)
+                                }
+                                MainScope::Sequence(scope_var, _) => {
+                                    ExprSelector::Struct(binder.hir().var, scope_var)
+                                }
+                                MainScope::MultiSequence(_) => panic!(),
+                            },
+                            self.level.next(),
+                        ),
                         StructuralOrigin::Start,
                         next_in_scope.clone(),
                         self.table,
                         self.unifier,
-                        self.level.next(),
                     )?);
                 }
 
@@ -214,13 +216,15 @@ fn find_and_unify_sequence<'m>(
     let scope_var = ScopeVar(Var(label.0));
 
     let sequence_body = unify_scope_structural(
-        MainScope::Value(scope_var),
-        ExprSelector::Struct(struct_var, scope_var),
+        (
+            MainScope::Value(scope_var),
+            ExprSelector::Struct(struct_var, scope_var),
+            level.next(),
+        ),
         StructuralOrigin::DependeesOf(scope_var),
         next_in_scope,
         table,
         unifier,
-        level.next(),
     )?;
 
     let mut seq_type_infer = SeqTypeInfer::new(output_seq_var);
