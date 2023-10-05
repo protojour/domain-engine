@@ -4,6 +4,7 @@ use std::fmt::Display;
 
 use indexmap::IndexMap;
 use ontol_hir::StructFlags;
+use ontol_runtime::var::Var;
 use smartstring::alias::String;
 use tracing::debug;
 
@@ -24,9 +25,9 @@ use super::{
     UnifierError, UnifierResult,
 };
 
-enum ExprMode {
+pub(super) enum ExprMode {
     Expr,
-    Condition,
+    Condition(Var),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -101,6 +102,10 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
         }
     }
 
+    pub(super) fn expr_mode(&self) -> &ExprMode {
+        &self.expr_mode
+    }
+
     pub(super) fn unify(
         &mut self,
         flat_scope: flat_scope::FlatScope<'m>,
@@ -145,7 +150,12 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
         self.hir_arena.add(TypedHirData(kind, meta))
     }
 
-    pub fn push_struct_expr_flags(&mut self, flags: StructFlags, ty: TypeRef) -> UnifierResult<()> {
+    pub fn push_struct_expr_flags(
+        &mut self,
+        struct_binder: Var,
+        flags: StructFlags,
+        ty: TypeRef,
+    ) -> UnifierResult<()> {
         if flags.contains(StructFlags::MATCH) {
             // Error is used in unifier tests
             if !matches!(ty, Type::Error) {
@@ -162,8 +172,10 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                     .identified_by(def_id)
                     .ok_or(UnifierError::NonEntityQuery)?;
             }
+            if self.match_struct_depth == 0 {
+                self.expr_mode = ExprMode::Condition(struct_binder);
+            }
             self.match_struct_depth += 1;
-            self.expr_mode = ExprMode::Condition;
         }
         Ok(())
     }

@@ -217,6 +217,7 @@ where
                 var_set
             }
             ontol_hir::Kind::Regex(..) => VarSet::default(),
+            ontol_hir::Kind::PushCondClause(..) => VarSet::default(),
         }
     }
 

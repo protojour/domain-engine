@@ -189,6 +189,10 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
+            Kind::PushCondClause(var, clause) => {
+                write!(f, "{indent}(push-cond-clause {var} {clause})")?;
+                Ok(Multiline(false))
+            }
         }
     }
 }

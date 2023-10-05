@@ -255,5 +255,8 @@ pub fn arena_import<'m>(
                 .collect();
             target.add(TypedHirData(MatchRegex(*iter, *var, *def_id, arms), *meta))
         }
+        PushCondClause(var, clause) => {
+            target.add(TypedHirData(PushCondClause(*var, clause.clone()), *meta))
+        }
     }
 }

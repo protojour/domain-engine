@@ -1,7 +1,7 @@
 use std::{fmt::Debug, ops::Index};
 
 use arena::{Arena, NodeRef};
-use ontol_runtime::{value::PropertyId, var::Var, vm::proc::BuiltinProc, DefId};
+use ontol_runtime::{condition::Clause, value::PropertyId, var::Var, vm::proc::BuiltinProc, DefId};
 use smallvec::SmallVec;
 use smartstring::alias::String;
 
@@ -193,6 +193,7 @@ pub enum Kind<'a, L: Lang> {
     ),
     /// A regex matcher/unpacker
     MatchRegex(Iter, Var, DefId, Vec<CaptureMatchArm<'a, L>>),
+    PushCondClause(Var, Clause),
 }
 
 #[derive(Clone)]

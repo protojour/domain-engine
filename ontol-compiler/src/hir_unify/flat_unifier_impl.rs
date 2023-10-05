@@ -120,7 +120,7 @@ pub(super) fn unify_root<'m>(
             // FIXME/DRY: This looks a lot like the expr code
             let next_in_scope = in_scope.union_one(scope_meta.scope_var.0);
 
-            unifier.push_struct_expr_flags(flags, meta.hir_meta.ty)?;
+            unifier.push_struct_expr_flags(binder.0.var, flags, meta.hir_meta.ty)?;
 
             let mut body = unify_scope_structural(
                 (

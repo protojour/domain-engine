@@ -1,4 +1,5 @@
 use ontol_runtime::{
+    condition::{Clause, CondTerm},
     smart_format,
     var::{Var, VarSet},
 };
@@ -17,7 +18,7 @@ use crate::{
 use super::{
     expr::{self, StringInterpolationComponent},
     flat_scope::{OutputVar, ScopeVar},
-    flat_unifier::{unifier_todo, FlatUnifier, Level, MainScope},
+    flat_unifier::{unifier_todo, ExprMode, FlatUnifier, Level, MainScope},
     flat_unifier_table::Table,
     UnifierResult,
 };
@@ -38,15 +39,17 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
         in_scope: &VarSet,
         main_scope: MainScope,
     ) -> UnifierResult<ontol_hir::Node> {
-        match kind {
-            expr::Kind::Var(var) => Ok(self.mk_node(ontol_hir::Kind::Var(var), meta.hir_meta)),
-            expr::Kind::Unit => Ok(self.mk_node(ontol_hir::Kind::Unit, meta.hir_meta)),
-            expr::Kind::I64(int) => Ok(self.mk_node(ontol_hir::Kind::I64(int), meta.hir_meta)),
-            expr::Kind::F64(float) => Ok(self.mk_node(ontol_hir::Kind::F64(float), meta.hir_meta)),
-            expr::Kind::Const(def_id) => {
+        match (self.unifier.expr_mode(), kind) {
+            (_, expr::Kind::Var(var)) => Ok(self.mk_node(ontol_hir::Kind::Var(var), meta.hir_meta)),
+            (_, expr::Kind::Unit) => Ok(self.mk_node(ontol_hir::Kind::Unit, meta.hir_meta)),
+            (_, expr::Kind::I64(int)) => Ok(self.mk_node(ontol_hir::Kind::I64(int), meta.hir_meta)),
+            (_, expr::Kind::F64(float)) => {
+                Ok(self.mk_node(ontol_hir::Kind::F64(float), meta.hir_meta))
+            }
+            (_, expr::Kind::Const(def_id)) => {
                 Ok(self.mk_node(ontol_hir::Kind::Const(def_id), meta.hir_meta))
             }
-            expr::Kind::Prop(prop) => {
+            (ExprMode::Expr, expr::Kind::Prop(prop)) => {
                 let variants: SmallVec<_> = match prop.variant {
                     expr::PropVariant::Singleton(attr) => {
                         [ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
@@ -84,28 +87,45 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                     meta.hir_meta,
                 ))
             }
-            expr::Kind::Call(expr::Call(proc, args)) => {
+            (ExprMode::Condition(cond_var), expr::Kind::Prop(prop)) => {
+                // debug!("push cond clause")
+                Ok(self.mk_node(
+                    ontol_hir::Kind::PushCondClause(
+                        *cond_var,
+                        Clause::Attr(
+                            prop.struct_var,
+                            prop.prop_id,
+                            (CondTerm::Wildcard, CondTerm::Wildcard),
+                        ),
+                    ),
+                    meta.hir_meta,
+                ))
+            }
+            (_, expr::Kind::Call(expr::Call(proc, args))) => {
                 let mut hir_args = ontol_hir::Nodes::default();
                 for arg in args {
                     hir_args.push(self.scoped_expr_to_node(arg, in_scope, main_scope.next())?);
                 }
                 Ok(self.mk_node(ontol_hir::Kind::Call(proc, hir_args), meta.hir_meta))
             }
-            expr::Kind::Map(arg) => {
+            (_, expr::Kind::Map(arg)) => {
                 let hir_arg = self.scoped_expr_to_node(*arg, in_scope, main_scope.next())?;
                 Ok(self.mk_node(ontol_hir::Kind::Map(hir_arg), meta.hir_meta))
             }
-            expr::Kind::Struct {
-                binder,
-                flags,
-                props,
-            } => {
+            (
+                _,
+                expr::Kind::Struct {
+                    binder,
+                    flags,
+                    props,
+                },
+            ) => {
                 let level = self.level;
                 let next_in_scope = in_scope.union_one(binder.hir().var);
                 let mut body = ontol_hir::Nodes::default();
 
                 self.unifier
-                    .push_struct_expr_flags(flags, meta.hir_meta.ty)?;
+                    .push_struct_expr_flags(binder.0.var, flags, meta.hir_meta.ty)?;
 
                 debug!(
                     "{level}Make struct {} scope_var={:?} in_scope={:?} main_scope={main_scope:?}",
@@ -169,7 +189,7 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                 self.unifier.pop_struct_expr_flags(flags);
                 Ok(self.mk_node(ontol_hir::Kind::Struct(binder, flags, body), meta.hir_meta))
             }
-            expr::Kind::SeqItem(label, _index, _iter, attr) => {
+            (_, expr::Kind::SeqItem(label, _index, _iter, attr)) => {
                 let (scope_var, output_var) = match main_scope {
                     MainScope::Sequence(scope_var, output_var) => (scope_var, output_var),
                     MainScope::MultiSequence(table) => {
@@ -188,7 +208,7 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                     UNIT_META,
                 ))
             }
-            expr::Kind::StringInterpolation(binder, components) => {
+            (_, expr::Kind::StringInterpolation(binder, components)) => {
                 let let_def = self.mk_node(ontol_hir::Kind::Text("".into()), meta.hir_meta);
                 let components: ontol_hir::Nodes = components
                     .into_iter()
@@ -217,8 +237,8 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                     meta.hir_meta,
                 ))
             }
-            expr::Kind::HirNode(node) => Ok(node),
-            other => Err(unifier_todo(smart_format!("leaf expr to node: {other:?}"))),
+            (_, expr::Kind::HirNode(node)) => Ok(node),
+            (_, other) => Err(unifier_todo(smart_format!("leaf expr to node: {other:?}"))),
         }
     }
 

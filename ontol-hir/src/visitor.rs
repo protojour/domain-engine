@@ -164,6 +164,9 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                     self.visit_capture_match_arm(index, arm, arena);
                 }
             }
+            Kind::PushCondClause(var, _) => {
+                self.visit_var(*var);
+            }
         }
     }
 

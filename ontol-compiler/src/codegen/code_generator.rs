@@ -694,6 +694,9 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 );
                 block.pop_until(top, span, self.builder);
             }
+            ontol_hir::Kind::PushCondClause(..) => {
+                todo!()
+            }
             ontol_hir::Kind::DeclSeq(..) | ontol_hir::Kind::Regex(..) => {
                 unreachable!(
                     "{} is only declarative, not used in code generation",
