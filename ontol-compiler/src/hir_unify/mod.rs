@@ -8,7 +8,7 @@ use tracing::{info, warn};
 use crate::{
     hir_unify::{expr_builder::ExprBuilder, scope_builder::ScopeBuilder, unifier::Unifier},
     typed_hir::{HirFunc, IntoTypedHirData, TypedHir},
-    Compiler, SourceSpan,
+    Compiler, SourceSpan, CLASSIC_UNIFIER_FALLBACK, USE_FLAT_UNIFIER,
 };
 
 use self::{
@@ -46,9 +46,6 @@ pub enum UnifierError {
 }
 
 pub type UnifierResult<T> = Result<T, UnifierError>;
-
-const USE_FLAT_UNIFIER: bool = true;
-const CLASSIC_UNIFIER_FALLBACK: bool = true;
 
 pub fn unify_to_function<'m>(
     scope: &ontol_hir::RootNode<'m, TypedHir>,

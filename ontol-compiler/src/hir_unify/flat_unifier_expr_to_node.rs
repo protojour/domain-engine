@@ -54,7 +54,7 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                     }
                     expr::PropVariant::Seq { label, elements } => {
                         assert!(elements.is_empty());
-                        let sequence_node = find_and_unify_sequence(
+                        let sequence_node = find_and_unify_sequence_prop(
                             prop.struct_var,
                             label,
                             in_scope,
@@ -195,7 +195,7 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
     }
 }
 
-fn find_and_unify_sequence<'m>(
+fn find_and_unify_sequence_prop<'m>(
     struct_var: Var,
     label: ontol_hir::Label,
     in_scope: &VarSet,

@@ -27,7 +27,7 @@ impl FromStr for Var {
 
 impl Debug for Var {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Var({})", AsAlpha(self.0))
+        write!(f, "${}", AsAlpha(self.0))
     }
 }
 

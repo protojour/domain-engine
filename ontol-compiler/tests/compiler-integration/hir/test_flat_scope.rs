@@ -15,7 +15,7 @@ fn test_flat_basic_struct1() {
     let expected = indoc! {
         "
         $a: {} - Struct def{$a} cns{}
-        $c: {$a} - PropVariant(d=0, opt=f, Var(a), S:0:0) def{$b} cns{}
+        $c: {$a} - PropVariant(d=0, opt=f, $a, S:0:0) def{$b} cns{}
         $d: {$c} - PropValue def{$b} cns{}
         $b: {$d} - Var def{$b} cns{}
         "
@@ -35,7 +35,7 @@ fn test_flat_arithmetic_prop() {
     let expected = indoc! {
         "
         $a: {} - Struct def{$a} cns{}
-        $c: {$a} - PropVariant(d=0, opt=f, Var(a), S:0:0) def{$b} cns{}
+        $c: {$a} - PropVariant(d=0, opt=f, $a, S:0:0) def{$b} cns{}
         $d: {$c} - PropValue def{$b} cns{}
         $e: {$d} - Call(Sub) def{$b} cns{}
         $b: {$e} - Var def{$b} cns{}
@@ -61,9 +61,9 @@ fn test_flat_arithmetic_prop_dependency() {
     let expected = indoc! {
         "
         $a: {} - Struct def{$a} cns{}
-        $d: {$a} - PropVariant(d=0, opt=f, Var(a), O:0:0) def{$b, $c} cns{}
+        $d: {$a} - PropVariant(d=0, opt=f, $a, O:0:0) def{$b, $c} cns{}
         $e: {$d} - PropValue def{$b, $c} cns{}
-        $f: {$a} - PropVariant(d=0, opt=f, Var(a), O:0:1) def{$b} cns{}
+        $f: {$a} - PropVariant(d=0, opt=f, $a, O:0:1) def{$b} cns{}
         $g: {$f} - PropValue def{$b} cns{}
         $h: {$e} - Call(Add) def{$b, $c} cns{}
         $i: {$g} - Call(Add) def{$b} cns{}
@@ -92,7 +92,7 @@ fn test_flat_regex() {
     let expected = indoc! {
         "
         $a: {} - Struct def{$a} cns{}
-        $c: {$a} - PropVariant(d=0, opt=f, Var(a), S:0:0) def{} cns{}
+        $c: {$a} - PropVariant(d=0, opt=f, $a, S:0:0) def{} cns{}
         $d: {$c} - PropValue def{} cns{}
         $e: {$d} - Regex(None, def@0:0) def{} cns{}
         $f: {$e} - RegexAlternation def{$b} cns{}
@@ -126,12 +126,12 @@ fn test_flat_seq() {
     let expected = indoc! {
         "
         $b: {} - Struct def{$b} cns{}
-        $f: {$b} - SeqPropVariant(Data(Label(f), Error), OutputVar(Var(h)), opt=f, HasDefault(false), Var(b), S:0:0) def{$f} cns{}
-        $i: {$f} - IterElement(Label(f), OutputVar(Var(h))) def{} cns{}
+        $f: {$b} - SeqPropVariant(Data(Label(f), Error), OutputVar($h), opt=f, HasDefault(false), $b, S:0:0) def{$f} cns{}
+        $i: {$f} - IterElement(Label(f), OutputVar($h)) def{} cns{}
         $j: {$i} - PropValue def{$c} cns{}
         $c: {$j} - Struct def{$c} cns{}
-        $g: {$c} - SeqPropVariant(Data(Label(g), Error), OutputVar(Var(k)), opt=f, HasDefault(false), Var(c), S:1:1) def{$g} cns{}
-        $l: {$g} - IterElement(Label(g), OutputVar(Var(k))) def{} cns{}
+        $g: {$c} - SeqPropVariant(Data(Label(g), Error), OutputVar($k), opt=f, HasDefault(false), $c, S:1:1) def{$g} cns{}
+        $l: {$g} - IterElement(Label(g), OutputVar($k)) def{} cns{}
         $m: {$l} - PropValue def{$a} cns{}
         $a: {$m} - Var def{$a} cns{}
         "
@@ -154,9 +154,9 @@ fn test_flat_seq_mix() {
     let expected = indoc! {
         "
         $c: {} - Struct def{$c} cns{}
-        $d: {$c} - SeqPropVariant(Data(Label(d), Error), OutputVar(Var(e)), opt=f, HasDefault(false), Var(c), S:1:1) def{$a, $c, $d} cns{}
+        $d: {$c} - SeqPropVariant(Data(Label(d), Error), OutputVar($e), opt=f, HasDefault(false), $c, S:1:1) def{$a, $c, $d} cns{}
         $f: {$d} - PropValue def{$a} cns{}
-        $g: {$d} - IterElement(Label(d), OutputVar(Var(e))) def{} cns{}
+        $g: {$d} - IterElement(Label(d), OutputVar($e)) def{} cns{}
         $h: {$g} - PropValue def{$b} cns{}
         $i: {$d} - PropValue def{$c} cns{}
         $a: {$f} - Var def{$a} cns{}

@@ -1,3 +1,4 @@
+use ontol_hir::Optional;
 use ontol_runtime::{
     smart_format,
     var::{Var, VarSet},
@@ -10,7 +11,7 @@ use crate::{
     primitive::PrimitiveKind,
     typed_hir::{self, UNIT_META},
     types::Type,
-    NO_SPAN,
+    NO_SPAN, USE_FLAT_SEQ_HANDLING,
 };
 
 use super::{
@@ -57,6 +58,44 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                     .push(Assignment::new(expr));
 
                 Ok(AssignResult::Success)
+            }
+            expr::Kind::Seq(label, attr) if USE_FLAT_SEQ_HANDLING => {
+                let slot =
+                    table.find_assignment_slot(&meta.free_vars, None, Optional(false), &mut filter);
+
+                let assign_result = self.assign_to_scope(
+                    expr::Expr(
+                        expr::Kind::SeqItem(label, 0, ontol_hir::Iter(true), attr),
+                        meta.clone(),
+                    ),
+                    depth,
+                    filter,
+                    table,
+                )?;
+                match assign_result {
+                    AssignResult::Unassigned(expr::Expr(kind, meta)) => {
+                        let expr::Kind::SeqItem(_, _, _, attr) = kind else {
+                            panic!();
+                        };
+                        Ok(Self::assign_to_assignment_slot(
+                            slot,
+                            expr::Expr(expr::Kind::Seq(label, attr), meta),
+                            table,
+                        ))
+                    }
+                    _ => {
+                        // BUG: Not 0?
+                        table
+                            .scope_map_mut(0)
+                            .assignments
+                            .push(Assignment::new(expr::Expr(
+                                expr::Kind::DestructuredSeq(label),
+                                meta,
+                            )));
+
+                        Ok(AssignResult::Success)
+                    }
+                }
             }
             expr::Kind::Prop(prop) => {
                 let expr::Prop {

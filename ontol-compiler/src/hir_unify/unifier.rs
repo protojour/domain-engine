@@ -8,7 +8,7 @@ use crate::{
     mem::Intern,
     typed_hir::{arena_import, IntoTypedHirData, Meta, TypedHir, TypedHirData, UNIT_META},
     types::{Type, Types, UNIT_TYPE},
-    NO_SPAN,
+    NO_SPAN, USE_FLAT_SEQ_HANDLING,
 };
 
 use super::{
@@ -672,11 +672,14 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     self.unify(scope::constant(), expr)
                 }
             }
-            (expr::Kind::Seq(_label, attr), _) => {
+            (expr::Kind::Seq(_label, attr), _scope) => {
+                if USE_FLAT_SEQ_HANDLING {
+                    panic!("Should be solved in flat unifier");
+                }
                 // FIXME: This needs to be better
                 let seq_ty = self
                     .types
-                    .intern(Type::Seq(&UNIT_TYPE, attr.val.hir_meta().ty));
+                    .intern(Type::Seq(attr.rel.hir_meta().ty, attr.val.hir_meta().ty));
 
                 let val = self.unify(scope::constant(), attr.val)?;
 
@@ -686,6 +689,9 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     typed_binder: None,
                     node: val.node,
                 })
+            }
+            (expr::Kind::DestructuredSeq(_), _) => {
+                panic!("Should not be used here")
             }
             (expr::Kind::SeqItem(..), _) => {
                 panic!("Only used in flat unifier")

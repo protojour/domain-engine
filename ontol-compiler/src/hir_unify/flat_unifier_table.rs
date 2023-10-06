@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 
+use ontol_hir::Label;
 use ontol_runtime::var::{Var, VarSet};
 use tracing::debug;
 
@@ -21,7 +22,7 @@ pub(super) struct Table<'m> {
 #[derive(Clone, Copy, Debug)]
 pub enum ExprSelector {
     Struct(Var, ScopeVar),
-    SeqItem,
+    SeqItem(Label),
 }
 
 pub trait IsInScope {
@@ -391,7 +392,10 @@ impl<'m> ScopeMap<'m> {
                     (expr::Kind::Prop(prop), ExprSelector::Struct(struct_var, _)) => {
                         prop.struct_var == struct_var
                     }
-                    (expr::Kind::SeqItem(..), ExprSelector::SeqItem) => true,
+                    (
+                        expr::Kind::SeqItem(item_label, ..),
+                        ExprSelector::SeqItem(selector_label),
+                    ) => item_label == &selector_label,
                     (expr::Kind::SeqItem(..), _) => false,
                     _ => true,
                 });

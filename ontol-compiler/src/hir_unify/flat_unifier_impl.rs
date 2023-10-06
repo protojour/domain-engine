@@ -34,7 +34,7 @@ struct ScopeGroup<'m> {
     subgroups: FnvHashMap<ScopeVar, ScopeGroup<'m>>,
 }
 
-pub(super) fn unify_single<'m>(
+pub(super) fn unify_root<'m>(
     parent_scope_var: Option<ScopeVar>,
     in_scope: VarSet,
     table: &mut Table<'m>,
@@ -63,6 +63,8 @@ pub(super) fn unify_single<'m>(
     let Some(index) = indexes.into_iter().next() else {
         panic!("multiple indexes");
     };
+
+    debug!("unify root index={index}");
 
     let scope_map = &mut table.scope_map_mut(index);
     let scope_meta = scope_map.scope.meta().clone();
@@ -172,6 +174,47 @@ pub(super) fn unify_single<'m>(
 
             Ok(node)
         }
+        (
+            Some(Assignment {
+                expr: expr::Expr(expr::Kind::DestructuredSeq(label), meta),
+                ..
+            }),
+            flat_scope::Kind::Struct,
+        ) => {
+            let next_in_scope = in_scope.union_one(scope_meta.scope_var.0);
+            let body = unify_scope_structural(
+                (
+                    MainScope::Value(scope_meta.scope_var),
+                    ExprSelector::SeqItem(label),
+                    Level(0),
+                ),
+                StructuralOrigin::DependeesOf(scope_var),
+                next_in_scope.clone(),
+                table,
+                unifier,
+            )?;
+
+            let node = UnifiedNode {
+                typed_binder: Some(
+                    ontol_hir::Binder {
+                        var: scope_meta.scope_var.0,
+                    }
+                    .with_meta(scope_meta.hir_meta),
+                ),
+                node: unifier.mk_node(
+                    ontol_hir::Kind::Sequence(
+                        ontol_hir::Binder {
+                            var: label.0.into(),
+                        }
+                        .with_meta(scope_meta.hir_meta),
+                        body.into(),
+                    ),
+                    meta.hir_meta,
+                ),
+            };
+
+            Ok(node)
+        }
         other => Err(unifier_todo(smart_format!("Handle pair {other:?}"))),
     }
 }
@@ -195,7 +238,13 @@ pub(super) fn unify_scope_structural<'m>(
     while !indexes.is_empty() {
         let mut next_indexes = vec![];
 
-        debug!("{level}indexes={indexes:?}");
+        debug!(
+            "{level}indexes={:?}",
+            indexes
+                .iter()
+                .map(|idx| table.scope_map_mut(*idx).scope.meta().scope_var.0)
+                .collect::<Vec<_>>()
+        );
 
         for index in indexes {
             let scope_map = &mut table.scope_map_mut(index);

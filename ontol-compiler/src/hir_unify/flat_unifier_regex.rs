@@ -64,7 +64,7 @@ pub(super) fn unify_regex<'m>(
             level.next(),
         )?);
         next_indexes.extend(table.dependees(Some(scope_var)));
-    } else if let Some(_seq_label) = opt_seq_label {
+    } else if let Some(seq_label) = opt_seq_label {
         debug!("{level}looping regex");
         // looping regex
         let mut match_arms: Vec<ontol_hir::CaptureMatchArm<'m, TypedHir>> = vec![];
@@ -158,7 +158,7 @@ pub(super) fn unify_regex<'m>(
             )?);
 
             match_arm.nodes.extend(unify_scope_structural(
-                (main_scope, ExprSelector::SeqItem, level.next()),
+                (main_scope, ExprSelector::SeqItem(seq_label), level.next()),
                 StructuralOrigin::DependeesOf(alt_scope_var),
                 captured_scope,
                 table,

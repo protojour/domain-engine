@@ -129,7 +129,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
 
         result?;
 
-        flat_unifier_impl::unify_single(None, Default::default(), &mut table, self)
+        flat_unifier_impl::unify_root(None, Default::default(), &mut table, self)
     }
 
     #[inline]

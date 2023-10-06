@@ -64,6 +64,15 @@ mod text_patterns;
 mod type_check;
 mod types;
 
+/// Temporary configuration: Use the new flat unifier
+const USE_FLAT_UNIFIER: bool = true;
+
+/// Temporary configuration: Fall back to the classic unifier if the flat unifier fails
+const CLASSIC_UNIFIER_FALLBACK: bool = true;
+
+/// Temporary configuration: Handle seq/DeclSeq in the flat unifier
+const USE_FLAT_SEQ_HANDLING: bool = false;
+
 #[derive(Debug)]
 pub struct Compiler<'m> {
     pub sources: Sources,

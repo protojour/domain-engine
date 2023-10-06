@@ -55,6 +55,7 @@ pub enum Kind<'m> {
     String(String),
     Const(DefId),
     Seq(ontol_hir::Label, Box<ontol_hir::Attribute<Expr<'m>>>),
+    DestructuredSeq(ontol_hir::Label),
     SeqItem(
         ontol_hir::Label,
         usize,
@@ -93,6 +94,7 @@ impl<'m> Kind<'m> {
             Self::String(string) => format!("String({string})"),
             Self::Const(const_def_id) => format!("Const({const_def_id:?})"),
             Self::Seq(label, _) => format!("Seq({label})"),
+            Self::DestructuredSeq(label) => format!("DestructuredSeq({label})"),
             Self::SeqItem(label, index, _iter, attr) => format!(
                 "SeqItem({label}, {index}, ({}, {}))",
                 attr.rel.kind().debug_short(),
@@ -207,6 +209,7 @@ impl FreeVarVisitor {
             Kind::Seq(_, attr) => {
                 self.visit_attr(attr);
             }
+            Kind::DestructuredSeq(_) => {}
             Kind::SeqItem(_, _, _, attr) => self.visit_attr(attr),
             Kind::Push(_, attr) => {
                 self.visit_attr(attr);
