@@ -21,6 +21,7 @@ pub(super) struct Table<'m> {
 
 #[derive(Clone, Copy, Debug)]
 pub enum ExprSelector {
+    Any,
     Struct(Var, ScopeVar),
     SeqItem(Label),
 }

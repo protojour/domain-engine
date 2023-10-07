@@ -1814,7 +1814,7 @@ fn test_basic_match_filter1() {
         ",
     );
     let expected = indoc! {"
-        |$d| (match-struct ($c))"
+        |$b| (match-struct ($c))"
     };
     assert_eq!(expected, output);
 }
@@ -1828,7 +1828,7 @@ fn test_basic_match_filter2() {
         )
         ",
         "
-        (decl-seq (@a) #u
+        (decl-seq (@d) #u
             (match-struct ($c)
                 (prop $c O:0:0 (#u $a))
             )

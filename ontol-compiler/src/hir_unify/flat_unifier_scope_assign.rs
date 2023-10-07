@@ -1,4 +1,4 @@
-use ontol_hir::Optional;
+use ontol_hir::{Optional, StructFlags};
 use ontol_runtime::{
     smart_format,
     var::{Var, VarSet},
@@ -19,13 +19,19 @@ use super::{
     flat_scope::{self, PropDepth, ScopeVar},
     flat_unifier::{unifier_todo, FlatUnifier},
     flat_unifier_table::{Assignment, AssignmentSlot, ScopeFilter, Table},
-    UnifierResult,
+    UnifierError, UnifierResult,
 };
 
 pub(super) enum AssignResult<'m> {
-    Success(usize),
-    SuccessWithLabel(usize, ontol_hir::Label),
+    Assigned(usize),
+    AssignedWithLabel(usize, ontol_hir::Label),
     Unassigned(expr::Expr<'m>),
+}
+
+enum IterAssignmentResult {
+    Assigned(usize, ontol_hir::Label),
+    FreeIterLabel,
+    Error(UnifierError),
 }
 
 impl<'a, 'm> FlatUnifier<'a, 'm> {
@@ -42,10 +48,10 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                     table.scope_maps[index]
                         .assignments
                         .push(Assignment::new(expr::Expr(kind, meta)));
-                    Ok(AssignResult::Success(index))
+                    Ok(AssignResult::Assigned(index))
                 } else {
                     table.const_expr = Some(expr::Expr(kind, meta));
-                    Ok(AssignResult::Success(0))
+                    Ok(AssignResult::Assigned(0))
                 }
             }
             kind @ expr::Kind::Struct { .. } => {
@@ -54,7 +60,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                 // BUG: Not 0?
                 table.scope_maps[0].assignments.push(Assignment::new(expr));
 
-                Ok(AssignResult::Success(0))
+                Ok(AssignResult::Assigned(0))
             }
             expr::Kind::Seq(label, attr) if USE_FLAT_SEQ_HANDLING => {
                 let assign_result = self.assign_to_scope(
@@ -72,20 +78,38 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                             panic!();
                         };
 
-                        let slot = table.find_assignment_slot(
-                            &meta.free_vars,
+                        // This should be a match-struct in a sequence
+                        let expr = match (attr.rel.kind(), attr.val.kind()) {
+                            (expr::Kind::Unit, expr::Kind::Struct { flags, .. })
+                                if flags.contains(StructFlags::MATCH) =>
+                            {
+                                expr::Expr(attr.val.0, meta)
+                            }
+                            _ => {
+                                return Ok(AssignResult::Unassigned(expr::Expr(
+                                    expr::Kind::Seq(label, attr),
+                                    meta,
+                                )))
+                            }
+                        };
+
+                        match table.find_assignment_slot(
+                            &expr.meta().free_vars,
                             None,
                             Optional(false),
                             &mut filter,
-                        );
+                        ) {
+                            Some(slot) => {
+                                Ok(Self::assign_to_assignment_slot(Some(slot), expr, table))
+                            }
+                            None => {
+                                table.scope_maps[0].assignments.push(Assignment::new(expr));
 
-                        Ok(Self::assign_to_assignment_slot(
-                            slot,
-                            expr::Expr(expr::Kind::Seq(label, attr), meta),
-                            table,
-                        ))
+                                Ok(AssignResult::Assigned(0))
+                            }
+                        }
                     }
-                    AssignResult::Success(index) | AssignResult::SuccessWithLabel(index, ..) => {
+                    AssignResult::Assigned(index) | AssignResult::AssignedWithLabel(index, ..) => {
                         let output_var = match &table.scope_maps[index].scope.kind() {
                             flat_scope::Kind::SeqPropVariant(_, output_var, ..) => *output_var,
                             flat_scope::Kind::IterElement(_, output_var) => *output_var,
@@ -100,7 +124,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                                 meta,
                             )));
 
-                        Ok(AssignResult::Success(0))
+                        Ok(AssignResult::Assigned(0))
                     }
                 }
             }
@@ -164,7 +188,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                                 table,
                             )?;
 
-                            if let AssignResult::SuccessWithLabel(_, final_label) = assign_result {
+                            if let AssignResult::AssignedWithLabel(_, final_label) = assign_result {
                                 label = final_label;
                             }
                         }
@@ -205,7 +229,18 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                 // Find the scope var that matches the label
                 let label_scope_var = ScopeVar(Var(label.0));
                 let (assignment_idx, final_label) =
-                    self.find_iter_assignment_slot(label_scope_var, &meta.free_vars, table)?;
+                    match self.find_iter_assignment_slot(label_scope_var, &meta.free_vars, table) {
+                        IterAssignmentResult::Assigned(assignment_idx, final_label) => {
+                            (assignment_idx, final_label)
+                        }
+                        IterAssignmentResult::FreeIterLabel => {
+                            return Ok(AssignResult::Unassigned(expr::Expr(
+                                expr::Kind::SeqItem(label, index, iter, attr),
+                                meta,
+                            )))
+                        }
+                        IterAssignmentResult::Error(error) => return Err(error),
+                    };
 
                 let rel = self.destructure_expr(attr.rel, depth, &filter, table)?;
                 let val = self.destructure_expr(attr.val, depth, &filter, table)?;
@@ -222,7 +257,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                     meta,
                 )));
 
-                Ok(AssignResult::SuccessWithLabel(assignment_idx, final_label))
+                Ok(AssignResult::AssignedWithLabel(assignment_idx, final_label))
             }
             e => Err(unifier_todo(smart_format!("expr kind: {e:?}"))),
         }
@@ -289,16 +324,16 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
         label_scope_var: ScopeVar,
         expr_free_vars: &VarSet,
         table: &mut Table<'m>,
-    ) -> UnifierResult<(usize, ontol_hir::Label)> {
+    ) -> IterAssignmentResult {
         let Some((_idx, scope_map)) = table.find_scope_map_by_scope_var(label_scope_var) else {
-            return Err(unifier_todo(smart_format!("Not able to find iter scope A")));
+            return IterAssignmentResult::FreeIterLabel;
         };
 
         match scope_map.scope.kind() {
             // For SeqPropVariant, find the scope child that iterates elements
             flat_scope::Kind::SeqPropVariant(label, ..) => {
                 let label = *label;
-                table
+                match table
                     .dependees(Some(label_scope_var))
                     .into_iter()
                     .find(|idx| {
@@ -306,15 +341,16 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                         matches!(scope_map.scope.kind(), flat_scope::Kind::IterElement(..))
                     })
                     .map(|idx| (idx, *label.hir()))
-                    .ok_or_else(|| {
-                        unifier_todo(smart_format!(
-                            "Unable to find IterElement scope under SeqPropVariant"
-                        ))
-                    })
+                {
+                    Some((idx, label)) => IterAssignmentResult::Assigned(idx, label),
+                    None => IterAssignmentResult::Error(unifier_todo(smart_format!(
+                        "Unable to find IterElement scope under SeqPropVariant"
+                    ))),
+                }
             }
             flat_scope::Kind::Regex(Some(_label), _) => {
                 // looping regex. Need to assign to the RegexAlternation that matches..
-                table
+                match table
                     .dependees(Some(label_scope_var))
                     .into_iter()
                     .find(|idx| {
@@ -330,10 +366,16 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                     .map(|idx| {
                         // allocate a new label so it can be used independently of other sequences
                         (idx, ontol_hir::Label(self.var_allocator.alloc().0))
-                    })
-                    .ok_or_else(|| unifier_todo(smart_format!("Unable to locate loge")))
+                    }) {
+                    Some((idx, label)) => IterAssignmentResult::Assigned(idx, label),
+                    None => IterAssignmentResult::Error(unifier_todo(smart_format!(
+                        "Unable to locate loge"
+                    ))),
+                }
             }
-            _ => Err(unifier_todo(smart_format!("Not able to find iter scope B"))),
+            _ => IterAssignmentResult::Error(unifier_todo(smart_format!(
+                "Not able to find iter scope B"
+            ))),
         }
     }
 
@@ -347,7 +389,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
             scope_map
                 .assignments
                 .push(Assignment::new(expr).with_lateral_deps(slot.lateral_deps));
-            AssignResult::Success(slot.index)
+            AssignResult::Assigned(slot.index)
         } else {
             AssignResult::Unassigned(expr)
         }

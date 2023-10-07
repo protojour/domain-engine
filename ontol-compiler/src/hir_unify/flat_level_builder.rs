@@ -3,7 +3,9 @@ use ontol_runtime::{value::PropertyId, var::Var};
 
 use crate::{
     hir_unify::flat_scope,
-    typed_hir::{self, IntoTypedHirData, TypedHir, UNIT_META},
+    typed_hir::{self, IntoTypedHirData, TypedHir},
+    types::UNIT_TYPE,
+    NO_SPAN,
 };
 
 use super::{
@@ -34,13 +36,24 @@ impl<'m> LevelBuilder<'m> {
                         .push((ontol_hir::PropPattern::Absent, ontol_hir::Nodes::default()));
                 }
 
+                let mut ty = &UNIT_TYPE;
+
+                // Compute the type of the match-prop expression.
+                // FIXME: Handle the case where there are multiple arms
+                // with differing type.
+                for (_, nodes) in &merged_match_arms.match_arms {
+                    if let Some(node) = nodes.last() {
+                        ty = &unifier.hir_arena[*node].meta().ty;
+                    }
+                }
+
                 self.output.push(unifier.mk_node(
                     ontol_hir::Kind::MatchProp(
                         struct_var,
                         property_id,
                         merged_match_arms.match_arms.into(),
                     ),
-                    UNIT_META,
+                    typed_hir::Meta { ty, span: NO_SPAN },
                 ));
             }
         }

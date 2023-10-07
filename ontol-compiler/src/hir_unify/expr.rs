@@ -1,4 +1,4 @@
-use ontol_hir::Node;
+use ontol_hir::{Node, StructFlags};
 use ontol_runtime::{
     smart_format,
     value::PropertyId,
@@ -81,7 +81,13 @@ impl<'m> Kind<'m> {
         match self {
             Self::Var(var) => format!("Var({var})"),
             Self::Unit => "Unit".to_string(),
-            Self::Struct { binder, .. } => format!("Struct({})", binder.hir().var),
+            Self::Struct { binder, flags, .. } => {
+                if flags.contains(StructFlags::MATCH) {
+                    format!("MatchStruct({})", binder.hir().var)
+                } else {
+                    format!("Struct({})", binder.hir().var)
+                }
+            }
             Self::Prop(prop) => format!(
                 "Prop{}({}{}[{}])",
                 if prop.optional.0 { "?" } else { "" },

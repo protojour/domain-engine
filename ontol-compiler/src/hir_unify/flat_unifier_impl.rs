@@ -215,6 +215,35 @@ pub(super) fn unify_root<'m>(
 
             Ok(node)
         }
+        (None, _) => {
+            let body = unify_scope_structural(
+                (
+                    MainScope::Value(scope_meta.scope_var),
+                    ExprSelector::Any,
+                    Level(0),
+                ),
+                StructuralOrigin::DependeesOf(scope_var),
+                VarSet::default(),
+                table,
+                unifier,
+            )?;
+
+            if body.len() > 1 {
+                todo!("many root nodes: {body:?}");
+            }
+
+            let node = UnifiedNode {
+                typed_binder: Some(
+                    ontol_hir::Binder {
+                        var: scope_meta.scope_var.0,
+                    }
+                    .with_meta(scope_meta.hir_meta),
+                ),
+                node: body.into_iter().next().unwrap(),
+            };
+
+            Ok(node)
+        }
         other => Err(unifier_todo(smart_format!("Handle pair {other:?}"))),
     }
 }

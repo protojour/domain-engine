@@ -11,7 +11,7 @@ use crate::{
     hir_unify::CLASSIC_UNIFIER_FALLBACK,
     relation::Relations,
     typed_hir::{Meta, TypedHir, TypedHirData},
-    types::{TypeRef, Types},
+    types::{Type, TypeRef, Types},
 };
 
 use super::{
@@ -110,6 +110,10 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
             debug!("flat_scope:\n{flat_scope}");
         }
 
+        if false {
+            debug!("expr: {expr:#?}");
+        }
+
         let mut table = Table::new(flat_scope);
 
         let result = self.assign_to_scope(expr, PropDepth(0), ScopeFilter::default(), &mut table);
@@ -143,11 +147,21 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
 
     pub fn push_struct_expr_flags(&mut self, flags: StructFlags, ty: TypeRef) -> UnifierResult<()> {
         if flags.contains(StructFlags::MATCH) {
-            let def_id = ty.get_single_def_id().ok_or(UnifierError::NonEntityQuery)?;
-            let _ = self
-                .relations
-                .identified_by(def_id)
-                .ok_or(UnifierError::NonEntityQuery)?;
+            // Error is used in unifier tests
+            if !matches!(ty, Type::Error) {
+                let def_ty = match ty {
+                    Type::Seq(_, val_ty) => val_ty,
+                    other => other,
+                };
+
+                let def_id = def_ty
+                    .get_single_def_id()
+                    .ok_or(UnifierError::NonEntityQuery)?;
+                let _ = self
+                    .relations
+                    .identified_by(def_id)
+                    .ok_or(UnifierError::NonEntityQuery)?;
+            }
             self.match_struct_depth += 1;
             self.expr_mode = ExprMode::Condition;
         }
