@@ -462,36 +462,36 @@ fn test_unify_basic_seq_prop_no_default() {
 fn test_unify_basic_seq_prop_element_iter_mix() {
     let output = test_unify(
         "
-        (struct ($b)
-            (prop $b S:0:0 (#u $a))
-            (prop $b S:0:1 (seq (@d) (iter #u $b)))
-            (prop $b S:0:2 (#u $c))
+        (struct ($e)
+            (prop $e S:0:0 (#u $a))
+            (prop $e S:0:1 (seq (@d) (iter #u $b)))
+            (prop $e S:0:2 (#u $c))
         )
         ",
         "
-        (struct ($c)
-            (prop $c S:1:1
+        (struct ($f)
+            (prop $f S:1:1
                 (seq (@d) (#u $a) (iter #u $b) (#u $c))
             )
         )
         ",
     );
     let expected = indoc! {"
-        |$b| (struct ($c)
-            (match-prop $b S:0:0
-                (($_ $a)
-                    (match-prop $b S:0:2
-                        (($_ $c)
-                            (match-prop $b S:0:1
-                                ((seq $d)
-                                    (prop $c S:1:1
+        |$e| (struct ($f)
+            (match-prop $e S:0:1
+                ((seq $d)
+                    (match-prop $e S:0:0
+                        (($_ $a)
+                            (match-prop $e S:0:2
+                                (($_ $c)
+                                    (prop $f S:1:1
                                         (#u
-                                            (sequence ($e)
-                                                (seq-push $e #u $a)
+                                            (sequence ($i)
+                                                (seq-push $i #u $a)
                                                 (for-each $d ($_ $b)
-                                                    (seq-push $e #u $b)
+                                                    (seq-push $i #u $b)
                                                 )
-                                                (seq-push $e #u $c)
+                                                (seq-push $i #u $c)
                                             )
                                         )
                                     )

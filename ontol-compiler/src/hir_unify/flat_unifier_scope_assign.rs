@@ -222,10 +222,6 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                 ))
             }
             expr::Kind::SeqItem(label, index, iter, attr) => {
-                if !iter.0 {
-                    return Err(unifier_todo(smart_format!("Handle non-iter seq element")));
-                }
-
                 // Find the scope var that matches the label
                 let label_scope_var = ScopeVar(Var(label.0));
                 let (assignment_idx, final_label) =

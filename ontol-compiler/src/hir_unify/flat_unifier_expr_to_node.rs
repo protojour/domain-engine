@@ -43,6 +43,9 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
             expr::Kind::Unit => Ok(self.mk_node(ontol_hir::Kind::Unit, meta.hir_meta)),
             expr::Kind::I64(int) => Ok(self.mk_node(ontol_hir::Kind::I64(int), meta.hir_meta)),
             expr::Kind::F64(float) => Ok(self.mk_node(ontol_hir::Kind::F64(float), meta.hir_meta)),
+            expr::Kind::Const(def_id) => {
+                Ok(self.mk_node(ontol_hir::Kind::Const(def_id), meta.hir_meta))
+            }
             expr::Kind::Prop(prop) => {
                 let variants: SmallVec<_> = match prop.variant {
                     expr::PropVariant::Singleton(attr) => {

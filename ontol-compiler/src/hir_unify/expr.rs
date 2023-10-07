@@ -109,8 +109,9 @@ impl<'m> Kind<'m> {
             Self::DestructuredSeq(label, output_var) => {
                 format!("DestructuredSeq({label}, {output_var:?})")
             }
-            Self::SeqItem(label, index, _iter, attr) => format!(
-                "SeqItem({label}, {index}, ({}, {}))",
+            Self::SeqItem(label, index, iter, attr) => format!(
+                "{}SeqItem({label}, {index}, ({}, {}))",
+                if iter.0 { "Iter" } else { "" },
                 attr.rel.kind().debug_short(),
                 attr.val.kind().debug_short()
             ),

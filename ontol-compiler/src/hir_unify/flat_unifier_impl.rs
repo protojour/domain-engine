@@ -408,6 +408,22 @@ pub(super) fn unify_scope_structural<'m>(
                             assignments_free_vars.union_with(&assignment.expr.meta().free_vars);
                         }
 
+                        let mut iter_assignments = vec![];
+                        let mut iter_index: Option<usize> = None;
+                        let mut item_assignments = vec![];
+
+                        for assignment in assignments {
+                            match &assignment.expr.kind() {
+                                expr::Kind::SeqItem(_, index, iter, _) if iter.0 => {
+                                    iter_index = Some(*index);
+                                    iter_assignments.push(assignment)
+                                }
+                                _ => {
+                                    item_assignments.push(assignment);
+                                }
+                            }
+                        }
+
                         let scope_map_free_vars = scope_map.scope.1.free_vars.clone();
 
                         debug!("{level}scope_map free vars: {scope_map_free_vars:?}");
@@ -430,7 +446,7 @@ pub(super) fn unify_scope_structural<'m>(
 
                         let for_each_inner_nodes = apply_lateral_scope(
                             MainScope::Sequence(scope_var, output_var),
-                            assignments,
+                            iter_assignments,
                             &|| in_scope_inner.clone(),
                             table,
                             unifier,
@@ -438,28 +454,33 @@ pub(super) fn unify_scope_structural<'m>(
                         )?;
 
                         if !for_each_inner_nodes.is_empty() {
-                            let for_each_node = unifier.mk_node(
-                                ontol_hir::Kind::ForEach(
-                                    Var(label.0),
-                                    (bindings.rel, bindings.val),
-                                    for_each_inner_nodes.into(),
-                                ),
-                                UNIT_META,
-                            );
-
-                            builder.output.extend(apply_lateral_scope(
-                                MainScope::Value(scope_var),
-                                vec![ScopedAssignment {
+                            item_assignments.insert(
+                                iter_index.unwrap(),
+                                ScopedAssignment {
                                     scope_var,
                                     expr: expr::Expr(
-                                        expr::Kind::HirNode(for_each_node),
+                                        expr::Kind::HirNode(unifier.mk_node(
+                                            ontol_hir::Kind::ForEach(
+                                                Var(label.0),
+                                                (bindings.rel, bindings.val),
+                                                for_each_inner_nodes.into(),
+                                            ),
+                                            UNIT_META,
+                                        )),
                                         expr::Meta {
                                             free_vars: assignments_free_vars,
                                             hir_meta: UNIT_META,
                                         },
                                     ),
                                     lateral_deps: Default::default(),
-                                }],
+                                },
+                            );
+                        }
+
+                        if !item_assignments.is_empty() {
+                            builder.output.extend(apply_lateral_scope(
+                                MainScope::Sequence(scope_var, output_var),
+                                item_assignments,
                                 &|| in_scope.union(&scope_map_free_vars),
                                 table,
                                 unifier,
