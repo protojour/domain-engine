@@ -66,7 +66,7 @@ pub(super) fn unify_root<'m>(
 
     debug!("unify root index={index}");
 
-    let scope_map = &mut table.scope_map_mut(index);
+    let scope_map = &mut table.scope_maps[index];
     let scope_meta = scope_map.scope.meta().clone();
     let scope_var = scope_meta.scope_var;
 
@@ -176,12 +176,15 @@ pub(super) fn unify_root<'m>(
         }
         (
             Some(Assignment {
-                expr: expr::Expr(expr::Kind::DestructuredSeq(label), meta),
+                expr: expr::Expr(expr::Kind::DestructuredSeq(label, output_var), meta),
                 ..
             }),
             flat_scope::Kind::Struct,
         ) => {
-            let next_in_scope = in_scope.union_one(scope_meta.scope_var.0);
+            let next_in_scope = in_scope
+                .union_one(scope_meta.scope_var.0)
+                .union_one(output_var.0);
+
             let body = unify_scope_structural(
                 (
                     MainScope::Value(scope_meta.scope_var),
@@ -203,10 +206,7 @@ pub(super) fn unify_root<'m>(
                 ),
                 node: unifier.mk_node(
                     ontol_hir::Kind::Sequence(
-                        ontol_hir::Binder {
-                            var: label.0.into(),
-                        }
-                        .with_meta(scope_meta.hir_meta),
+                        ontol_hir::Binder { var: output_var.0 }.with_meta(scope_meta.hir_meta),
                         body.into(),
                     ),
                     meta.hir_meta,
@@ -242,12 +242,12 @@ pub(super) fn unify_scope_structural<'m>(
             "{level}indexes={:?}",
             indexes
                 .iter()
-                .map(|idx| table.scope_map_mut(*idx).scope.meta().scope_var.0)
+                .map(|idx| table.scope_maps[*idx].scope.meta().scope_var.0)
                 .collect::<Vec<_>>()
         );
 
         for index in indexes {
-            let scope_map = &mut table.scope_map_mut(index);
+            let scope_map = &mut table.scope_maps[index];
             let scope_var = scope_map.scope.meta().scope_var;
 
             match scope_map.scope.kind() {
@@ -359,41 +359,83 @@ pub(super) fn unify_scope_structural<'m>(
                 }
                 flat_scope::Kind::IterElement(label, output_var) => {
                     if scope_map.assignments.is_empty() {
-                        debug!("IterElement empty");
+                        debug!("{level}IterElement empty");
                         next_indexes.extend(table.dependees(Some(scope_var)));
                     } else if in_scope.contains(output_var.0) {
                         let label = *label;
                         let output_var = *output_var;
+
+                        // For the inner loop, pretend all "upvars" are in scope.
+                        // That is, all the free variables of the assignment, _minus_ the variables introduced by the Seq scope map.
+                        let mut in_scope_inner = VarSet::default();
+                        table.all_free_vars_except_under(scope_var, &mut in_scope_inner);
+
+                        let scope_map = &mut table.scope_maps[index];
+                        let scope_var = scope_map.scope.meta().scope_var;
                         let assignments = scope_map.take_assignments();
+
+                        let mut assignments_free_vars = VarSet::default();
+                        for assignment in &assignments {
+                            assignments_free_vars.union_with(&assignment.expr.meta().free_vars);
+                        }
+
+                        let scope_map_free_vars = scope_map.scope.1.free_vars.clone();
+
+                        debug!("{level}scope_map free vars: {scope_map_free_vars:?}");
+                        debug!("{level}in_scope_inner: {in_scope_inner:?}");
+
                         let bindings = table.rel_val_bindings(scope_var);
 
-                        let push_nodes = apply_lateral_scope(
+                        {
+                            if let ontol_hir::Binding::Binder(binder) = &bindings.rel {
+                                in_scope_inner.insert(binder.hir().var);
+                            }
+                            if let ontol_hir::Binding::Binder(binder) = &bindings.val {
+                                in_scope_inner.insert(binder.hir().var);
+                            }
+
+                            debug!(
+                                "{level}make iter_element nodes with in_scope_inner: {in_scope_inner:?}"
+                            );
+                        }
+
+                        let for_each_inner_nodes = apply_lateral_scope(
                             MainScope::Sequence(scope_var, output_var),
                             assignments,
-                            &|| {
-                                let mut next_in_scope = in_scope.clone();
-                                if let ontol_hir::Binding::Binder(binder) = &bindings.rel {
-                                    next_in_scope.insert(binder.hir().var);
-                                }
-                                if let ontol_hir::Binding::Binder(binder) = &bindings.val {
-                                    next_in_scope.insert(binder.hir().var);
-                                }
-                                next_in_scope
-                            },
+                            &|| in_scope_inner.clone(),
                             table,
                             unifier,
                             level,
                         )?;
 
-                        if !push_nodes.is_empty() {
-                            builder.output.push(unifier.mk_node(
+                        if !for_each_inner_nodes.is_empty() {
+                            let for_each_node = unifier.mk_node(
                                 ontol_hir::Kind::ForEach(
                                     Var(label.0),
                                     (bindings.rel, bindings.val),
-                                    push_nodes.into(),
+                                    for_each_inner_nodes.into(),
                                 ),
                                 UNIT_META,
-                            ));
+                            );
+
+                            builder.output.extend(apply_lateral_scope(
+                                MainScope::Value(scope_var),
+                                vec![ScopedAssignment {
+                                    scope_var,
+                                    expr: expr::Expr(
+                                        expr::Kind::HirNode(for_each_node),
+                                        expr::Meta {
+                                            free_vars: assignments_free_vars,
+                                            hir_meta: UNIT_META,
+                                        },
+                                    ),
+                                    lateral_deps: Default::default(),
+                                }],
+                                &|| in_scope.union(&scope_map_free_vars),
+                                table,
+                                unifier,
+                                level,
+                            )?);
                         }
                     }
                 }
@@ -438,26 +480,22 @@ pub(super) fn apply_lateral_scope<'m>(
 
     let mut scope_groups: FnvHashMap<ScopeVar, ScopeGroup<'m>> = Default::default();
     let mut ungrouped = vec![];
-    let mut nodes = vec![];
 
     for assignment in assignments {
-        if assignment.expr.free_vars().0.is_subset(&in_scope.0) {
+        let expr_free_vars = assignment.expr.free_vars();
+
+        if expr_free_vars.0.is_subset(&in_scope.0) {
             debug!(
                 "{level}ungrouped assignment {}",
                 assignment.expr.kind().debug_short()
             );
             ungrouped.push(assignment);
         } else {
-            let introduced_var = Var(assignment
-                .expr
-                .free_vars()
-                .0
-                .difference(&in_scope.0)
-                .next()
-                .unwrap() as u32);
+            let introduced_var =
+                Var(expr_free_vars.0.difference(&in_scope.0).next().unwrap() as u32);
 
             if let Some(data_point_index) = table.find_data_point(introduced_var) {
-                let scope_map = &mut table.scope_map_mut(data_point_index);
+                let scope_map = &mut table.scope_maps[data_point_index];
                 let scope_group = scope_groups
                     .entry(scope_map.scope.meta().scope_var)
                     .or_default();
@@ -507,13 +545,15 @@ pub(super) fn apply_lateral_scope<'m>(
         scope_groups = new_scope_groups;
     }
 
+    let mut output = vec![];
+
     for (scope_var, scope_group) in scope_groups {
         apply_scope_group(
             main_scope,
             scope_var,
             scope_group,
             &in_scope,
-            &mut nodes,
+            &mut output,
             table,
             unifier,
             level,
@@ -521,7 +561,7 @@ pub(super) fn apply_lateral_scope<'m>(
     }
 
     for assignment in ungrouped {
-        nodes.push(
+        output.push(
             ScopedExprToNode {
                 table,
                 unifier,
@@ -532,7 +572,7 @@ pub(super) fn apply_lateral_scope<'m>(
         );
     }
 
-    Ok(nodes)
+    Ok(output)
 }
 
 #[allow(clippy::too_many_arguments)]

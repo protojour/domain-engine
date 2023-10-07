@@ -23,8 +23,8 @@ use super::{
 };
 
 pub(super) enum AssignResult<'m> {
-    Success,
-    SuccessWithLabel(ontol_hir::Label),
+    Success(usize),
+    SuccessWithLabel(usize, ontol_hir::Label),
     Unassigned(expr::Expr<'m>),
 }
 
@@ -39,37 +39,31 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
         match kind {
             expr::Kind::Var(var) => {
                 if let Some(index) = table.find_var_index(ScopeVar(var)) {
-                    table
-                        .scope_map_mut(index)
+                    table.scope_maps[index]
                         .assignments
                         .push(Assignment::new(expr::Expr(kind, meta)));
+                    Ok(AssignResult::Success(index))
                 } else {
                     table.const_expr = Some(expr::Expr(kind, meta));
+                    Ok(AssignResult::Success(0))
                 }
-                Ok(AssignResult::Success)
             }
             kind @ expr::Kind::Struct { .. } => {
                 let expr = self.destructure_expr(expr::Expr(kind, meta), depth, &filter, table)?;
 
                 // BUG: Not 0?
-                table
-                    .scope_map_mut(0)
-                    .assignments
-                    .push(Assignment::new(expr));
+                table.scope_maps[0].assignments.push(Assignment::new(expr));
 
-                Ok(AssignResult::Success)
+                Ok(AssignResult::Success(0))
             }
             expr::Kind::Seq(label, attr) if USE_FLAT_SEQ_HANDLING => {
-                let slot =
-                    table.find_assignment_slot(&meta.free_vars, None, Optional(false), &mut filter);
-
                 let assign_result = self.assign_to_scope(
                     expr::Expr(
                         expr::Kind::SeqItem(label, 0, ontol_hir::Iter(true), attr),
                         meta.clone(),
                     ),
                     depth,
-                    filter,
+                    filter.clone(),
                     table,
                 )?;
                 match assign_result {
@@ -77,23 +71,36 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                         let expr::Kind::SeqItem(_, _, _, attr) = kind else {
                             panic!();
                         };
+
+                        let slot = table.find_assignment_slot(
+                            &meta.free_vars,
+                            None,
+                            Optional(false),
+                            &mut filter,
+                        );
+
                         Ok(Self::assign_to_assignment_slot(
                             slot,
                             expr::Expr(expr::Kind::Seq(label, attr), meta),
                             table,
                         ))
                     }
-                    _ => {
+                    AssignResult::Success(index) | AssignResult::SuccessWithLabel(index, ..) => {
+                        let output_var = match &table.scope_maps[index].scope.kind() {
+                            flat_scope::Kind::SeqPropVariant(_, output_var, ..) => *output_var,
+                            flat_scope::Kind::IterElement(_, output_var) => *output_var,
+                            _ => panic!(),
+                        };
+
                         // BUG: Not 0?
-                        table
-                            .scope_map_mut(0)
+                        table.scope_maps[0]
                             .assignments
                             .push(Assignment::new(expr::Expr(
-                                expr::Kind::DestructuredSeq(label),
+                                expr::Kind::DestructuredSeq(label, output_var),
                                 meta,
                             )));
 
-                        Ok(AssignResult::Success)
+                        Ok(AssignResult::Success(0))
                     }
                 }
             }
@@ -157,7 +164,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                                 table,
                             )?;
 
-                            if let AssignResult::SuccessWithLabel(final_label) = assign_result {
+                            if let AssignResult::SuccessWithLabel(_, final_label) = assign_result {
                                 label = final_label;
                             }
                         }
@@ -203,7 +210,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                 let rel = self.destructure_expr(attr.rel, depth, &filter, table)?;
                 let val = self.destructure_expr(attr.val, depth, &filter, table)?;
 
-                let iter_scope_map = &mut table.table_mut()[assignment_idx];
+                let iter_scope_map = &mut table.scope_maps[assignment_idx];
 
                 iter_scope_map.assignments.push(Assignment::new(expr::Expr(
                     expr::Kind::SeqItem(
@@ -215,7 +222,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                     meta,
                 )));
 
-                Ok(AssignResult::SuccessWithLabel(final_label))
+                Ok(AssignResult::SuccessWithLabel(assignment_idx, final_label))
             }
             e => Err(unifier_todo(smart_format!("expr kind: {e:?}"))),
         }
@@ -295,7 +302,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                     .dependees(Some(label_scope_var))
                     .into_iter()
                     .find(|idx| {
-                        let scope_map = &table.table_mut()[*idx];
+                        let scope_map = &table.scope_maps[*idx];
                         matches!(scope_map.scope.kind(), flat_scope::Kind::IterElement(..))
                     })
                     .map(|idx| (idx, *label.hir()))
@@ -311,7 +318,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                     .dependees(Some(label_scope_var))
                     .into_iter()
                     .find(|idx| {
-                        let alternation_scope_map = &table.table_mut()[*idx];
+                        let alternation_scope_map = &table.scope_maps[*idx];
 
                         alternation_scope_map
                             .scope
@@ -336,11 +343,11 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
         table: &mut Table<'m>,
     ) -> AssignResult<'m> {
         if let Some(slot) = slot {
-            let scope_map = table.scope_map_mut(slot.index);
+            let scope_map = &mut table.scope_maps[slot.index];
             scope_map
                 .assignments
                 .push(Assignment::new(expr).with_lateral_deps(slot.lateral_deps));
-            AssignResult::Success
+            AssignResult::Success(slot.index)
         } else {
             AssignResult::Unassigned(expr)
         }

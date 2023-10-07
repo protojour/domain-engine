@@ -40,10 +40,10 @@ pub(super) fn unify_regex<'m>(
     let capture_scope_union = {
         let mut union = VarSet::default();
         for alt_idx in table.dependees(Some(scope_var)) {
-            let alt_scope_var = table.scope_map_mut(alt_idx).scope.meta().scope_var;
+            let alt_scope_var = table.scope_maps[alt_idx].scope.meta().scope_var;
 
             for cap_scope_idx in table.dependees(Some(alt_scope_var)) {
-                let cap_scope_map = &mut table.scope_map_mut(cap_scope_idx);
+                let cap_scope_map = &mut table.scope_maps[cap_scope_idx];
                 let cap_scope_var = cap_scope_map.scope.meta().scope_var;
 
                 union.insert(cap_scope_var.0);
@@ -52,7 +52,7 @@ pub(super) fn unify_regex<'m>(
         union
     };
 
-    let scope_map = &mut table.scope_map_mut(index);
+    let scope_map = &mut table.scope_maps[index];
 
     if !in_scope.0.is_disjoint(&capture_scope_union.0) {
         builder.output.extend(apply_lateral_scope(
@@ -108,7 +108,7 @@ pub(super) fn unify_regex<'m>(
         }
 
         // Input for sequence type "inference"
-        for scope_map in table.table_mut() {
+        for scope_map in &mut table.scope_maps {
             for assignment in &scope_map.assignments {
                 if let expr::Kind::SeqItem(label, _, _, attr) = assignment.expr.kind() {
                     if let Some(infer) = seq_type_inferers.get_mut(label) {
@@ -122,7 +122,7 @@ pub(super) fn unify_regex<'m>(
 
         // alternations:
         for alt_idx in table.dependees(Some(scope_var)) {
-            let alt_scope_var = table.scope_map_mut(alt_idx).scope.meta().scope_var;
+            let alt_scope_var = table.scope_maps[alt_idx].scope.meta().scope_var;
 
             let mut match_arm = ontol_hir::CaptureMatchArm {
                 capture_groups: vec![],
@@ -131,7 +131,7 @@ pub(super) fn unify_regex<'m>(
             let mut captured_scope = VarSet::default();
 
             for cap_scope_idx in table.dependees(Some(alt_scope_var)) {
-                let cap_scope_map = &mut table.scope_map_mut(cap_scope_idx);
+                let cap_scope_map = &mut table.scope_maps[cap_scope_idx];
                 let cap_scope_var = cap_scope_map.scope.meta().scope_var;
 
                 let flat_scope::Kind::RegexCapture(cap_index) = cap_scope_map.scope.kind() else {
@@ -150,7 +150,7 @@ pub(super) fn unify_regex<'m>(
 
             match_arm.nodes.extend(apply_lateral_scope(
                 MainScope::MultiSequence(&seq_type_inferers),
-                table.scope_map_mut(alt_idx).take_assignments(),
+                table.scope_maps[alt_idx].take_assignments(),
                 &|| next_in_scope.union(&captured_scope),
                 table,
                 unifier,
@@ -221,7 +221,7 @@ pub(super) fn unify_regex<'m>(
 
         // alternations:
         for alt_idx in table.dependees(Some(scope_var)) {
-            let alt_scope_map = table.scope_map_mut(alt_idx);
+            let alt_scope_map = &mut table.scope_maps[alt_idx];
             let alt_scope_var = alt_scope_map.scope.meta().scope_var;
 
             let mut match_arm = ontol_hir::CaptureMatchArm {
@@ -231,7 +231,7 @@ pub(super) fn unify_regex<'m>(
             let mut captured_scope = VarSet::default();
 
             for cap_scope_idx in table.dependees(Some(alt_scope_var)) {
-                let cap_scope_map = &mut table.scope_map_mut(cap_scope_idx);
+                let cap_scope_map = &mut table.scope_maps[cap_scope_idx];
                 let cap_scope_var = cap_scope_map.scope.meta().scope_var;
 
                 let flat_scope::Kind::RegexCapture(cap_index) = cap_scope_map.scope.kind() else {

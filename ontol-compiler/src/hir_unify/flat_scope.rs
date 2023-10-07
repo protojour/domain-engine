@@ -66,7 +66,7 @@ pub struct Meta<'m> {
     pub deps: VarSet,
     /// The set of all ScopeVar parents.
     /// TODO: Let's see if this needs to include all parents, or just the parents
-    /// that needs to be used for filtering (sequences/optionals)
+    /// that need to be used for filtering (sequences/optionals)
     pub constraints: Rc<VarSet>,
     /// All free vars under this node
     pub free_vars: VarSet,

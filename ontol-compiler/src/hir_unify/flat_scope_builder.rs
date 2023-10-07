@@ -437,7 +437,7 @@ fn propagate_vars(scope_nodes: &mut Vec<ScopeNode>) {
 
     while !candidates.is_empty() && !propagations.is_empty() {
         // Every iteration should do fewer propagations and have fewer candidates.
-        // The candidate list is split into propagaitions to do now, and candidates to process later.
+        // The candidate list is split into propagations to do now, and candidates to process later.
         // This must end up at 0 in the end.
         let mut next_propagations = Vec::with_capacity(propagations.len());
         let mut next_candidates = Vec::with_capacity(candidates.len());

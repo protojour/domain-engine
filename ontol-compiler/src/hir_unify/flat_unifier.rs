@@ -115,7 +115,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
         let result = self.assign_to_scope(expr, PropDepth(0), ScopeFilter::default(), &mut table);
 
         // Debug even if assign_to_scope failed
-        for scope_map in table.table_mut() {
+        for scope_map in &mut table.scope_maps {
             debug!("{}", scope_map.scope);
             for assignment in &scope_map.assignments {
                 debug!(

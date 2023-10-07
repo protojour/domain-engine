@@ -1,3 +1,4 @@
+use ontol_hir::Node;
 use ontol_runtime::{
     smart_format,
     value::PropertyId,
@@ -11,6 +12,8 @@ use crate::{
     typed_hir::{self, TypedHirData},
     SourceSpan,
 };
+
+use super::flat_scope::OutputVar;
 
 #[derive(Debug)]
 pub struct Expr<'m>(pub Kind<'m>, pub Meta<'m>);
@@ -55,7 +58,7 @@ pub enum Kind<'m> {
     String(String),
     Const(DefId),
     Seq(ontol_hir::Label, Box<ontol_hir::Attribute<Expr<'m>>>),
-    DestructuredSeq(ontol_hir::Label),
+    DestructuredSeq(ontol_hir::Label, OutputVar),
     SeqItem(
         ontol_hir::Label,
         usize,
@@ -67,6 +70,9 @@ pub enum Kind<'m> {
         TypedHirData<'m, ontol_hir::Binder>,
         Vec<StringInterpolationComponent>,
     ),
+    /// Temporarily wrap an ontol_hir::Node
+    /// FIXME: This is a temporary hack for flat_unifier for dividing scoping into outside-loop and inside-loop
+    HirNode(Node),
 }
 
 impl<'m> Kind<'m> {
@@ -94,7 +100,9 @@ impl<'m> Kind<'m> {
             Self::String(string) => format!("String({string})"),
             Self::Const(const_def_id) => format!("Const({const_def_id:?})"),
             Self::Seq(label, _) => format!("Seq({label})"),
-            Self::DestructuredSeq(label) => format!("DestructuredSeq({label})"),
+            Self::DestructuredSeq(label, output_var) => {
+                format!("DestructuredSeq({label}, {output_var:?})")
+            }
             Self::SeqItem(label, index, _iter, attr) => format!(
                 "SeqItem({label}, {index}, ({}, {}))",
                 attr.rel.kind().debug_short(),
@@ -104,6 +112,7 @@ impl<'m> Kind<'m> {
             Self::StringInterpolation(binder, _) => {
                 format!("StringInterpolation({})", binder.hir().var)
             }
+            Self::HirNode(_) => "Node".to_string(),
         }
     }
 }
@@ -209,7 +218,7 @@ impl FreeVarVisitor {
             Kind::Seq(_, attr) => {
                 self.visit_attr(attr);
             }
-            Kind::DestructuredSeq(_) => {}
+            Kind::DestructuredSeq(..) => {}
             Kind::SeqItem(_, _, _, attr) => self.visit_attr(attr),
             Kind::Push(_, attr) => {
                 self.visit_attr(attr);
@@ -224,6 +233,7 @@ impl FreeVarVisitor {
                     }
                 }
             }
+            Kind::HirNode(_) => {}
         }
     }
 

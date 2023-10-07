@@ -185,6 +185,7 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                     UNIT_META,
                 ))
             }
+            expr::Kind::HirNode(node) => Ok(node),
             other => Err(unifier_todo(smart_format!("leaf expr to node: {other:?}"))),
         }
     }

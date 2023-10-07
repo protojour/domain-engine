@@ -744,23 +744,87 @@ fn test_unify_flat_map1() {
         ",
     );
     let expected = indoc! {"
-        |$c| (match-prop $c S:1:1
-            (($_ $b)
-                (match-prop $c S:0:0
-                    ((seq $d)
-                        (sequence ($g)
+        |$c| (sequence ($g)
+            (match-prop $c S:0:0
+                ((seq $d)
+                    (match-prop $c S:1:1
+                        (($_ $b)
                             (for-each $d ($_ $e)
-                                (seq-push $g #u
-                                    (struct ($f)
-                                        (match-prop $e S:2:2
-                                            (($_ $a)
+                                (match-prop $e S:2:2
+                                    (($_ $a)
+                                        (seq-push $g #u
+                                            (struct ($f)
+                                                (prop $f O:1:1
+                                                    (#u $b)
+                                                )
                                                 (prop $f O:0:0
                                                     (#u $a)
                                                 )
                                             )
                                         )
-                                        (prop $f O:1:1
-                                            (#u $b)
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )"
+    };
+    assert_eq!(expected, output);
+}
+
+#[test]
+fn test_unify_flat_map2() {
+    let output = test_unify(
+        // The difference with test_unify_flat_map1 is that the non-seq-prop appears _first_ here:
+        "
+        (struct ($d)
+            (prop $d S:1:2 (#u $a))
+            (prop $d S:1:5
+                (seq (@c)
+                    (iter #u
+                        (struct ($e)
+                            (prop $e S:1:4
+                                (#u $b)
+                            )
+                        )
+                    )
+                )
+            )
+        )
+        ",
+        "
+        (decl-seq (@c) #u
+            (struct ($f)
+                (prop $f S:1:7
+                    (#u $a)
+                )
+                (prop $f S:1:8
+                    (#u $b)
+                )
+            )
+        )
+        ",
+    );
+    let expected = indoc! {"
+        |$d| (sequence ($i)
+            (match-prop $d S:1:5
+                ((seq $c)
+                    (match-prop $d S:1:2
+                        (($_ $a)
+                            (for-each $c ($_ $e)
+                                (match-prop $e S:1:4
+                                    (($_ $b)
+                                        (seq-push $i #u
+                                            (struct ($f)
+                                                (prop $f S:1:7
+                                                    (#u $a)
+                                                )
+                                                (prop $f S:1:8
+                                                    (#u $b)
+                                                )
+                                            )
                                         )
                                     )
                                 )

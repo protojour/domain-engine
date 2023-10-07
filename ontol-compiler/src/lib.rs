@@ -71,7 +71,7 @@ const USE_FLAT_UNIFIER: bool = true;
 const CLASSIC_UNIFIER_FALLBACK: bool = true;
 
 /// Temporary configuration: Handle seq/DeclSeq in the flat unifier
-const USE_FLAT_SEQ_HANDLING: bool = false;
+const USE_FLAT_SEQ_HANDLING: bool = true;
 
 #[derive(Debug)]
 pub struct Compiler<'m> {

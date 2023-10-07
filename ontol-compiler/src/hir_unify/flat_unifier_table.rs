@@ -15,7 +15,7 @@ use super::{
 pub struct ExprIdx(pub usize);
 
 pub(super) struct Table<'m> {
-    table: Vec<ScopeMap<'m>>,
+    pub scope_maps: Vec<ScopeMap<'m>>,
     pub const_expr: Option<expr::Expr<'m>>,
 }
 
@@ -48,7 +48,7 @@ impl ScopeFilter {
 impl<'m> Table<'m> {
     pub fn new(flat_scope: flat_scope::FlatScope<'m>) -> Self {
         Self {
-            table: flat_scope
+            scope_maps: flat_scope
                 .scope_nodes
                 .into_iter()
                 .map(|scope_node| ScopeMap {
@@ -58,14 +58,6 @@ impl<'m> Table<'m> {
                 .collect(),
             const_expr: None,
         }
-    }
-
-    pub fn scope_map_mut(&mut self, index: usize) -> &mut ScopeMap<'m> {
-        &mut self.table[index]
-    }
-
-    pub fn table_mut(&mut self) -> &mut [ScopeMap<'m>] {
-        &mut self.table
     }
 
     pub fn find_assignment_slot(
@@ -90,7 +82,7 @@ impl<'m> Table<'m> {
             let filter_req_len = filter.req_constraints.0.len();
 
             let pre_candidates: Vec<_> = self
-                .table
+                .scope_maps
                 .iter()
                 .enumerate()
                 .filter(|(_index, scope_map)| {
@@ -127,7 +119,7 @@ impl<'m> Table<'m> {
         } else {
             // required property strategy
             // Note: Reverse search.
-            for (index, scope_map) in self.table.iter().enumerate().rev() {
+            for (index, scope_map) in self.scope_maps.iter().enumerate().rev() {
                 let scope_defs = &scope_map.scope.meta().defs;
 
                 // quick early check
@@ -165,7 +157,7 @@ impl<'m> Table<'m> {
             }
 
             lateral_deps = if let Some(index) = candidate {
-                let scope_map = self.scope_map_mut(index);
+                let scope_map = &mut self.scope_maps[index];
                 VarSet(free_vars.0.difference(&scope_map.scope.1.defs.0).collect())
             } else {
                 VarSet::default()
@@ -174,7 +166,7 @@ impl<'m> Table<'m> {
 
         // apply new filter
         if let Some(index) = candidate {
-            let scope_map = self.scope_map_mut(index);
+            let scope_map = &mut self.scope_maps[index];
             let scope_var = scope_map.scope.meta().scope_var;
             match scope_map.scope.kind() {
                 flat_scope::Kind::PropVariant(_, optional, ..) => {
@@ -199,14 +191,14 @@ impl<'m> Table<'m> {
         &self,
         scope_var: ScopeVar,
     ) -> Option<(usize, &ScopeMap<'m>)> {
-        self.table
+        self.scope_maps
             .iter()
             .enumerate()
             .find(|(_index, scope_map)| scope_map.scope.meta().scope_var == scope_var)
     }
 
     pub fn find_var_index(&self, scope_var: ScopeVar) -> Option<usize> {
-        self.table
+        self.scope_maps
             .iter()
             .enumerate()
             .find_map(|(index, assignment)| {
@@ -228,7 +220,7 @@ impl<'m> Table<'m> {
     }
 
     pub fn find_data_point(&self, var: Var) -> Option<usize> {
-        self.table
+        self.scope_maps
             .iter()
             .enumerate()
             .find_map(|(index, assignment)| {
@@ -271,12 +263,12 @@ impl<'m> Table<'m> {
         indexes
             .into_iter()
             .next()
-            .map(|index| &self.table[index].scope)
+            .map(|index| &self.scope_maps[index].scope)
     }
 
     pub fn dependees(&self, scope_var: Option<ScopeVar>) -> Vec<usize> {
         if let Some(scope_var) = scope_var {
-            self.table
+            self.scope_maps
                 .iter()
                 .enumerate()
                 .filter_map(|(index, assignment)| {
@@ -288,7 +280,7 @@ impl<'m> Table<'m> {
                 })
                 .collect()
         } else {
-            self.table
+            self.scope_maps
                 .iter()
                 .enumerate()
                 .filter_map(|(index, assignment)| {
@@ -299,6 +291,25 @@ impl<'m> Table<'m> {
                     }
                 })
                 .collect()
+        }
+    }
+
+    pub fn all_free_vars_except_under(&self, scope_var: ScopeVar, output: &mut VarSet) {
+        let mut skip: VarSet = [scope_var.0].into();
+
+        for scope_map in &self.scope_maps {
+            let meta = scope_map.scope.meta();
+
+            if skip.contains(meta.scope_var.0) {
+                continue;
+            }
+
+            if meta.deps.0.intersection(&skip.0).count() > 0 {
+                skip.insert(meta.scope_var.0);
+                continue;
+            }
+
+            output.union_with(&meta.defs);
         }
     }
 
@@ -343,7 +354,7 @@ impl<'m> Table<'m> {
         };
 
         for index in self.dependees(Some(variant_var)) {
-            let scope_map = &self.table[index];
+            let scope_map = &self.scope_maps[index];
             match scope_map.scope.kind() {
                 flat_scope::Kind::PropRelParam => {
                     attribute.rel = Some(scope_map.scope.meta().scope_var);
@@ -388,15 +399,17 @@ impl<'m> ScopeMap<'m> {
         let (filtered, retained) =
             std::mem::take(&mut self.assignments)
                 .into_iter()
-                .partition(|assignment| match (assignment.expr.kind(), selector) {
-                    (expr::Kind::Prop(prop), ExprSelector::Struct(struct_var, _)) => {
+                .partition(|assignment| match (selector, assignment.expr.kind()) {
+                    (ExprSelector::Struct(struct_var, _), expr::Kind::Prop(prop)) => {
                         prop.struct_var == struct_var
                     }
                     (
-                        expr::Kind::SeqItem(item_label, ..),
                         ExprSelector::SeqItem(selector_label),
+                        expr::Kind::SeqItem(item_label, ..),
                     ) => item_label == &selector_label,
-                    (expr::Kind::SeqItem(..), _) => false,
+                    (_, expr::Kind::SeqItem(..)) => false,
+                    (ExprSelector::SeqItem(_), expr::Kind::Prop(_)) => false,
+                    // FIXME: Default should be _false_:
                     _ => true,
                 });
         self.assignments = retained;

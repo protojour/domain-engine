@@ -84,7 +84,7 @@ impl<'m> LevelBuilder<'m> {
         table: &mut Table<'m>,
     ) {
         let scope_map = table
-            .table_mut()
+            .scope_maps
             .iter()
             .find(|scope_map| scope_map.scope.meta().scope_var == scope_var)
             .unwrap();
