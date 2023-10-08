@@ -15,7 +15,7 @@ use crate::{
 };
 
 use super::{
-    expr,
+    expr::{self, StringInterpolationComponent},
     flat_scope::{OutputVar, ScopeVar},
     flat_unifier::{unifier_todo, FlatUnifier, Level, MainScope},
     flat_unifier_table::Table,
@@ -186,6 +186,35 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                 Ok(self.mk_node(
                     ontol_hir::Kind::SeqPush(output_var.0, ontol_hir::Attribute { rel, val }),
                     UNIT_META,
+                ))
+            }
+            expr::Kind::StringInterpolation(binder, components) => {
+                let let_def = self.mk_node(ontol_hir::Kind::Text("".into()), meta.hir_meta);
+                let components: ontol_hir::Nodes = components
+                    .into_iter()
+                    .map(|component| {
+                        let string_push_param = match component {
+                            StringInterpolationComponent::Const(string) => {
+                                self.mk_node(ontol_hir::Kind::Text(string), UNIT_META)
+                            }
+                            StringInterpolationComponent::Var(var, span) => self.mk_node(
+                                ontol_hir::Kind::Var(var),
+                                Meta {
+                                    ty: UNIT_META.ty,
+                                    span,
+                                },
+                            ),
+                        };
+                        self.mk_node(
+                            ontol_hir::Kind::StringPush(binder.hir().var, string_push_param),
+                            UNIT_META,
+                        )
+                    })
+                    .collect();
+
+                Ok(self.mk_node(
+                    ontol_hir::Kind::Let(binder, let_def, components),
+                    meta.hir_meta,
                 ))
             }
             expr::Kind::HirNode(node) => Ok(node),
