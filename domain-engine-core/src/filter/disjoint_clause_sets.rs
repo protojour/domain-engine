@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
 use itertools::Itertools;
 use ontol_runtime::{
-    condition::Clause,
+    condition::{Clause, CondTerm},
     var::{Var, VarSet},
 };
 
@@ -10,7 +10,7 @@ use super::condition_utils::{get_clause_vars, AllVars};
 /// Finds the disjoint clauses.
 /// Disjoint clauses are groups with no variable "leakage" to other groups.
 /// The return value is grouped indexes into the passed clause slice.
-pub fn disjoint_clause_sets(clauses: &[Clause]) -> Vec<Vec<usize>> {
+pub fn disjoint_clause_sets(clauses: &[Clause<CondTerm>]) -> Vec<Vec<usize>> {
     let mut forest = ClauseForest::default();
 
     for (index, clause) in clauses.iter().enumerate() {

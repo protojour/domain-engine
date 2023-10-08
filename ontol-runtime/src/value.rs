@@ -9,7 +9,10 @@ use smallvec::SmallVec;
 use smartstring::alias::String;
 
 use crate::{
-    cast::Cast, condition::Condition, ontology::Ontology, DefId, PackageId, RelationshipId, Role,
+    cast::Cast,
+    condition::{CondTerm, Condition},
+    ontology::Ontology,
+    DefId, PackageId, RelationshipId, Role,
 };
 
 #[derive(Clone, Debug)]
@@ -139,7 +142,7 @@ pub enum Data {
     /// Other sequences will behave more like tuples.
     Sequence(Vec<Attribute>),
 
-    Condition(Condition),
+    Condition(Condition<CondTerm>),
 }
 
 impl Data {

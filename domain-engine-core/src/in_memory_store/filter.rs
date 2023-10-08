@@ -13,7 +13,7 @@ use crate::filter::plan::compute_plans;
 use super::store::{DynamicKey, InMemoryStore};
 
 pub fn filter(
-    condition: &Condition,
+    condition: &Condition<CondTerm>,
     store: &InMemoryStore,
     ontology: &Ontology,
 ) -> Vec<(DefId, DynamicKey)> {

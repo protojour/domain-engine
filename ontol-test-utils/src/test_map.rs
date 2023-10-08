@@ -1,12 +1,11 @@
 use ontol_runtime::{
-    condition::{Clause, CondTerm, Condition},
-    value::{PropertyId, Value},
-    var::Var,
+    condition::{CondTerm, Condition},
+    value::Value,
     vm::{
         proc::{Procedure, Yield},
         VmState,
     },
-    DefId, MapKey,
+    MapKey,
 };
 use unimock::{unimock, Unimock};
 
@@ -73,7 +72,7 @@ impl OntolTest {
 
 #[unimock(api = YielderMock)]
 pub trait Yielder {
-    fn yield_match(&self, condition: Condition) -> Value;
+    fn yield_match(&self, condition: Condition<CondTerm>) -> Value;
 }
 
 pub struct TestMapper<'on> {
@@ -190,12 +189,4 @@ impl<'on> TestMapper<'on> {
             }
         }
     }
-}
-
-pub enum TestClause {
-    Root(Var),
-    IsEntity(CondTerm, DefId),
-    Attr(Var, PropertyId, (CondTerm, CondTerm)),
-    Eq(Var, CondTerm),
-    Or(Vec<Clause>),
 }

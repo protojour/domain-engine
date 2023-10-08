@@ -4,8 +4,8 @@ use ontol_runtime::{format_utils::AsAlpha, vm::proc::BuiltinProc};
 
 use crate::{
     arena::{Arena, NodeRef},
-    Attribute, Binding, CaptureGroup, CaptureMatchArm, HasDefault, Iter, Kind, Label, Lang, Node,
-    Nodes, PropPattern, PropVariant, RootNode, StructFlags,
+    Attribute, Binding, CaptureGroup, CaptureMatchArm, EvalCondTerm, HasDefault, Iter, Kind, Label,
+    Lang, Node, Nodes, PropPattern, PropVariant, RootNode, StructFlags,
 };
 
 impl<'h, 'a, L: Lang> std::fmt::Display for NodeRef<'h, 'a, L> {
@@ -476,5 +476,16 @@ impl Debug for Label {
 impl Display for Label {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "@{}", AsAlpha(self.0))
+    }
+}
+
+impl Display for EvalCondTerm {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Wildcard => write!(f, "_"),
+            Self::QuoteVar(var) => write!(f, "'{var}"),
+            Self::Const(value) => write!(f, "{:?}", value.data),
+            Self::Eval(var) => write!(f, "{var}"),
+        }
     }
 }

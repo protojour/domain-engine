@@ -6,13 +6,22 @@ use crate::{
     DefId,
 };
 
-#[derive(Clone, Default)]
-pub struct Condition {
-    pub clauses: Vec<Clause>,
+#[derive(Clone)]
+pub struct Condition<Term> {
+    pub clauses: Vec<Clause<Term>>,
+}
+
+impl<Term> Default for Condition<Term> {
+    fn default() -> Self {
+        Self { clauses: vec![] }
+    }
 }
 
 /// The PartialEq implementation is only meant for debugging purposes
-impl PartialEq<str> for Condition {
+impl<Term> PartialEq<str> for Condition<Term>
+where
+    Term: Display,
+{
     fn eq(&self, other: &str) -> bool {
         let str = format!("{self}");
         str == other
@@ -20,12 +29,12 @@ impl PartialEq<str> for Condition {
 }
 
 #[derive(Clone)]
-pub enum Clause {
+pub enum Clause<Term> {
     Root(Var),
-    IsEntity(CondTerm, DefId),
-    Attr(Var, PropertyId, (CondTerm, CondTerm)),
-    Eq(Var, CondTerm),
-    Or(Vec<Clause>),
+    IsEntity(Term, DefId),
+    Attr(Var, PropertyId, (Term, Term)),
+    Eq(Var, Term),
+    Or(Vec<Term>),
 }
 
 #[derive(Clone)]
@@ -41,7 +50,10 @@ impl From<Value> for CondTerm {
     }
 }
 
-impl Display for Condition {
+impl<Term> Display for Condition<Term>
+where
+    Term: Display,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for clause in &self.clauses {
             writeln!(f, "{clause}")?;
@@ -50,7 +62,10 @@ impl Display for Condition {
     }
 }
 
-impl Display for Clause {
+impl<Term> Display for Clause<Term>
+where
+    Term: Display,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Clause::Root(var) => write!(f, "(root {var})"),
@@ -74,13 +89,19 @@ impl Display for CondTerm {
     }
 }
 
-impl Debug for Condition {
+impl<Term> Debug for Condition<Term>
+where
+    Term: Display,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{self}")
     }
 }
 
-impl Debug for Clause {
+impl<Term> Debug for Clause<Term>
+where
+    Term: Display,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{self}")
     }

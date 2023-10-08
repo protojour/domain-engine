@@ -65,7 +65,10 @@ struct PlanBuilder<'on> {
     current_join_roots: FnvHashMap<Var, DefId>,
 }
 
-pub fn compute_plans(condition: &Condition, ontology: &Ontology) -> PlanResult<Vec<Plan>> {
+pub fn compute_plans(
+    condition: &Condition<CondTerm>,
+    ontology: &Ontology,
+) -> PlanResult<Vec<Plan>> {
     let clauses = &condition.clauses;
     let mut output = vec![];
 
@@ -108,7 +111,10 @@ pub fn compute_plans(condition: &Condition, ontology: &Ontology) -> PlanResult<V
     Ok(output)
 }
 
-fn compute_plan(clauses: &[&Clause], builder: &mut PlanBuilder) -> Option<PlanResult<Plan>> {
+fn compute_plan(
+    clauses: &[&Clause<CondTerm>],
+    builder: &mut PlanBuilder,
+) -> Option<PlanResult<Plan>> {
     let root_var = clauses.iter().find_map(|clause| match clause {
         Clause::Root(var) => Some(*var),
         _ => None,
@@ -138,7 +144,7 @@ struct Origin {
 
 fn sub_plans(
     origin: Origin,
-    clauses: &[&Clause],
+    clauses: &[&Clause<CondTerm>],
     builder: &mut PlanBuilder,
 ) -> PlanResult<Vec<Plan>> {
     let mut plans: Vec<Plan> = vec![];
@@ -213,7 +219,7 @@ fn sub_plans(
 fn term_plans(
     term: &CondTerm,
     target: DefId,
-    clauses: &[&Clause],
+    clauses: &[&Clause<CondTerm>],
     builder: &mut PlanBuilder,
 ) -> PlanResult<Vec<Plan>> {
     let mut plans = vec![];

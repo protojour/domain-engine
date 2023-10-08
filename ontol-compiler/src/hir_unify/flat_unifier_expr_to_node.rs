@@ -1,5 +1,6 @@
+use ontol_hir::EvalCondTerm;
 use ontol_runtime::{
-    condition::{Clause, CondTerm},
+    condition::Clause,
     smart_format,
     var::{Var, VarSet},
 };
@@ -95,7 +96,7 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                         Clause::Attr(
                             prop.struct_var,
                             prop.prop_id,
-                            (CondTerm::Wildcard, CondTerm::Wildcard),
+                            (EvalCondTerm::Wildcard, EvalCondTerm::Wildcard),
                         ),
                     ),
                     meta.hir_meta,
@@ -216,7 +217,7 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                                             Clause::Attr(
                                                 prop.struct_var,
                                                 prop.prop_id,
-                                                (CondTerm::Wildcard, CondTerm::Wildcard),
+                                                (EvalCondTerm::Wildcard, EvalCondTerm::Wildcard),
                                             ),
                                         ),
                                         meta.hir_meta,

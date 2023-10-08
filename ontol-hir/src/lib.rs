@@ -1,7 +1,13 @@
 use std::{fmt::Debug, ops::Index};
 
 use arena::{Arena, NodeRef};
-use ontol_runtime::{condition::Clause, value::PropertyId, var::Var, vm::proc::BuiltinProc, DefId};
+use ontol_runtime::{
+    condition::Clause,
+    value::{PropertyId, Value},
+    var::Var,
+    vm::proc::BuiltinProc,
+    DefId,
+};
 use smallvec::SmallVec;
 use smartstring::alias::String;
 
@@ -193,7 +199,7 @@ pub enum Kind<'a, L: Lang> {
     ),
     /// A regex matcher/unpacker
     MatchRegex(Iter, Var, DefId, Vec<CaptureMatchArm<'a, L>>),
-    PushCondClause(Var, Clause),
+    PushCondClause(Var, Clause<EvalCondTerm>),
 }
 
 #[derive(Clone)]
@@ -236,6 +242,19 @@ pub struct CaptureGroup<'a, L: Lang> {
 pub struct CaptureMatchArm<'a, L: Lang> {
     pub capture_groups: Vec<CaptureGroup<'a, L>>,
     pub nodes: Nodes,
+}
+
+/// Evaluated version of ontol_runtime::condition::CondTerm
+#[derive(Clone)]
+pub enum EvalCondTerm {
+    /// Ignored
+    Wildcard,
+    /// Quoted var, i.e. not evaluated
+    QuoteVar(Var),
+    /// Evaluate var into a CondTerm::Value
+    Eval(Var),
+    /// Constant value
+    Const(Value),
 }
 
 #[derive(Debug)]

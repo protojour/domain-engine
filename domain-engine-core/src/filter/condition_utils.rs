@@ -30,7 +30,7 @@ impl Collector for TermVars {
     }
 }
 
-pub fn get_clause_vars(clause: &Clause, collector: &mut impl Collector) {
+pub fn get_clause_vars(clause: &Clause<CondTerm>, collector: &mut impl Collector) {
     match clause {
         Clause::Root(var) => {
             collector.collect_input_var(*var);

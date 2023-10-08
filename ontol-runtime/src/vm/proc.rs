@@ -3,7 +3,11 @@ use bit_vec::BitVec;
 use derive_debug_extras::DebugExtras;
 use smartstring::alias::String;
 
-use crate::{condition::Condition, value::PropertyId, DefId};
+use crate::{
+    condition::{CondTerm, Condition},
+    value::PropertyId,
+    DefId,
+};
 
 /// A complete ONTOL code library consisting of procedures.
 /// This structure only stores opcodes.
@@ -167,5 +171,5 @@ impl GetAttrFlags {
 }
 
 pub enum Yield {
-    Match(Condition),
+    Match(Condition<CondTerm>),
 }
