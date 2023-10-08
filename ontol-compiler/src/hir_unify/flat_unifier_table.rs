@@ -399,7 +399,7 @@ impl<'m> ScopeMap<'m> {
     pub fn select_assignments(&mut self, selector: ExprSelector) -> Vec<ScopedAssignment<'m>> {
         let (filtered, retained) = std::mem::take(&mut self.assignments)
             .into_iter()
-            .partition(|assignment| Self::select_predicate(selector, assignment));
+            .partition(|assignment| selector_predicate(selector, assignment));
         self.assignments = retained;
         filtered
             .into_iter()
@@ -410,28 +410,25 @@ impl<'m> ScopeMap<'m> {
             })
             .collect()
     }
+}
 
-    #[inline]
-    fn select_predicate(selector: ExprSelector, assignment: &Assignment) -> bool {
-        use expr::Kind as EKind;
-        use ExprSelector as Sel;
+#[inline]
+fn selector_predicate(selector: ExprSelector, assignment: &Assignment) -> bool {
+    use expr::Kind as EKind;
+    use ExprSelector as Sel;
 
-        match (selector, assignment.expr.kind()) {
-            (Sel::Struct(struct_var, _), EKind::Prop(prop)) => prop.struct_var == struct_var,
-            (Sel::SeqItem(selector_label), EKind::SeqItem(item_label, ..)) => {
-                item_label == &selector_label
-            }
-            (Sel::Struct(_, scope_var), EKind::SeqItem(label, _, iter, _)) => {
-                if !iter.0 {
-                    debug!("select !iter SeqItem: {scope_var:?}, {label:?}");
-                }
-                scope_var.0 .0 == label.0 && !iter.0
-            }
-            (_, EKind::SeqItem(..)) => false,
-            (Sel::SeqItem(_), EKind::Prop(_)) => false,
-            // FIXME: Default should be _false_:
-            _ => true,
+    match (selector, assignment.expr.kind()) {
+        (Sel::Struct(struct_var, _), EKind::Prop(prop)) => prop.struct_var == struct_var,
+        (Sel::Struct(_, scope_var), EKind::SeqItem(label, _, iter, _)) => {
+            scope_var.0 .0 == label.0 && !iter.0
         }
+        (Sel::SeqItem(selector_label), EKind::SeqItem(item_label, ..)) => {
+            item_label == &selector_label
+        }
+        (_, EKind::SeqItem(..)) => false,
+        (Sel::SeqItem(_), EKind::Prop(_)) => false,
+        (Sel::Any, _) => true,
+        _ => false,
     }
 }
 
