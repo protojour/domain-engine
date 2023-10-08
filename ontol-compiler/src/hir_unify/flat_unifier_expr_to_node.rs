@@ -213,19 +213,25 @@ fn find_and_unify_sequence_prop<'m>(
             flat_scope::Kind::SeqPropVariant(_, output_var, _, _, _, _) => Some(*output_var),
             _ => None,
         })
-        .unwrap();
+        .unwrap_or_else(|| {
+            // This happens when there is no iteration at all, i.e. only !iter elements.
+            OutputVar(unifier.var_allocator.alloc())
+        });
 
     let next_in_scope = in_scope.union_one(output_seq_var.0);
 
     let scope_var = ScopeVar(Var(label.0));
 
+    debug!("{level}going to unify scope for sequence prop");
+
     let sequence_body = unify_scope_structural(
         (
-            MainScope::Value(scope_var),
-            ExprSelector::Struct(struct_var, scope_var),
+            MainScope::Sequence(scope_var, output_seq_var),
+            ExprSelector::Struct(struct_var, ScopeVar(Var(label.0))),
             level.next(),
         ),
-        StructuralOrigin::DependeesOf(scope_var),
+        // Start traversing from the beginning, to catch eventual non-iterated elements
+        StructuralOrigin::Start,
         next_in_scope,
         table,
         unifier,

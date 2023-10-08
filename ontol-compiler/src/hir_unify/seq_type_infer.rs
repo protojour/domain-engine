@@ -1,10 +1,10 @@
 use ontol_hir::visitor::HirVisitor;
-use tracing::warn;
+use tracing::{error, warn};
 
 use crate::{
     mem::Intern,
     typed_hir::{TypedHir, TypedNodeRef},
-    types::{Type, TypeRef, Types},
+    types::{Type, TypeRef, Types, ERROR_TYPE},
 };
 
 use super::flat_scope::OutputVar;
@@ -25,7 +25,10 @@ impl<'m> SeqTypeInfer<'m> {
 
     pub fn infer(self, types: &mut Types<'m>) -> TypeRef<'m> {
         let seq_type_pair = match self.types.len() {
-            0 => panic!("Type of seq not inferrable"),
+            0 => {
+                error!("Type of seq not inferrable");
+                (&ERROR_TYPE, &ERROR_TYPE)
+            }
             1 => self.types.into_iter().next().unwrap(),
             _ => {
                 warn!("Multiple seq types, imprecise inference");

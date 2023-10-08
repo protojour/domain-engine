@@ -113,7 +113,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                         let output_var = match &table.scope_maps[index].scope.kind() {
                             flat_scope::Kind::SeqPropVariant(_, output_var, ..) => *output_var,
                             flat_scope::Kind::IterElement(_, output_var) => *output_var,
-                            _ => panic!(),
+                            other => panic!("{other:?}"),
                         };
 
                         // BUG: Not 0?
@@ -151,7 +151,15 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
 
                 // Provide the sequence label to the assignment slot search
                 let seq_label = match &variant {
-                    expr::PropVariant::Seq { label, .. } => Some(ScopeVar(Var(label.0))),
+                    expr::PropVariant::Seq {
+                        label, elements, ..
+                    } => {
+                        if elements.iter().any(|(iter, _)| iter.0) {
+                            Some(ScopeVar(Var(label.0)))
+                        } else {
+                            None
+                        }
+                    }
                     expr::PropVariant::Singleton(..) => None,
                 };
 
@@ -166,30 +174,45 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                     } => {
                         let label_filter = filter.with_constraint(ScopeVar(Var(label.0)));
 
+                        let mut non_iter_elements: Vec<(
+                            ontol_hir::Iter,
+                            ontol_hir::Attribute<expr::Expr<'m>>,
+                        )> = vec![];
+
                         // recursively assign seq elements
                         // The elements are consumed here and assigned to the scope table.
                         for (index, (iter, attr)) in elements.into_iter().enumerate() {
-                            let mut free_vars = VarSet::default();
-                            free_vars.union_with(&attr.rel.meta().free_vars);
-                            free_vars.union_with(&attr.val.meta().free_vars);
+                            if true {
+                                let mut free_vars = VarSet::default();
+                                free_vars.union_with(&attr.rel.meta().free_vars);
+                                free_vars.union_with(&attr.val.meta().free_vars);
 
-                            let element_expr = expr::Expr(
-                                expr::Kind::SeqItem(label, index, iter, Box::new(attr)),
-                                expr::Meta {
-                                    free_vars,
-                                    hir_meta: UNIT_META,
-                                },
-                            );
+                                let element_expr = expr::Expr(
+                                    expr::Kind::SeqItem(label, index, iter, Box::new(attr)),
+                                    expr::Meta {
+                                        free_vars,
+                                        hir_meta: UNIT_META,
+                                    },
+                                );
 
-                            let assign_result = self.assign_to_scope(
-                                element_expr,
-                                depth.next(),
-                                label_filter.clone(),
-                                table,
-                            )?;
-
-                            if let AssignResult::AssignedWithLabel(_, final_label) = assign_result {
-                                label = final_label;
+                                match self.assign_to_scope(
+                                    element_expr,
+                                    depth.next(),
+                                    label_filter.clone(),
+                                    table,
+                                )? {
+                                    AssignResult::AssignedWithLabel(_, final_label) => {
+                                        label = final_label;
+                                    }
+                                    AssignResult::Assigned(_) => {
+                                        // non-iterated
+                                    }
+                                    AssignResult::Unassigned(_) => {
+                                        panic!();
+                                    }
+                                }
+                            } else {
+                                non_iter_elements.push((ontol_hir::Iter(false), attr));
                             }
                         }
 
@@ -230,10 +253,32 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                             (assignment_idx, final_label)
                         }
                         IterAssignmentResult::FreeIterLabel => {
-                            return Ok(AssignResult::Unassigned(expr::Expr(
-                                expr::Kind::SeqItem(label, index, iter, attr),
-                                meta,
-                            )))
+                            return match &attr.val.kind() {
+                                expr::Kind::Struct { flags, .. }
+                                    if flags.contains(StructFlags::MATCH) =>
+                                {
+                                    Ok(AssignResult::Unassigned(expr::Expr(
+                                        expr::Kind::SeqItem(label, index, iter, attr),
+                                        meta,
+                                    )))
+                                }
+                                _ => {
+                                    let slot = table.find_assignment_slot(
+                                        &meta.free_vars,
+                                        None,
+                                        Optional(false),
+                                        &mut filter,
+                                    );
+                                    Ok(Self::assign_to_assignment_slot(
+                                        slot,
+                                        expr::Expr(
+                                            expr::Kind::SeqItem(label, index, iter, attr),
+                                            meta,
+                                        ),
+                                        table,
+                                    ))
+                                }
+                            };
                         }
                         IterAssignmentResult::Error(error) => return Err(error),
                     };
