@@ -157,31 +157,75 @@ impl<'t, 'u, 'a, 'm> ScopedExprToNode<'t, 'u, 'a, 'm> {
                     )?);
                 }
 
-                for prop in props {
-                    match prop.variant {
-                        expr::PropVariant::Singleton(attr) => {
-                            let rel =
-                                self.scoped_expr_to_node(attr.rel, in_scope, main_scope.next())?;
-                            let val =
-                                self.scoped_expr_to_node(attr.val, in_scope, main_scope.next())?;
-                            body.push(
-                                self.mk_node(
-                                    ontol_hir::Kind::Prop(
-                                        ontol_hir::Optional(false),
-                                        prop.struct_var,
-                                        prop.prop_id,
-                                        [ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
-                                            rel,
-                                            val,
-                                        })]
-                                        .into(),
-                                    ),
-                                    UNIT_META,
-                                ),
-                            );
+                match self.unifier.expr_mode() {
+                    ExprMode::Expr => {
+                        for prop in props {
+                            match prop.variant {
+                                expr::PropVariant::Singleton(attr) => {
+                                    let rel = self.scoped_expr_to_node(
+                                        attr.rel,
+                                        in_scope,
+                                        main_scope.next(),
+                                    )?;
+                                    let val = self.scoped_expr_to_node(
+                                        attr.val,
+                                        in_scope,
+                                        main_scope.next(),
+                                    )?;
+                                    body.push(
+                                        self.mk_node(
+                                            ontol_hir::Kind::Prop(
+                                                ontol_hir::Optional(false),
+                                                prop.struct_var,
+                                                prop.prop_id,
+                                                [ontol_hir::PropVariant::Singleton(
+                                                    ontol_hir::Attribute { rel, val },
+                                                )]
+                                                .into(),
+                                            ),
+                                            UNIT_META,
+                                        ),
+                                    );
+                                }
+                                expr::PropVariant::Seq { .. } => {
+                                    return Err(unifier_todo(smart_format!("seq prop")))
+                                }
+                            }
                         }
-                        expr::PropVariant::Seq { .. } => {
-                            return Err(unifier_todo(smart_format!("seq prop")))
+                    }
+                    ExprMode::Condition(cond_var) => {
+                        let cond_var = *cond_var;
+                        for prop in props {
+                            match prop.variant {
+                                expr::PropVariant::Singleton(attr) => {
+                                    let _rel = self.scoped_expr_to_node(
+                                        attr.rel,
+                                        in_scope,
+                                        main_scope.next(),
+                                    )?;
+                                    // body.push(rel);
+                                    let _val = self.scoped_expr_to_node(
+                                        attr.val,
+                                        in_scope,
+                                        main_scope.next(),
+                                    )?;
+                                    // body.push(val);
+                                    body.push(self.mk_node(
+                                        ontol_hir::Kind::PushCondClause(
+                                            cond_var,
+                                            Clause::Attr(
+                                                prop.struct_var,
+                                                prop.prop_id,
+                                                (CondTerm::Wildcard, CondTerm::Wildcard),
+                                            ),
+                                        ),
+                                        meta.hir_meta,
+                                    ));
+                                }
+                                expr::PropVariant::Seq { .. } => {
+                                    return Err(unifier_todo(smart_format!("seq prop")))
+                                }
+                            }
                         }
                     }
                 }

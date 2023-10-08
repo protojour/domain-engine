@@ -191,7 +191,7 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
             }
             Kind::PushCondClause(var, clause) => {
                 write!(f, "{indent}(push-cond-clause {var} {clause})")?;
-                Ok(Multiline(false))
+                Ok(Multiline(true))
             }
         }
     }

@@ -1839,9 +1839,7 @@ fn test_basic_match_filter2() {
         |$b| (match-prop $b S:0:0
             (($_ $a)
                 (match-struct ($c)
-                    (prop $c O:0:0
-                        (#u $a)
-                    )
+                    (push-cond-clause $c (attr $c O:0:0 (_ _)))
                 )
             )
         )"
