@@ -21,7 +21,7 @@ use super::{
     dep_tree::Expression,
     flat_scope::ScopeVar,
     flat_unifier::{FlatUnifier, Level, MainScope, StructuralOrigin},
-    flat_unifier_expr_to_node::ScopedExprToNode,
+    flat_unifier_expr_to_hir::ExprToHir,
     flat_unifier_table::{Assignment, ExprSelector, ScopedAssignment, Table},
     unifier::UnifiedNode,
     UnifierError, UnifierResult,
@@ -43,13 +43,13 @@ pub(super) fn unify_root<'m>(
     if let Some(const_expr) = table.const_expr.take() {
         return Ok(UnifiedNode {
             typed_binder: None,
-            node: ScopedExprToNode {
+            node: ExprToHir {
                 table,
                 unifier,
                 scope_var: None,
                 level: Level(0),
             }
-            .scoped_expr_to_node(const_expr, &in_scope, MainScope::Const)?,
+            .expr_to_hir(const_expr, &in_scope, MainScope::Const)?,
         });
     }
 
@@ -85,13 +85,13 @@ pub(super) fn unify_root<'m>(
                 .with_meta(scope_map.scope.meta().hir_meta),
             );
 
-            let inner_node = ScopedExprToNode {
+            let inner_node = ExprToHir {
                 table,
                 unifier,
                 scope_var: Some(scope_var),
                 level: Level(0),
             }
-            .scoped_expr_to_node(
+            .expr_to_hir(
                 expr::Expr(kind, meta),
                 &in_scope,
                 MainScope::Value(scope_var),
@@ -136,13 +136,13 @@ pub(super) fn unify_root<'m>(
 
             for prop in props {
                 let free_vars = prop.free_vars.clone();
-                let prop_node = ScopedExprToNode {
+                let prop_node = ExprToHir {
                     table,
                     unifier,
                     scope_var: Some(scope_var),
                     level: Level(0),
                 }
-                .scoped_expr_to_node(
+                .expr_to_hir(
                     expr::Expr(
                         expr::Kind::Prop(Box::new(prop)),
                         expr::Meta {
@@ -612,13 +612,13 @@ pub(super) fn apply_lateral_scope<'m>(
 
     for assignment in ungrouped {
         output.push(
-            ScopedExprToNode {
+            ExprToHir {
                 table,
                 unifier,
                 scope_var: Some(assignment.scope_var),
                 level,
             }
-            .scoped_expr_to_node(assignment.expr, &in_scope, main_scope)?,
+            .expr_to_hir(assignment.expr, &in_scope, main_scope)?,
         );
     }
 
