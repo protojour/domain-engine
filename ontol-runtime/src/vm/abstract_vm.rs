@@ -1,8 +1,9 @@
 use bit_vec::BitVec;
 use tracing::debug;
 
-use super::proc::GetAttrFlags;
+use super::proc::{GetAttrFlags, OpCodeCondTerm};
 use crate::{
+    condition::Clause,
     ontology::Ontology,
     text_pattern::TextPattern,
     value::PropertyId,
@@ -71,6 +72,7 @@ pub trait Processor {
         index_filter: &BitVec,
     );
     fn assert_true(&mut self);
+    fn push_cond_clause(&mut self, cond_local: Local, clause: &Clause<OpCodeCondTerm>);
     fn yield_condition(&mut self) -> Self::Yield;
 }
 
@@ -234,12 +236,16 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                     processor.assert_true();
                     self.program_counter += 1;
                 }
-                OpCode::Panic(message) => {
-                    panic!("{message}");
+                OpCode::PushCondClause(cond_local, clause) => {
+                    processor.push_cond_clause(*cond_local, clause);
+                    self.program_counter += 1;
                 }
                 OpCode::MatchCondition => {
                     self.program_counter += 1;
                     return Some(processor.yield_condition());
+                }
+                OpCode::Panic(message) => {
+                    panic!("{message}");
                 }
             }
         }

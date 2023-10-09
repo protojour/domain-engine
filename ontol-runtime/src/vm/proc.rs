@@ -1,11 +1,14 @@
+use std::fmt::Display;
+
 use ::serde::{Deserialize, Serialize};
 use bit_vec::BitVec;
 use derive_debug_extras::DebugExtras;
 use smartstring::alias::String;
 
 use crate::{
-    condition::{CondTerm, Condition},
+    condition::{Clause, CondTerm, Condition},
     value::PropertyId,
+    var::Var,
     DefId,
 };
 
@@ -112,6 +115,8 @@ pub enum OpCode {
     RegexCaptureIndexes(BitVec),
     /// Yanks True from the stack and crashes unless true
     AssertTrue,
+    /// Push a condition clause into the condition at local
+    PushCondClause(Local, Clause<OpCodeCondTerm>),
     /// Execute a match on a datastore, using the condition at top of stack
     MatchCondition,
     Panic(String),
@@ -172,4 +177,17 @@ impl GetAttrFlags {
 
 pub enum Yield {
     Match(Condition<CondTerm>),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum OpCodeCondTerm {
+    Wildcard,
+    Var(Var),
+    Value(Local),
+}
+
+impl Display for OpCodeCondTerm {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
 }

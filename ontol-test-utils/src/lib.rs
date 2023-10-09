@@ -120,10 +120,12 @@ impl OntolTest {
 
 pub trait TestCompile: Sized {
     /// Compile, expect no errors, return the OntolTest as the ontology interface
+    #[track_caller]
     fn compile(self) -> OntolTest;
 
     /// Compile, then run closure on the resulting test.
     /// This style is suitable when the ONTOL source is contained inline in the test.
+    #[track_caller]
     fn compile_then(self, validator: impl Fn(OntolTest)) -> OntolTest {
         let test = self.compile();
         validator(test.clone());
@@ -131,9 +133,11 @@ pub trait TestCompile: Sized {
     }
 
     /// Compile, expect failure
+    #[track_caller]
     fn compile_fail(self) -> Vec<AnnotatedCompileError>;
 
     /// Compile, expect failure with error closure
+    #[track_caller]
     fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>));
 }
 
@@ -263,6 +267,7 @@ impl TestPackages {
         }
     }
 
+    #[track_caller]
     fn compile_topology_ok(&mut self) -> OntolTest {
         match self.compile_topology() {
             Ok(ontol_test) => ontol_test,

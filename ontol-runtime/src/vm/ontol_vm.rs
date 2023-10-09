@@ -7,7 +7,7 @@ use tracing::{trace, Level};
 
 use crate::{
     cast::Cast,
-    condition::Condition,
+    condition::{Clause, CondTerm, Condition},
     ontology::Ontology,
     text_pattern::TextPattern,
     value::{Attribute, Data, PropertyId, Value, ValueDebug},
@@ -17,7 +17,7 @@ use crate::{
 };
 
 use super::{
-    proc::{GetAttrFlags, Predicate, Yield},
+    proc::{GetAttrFlags, OpCodeCondTerm, Predicate, Yield},
     VmState,
 };
 
@@ -303,6 +303,27 @@ impl Processor for OntolProcessor {
         }
     }
 
+    fn push_cond_clause(&mut self, cond_local: Local, clause: &Clause<OpCodeCondTerm>) {
+        let clause: Clause<CondTerm> = match clause {
+            Clause::Root(var) => Clause::Root(*var),
+            Clause::IsEntity(term, def_id) => {
+                Clause::IsEntity(self.opcode_term_to_cond_term(term), *def_id)
+            }
+            Clause::Attr(var, prop_id, (rel, val)) => {
+                let rel = self.opcode_term_to_cond_term(rel);
+                let val = self.opcode_term_to_cond_term(val);
+                Clause::Attr(*var, *prop_id, (rel, val))
+            }
+            Clause::Eq(..) => todo!(),
+            Clause::Or(_) => todo!(),
+        };
+
+        let Data::Condition(condition) = &mut self.local_mut(cond_local).data else {
+            panic!();
+        };
+        condition.clauses.push(clause);
+    }
+
     fn yield_condition(&mut self) -> Self::Yield {
         match self.stack.pop().unwrap().data {
             Data::Condition(condition) => Yield::Match(condition),
@@ -413,6 +434,14 @@ impl OntolProcessor {
     #[inline(always)]
     fn push_false(&mut self) {
         self.stack.push(Value::new(Data::I64(0), DefId::unit()));
+    }
+
+    fn opcode_term_to_cond_term(&mut self, term: &OpCodeCondTerm) -> CondTerm {
+        match term {
+            OpCodeCondTerm::Wildcard => CondTerm::Wildcard,
+            OpCodeCondTerm::Var(var) => CondTerm::Var(*var),
+            OpCodeCondTerm::Value(local) => CondTerm::Value(self.stack[local.0 as usize].take()),
+        }
     }
 }
 

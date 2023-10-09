@@ -43,6 +43,7 @@ pub struct AnnotatedCompileError {
     pub span_text: String,
 }
 
+#[track_caller]
 pub fn diff_errors(
     errors: UnifiedCompileError,
     sources: &Sources,

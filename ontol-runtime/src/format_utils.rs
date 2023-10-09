@@ -181,6 +181,20 @@ impl Display for AsAlpha {
     }
 }
 
+pub struct Literal<'a>(pub &'a str);
+
+impl<'a> Display for Literal<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl<'a> Debug for Literal<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 #[test]
 fn test_as_alpha() {
     assert_eq!("a", format!("{}", AsAlpha(0)));

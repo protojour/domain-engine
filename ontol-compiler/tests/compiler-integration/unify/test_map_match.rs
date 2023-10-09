@@ -1,4 +1,5 @@
-use ontol_runtime::value::Value;
+use indoc::indoc;
+use ontol_runtime::{format_utils::Literal, value::Value};
 use ontol_test_utils::{test_map::YielderMock, TestCompile};
 use serde_json::json;
 use test_log::test;
@@ -37,8 +38,11 @@ fn test_map_match_scalar_key() {
         let [foo] = test.bind(["foo"]);
         test.mapper(
             YielderMock::yield_match
-                // BUG: Should have condition clauses here:
-                .next_call(matching!(eq!("")))
+                .next_call(matching!(eq!(&Literal(indoc! { r#"
+                    (root $b)
+                    (attr $b S:1:4 (_ Text("input")))
+                    "#
+                }))))
                 .returns(Value::from(
                     foo.value_builder(json!({ "key": "x", "prop": "y" })),
                 )),
@@ -71,7 +75,10 @@ fn test_map_match_parameterless_query() {
         let [foo] = test.bind(["foo"]);
         test.mapper(
             YielderMock::yield_match
-                .next_call(matching!(eq!("")))
+                .next_call(matching!(eq!(&Literal(indoc! { "
+                    (root $c)
+                    "
+                }))))
                 .returns(Value::sequence_of([foo
                     .value_builder(json!({ "key": "key", "prop": "test" }))
                     .into()])),

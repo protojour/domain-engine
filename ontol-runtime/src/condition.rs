@@ -1,6 +1,9 @@
 use std::fmt::{Debug, Display};
 
+use serde::{Deserialize, Serialize};
+
 use crate::{
+    format_utils::Literal,
     value::{PropertyId, Value},
     var::Var,
     DefId,
@@ -18,17 +21,18 @@ impl<Term> Default for Condition<Term> {
 }
 
 /// The PartialEq implementation is only meant for debugging purposes
-impl<Term> PartialEq<str> for Condition<Term>
+impl<'a, Term> PartialEq<Literal<'a>> for Condition<Term>
 where
     Term: Display,
 {
-    fn eq(&self, other: &str) -> bool {
-        let str = format!("{self}");
-        str == other
+    fn eq(&self, other: &Literal<'a>) -> bool {
+        let a = format!("{self}");
+        let b = format!("{other}");
+        a == b
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub enum Clause<Term> {
     Root(Var),
     IsEntity(Term, DefId),

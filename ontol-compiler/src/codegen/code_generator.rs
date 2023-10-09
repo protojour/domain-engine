@@ -1,14 +1,17 @@
 use bit_set::BitSet;
 use fnv::FnvHashMap;
-use ontol_hir::{HasDefault, PropPattern, PropVariant, StructFlags};
+use ontol_hir::{EvalCondTerm, HasDefault, PropPattern, PropVariant, StructFlags};
 use ontol_runtime::{
+    condition::Clause,
     smart_format,
     value::PropertyId,
     var::Var,
-    vm::proc::{BuiltinProc, GetAttrFlags, Local, NParams, OpCode, Predicate, Procedure},
+    vm::proc::{
+        BuiltinProc, GetAttrFlags, Local, NParams, OpCode, OpCodeCondTerm, Predicate, Procedure,
+    },
     DefId, MapKey,
 };
-use tracing::{debug, warn};
+use tracing::debug;
 
 use crate::{
     codegen::{
@@ -269,9 +272,8 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                         self.builder,
                     );
                     self.scope.insert(binder.hir().var, condition_local);
-                    for _node_ref in arena.refs(nodes) {
-                        warn!("Not generating condition clauses yet");
-                        // self.gen_node(node_ref, block);
+                    for node_ref in arena.refs(nodes) {
+                        self.gen_node(node_ref, block);
 
                         block.pop_until(condition_local, span, self.builder);
                     }
@@ -699,14 +701,65 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 );
                 block.pop_until(top, span, self.builder);
             }
-            ontol_hir::Kind::PushCondClause(..) => {
-                todo!()
+            ontol_hir::Kind::PushCondClause(cond_var, clause) => {
+                let Ok(cond_local) = self.var_local(*cond_var) else {
+                    return;
+                };
+
+                let top = self.builder.top();
+
+                match clause {
+                    Clause::Root(var) => {
+                        block.op(
+                            OpCode::PushCondClause(cond_local, Clause::Root(*var)),
+                            Delta(0),
+                            span,
+                            self.builder,
+                        );
+                    }
+                    Clause::IsEntity(..) => todo!(),
+                    Clause::Attr(var, prop_id, (rel, val)) => {
+                        let rel = self.gen_eval_cond_term(rel, arena, block);
+                        let val = self.gen_eval_cond_term(val, arena, block);
+                        block.op(
+                            OpCode::PushCondClause(
+                                cond_local,
+                                Clause::Attr(*var, *prop_id, (rel, val)),
+                            ),
+                            Delta(0),
+                            span,
+                            self.builder,
+                        );
+                    }
+                    Clause::Eq(..) => todo!(),
+                    Clause::Or(_) => todo!(),
+                }
+
+                block.pop_until(top, span, self.builder);
             }
             ontol_hir::Kind::DeclSeq(..) | ontol_hir::Kind::Regex(..) => {
                 unreachable!(
                     "{} is only declarative, not used in code generation",
                     node_ref
                 );
+            }
+        }
+    }
+
+    fn gen_eval_cond_term(
+        &mut self,
+        term: &EvalCondTerm,
+        arena: &TypedArena<'m>,
+        block: &mut Block,
+    ) -> OpCodeCondTerm {
+        match term {
+            EvalCondTerm::Wildcard => OpCodeCondTerm::Wildcard,
+            EvalCondTerm::QuoteVar(var) => OpCodeCondTerm::Var(*var),
+            EvalCondTerm::Eval(node) => {
+                self.gen_node(arena.node_ref(*node), block);
+                let top = self.builder.top();
+
+                OpCodeCondTerm::Value(top)
             }
         }
     }

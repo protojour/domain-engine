@@ -4,10 +4,11 @@ use std::{
 };
 
 use bit_set::BitSet;
+use serde::{Deserialize, Serialize};
 
 use crate::format_utils::{try_alpha_to_u32, AsAlpha, DebugViaDisplay};
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct Var(pub u32);
 
 impl From<u32> for Var {
