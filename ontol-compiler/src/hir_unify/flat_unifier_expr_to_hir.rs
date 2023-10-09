@@ -72,6 +72,13 @@ impl<'t, 'u, 'a, 'm> ExprToHir<'t, 'u, 'a, 'm> {
                 self.unifier
                     .push_struct_expr_flags(binder.0.var, flags, meta.hir_meta.ty)?;
 
+                if let ExprMode::Condition(cond_var) = self.unifier.expr_mode() {
+                    body.push(self.mk_node(
+                        ontol_hir::Kind::PushCondClause(cond_var, Clause::Root(cond_var)),
+                        UNIT_META,
+                    ));
+                }
+
                 debug!(
                     "{level}Make struct {} scope_var={:?} in_scope={:?} main_scope={main_scope:?}",
                     binder.hir().var,
@@ -100,13 +107,6 @@ impl<'t, 'u, 'a, 'm> ExprToHir<'t, 'u, 'a, 'm> {
                         self.table,
                         self.unifier,
                     )?);
-                }
-
-                if let ExprMode::Condition(cond_var) = self.unifier.expr_mode() {
-                    body.push(self.mk_node(
-                        ontol_hir::Kind::PushCondClause(cond_var, Clause::Root(cond_var)),
-                        UNIT_META,
-                    ));
                 }
 
                 for prop in props {

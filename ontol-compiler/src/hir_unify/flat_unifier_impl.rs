@@ -1,5 +1,6 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
+    condition::Clause,
     smart_format,
     var::{Var, VarSet},
 };
@@ -10,7 +11,7 @@ use crate::{
         expr,
         flat_level_builder::LevelBuilder,
         flat_scope::{self},
-        flat_unifier::unifier_todo,
+        flat_unifier::{unifier_todo, ExprMode},
         flat_unifier_regex::unify_regex,
         flat_unifier_table::IsInScope,
     },
@@ -133,6 +134,13 @@ pub(super) fn unify_root<'m>(
                 table,
                 unifier,
             )?;
+
+            if let ExprMode::Condition(cond_var) = unifier.expr_mode() {
+                body.push(unifier.mk_node(
+                    ontol_hir::Kind::PushCondClause(cond_var, Clause::Root(cond_var)),
+                    UNIT_META,
+                ));
+            }
 
             for prop in props {
                 let free_vars = prop.free_vars.clone();
