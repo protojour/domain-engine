@@ -239,7 +239,7 @@ pub struct CaptureMatchArm<'a, L: Lang> {
 }
 
 /// Evaluated version of ontol_runtime::condition::CondTerm
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum EvalCondTerm {
     /// Ignored
     Wildcard,

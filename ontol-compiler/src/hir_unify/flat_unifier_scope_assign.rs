@@ -79,34 +79,21 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                         };
 
                         // This should be a match-struct in a sequence
-                        let expr = match (attr.rel.kind(), attr.val.kind()) {
+                        match (attr.rel.kind(), attr.val.kind()) {
                             (expr::Kind::Unit, expr::Kind::Struct { flags, .. })
                                 if flags.contains(StructFlags::MATCH) =>
                             {
-                                expr::Expr(attr.val.0, meta)
+                                self.assign_to_scope(
+                                    expr::Expr(attr.val.0, meta),
+                                    depth,
+                                    filter,
+                                    table,
+                                )
                             }
-                            _ => {
-                                return Ok(AssignResult::Unassigned(expr::Expr(
-                                    expr::Kind::Seq(label, attr),
-                                    meta,
-                                )))
-                            }
-                        };
-
-                        match table.find_assignment_slot(
-                            &expr.meta().free_vars,
-                            None,
-                            Optional(false),
-                            &mut filter,
-                        ) {
-                            Some(slot) => {
-                                Ok(Self::assign_to_assignment_slot(Some(slot), expr, table))
-                            }
-                            None => {
-                                table.scope_maps[0].assignments.push(Assignment::new(expr));
-
-                                Ok(AssignResult::Assigned(0))
-                            }
+                            _ => Ok(AssignResult::Unassigned(expr::Expr(
+                                expr::Kind::Seq(label, attr),
+                                meta,
+                            ))),
                         }
                     }
                     AssignResult::Assigned(index) | AssignResult::AssignedWithLabel(index, ..) => {

@@ -226,7 +226,6 @@ impl<'h, 'a, L: Lang> Print<PropVariant<'a, L>> for Printer<'h, 'a, L> {
             }
         };
 
-        // let multi = self.print_all(sep, [attr.rel.kind(), attr.val.kind()].into_iter(), f)?;
         self.print_rparen(multi, f)?;
         Ok(Multiline(true))
     }

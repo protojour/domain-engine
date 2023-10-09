@@ -123,7 +123,16 @@ pub(super) fn unify_root<'m>(
 
             unifier.push_struct_expr_flags(binder.0.var, flags, meta.hir_meta.ty)?;
 
-            let mut body = unify_scope_structural(
+            let mut body = vec![];
+
+            if let ExprMode::Condition(cond_var) = unifier.expr_mode() {
+                body.push(unifier.mk_node(
+                    ontol_hir::Kind::PushCondClause(cond_var, Clause::Root(cond_var)),
+                    UNIT_META,
+                ));
+            }
+
+            body.extend(unify_scope_structural(
                 (
                     MainScope::Value(scope_meta.scope_var),
                     ExprSelector::Struct(binder.hir().var, scope_var),
@@ -133,14 +142,7 @@ pub(super) fn unify_root<'m>(
                 next_in_scope.clone(),
                 table,
                 unifier,
-            )?;
-
-            if let ExprMode::Condition(cond_var) = unifier.expr_mode() {
-                body.push(unifier.mk_node(
-                    ontol_hir::Kind::PushCondClause(cond_var, Clause::Root(cond_var)),
-                    UNIT_META,
-                ));
-            }
+            )?);
 
             for prop in props {
                 let free_vars = prop.free_vars.clone();
