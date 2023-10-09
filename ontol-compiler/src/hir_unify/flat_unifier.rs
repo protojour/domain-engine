@@ -28,8 +28,10 @@ use super::{
 #[derive(Clone, Copy)]
 pub(super) enum ExprMode {
     Expr,
-    Condition(Var),
+    Condition(Var, ConditionRoot),
 }
+#[derive(Clone, Copy)]
+pub struct ConditionRoot(pub bool);
 
 #[derive(Clone, Copy, Debug)]
 pub(super) enum MainScope<'a, 'm> {
@@ -83,8 +85,8 @@ pub struct FlatUnifier<'a, 'm> {
     pub(super) var_allocator: ontol_hir::VarAllocator,
     pub(super) hir_arena: ontol_hir::arena::Arena<'m, TypedHir>,
 
+    condition_root: Option<Var>,
     match_struct_depth: usize,
-    expr_mode: ExprMode,
 }
 
 impl<'a, 'm> FlatUnifier<'a, 'm> {
@@ -98,13 +100,17 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
             relations,
             var_allocator,
             hir_arena: Default::default(),
+            condition_root: None,
             match_struct_depth: 0,
-            expr_mode: ExprMode::Expr,
         }
     }
 
     pub(super) fn expr_mode(&self) -> ExprMode {
-        self.expr_mode
+        match (self.condition_root, self.match_struct_depth) {
+            (Some(root), 1) => ExprMode::Condition(root, ConditionRoot(true)),
+            (Some(root), _) => ExprMode::Condition(root, ConditionRoot(false)),
+            _ => ExprMode::Expr,
+        }
     }
 
     pub(super) fn unify(
@@ -174,8 +180,10 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                     .ok_or(UnifierError::NonEntityQuery)?;
             }
             if self.match_struct_depth == 0 {
-                self.expr_mode = ExprMode::Condition(struct_binder);
+                self.condition_root = Some(struct_binder);
             }
+            self.match_struct_depth += 1;
+        } else if self.condition_root.is_some() {
             self.match_struct_depth += 1;
         }
         Ok(())
@@ -185,8 +193,10 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
         if flags.contains(StructFlags::MATCH) {
             self.match_struct_depth -= 1;
             if self.match_struct_depth == 0 {
-                self.expr_mode = ExprMode::Expr;
+                self.condition_root = None;
             }
+        } else if self.condition_root.is_some() {
+            self.match_struct_depth -= 1;
         }
     }
 }

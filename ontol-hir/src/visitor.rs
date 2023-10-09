@@ -87,6 +87,11 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
             Kind::Var(var) => {
                 self.visit_var(*var);
             }
+            Kind::Begin(nodes) => {
+                for (index, node) in arena.refs(nodes).enumerate() {
+                    self.visit_node(index, node)
+                }
+            }
             Kind::Unit | Kind::I64(_) | Kind::F64(_) | Kind::Text(_) | Kind::Const(_) => {}
             Kind::Call(_proc, params) => {
                 for (index, arg) in arena.refs(params).enumerate() {

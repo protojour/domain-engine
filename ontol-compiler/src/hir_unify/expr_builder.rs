@@ -186,7 +186,8 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
             ontol_hir::Kind::Sequence(..) => {
                 todo!()
             }
-            ontol_hir::Kind::MatchProp(..)
+            ontol_hir::Kind::Begin(_)
+            | ontol_hir::Kind::MatchProp(..)
             | ontol_hir::Kind::MatchRegex(..)
             | ontol_hir::Kind::ForEach(..)
             | ontol_hir::Kind::StringPush(..)

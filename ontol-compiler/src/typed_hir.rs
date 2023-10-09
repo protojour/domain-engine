@@ -164,6 +164,10 @@ pub fn arena_import<'m>(
             // No subnodes
             target.add(TypedHirData(kind.clone(), *meta))
         }
+        Begin(body) => {
+            let imported_body = import_nodes(target, source.arena(), body);
+            target.add(TypedHirData(Begin(imported_body), *meta))
+        }
         Let(binder, def, body) => {
             let def = arena_import(target, source.arena().node_ref(*def));
             let body = import_nodes(target, source.arena(), body);

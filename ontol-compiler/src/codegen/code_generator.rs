@@ -141,6 +141,11 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
                 block.op(OpCode::Clone(*local), Delta(1), span, self.builder);
             }
+            ontol_hir::Kind::Begin(body) => {
+                for node_ref in arena.refs(body) {
+                    self.gen_node(node_ref, block);
+                }
+            }
             ontol_hir::Kind::Unit => {
                 block.op(
                     OpCode::CallBuiltin(BuiltinProc::NewUnit, DefId::unit()),

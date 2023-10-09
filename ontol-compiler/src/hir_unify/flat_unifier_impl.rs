@@ -11,7 +11,7 @@ use crate::{
         expr,
         flat_level_builder::LevelBuilder,
         flat_scope::{self},
-        flat_unifier::{unifier_todo, ExprMode},
+        flat_unifier::{unifier_todo, ConditionRoot, ExprMode},
         flat_unifier_regex::unify_regex,
         flat_unifier_table::IsInScope,
     },
@@ -125,7 +125,7 @@ pub(super) fn unify_root<'m>(
 
             let mut body = vec![];
 
-            if let ExprMode::Condition(cond_var) = unifier.expr_mode() {
+            if let ExprMode::Condition(cond_var, ConditionRoot(true)) = unifier.expr_mode() {
                 body.push(unifier.mk_node(
                     ontol_hir::Kind::PushCondClause(cond_var, Clause::Root(cond_var)),
                     UNIT_META,

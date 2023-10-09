@@ -1,4 +1,4 @@
-use ontol_hir::EvalCondTerm;
+use ontol_hir::{EvalCondTerm, StructFlags};
 use ontol_runtime::{
     condition::Clause,
     smart_format,
@@ -12,14 +12,14 @@ use crate::{
         flat_scope, flat_unifier::StructuralOrigin, flat_unifier_impl::unify_scope_structural,
         flat_unifier_table::ExprSelector, seq_type_infer::SeqTypeInfer,
     },
-    typed_hir::{self, IntoTypedHirData, Meta, TypedHir, UNIT_META},
+    typed_hir::{self, IntoTypedHirData, Meta, TypedHir, TypedHirData, UNIT_META},
     NO_SPAN,
 };
 
 use super::{
     expr::{self, StringInterpolationComponent},
     flat_scope::{OutputVar, ScopeVar},
-    flat_unifier::{unifier_todo, ExprMode, FlatUnifier, Level, MainScope},
+    flat_unifier::{unifier_todo, ConditionRoot, ExprMode, FlatUnifier, Level, MainScope},
     flat_unifier_table::Table,
     UnifierResult,
 };
@@ -66,18 +66,6 @@ impl<'t, 'u, 'a, 'm> ExprToHir<'t, 'u, 'a, 'm> {
                 props,
             } => {
                 let level = self.level;
-                let next_in_scope = in_scope.union_one(binder.hir().var);
-                let mut body = ontol_hir::Nodes::default();
-
-                self.unifier
-                    .push_struct_expr_flags(binder.0.var, flags, meta.hir_meta.ty)?;
-
-                if let ExprMode::Condition(cond_var) = self.unifier.expr_mode() {
-                    body.push(self.mk_node(
-                        ontol_hir::Kind::PushCondClause(cond_var, Clause::Root(cond_var)),
-                        UNIT_META,
-                    ));
-                }
 
                 debug!(
                     "{level}Make struct {} scope_var={:?} in_scope={:?} main_scope={main_scope:?}",
@@ -86,34 +74,8 @@ impl<'t, 'u, 'a, 'm> ExprToHir<'t, 'u, 'a, 'm> {
                     in_scope
                 );
 
-                if self.scope_var.is_some() {
-                    body.extend(unify_scope_structural(
-                        (
-                            main_scope.next(),
-                            match main_scope {
-                                MainScope::Const => unreachable!(),
-                                MainScope::Value(scope_var) => {
-                                    ExprSelector::Struct(binder.hir().var, scope_var)
-                                }
-                                MainScope::Sequence(scope_var, _) => {
-                                    ExprSelector::Struct(binder.hir().var, scope_var)
-                                }
-                                MainScope::MultiSequence(_) => panic!(),
-                            },
-                            self.level.next(),
-                        ),
-                        StructuralOrigin::Start,
-                        next_in_scope.clone(),
-                        self.table,
-                        self.unifier,
-                    )?);
-                }
-
-                for prop in props {
-                    body.push(self.prop_to_hir(prop, in_scope, main_scope)?);
-                }
-
-                self.unifier.pop_struct_expr_flags(flags);
+                let body =
+                    self.struct_body(&binder, flags, meta.hir_meta, props, in_scope, main_scope)?;
                 Ok(self.mk_node(ontol_hir::Kind::Struct(binder, flags, body), meta.hir_meta))
             }
             expr::Kind::SeqItem(label, _index, _iter, attr) => {
@@ -169,6 +131,60 @@ impl<'t, 'u, 'a, 'm> ExprToHir<'t, 'u, 'a, 'm> {
         }
     }
 
+    fn struct_body(
+        &mut self,
+        binder: &TypedHirData<'m, ontol_hir::Binder>,
+        flags: StructFlags,
+        hir_meta: typed_hir::Meta<'m>,
+        props: Vec<expr::Prop<'m>>,
+        in_scope: &VarSet,
+        main_scope: MainScope,
+    ) -> UnifierResult<ontol_hir::Nodes> {
+        let next_in_scope = in_scope.union_one(binder.hir().var);
+        let mut body = ontol_hir::Nodes::default();
+
+        self.unifier
+            .push_struct_expr_flags(binder.0.var, flags, hir_meta.ty)?;
+
+        if let ExprMode::Condition(cond_var, ConditionRoot(true)) = self.unifier.expr_mode() {
+            body.push(self.mk_node(
+                ontol_hir::Kind::PushCondClause(cond_var, Clause::Root(binder.0.var)),
+                UNIT_META,
+            ));
+        }
+
+        if self.scope_var.is_some() {
+            body.extend(unify_scope_structural(
+                (
+                    main_scope.next(),
+                    match main_scope {
+                        MainScope::Const => unreachable!(),
+                        MainScope::Value(scope_var) => {
+                            ExprSelector::Struct(binder.hir().var, scope_var)
+                        }
+                        MainScope::Sequence(scope_var, _) => {
+                            ExprSelector::Struct(binder.hir().var, scope_var)
+                        }
+                        MainScope::MultiSequence(_) => panic!(),
+                    },
+                    self.level.next(),
+                ),
+                StructuralOrigin::Start,
+                next_in_scope.clone(),
+                self.table,
+                self.unifier,
+            )?);
+        }
+
+        for prop in props {
+            body.push(self.prop_to_hir(prop, in_scope, main_scope)?);
+        }
+
+        self.unifier.pop_struct_expr_flags(flags);
+
+        Ok(body)
+    }
+
     fn prop_to_hir(
         &mut self,
         prop: expr::Prop<'m>,
@@ -214,17 +230,30 @@ impl<'t, 'u, 'a, 'm> ExprToHir<'t, 'u, 'a, 'm> {
                     UNIT_META,
                 ))
             }
-            ExprMode::Condition(cond_var) => match prop.variant {
+            ExprMode::Condition(cond_var, _) => match prop.variant {
                 expr::PropVariant::Singleton(attr) => {
-                    let rel = self.expr_to_cond_term(attr.rel, in_scope, main_scope.next())?;
-                    let val = self.expr_to_cond_term(attr.val, in_scope, main_scope.next())?;
-                    Ok(self.mk_node(
+                    let mut body = vec![];
+
+                    let (rel, rel_nodes) =
+                        self.expr_to_cond_term(attr.rel, in_scope, main_scope.next())?;
+                    let (val, val_nodes) =
+                        self.expr_to_cond_term(attr.val, in_scope, main_scope.next())?;
+
+                    body.push(self.mk_node(
                         ontol_hir::Kind::PushCondClause(
                             cond_var,
                             Clause::Attr(prop.struct_var, prop.prop_id, (rel, val)),
                         ),
                         UNIT_META,
-                    ))
+                    ));
+                    body.extend(rel_nodes);
+                    body.extend(val_nodes);
+
+                    Ok(if body.len() == 1 {
+                        body.into_iter().next().unwrap()
+                    } else {
+                        self.mk_node(ontol_hir::Kind::Begin(body.into()), UNIT_META)
+                    })
                 }
                 expr::PropVariant::Seq { .. } => Err(unifier_todo(smart_format!("seq prop"))),
             },
@@ -236,12 +265,22 @@ impl<'t, 'u, 'a, 'm> ExprToHir<'t, 'u, 'a, 'm> {
         expr::Expr(kind, meta): expr::Expr<'m>,
         in_scope: &VarSet,
         main_scope: MainScope,
-    ) -> UnifierResult<EvalCondTerm> {
+    ) -> UnifierResult<(EvalCondTerm, ontol_hir::Nodes)> {
         match kind {
-            expr::Kind::Unit => Ok(EvalCondTerm::Wildcard),
+            expr::Kind::Unit => Ok((EvalCondTerm::Wildcard, ontol_hir::Nodes::default())),
+            expr::Kind::Struct {
+                binder,
+                flags,
+                props,
+            } => {
+                let var = binder.0.var;
+                let body =
+                    self.struct_body(&binder, flags, meta.hir_meta, props, in_scope, main_scope)?;
+                Ok((EvalCondTerm::QuoteVar(var), body))
+            }
             _ => {
                 let node = self.expr_to_hir(expr::Expr(kind, meta), in_scope, main_scope)?;
-                Ok(EvalCondTerm::Eval(node))
+                Ok((EvalCondTerm::Eval(node), ontol_hir::Nodes::default()))
             }
         }
     }

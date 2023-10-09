@@ -59,7 +59,7 @@ fn test_unify_matchcond_single_prop() {
 }
 
 #[test]
-fn test_unify_matchcond_complex() {
+fn test_unify_matchcond_struct_in_struct() {
     let output = test_unify(
         "
         (struct ($c)
@@ -85,6 +85,22 @@ fn test_unify_matchcond_complex() {
         |$c| (match-struct ($d)
             (push-cond-clause $d
                 (root '$d)
+            )
+            (match-prop $c S:0:0
+                (($_ $a)
+                    (match-prop $c S:0:1
+                        (($_ $b)
+                            (begin
+                                (push-cond-clause $d
+                                    (attr '$d O:0:0 (_ '$e))
+                                )
+                                (push-cond-clause $d
+                                    (attr '$e O:1:0 ($a $b))
+                                )
+                            )
+                        )
+                    )
+                )
             )
         )"
     };

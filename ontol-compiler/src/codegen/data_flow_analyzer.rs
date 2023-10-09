@@ -68,6 +68,13 @@ where
         let arena = node_ref.arena();
         match node_ref.kind() {
             ontol_hir::Kind::Var(var) => VarSet::from([*var]),
+            ontol_hir::Kind::Begin(body) => {
+                let mut var_set = VarSet::default();
+                for child in arena.refs(body) {
+                    var_set.union_with(&self.analyze_node(child));
+                }
+                var_set
+            }
             ontol_hir::Kind::Unit => VarSet::default(),
             ontol_hir::Kind::I64(_) => VarSet::default(),
             ontol_hir::Kind::F64(_) => VarSet::default(),

@@ -64,6 +64,12 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
                 write!(f, "{sep}{}", var)?;
                 Ok(sep.multiline())
             }
+            Kind::Begin(nodes) => {
+                write!(f, "{indent}(begin")?;
+                let multi = self.print_all(Sep::Space, self.kinds(nodes), f)?;
+                self.print_rparen(multi, f)?;
+                Ok(Multiline(true))
+            }
             Kind::Unit => {
                 write!(f, "{sep}#u")?;
                 Ok(sep.multiline())
@@ -191,7 +197,7 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
             }
             Kind::PushCondClause(var, clause) => {
                 write!(f, "{indent}(push-cond-clause {var}")?;
-                let multi = self.print(self.indent.indent(), clause, f)?;
+                let multi = self.print_all(self.indent.indent(), [clause].into_iter(), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }

@@ -151,6 +151,8 @@ pub type Nodes = SmallVec<[Node; 2]>;
 pub enum Kind<'a, L: Lang> {
     /// A variable reference.
     Var(Var),
+    /// Begin - a sequence of nodes where the last node is the value
+    Begin(Nodes),
     /// A unit value.
     Unit,
     /// A 64 bit signed integer
