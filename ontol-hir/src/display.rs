@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Display};
 
-use ontol_runtime::{format_utils::AsAlpha, vm::proc::BuiltinProc};
+use ontol_runtime::{condition::Clause, format_utils::AsAlpha, vm::proc::BuiltinProc};
 
 use crate::{
     arena::{Arena, NodeRef},
@@ -190,7 +190,9 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
                 Ok(Multiline(true))
             }
             Kind::PushCondClause(var, clause) => {
-                write!(f, "{indent}(push-cond-clause {var} {clause})")?;
+                write!(f, "{indent}(push-cond-clause {var}")?;
+                let multi = self.print(self.indent.indent(), clause, f)?;
+                self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
         }
@@ -288,6 +290,49 @@ impl<'h, 'a, L: Lang> Print<(PropPattern<'a, L>, Nodes)> for Printer<'h, 'a, L> 
         let multi = self.print_all(Sep::Space, self.kinds(nodes), f)?;
         self.print_rparen(multi, f)?;
         Ok(Multiline(true))
+    }
+}
+
+impl<'h, 'a, L: Lang> Print<Clause<EvalCondTerm>> for Printer<'h, 'a, L> {
+    fn print(
+        self,
+        sep: Sep,
+        clause: &Clause<EvalCondTerm>,
+        f: &mut std::fmt::Formatter,
+    ) -> PrintResult {
+        write!(f, "{sep}")?;
+        match clause {
+            Clause::Root(var) => {
+                write!(f, "(root '{var})")?;
+                Ok(Multiline(false))
+            }
+            Clause::Attr(var, prop_id, (rel, val)) => {
+                write!(f, "(attr '{var} {prop_id} (")?;
+                let multi = self.print_all(Sep::None, [rel, val].into_iter(), f)?;
+                self.print_rparen(multi, f)?;
+                self.print_rparen(multi, f)?;
+                Ok(Multiline(true))
+            }
+            _ => todo!(),
+        }
+    }
+}
+
+impl<'h, 'a, L: Lang> Print<EvalCondTerm> for Printer<'h, 'a, L> {
+    fn print(self, sep: Sep, term: &EvalCondTerm, f: &mut std::fmt::Formatter) -> PrintResult {
+        // let indent = self.indent;
+        // write!(f, "{indent}")?;
+        match term {
+            EvalCondTerm::Wildcard => {
+                write!(f, "{sep}_")?;
+                Ok(Multiline(false))
+            }
+            EvalCondTerm::QuoteVar(var) => {
+                write!(f, "{sep}'{var}")?;
+                Ok(Multiline(false))
+            }
+            EvalCondTerm::Eval(node) => self.print(sep, self.kind(*node), f),
+        }
     }
 }
 
@@ -476,16 +521,5 @@ impl Debug for Label {
 impl Display for Label {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "@{}", AsAlpha(self.0))
-    }
-}
-
-impl Display for EvalCondTerm {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Wildcard => write!(f, "_"),
-            Self::QuoteVar(var) => write!(f, "'{var}"),
-            Self::Const(value) => write!(f, "{:?}", value.data),
-            Self::Eval(var) => write!(f, "{var}"),
-        }
     }
 }

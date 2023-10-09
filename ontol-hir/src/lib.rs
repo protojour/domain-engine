@@ -1,13 +1,7 @@
 use std::{fmt::Debug, ops::Index};
 
 use arena::{Arena, NodeRef};
-use ontol_runtime::{
-    condition::Clause,
-    value::{PropertyId, Value},
-    var::Var,
-    vm::proc::BuiltinProc,
-    DefId,
-};
+use ontol_runtime::{condition::Clause, value::PropertyId, var::Var, vm::proc::BuiltinProc, DefId};
 use smallvec::SmallVec;
 use smartstring::alias::String;
 
@@ -252,9 +246,7 @@ pub enum EvalCondTerm {
     /// Quoted var, i.e. not evaluated
     QuoteVar(Var),
     /// Evaluate var into a CondTerm::Value
-    Eval(Var),
-    /// Constant value
-    Const(Value),
+    Eval(Node),
 }
 
 #[derive(Debug)]

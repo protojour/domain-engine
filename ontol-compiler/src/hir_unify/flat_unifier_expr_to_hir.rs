@@ -211,24 +211,33 @@ impl<'t, 'u, 'a, 'm> ExprToHir<'t, 'u, 'a, 'm> {
                 let cond_var = *cond_var;
                 match prop.variant {
                     expr::PropVariant::Singleton(attr) => {
-                        let _rel = self.expr_to_hir(attr.rel, in_scope, main_scope.next())?;
-                        // body.push(rel);
-                        let _val = self.expr_to_hir(attr.val, in_scope, main_scope.next())?;
-                        // body.push(val);
+                        let rel = self.expr_to_cond_term(attr.rel, in_scope, main_scope.next())?;
+                        let val = self.expr_to_cond_term(attr.val, in_scope, main_scope.next())?;
                         Ok(self.mk_node(
                             ontol_hir::Kind::PushCondClause(
                                 cond_var,
-                                Clause::Attr(
-                                    prop.struct_var,
-                                    prop.prop_id,
-                                    (EvalCondTerm::Wildcard, EvalCondTerm::Wildcard),
-                                ),
+                                Clause::Attr(prop.struct_var, prop.prop_id, (rel, val)),
                             ),
                             UNIT_META,
                         ))
                     }
                     expr::PropVariant::Seq { .. } => Err(unifier_todo(smart_format!("seq prop"))),
                 }
+            }
+        }
+    }
+
+    pub fn expr_to_cond_term(
+        &mut self,
+        expr::Expr(kind, meta): expr::Expr<'m>,
+        in_scope: &VarSet,
+        main_scope: MainScope,
+    ) -> UnifierResult<EvalCondTerm> {
+        match kind {
+            expr::Kind::Unit => Ok(EvalCondTerm::Wildcard),
+            _ => {
+                let node = self.expr_to_hir(expr::Expr(kind, meta), in_scope, main_scope)?;
+                Ok(EvalCondTerm::Eval(node))
             }
         }
     }
