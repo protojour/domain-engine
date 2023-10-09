@@ -35,7 +35,7 @@ map BlogPostQuery {
     BlogPost: [
         ..db.Article match {
             'author': db.User match {
-                'username'?: by // ERROR unbound variable
+                'username'?: by
             }
         }
     ]

@@ -95,3 +95,54 @@ fn test_map_match_parameterless_query() {
         );
     });
 }
+
+#[test]
+fn test_map_match_anonymous_query_mandatory_parameters() {
+    r#"
+    pub def key { rel .is: text }
+    pub def foo {
+        rel .'key'|id: key
+        rel .'prop_a': text
+        rel .'prop_b': text
+    }
+    map query {
+        {
+            'input_a': a
+            'input_b': b
+        }
+        foo: [..foo match {
+            'prop_a': a
+            'prop_b': b
+        }]
+    }
+    "#
+    .compile_then(|test| {
+        let [foo] = test.bind(["foo"]);
+        test.mapper(
+            YielderMock::yield_match
+                .next_call(matching!(eq!(&Literal(indoc! { r#"
+                    (root $e)
+                    (attr $e S:1:6 (_ Text("A")))
+                    (attr $e S:1:7 (_ Text("B")))
+                    "#
+                }))))
+                .returns(Value::sequence_of([foo
+                    .value_builder(json!({ "key": "key", "prop_a": "a!", "prop_b": "b!" }))
+                    .into()])),
+        )
+        .assert_named_forward_map(
+            "query",
+            json!({
+                "input_a": "A",
+                "input_b": "B"
+            }),
+            json!([
+                {
+                    "key": "key",
+                    "prop_a": "a!",
+                    "prop_b": "b!"
+                }
+            ]),
+        );
+    });
+}

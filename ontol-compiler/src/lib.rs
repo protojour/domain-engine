@@ -52,6 +52,7 @@ mod compiler_queries;
 mod def;
 mod lowering;
 mod map;
+mod map_arm_def_inference;
 mod namespace;
 mod ontol_domain;
 mod pattern;
@@ -184,7 +185,7 @@ impl<'m> Compiler<'m> {
         self.package_config_table
             .insert(package.package_id, package.config);
 
-        let root_defs = {
+        let lowered = {
             let mut lowering = Lowering::new(self, &src);
 
             for stmt in package.statements {
@@ -194,9 +195,23 @@ impl<'m> Compiler<'m> {
             lowering.finish()
         };
 
-        let mut type_check = self.type_check();
-        for root_def in root_defs {
-            type_check.check_def_shallow(root_def);
+        for def_id in lowered.root_defs {
+            if lowered.map_defs.contains(&def_id) {
+                if let Some(arm_inference) = self.check_map_arm_def_inference(def_id) {
+                    self.type_check().check_def_sealed(arm_inference.source.1);
+                    let new_defs = self
+                        .map_arm_def_inferencer(def_id)
+                        .infer_map_arm_type(arm_inference);
+
+                    for def_id in new_defs {
+                        self.type_check().check_def_shallow(def_id);
+                    }
+
+                    self.type_check().check_def_sealed(arm_inference.target.1);
+                }
+            }
+
+            self.type_check().check_def_shallow(def_id);
         }
 
         self.seal_domain(package.package_id);

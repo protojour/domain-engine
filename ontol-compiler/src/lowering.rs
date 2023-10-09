@@ -1,4 +1,7 @@
-use std::{collections::HashMap, ops::Range};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Range,
+};
 
 use either::Either;
 use indexmap::map::Entry;
@@ -31,6 +34,12 @@ pub struct Lowering<'s, 'm> {
     compiler: &'s mut Compiler<'m>,
     src: &'s Src,
     root_defs: Vec<DefId>,
+    map_defs: HashSet<DefId>,
+}
+
+pub struct Lowered {
+    pub root_defs: Vec<DefId>,
+    pub map_defs: HashSet<DefId>,
 }
 
 type LoweringError = (CompileError, Span);
@@ -44,11 +53,15 @@ impl<'s, 'm> Lowering<'s, 'm> {
             compiler,
             src,
             root_defs: Default::default(),
+            map_defs: Default::default(),
         }
     }
 
-    pub fn finish(self) -> Vec<DefId> {
-        self.root_defs
+    pub fn finish(self) -> Lowered {
+        Lowered {
+            root_defs: self.root_defs,
+            map_defs: self.map_defs,
+        }
     }
 
     pub fn lower_statement(&mut self, stmt: (ast::Statement, Span)) -> Result<(), ()> {
@@ -143,6 +156,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     },
                     &span,
                 );
+
+                self.map_defs.insert(def_id);
 
                 Ok([def_id].into())
             }

@@ -35,7 +35,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         def: &Def,
         var_allocator: &VarAllocator,
         pat_ids: [PatId; 2],
-    ) -> Result<TypeRef<'m>, AggrGroupError> {
+    ) -> Result<TypeRef<'m>, CheckMapError> {
         let mut ctx = HirBuildCtx::new(def.span, VarAllocator::from(*var_allocator.peek_next()));
 
         let mut map_check = MapCheck {
@@ -64,7 +64,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         def: &Def,
         input: [(PatId, Arm); 2],
         ctx: &mut HirBuildCtx<'m>,
-    ) -> Result<(), AggrGroupError> {
+    ) -> Result<(), CheckMapError> {
         let mut arm_nodes = input.map(|(pat_id, arm)| {
             let _entered = arm.tracing_debug_span().entered();
 
@@ -254,7 +254,7 @@ impl<'c> MapCheck<'c> {
         expr: &Pattern,
         parent_aggr_group: Option<CtrlFlowGroup>,
         ctx: &mut HirBuildCtx<'_>,
-    ) -> Result<ArmAnalysis, AggrGroupError> {
+    ) -> Result<ArmAnalysis, CheckMapError> {
         let mut group_set = AggrGroupSet::new();
         let mut arm_class = MapOutputClass::Data;
 
@@ -332,7 +332,7 @@ impl<'c> MapCheck<'c> {
                         }
                     }
 
-                    ctx.enter_ctrl::<Result<(), AggrGroupError>>(|ctx| {
+                    ctx.enter_ctrl::<Result<(), CheckMapError>>(|ctx| {
                         match inner_aggr_group.disambiguate(ctx, ctx.current_ctrl_flow_depth()) {
                             Ok(label) => {
                                 ctx.label_map.insert(*pat_id, label);
@@ -404,7 +404,7 @@ impl<'c> MapCheck<'c> {
         full_span: &SourceSpan,
         parent_aggr_group: Option<CtrlFlowGroup>,
         ctx: &mut HirBuildCtx<'_>,
-    ) -> Result<AggrGroupSet, AggrGroupError> {
+    ) -> Result<AggrGroupSet, CheckMapError> {
         let mut group_set = AggrGroupSet::new();
         match node {
             RegexPatternCaptureNode::Capture { var, name_span, .. } => {
@@ -473,7 +473,7 @@ impl<'c> MapCheck<'c> {
                         inner_aggr_group.join(group);
                     });
 
-                    ctx.enter_ctrl::<Result<(), AggrGroupError>>(|ctx| {
+                    ctx.enter_ctrl::<Result<(), CheckMapError>>(|ctx| {
                         match inner_aggr_group.disambiguate(ctx, ctx.current_ctrl_flow_depth()) {
                             Ok(label) => {
                                 ctx.label_map.insert(*pat_id, label);
@@ -559,7 +559,9 @@ impl<'c> MapCheck<'c> {
 }
 
 #[derive(Debug)]
-pub enum AggrGroupError {
+pub enum CheckMapError {
+    MutualArmInference,
+    ArmNotInferrable,
     DepthExceeded,
     RootCount(usize),
     NoLeaves,
@@ -596,9 +598,9 @@ impl AggrGroupSet {
         self,
         ctx: &HirBuildCtx,
         max_depth: CtrlFlowDepth,
-    ) -> Result<Label, AggrGroupError> {
+    ) -> Result<Label, CheckMapError> {
         if self.tallest_depth > max_depth.0 {
-            return Err(AggrGroupError::DepthExceeded);
+            return Err(CheckMapError::DepthExceeded);
         }
 
         let mut roots: FnvHashSet<Label> = Default::default();
@@ -624,12 +626,12 @@ impl AggrGroupSet {
                     .collect::<Vec<_>>();
 
                 match leaves.len() {
-                    0 => Err(AggrGroupError::NoLeaves),
+                    0 => Err(CheckMapError::NoLeaves),
                     1 => Ok(leaves.into_iter().next().unwrap()),
-                    _ => Err(AggrGroupError::TooManyLeaves(leaves)),
+                    _ => Err(CheckMapError::TooManyLeaves(leaves)),
                 }
             }
-            other => Err(AggrGroupError::RootCount(other)),
+            other => Err(CheckMapError::RootCount(other)),
         }
     }
 }

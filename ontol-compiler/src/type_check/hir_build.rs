@@ -1,6 +1,5 @@
 use std::str::FromStr;
 
-use ontol_hir::StructFlags;
 use ontol_runtime::smart_format;
 use tracing::debug;
 
@@ -8,7 +7,9 @@ use crate::{
     def::{Def, DefKind},
     error::CompileError,
     mem::Intern,
-    pattern::{PatId, Pattern, PatternKind, RegexPatternCaptureNode, TypePath},
+    pattern::{
+        CompoundPatternModifier, PatId, Pattern, PatternKind, RegexPatternCaptureNode, TypePath,
+    },
     primitive::PrimitiveKind,
     type_check::{
         ena_inference::{InferValue, Strength},
@@ -127,61 +128,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             (
                 PatternKind::Compound {
-                    type_path:
-                        TypePath::Specified {
-                            def_id: path_def_id,
-                            span: path_span,
-                        },
-                    modifier,
-                    is_unit_binding,
-                    attributes,
-                },
-                expected_ty,
-            ) => {
-                let struct_ty = self.check_def_sealed(*path_def_id);
-                match struct_ty {
-                    Type::Domain(def_id) => {
-                        assert_eq!(*def_id, *path_def_id);
-                    }
-                    _ => return self.error_node(CompileError::DomainTypeExpected, path_span, ctx),
-                };
-                let node = self.build_unpacker(
-                    UnpackerInfo {
-                        type_def_id: *path_def_id,
-                        ty: struct_ty,
-                        modifier: *modifier,
-                        is_unit_binding: *is_unit_binding,
-                        parent_struct_flags: node_info.parent_struct_flags,
-                    },
-                    attributes,
-                    pattern.span,
-                    ctx,
-                );
-
-                let meta = *ctx.hir_arena[node].meta();
-                match expected_ty {
-                    Some((Type::Infer(_), _)) => node,
-                    Some((Type::Domain(_), _)) => node,
-                    Some((Type::Option(Type::Domain(_)), _)) => {
-                        *ctx.hir_arena[node].meta_mut() = Meta {
-                            ty: self.types.intern(Type::Option(meta.ty)),
-                            span: meta.span,
-                        };
-                        node
-                    }
-                    Some((expected_ty, _)) => self.type_error_node(
-                        TypeError::Mismatch(TypeEquation {
-                            actual: (meta.ty, Strength::Strong),
-                            expected: (expected_ty, Strength::Strong),
-                        }),
-                        &pattern.span,
-                        ctx,
-                    ),
-                    _ => node,
-                }
-            }
-            (
-                PatternKind::Compound {
                     type_path: TypePath::RelContextual,
                     modifier,
                     is_unit_binding,
@@ -216,50 +162,81 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             (
                 PatternKind::Compound {
-                    type_path:
-                        TypePath::Inferred {
-                            def_id: infer_def_id,
-                        },
+                    type_path,
+                    mut modifier,
+                    is_unit_binding,
                     attributes,
-                    ..
                 },
                 expected_ty,
             ) => {
-                // ONTOL syntax (currently) requires that the explicit struct type be specified
-                // when being part of a parent expression (the reason why the expected_ty would be defined)
-                if expected_ty.is_some() {
-                    return self.type_error_node(
-                        TypeError::StructTypeNotInferrable,
-                        &pattern.span,
-                        ctx,
-                    );
-                }
-
-                if attributes.len() > 1 {
-                    // TODO: Register types for anonymous struct, with type inference
-                    return self.type_error_node(
-                        TypeError::NoRelationParametersExpected,
-                        &pattern.span,
-                        ctx,
-                    );
-                }
-
-                // Anonymous top-level struct defined _within the map statement_.
-                // It can be mapped _from_ but never _to_, so a resemblance to `match`.
-                // The difference is that all the field types must be directly inferred.
-                // let lolge = self.defs.alloc_def_id(ONTOL_PKG);
-                let ty = self.check_def_sealed(*infer_def_id);
-                let meta = Meta {
-                    ty,
-                    span: pattern.span,
+                let (struct_ty, path_def_id) = match type_path {
+                    TypePath::Specified {
+                        def_id: path_def_id,
+                        span,
+                    } => {
+                        let struct_ty = self.check_def_sealed(*path_def_id);
+                        match struct_ty {
+                            Type::Domain(def_id) => {
+                                assert_eq!(*def_id, *path_def_id);
+                            }
+                            _ => {
+                                return self.error_node(CompileError::DomainTypeExpected, span, ctx)
+                            }
+                        };
+                        (struct_ty, *path_def_id)
+                    }
+                    TypePath::Inferred { def_id } => {
+                        let struct_ty = self.check_def_sealed(*def_id);
+                        // ONTOL syntax (currently) requires that the explicit struct type be specified
+                        // when being part of a parent expression (the reason why the expected_ty would be defined)
+                        if expected_ty.is_some() {
+                            return self.type_error_node(
+                                TypeError::StructTypeNotInferrable,
+                                &pattern.span,
+                                ctx,
+                            );
+                        }
+                        // Forced match
+                        modifier = Some(CompoundPatternModifier::Match);
+                        (struct_ty, *def_id)
+                    }
+                    _ => unreachable!(),
                 };
-                let struct_binder: TypedHirData<'_, ontol_hir::Binder> =
-                    TypedHirData(ctx.var_allocator.alloc().into(), meta);
 
-                ctx.mk_node(
-                    ontol_hir::Kind::Struct(struct_binder, StructFlags::MATCH, Default::default()),
-                    meta,
-                )
+                let node = self.build_unpacker(
+                    UnpackerInfo {
+                        type_def_id: path_def_id,
+                        ty: struct_ty,
+                        modifier,
+                        is_unit_binding: *is_unit_binding,
+                        parent_struct_flags: node_info.parent_struct_flags,
+                    },
+                    attributes,
+                    pattern.span,
+                    ctx,
+                );
+
+                let meta = *ctx.hir_arena[node].meta();
+                match expected_ty {
+                    Some((Type::Infer(_), _)) => node,
+                    Some((Type::Domain(_), _)) => node,
+                    Some((Type::Option(Type::Domain(_)), _)) => {
+                        *ctx.hir_arena[node].meta_mut() = Meta {
+                            ty: self.types.intern(Type::Option(meta.ty)),
+                            span: meta.span,
+                        };
+                        node
+                    }
+                    Some((expected_ty, _)) => self.type_error_node(
+                        TypeError::Mismatch(TypeEquation {
+                            actual: (meta.ty, Strength::Strong),
+                            expected: (expected_ty, Strength::Strong),
+                        }),
+                        &pattern.span,
+                        ctx,
+                    ),
+                    _ => node,
+                }
             }
             (PatternKind::Seq(aggr_pat_id, pat_elements), expected_ty) => {
                 let (rel_ty, val_ty) = match expected_ty {

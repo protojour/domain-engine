@@ -66,7 +66,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             } => match self.check_map(def, var_alloc, *arms) {
                 Ok(ty) => ty,
                 Err(error) => {
-                    debug!("Aggregation group error: {error:?}");
+                    debug!("Check map error: {error:?}");
                     self.types.intern(Type::Error)
                 }
             },

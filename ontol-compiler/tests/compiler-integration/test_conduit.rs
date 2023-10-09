@@ -88,6 +88,5 @@ fn test_map_conduit_contrived_signup() {
 
 #[test]
 fn test_map_blog_post_query() {
-    // FIXME: Must generate the "anonymous struct"
-    TestPackages::with_sources([CONDUIT_DB, BLOG_POST_QUERY.root()]).compile_fail();
+    TestPackages::with_sources([CONDUIT_DB, BLOG_POST_QUERY.root()]).compile();
 }
