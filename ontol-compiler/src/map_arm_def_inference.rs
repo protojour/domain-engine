@@ -1,10 +1,10 @@
+use fnv::FnvHashMap;
 use ontol_runtime::{
     ontology::{PropertyCardinality, ValueCardinality},
     smart_format,
     var::Var,
     DefId,
 };
-use tracing::debug;
 
 use crate::{
     def::{Def, DefKind, Defs, LookupRelationshipMeta, RelParams, Relationship},
@@ -19,7 +19,7 @@ pub struct MapArmInferenceInfo {
     pub source: (PatId, DefId),
 }
 
-struct RelationshipInfo {
+struct VarRelationship {
     val_def_id: DefId,
 }
 
@@ -41,7 +41,10 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
             .properties_by_def_id_mut(info.target.1)
             .table_mut();
 
-        self.traverse_pattern(target_pattern, info.target.1, info);
+        let mut source_variables = Default::default();
+        self.scan_source_variables(self.get_pattern(info.source.0), &mut source_variables);
+
+        self.traverse_pattern(target_pattern, info.target.1, &source_variables);
         std::mem::take(&mut self.new_defs)
     }
 
@@ -49,7 +52,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
         &mut self,
         target_pat: &Pattern,
         target_def_id: DefId,
-        info: MapArmInferenceInfo,
+        source_vars: &FnvHashMap<Var, Vec<VarRelationship>>,
     ) {
         match &target_pat.kind {
             PatternKind::Call(_, _) => self.error(
@@ -70,7 +73,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                 }
 
                 for pattern_attr in attributes.iter() {
-                    self.infer_attr(pattern_attr, target_def_id, info);
+                    self.infer_attr(pattern_attr, target_def_id, source_vars);
                 }
             }
             PatternKind::Seq(_, _) => todo!(),
@@ -85,7 +88,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
         &mut self,
         pattern_attr: &CompoundPatternAttr,
         parent_def_id: DefId,
-        info: MapArmInferenceInfo,
+        source_vars: &FnvHashMap<Var, Vec<VarRelationship>>,
     ) {
         match &pattern_attr.value.kind {
             PatternKind::Call(_, _) => self.error(
@@ -93,37 +96,35 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                 &pattern_attr.value.span,
             ),
             PatternKind::Variable(var) => {
-                let Some(relation_info) = self.lookup_source_variable(*var, info) else {
-                    self.error(
-                        CompileError::TODO(smart_format!(
-                            "Inference failed: Corresponding variable not found"
-                        )),
-                        &pattern_attr.value.span,
+                if let Some(var_relationship) =
+                    self.find_source_var_relationship(source_vars, *var, &pattern_attr.value.span)
+                {
+                    let relationship = Relationship {
+                        relation_def_id: pattern_attr.key.0,
+                        subject: (parent_def_id, pattern_attr.value.span),
+                        subject_cardinality: (
+                            PropertyCardinality::Mandatory,
+                            ValueCardinality::One,
+                        ),
+                        object: (var_relationship.val_def_id, pattern_attr.value.span),
+                        object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
+                        object_prop: None,
+                        rel_params: RelParams::Unit,
+                    };
+
+                    let relationship_id = self.defs.alloc_def_id(self.map_def_id.package_id());
+                    self.defs.table.insert(
+                        relationship_id,
+                        Def {
+                            id: relationship_id,
+                            package: self.map_def_id.package_id(),
+                            kind: DefKind::Relationship(relationship),
+                            span: pattern_attr.value.span,
+                        },
                     );
-                    return;
-                };
-                let relationship = Relationship {
-                    relation_def_id: pattern_attr.key.0,
-                    subject: (parent_def_id, pattern_attr.value.span),
-                    subject_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
-                    object: (relation_info.val_def_id, pattern_attr.value.span),
-                    object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
-                    object_prop: None,
-                    rel_params: RelParams::Unit,
-                };
 
-                let relationship_id = self.defs.alloc_def_id(self.map_def_id.package_id());
-                self.defs.table.insert(
-                    relationship_id,
-                    Def {
-                        id: relationship_id,
-                        package: self.map_def_id.package_id(),
-                        kind: DefKind::Relationship(relationship),
-                        span: pattern_attr.value.span,
-                    },
-                );
-
-                self.new_defs.push(relationship_id);
+                    self.new_defs.push(relationship_id);
+                }
             }
             PatternKind::Compound { .. } => todo!(),
             PatternKind::Seq(..) => todo!(),
@@ -133,43 +134,70 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
         }
     }
 
-    fn lookup_source_variable(
-        &self,
+    fn find_source_var_relationship<'r>(
+        &mut self,
+        source_vars: &'r FnvHashMap<Var, Vec<VarRelationship>>,
         var: Var,
-        info: MapArmInferenceInfo,
-    ) -> Option<RelationshipInfo> {
-        self.find_source_variable(self.get_pattern(info.source.0), var)
+        span: &SourceSpan,
+    ) -> Option<&'r VarRelationship> {
+        match source_vars.get(&var) {
+            None => {
+                self.error(
+                    CompileError::TODO(smart_format!(
+                        "Inference failed: Corresponding variable not found"
+                    )),
+                    span,
+                );
+                None
+            }
+            Some(relationships) => {
+                if relationships.len() != 1 {
+                    self.error(
+                        CompileError::TODO(smart_format!(
+                            "Inference failed: Variable is mentioned more than once in the opposing arm"
+                        )),
+                        span,
+                    );
+                    None
+                } else {
+                    relationships.iter().next()
+                }
+            }
+        }
     }
 
-    fn find_source_variable(&self, pattern: &Pattern, var: Var) -> Option<RelationshipInfo> {
+    fn scan_source_variables(
+        &self,
+        pattern: &Pattern,
+        output: &mut FnvHashMap<Var, Vec<VarRelationship>>,
+    ) {
         match &pattern.kind {
-            PatternKind::Call(..) => None,
-            PatternKind::Variable(_) => None,
+            PatternKind::Call(..) => {}
+            PatternKind::Variable(_) => {}
             PatternKind::Compound {
                 type_path,
                 attributes,
                 ..
             } => {
                 let TypePath::Specified { def_id, .. } = type_path else {
-                    return None;
+                    return;
                 };
-                debug!("HERE");
+                let Some(properties) = self.relations.properties_by_def_id(*def_id) else {
+                    return;
+                };
+                let Some(table) = properties.table.as_ref() else {
+                    return;
+                };
                 for attr in attributes.iter() {
                     match &attr.value.kind {
                         PatternKind::Compound { .. } => {
-                            if let Some(lol) = self.find_source_variable(&attr.value, var) {
-                                return Some(lol);
+                            if let Some(rel) = &attr.rel {
+                                self.scan_source_variables(rel, output);
                             }
+                            self.scan_source_variables(&attr.value, output);
                         }
                         PatternKind::Variable(pat_var) => {
-                            debug!("A");
-                            let properties = self.relations.properties_by_def_id(*def_id)?;
-                            debug!("B");
-                            let table = properties.table.as_ref()?;
-
-                            debug!("C");
-
-                            let (prop_id, found_relationship_meta) =
+                            let Some((prop_id, found_relationship_meta)) =
                                 table.iter().find_map(|(prop_id, _property)| {
                                     let meta = self.defs.relationship_meta(prop_id.relationship_id);
                                     if meta.relationship.relation_def_id == attr.key.0 {
@@ -177,35 +205,32 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                                     } else {
                                         None
                                     }
-                                })?;
-
-                            debug!("D");
+                                })
+                            else {
+                                continue;
+                            };
 
                             let (val_def_id, _cardinality, _) = found_relationship_meta
                                 .relationship
                                 .by(prop_id.role.opposite());
 
-                            if pat_var == &var {
-                                return Some(RelationshipInfo { val_def_id });
-                            }
+                            output
+                                .entry(*pat_var)
+                                .or_default()
+                                .push(VarRelationship { val_def_id });
                         }
                         _ => {}
                     }
                 }
-
-                None
             }
             PatternKind::Seq(_, elements) => {
                 for element in elements {
-                    if let Some(found) = self.find_source_variable(&element.pattern, var) {
-                        return Some(found);
-                    }
+                    self.scan_source_variables(&element.pattern, output);
                 }
-                None
             }
-            PatternKind::ConstI64(_) => todo!(),
-            PatternKind::Regex(_) => todo!(),
-            PatternKind::ConstText(_) => todo!(),
+            PatternKind::ConstI64(_) => {}
+            PatternKind::Regex(_) => {}
+            PatternKind::ConstText(_) => {}
         }
     }
 

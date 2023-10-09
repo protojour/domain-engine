@@ -273,3 +273,26 @@ fn map_unbound_variable_in_regex_interpolation() {
         expect_eq!(actual = errors[0].span_text, expected = "bad_var");
     })
 }
+
+#[test]
+fn map_error_def_inference_ambiguity() {
+    r"
+    def foo {
+        rel .'a': text
+        rel .'b': text
+    }
+    map {
+        {
+            'a': x // ERROR TODO: Inference failed: Variable is mentioned more than once in the opposing arm// ERROR unknown property
+            'b': y // ERROR TODO: Inference failed: Corresponding variable not found// ERROR unknown property
+        }
+        foo {
+            'a': x
+            'b': x
+        }
+    }
+    "
+    .compile_fail_then(|errors| {
+        expect_eq!(actual = errors[0].span_text, expected = "bad_var");
+    })
+}
