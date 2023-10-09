@@ -102,6 +102,13 @@ impl<'t, 'u, 'a, 'm> ExprToHir<'t, 'u, 'a, 'm> {
                     )?);
                 }
 
+                if let ExprMode::Condition(cond_var) = self.unifier.expr_mode() {
+                    body.push(self.mk_node(
+                        ontol_hir::Kind::PushCondClause(cond_var, Clause::Root(cond_var)),
+                        UNIT_META,
+                    ));
+                }
+
                 for prop in props {
                     body.push(self.prop_to_hir(prop, in_scope, main_scope)?);
                 }
@@ -207,23 +214,20 @@ impl<'t, 'u, 'a, 'm> ExprToHir<'t, 'u, 'a, 'm> {
                     UNIT_META,
                 ))
             }
-            ExprMode::Condition(cond_var) => {
-                let cond_var = *cond_var;
-                match prop.variant {
-                    expr::PropVariant::Singleton(attr) => {
-                        let rel = self.expr_to_cond_term(attr.rel, in_scope, main_scope.next())?;
-                        let val = self.expr_to_cond_term(attr.val, in_scope, main_scope.next())?;
-                        Ok(self.mk_node(
-                            ontol_hir::Kind::PushCondClause(
-                                cond_var,
-                                Clause::Attr(prop.struct_var, prop.prop_id, (rel, val)),
-                            ),
-                            UNIT_META,
-                        ))
-                    }
-                    expr::PropVariant::Seq { .. } => Err(unifier_todo(smart_format!("seq prop"))),
+            ExprMode::Condition(cond_var) => match prop.variant {
+                expr::PropVariant::Singleton(attr) => {
+                    let rel = self.expr_to_cond_term(attr.rel, in_scope, main_scope.next())?;
+                    let val = self.expr_to_cond_term(attr.val, in_scope, main_scope.next())?;
+                    Ok(self.mk_node(
+                        ontol_hir::Kind::PushCondClause(
+                            cond_var,
+                            Clause::Attr(prop.struct_var, prop.prop_id, (rel, val)),
+                        ),
+                        UNIT_META,
+                    ))
                 }
-            }
+                expr::PropVariant::Seq { .. } => Err(unifier_todo(smart_format!("seq prop"))),
+            },
         }
     }
 

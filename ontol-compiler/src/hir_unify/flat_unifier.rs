@@ -25,6 +25,7 @@ use super::{
     UnifierError, UnifierResult,
 };
 
+#[derive(Clone, Copy)]
 pub(super) enum ExprMode {
     Expr,
     Condition(Var),
@@ -102,8 +103,8 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
         }
     }
 
-    pub(super) fn expr_mode(&self) -> &ExprMode {
-        &self.expr_mode
+    pub(super) fn expr_mode(&self) -> ExprMode {
+        self.expr_mode
     }
 
     pub(super) fn unify(

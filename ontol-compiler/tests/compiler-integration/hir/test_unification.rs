@@ -1840,6 +1840,9 @@ fn test_basic_match_filter2() {
             (($_ $a)
                 (match-struct ($c)
                     (push-cond-clause $c
+                        (root '$c)
+                    )
+                    (push-cond-clause $c
                         (attr '$c O:0:0 (_ $a))
                     )
                 )

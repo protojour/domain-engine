@@ -304,7 +304,7 @@ impl<'h, 'a, L: Lang> Print<Clause<EvalCondTerm>> for Printer<'h, 'a, L> {
         match clause {
             Clause::Root(var) => {
                 write!(f, "(root '{var})")?;
-                Ok(Multiline(false))
+                Ok(Multiline(true))
             }
             Clause::Attr(var, prop_id, (rel, val)) => {
                 write!(f, "(attr '{var} {prop_id} (")?;
