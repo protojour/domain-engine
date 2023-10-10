@@ -11,7 +11,7 @@ use interface::{
 };
 use lowering::Lowering;
 use mem::Mem;
-use namespace::Namespaces;
+use namespace::{Namespaces, Space};
 use ontol_runtime::{
     config::PackageConfig,
     interface::{
@@ -241,6 +241,13 @@ impl<'m> Compiler<'m> {
 
         let dynamic_sequence_operator_id = serde_generator.make_dynamic_sequence_operator();
 
+        let map_namespaces: FnvHashMap<_, _> = namespaces
+            .iter_mut()
+            .map(|(package_id, namespace)| {
+                (*package_id, std::mem::take(namespace.space_mut(Space::Map)))
+            })
+            .collect();
+
         // For now, create serde operators for every domain
         for package_id in package_ids.iter().cloned() {
             let domain_name = unique_domain_names
@@ -306,6 +313,8 @@ impl<'m> Compiler<'m> {
                 if let Some(schema) = generate_graphql_schema(
                     package_id,
                     builder.partial_ontology(),
+                    map_namespaces.get(&package_id),
+                    &self.codegen_tasks.result_named_forward_maps,
                     &mut serde_generator,
                 ) {
                     interfaces

@@ -299,8 +299,8 @@ impl<'m> Compiler<'m> {
             }
             [InfStatus::Source(source_def_id), InfStatus::Infer(target_def_id)] => {
                 Some(MapArmInferenceInfo {
-                    target: (arms[0], target_def_id),
-                    source: (arms[1], source_def_id),
+                    target: (arms[1], target_def_id),
+                    source: (arms[0], source_def_id),
                 })
             }
             _ => None,

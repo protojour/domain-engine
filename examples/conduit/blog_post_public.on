@@ -25,3 +25,16 @@ map {
         'tags': [..tag]
     }
 }
+
+map posts {
+    {
+        'written_by'?: by
+    }
+    BlogPost: [
+        ..db.Article match {
+            'author': db.User match {
+                'username'?: by
+            }
+        }
+    ]
+}

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
@@ -18,7 +20,7 @@ use ontol_runtime::{
         serde::SerdeModifier,
     },
     ontology::{Ontology, PropertyCardinality, ValueCardinality},
-    smart_format, DefId, PackageId, Role,
+    smart_format, DefId, MapKey, PackageId, Role,
 };
 use smartstring::alias::String;
 use tracing::trace;
@@ -38,6 +40,8 @@ use super::graphql_namespace::{DomainDisambiguation, GraphqlNamespace};
 pub fn generate_graphql_schema<'c>(
     package_id: PackageId,
     partial_ontology: &'c Ontology,
+    map_namespace: Option<&'c IndexMap<&str, DefId>>,
+    named_forward_maps: &'c HashMap<(PackageId, String), [MapKey; 2]>,
     serde_generator: &mut SerdeGenerator<'c, '_>,
 ) -> Option<GraphqlSchema> {
     let domain = partial_ontology.find_domain(package_id).unwrap();
@@ -98,6 +102,15 @@ pub fn generate_graphql_schema<'c>(
 
             if let Some(entity_data) = entity_check(builder.schema, type_ref) {
                 builder.add_entity_queries_and_mutations(entity_data);
+            }
+        }
+    }
+
+    if let Some(map_namespace) = map_namespace {
+        // Register named maps in the user-specified order (using the IndexMap from the namespace)
+        for name in map_namespace.keys() {
+            if let Some(map_key) = named_forward_maps.get(&(package_id, (*name).into())) {
+                builder.add_named_map_query(name, map_key);
             }
         }
     }
@@ -739,6 +752,18 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
 
             fields.insert(field_namespace.unique_literal(prop_key), field_data);
         }
+    }
+
+    pub fn add_named_map_query(&mut self, name: &str, key: &[MapKey; 2]) {
+        let value_type_ref =
+            self.get_def_type_ref(key[1].def_id, QLevel::Connection { rel_params: None });
+
+        object_data_mut(self.schema.query, self.schema)
+            .fields
+            .insert(
+                name.into(),
+                FieldData::mandatory(FieldKind::MapQuery, value_type_ref),
+            );
     }
 
     pub fn add_entity_queries_and_mutations(&mut self, entity_data: EntityData) {

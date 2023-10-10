@@ -327,6 +327,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 self.registry
                     .arg::<Option<std::string::String>>(after.name(), &()),
             ]),
+            FieldKind::MapQuery => Some(vec![]),
             FieldKind::CreateMutation { input } => Some(vec![self.get_domain_field_arg(input)]),
             FieldKind::UpdateMutation { id, input } => Some(vec![
                 self.get_domain_field_arg(id),

@@ -1,8 +1,6 @@
 use ontol_test_utils::{
     examples::{
-        conduit::{
-            BLOG_POST_PUBLIC, BLOG_POST_QUERY, CONDUIT_CONTRIVED_SIGNUP, CONDUIT_DB, CONDUIT_PUBLIC,
-        },
+        conduit::{BLOG_POST_PUBLIC, CONDUIT_CONTRIVED_SIGNUP, CONDUIT_DB, CONDUIT_PUBLIC},
         Root,
     },
     TestCompile, TestPackages,
@@ -84,9 +82,4 @@ fn test_map_conduit_no_tags_in_db_object() {
 #[test]
 fn test_map_conduit_contrived_signup() {
     TestPackages::with_sources([CONDUIT_DB, CONDUIT_CONTRIVED_SIGNUP.root()]).compile();
-}
-
-#[test]
-fn test_map_blog_post_query() {
-    TestPackages::with_sources([CONDUIT_DB, BLOG_POST_QUERY.root()]).compile();
 }

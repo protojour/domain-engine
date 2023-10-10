@@ -217,6 +217,7 @@ pub enum FieldKind {
         first: argument::First,
         after: argument::After,
     },
+    MapQuery,
     CreateMutation {
         input: argument::Input,
     },
