@@ -238,7 +238,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     _ => node,
                 }
             }
-            (PatternKind::Seq(aggr_pat_id, pat_elements), expected_ty) => {
+            (PatternKind::Seq(pat_elements), expected_ty) => {
                 let (rel_ty, val_ty) = match expected_ty {
                     Some((Type::Seq(rel_ty, val_ty), _)) => (*rel_ty, *val_ty),
                     Some((other_ty, _strength)) => {
@@ -251,7 +251,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 if let PatternKind::Regex(regex_pattern) = &pat_element.pattern.kind
                                 {
                                     if pat_element.iter {
-                                        let label = *ctx.label_map.get(aggr_pat_id).unwrap();
+                                        let label = *ctx.label_map.get(&pattern.id).unwrap();
 
                                         let capture_groups_list = self
                                             .build_regex_capture_alternations(
@@ -320,8 +320,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     },
                     ctx,
                 );
-                let label = *ctx.label_map.get(aggr_pat_id).unwrap();
+                let label = *ctx.label_map.get(&pattern.id).unwrap();
                 let seq_ty = self.types.intern(Type::Seq(rel_ty, val_ty));
+
+                if val_ty != ctx.hir_arena[val].meta().ty {
+                    // panic!("{val_ty:?} -- {:?}", ctx.hir_arena[val].meta().ty);
+                }
 
                 ctx.mk_node(
                     ontol_hir::Kind::DeclSeq(
@@ -537,7 +541,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ctx,
                 )
             }
-            PatternKind::Seq(_, elements) => {
+            PatternKind::Seq(elements) => {
                 // FIXME: Unsure how correct this is:
                 for element in elements {
                     let node = self.build_implicit_rel_node(ty, &element.pattern, prop_span, ctx);

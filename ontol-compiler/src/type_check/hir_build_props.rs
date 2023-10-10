@@ -340,7 +340,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 })
             }
             ValueCardinality::Many => match &value.kind {
-                PatternKind::Seq(aggr_pat_id, pat_elements) => {
+                PatternKind::Seq(pat_elements) => {
                     let mut hir_elements = Vec::with_capacity(pat_elements.len());
                     for element in pat_elements {
                         let val_node = self.build_node(
@@ -360,7 +360,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         ));
                     }
 
-                    let label = *ctx.label_map.get(aggr_pat_id).unwrap();
+                    let label = *ctx.label_map.get(&value.id).unwrap();
                     let seq_ty = self.types.intern(Type::Seq(rel_params_ty, value_ty));
 
                     ontol_hir::PropVariant::Seq(ontol_hir::SeqPropertyVariant {

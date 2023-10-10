@@ -758,8 +758,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             })
         }
 
-        let seq_id = self.compiler.patterns.alloc_pat_id();
-        Ok(self.mk_pattern(PatternKind::Seq(seq_id, pattern_elements), &span))
+        Ok(self.mk_pattern(PatternKind::Seq(pattern_elements), &span))
     }
 
     fn lower_expr_pattern(

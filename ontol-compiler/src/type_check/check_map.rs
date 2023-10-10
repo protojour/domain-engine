@@ -251,14 +251,15 @@ struct ArmAnalysis {
 impl<'c> MapCheck<'c> {
     fn analyze_arm(
         &mut self,
-        expr: &Pattern,
+        pat: &Pattern,
         parent_aggr_group: Option<CtrlFlowGroup>,
         ctx: &mut HirBuildCtx<'_>,
     ) -> Result<ArmAnalysis, CheckMapError> {
+        let pat_id = pat.id;
         let mut group_set = AggrGroupSet::new();
         let mut arm_class = MapOutputClass::Data;
 
-        match &expr.kind {
+        match &pat.kind {
             PatternKind::Call(_, args) => {
                 for arg in args.iter() {
                     group_set.join(self.analyze_arm(arg, parent_aggr_group, ctx)?.group_set);
@@ -280,7 +281,7 @@ impl<'c> MapCheck<'c> {
                     arm_class = MapOutputClass::FindMatch;
                 }
             }
-            PatternKind::Seq(pat_id, elements) => {
+            PatternKind::Seq(elements) => {
                 if ctx.current_arm.is_first() {
                     group_set.add(parent_aggr_group);
 
@@ -289,7 +290,7 @@ impl<'c> MapCheck<'c> {
                     debug!("first arm seq: pat_id={pat_id:?}");
                     ctx.ctrl_flow_forest
                         .insert(label, parent_aggr_group.map(|parent| parent.label));
-                    ctx.label_map.insert(*pat_id, label);
+                    ctx.label_map.insert(pat_id, label);
 
                     ctx.enter_ctrl(|ctx| {
                         for element in elements {
@@ -335,7 +336,7 @@ impl<'c> MapCheck<'c> {
                     ctx.enter_ctrl::<Result<(), CheckMapError>>(|ctx| {
                         match inner_aggr_group.disambiguate(ctx, ctx.current_ctrl_flow_depth()) {
                             Ok(label) => {
-                                ctx.label_map.insert(*pat_id, label);
+                                ctx.label_map.insert(pat_id, label);
 
                                 group_set.add(ctx.ctrl_flow_forest.find_parent(label).map(
                                     |label| CtrlFlowGroup {
@@ -355,7 +356,7 @@ impl<'c> MapCheck<'c> {
                                         CompileError::TODO(smart_format!(
                                             "Incompatible aggregation group"
                                         )),
-                                        &expr.span,
+                                        &pat.span,
                                     );
                                     Err(error)
                                 } else {
@@ -369,7 +370,7 @@ impl<'c> MapCheck<'c> {
                                         label,
                                         parent_aggr_group.map(|parent| parent.label),
                                     );
-                                    ctx.label_map.insert(*pat_id, label);
+                                    ctx.label_map.insert(pat_id, label);
 
                                     Ok(())
                                 }
@@ -379,12 +380,12 @@ impl<'c> MapCheck<'c> {
                 }
             }
             PatternKind::Variable(var) => {
-                self.register_variable(*var, &expr.span, parent_aggr_group, &mut group_set, ctx);
+                self.register_variable(*var, &pat.span, parent_aggr_group, &mut group_set, ctx);
             }
             PatternKind::Regex(expr_regex) => {
                 group_set.join(self.analyze_regex_capture_node(
                     &expr_regex.capture_node,
-                    &expr.span,
+                    &pat.span,
                     parent_aggr_group,
                     ctx,
                 )?);
