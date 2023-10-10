@@ -293,6 +293,7 @@ fn map_error_def_inference_ambiguity() {
     }
     "
     .compile_fail_then(|errors| {
-        expect_eq!(actual = errors[0].span_text, expected = "bad_var");
+        expect_eq!(actual = errors[0].span_text, expected = "x");
+        expect_eq!(actual = errors[1].span_text, expected = "'a'");
     })
 }
