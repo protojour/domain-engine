@@ -138,6 +138,7 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                         binder: *binder,
                         flags: *flags,
                         props,
+                        opt_output_type: None,
                     },
                     expr::Meta {
                         hir_meta,

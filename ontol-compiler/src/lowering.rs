@@ -577,7 +577,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     self.lower_map_expr_binding(path, ast, span.clone(), var_table)?
                 }
                 ast::ExprOrSeqPattern::Seq(ast_elements) => {
-                    self.lower_seq_pattern(ast_elements, span, var_table)?
+                    self.lower_seq_pattern(Some(path), ast_elements, span, var_table)?
                 }
             },
         };
@@ -590,12 +590,12 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
     fn lower_map_expr_binding(
         &mut self,
-        path: (ast::Path, Span),
+        type_path: (ast::Path, Span),
         (ast, expr_span): (ast::ExprPattern, Span),
         span: Span,
         var_table: &mut MapVarTable,
     ) -> Res<Pattern> {
-        let type_def_id = self.lookup_path(&path.0, &path.1)?;
+        let type_def_id = self.lookup_path(&type_path.0, &type_path.1)?;
         let key = (DefId::unit(), self.src.span(&span));
         let pattern = self.lower_expr_pattern((ast, expr_span), var_table)?;
 
@@ -603,7 +603,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             PatternKind::Compound {
                 type_path: TypePath::Specified {
                     def_id: type_def_id,
-                    span: self.src.span(&path.1),
+                    span: self.src.span(&type_path.1),
                 },
                 modifier: None,
                 is_unit_binding: true,
@@ -728,13 +728,14 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 self.lower_struct_pattern((ast, span), var_table)
             }
             ast::ExprOrStructOrSeqPattern::Seq(ast_elements) => {
-                self.lower_seq_pattern(ast_elements, span, var_table)
+                self.lower_seq_pattern(None, ast_elements, span, var_table)
             }
         }
     }
 
     fn lower_seq_pattern(
         &mut self,
+        type_path: Option<(ast::Path, Span)>,
         ast_elements: Vec<(ast::SeqPatternElement, Span)>,
         span: Span,
         var_table: &mut MapVarTable,
@@ -745,6 +746,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 span.clone(),
             ));
         }
+
+        let seq_type = type_path
+            .map(|(path, span)| self.lookup_path(&path, &span))
+            .transpose()?;
 
         let mut pattern_elements = Vec::with_capacity(ast_elements.len());
         for (ast_element, _element_span) in ast_elements {
@@ -758,7 +763,13 @@ impl<'s, 'm> Lowering<'s, 'm> {
             })
         }
 
-        Ok(self.mk_pattern(PatternKind::Seq(pattern_elements), &span))
+        Ok(self.mk_pattern(
+            PatternKind::Seq {
+                val_type_def: seq_type,
+                elements: pattern_elements,
+            },
+            &span,
+        ))
     }
 
     fn lower_expr_pattern(

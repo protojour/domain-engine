@@ -10,6 +10,7 @@ use smartstring::alias::String;
 
 use crate::{
     typed_hir::{self, TypedHirData},
+    types::TypeRef,
     SourceSpan,
 };
 
@@ -49,6 +50,8 @@ pub enum Kind<'m> {
         binder: TypedHirData<'m, ontol_hir::Binder>,
         flags: ontol_hir::StructFlags,
         props: Vec<Prop<'m>>,
+        /// Optionally map into a different type:
+        opt_output_type: Option<TypeRef<'m>>,
     },
     Prop(Box<Prop<'m>>),
     Map(Box<Expr<'m>>),

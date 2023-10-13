@@ -1,6 +1,7 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use fnv::FnvHashMap;
+use tracing::debug;
 
 use crate::{
     mem::Intern,
@@ -110,7 +111,10 @@ impl<'c, 'm> Infer<'c, 'm> {
         match ty {
             Type::Error => Err(TypeError::Propagated),
             Type::Infer(var) => match self.eq_relations.probe_value(*var) {
-                InferValue::Known((ty, _)) => Ok(ty),
+                InferValue::Known((ty, _)) => {
+                    debug!("{var:?} inferred to: {ty:?}");
+                    Ok(ty)
+                }
                 InferValue::Unknown => Err(TypeError::NotEnoughInformation),
             },
             Type::Seq(rel, val) => {

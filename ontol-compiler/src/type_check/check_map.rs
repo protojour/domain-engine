@@ -281,7 +281,7 @@ impl<'c> MapCheck<'c> {
                     arm_class = MapOutputClass::FindMatch;
                 }
             }
-            PatternKind::Seq(elements) => {
+            PatternKind::Seq { elements, .. } => {
                 if ctx.current_arm.is_first() {
                     group_set.add(parent_aggr_group);
 

@@ -64,6 +64,7 @@ impl<'t, 'u, 'a, 'm> ExprToHir<'t, 'u, 'a, 'm> {
                 binder,
                 flags,
                 props,
+                opt_output_type,
             } => {
                 let level = self.level;
 
@@ -76,7 +77,9 @@ impl<'t, 'u, 'a, 'm> ExprToHir<'t, 'u, 'a, 'm> {
 
                 let body =
                     self.struct_body(&binder, flags, meta.hir_meta, props, in_scope, main_scope)?;
-                Ok(self.mk_node(ontol_hir::Kind::Struct(binder, flags, body), meta.hir_meta))
+                let struct_node =
+                    self.mk_node(ontol_hir::Kind::Struct(binder, flags, body), meta.hir_meta);
+                Ok(self.unifier.maybe_map_node(struct_node, opt_output_type))
             }
             expr::Kind::SeqItem(label, _index, _iter, attr) => {
                 let (scope_var, output_var) = match main_scope {
@@ -272,6 +275,7 @@ impl<'t, 'u, 'a, 'm> ExprToHir<'t, 'u, 'a, 'm> {
                 binder,
                 flags,
                 props,
+                opt_output_type: _,
             } => {
                 let var = binder.0.var;
                 let body =

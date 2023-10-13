@@ -111,6 +111,7 @@ pub(super) fn unify_root<'m>(
                             binder,
                             flags,
                             props,
+                            opt_output_type,
                         },
                         meta,
                     ),
@@ -174,10 +175,13 @@ pub(super) fn unify_root<'m>(
                     }
                     .with_meta(scope_meta.hir_meta),
                 ),
-                node: unifier.mk_node(
-                    ontol_hir::Kind::Struct(binder, flags, body.into()),
-                    meta.hir_meta,
-                ),
+                node: {
+                    let struct_node = unifier.mk_node(
+                        ontol_hir::Kind::Struct(binder, flags, body.into()),
+                        meta.hir_meta,
+                    );
+                    unifier.maybe_map_node(struct_node, opt_output_type)
+                },
             };
 
             unifier.pop_struct_expr_flags(flags);

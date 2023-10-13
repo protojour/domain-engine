@@ -4,13 +4,13 @@ use ontol_runtime::{
     var::{Var, VarSet},
     DefId,
 };
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::{
     mem::Intern,
     primitive::PrimitiveKind,
     typed_hir::{self, UNIT_META},
-    types::Type,
+    types::{Type, UNIT_TYPE},
     NO_SPAN, USE_FLAT_SEQ_HANDLING,
 };
 
@@ -77,21 +77,58 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                         let expr::Kind::SeqItem(_, _, _, attr) = kind else {
                             panic!();
                         };
+                        let seq_val_ty = match meta.hir_meta.ty {
+                            Type::Seq(_, seq_val_ty) => seq_val_ty,
+                            other => {
+                                warn!("Not a sequence: {other:?}");
+                                other
+                            }
+                        };
 
                         // This should be a match-struct in a sequence
-                        match (attr.rel.kind(), attr.val.kind()) {
-                            (expr::Kind::Unit, expr::Kind::Struct { flags, .. })
-                                if flags.contains(StructFlags::MATCH) =>
-                            {
+                        match (attr.rel, attr.val) {
+                            (
+                                expr::Expr(expr::Kind::Unit, _),
+                                expr::Expr(
+                                    expr::Kind::Struct {
+                                        binder,
+                                        flags,
+                                        props,
+                                        opt_output_type: _,
+                                    },
+                                    val_meta,
+                                ),
+                            ) if flags.contains(StructFlags::MATCH) => {
+                                let expr_meta = expr::Meta {
+                                    hir_meta: typed_hir::Meta {
+                                        ty: self
+                                            .types
+                                            .intern(Type::Seq(&UNIT_TYPE, val_meta.hir_meta.ty)),
+                                        span: val_meta.hir_meta.span,
+                                    },
+                                    free_vars: val_meta.free_vars,
+                                };
                                 self.assign_to_scope(
-                                    expr::Expr(attr.val.0, meta),
+                                    expr::Expr(
+                                        expr::Kind::Struct {
+                                            binder,
+                                            flags,
+                                            props,
+                                            opt_output_type: if seq_val_ty != val_meta.hir_meta.ty {
+                                                Some(meta.hir_meta.ty)
+                                            } else {
+                                                None
+                                            },
+                                        },
+                                        expr_meta,
+                                    ),
                                     depth,
                                     filter,
                                     table,
                                 )
                             }
-                            _ => Ok(AssignResult::Unassigned(expr::Expr(
-                                expr::Kind::Seq(label, attr),
+                            (rel, val) => Ok(AssignResult::Unassigned(expr::Expr(
+                                expr::Kind::Seq(label, Box::new(ontol_hir::Attribute { rel, val })),
                                 meta,
                             ))),
                         }
@@ -303,6 +340,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                 binder,
                 flags,
                 props,
+                opt_output_type,
             } => {
                 let mut retained_props: Vec<expr::Prop> = vec![];
                 for prop in props {
@@ -338,6 +376,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                         binder,
                         flags,
                         props: retained_props,
+                        opt_output_type,
                     },
                     meta,
                 ))

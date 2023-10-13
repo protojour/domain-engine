@@ -146,3 +146,48 @@ fn test_map_match_anonymous_query_mandatory_parameters() {
         );
     });
 }
+
+#[test]
+fn test_map_match_anonymous_with_translation() {
+    r#"
+    pub def key { rel .is: text }
+    pub def foo {
+        rel .'key'|id: key
+        rel .'foo': text
+    }
+    pub def bar {
+        rel .'bar': text
+    }
+    map {
+        foo match { 'foo': x }
+        bar { 'bar': x }
+    }
+    map query {
+        { 'input': x }
+        bar: [..foo match {
+            'foo': x
+        }]
+    }
+    "#
+    .compile_then(|test| {
+        let [foo] = test.bind(["foo"]);
+        test.mapper(
+            YielderMock::yield_match
+                .next_call(matching!(eq!(&Literal(indoc! { r#"
+                    (root $d)
+                    (attr $d S:1:6 (_ Text("X")))
+                    "#
+                }))))
+                .returns(Value::sequence_of([foo
+                    .value_builder(json!({ "key": "key", "foo": "x!" }))
+                    .into()])),
+        )
+        .assert_named_forward_map(
+            "query",
+            json!({ "input": "X", }),
+            json!([
+                { "bar": "x!", }
+            ]),
+        );
+    });
+}

@@ -238,7 +238,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     _ => node,
                 }
             }
-            (PatternKind::Seq(pat_elements), expected_ty) => {
+            (
+                PatternKind::Seq {
+                    val_type_def,
+                    elements,
+                },
+                expected_ty,
+            ) => {
                 let (rel_ty, val_ty) = match expected_ty {
                     Some((Type::Seq(rel_ty, val_ty), _)) => (*rel_ty, *val_ty),
                     Some((other_ty, _strength)) => {
@@ -246,8 +252,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         if let Type::Primitive(PrimitiveKind::Text, _) | Type::TextLike(..) =
                             other_ty
                         {
-                            if pat_elements.len() == 1 {
-                                let pat_element = pat_elements.iter().next().unwrap();
+                            if elements.len() == 1 {
+                                let pat_element = elements.iter().next().unwrap();
                                 if let PatternKind::Regex(regex_pattern) = &pat_element.pattern.kind
                                 {
                                     if pat_element.iter {
@@ -293,17 +299,23 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         (&UNIT_TYPE, &ERROR_TYPE)
                     }
                     None => {
-                        let pat_id = self.patterns.alloc_pat_id();
-                        let val_ty = self
-                            .types
-                            .intern(Type::Infer(ctx.inference.new_type_variable(pat_id)));
+                        let val_ty = val_type_def
+                            .map(|def_id| self.check_def_sealed(def_id))
+                            .unwrap_or_else(|| {
+                                let val_pat_id = self.patterns.alloc_pat_id();
+                                let val_ty = self.types.intern(Type::Infer(
+                                    ctx.inference.new_type_variable(val_pat_id),
+                                ));
 
-                        debug!("Infer seq val type: {val_ty:?}");
+                                debug!("Infer seq val type: {val_ty:?}");
+                                val_ty
+                            });
+
                         (&UNIT_TYPE, val_ty)
                     }
                 };
 
-                if pat_elements.len() != 1 {
+                if elements.len() != 1 {
                     return self.error_node(
                         CompileError::TODO(smart_format!("Standalone seq needs one element")),
                         &pattern.span,
@@ -313,7 +325,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 let rel = ctx.mk_unit_node_no_span();
                 let val = self.build_node(
-                    &pat_elements.iter().next().unwrap().pattern,
+                    &elements.iter().next().unwrap().pattern,
                     NodeInfo {
                         expected_ty: Some((val_ty, Strength::Strong)),
                         parent_struct_flags: node_info.parent_struct_flags,
@@ -322,10 +334,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 );
                 let label = *ctx.label_map.get(&pattern.id).unwrap();
                 let seq_ty = self.types.intern(Type::Seq(rel_ty, val_ty));
-
-                if val_ty != ctx.hir_arena[val].meta().ty {
-                    // panic!("{val_ty:?} -- {:?}", ctx.hir_arena[val].meta().ty);
-                }
 
                 ctx.mk_node(
                     ontol_hir::Kind::DeclSeq(
@@ -541,7 +549,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ctx,
                 )
             }
-            PatternKind::Seq(elements) => {
+            PatternKind::Seq { elements, .. } => {
                 // FIXME: Unsure how correct this is:
                 for element in elements {
                     let node = self.build_implicit_rel_node(ty, &element.pattern, prop_span, ctx);

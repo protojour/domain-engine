@@ -36,7 +36,10 @@ pub enum PatternKind {
         attributes: Box<[CompoundPatternAttr]>,
     },
     /// Expression enclosed in sequence brackets: `[expr]`
-    Seq(Vec<SeqPatternElement>),
+    Seq {
+        val_type_def: Option<DefId>,
+        elements: Vec<SeqPatternElement>,
+    },
     Variable(Var),
     ConstI64(i64),
     ConstText(String),

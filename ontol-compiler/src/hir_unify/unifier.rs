@@ -493,6 +493,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     binder: expr_binder,
                     flags,
                     props,
+                    opt_output_type: _,
                 },
                 scope::Kind::PropSet(scope::PropSet(scope_binder, scope_props)),
             ) => {
@@ -578,6 +579,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     binder,
                     flags,
                     props,
+                    opt_output_type: _,
                 },
                 scope_kind,
             ) => {
