@@ -217,7 +217,11 @@ pub enum FieldKind {
         first: argument::First,
         after: argument::After,
     },
-    MapQuery,
+    MapQuery {
+        input_operator_id: SerdeOperatorId,
+        /// If this string is defined, there will be a single argument with this name.
+        scalar_input_name: Option<String>,
+    },
     CreateMutation {
         input: argument::Input,
     },

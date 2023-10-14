@@ -30,6 +30,11 @@ pub struct RegistryCtx<'a, 'r> {
     pub registry: &'a mut juniper::Registry<'r, GqlScalar>,
 }
 
+#[derive(Debug)]
+pub enum CollectOperatorError {
+    Scalar,
+}
+
 impl<'a, 'r> RegistryCtx<'a, 'r> {
     pub fn new(
         schema_ctx: &'a Arc<SchemaCtx>,
@@ -80,7 +85,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         output: &mut Vec<juniper::meta::Argument<'r, GqlScalar>>,
         typing_purpose: TypingPurpose,
         filter: ArgumentFilter,
-    ) {
+    ) -> Result<(), CollectOperatorError> {
         let serde_operator = self.schema_ctx.ontology.get_serde_operator(operator_id);
 
         match serde_operator {
@@ -118,6 +123,8 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         }),
                     ))
                 }
+
+                Ok(())
             }
             SerdeOperator::Union(union_op) => {
                 let (mode, level) = typing_purpose.mode_and_level();
@@ -128,7 +135,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                             output,
                             typing_purpose,
                             filter,
-                        );
+                        )?;
                     }
                     FilteredVariants::Union(variants) => {
                         // FIXME: Instead of just deduplicating the properties,
@@ -145,7 +152,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                                     skip_subject: false,
                                     skip_object: true,
                                 },
-                            );
+                            )?;
                         }
                         for variant in variants {
                             self.collect_operator_arguments(
@@ -157,10 +164,12 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                                     skip_subject: true,
                                     skip_object: false,
                                 },
-                            );
+                            )?;
                         }
                     }
                 }
+
+                Ok(())
             }
             SerdeOperator::Alias(alias_op) => {
                 self.collect_operator_arguments(
@@ -168,7 +177,9 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                     output,
                     typing_purpose,
                     filter,
-                );
+                )?;
+
+                Ok(())
             }
             SerdeOperator::IdSingletonStruct(property_name, id_operator_id) => {
                 if filter.filter_property(property_name, None, output) {
@@ -180,10 +191,10 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         TypeModifier::Unit(Optionality::Optional),
                     ));
                 }
+
+                Ok(())
             }
-            other => {
-                panic!("{other:?}");
-            }
+            _ => Err(CollectOperatorError::Scalar),
         }
     }
 
@@ -327,7 +338,31 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 self.registry
                     .arg::<Option<std::string::String>>(after.name(), &()),
             ]),
-            FieldKind::MapQuery => Some(vec![]),
+            FieldKind::MapQuery {
+                input_operator_id,
+                scalar_input_name,
+            } => {
+                let mut arguments = vec![];
+                if let Some(scalar_input_name) = scalar_input_name {
+                    let argument = self.get_operator_argument(
+                        scalar_input_name,
+                        *input_operator_id,
+                        None,
+                        SerdePropertyFlags::empty(),
+                        TypeModifier::Unit(Optionality::Mandatory),
+                    );
+                    arguments.push(argument);
+                } else {
+                    self.collect_operator_arguments(
+                        *input_operator_id,
+                        &mut arguments,
+                        TypingPurpose::Input,
+                        ArgumentFilter::default(),
+                    )
+                    .unwrap();
+                }
+                Some(arguments)
+            }
             FieldKind::CreateMutation { input } => Some(vec![self.get_domain_field_arg(input)]),
             FieldKind::UpdateMutation { id, input } => Some(vec![
                 self.get_domain_field_arg(id),

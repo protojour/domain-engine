@@ -47,7 +47,8 @@ impl juniper::GraphQLType<GqlScalar> for InputType {
                     &mut arguments,
                     info.typing_purpose,
                     ArgumentFilter::default(),
-                );
+                )
+                .unwrap();
 
                 registry
                     .build_input_object_type::<Self>(info, &arguments)
@@ -67,7 +68,8 @@ impl juniper::GraphQLType<GqlScalar> for InputType {
                     &mut arguments,
                     info.typing_purpose,
                     ArgumentFilter::default(),
-                );
+                )
+                .unwrap();
 
                 if let Some(rel_ref) = rel_ref {
                     arguments.push(juniper::meta::Argument::new(
@@ -90,7 +92,8 @@ impl juniper::GraphQLType<GqlScalar> for InputType {
                     &mut arguments,
                     info.typing_purpose,
                     ArgumentFilter::default(),
-                );
+                )
+                .unwrap();
                 registry
                     .build_input_object_type::<Self>(info, &arguments)
                     .into_meta()
