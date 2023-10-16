@@ -601,6 +601,8 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "domain-engine-core",
+ "domain-engine-test-templates",
+ "domain-engine-test-utils",
  "fnv",
  "graphql-parser",
  "indexmap",
@@ -622,6 +624,19 @@ dependencies = [
 [[package]]
 name = "domain-engine-test-templates"
 version = "0.1.0"
+
+[[package]]
+name = "domain-engine-test-utils"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "domain-engine-core",
+ "domain-engine-juniper",
+ "graphql-parser",
+ "juniper",
+ "ontol-test-utils",
+ "unimock",
+]
 
 [[package]]
 name = "domain-engine-wasm"

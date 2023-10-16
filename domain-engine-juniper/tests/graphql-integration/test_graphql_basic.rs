@@ -12,12 +12,14 @@ use serde_json::json;
 use test_log::test;
 use unimock::*;
 
-use crate::{
-    gql_ctx_mock_data_store, mock_data_store_query_entities_empty,
+use domain_engine_test_utils::{
+    graphql::{
+        gql_ctx_mock_data_store, mock_data_store_query_entities_empty, Exec, TestCompileSchema,
+        TestError,
+    },
     parser_document_utils::{
         find_input_object_type, find_object_field, find_object_type, FieldInfo,
     },
-    Exec, TestCompileSchema, TestError,
 };
 
 const ROOT: SourceName = SourceName::root();

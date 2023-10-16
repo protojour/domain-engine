@@ -4,6 +4,7 @@ members = [
     "domain-engine-juniper",
     "domain-engine-wasm",
     "domain-engine-test-templates",
+    "domain-engine-test-utils",
     "domain-service",
     "ontol-faker",
     "ontol-hir",

@@ -1,10 +1,8 @@
 use std::sync::Arc;
 
-use domain_engine_core::{
-    data_store::{DataStoreAPIMock, DefaultDataStoreFactory},
-    DomainEngine,
-};
+use domain_engine_core::{data_store::DataStoreAPIMock, DomainEngine};
 use domain_engine_juniper::{context::ServiceCtx, Schema};
+use domain_engine_test_utils::graphql::{gql_ctx_mock_data_store, Exec, TestCompileSchema};
 use fnv::FnvHashMap;
 use juniper::{graphql_value, InputValue};
 use ontol_runtime::{
@@ -19,8 +17,6 @@ use ontol_test_utils::{
 use test_log::test;
 use unimock::{matching, MockFn};
 
-use crate::{gql_ctx_mock_data_store, Exec, TestCompileSchema};
-
 const ROOT: SourceName = SourceName::root();
 
 fn conduit_db_only() -> TestPackages {
@@ -29,11 +25,11 @@ fn conduit_db_only() -> TestPackages {
 }
 
 #[test(tokio::test)]
-async fn test_graphql_in_memory_conduit_db() {
+async fn test_graphql_conduit_db() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
     let gql_context: ServiceCtx = DomainEngine::test_builder(test.ontology.clone())
-        .build::<DefaultDataStoreFactory>()
+        .build::<crate::TestDataStoreFactory>()
         .into();
 
     expect_eq!(
@@ -90,11 +86,11 @@ async fn test_graphql_in_memory_conduit_db() {
 }
 
 #[test(tokio::test)]
-async fn test_graphql_in_memory_conduit_db_create_with_foreign_reference() {
+async fn test_graphql_conduit_db_create_with_foreign_reference() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
     let gql_context: ServiceCtx = DomainEngine::test_builder(test.ontology.clone())
-        .build::<DefaultDataStoreFactory>()
+        .build::<crate::TestDataStoreFactory>()
         .into();
 
     let response = r#"mutation {
@@ -159,11 +155,11 @@ async fn test_graphql_in_memory_conduit_db_create_with_foreign_reference() {
 }
 
 #[test(tokio::test)]
-async fn test_graphql_in_memory_conduit_db_query_article_with_tags() {
+async fn test_graphql_conduit_db_query_article_with_tags() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
     let gql_context: ServiceCtx = DomainEngine::test_builder(test.ontology.clone())
-        .build::<DefaultDataStoreFactory>()
+        .build::<crate::TestDataStoreFactory>()
         .into();
 
     let _response = r#"mutation {
@@ -240,7 +236,7 @@ impl BlogPostConduit {
         Self {
             domain_engine: Arc::new(
                 DomainEngine::test_builder(test.ontology.clone())
-                    .build::<DefaultDataStoreFactory>(),
+                    .build::<crate::TestDataStoreFactory>(),
             ),
             test,
             db_schema,
@@ -312,7 +308,7 @@ impl BlogPostConduit {
 }
 
 #[test(tokio::test)]
-async fn test_graphql_in_memory_blog_post_conduit_implicit_join() {
+async fn test_graphql_blog_post_conduit_implicit_join() {
     let ctx = BlogPostConduit::new();
     ctx.create_db_article().await;
 
@@ -345,7 +341,7 @@ async fn test_graphql_in_memory_blog_post_conduit_implicit_join() {
 }
 
 #[test(tokio::test)]
-async fn test_graphql_in_memory_blog_post_conduit_tags() {
+async fn test_graphql_blog_post_conduit_tags() {
     let ctx = BlogPostConduit::new();
     ctx.create_db_article_with_tag().await;
 
@@ -380,7 +376,7 @@ async fn test_graphql_in_memory_blog_post_conduit_tags() {
 }
 
 #[test(tokio::test)]
-async fn test_graphql_in_memory_blog_post_conduit_no_join_mocked() {
+async fn test_graphql_blog_post_conduit_no_join_mocked() {
     let ctx = BlogPostConduit::new();
     expect_eq!(
         actual = "{
@@ -439,7 +435,7 @@ async fn test_graphql_in_memory_blog_post_conduit_no_join_mocked() {
 }
 
 #[test(tokio::test)]
-async fn test_graphql_in_memory_blog_post_conduit_no_join_real() {
+async fn test_graphql_blog_post_conduit_no_join_real() {
     let ctx = BlogPostConduit::new();
     ctx.create_db_article().await;
 

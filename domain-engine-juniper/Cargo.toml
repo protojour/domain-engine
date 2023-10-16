@@ -22,6 +22,7 @@ juniper = { git = "https://github.com/protojour/juniper", branch = "protojour-mo
 
 [dev-dependencies]
 ontol-test-utils.path = "../ontol-test-utils"
+domain-engine-test-utils.path = "../domain-engine-test-utils"
 tracing-subscriber.workspace = true
 test-log.workspace = true
 tokio.workspace = true
@@ -29,3 +30,6 @@ async-trait = "0.1"
 pretty_assertions = "1"
 unimock = "0.5"
 graphql-parser = "0.4"
+
+[build-dependencies]
+domain-engine-test-templates.path = "../domain-engine-test-templates"

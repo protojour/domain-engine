@@ -1,0 +1,13 @@
+[package]
+name = "domain-engine-test-utils"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ontol-test-utils.path = "../ontol-test-utils"
+domain-engine-core.path = "../domain-engine-core"
+domain-engine-juniper.path = "../domain-engine-juniper"
+unimock = "0.5"
+async-trait = "0.1"
+juniper = { git = "https://github.com/protojour/juniper", branch = "protojour-mods", default-features = false, features = ["schema-language"] }
+graphql-parser = "0.4"

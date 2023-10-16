@@ -1,8 +1,7 @@
+use domain_engine_test_utils::graphql::{gql_ctx_mock_data_store, Exec, TestCompileSchema};
 use juniper::graphql_value;
 use ontol_test_utils::{assert_error_msg, expect_eq, SourceName};
 use test_log::test;
-
-use crate::{gql_ctx_mock_data_store, Exec, TestCompileSchema};
 
 const ROOT: SourceName = SourceName::root();
 

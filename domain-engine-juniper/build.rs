@@ -1,0 +1,4 @@
+fn main() {
+    domain_engine_test_templates::include_graphql_conduit_tests();
+    println!("cargo:rerun-if-changed=build.rs");
+}
