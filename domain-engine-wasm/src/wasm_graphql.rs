@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use domain_engine_core::DomainEngine;
+use domain_engine_core::{data_store::DefaultDataStoreFactory, DomainEngine};
 use domain_engine_juniper::{create_graphql_schema, juniper, Schema};
 use ontol_runtime::{ontology::Ontology, PackageId};
 use serde::Serialize;
@@ -23,7 +23,8 @@ impl WasmGraphqlSchema {
     ) -> Result<Self, WasmError> {
         // Since the domain engine currently gets created here,
         // its data store (if any) won't be shared with other interfaces.
-        let domain_engine = DomainEngine::builder(ontology.clone()).build();
+        let domain_engine =
+            DomainEngine::builder(ontology.clone()).build::<DefaultDataStoreFactory>();
 
         let schema = create_graphql_schema(package_id, ontology.clone())?;
 

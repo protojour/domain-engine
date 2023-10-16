@@ -3,7 +3,7 @@ use std::{fs::File, path::PathBuf, sync::Arc};
 use anyhow::Context;
 use axum::Extension;
 use clap::Parser;
-use domain_engine_core::DomainEngine;
+use domain_engine_core::{data_store::DefaultDataStoreFactory, DomainEngine};
 use domain_engine_juniper::CreateSchemaError;
 use graphql::{graphiql_handler, GraphqlService};
 use ontol_runtime::{ontology::Ontology, PackageId};
@@ -53,7 +53,7 @@ async fn main() -> anyhow::Result<()> {
     let engine = Arc::new(
         DomainEngine::builder(ontology.clone())
             .system(Box::new(System))
-            .build(),
+            .build::<DefaultDataStoreFactory>(),
     );
 
     let mut router: axum::Router = axum::Router::new();

@@ -224,7 +224,7 @@ fn compile(
 
                     if let Some(path) = paths_by_name.get(source_name) {
                         if Some(path) == data_store_path.as_ref() {
-                            package_config.data_store = Some(DataStoreConfig::InMemory);
+                            package_config.data_store = Some(DataStoreConfig::Default);
                         }
 
                         if let Some(source_text) = sources_by_name.get(source_name) {

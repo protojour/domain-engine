@@ -1,3 +1,4 @@
+use domain_engine_core::DomainEngine;
 use ontol_runtime::{config::DataStoreConfig, select::Select};
 use ontol_test_utils::{
     assert_error_msg,
@@ -11,22 +12,21 @@ use serde_json::json;
 use test_log::test;
 use uuid::Uuid;
 
-use crate::domain_engine::DomainEngine;
-
 fn conduit_db() -> TestPackages {
     TestPackages::with_sources([CONDUIT_DB.root()])
-        .with_data_store(SourceName::root(), DataStoreConfig::InMemory)
+        .with_data_store(SourceName::root(), DataStoreConfig::Default)
 }
 
 fn artist_and_instrument() -> TestPackages {
     TestPackages::with_sources([ARTIST_AND_INSTRUMENT.root()])
-        .with_data_store(SourceName::root(), DataStoreConfig::InMemory)
+        .with_data_store(SourceName::root(), DataStoreConfig::Default)
 }
 
 #[test(tokio::test)]
-async fn test_conduit_db_in_memory_id_generation() {
+async fn test_conduit_db_id_generation() {
     let test = conduit_db().compile();
-    let domain_engine = DomainEngine::test_builder(test.ontology.clone()).build();
+    let domain_engine =
+        DomainEngine::test_builder(test.ontology.clone()).build::<crate::TestDataStoreFactory>();
     let [user, article, comment, tag_entity] =
         test.bind(["User", "Article", "Comment", "TagEntity"]);
 
@@ -116,7 +116,8 @@ async fn test_conduit_db_in_memory_id_generation() {
 #[test(tokio::test)]
 async fn test_conduit_db_store_entity_tree() {
     let test = conduit_db().compile();
-    let domain_engine = DomainEngine::test_builder(test.ontology.clone()).build();
+    let domain_engine =
+        DomainEngine::test_builder(test.ontology.clone()).build::<crate::TestDataStoreFactory>();
     let [user_type, article_type, comment_type] = test.bind(["User", "Article", "Comment"]);
 
     let pre_existing_user_id: Uuid = domain_engine
@@ -261,7 +262,8 @@ async fn test_conduit_db_store_entity_tree() {
 #[test(tokio::test)]
 async fn test_conduit_db_unresolved_foreign_key() {
     let test = conduit_db().compile();
-    let domain_engine = DomainEngine::test_builder(test.ontology.clone()).build();
+    let domain_engine =
+        DomainEngine::test_builder(test.ontology.clone()).build::<crate::TestDataStoreFactory>();
     let [article] = test.bind(["Article"]);
 
     assert_error_msg!(
@@ -288,7 +290,8 @@ async fn test_conduit_db_unresolved_foreign_key() {
 #[test(tokio::test)]
 async fn test_artist_and_instrument_fmt_id_generation() {
     let test = artist_and_instrument().compile();
-    let domain_engine = DomainEngine::test_builder(test.ontology.clone()).build();
+    let domain_engine =
+        DomainEngine::test_builder(test.ontology.clone()).build::<crate::TestDataStoreFactory>();
     let [artist] = test.bind(["artist"]);
     let artist_id = TypeBinding::from_def_id(
         artist

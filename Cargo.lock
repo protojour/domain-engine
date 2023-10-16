@@ -573,6 +573,7 @@ dependencies = [
  "async-trait",
  "bit-set",
  "chrono",
+ "domain-engine-test-templates",
  "fnv",
  "indexmap",
  "itertools",
@@ -617,6 +618,10 @@ dependencies = [
  "tracing-subscriber",
  "unimock",
 ]
+
+[[package]]
+name = "domain-engine-test-templates"
+version = "0.1.0"
 
 [[package]]
 name = "domain-engine-wasm"

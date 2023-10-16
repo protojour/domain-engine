@@ -3,6 +3,7 @@ members = [
     "domain-engine-core",
     "domain-engine-juniper",
     "domain-engine-wasm",
+    "domain-engine-test-templates",
     "domain-service",
     "ontol-faker",
     "ontol-hir",

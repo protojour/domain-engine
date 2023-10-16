@@ -98,7 +98,7 @@ pub fn compile_ontol_domain(filename: String, source: String) -> Result<WasmOnto
                             request,
                             source_text,
                             PackageConfig {
-                                data_store: Some(DataStoreConfig::InMemory),
+                                data_store: Some(DataStoreConfig::Default),
                             },
                             &mut sources,
                             &mut source_code_registry,
@@ -211,7 +211,7 @@ impl WasmSources {
                                     // apparently there should only be one data store
                                     data_store: match is_root {
                                         false => None,
-                                        true => Some(DataStoreConfig::InMemory),
+                                        true => Some(DataStoreConfig::Default),
                                     },
                                 },
                                 &mut sources,

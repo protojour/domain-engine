@@ -33,3 +33,6 @@ ontol-test-utils.path = "../ontol-test-utils"
 test-log.workspace = true
 tracing-subscriber.workspace = true
 pretty_assertions = "1"
+
+[build-dependencies]
+domain-engine-test-templates.path = "../domain-engine-test-templates"

@@ -1,12 +1,14 @@
 use ontol_runtime::{
+    config::DataStoreConfig,
+    ontology::Ontology,
     select::{EntitySelect, Select},
     value::{Attribute, Value},
     PackageId,
 };
 use unimock::unimock;
 
-use crate::domain_engine::DomainEngine;
 use crate::domain_error::DomainResult;
+use crate::{domain_engine::DomainEngine, in_memory_store::api::InMemoryDb};
 
 pub struct DataStore {
     package_id: PackageId,
@@ -42,4 +44,25 @@ pub trait DataStoreAPI {
         entity: Value,
         select: Select,
     ) -> DomainResult<Value>;
+}
+
+/// Trait for creating data store APIs
+pub trait DataStoreFactory {
+    fn new_api(
+        config: &DataStoreConfig,
+        ontology: &Ontology,
+        package_id: PackageId,
+    ) -> Box<dyn DataStoreAPI + Send + Sync>;
+}
+
+pub struct DefaultDataStoreFactory;
+
+impl DataStoreFactory for DefaultDataStoreFactory {
+    fn new_api(
+        _config: &DataStoreConfig,
+        ontology: &Ontology,
+        package_id: PackageId,
+    ) -> Box<dyn DataStoreAPI + Send + Sync> {
+        Box::new(InMemoryDb::new(ontology, package_id))
+    }
 }

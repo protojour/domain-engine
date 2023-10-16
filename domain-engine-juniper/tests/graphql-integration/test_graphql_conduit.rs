@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use domain_engine_core::{data_store::DataStoreAPIMock, DomainEngine};
+use domain_engine_core::{
+    data_store::{DataStoreAPIMock, DefaultDataStoreFactory},
+    DomainEngine,
+};
 use domain_engine_juniper::{context::ServiceCtx, Schema};
 use fnv::FnvHashMap;
 use juniper::{graphql_value, InputValue};
@@ -22,7 +25,7 @@ const ROOT: SourceName = SourceName::root();
 
 fn conduit_db_only() -> TestPackages {
     TestPackages::with_sources([(ROOT, CONDUIT_DB.1)])
-        .with_data_store(ROOT, DataStoreConfig::InMemory)
+        .with_data_store(ROOT, DataStoreConfig::Default)
 }
 
 #[test(tokio::test)]
@@ -30,7 +33,7 @@ async fn test_graphql_in_memory_conduit_db() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
     let gql_context: ServiceCtx = DomainEngine::test_builder(test.ontology.clone())
-        .build()
+        .build::<DefaultDataStoreFactory>()
         .into();
 
     expect_eq!(
@@ -91,7 +94,7 @@ async fn test_graphql_in_memory_conduit_db_create_with_foreign_reference() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
     let gql_context: ServiceCtx = DomainEngine::test_builder(test.ontology.clone())
-        .build()
+        .build::<DefaultDataStoreFactory>()
         .into();
 
     let response = r#"mutation {
@@ -160,7 +163,7 @@ async fn test_graphql_in_memory_conduit_db_query_article_with_tags() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
     let gql_context: ServiceCtx = DomainEngine::test_builder(test.ontology.clone())
-        .build()
+        .build::<DefaultDataStoreFactory>()
         .into();
 
     let _response = r#"mutation {
@@ -231,11 +234,14 @@ struct BlogPostConduit {
 impl BlogPostConduit {
     fn new() -> Self {
         let test_packages = TestPackages::with_sources([(ROOT, BLOG_POST_PUBLIC.1), CONDUIT_DB])
-            .with_data_store(CONDUIT_DB.0, DataStoreConfig::InMemory);
+            .with_data_store(CONDUIT_DB.0, DataStoreConfig::Default);
 
         let (test, [db_schema, blog_schema]) = test_packages.compile_schemas([CONDUIT_DB.0, ROOT]);
         Self {
-            domain_engine: Arc::new(DomainEngine::test_builder(test.ontology.clone()).build()),
+            domain_engine: Arc::new(
+                DomainEngine::test_builder(test.ontology.clone())
+                    .build::<DefaultDataStoreFactory>(),
+            ),
             test,
             db_schema,
             blog_schema,

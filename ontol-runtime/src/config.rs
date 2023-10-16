@@ -1,4 +1,5 @@
 use ::serde::{Deserialize, Serialize};
+use smartstring::alias::String;
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct PackageConfig {
@@ -7,5 +8,6 @@ pub struct PackageConfig {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum DataStoreConfig {
-    InMemory,
+    Default,
+    ByName(String),
 }

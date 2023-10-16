@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use ontol_runtime::{
-    config::DataStoreConfig,
     interface::serde::processor::ProcessorMode,
     ontology::Ontology,
     select::{EntitySelect, Select},
@@ -12,9 +11,8 @@ use ontol_runtime::{
 use tracing::debug;
 
 use crate::{
-    data_store::DataStore,
+    data_store::{DataStore, DataStoreFactory},
     domain_error::DomainResult,
-    in_memory_store::api::InMemoryDb,
     resolve_path::ResolverGraph,
     select_data_flow::translate_entity_select,
     system::{SystemAPI, TestSystem},
@@ -182,17 +180,15 @@ impl Builder {
         self
     }
 
-    pub fn build(self) -> DomainEngine {
+    pub fn build<F: DataStoreFactory>(self) -> DomainEngine {
         let data_store = self.data_store.or_else(|| {
             let mut data_store: Option<DataStore> = None;
 
             for (package_id, _) in self.ontology.domains() {
                 if let Some(config) = self.ontology.get_package_config(*package_id) {
-                    if let Some(DataStoreConfig::InMemory) = config.data_store {
-                        data_store = Some(DataStore::new(
-                            *package_id,
-                            Box::new(InMemoryDb::new(&self.ontology, *package_id)),
-                        ));
+                    if let Some(data_store_config) = &config.data_store {
+                        let api = F::new_api(data_store_config, &self.ontology, *package_id);
+                        data_store = Some(DataStore::new(*package_id, api));
                     }
                 }
             }
