@@ -15,7 +15,6 @@ use ontol_runtime::{
 };
 use type_binding::TypeBinding;
 
-pub mod data_store_tests;
 pub mod diagnostics;
 pub mod examples;
 pub mod serde_utils;
