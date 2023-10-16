@@ -341,6 +341,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             FieldKind::MapQuery {
                 input_operator_id,
                 scalar_input_name,
+                ..
             } => {
                 let mut arguments = vec![];
                 if let Some(scalar_input_name) = scalar_input_name {

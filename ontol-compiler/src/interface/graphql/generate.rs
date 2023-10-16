@@ -754,10 +754,8 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
         }
     }
 
-    pub fn add_named_map_query(&mut self, name: &str, key: &[MapKey; 2]) {
+    pub fn add_named_map_query(&mut self, name: &str, [input_key, output_key]: &[MapKey; 2]) {
         let input_serde_key = {
-            let input_key = key[0];
-
             let mut serde_modifier = SerdeModifier::graphql_default();
 
             if input_key.seq {
@@ -772,13 +770,14 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
             .gen_operator_id(input_serde_key)
             .unwrap();
 
-        let value_type_ref =
-            self.get_def_type_ref(key[1].def_id, QLevel::Connection { rel_params: None });
-
-        let field_kind = match self.serde_generator.seal_ctx.get_repr_kind(&key[0].def_id) {
+        let field_kind = match self
+            .serde_generator
+            .seal_ctx
+            .get_repr_kind(&input_key.def_id)
+        {
             Some(ReprKind::Scalar(..)) => {
                 let scalar_input_name: String =
-                    match self.serde_generator.defs.def_kind(key[0].def_id) {
+                    match self.serde_generator.defs.def_kind(input_key.def_id) {
                         DefKind::Type(type_def) => match type_def.ident {
                             Some(ident) => ident.into(),
                             None => return,
@@ -787,22 +786,39 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                     };
 
                 FieldKind::MapQuery {
+                    key: [*input_key, *output_key],
                     input_operator_id,
                     scalar_input_name: Some(scalar_input_name),
                 }
             }
             _ => FieldKind::MapQuery {
+                key: [*input_key, *output_key],
                 input_operator_id,
                 scalar_input_name: None,
             },
         };
 
+        let field_data = if output_key.seq {
+            FieldData {
+                kind: field_kind,
+                field_type: TypeRef {
+                    modifier: TypeModifier::Unit(Optionality::Mandatory),
+                    unit: self.get_def_type_ref(output_key.def_id, QLevel::Node),
+                },
+            }
+        } else {
+            FieldData {
+                kind: field_kind,
+                field_type: TypeRef {
+                    modifier: TypeModifier::Unit(Optionality::Optional),
+                    unit: self.get_def_type_ref(output_key.def_id, QLevel::Node),
+                },
+            }
+        };
+
         object_data_mut(self.schema.query, self.schema)
             .fields
-            .insert(
-                name.into(),
-                FieldData::mandatory(field_kind, value_type_ref),
-            );
+            .insert(name.into(), field_data);
     }
 
     pub fn add_entity_queries_and_mutations(&mut self, entity_data: EntityData) {

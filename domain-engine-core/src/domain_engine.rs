@@ -6,8 +6,8 @@ use ontol_runtime::{
     ontology::Ontology,
     select::{EntitySelect, Select},
     value::{Attribute, Value},
-    vm::VmState,
-    PackageId,
+    vm::{proc::Yield, VmState},
+    MapKey, PackageId,
 };
 use tracing::debug;
 
@@ -62,6 +62,23 @@ impl DomainEngine {
 
     fn get_data_store(&self) -> DomainResult<&DataStore> {
         self.data_store.as_ref().ok_or(DomainError::NoDataStore)
+    }
+
+    pub async fn call_map(&self, key: [MapKey; 2], input: Attribute) -> DomainResult<Attribute> {
+        let proc = self
+            .ontology
+            .get_mapper_proc(key)
+            .ok_or(DomainError::MappingProcedureNotFound)?;
+        let mut vm = self.ontology.new_vm(proc);
+
+        let input_value = input.value;
+
+        loop {
+            match vm.run([input_value]) {
+                VmState::Complete(value) => return Ok(value.into()),
+                VmState::Yielded(Yield::Match(condition)) => todo!("match {condition:?}"),
+            }
+        }
     }
 
     pub async fn query_entities(&self, mut select: EntitySelect) -> DomainResult<Vec<Attribute>> {

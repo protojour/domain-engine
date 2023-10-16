@@ -6,6 +6,7 @@ use ontol_runtime::{
     interface::serde::operator::SerdeOperatorId,
     ontology::Ontology,
     smart_format,
+    value::Attribute,
 };
 use serde::de::{self, DeserializeSeed, IntoDeserializer};
 
@@ -18,6 +19,33 @@ pub struct ArgsWrapper<'a> {
 impl<'a> ArgsWrapper<'a> {
     pub fn new(arguments: &'a [LookAheadArgument<'a, GqlScalar>]) -> Self {
         Self { arguments }
+    }
+
+    pub fn domain_deserialize(
+        &self,
+        operator_id: SerdeOperatorId,
+        scalar_input_name: Option<&str>,
+        typing_purpose: TypingPurpose,
+        ontology: &Ontology,
+    ) -> Result<Attribute, juniper::FieldError<GqlScalar>> {
+        let (mode, level) = typing_purpose.mode_and_level();
+
+        if let Some(_scalar_input_name) = scalar_input_name {
+            let spanned_arg = self
+                .arguments
+                .first()
+                .ok_or_else(|| {
+                    juniper::FieldError::new("Expected single argument", graphql_value!(None))
+                })?
+                .spanned_value();
+
+            ontology
+                .new_serde_processor(operator_id, mode, level)
+                .deserialize(LookAheadValueDeserializer { value: spanned_arg })
+                .map_err(|error| juniper::FieldError::new(error, graphql_value!(None)))
+        } else {
+            todo!()
+        }
     }
 
     pub fn deserialize<'de, T: serde::Deserialize<'de>>(

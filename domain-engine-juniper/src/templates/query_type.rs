@@ -10,7 +10,7 @@ use crate::{
     gql_scalar::GqlScalar,
     macros::impl_graphql_value,
     registry_ctx::RegistryCtx,
-    select_analyzer::SelectAnalyzer,
+    select_analyzer::{AnalyzedQuery, SelectAnalyzer},
     templates::{attribute_type::AttributeType, resolve_schema_type_field},
 };
 
@@ -52,20 +52,35 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
             let schema_ctx = &info.schema_ctx;
             let query_field = info.type_data().fields().unwrap().get(field_name).unwrap();
 
-            let entity_query = SelectAnalyzer::new(schema_ctx, executor.context())
-                .analyze_entity_select(&executor.look_ahead(), query_field);
+            let analyzed_query = SelectAnalyzer::new(schema_ctx, executor.context())
+                .analyze_query(&executor.look_ahead(), query_field)?;
 
-            debug!("Executing query {field_name}: {entity_query:#?}");
+            debug!("Executing query {field_name}: {analyzed_query:#?}");
 
-            let entity_attributes = executor
-                .context()
-                .domain_engine
-                .query_entities(entity_query)
-                .await?;
+            let attribute = match analyzed_query {
+                AnalyzedQuery::NamedMap {
+                    key,
+                    input,
+                    select: _,
+                } => {
+                    executor
+                        .context()
+                        .domain_engine
+                        .call_map(key, input)
+                        .await?
+                }
+                AnalyzedQuery::ClassicConnection(entity_query) => {
+                    let entity_attributes = executor
+                        .context()
+                        .domain_engine
+                        .query_entities(entity_query)
+                        .await?;
 
-            let attribute = Attribute {
-                value: Value::new(Data::Sequence(entity_attributes), DefId::unit()),
-                rel_params: Value::unit(),
+                    Attribute {
+                        value: Value::new(Data::Sequence(entity_attributes), DefId::unit()),
+                        rel_params: Value::unit(),
+                    }
+                }
             };
 
             debug!("query result: {}", ValueDebug(&attribute.value));

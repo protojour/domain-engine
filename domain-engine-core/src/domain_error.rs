@@ -4,6 +4,8 @@ use thiserror::Error;
 
 #[derive(Error, Clone, Debug)]
 pub enum DomainError {
+    #[error("Mapping procedure not found")]
+    MappingProcedureNotFound,
     #[error("No data store")]
     NoDataStore,
     #[error("No resolve path to data store")]

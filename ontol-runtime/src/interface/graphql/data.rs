@@ -4,7 +4,7 @@ use smartstring::alias::String;
 
 use crate::{
     interface::serde::operator::SerdeOperatorId, ontology::Ontology, value::PropertyId, DefId,
-    RelationshipId,
+    MapKey, RelationshipId,
 };
 
 use super::argument::{self};
@@ -218,6 +218,7 @@ pub enum FieldKind {
         after: argument::After,
     },
     MapQuery {
+        key: [MapKey; 2],
         input_operator_id: SerdeOperatorId,
         /// If this string is defined, there will be a single argument with this name.
         scalar_input_name: Option<String>,

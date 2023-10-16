@@ -716,6 +716,45 @@ async fn test_graphql_municipalities() {
     );
 }
 
+#[test(tokio::test)]
+#[should_panic = "not yet implemented"]
+async fn test_graphql_municipalities_named_query() {
+    let (test, [schema]) = TestPackages::with_sources([(ROOT, MUNICIPALITIES.1), GEOJSON, WGS])
+        .compile_schemas([ROOT]);
+
+    expect_eq!(
+        actual = r#"{
+            municipality(code: "OSL") {
+                code
+                geometry {
+                    __typename
+                    ... on _geojson_Polygon {
+                        coordinates
+                    }
+                    ... on _geojson_GeometryCollection {
+                        geometries {
+                            ... on _geojson_Polygon {
+                                coordinates
+                            }
+                        }
+                    }
+                }
+            }
+        }"#
+        .exec(
+            &schema,
+            &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()),
+            []
+        )
+        .await,
+        expected = Ok(graphql_value!({
+            "municipalityList": {
+                "edges": []
+            }
+        })),
+    );
+}
+
 #[test]
 fn test_graphql_municipalities_geojson_union() {
     let (_test, [schema]) = TestPackages::with_sources([(ROOT, MUNICIPALITIES.1), GEOJSON, WGS])
