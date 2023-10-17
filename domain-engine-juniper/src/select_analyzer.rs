@@ -11,6 +11,7 @@ use ontol_runtime::{
     },
     select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
     value::{Attribute, PropertyId},
+    var::Var,
     DefId, MapKey, RelationshipId,
 };
 use smartstring::alias::String;
@@ -33,7 +34,7 @@ pub enum AnalyzedQuery {
     NamedMap {
         key: [MapKey; 2],
         input: Attribute,
-        select: EntitySelect,
+        selects: FnvHashMap<Var, EntitySelect>,
     },
     ClassicConnection(EntitySelect),
 }
@@ -46,16 +47,17 @@ impl<'a> SelectAnalyzer<'a> {
         }
     }
 
-    pub fn analyze_query(
+    pub fn analyze_look_ahead(
         &self,
         look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
         field_data: &FieldData,
     ) -> Result<AnalyzedQuery, juniper::FieldError<GqlScalar>> {
         match &field_data.kind {
-            FieldKind::MapQuery {
+            FieldKind::Map {
                 key,
                 input_operator_id,
                 scalar_input_name,
+                queries,
             } => {
                 let input = ArgsWrapper::new(look_ahead.arguments()).domain_deserialize(
                     *input_operator_id,
@@ -64,16 +66,23 @@ impl<'a> SelectAnalyzer<'a> {
                     &self.schema_ctx.ontology,
                 )?;
 
-                match self.analyze(look_ahead, field_data).select {
-                    Select::Entity(entity_select) => Ok(AnalyzedQuery::NamedMap {
-                        key: *key,
-                        input,
-                        select: entity_select,
-                    }),
-                    select => panic!("BUG: not an entity select: {select:?}"),
-                }
+                let mut output_selects: FnvHashMap<Var, EntitySelect> = Default::default();
+
+                self.analyze_map(
+                    look_ahead,
+                    field_data,
+                    unit_property(),
+                    queries,
+                    &mut output_selects,
+                );
+
+                Ok(AnalyzedQuery::NamedMap {
+                    key: *key,
+                    input,
+                    selects: output_selects,
+                })
             }
-            _ => match self.analyze(look_ahead, field_data).select {
+            _ => match self.analyze_selection(look_ahead, field_data).select {
                 Select::Entity(entity_select) => {
                     Ok(AnalyzedQuery::ClassicConnection(entity_select))
                 }
@@ -87,14 +96,41 @@ impl<'a> SelectAnalyzer<'a> {
         look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
         field_data: &FieldData,
     ) -> StructOrUnionSelect {
-        match self.analyze(look_ahead, field_data).select {
+        match self.analyze_selection(look_ahead, field_data).select {
             Select::Struct(struct_) => StructOrUnionSelect::Struct(struct_),
             Select::StructUnion(def_id, variants) => StructOrUnionSelect::Union(def_id, variants),
             select => panic!("BUG: not a struct select: {select:?}"),
         }
     }
 
-    pub fn analyze(
+    fn analyze_map(
+        &self,
+        look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
+        field_data: &FieldData,
+        parent_property: PropertyId,
+        input_queries: &FnvHashMap<PropertyId, Var>,
+        output_selections: &mut FnvHashMap<Var, EntitySelect>,
+    ) {
+        match input_queries.get(&parent_property) {
+            Some(var) => match self.analyze_selection(look_ahead, field_data).select {
+                Select::Entity(entity_select) => {
+                    output_selections.insert(*var, entity_select);
+                }
+                select => panic!("BUG: not an entity select: {select:?}"),
+            },
+            None => match self.schema_ctx.lookup_type_data(field_data.field_type.unit) {
+                Ok(TypeData {
+                    kind: TypeKind::Object(_),
+                    ..
+                }) => {}
+                _ => {
+                    panic!();
+                }
+            },
+        }
+    }
+
+    fn analyze_selection(
         &self,
         look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
         field_data: &FieldData,
@@ -103,7 +139,7 @@ impl<'a> SelectAnalyzer<'a> {
             &field_data.kind,
             self.schema_ctx.lookup_type_data(field_data.field_type.unit),
         ) {
-            (FieldKind::MapQuery { .. }, Ok(type_data)) => {
+            (FieldKind::Map { .. }, Ok(type_data)) => {
                 match (field_data.field_type.modifier, type_data) {
                     (TypeModifier::Unit(Optionality::Optional), type_data) => {
                         KeyedPropertySelection {
@@ -135,7 +171,9 @@ impl<'a> SelectAnalyzer<'a> {
                             let field_data = object_data.fields.get(field_name).unwrap();
 
                             if let FieldKind::Edges = &field_data.kind {
-                                select = Some(self.analyze(field_look_ahead, field_data).select);
+                                select = Some(
+                                    self.analyze_selection(field_look_ahead, field_data).select,
+                                );
                             }
                         }
 
@@ -190,7 +228,7 @@ impl<'a> SelectAnalyzer<'a> {
                     let field_data = object_data.fields.get(field_name).unwrap();
 
                     if let FieldKind::Edges = &field_data.kind {
-                        select = Some(self.analyze(field_look_ahead, field_data).select);
+                        select = Some(self.analyze_selection(field_look_ahead, field_data).select);
                     }
                 }
 
@@ -228,7 +266,7 @@ impl<'a> SelectAnalyzer<'a> {
                     let field_data = object_data.fields.get(field_name).unwrap();
 
                     if let FieldKind::Node = &field_data.kind {
-                        selection = Some(self.analyze(field_look_ahead, field_data));
+                        selection = Some(self.analyze_selection(field_look_ahead, field_data));
                     }
                 }
 
@@ -279,7 +317,7 @@ impl<'a> SelectAnalyzer<'a> {
                         let KeyedPropertySelection {
                             key: property_id,
                             select: selection,
-                        } = self.analyze(field_look_ahead, field_data);
+                        } = self.analyze_selection(field_look_ahead, field_data);
 
                         properties.insert(property_id, selection);
                     }
@@ -336,7 +374,7 @@ impl<'a> SelectAnalyzer<'a> {
                         let KeyedPropertySelection {
                             key: property_id,
                             select: selection,
-                        } = self.analyze(field_look_ahead, field_data);
+                        } = self.analyze_selection(field_look_ahead, field_data);
 
                         variant_map.insert(property_id, selection);
                     }

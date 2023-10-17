@@ -1,10 +1,12 @@
 use std::sync::Arc;
 
+use fnv::FnvHashMap;
 use ontol_runtime::{
     interface::serde::processor::ProcessorMode,
     ontology::Ontology,
     select::{EntitySelect, Select},
     value::{Attribute, Value},
+    var::Var,
     vm::{proc::Yield, VmState},
     MapKey, PackageId,
 };
@@ -62,19 +64,39 @@ impl DomainEngine {
         self.data_store.as_ref().ok_or(DomainError::NoDataStore)
     }
 
-    pub async fn call_map(&self, key: [MapKey; 2], input: Attribute) -> DomainResult<Attribute> {
+    pub async fn call_map(
+        &self,
+        key: [MapKey; 2],
+        input: Attribute,
+        mut selects: FnvHashMap<Var, EntitySelect>,
+    ) -> DomainResult<Attribute> {
         let proc = self
             .ontology
             .get_mapper_proc(key)
             .ok_or(DomainError::MappingProcedureNotFound)?;
         let mut vm = self.ontology.new_vm(proc);
 
-        let input_value = input.value;
+        let mut input_value = input.value;
 
         loop {
             match vm.run([input_value]) {
                 VmState::Complete(value) => return Ok(value.into()),
-                VmState::Yielded(Yield::Match(_var, condition)) => todo!("match {condition:?}"),
+                VmState::Yielded(Yield::Match(var, _condition)) => {
+                    let Some(entity_select) = selects.remove(&var) else {
+                        panic!("No selection for {var}");
+                    };
+
+                    let attributes = self.query_entities(entity_select).await?;
+
+                    match attributes.into_iter().next() {
+                        Some(attribute) => {
+                            input_value = attribute.value;
+                        }
+                        None => {
+                            return Err(DomainError::EntityNotFound);
+                        }
+                    }
+                }
             }
         }
     }

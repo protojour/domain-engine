@@ -19,6 +19,7 @@ use crate::{
     text_pattern::TextPattern,
     value::PropertyId,
     value_generator::ValueGenerator,
+    var::Var,
     vm::{
         ontol_vm::OntolVm,
         proc::{Lib, Procedure},
@@ -315,6 +316,7 @@ pub struct PropertyFlow {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Serialize, Deserialize)]
 pub enum PropertyFlowData {
     Type(DefId),
+    Match(Var),
     Cardinality(Cardinality),
     ChildOf(PropertyId),
     DependentOn(PropertyId),

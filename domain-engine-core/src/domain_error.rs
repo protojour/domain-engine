@@ -10,12 +10,14 @@ pub enum DomainError {
     NoDataStore,
     #[error("No resolve path to data store")]
     NoResolvePathToDataStore,
+    #[error("Entity not found")]
+    EntityNotFound,
     #[error("Not an entity")]
     NotAnEntity(DefId),
     #[error("Entity must be a struct")]
     EntityMustBeStruct,
-    #[error("Id not found in structure")]
-    IdNotFound,
+    #[error("Inherent ID not found in structure")]
+    InherentIdNotFound,
     #[error("BUG: Invalid entity DefId")]
     InvalidEntityDefId,
     #[error("Type cannot be used for id generation")]

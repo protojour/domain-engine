@@ -212,7 +212,7 @@ impl InMemoryStore {
                     .get(entity_key)
                     .map(|properties| (*def_id, properties.clone()))
             })
-            .ok_or(DomainError::IdNotFound)?;
+            .ok_or(DomainError::InherentIdNotFound)?;
 
         let type_info = engine.ontology().get_type_info(def_id);
         let entity_info = type_info
@@ -497,7 +497,7 @@ impl InMemoryStore {
         match id_data {
             Data::Struct(struct_map) => {
                 if struct_map.len() != 1 {
-                    return Err(DomainError::IdNotFound);
+                    return Err(DomainError::InherentIdNotFound);
                 }
 
                 let attribute = struct_map.iter().next().unwrap();
@@ -506,7 +506,7 @@ impl InMemoryStore {
             Data::Text(string) => Ok(DynamicKey::Text(string.clone())),
             Data::OctetSequence(octets) => Ok(DynamicKey::Octets(octets.clone())),
             Data::I64(int) => Ok(DynamicKey::Int(*int)),
-            _ => Err(DomainError::IdNotFound),
+            _ => Err(DomainError::InherentIdNotFound),
         }
     }
 

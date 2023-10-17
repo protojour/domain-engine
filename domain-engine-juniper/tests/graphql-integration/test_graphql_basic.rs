@@ -725,41 +725,45 @@ async fn test_graphql_municipalities() {
 }
 
 #[test(tokio::test)]
-#[should_panic = "not yet implemented"]
 async fn test_graphql_municipalities_named_query() {
     let (test, [schema]) = TestPackages::with_sources([(ROOT, MUNICIPALITIES.1), GEOJSON, WGS])
         .compile_schemas([ROOT]);
 
-    expect_eq!(
-        actual = r#"{
-            municipality(code: "OSL") {
-                code
-                geometry {
-                    __typename
-                    ... on _geojson_Polygon {
-                        coordinates
-                    }
-                    ... on _geojson_GeometryCollection {
-                        geometries {
-                            ... on _geojson_Polygon {
-                                coordinates
-                            }
+    let error = r#"{
+        municipality(code: "OSL") {
+            code
+            geometry {
+                __typename
+                ... on _geojson_Polygon {
+                    coordinates
+                }
+                ... on _geojson_GeometryCollection {
+                    geometries {
+                        ... on _geojson_Polygon {
+                            coordinates
                         }
                     }
                 }
             }
-        }"#
-        .exec(
-            &schema,
-            &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
-            []
-        )
-        .await,
-        expected = Ok(graphql_value!({
-            "municipalityList": {
-                "edges": []
-            }
-        })),
+        }
+    }"#
+    .exec(
+        &schema,
+        &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
+        [],
+    )
+    .await
+    .unwrap_err();
+
+    let TestError::Execution(exec_errors) = error else {
+        panic!();
+    };
+    expect_eq!(
+        actual = format!(
+            "{}",
+            exec_errors.into_iter().next().unwrap().error().message()
+        ),
+        expected = "Entity not found"
     );
 }
 

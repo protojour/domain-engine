@@ -142,8 +142,9 @@ impl<'on> SelectFlowProcessor<'on> {
                         );
                     }
                 }
-                PropertyFlowData::Type(_def_id) => {}
-                PropertyFlowData::Cardinality(_) => {}
+                PropertyFlowData::Type(_)
+                | PropertyFlowData::Cardinality(_)
+                | PropertyFlowData::Match(_) => {}
             }
         }
 

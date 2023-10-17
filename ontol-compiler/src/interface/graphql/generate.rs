@@ -17,8 +17,11 @@ use ontol_runtime::{
         },
         serde::SerdeModifier,
     },
-    ontology::{Ontology, PropertyCardinality, PropertyFlow, ValueCardinality},
-    smart_format, DefId, MapKey, PackageId, Role,
+    ontology::{Ontology, PropertyCardinality, PropertyFlow, PropertyFlowData, ValueCardinality},
+    smart_format,
+    value::PropertyId,
+    var::Var,
+    DefId, MapKey, PackageId, Role,
 };
 use smartstring::alias::String;
 use tracing::trace;
@@ -762,7 +765,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
         &mut self,
         name: &str,
         [input_key, output_key]: &[MapKey; 2],
-        _prop_flow: &[PropertyFlow],
+        prop_flow: &[PropertyFlow],
     ) {
         let input_serde_key = {
             let mut serde_modifier = SerdeModifier::graphql_default();
@@ -774,12 +777,23 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
             SerdeKey::Def(SerdeDef::new(input_key.def_id, serde_modifier))
         };
 
-        // debug!("named prop flow: {prop_flow:#?}");
+        // panic!("named prop flow: {prop_flow:#?}");
 
         let input_operator_id = self
             .serde_generator
             .gen_operator_id(input_serde_key)
             .unwrap();
+
+        let queries: FnvHashMap<PropertyId, Var> = prop_flow
+            .iter()
+            .filter_map(|prop_flow| {
+                if let PropertyFlowData::Match(var) = &prop_flow.data {
+                    Some((prop_flow.id, *var))
+                } else {
+                    None
+                }
+            })
+            .collect();
 
         let field_kind = match self
             .serde_generator
@@ -796,16 +810,18 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                         _ => return,
                     };
 
-                FieldKind::MapQuery {
+                FieldKind::Map {
                     key: [*input_key, *output_key],
                     input_operator_id,
                     scalar_input_name: Some(scalar_input_name),
+                    queries,
                 }
             }
-            _ => FieldKind::MapQuery {
+            _ => FieldKind::Map {
                 key: [*input_key, *output_key],
                 input_operator_id,
                 scalar_input_name: None,
+                queries,
             },
         };
 

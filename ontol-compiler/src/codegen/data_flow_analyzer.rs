@@ -3,12 +3,12 @@
 use std::{collections::BTreeSet, fmt::Debug};
 
 use fnv::{FnvHashMap, FnvHashSet};
-use ontol_hir::{PropVariant, SeqPropertyVariant};
+use ontol_hir::{PropVariant, SeqPropertyVariant, StructFlags};
 use ontol_runtime::{
     ontology::{PropertyFlow, PropertyFlowData},
     value::PropertyId,
     var::{Var, VarSet},
-    DefId,
+    DefId, RelationshipId, Role,
 };
 
 use crate::{def::LookupRelationshipMeta, typed_hir::TypedNodeRef, types::Type};
@@ -47,16 +47,32 @@ where
     pub fn analyze(&mut self, arg: Var, body: TypedNodeRef<'_, 'm>) -> Option<Vec<PropertyFlow>> {
         self.var_dependencies.insert(arg, VarSet::default());
 
+        let unit_prop_id = PropertyId {
+            role: Role::Subject,
+            relationship_id: RelationshipId(DefId::unit()),
+        };
+
         match body.kind() {
-            ontol_hir::Kind::Struct(struct_binder, _flags, nodes) => {
+            ontol_hir::Kind::Struct(binder, flags, nodes) => {
                 self.var_dependencies
-                    .insert(struct_binder.hir().var, VarSet::default());
+                    .insert(binder.hir().var, VarSet::default());
                 for node_ref in body.arena().refs(nodes) {
-                    self.analyze_node(node_ref);
+                    self.analyze_node(node_ref, unit_prop_id);
+                }
+
+                if flags.contains(StructFlags::MATCH) {
+                    self.property_flow.insert(PropertyFlow {
+                        id: unit_prop_id,
+                        data: PropertyFlowData::Match(binder.0.var),
+                    });
                 }
             }
             _ => {
-                self.analyze_node(body);
+                self.var_to_property
+                    .insert(arg, FnvHashSet::from_iter([unit_prop_id]));
+
+                let deps = self.analyze_node(body, unit_prop_id);
+                self.reg_output_prop(arg, unit_prop_id, deps);
             }
         }
 
@@ -67,14 +83,14 @@ where
         )
     }
 
-    fn analyze_node(&mut self, node_ref: TypedNodeRef<'_, 'm>) -> VarSet {
+    fn analyze_node(&mut self, node_ref: TypedNodeRef<'_, 'm>, parent_prop: PropertyId) -> VarSet {
         let arena = node_ref.arena();
         match node_ref.kind() {
             ontol_hir::Kind::Var(var) => VarSet::from([*var]),
             ontol_hir::Kind::Begin(body) => {
                 let mut var_set = VarSet::default();
                 for child in arena.refs(body) {
-                    var_set.union_with(&self.analyze_node(child));
+                    var_set.union_with(&self.analyze_node(child, parent_prop));
                 }
                 var_set
             }
@@ -84,12 +100,12 @@ where
             ontol_hir::Kind::Text(_) => VarSet::default(),
             ontol_hir::Kind::Const(_) => VarSet::default(),
             ontol_hir::Kind::Let(binder, definition, body) => {
-                let var_deps = self.analyze_node(arena.node_ref(*definition));
+                let var_deps = self.analyze_node(arena.node_ref(*definition), parent_prop);
                 self.var_dependencies.insert(binder.hir().var, var_deps);
 
                 let mut var_set = VarSet::default();
                 for child in arena.refs(body) {
-                    var_set.union_with(&self.analyze_node(child));
+                    var_set.union_with(&self.analyze_node(child, parent_prop));
                 }
 
                 var_set
@@ -97,19 +113,27 @@ where
             ontol_hir::Kind::Call(_, params) => {
                 let mut var_set = VarSet::default();
                 for child in arena.refs(params) {
-                    var_set.union_with(&self.analyze_node(child));
+                    var_set.union_with(&self.analyze_node(child, parent_prop));
                 }
                 var_set
             }
-            ontol_hir::Kind::Map(node) => self.analyze_node(arena.node_ref(*node)),
+            ontol_hir::Kind::Map(node) => self.analyze_node(arena.node_ref(*node), parent_prop),
             ontol_hir::Kind::DeclSeq(_, _) => {
                 unreachable!()
             }
-            ontol_hir::Kind::Struct(_binder, _flags, body) => {
+            ontol_hir::Kind::Struct(binder, flags, body) => {
                 let mut var_set = VarSet::default();
                 for child in arena.refs(body) {
-                    var_set.union_with(&self.analyze_node(child));
+                    var_set.union_with(&self.analyze_node(child, parent_prop));
                 }
+
+                if flags.contains(StructFlags::MATCH) {
+                    self.property_flow.insert(PropertyFlow {
+                        id: parent_prop,
+                        data: PropertyFlowData::Match(binder.0.var),
+                    });
+                }
+
                 var_set
             }
             ontol_hir::Kind::Prop(_, struct_var, prop_id, variants) => {
@@ -121,13 +145,15 @@ where
                 for variant in variants {
                     match variant {
                         PropVariant::Singleton(ontol_hir::Attribute { rel, val }) => {
-                            var_set.union_with(&self.analyze_node(arena.node_ref(*rel)));
-                            var_set.union_with(&self.analyze_node(arena.node_ref(*val)));
+                            var_set.union_with(&self.analyze_node(arena.node_ref(*rel), *prop_id));
+                            var_set.union_with(&self.analyze_node(arena.node_ref(*val), *prop_id));
                         }
                         PropVariant::Seq(SeqPropertyVariant { elements, .. }) => {
                             for (_iter, ontol_hir::Attribute { rel, val }) in elements {
-                                var_set.union_with(&self.analyze_node(arena.node_ref(*rel)));
-                                var_set.union_with(&self.analyze_node(arena.node_ref(*val)));
+                                var_set
+                                    .union_with(&self.analyze_node(arena.node_ref(*rel), *prop_id));
+                                var_set
+                                    .union_with(&self.analyze_node(arena.node_ref(*val), *prop_id));
                             }
                         }
                     }
@@ -169,7 +195,7 @@ where
                     }
 
                     for child in arena.refs(body) {
-                        var_set.0.extend(&self.analyze_node(child).0);
+                        var_set.0.extend(&self.analyze_node(child, parent_prop).0);
                     }
                 }
 
@@ -184,7 +210,7 @@ where
             ontol_hir::Kind::Sequence(_, body) => {
                 let mut var_set = VarSet::default();
                 for child in arena.refs(body) {
-                    var_set.union_with(&self.analyze_node(child));
+                    var_set.union_with(&self.analyze_node(child, parent_prop));
                 }
                 var_set
             }
@@ -197,20 +223,20 @@ where
                 }
                 let mut var_set = VarSet::default();
                 for child in arena.refs(body) {
-                    var_set.union_with(&self.analyze_node(child));
+                    var_set.union_with(&self.analyze_node(child, parent_prop));
                 }
                 var_set
             }
             ontol_hir::Kind::SeqPush(var, ontol_hir::Attribute { rel, val }) => {
-                let mut var_set = self.analyze_node(arena.node_ref(*rel));
-                var_set.union_with(&self.analyze_node(arena.node_ref(*val)));
+                let mut var_set = self.analyze_node(arena.node_ref(*rel), parent_prop);
+                var_set.union_with(&self.analyze_node(arena.node_ref(*val), parent_prop));
 
                 self.var_dependencies.insert(*var, var_set.clone());
 
                 var_set
             }
             ontol_hir::Kind::StringPush(to_var, node) => {
-                let var_set = self.analyze_node(arena.node_ref(*node));
+                let var_set = self.analyze_node(arena.node_ref(*node), parent_prop);
                 self.var_dependencies.insert(*to_var, var_set.clone());
                 var_set
             }
@@ -221,7 +247,7 @@ where
                         self.add_dep(group.binder.hir().var, *var);
                     }
                     for child in arena.refs(&match_arm.nodes) {
-                        var_set.union_with(&self.analyze_node(child));
+                        var_set.union_with(&self.analyze_node(child, parent_prop));
                     }
                 }
                 var_set

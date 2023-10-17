@@ -53,7 +53,7 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
             let query_field = info.type_data().fields().unwrap().get(field_name).unwrap();
 
             let analyzed_query = SelectAnalyzer::new(schema_ctx, executor.context())
-                .analyze_query(&executor.look_ahead(), query_field)?;
+                .analyze_look_ahead(&executor.look_ahead(), query_field)?;
 
             debug!("Executing query {field_name}: {analyzed_query:#?}");
 
@@ -61,12 +61,12 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
                 AnalyzedQuery::NamedMap {
                     key,
                     input,
-                    select: _,
+                    selects,
                 } => {
                     executor
                         .context()
                         .domain_engine
-                        .call_map(key, input)
+                        .call_map(key, input, selects)
                         .await?
                 }
                 AnalyzedQuery::ClassicConnection(entity_query) => {

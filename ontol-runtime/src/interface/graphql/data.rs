@@ -1,10 +1,11 @@
+use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use smartstring::alias::String;
 
 use crate::{
-    interface::serde::operator::SerdeOperatorId, ontology::Ontology, value::PropertyId, DefId,
-    MapKey, RelationshipId,
+    interface::serde::operator::SerdeOperatorId, ontology::Ontology, value::PropertyId, var::Var,
+    DefId, MapKey, RelationshipId,
 };
 
 use super::argument::{self};
@@ -217,11 +218,12 @@ pub enum FieldKind {
         first: argument::First,
         after: argument::After,
     },
-    MapQuery {
+    Map {
         key: [MapKey; 2],
         input_operator_id: SerdeOperatorId,
         /// If this string is defined, there will be a single argument with this name.
         scalar_input_name: Option<String>,
+        queries: FnvHashMap<PropertyId, Var>,
     },
     CreateMutation {
         input: argument::Input,

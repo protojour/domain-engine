@@ -338,7 +338,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 self.registry
                     .arg::<Option<std::string::String>>(after.name(), &()),
             ]),
-            FieldKind::MapQuery {
+            FieldKind::Map {
                 input_operator_id,
                 scalar_input_name,
                 ..
