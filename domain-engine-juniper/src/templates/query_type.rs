@@ -1,9 +1,9 @@
 use ontol_runtime::{
-    interface::graphql::schema::TypingPurpose,
+    interface::graphql::{data::TypeModifier, schema::TypingPurpose},
     value::{Attribute, Data, Value, ValueDebug},
     DefId,
 };
-use tracing::debug;
+use tracing::{debug, debug_span, Instrument};
 
 use crate::{
     context::SchemaType,
@@ -11,7 +11,9 @@ use crate::{
     macros::impl_graphql_value,
     registry_ctx::RegistryCtx,
     select_analyzer::{AnalyzedQuery, SelectAnalyzer},
-    templates::{attribute_type::AttributeType, resolve_schema_type_field},
+    templates::{
+        attribute_type::AttributeType, resolve_schema_type_field, sequence_type::SequenceType,
+    },
 };
 
 pub struct QueryType;
@@ -49,49 +51,75 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
         executor: &'a juniper::Executor<Self::Context, GqlScalar>,
     ) -> juniper::BoxFuture<'a, juniper::ExecutionResult<GqlScalar>> {
         Box::pin(async move {
+            let debug_span = debug_span!("query", "name" = field_name);
+
             let schema_ctx = &info.schema_ctx;
             let query_field = info.type_data().fields().unwrap().get(field_name).unwrap();
 
-            let analyzed_query = SelectAnalyzer::new(schema_ctx, executor.context())
-                .analyze_look_ahead(&executor.look_ahead(), query_field)?;
+            let analyzed_query = debug_span.in_scope(|| {
+                SelectAnalyzer::new(schema_ctx, executor.context())
+                    .analyze_look_ahead(&executor.look_ahead(), query_field)
+            })?;
 
-            debug!("Executing query `{field_name}`");
+            let schema_type = schema_ctx
+                .find_schema_type_by_unit(query_field.field_type.unit, TypingPurpose::Selection)
+                .unwrap();
 
-            let attribute = match analyzed_query {
+            match analyzed_query {
                 AnalyzedQuery::NamedMap {
                     key,
                     input,
                     queries,
+                    field_type,
                 } => {
-                    executor
+                    let attribute = executor
                         .context()
                         .domain_engine
-                        .call_map(key, input, queries)
-                        .await?
+                        .exec_map(key, input, queries)
+                        .instrument(debug_span.clone())
+                        .await?;
+
+                    debug_span.in_scope(|| {
+                        debug!("query result: {}", ValueDebug(&attribute.value));
+
+                        if matches!(field_type.modifier, TypeModifier::Array(..)) {
+                            let Data::Sequence(seq) = &attribute.value.data else {
+                                panic!("Not a sequence")
+                            };
+                            resolve_schema_type_field(SequenceType { seq }, schema_type, executor)
+                        } else {
+                            resolve_schema_type_field(
+                                AttributeType { attr: &attribute },
+                                schema_type,
+                                executor,
+                            )
+                        }
+                    })
                 }
                 AnalyzedQuery::ClassicConnection(entity_query) => {
                     let entity_attributes = executor
                         .context()
                         .domain_engine
                         .query_entities(entity_query)
+                        .instrument(debug_span.clone())
                         .await?;
 
-                    Attribute {
+                    let attribute = Attribute {
                         value: Value::new(Data::Sequence(entity_attributes), DefId::unit()),
                         rel_params: Value::unit(),
-                    }
+                    };
+
+                    debug_span.in_scope(|| {
+                        debug!("query result: {}", ValueDebug(&attribute.value));
+
+                        resolve_schema_type_field(
+                            AttributeType { attr: &attribute },
+                            schema_type,
+                            executor,
+                        )
+                    })
                 }
-            };
-
-            debug!("query result: {}", ValueDebug(&attribute.value));
-
-            resolve_schema_type_field(
-                AttributeType { attr: &attribute },
-                schema_ctx
-                    .find_schema_type_by_unit(query_field.field_type.unit, TypingPurpose::Selection)
-                    .unwrap(),
-                executor,
-            )
+            }
         })
     }
 }

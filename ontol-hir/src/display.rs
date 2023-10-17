@@ -311,6 +311,13 @@ impl<'h, 'a, L: Lang> Print<Clause<EvalCondTerm>> for Printer<'h, 'a, L> {
                 write!(f, "(root '{var})")?;
                 Ok(Multiline(true))
             }
+            Clause::IsEntity(term, def_id) => {
+                write!(f, "(is-entity")?;
+                self.print(Sep::Space, term, f)?;
+                write!(f, " {def_id:?})")?;
+
+                Ok(Multiline(false))
+            }
             Clause::Attr(var, prop_id, (rel, val)) => {
                 write!(f, "(attr '{var} {prop_id} (")?;
                 let multi = self.print_all(Sep::None, [rel, val].into_iter(), f)?;

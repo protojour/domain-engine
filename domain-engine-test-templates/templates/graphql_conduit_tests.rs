@@ -345,7 +345,7 @@ async fn test_graphql_blog_post_conduit_implicit_join() {
 }
 
 #[test(tokio::test)]
-async fn test_graphql_blog_post_conduit_implicit_join2() {
+async fn test_graphql_blog_post_conduit_implicit_join_named_query() {
     let ctx = BlogPostConduit::new().await;
     ctx.create_db_article().await;
 
@@ -359,16 +359,12 @@ async fn test_graphql_blog_post_conduit_implicit_join2() {
         .exec(&ctx.blog_schema, &ctx.gql_context(), [])
         .await,
         expected = Ok(graphql_value!({
-            "BlogPostList": {
-                "edges": [
-                    {
-                        "node": {
-                            "contents": "THE BODY",
-                            "written_by": "teh_user",
-                        }
-                    }
-                ]
-            }
+            "posts": [
+                {
+                    "contents": "THE BODY",
+                    "written_by": "teh_user",
+                }
+            ]
         })),
     );
 }

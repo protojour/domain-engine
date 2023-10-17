@@ -19,7 +19,7 @@ use crate::{
 use super::{
     expr::{self, StringInterpolationComponent},
     flat_scope::{OutputVar, ScopeVar},
-    flat_unifier::{unifier_todo, ConditionRoot, ExprMode, FlatUnifier, Level, MainScope},
+    flat_unifier::{unifier_todo, ExprMode, FlatUnifier, Level, MainScope},
     flat_unifier_table::Table,
     UnifierResult,
 };
@@ -149,11 +149,9 @@ impl<'t, 'u, 'a, 'm> ExprToHir<'t, 'u, 'a, 'm> {
         self.unifier
             .push_struct_expr_flags(binder.0.var, flags, hir_meta.ty)?;
 
-        if let ExprMode::Condition(cond_var, ConditionRoot(true)) = self.unifier.expr_mode() {
-            body.push(self.mk_node(
-                ontol_hir::Kind::PushCondClause(cond_var, Clause::Root(binder.0.var)),
-                UNIT_META,
-            ));
+        if let ExprMode::Condition(cond_var, condition_root) = self.unifier.expr_mode() {
+            self.unifier
+                .push_struct_cond_clauses(cond_var, condition_root, *binder, &mut body);
         }
 
         if self.scope_var.is_some() {

@@ -282,7 +282,7 @@ impl<'v> AttributeType<'v> {
                     panic!("BUG: Tried to read edge property from {other:?}");
                 }
             },
-            other => panic!("BUG: unhandled combination: {other:?}"),
+            other => panic!("BUG: unhandled combination: {other:#?}"),
         }
     }
 

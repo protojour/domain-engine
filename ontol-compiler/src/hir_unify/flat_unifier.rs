@@ -3,8 +3,8 @@
 use std::fmt::Display;
 
 use indexmap::IndexMap;
-use ontol_hir::StructFlags;
-use ontol_runtime::var::Var;
+use ontol_hir::{EvalCondTerm, StructFlags};
+use ontol_runtime::{condition::Clause, var::Var};
 use smartstring::alias::String;
 use tracing::{debug, warn};
 
@@ -327,6 +327,37 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
             }
         } else if self.condition_root.is_some() {
             self.match_struct_depth -= 1;
+        }
+    }
+
+    pub fn push_struct_cond_clauses(
+        &mut self,
+        cond_var: Var,
+        condition_root: ConditionRoot,
+        struct_binder: TypedHirData<'m, ontol_hir::Binder>,
+        body: &mut ontol_hir::Nodes,
+    ) {
+        if condition_root.0 {
+            body.push(self.mk_node(
+                ontol_hir::Kind::PushCondClause(cond_var, Clause::Root(cond_var)),
+                UNIT_META,
+            ));
+        }
+
+        let Some(type_def_id) = struct_binder.meta().ty.get_single_def_id() else {
+            return;
+        };
+
+        if let Some(properties) = self.relations.properties_by_def_id(type_def_id) {
+            if properties.identified_by.is_some() {
+                body.push(self.mk_node(
+                    ontol_hir::Kind::PushCondClause(
+                        cond_var,
+                        Clause::IsEntity(EvalCondTerm::QuoteVar(struct_binder.0.var), type_def_id),
+                    ),
+                    UNIT_META,
+                ));
+            }
         }
     }
 }

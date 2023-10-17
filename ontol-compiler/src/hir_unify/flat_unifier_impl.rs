@@ -1,6 +1,5 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    condition::Clause,
     smart_format,
     var::{Var, VarSet},
 };
@@ -11,7 +10,7 @@ use crate::{
         expr,
         flat_level_builder::LevelBuilder,
         flat_scope::{self},
-        flat_unifier::{unifier_todo, ConditionRoot, ExprMode},
+        flat_unifier::{unifier_todo, ExprMode},
         flat_unifier_regex::unify_regex,
         flat_unifier_table::IsInScope,
     },
@@ -124,13 +123,10 @@ pub(super) fn unify_root<'m>(
 
             unifier.push_struct_expr_flags(binder.0.var, flags, meta.hir_meta.ty)?;
 
-            let mut body = vec![];
+            let mut body = ontol_hir::Nodes::default();
 
-            if let ExprMode::Condition(cond_var, ConditionRoot(true)) = unifier.expr_mode() {
-                body.push(unifier.mk_node(
-                    ontol_hir::Kind::PushCondClause(cond_var, Clause::Root(cond_var)),
-                    UNIT_META,
-                ));
+            if let ExprMode::Condition(cond_var, condition_root) = unifier.expr_mode() {
+                unifier.push_struct_cond_clauses(cond_var, condition_root, binder, &mut body);
             }
 
             body.extend(unify_scope_structural(
@@ -176,10 +172,8 @@ pub(super) fn unify_root<'m>(
                     .with_meta(scope_meta.hir_meta),
                 ),
                 node: {
-                    let struct_node = unifier.mk_node(
-                        ontol_hir::Kind::Struct(binder, flags, body.into()),
-                        meta.hir_meta,
-                    );
+                    let struct_node = unifier
+                        .mk_node(ontol_hir::Kind::Struct(binder, flags, body), meta.hir_meta);
                     unifier.maybe_map_node(struct_node, opt_output_type)
                 },
             };

@@ -2,9 +2,10 @@ use std::sync::Arc;
 
 use fnv::FnvHashMap;
 use ontol_runtime::{
+    condition::{Clause, CondTerm, Condition},
     interface::serde::processor::ProcessorMode,
     ontology::{Ontology, PropertyCardinality, ValueCardinality},
-    select::{EntitySelect, Select},
+    select::{EntitySelect, Select, StructOrUnionSelect},
     value::{Attribute, Data, Value},
     var::Var,
     vm::{proc::Yield, VmState},
@@ -15,7 +16,7 @@ use tracing::debug;
 use crate::{
     data_store::{DataStore, DataStoreFactory},
     domain_error::DomainResult,
-    resolve_path::ResolverGraph,
+    resolve_path::{ProbeOptions, ResolverGraph},
     select_data_flow::translate_entity_select,
     system::{SystemAPI, TestSystem},
     value_generator::Generator,
@@ -64,7 +65,7 @@ impl DomainEngine {
         self.data_store.as_ref().ok_or(DomainError::NoDataStore)
     }
 
-    pub async fn call_map(
+    pub async fn exec_map(
         &self,
         key: [MapKey; 2],
         input: Attribute,
@@ -81,40 +82,14 @@ impl DomainEngine {
         loop {
             match vm.run([input_value]) {
                 VmState::Complete(value) => return Ok(value.into()),
-                VmState::Yielded(Yield::Match(var, condition)) => {
-                    let Some(entity_query) = queries.remove(&var) else {
-                        panic!("No selection for {var}");
+                VmState::Yielded(Yield::Match(match_var, condition)) => {
+                    let Some(entity_query) = queries.remove(&match_var) else {
+                        panic!("No selection for {match_var}");
                     };
 
-                    debug!("match condition:\n{condition:#?}");
-
-                    let edges = self
-                        .get_data_store()?
-                        .api()
-                        .query(self, entity_query.select)
+                    input_value = self
+                        .exec_map_query(match_var, entity_query, condition)
                         .await?;
-
-                    match entity_query.cardinality.1 {
-                        ValueCardinality::One => {
-                            match (edges.into_iter().next(), entity_query.cardinality.0) {
-                                (Some(attribute), _) => {
-                                    input_value = attribute.value;
-                                }
-                                (None, PropertyCardinality::Optional) => {
-                                    input_value = Value::unit();
-                                }
-                                (None, PropertyCardinality::Mandatory) => {
-                                    return Err(DomainError::EntityNotFound);
-                                }
-                            }
-                        }
-                        ValueCardinality::Many => {
-                            input_value = Value {
-                                data: Data::Sequence(edges),
-                                type_def_id: DefId::unit(),
-                            };
-                        }
-                    }
                 }
             }
         }
@@ -187,6 +162,89 @@ impl DomainEngine {
             .api()
             .store_new_entity(self, entity, select)
             .await
+    }
+
+    async fn exec_map_query(
+        &self,
+        match_var: Var,
+        mut entity_query: EntityQuery,
+        condition: Condition<CondTerm>,
+    ) -> DomainResult<ontol_runtime::value::Value> {
+        let data_store = self.get_data_store()?;
+
+        debug!("Match condition:\n{condition:#?}");
+
+        match &entity_query.select.source {
+            StructOrUnionSelect::Struct(struct_select) => {
+                let inner_entity_def_id = condition
+                    .clauses
+                    .iter()
+                    .find_map(|clause| {
+                        if let Clause::IsEntity(CondTerm::Var(entity_var), def_id) = clause {
+                            if *entity_var == match_var {
+                                Some(*def_id)
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    })
+                    .expect("Root entity DefId not found in condition clauses");
+
+                // TODO: The probe algorithm here needs to work differently.
+                // The map statement (currently) knows about the data store type
+                // because the conditions must be expressed in its domain.
+                // So we don't need to search for a target type, only a valid resolve
+                // path _between_ the two known types
+                let resolve_path = self
+                    .resolver_graph
+                    .probe_path(
+                        &self.ontology,
+                        struct_select.def_id,
+                        data_store.package_id(),
+                        ProbeOptions {
+                            must_be_entity: true,
+                            inverted: true,
+                        },
+                    )
+                    .ok_or(DomainError::NoResolvePathToDataStore)?;
+
+                if let Some(dest) = resolve_path.iter().last() {
+                    assert_eq!(dest, inner_entity_def_id);
+                }
+
+                let mut cur_def_id = struct_select.def_id;
+
+                // Transform select
+                for next_def_id in resolve_path.iter() {
+                    translate_entity_select(
+                        &mut entity_query.select,
+                        cur_def_id.into(),
+                        next_def_id.into(),
+                        &self.ontology,
+                    );
+                    cur_def_id = next_def_id;
+                }
+            }
+            _ => todo!("Basically apply the same operation as above, but refactor"),
+        }
+
+        let edges = data_store.api().query(self, entity_query.select).await?;
+
+        debug!("Cardinality: {:?}", entity_query.cardinality);
+
+        match entity_query.cardinality.1 {
+            ValueCardinality::One => match (edges.into_iter().next(), entity_query.cardinality.0) {
+                (Some(attribute), _) => Ok(attribute.value),
+                (None, PropertyCardinality::Optional) => Ok(Value::unit()),
+                (None, PropertyCardinality::Mandatory) => Err(DomainError::EntityNotFound),
+            },
+            ValueCardinality::Many => Ok(Value {
+                data: Data::Sequence(edges),
+                type_def_id: DefId::unit(),
+            }),
+        }
     }
 }
 

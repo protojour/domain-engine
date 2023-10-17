@@ -67,10 +67,10 @@ impl ResolverGraph {
     pub fn probe_path_for_entity_select(
         &self,
         ontology: &Ontology,
-        query: &EntitySelect,
+        select: &EntitySelect,
         data_store: &DataStore,
     ) -> Option<(DefId, ResolvePath)> {
-        match &query.source {
+        match &select.source {
             StructOrUnionSelect::Struct(struct_query) => self
                 .probe_path(
                     ontology,

@@ -40,6 +40,7 @@ fn test_map_match_scalar_key() {
             YielderMock::yield_match
                 .next_call(matching!(eq!(&Literal(indoc! { r#"
                     (root $b)
+                    (is-entity $b def@1:3)
                     (attr $b S:1:4 (_ Text("input")))
                     "#
                 }))))
@@ -77,6 +78,7 @@ fn test_map_match_parameterless_query() {
             YielderMock::yield_match
                 .next_call(matching!(eq!(&Literal(indoc! { "
                     (root $c)
+                    (is-entity $c def@1:3)
                     "
                 }))))
                 .returns(Value::sequence_of([foo
@@ -122,6 +124,7 @@ fn test_map_match_anonymous_query_mandatory_parameters() {
             YielderMock::yield_match
                 .next_call(matching!(eq!(&Literal(indoc! { r#"
                     (root $e)
+                    (is-entity $e def@1:3)
                     (attr $e S:1:6 (_ Text("A")))
                     (attr $e S:1:7 (_ Text("B")))
                     "#
@@ -175,6 +178,7 @@ fn test_map_match_anonymous_with_translation() {
             YielderMock::yield_match
                 .next_call(matching!(eq!(&Literal(indoc! { r#"
                     (root $d)
+                    (is-entity $d def@1:3)
                     (attr $d S:1:6 (_ Text("X")))
                     "#
                 }))))

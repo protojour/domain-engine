@@ -6,7 +6,7 @@ use ontol_runtime::{
         argument::FieldArg,
         data::{
             FieldData, FieldKind, NodeData, ObjectData, ObjectKind, Optionality, TypeData,
-            TypeKind, TypeModifier,
+            TypeKind, TypeModifier, TypeRef,
         },
         schema::TypingPurpose,
     },
@@ -38,6 +38,7 @@ pub enum AnalyzedQuery {
         key: [MapKey; 2],
         input: Attribute,
         queries: FnvHashMap<Var, EntityQuery>,
+        field_type: TypeRef,
     },
     ClassicConnection(EntitySelect),
 }
@@ -83,6 +84,7 @@ impl<'a> SelectAnalyzer<'a> {
                     key: *key,
                     input,
                     queries: output_queries,
+                    field_type: field_data.field_type,
                 })
             }
             _ => match self.analyze_selection(look_ahead, field_data).select {
@@ -182,7 +184,7 @@ impl<'a> SelectAnalyzer<'a> {
 
                         KeyedPropertySelection {
                             key: unit_property(),
-                            cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
+                            cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Many),
                             select: match select {
                                 Select::Struct(object) => Select::Entity(EntitySelect {
                                     source: StructOrUnionSelect::Struct(object),

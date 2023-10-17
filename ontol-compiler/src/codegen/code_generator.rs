@@ -722,7 +722,15 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                             self.builder,
                         );
                     }
-                    Clause::IsEntity(..) => todo!(),
+                    Clause::IsEntity(term, def_id) => {
+                        let term = self.gen_eval_cond_term(term, arena, block);
+                        block.op(
+                            OpCode::PushCondClause(cond_local, Clause::IsEntity(term, *def_id)),
+                            Delta(0),
+                            span,
+                            self.builder,
+                        );
+                    }
                     Clause::Attr(var, prop_id, (rel, val)) => {
                         let rel = self.gen_eval_cond_term(rel, arena, block);
                         let val = self.gen_eval_cond_term(val, arena, block);
