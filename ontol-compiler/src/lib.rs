@@ -314,7 +314,7 @@ impl<'m> Compiler<'m> {
                     package_id,
                     builder.partial_ontology(),
                     map_namespaces.get(&package_id),
-                    &self.codegen_tasks.result_named_forward_maps,
+                    &self.codegen_tasks,
                     &mut serde_generator,
                 ) {
                     interfaces

@@ -45,23 +45,26 @@ where
     }
 
     pub fn analyze(&mut self, arg: Var, body: TypedNodeRef<'_, 'm>) -> Option<Vec<PropertyFlow>> {
+        self.var_dependencies.insert(arg, VarSet::default());
+
         match body.kind() {
             ontol_hir::Kind::Struct(struct_binder, _flags, nodes) => {
-                self.var_dependencies.insert(arg, VarSet::default());
                 self.var_dependencies
                     .insert(struct_binder.hir().var, VarSet::default());
                 for node_ref in body.arena().refs(nodes) {
                     self.analyze_node(node_ref);
                 }
-
-                Some(
-                    std::mem::take(&mut self.property_flow)
-                        .into_iter()
-                        .collect(),
-                )
             }
-            _ => None,
+            _ => {
+                self.analyze_node(body);
+            }
         }
+
+        Some(
+            std::mem::take(&mut self.property_flow)
+                .into_iter()
+                .collect(),
+        )
     }
 
     fn analyze_node(&mut self, node_ref: TypedNodeRef<'_, 'm>) -> VarSet {
@@ -102,7 +105,7 @@ where
             ontol_hir::Kind::DeclSeq(_, _) => {
                 unreachable!()
             }
-            ontol_hir::Kind::Struct(_, _, body) => {
+            ontol_hir::Kind::Struct(_binder, _flags, body) => {
                 let mut var_set = VarSet::default();
                 for child in arena.refs(body) {
                     var_set.union_with(&self.analyze_node(child));

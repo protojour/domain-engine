@@ -86,18 +86,18 @@ fn test_analyze1() {
         "$b",
         "
         (struct ($a)
-            (match-prop $b O:0:0
+            (match-prop $b O:1:0
                 (($_ $c)
-                    (prop $a S:0:0
+                    (prop $a S:1:0
                         (#u (map $c))
                     )
                 )
             )
-            (match-prop $b O:1:1
+            (match-prop $b O:2:1
                 (($_ $d)
-                    (prop $a S:1:1
+                    (prop $a S:2:1
                         (#u
-                            (match-prop $d O:2:2
+                            (match-prop $d O:3:2
                                 (($_ $e) $e)
                             )
                         )
@@ -111,15 +111,15 @@ fn test_analyze1() {
     expect_eq!(
         actual = data_flow,
         expected = vec![
-            prop_flow("S:0:0", dependent_on("O:0:0")),
-            prop_flow("S:1:1", dependent_on("O:2:2")),
-            prop_flow("O:0:0", default_type()),
-            prop_flow("O:0:0", default_cardinality()),
-            prop_flow("O:1:1", default_type()),
-            prop_flow("O:1:1", default_cardinality()),
-            prop_flow("O:2:2", default_type()),
-            prop_flow("O:2:2", default_cardinality()),
-            prop_flow("O:2:2", child_of("O:1:1")),
+            prop_flow("S:1:0", dependent_on("O:1:0")),
+            prop_flow("S:2:1", dependent_on("O:3:2")),
+            prop_flow("O:1:0", default_type()),
+            prop_flow("O:1:0", default_cardinality()),
+            prop_flow("O:2:1", default_type()),
+            prop_flow("O:2:1", default_cardinality()),
+            prop_flow("O:3:2", default_type()),
+            prop_flow("O:3:2", default_cardinality()),
+            prop_flow("O:3:2", child_of("O:2:1")),
         ]
     );
 }
@@ -130,14 +130,14 @@ fn test_analyze_seq1() {
         "$b",
         "
         (struct ($a)
-            (match-prop $b O:0:0
+            (match-prop $b O:1:0
                 ((seq-default $c)
-                    (prop $a S:0:0
+                    (prop $a S:1:0
                         (#u
                             (sequence ($d)
                                 (for-each $c ($_ $e)
                                     (seq-push $d #u
-                                        (match-prop $e O:1:1
+                                        (match-prop $e O:2:1
                                             (($_ $f) $f)
                                         )
                                     )
@@ -154,12 +154,12 @@ fn test_analyze_seq1() {
     expect_eq!(
         actual = data_flow,
         expected = vec![
-            prop_flow("S:0:0", dependent_on("O:1:1")),
-            prop_flow("O:0:0", default_type()),
-            prop_flow("O:0:0", default_cardinality()),
-            prop_flow("O:1:1", default_type()),
-            prop_flow("O:1:1", default_cardinality()),
-            prop_flow("O:1:1", child_of("O:0:0")),
+            prop_flow("S:1:0", dependent_on("O:2:1")),
+            prop_flow("O:1:0", default_type()),
+            prop_flow("O:1:0", default_cardinality()),
+            prop_flow("O:2:1", default_type()),
+            prop_flow("O:2:1", default_cardinality()),
+            prop_flow("O:2:1", child_of("O:1:0")),
         ]
     );
 }
@@ -170,16 +170,16 @@ fn test_analyze_regex_match1() {
         "$b",
         "
         (struct ($a)
-            (match-prop $b O:0:0
+            (match-prop $b O:1:0
                 (($_ $c)
                     (match-regex $c def@0:0
                         (((1 $d))
-                            (prop $a S:0:0
+                            (prop $a S:1:0
                                 (#u $d)
                             )
                         )
                         (((2 $e))
-                            (prop $a S:0:1
+                            (prop $a S:1:1
                                 (#u $e)
                             )
                         )
@@ -193,10 +193,10 @@ fn test_analyze_regex_match1() {
     expect_eq!(
         actual = data_flow,
         expected = vec![
-            prop_flow("S:0:0", dependent_on("O:0:0")),
-            prop_flow("S:0:1", dependent_on("O:0:0")),
-            prop_flow("O:0:0", default_type()),
-            prop_flow("O:0:0", default_cardinality()),
+            prop_flow("S:1:0", dependent_on("O:1:0")),
+            prop_flow("S:1:1", dependent_on("O:1:0")),
+            prop_flow("O:1:0", default_type()),
+            prop_flow("O:1:0", default_cardinality()),
         ]
     );
 }

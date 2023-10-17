@@ -279,7 +279,12 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     }
                     self.scope.remove(&binder.hir().var);
                     block.pop_until(condition_local, span, self.builder);
-                    block.op(OpCode::MatchCondition, Delta(0), span, self.builder);
+                    block.op(
+                        OpCode::MatchCondition(binder.0.var),
+                        Delta(0),
+                        span,
+                        self.builder,
+                    );
                 } else {
                     let Some(def_id) = ty.get_single_def_id() else {
                         panic!("No def_id for {ty:?}");

@@ -118,7 +118,7 @@ pub enum OpCode {
     /// Push a condition clause into the condition at local
     PushCondClause(Local, Clause<OpCodeCondTerm>),
     /// Execute a match on a datastore, using the condition at top of stack
-    MatchCondition,
+    MatchCondition(Var),
     Panic(String),
 }
 
@@ -176,7 +176,7 @@ impl GetAttrFlags {
 }
 
 pub enum Yield {
-    Match(Condition<CondTerm>),
+    Match(Var, Condition<CondTerm>),
 }
 
 #[derive(Serialize, Deserialize, Debug)]

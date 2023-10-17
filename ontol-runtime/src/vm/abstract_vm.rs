@@ -7,6 +7,7 @@ use crate::{
     ontology::Ontology,
     text_pattern::TextPattern,
     value::PropertyId,
+    var::Var,
     vm::proc::{BuiltinProc, Local, OpCode, Predicate, Procedure},
     DefId,
 };
@@ -73,7 +74,7 @@ pub trait Processor {
     );
     fn assert_true(&mut self);
     fn push_cond_clause(&mut self, cond_local: Local, clause: &Clause<OpCodeCondTerm>);
-    fn yield_condition(&mut self) -> Self::Yield;
+    fn yield_match_condition(&mut self, var: Var) -> Self::Yield;
 }
 
 impl<'o, P: Processor> AbstractVm<'o, P> {
@@ -240,9 +241,9 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                     processor.push_cond_clause(*cond_local, clause);
                     self.program_counter += 1;
                 }
-                OpCode::MatchCondition => {
+                OpCode::MatchCondition(var) => {
                     self.program_counter += 1;
-                    return Some(processor.yield_condition());
+                    return Some(processor.yield_match_condition(*var));
                 }
                 OpCode::Panic(message) => {
                     panic!("{message}");

@@ -30,13 +30,13 @@ fn test_unify_matchcond_single_prop() {
     let output = test_unify(
         "
         (struct ($b)
-            (prop $b S:0:0 (#u $a))
+            (prop $b S:1:0 (#u $a))
         )
         ",
         "
         (decl-seq (@d) #u
             (match-struct ($c)
-                (prop $c O:0:0 (#u $a))
+                (prop $c O:1:0 (#u $a))
             )
         )
         ",
@@ -46,10 +46,10 @@ fn test_unify_matchcond_single_prop() {
             (push-cond-clause $c
                 (root '$c)
             )
-            (match-prop $b S:0:0
+            (match-prop $b S:1:0
                 (($_ $a)
                     (push-cond-clause $c
-                        (attr '$c O:0:0 (_ $a))
+                        (attr '$c O:1:0 (_ $a))
                     )
                 )
             )
@@ -63,17 +63,17 @@ fn test_unify_matchcond_struct_in_struct() {
     let output = test_unify(
         "
         (struct ($c)
-            (prop $c S:0:0 (#u $a))
-            (prop $c S:0:1 (#u $b))
+            (prop $c S:1:0 (#u $a))
+            (prop $c S:1:1 (#u $b))
         )
         ",
         "
         (decl-seq (@f) #u
             (match-struct ($d)
-                (prop $d O:0:0
+                (prop $d O:1:0
                     (#u
                         (struct ($e)
-                            (prop $e O:1:0 ($a $b))
+                            (prop $e O:2:0 ($a $b))
                         )
                     )
                 )
@@ -86,16 +86,16 @@ fn test_unify_matchcond_struct_in_struct() {
             (push-cond-clause $d
                 (root '$d)
             )
-            (match-prop $c S:0:0
+            (match-prop $c S:1:0
                 (($_ $a)
-                    (match-prop $c S:0:1
+                    (match-prop $c S:1:1
                         (($_ $b)
                             (begin
                                 (push-cond-clause $d
-                                    (attr '$d O:0:0 (_ '$e))
+                                    (attr '$d O:1:0 (_ '$e))
                                 )
                                 (push-cond-clause $d
-                                    (attr '$e O:1:0 ($a $b))
+                                    (attr '$e O:2:0 ($a $b))
                                 )
                             )
                         )

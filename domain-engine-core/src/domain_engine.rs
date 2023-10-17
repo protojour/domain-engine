@@ -74,7 +74,7 @@ impl DomainEngine {
         loop {
             match vm.run([input_value]) {
                 VmState::Complete(value) => return Ok(value.into()),
-                VmState::Yielded(Yield::Match(condition)) => todo!("match {condition:?}"),
+                VmState::Yielded(Yield::Match(_var, condition)) => todo!("match {condition:?}"),
             }
         }
     }

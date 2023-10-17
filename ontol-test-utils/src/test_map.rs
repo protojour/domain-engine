@@ -183,7 +183,7 @@ impl<'on> TestMapper<'on> {
         loop {
             match vm.run([param]) {
                 VmState::Complete(value) => return value,
-                VmState::Yielded(Yield::Match(condition)) => {
+                VmState::Yielded(Yield::Match(_var, condition)) => {
                     param = self.yielder.yield_match(condition);
                 }
             }

@@ -562,7 +562,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     }
 
                     let ranges = sequence_range_builder.build();
-                    debug!("sequence ranges: {:#?}", ranges);
+                    trace!("sequence ranges: {:#?}", ranges);
 
                     let operator_id = self.alloc_operator_id(&def);
                     Some(OperatorAllocation::Allocated(

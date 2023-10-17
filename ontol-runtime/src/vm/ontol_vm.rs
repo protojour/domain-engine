@@ -11,6 +11,7 @@ use crate::{
     ontology::Ontology,
     text_pattern::TextPattern,
     value::{Attribute, Data, PropertyId, Value, ValueDebug},
+    var::Var,
     vm::abstract_vm::{AbstractVm, Processor, VmDebug},
     vm::proc::{BuiltinProc, Local, Procedure},
     DefId, PackageId,
@@ -324,9 +325,9 @@ impl Processor for OntolProcessor {
         condition.clauses.push(clause);
     }
 
-    fn yield_condition(&mut self) -> Self::Yield {
+    fn yield_match_condition(&mut self, var: Var) -> Self::Yield {
         match self.stack.pop().unwrap().data {
-            Data::Condition(condition) => Yield::Match(condition),
+            Data::Condition(condition) => Yield::Match(var, condition),
             _ => panic!("Top of stack is not a condition"),
         }
     }

@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
@@ -19,13 +17,14 @@ use ontol_runtime::{
         },
         serde::SerdeModifier,
     },
-    ontology::{Ontology, PropertyCardinality, ValueCardinality},
+    ontology::{Ontology, PropertyCardinality, PropertyFlow, ValueCardinality},
     smart_format, DefId, MapKey, PackageId, Role,
 };
 use smartstring::alias::String;
 use tracing::trace;
 
 use crate::{
+    codegen::task::CodegenTasks,
     def::{DefKind, Defs, LookupRelationshipMeta, RelParams},
     interface::serde::serde_generator::SerdeGenerator,
     relation::{Properties, Relations},
@@ -41,7 +40,7 @@ pub fn generate_graphql_schema<'c>(
     package_id: PackageId,
     partial_ontology: &'c Ontology,
     map_namespace: Option<&'c IndexMap<&str, DefId>>,
-    named_forward_maps: &'c HashMap<(PackageId, String), [MapKey; 2]>,
+    codegen_tasks: &'c CodegenTasks,
     serde_generator: &mut SerdeGenerator<'c, '_>,
 ) -> Option<GraphqlSchema> {
     let domain = partial_ontology.find_domain(package_id).unwrap();
@@ -109,8 +108,13 @@ pub fn generate_graphql_schema<'c>(
     if let Some(map_namespace) = map_namespace {
         // Register named maps in the user-specified order (using the IndexMap from the namespace)
         for name in map_namespace.keys() {
-            if let Some(map_key) = named_forward_maps.get(&(package_id, (*name).into())) {
-                builder.add_named_map_query(name, map_key);
+            if let Some(map_key) = codegen_tasks
+                .result_named_forward_maps
+                .get(&(package_id, (*name).into()))
+            {
+                let prop_flow = codegen_tasks.result_propflow_table.get(map_key).unwrap();
+
+                builder.add_named_map_query(name, map_key, prop_flow);
             }
         }
     }
@@ -754,7 +758,12 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
         }
     }
 
-    pub fn add_named_map_query(&mut self, name: &str, [input_key, output_key]: &[MapKey; 2]) {
+    pub fn add_named_map_query(
+        &mut self,
+        name: &str,
+        [input_key, output_key]: &[MapKey; 2],
+        _prop_flow: &[PropertyFlow],
+    ) {
         let input_serde_key = {
             let mut serde_modifier = SerdeModifier::graphql_default();
 
@@ -764,6 +773,8 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
 
             SerdeKey::Def(SerdeDef::new(input_key.def_id, serde_modifier))
         };
+
+        // debug!("named prop flow: {prop_flow:#?}");
 
         let input_operator_id = self
             .serde_generator
