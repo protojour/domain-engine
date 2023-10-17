@@ -61,12 +61,12 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
                 AnalyzedQuery::NamedMap {
                     key,
                     input,
-                    selects,
+                    queries,
                 } => {
                     executor
                         .context()
                         .domain_engine
-                        .call_map(key, input, selects)
+                        .call_map(key, input, queries)
                         .await?
                 }
                 AnalyzedQuery::ClassicConnection(entity_query) => {

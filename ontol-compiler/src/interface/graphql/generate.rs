@@ -825,22 +825,12 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
             },
         };
 
-        let field_data = if output_key.seq {
-            FieldData {
-                kind: field_kind,
-                field_type: TypeRef {
-                    modifier: TypeModifier::Unit(Optionality::Mandatory),
-                    unit: self.get_def_type_ref(output_key.def_id, QLevel::Node),
-                },
-            }
-        } else {
-            FieldData {
-                kind: field_kind,
-                field_type: TypeRef {
-                    modifier: TypeModifier::Unit(Optionality::Optional),
-                    unit: self.get_def_type_ref(output_key.def_id, QLevel::Node),
-                },
-            }
+        let field_data = FieldData {
+            kind: field_kind,
+            field_type: TypeRef {
+                modifier: TypeModifier::Unit(Optionality::Mandatory),
+                unit: self.get_def_type_ref(output_key.def_id, QLevel::Node),
+            },
         };
 
         object_data_mut(self.schema.query, self.schema)

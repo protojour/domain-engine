@@ -3,12 +3,12 @@ use std::sync::Arc;
 use fnv::FnvHashMap;
 use ontol_runtime::{
     interface::serde::processor::ProcessorMode,
-    ontology::Ontology,
+    ontology::{Ontology, PropertyCardinality, ValueCardinality},
     select::{EntitySelect, Select},
-    value::{Attribute, Value},
+    value::{Attribute, Data, Value},
     var::Var,
     vm::{proc::Yield, VmState},
-    MapKey, PackageId,
+    DefId, MapKey, PackageId,
 };
 use tracing::debug;
 
@@ -19,7 +19,7 @@ use crate::{
     select_data_flow::translate_entity_select,
     system::{SystemAPI, TestSystem},
     value_generator::Generator,
-    Config, DomainError,
+    Config, DomainError, EntityQuery,
 };
 
 pub struct DomainEngine {
@@ -68,7 +68,7 @@ impl DomainEngine {
         &self,
         key: [MapKey; 2],
         input: Attribute,
-        mut selects: FnvHashMap<Var, EntitySelect>,
+        mut queries: FnvHashMap<Var, EntityQuery>,
     ) -> DomainResult<Attribute> {
         let proc = self
             .ontology
@@ -82,18 +82,30 @@ impl DomainEngine {
             match vm.run([input_value]) {
                 VmState::Complete(value) => return Ok(value.into()),
                 VmState::Yielded(Yield::Match(var, _condition)) => {
-                    let Some(entity_select) = selects.remove(&var) else {
+                    let Some(entity_query) = queries.remove(&var) else {
                         panic!("No selection for {var}");
                     };
 
-                    let attributes = self.query_entities(entity_select).await?;
-
-                    match attributes.into_iter().next() {
-                        Some(attribute) => {
-                            input_value = attribute.value;
+                    let attributes = self.query_entities(entity_query.select).await?;
+                    match entity_query.cardinality.1 {
+                        ValueCardinality::One => {
+                            match (attributes.into_iter().next(), entity_query.cardinality.0) {
+                                (Some(attribute), _) => {
+                                    input_value = attribute.value;
+                                }
+                                (None, PropertyCardinality::Optional) => {
+                                    input_value = Value::unit();
+                                }
+                                (None, PropertyCardinality::Mandatory) => {
+                                    return Err(DomainError::EntityNotFound);
+                                }
+                            }
                         }
-                        None => {
-                            return Err(DomainError::EntityNotFound);
+                        ValueCardinality::Many => {
+                            input_value = Value {
+                                data: Data::Sequence(attributes),
+                                type_def_id: DefId::unit(),
+                            };
                         }
                     }
                 }

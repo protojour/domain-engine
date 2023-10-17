@@ -12,6 +12,7 @@ mod value_generator;
 
 pub use domain_engine::DomainEngine;
 pub use domain_error::{DomainError, DomainResult};
+use ontol_runtime::{ontology::Cardinality, select::EntitySelect};
 
 pub struct Config {
     pub default_limit: u32,
@@ -21,4 +22,10 @@ impl Default for Config {
     fn default() -> Self {
         Self { default_limit: 20 }
     }
+}
+
+#[derive(Debug)]
+pub struct EntityQuery {
+    pub cardinality: Cardinality,
+    pub select: EntitySelect,
 }

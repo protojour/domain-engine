@@ -1,3 +1,4 @@
+use domain_engine_core::EntityQuery;
 use fnv::FnvHashMap;
 use juniper::LookAheadMethods;
 use ontol_runtime::{
@@ -9,6 +10,7 @@ use ontol_runtime::{
         },
         schema::TypingPurpose,
     },
+    ontology::{Cardinality, PropertyCardinality, ValueCardinality},
     select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
     value::{Attribute, PropertyId},
     var::Var,
@@ -21,6 +23,7 @@ use crate::{context::SchemaCtx, gql_scalar::GqlScalar, look_ahead_utils::ArgsWra
 
 pub struct KeyedPropertySelection {
     pub key: PropertyId,
+    pub cardinality: Cardinality,
     pub select: Select,
 }
 
@@ -34,7 +37,7 @@ pub enum AnalyzedQuery {
     NamedMap {
         key: [MapKey; 2],
         input: Attribute,
-        selects: FnvHashMap<Var, EntitySelect>,
+        queries: FnvHashMap<Var, EntityQuery>,
     },
     ClassicConnection(EntitySelect),
 }
@@ -57,7 +60,7 @@ impl<'a> SelectAnalyzer<'a> {
                 key,
                 input_operator_id,
                 scalar_input_name,
-                queries,
+                queries: map_queries,
             } => {
                 let input = ArgsWrapper::new(look_ahead.arguments()).domain_deserialize(
                     *input_operator_id,
@@ -66,20 +69,20 @@ impl<'a> SelectAnalyzer<'a> {
                     &self.schema_ctx.ontology,
                 )?;
 
-                let mut output_selects: FnvHashMap<Var, EntitySelect> = Default::default();
+                let mut output_queries: FnvHashMap<Var, EntityQuery> = Default::default();
 
                 self.analyze_map(
                     look_ahead,
                     field_data,
                     unit_property(),
-                    queries,
-                    &mut output_selects,
+                    map_queries,
+                    &mut output_queries,
                 );
 
                 Ok(AnalyzedQuery::NamedMap {
                     key: *key,
                     input,
-                    selects: output_selects,
+                    queries: output_queries,
                 })
             }
             _ => match self.analyze_selection(look_ahead, field_data).select {
@@ -109,15 +112,24 @@ impl<'a> SelectAnalyzer<'a> {
         field_data: &FieldData,
         parent_property: PropertyId,
         input_queries: &FnvHashMap<PropertyId, Var>,
-        output_selections: &mut FnvHashMap<Var, EntitySelect>,
+        output_queries: &mut FnvHashMap<Var, EntityQuery>,
     ) {
         match input_queries.get(&parent_property) {
-            Some(var) => match self.analyze_selection(look_ahead, field_data).select {
-                Select::Entity(entity_select) => {
-                    output_selections.insert(*var, entity_select);
+            Some(var) => {
+                let selection = self.analyze_selection(look_ahead, field_data);
+                match selection.select {
+                    Select::Entity(entity_select) => {
+                        output_queries.insert(
+                            *var,
+                            EntityQuery {
+                                cardinality: selection.cardinality,
+                                select: entity_select,
+                            },
+                        );
+                    }
+                    select => panic!("BUG: not an entity select: {select:?}"),
                 }
-                select => panic!("BUG: not an entity select: {select:?}"),
-            },
+            }
             None => match self.schema_ctx.lookup_type_data(field_data.field_type.unit) {
                 Ok(TypeData {
                     kind: TypeKind::Object(_),
@@ -141,22 +153,24 @@ impl<'a> SelectAnalyzer<'a> {
         ) {
             (FieldKind::Map { .. }, Ok(type_data)) => {
                 match (field_data.field_type.modifier, type_data) {
-                    (TypeModifier::Unit(Optionality::Optional), type_data) => {
-                        KeyedPropertySelection {
-                            key: unit_property(),
-                            select: match self.analyze_data(look_ahead, type_data) {
-                                Select::Struct(struct_select) => Select::Entity(EntitySelect {
-                                    source: StructOrUnionSelect::Struct(struct_select),
-                                    limit: 1,
-                                    cursor: None,
-                                }),
-                                select => select,
+                    (TypeModifier::Unit(optionality), type_data) => KeyedPropertySelection {
+                        key: unit_property(),
+                        cardinality: (
+                            match optionality {
+                                Optionality::Mandatory => PropertyCardinality::Mandatory,
+                                Optionality::Optional => PropertyCardinality::Optional,
                             },
-                        }
-                    }
-                    (TypeModifier::Unit(Optionality::Mandatory), _) => {
-                        panic!()
-                    }
+                            ValueCardinality::One,
+                        ),
+                        select: match self.analyze_data(look_ahead, type_data) {
+                            Select::Struct(struct_select) => Select::Entity(EntitySelect {
+                                source: StructOrUnionSelect::Struct(struct_select),
+                                limit: 1,
+                                cursor: None,
+                            }),
+                            select => select,
+                        },
+                    },
                     (
                         TypeModifier::Array(..),
                         TypeData {
@@ -179,6 +193,7 @@ impl<'a> SelectAnalyzer<'a> {
 
                         KeyedPropertySelection {
                             key: unit_property(),
+                            cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
                             select: match select {
                                 Some(Select::Struct(object)) => Select::Entity(EntitySelect {
                                     source: StructOrUnionSelect::Struct(object),
@@ -234,6 +249,7 @@ impl<'a> SelectAnalyzer<'a> {
 
                 KeyedPropertySelection {
                     key: property_id.unwrap_or(unit_property()),
+                    cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Many),
                     select: match select {
                         Some(Select::Struct(object)) => Select::Entity(EntitySelect {
                             source: StructOrUnionSelect::Struct(object),
@@ -272,6 +288,7 @@ impl<'a> SelectAnalyzer<'a> {
 
                 selection.unwrap_or_else(|| KeyedPropertySelection {
                     key: unit_property(),
+                    cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Many),
                     select: Select::Leaf,
                 })
             }
@@ -282,18 +299,22 @@ impl<'a> SelectAnalyzer<'a> {
                 Ok(type_data),
             ) => KeyedPropertySelection {
                 key: unit_property(),
+                cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
                 select: self.analyze_data(look_ahead, type_data),
             },
             (FieldKind::Property(property_data), Ok(type_data)) => KeyedPropertySelection {
                 key: property_data.property_id,
+                cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
                 select: self.analyze_data(look_ahead, type_data),
             },
             (FieldKind::Property(property_data), Err(_scalar_ref)) => KeyedPropertySelection {
                 key: property_data.property_id,
+                cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
                 select: Select::Leaf,
             },
             (FieldKind::Id(id_property_data), Err(_scalar_ref)) => KeyedPropertySelection {
                 key: PropertyId::subject(id_property_data.relationship_id),
+                cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
                 select: Select::Leaf,
             },
             (kind, res) => panic!("unhandled: {kind:?} res is ok: {}", res.is_ok()),
@@ -317,6 +338,7 @@ impl<'a> SelectAnalyzer<'a> {
                         let KeyedPropertySelection {
                             key: property_id,
                             select: selection,
+                            cardinality: _,
                         } = self.analyze_selection(field_look_ahead, field_data);
 
                         properties.insert(property_id, selection);
@@ -374,6 +396,7 @@ impl<'a> SelectAnalyzer<'a> {
                         let KeyedPropertySelection {
                             key: property_id,
                             select: selection,
+                            cardinality: _,
                         } = self.analyze_selection(field_look_ahead, field_data);
 
                         variant_map.insert(property_id, selection);
