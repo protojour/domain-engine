@@ -345,6 +345,35 @@ async fn test_graphql_blog_post_conduit_implicit_join() {
 }
 
 #[test(tokio::test)]
+async fn test_graphql_blog_post_conduit_implicit_join2() {
+    let ctx = BlogPostConduit::new().await;
+    ctx.create_db_article().await;
+
+    expect_eq!(
+        actual = r#"{
+            posts(written_by: "me") {
+                contents
+                written_by
+            }
+        }"#
+        .exec(&ctx.blog_schema, &ctx.gql_context(), [])
+        .await,
+        expected = Ok(graphql_value!({
+            "BlogPostList": {
+                "edges": [
+                    {
+                        "node": {
+                            "contents": "THE BODY",
+                            "written_by": "teh_user",
+                        }
+                    }
+                ]
+            }
+        })),
+    );
+}
+
+#[test(tokio::test)]
 async fn test_graphql_blog_post_conduit_tags() {
     let ctx = BlogPostConduit::new().await;
     ctx.create_db_article_with_tag().await;

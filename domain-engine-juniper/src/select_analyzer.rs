@@ -174,43 +174,32 @@ impl<'a> SelectAnalyzer<'a> {
                     (
                         TypeModifier::Array(..),
                         TypeData {
-                            kind: TypeKind::Object(object_data),
+                            kind: TypeKind::Object(_),
                             ..
                         },
                     ) => {
-                        let mut select = None;
-
-                        for field_look_ahead in look_ahead.children() {
-                            let field_name = field_look_ahead.field_name();
-                            let field_data = object_data.fields.get(field_name).unwrap();
-
-                            if let FieldKind::Edges = &field_data.kind {
-                                select = Some(
-                                    self.analyze_selection(field_look_ahead, field_data).select,
-                                );
-                            }
-                        }
+                        let select = self.analyze_data(look_ahead, type_data);
 
                         KeyedPropertySelection {
                             key: unit_property(),
                             cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
                             select: match select {
-                                Some(Select::Struct(object)) => Select::Entity(EntitySelect {
+                                Select::Struct(object) => Select::Entity(EntitySelect {
                                     source: StructOrUnionSelect::Struct(object),
                                     limit: self.default_limit(),
                                     cursor: None,
                                 }),
-                                Some(Select::StructUnion(def_id, variants)) => {
+                                Select::StructUnion(def_id, variants) => {
                                     Select::Entity(EntitySelect {
                                         source: StructOrUnionSelect::Union(def_id, variants),
                                         limit: self.default_limit(),
                                         cursor: None,
                                     })
                                 }
-                                Some(Select::Entity(_) | Select::EntityId) => {
+                                Select::Entity(_) | Select::EntityId => {
                                     panic!("Select in select")
                                 }
-                                Some(Select::Leaf) | None => Select::Leaf,
+                                Select::Leaf => Select::Leaf,
                             },
                         }
                     }

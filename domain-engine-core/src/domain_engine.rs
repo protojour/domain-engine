@@ -81,15 +81,22 @@ impl DomainEngine {
         loop {
             match vm.run([input_value]) {
                 VmState::Complete(value) => return Ok(value.into()),
-                VmState::Yielded(Yield::Match(var, _condition)) => {
+                VmState::Yielded(Yield::Match(var, condition)) => {
                     let Some(entity_query) = queries.remove(&var) else {
                         panic!("No selection for {var}");
                     };
 
-                    let attributes = self.query_entities(entity_query.select).await?;
+                    debug!("match condition:\n{condition:#?}");
+
+                    let edges = self
+                        .get_data_store()?
+                        .api()
+                        .query(self, entity_query.select)
+                        .await?;
+
                     match entity_query.cardinality.1 {
                         ValueCardinality::One => {
-                            match (attributes.into_iter().next(), entity_query.cardinality.0) {
+                            match (edges.into_iter().next(), entity_query.cardinality.0) {
                                 (Some(attribute), _) => {
                                     input_value = attribute.value;
                                 }
@@ -103,7 +110,7 @@ impl DomainEngine {
                         }
                         ValueCardinality::Many => {
                             input_value = Value {
-                                data: Data::Sequence(attributes),
+                                data: Data::Sequence(edges),
                                 type_def_id: DefId::unit(),
                             };
                         }

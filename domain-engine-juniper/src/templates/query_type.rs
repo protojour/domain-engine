@@ -55,7 +55,7 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
             let analyzed_query = SelectAnalyzer::new(schema_ctx, executor.context())
                 .analyze_look_ahead(&executor.look_ahead(), query_field)?;
 
-            debug!("Executing query {field_name}: {analyzed_query:#?}");
+            debug!("Executing query `{field_name}`");
 
             let attribute = match analyzed_query {
                 AnalyzedQuery::NamedMap {

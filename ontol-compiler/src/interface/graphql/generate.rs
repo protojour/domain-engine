@@ -777,8 +777,6 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
             SerdeKey::Def(SerdeDef::new(input_key.def_id, serde_modifier))
         };
 
-        // panic!("named prop flow: {prop_flow:#?}");
-
         let input_operator_id = self
             .serde_generator
             .gen_operator_id(input_serde_key)
@@ -828,7 +826,11 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
         let field_data = FieldData {
             kind: field_kind,
             field_type: TypeRef {
-                modifier: TypeModifier::Unit(Optionality::Mandatory),
+                modifier: if output_key.seq {
+                    TypeModifier::Array(Optionality::Mandatory, Optionality::Mandatory)
+                } else {
+                    TypeModifier::Unit(Optionality::Mandatory)
+                },
                 unit: self.get_def_type_ref(output_key.def_id, QLevel::Node),
             },
         };
