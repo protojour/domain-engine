@@ -34,8 +34,8 @@ pub struct WasmOntology {
 
 #[wasm_bindgen]
 impl WasmOntology {
-    pub fn create_graphql_schema(&self) -> Result<WasmGraphqlSchema, WasmError> {
-        WasmGraphqlSchema::create(self.ontology.clone(), self.package_id)
+    pub async fn create_graphql_schema(&self) -> Result<WasmGraphqlSchema, WasmError> {
+        WasmGraphqlSchema::create(self.ontology.clone(), self.package_id).await
     }
 
     pub fn domains(&self) -> Vec<JsValue> {
@@ -324,7 +324,7 @@ mod tests {
         ";
 
         let wasm_ontology = compile_ontol_domain("test.on".to_string(), ontol.to_string()).unwrap();
-        let graphql_schema = wasm_ontology.create_graphql_schema().unwrap();
+        let graphql_schema = wasm_ontology.create_graphql_schema().await.unwrap();
 
         let document = "{
             __schema {

@@ -47,8 +47,9 @@ pub trait DataStoreAPI {
 }
 
 /// Trait for creating data store APIs
+#[async_trait::async_trait]
 pub trait DataStoreFactory {
-    fn new_api(
+    async fn new_api(
         config: &DataStoreConfig,
         ontology: &Ontology,
         package_id: PackageId,
@@ -57,8 +58,9 @@ pub trait DataStoreFactory {
 
 pub struct DefaultDataStoreFactory;
 
+#[async_trait::async_trait]
 impl DataStoreFactory for DefaultDataStoreFactory {
-    fn new_api(
+    async fn new_api(
         _config: &DataStoreConfig,
         ontology: &Ontology,
         package_id: PackageId,

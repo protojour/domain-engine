@@ -180,21 +180,25 @@ impl Builder {
         self
     }
 
-    pub fn build<F: DataStoreFactory>(self) -> DomainEngine {
-        let data_store = self.data_store.or_else(|| {
-            let mut data_store: Option<DataStore> = None;
+    pub async fn build<F: DataStoreFactory>(self) -> DomainEngine {
+        let data_store = match self.data_store {
+            Some(data_store) => Some(data_store),
+            None => {
+                let mut data_store: Option<DataStore> = None;
 
-            for (package_id, _) in self.ontology.domains() {
-                if let Some(config) = self.ontology.get_package_config(*package_id) {
-                    if let Some(data_store_config) = &config.data_store {
-                        let api = F::new_api(data_store_config, &self.ontology, *package_id);
-                        data_store = Some(DataStore::new(*package_id, api));
+                for (package_id, _) in self.ontology.domains() {
+                    if let Some(config) = self.ontology.get_package_config(*package_id) {
+                        if let Some(data_store_config) = &config.data_store {
+                            let api =
+                                F::new_api(data_store_config, &self.ontology, *package_id).await;
+                            data_store = Some(DataStore::new(*package_id, api));
+                        }
                     }
                 }
-            }
 
-            data_store
-        });
+                data_store
+            }
+        };
 
         let resolver_graph = ResolverGraph::new(&self.ontology);
 

@@ -86,7 +86,7 @@ async fn test_graphql_int_scalars() {
         }"
         .exec(
             &schema,
-            &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()),
+            &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
             []
         )
         .await,
@@ -117,7 +117,8 @@ async fn test_graphql_int_scalars() {
                 DataStoreAPIMock::store_new_entity
                     .next_call(matching!(_, _, _))
                     .returns(Ok(entity.into()))
-            ),
+            )
+            .await,
             []
         )
         .await,
@@ -151,7 +152,7 @@ async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
         }"
         .exec(
             &schema,
-            &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()),
+            &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
             []
         )
         .await,
@@ -218,7 +219,7 @@ async fn test_inner_struct() {
         }"
         .exec(
             &schema,
-            &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()),
+            &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
             []
         )
         .await,
@@ -251,7 +252,8 @@ async fn test_inner_struct() {
                 DataStoreAPIMock::store_new_entity
                     .next_call(matching!(_, _, _))
                     .returns(Ok(entity.into()))
-            ),
+            )
+            .await,
             []
         )
         .await,
@@ -292,7 +294,7 @@ async fn test_docs_introspection() {
                 }
             }
         }"#
-        .exec(&schema, &gql_ctx_mock_data_store(&test, ROOT, ()), [])
+        .exec(&schema, &gql_ctx_mock_data_store(&test, ROOT, ()).await, [])
         .await,
         expected = Ok(graphql_value!({
             "__type": {
@@ -362,7 +364,8 @@ async fn test_graphql_artist_and_instrument_connections() {
                 DataStoreAPIMock::query
                     .next_call(matching!(_))
                     .returns(Ok(vec![ziggy.clone()]))
-            ),
+            )
+            .await,
             []
         )
         .await,
@@ -409,7 +412,7 @@ async fn test_graphql_artist_and_instrument_connections() {
         }"
         .exec(
             &schema,
-            &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()),
+            &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
             []
         )
         .await,
@@ -453,7 +456,8 @@ async fn test_graphql_artist_and_instrument_connections() {
                 DataStoreAPIMock::store_new_entity
                     .next_call(matching!(_, _, _))
                     .returns(Ok(ziggy.value))
-            ),
+            )
+            .await,
             []
         )
         .await,
@@ -519,7 +523,8 @@ async fn test_graphql_guitar_synth_union_selection() {
                 DataStoreAPIMock::query
                     .next_call(matching!(_, _))
                     .returns(Ok(vec![artist_entity]))
-            ),
+            )
+            .await,
             []
         )
         .await,
@@ -629,7 +634,8 @@ async fn test_graphql_guitar_synth_union_input_exec() {
                 DataStoreAPIMock::store_new_entity
                     .next_call(matching!(_, _, _))
                     .returns(Ok(ziggy))
-            ),
+            )
+            .await,
             []
         )
         .await,
@@ -670,7 +676,7 @@ async fn test_graphql_guitar_synth_union_input_error_span() {
                 }
             }
         "#
-        .exec(&schema, &gql_ctx_mock_data_store(&test, ROOT, ()), [])
+        .exec(&schema, &gql_ctx_mock_data_store(&test, ROOT, ()).await, [])
         .await,
         expected = Err(TestError::Execution(vec![expected_error])),
     );
@@ -706,7 +712,7 @@ async fn test_graphql_municipalities() {
         }"
         .exec(
             &schema,
-            &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()),
+            &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
             []
         )
         .await,
@@ -745,7 +751,7 @@ async fn test_graphql_municipalities_named_query() {
         }"#
         .exec(
             &schema,
-            &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()),
+            &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
             []
         )
         .await,

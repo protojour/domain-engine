@@ -17,14 +17,15 @@ pub struct WasmGraphqlSchema {
 
 #[wasm_bindgen]
 impl WasmGraphqlSchema {
-    pub(crate) fn create(
+    pub(crate) async fn create(
         ontology: Arc<Ontology>,
         package_id: PackageId,
     ) -> Result<Self, WasmError> {
         // Since the domain engine currently gets created here,
         // its data store (if any) won't be shared with other interfaces.
-        let domain_engine =
-            DomainEngine::builder(ontology.clone()).build::<DefaultDataStoreFactory>();
+        let domain_engine = DomainEngine::builder(ontology.clone())
+            .build::<DefaultDataStoreFactory>()
+            .await;
 
         let schema = create_graphql_schema(package_id, ontology.clone())?;
 

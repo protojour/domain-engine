@@ -53,7 +53,8 @@ async fn main() -> anyhow::Result<()> {
     let engine = Arc::new(
         DomainEngine::builder(ontology.clone())
             .system(Box::new(System))
-            .build::<DefaultDataStoreFactory>(),
+            .build::<DefaultDataStoreFactory>()
+            .await,
     );
 
     let mut router: axum::Router = axum::Router::new();

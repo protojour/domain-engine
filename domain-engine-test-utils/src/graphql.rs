@@ -77,7 +77,7 @@ pub fn mock_data_store_query_entities_empty() -> impl unimock::Clause {
         .returns(Ok(vec![]))
 }
 
-pub fn gql_ctx_mock_data_store(
+pub async fn gql_ctx_mock_data_store(
     ontol_test: &OntolTest,
     data_store_package: SourceName,
     setup: impl unimock::Clause,
@@ -86,7 +86,8 @@ pub fn gql_ctx_mock_data_store(
         domain_engine: Arc::new(
             DomainEngine::test_builder(ontol_test.ontology.clone())
                 .mock_data_store(ontol_test.get_package_id(data_store_package.0), setup)
-                .build::<DefaultDataStoreFactory>(),
+                .build::<DefaultDataStoreFactory>()
+                .await,
         ),
     }
 }

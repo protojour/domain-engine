@@ -30,6 +30,7 @@ async fn test_graphql_conduit_db() {
     let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
     let gql_context: ServiceCtx = DomainEngine::test_builder(test.ontology.clone())
         .build::<crate::TestDataStoreFactory>()
+        .await
         .into();
 
     expect_eq!(
@@ -91,6 +92,7 @@ async fn test_graphql_conduit_db_create_with_foreign_reference() {
     let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
     let gql_context: ServiceCtx = DomainEngine::test_builder(test.ontology.clone())
         .build::<crate::TestDataStoreFactory>()
+        .await
         .into();
 
     let response = r#"mutation {
@@ -160,6 +162,7 @@ async fn test_graphql_conduit_db_query_article_with_tags() {
     let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
     let gql_context: ServiceCtx = DomainEngine::test_builder(test.ontology.clone())
         .build::<crate::TestDataStoreFactory>()
+        .await
         .into();
 
     let _response = r#"mutation {
@@ -228,7 +231,7 @@ struct BlogPostConduit {
 }
 
 impl BlogPostConduit {
-    fn new() -> Self {
+    async fn new() -> Self {
         let test_packages = TestPackages::with_sources([(ROOT, BLOG_POST_PUBLIC.1), CONDUIT_DB])
             .with_data_store(CONDUIT_DB.0, DataStoreConfig::Default);
 
@@ -236,7 +239,8 @@ impl BlogPostConduit {
         Self {
             domain_engine: Arc::new(
                 DomainEngine::test_builder(test.ontology.clone())
-                    .build::<crate::TestDataStoreFactory>(),
+                    .build::<crate::TestDataStoreFactory>()
+                    .await,
             ),
             test,
             db_schema,
@@ -309,7 +313,7 @@ impl BlogPostConduit {
 
 #[test(tokio::test)]
 async fn test_graphql_blog_post_conduit_implicit_join() {
-    let ctx = BlogPostConduit::new();
+    let ctx = BlogPostConduit::new().await;
     ctx.create_db_article().await;
 
     expect_eq!(
@@ -342,7 +346,7 @@ async fn test_graphql_blog_post_conduit_implicit_join() {
 
 #[test(tokio::test)]
 async fn test_graphql_blog_post_conduit_tags() {
-    let ctx = BlogPostConduit::new();
+    let ctx = BlogPostConduit::new().await;
     ctx.create_db_article_with_tag().await;
 
     expect_eq!(
@@ -377,7 +381,7 @@ async fn test_graphql_blog_post_conduit_tags() {
 
 #[test(tokio::test)]
 async fn test_graphql_blog_post_conduit_no_join_mocked() {
-    let ctx = BlogPostConduit::new();
+    let ctx = BlogPostConduit::new().await;
     expect_eq!(
         actual = "{
             BlogPostList {
@@ -426,7 +430,8 @@ async fn test_graphql_blog_post_conduit_no_join_mocked() {
                         })
                     ))
                     .returns(Ok(vec![]))
-            ),
+            )
+            .await,
             []
         )
         .await,
@@ -436,7 +441,7 @@ async fn test_graphql_blog_post_conduit_no_join_mocked() {
 
 #[test(tokio::test)]
 async fn test_graphql_blog_post_conduit_no_join_real() {
-    let ctx = BlogPostConduit::new();
+    let ctx = BlogPostConduit::new().await;
     ctx.create_db_article().await;
 
     expect_eq!(

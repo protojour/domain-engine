@@ -25,8 +25,9 @@ fn artist_and_instrument() -> TestPackages {
 #[test(tokio::test)]
 async fn test_conduit_db_id_generation() {
     let test = conduit_db().compile();
-    let domain_engine =
-        DomainEngine::test_builder(test.ontology.clone()).build::<crate::TestDataStoreFactory>();
+    let domain_engine = DomainEngine::test_builder(test.ontology.clone())
+        .build::<crate::TestDataStoreFactory>()
+        .await;
     let [user, article, comment, tag_entity] =
         test.bind(["User", "Article", "Comment", "TagEntity"]);
 
@@ -116,8 +117,9 @@ async fn test_conduit_db_id_generation() {
 #[test(tokio::test)]
 async fn test_conduit_db_store_entity_tree() {
     let test = conduit_db().compile();
-    let domain_engine =
-        DomainEngine::test_builder(test.ontology.clone()).build::<crate::TestDataStoreFactory>();
+    let domain_engine = DomainEngine::test_builder(test.ontology.clone())
+        .build::<crate::TestDataStoreFactory>()
+        .await;
     let [user_type, article_type, comment_type] = test.bind(["User", "Article", "Comment"]);
 
     let pre_existing_user_id: Uuid = domain_engine
@@ -262,8 +264,9 @@ async fn test_conduit_db_store_entity_tree() {
 #[test(tokio::test)]
 async fn test_conduit_db_unresolved_foreign_key() {
     let test = conduit_db().compile();
-    let domain_engine =
-        DomainEngine::test_builder(test.ontology.clone()).build::<crate::TestDataStoreFactory>();
+    let domain_engine = DomainEngine::test_builder(test.ontology.clone())
+        .build::<crate::TestDataStoreFactory>()
+        .await;
     let [article] = test.bind(["Article"]);
 
     assert_error_msg!(
@@ -290,8 +293,9 @@ async fn test_conduit_db_unresolved_foreign_key() {
 #[test(tokio::test)]
 async fn test_artist_and_instrument_fmt_id_generation() {
     let test = artist_and_instrument().compile();
-    let domain_engine =
-        DomainEngine::test_builder(test.ontology.clone()).build::<crate::TestDataStoreFactory>();
+    let domain_engine = DomainEngine::test_builder(test.ontology.clone())
+        .build::<crate::TestDataStoreFactory>()
+        .await;
     let [artist] = test.bind(["artist"]);
     let artist_id = TypeBinding::from_def_id(
         artist
