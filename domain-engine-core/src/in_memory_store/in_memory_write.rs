@@ -173,6 +173,9 @@ impl InMemoryStore {
             let foreign_id = self.write_new_entity_inner(value, engine)?;
             Self::extract_dynamic_key(&foreign_id.data)?
         } else {
+            // This is for creating a relationship to an existing entity,
+            // using only a primary key.
+
             let type_info = ontology.get_type_info(data_relationship.target);
             let entity_info = type_info.entity_info.as_ref().unwrap();
 
