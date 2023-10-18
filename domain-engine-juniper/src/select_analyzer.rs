@@ -366,8 +366,8 @@ impl<'a> SelectAnalyzer<'a> {
                         let variant_type_data = union_data
                             .variants
                             .iter()
-                            .find_map(|type_index| {
-                                let type_data = self.schema_ctx.type_data(*type_index);
+                            .find_map(|type_addr| {
+                                let type_data = self.schema_ctx.type_data(*type_addr);
 
                                 if type_data.typename == applies_for {
                                     Some(type_data)

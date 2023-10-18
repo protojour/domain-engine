@@ -9,27 +9,27 @@ use crate::{
     DefId, PackageId,
 };
 
-use super::data::{TypeData, TypeIndex};
+use super::data::{TypeAddr, TypeData};
 
 #[derive(Serialize, Deserialize)]
 pub struct GraphqlSchema {
     pub package_id: PackageId,
-    pub query: TypeIndex,
-    pub mutation: TypeIndex,
-    pub json_scalar: TypeIndex,
-    pub i64_custom_scalar: Option<TypeIndex>,
+    pub query: TypeAddr,
+    pub mutation: TypeAddr,
+    pub json_scalar: TypeAddr,
+    pub i64_custom_scalar: Option<TypeAddr>,
     pub types: Vec<TypeData>,
-    pub type_index_by_def: FnvHashMap<(DefId, QueryLevel), TypeIndex>,
+    pub type_addr_by_def: FnvHashMap<(DefId, QueryLevel), TypeAddr>,
 }
 
 impl GraphqlSchema {
-    pub fn type_data(&self, type_index: TypeIndex) -> &TypeData {
-        &self.types[type_index.0 as usize]
+    pub fn type_data(&self, type_addr: TypeAddr) -> &TypeData {
+        &self.types[type_addr.0 as usize]
     }
 
     pub fn type_data_by_key(&self, key: (DefId, QueryLevel)) -> Option<&TypeData> {
-        let type_index = self.type_index_by_def.get(&key)?;
-        Some(self.type_data(*type_index))
+        let type_addr = self.type_addr_by_def.get(&key)?;
+        Some(self.type_data(*type_addr))
     }
 }
 

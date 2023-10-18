@@ -5,7 +5,7 @@ use ontol_runtime::{
     interface::graphql::{
         argument::{ArgKind, DomainFieldArg, FieldArg},
         data::{
-            FieldKind, NativeScalarKind, Optionality, TypeIndex, TypeKind, TypeModifier, TypeRef,
+            FieldKind, NativeScalarKind, Optionality, TypeAddr, TypeKind, TypeModifier, TypeRef,
             UnitTypeRef,
         },
         schema::{QueryLevel, TypingPurpose},
@@ -46,14 +46,11 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         }
     }
 
-    pub fn get_fields(
-        &mut self,
-        type_index: TypeIndex,
-    ) -> Vec<juniper::meta::Field<'r, GqlScalar>> {
+    pub fn get_fields(&mut self, type_addr: TypeAddr) -> Vec<juniper::meta::Field<'r, GqlScalar>> {
         // This is part of a big recursive algorithm, so iterator mapping is avoided
         let mut fields = vec![];
 
-        let type_data = self.schema_ctx.schema.type_data(type_index);
+        let type_data = self.schema_ctx.schema.type_data(type_addr);
 
         if let TypeKind::Object(object) = &type_data.kind {
             for (name, field_data) in &object.fields {
@@ -242,13 +239,13 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             SerdeOperator::RelationSequence(seq_op) => {
                 match self
                     .schema_ctx
-                    .type_index_by_def(seq_op.def.def_id, QueryLevel::Edge { rel_params })
+                    .type_addr_by_def(seq_op.def.def_id, QueryLevel::Edge { rel_params })
                 {
-                    Some(type_index) => self.registry.arg::<Option<Vec<InputType>>>(
+                    Some(type_addr) => self.registry.arg::<Option<Vec<InputType>>>(
                         name,
                         &self
                             .schema_ctx
-                            .get_schema_type(type_index, TypingPurpose::InputOrReference),
+                            .get_schema_type(type_addr, TypingPurpose::InputOrReference),
                     ),
                     None => self.get_operator_argument(
                         name,
@@ -291,12 +288,12 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                     (QueryLevel::Node, TypingPurpose::Input)
                 };
 
-                let type_index = self
+                let type_addr = self
                     .schema_ctx
-                    .type_index_by_def(def_id, query_level)
+                    .type_addr_by_def(def_id, query_level)
                     .expect("No union found");
 
-                let info = self.schema_ctx.get_schema_type(type_index, typing_purpose);
+                let info = self.schema_ctx.get_schema_type(type_addr, typing_purpose);
 
                 match modifier.unit_optionality() {
                     Optionality::Mandatory => self.registry.arg::<InputType>(name, &info),
@@ -305,14 +302,14 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             }
             SerdeOperator::Struct(struct_op) => {
                 let def_id = struct_op.def.def_id;
-                let type_index = self
+                let type_addr = self
                     .schema_ctx
-                    .type_index_by_def(def_id, QueryLevel::Node)
+                    .type_addr_by_def(def_id, QueryLevel::Node)
                     .expect("No struct found");
 
                 let info = self
                     .schema_ctx
-                    .get_schema_type(type_index, TypingPurpose::Input);
+                    .get_schema_type(type_addr, TypingPurpose::Input);
 
                 match modifier.unit_optionality() {
                     Optionality::Mandatory => {
@@ -384,11 +381,11 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         argument: &dyn DomainFieldArg,
     ) -> juniper::meta::Argument<'r, GqlScalar> {
         match argument.kind() {
-            ArgKind::Indexed(type_index) => self.registry.arg::<InputType>(
+            ArgKind::Addr(type_addr) => self.registry.arg::<InputType>(
                 argument.name(),
                 &self
                     .schema_ctx
-                    .get_schema_type(type_index, argument.typing_purpose()),
+                    .get_schema_type(type_addr, argument.typing_purpose()),
             ),
             ArgKind::Operator(addr) => self.get_operator_argument(
                 argument.name(),
@@ -410,10 +407,10 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         I: juniper::GraphQLType<GqlScalar> + juniper::GraphQLType<GqlScalar, TypeInfo = SchemaType>,
     {
         match type_ref.unit {
-            UnitTypeRef::Indexed(type_index) => self.modified_type::<I>(
+            UnitTypeRef::Addr(type_addr) => self.modified_type::<I>(
                 &SchemaType {
                     schema_ctx: self.schema_ctx.clone(),
-                    type_index,
+                    type_addr,
                     typing_purpose,
                 },
                 type_ref.modifier,

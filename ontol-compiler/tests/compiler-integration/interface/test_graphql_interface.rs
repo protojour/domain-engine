@@ -59,7 +59,7 @@ fn test_graphql_i64_custom_scalar() {
         let prop_field = foo_object.fields.get("prop").unwrap();
         assert_matches!(prop_field.kind, FieldKind::Property(_));
 
-        let prop_type_data = schema.type_data(prop_field.field_type.unit.indexed());
+        let prop_type_data = schema.type_data(prop_field.field_type.unit.addr());
 
         expect_eq!(actual = prop_type_data.typename, expected = "_ontol_i64");
         let _i64_scalar_data = prop_type_data.custom_scalar();
@@ -149,7 +149,7 @@ fn test_graphql_artist_and_instrument() {
     let query_object = test.query_object_data();
 
     let artist_list_field = query_object.fields.get("artistList").unwrap();
-    let artist_connection = schema.type_data(artist_list_field.field_type.unit.indexed());
+    let artist_connection = schema.type_data(artist_list_field.field_type.unit.addr());
 
     expect_eq!(
         actual = artist_connection.typename,
@@ -157,12 +157,12 @@ fn test_graphql_artist_and_instrument() {
     );
 
     let edges_field = artist_connection.object_data().fields.get("edges").unwrap();
-    let artist_edge = schema.type_data(edges_field.field_type.unit.indexed());
+    let artist_edge = schema.type_data(edges_field.field_type.unit.addr());
 
     expect_eq!(actual = artist_edge.typename, expected = "artistEdge");
 
     let node_field = artist_edge.object_data().fields.get("node").unwrap();
-    let artist = schema.type_data(node_field.field_type.unit.indexed());
+    let artist = schema.type_data(node_field.field_type.unit.addr());
 
     expect_eq!(actual = artist.typename, expected = "artist");
     expect_eq!(

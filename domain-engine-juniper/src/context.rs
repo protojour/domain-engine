@@ -7,7 +7,7 @@ use std::sync::Arc;
 use domain_engine_core::DomainEngine;
 use ontol_runtime::{
     interface::graphql::{
-        data::{NativeScalarRef, TypeData, TypeIndex, TypeKind, UnitTypeRef},
+        data::{NativeScalarRef, TypeAddr, TypeData, TypeKind, UnitTypeRef},
         schema::{GraphqlSchema, QueryLevel, TypingPurpose},
     },
     ontology::Ontology,
@@ -57,12 +57,12 @@ impl SchemaCtx {
 
     pub fn get_schema_type(
         self: &Arc<Self>,
-        type_index: TypeIndex,
+        type_addr: TypeAddr,
         typing_purpose: TypingPurpose,
     ) -> SchemaType {
         SchemaType {
             schema_ctx: self.clone(),
-            type_index,
+            type_addr,
             typing_purpose,
         }
     }
@@ -72,10 +72,10 @@ impl SchemaCtx {
         type_ref: UnitTypeRef,
         typing_purpose: TypingPurpose,
     ) -> Result<SchemaType, NativeScalarRef> {
-        self.lookup_type_index(type_ref)
-            .map(|type_index| SchemaType {
+        self.lookup_type_by_addr(type_ref)
+            .map(|type_addr| SchemaType {
                 schema_ctx: self.clone(),
-                type_index,
+                type_addr,
                 typing_purpose,
             })
     }
@@ -88,25 +88,25 @@ impl SchemaCtx {
         self.get_schema_type(self.schema.mutation, TypingPurpose::Selection)
     }
 
-    pub fn type_data(&self, type_index: TypeIndex) -> &TypeData {
-        &self.schema.types[type_index.0 as usize]
+    pub fn type_data(&self, type_addr: TypeAddr) -> &TypeData {
+        &self.schema.types[type_addr.0 as usize]
     }
 
-    pub fn lookup_type_index(&self, type_ref: UnitTypeRef) -> Result<TypeIndex, NativeScalarRef> {
+    pub fn lookup_type_by_addr(&self, type_ref: UnitTypeRef) -> Result<TypeAddr, NativeScalarRef> {
         match type_ref {
-            UnitTypeRef::Indexed(type_index) => Ok(type_index),
+            UnitTypeRef::Addr(type_addr) => Ok(type_addr),
             UnitTypeRef::NativeScalar(scalar_ref) => Err(scalar_ref),
         }
     }
 
     pub fn lookup_type_data(&self, type_ref: UnitTypeRef) -> Result<&TypeData, NativeScalarRef> {
-        self.lookup_type_index(type_ref)
-            .map(|type_index| self.type_data(type_index))
+        self.lookup_type_by_addr(type_ref)
+            .map(|type_addr| self.type_data(type_addr))
     }
 
-    pub fn type_index_by_def(&self, def_id: DefId, query_level: QueryLevel) -> Option<TypeIndex> {
+    pub fn type_addr_by_def(&self, def_id: DefId, query_level: QueryLevel) -> Option<TypeAddr> {
         self.schema
-            .type_index_by_def
+            .type_addr_by_def
             .get(&(def_id, query_level))
             .cloned()
     }
@@ -116,12 +116,12 @@ impl SchemaCtx {
 ///
 /// i.e. it does not represent a NativeScalar, as that's not defined by the schema itself.
 ///
-/// SchemaType represents a type by using a TypeIndex and a TypingPurpose,
+/// SchemaType represents a type by using a TypeAddr and a TypingPurpose,
 /// and by looking up this in the SchemaCtx, finds metadata about the type that it represents.
 #[derive(Clone)]
 pub struct SchemaType {
     pub schema_ctx: Arc<SchemaCtx>,
-    pub type_index: TypeIndex,
+    pub type_addr: TypeAddr,
     pub typing_purpose: TypingPurpose,
 }
 
@@ -131,7 +131,7 @@ impl SchemaType {
     }
 
     pub fn type_data(&self) -> &TypeData {
-        self.schema_ctx.schema.type_data(self.type_index)
+        self.schema_ctx.schema.type_data(self.type_addr)
     }
 
     pub fn typename(&self) -> &str {

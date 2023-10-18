@@ -11,7 +11,7 @@ use crate::{
 use super::argument::{self};
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
-pub struct TypeIndex(pub u32);
+pub struct TypeAddr(pub u32);
 
 #[derive(Clone, Copy, Default, Serialize, Deserialize, Debug)]
 pub enum Optionality {
@@ -51,7 +51,7 @@ impl TypeModifier {
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub enum UnitTypeRef {
-    Indexed(TypeIndex),
+    Addr(TypeAddr),
     NativeScalar(NativeScalarRef),
 }
 
@@ -176,7 +176,7 @@ pub struct NodeData {
 #[derive(Serialize, Deserialize)]
 pub struct UnionData {
     pub union_def_id: DefId,
-    pub variants: Vec<TypeIndex>,
+    pub variants: Vec<TypeAddr>,
     pub operator_addr: SerdeOperatorAddr,
 }
 
@@ -250,7 +250,7 @@ pub struct IdPropertyData {
 }
 
 pub struct EntityData {
-    pub type_index: TypeIndex,
+    pub type_addr: TypeAddr,
     pub node_def_id: DefId,
     pub id_def_id: DefId,
 }

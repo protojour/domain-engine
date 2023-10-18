@@ -10,8 +10,8 @@ use ontol_runtime::{
             argument,
             data::{
                 EdgeData, EntityData, FieldData, FieldKind, NativeScalarKind, NativeScalarRef,
-                NodeData, ObjectData, ObjectKind, Optionality, PropertyData, ScalarData, TypeData,
-                TypeIndex, TypeKind, TypeModifier, TypeRef, UnionData, UnitTypeRef,
+                NodeData, ObjectData, ObjectKind, Optionality, PropertyData, ScalarData, TypeAddr,
+                TypeData, TypeKind, TypeModifier, TypeRef, UnionData, UnitTypeRef,
             },
             schema::{GraphqlSchema, QueryLevel, TypingPurpose},
         },
@@ -59,12 +59,12 @@ pub fn generate_graphql_schema<'c>(
 
     let mut schema = GraphqlSchema {
         package_id,
-        query: TypeIndex(0),
-        mutation: TypeIndex(0),
+        query: TypeAddr(0),
+        mutation: TypeAddr(0),
         i64_custom_scalar: None,
-        json_scalar: TypeIndex(0),
+        json_scalar: TypeAddr(0),
         types: Vec::with_capacity(domain.type_names.len()),
-        type_index_by_def: FnvHashMap::with_capacity_and_hasher(
+        type_addr_by_def: FnvHashMap::with_capacity_and_hasher(
             domain.type_names.len(),
             Default::default(),
         ),
@@ -132,8 +132,8 @@ pub fn generate_graphql_schema<'c>(
 }
 
 fn entity_check(schema: &GraphqlSchema, type_ref: UnitTypeRef) -> Option<EntityData> {
-    if let UnitTypeRef::Indexed(type_index) = type_ref {
-        let type_data = &schema.type_data(type_index);
+    if let UnitTypeRef::Addr(type_addr) = type_ref {
+        let type_data = &schema.type_data(type_addr);
 
         if let TypeData {
             kind:
@@ -150,7 +150,7 @@ fn entity_check(schema: &GraphqlSchema, type_ref: UnitTypeRef) -> Option<EntityD
         } = type_data
         {
             Some(EntityData {
-                type_index,
+                type_addr,
                 node_def_id: *node_def_id,
                 id_def_id: *id_def_id,
             })
@@ -183,7 +183,7 @@ struct Builder<'a, 's, 'c, 'm> {
 
 enum LazyTask {
     HarvestFields {
-        type_index: TypeIndex,
+        type_addr: TypeAddr,
         def_id: DefId,
         property_field_producer: PropertyFieldProducer,
         is_entrypoint: bool,
@@ -191,7 +191,7 @@ enum LazyTask {
 }
 
 enum NewType {
-    Indexed(TypeIndex, TypeData),
+    Addr(TypeAddr, TypeData),
     NativeScalar(NativeScalarRef),
 }
 
@@ -199,7 +199,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
     fn exec_lazy_task(&mut self, task: LazyTask) {
         match task {
             LazyTask::HarvestFields {
-                type_index,
+                type_addr,
                 def_id,
                 property_field_producer,
                 is_entrypoint,
@@ -209,14 +209,14 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 };
                 let mut fields = Default::default();
 
-                trace!("Harvest fields for {def_id:?} / {type_index:?}");
+                trace!("Harvest fields for {def_id:?} / {type_addr:?}");
 
                 if is_entrypoint {
                     let repr_kind = self.seal_ctx.get_repr_kind(&def_id).expect("NO REPR KIND");
                     if let ReprKind::StructIntersection(members) = repr_kind {
                         for (member_def_id, _) in members {
                             self.lazy_tasks.push(LazyTask::HarvestFields {
-                                type_index,
+                                type_addr,
                                 def_id: *member_def_id,
                                 property_field_producer,
                                 is_entrypoint: false,
@@ -232,7 +232,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                     &mut GraphqlNamespace::default(),
                 );
 
-                match &mut self.schema.types[type_index.0 as usize].kind {
+                match &mut self.schema.types[type_addr.0 as usize].kind {
                     TypeKind::Object(object_data) => {
                         object_data.fields.extend(fields);
                     }
@@ -243,7 +243,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
     }
 
     fn register_json_scalar(&mut self) {
-        let index = self.next_type_index();
+        let index = self.next_type_addr();
         self.schema.types.push(TypeData {
             typename: "_ontol_json".into(),
             input_typename: None,
@@ -256,7 +256,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
     }
 
     fn register_query(&mut self) {
-        let index = self.next_type_index();
+        let index = self.next_type_addr();
         self.schema.types.push(TypeData {
             typename: "Query".into(),
             input_typename: None,
@@ -270,7 +270,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
     }
 
     pub fn register_mutation(&mut self) {
-        let index = self.next_type_index();
+        let index = self.next_type_addr();
         self.schema.types.push(TypeData {
             typename: "Mutation".into(),
             input_typename: None,
@@ -284,29 +284,29 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
     }
 
     pub fn get_def_type_ref(&mut self, def_id: DefId, level: QLevel) -> UnitTypeRef {
-        if let Some(type_index) = self
+        if let Some(type_addr) = self
             .schema
-            .type_index_by_def
+            .type_addr_by_def
             .get(&(def_id, level.as_query_level()))
         {
-            return UnitTypeRef::Indexed(*type_index);
+            return UnitTypeRef::Addr(*type_addr);
         }
 
         match self.make_def_type(def_id, level) {
-            NewType::Indexed(type_index, type_data) => {
-                self.schema.types[type_index.0 as usize] = type_data;
-                UnitTypeRef::Indexed(type_index)
+            NewType::Addr(type_addr, type_data) => {
+                self.schema.types[type_addr.0 as usize] = type_data;
+                UnitTypeRef::Addr(type_addr)
             }
             NewType::NativeScalar(scalar_ref) => UnitTypeRef::NativeScalar(scalar_ref),
         }
     }
 
-    fn next_type_index(&self) -> TypeIndex {
-        TypeIndex(self.schema.types.len() as u32)
+    fn next_type_addr(&self) -> TypeAddr {
+        TypeAddr(self.schema.types.len() as u32)
     }
 
-    fn alloc_def_type_index(&mut self, def_id: DefId, level: QLevel) -> TypeIndex {
-        let index = self.next_type_index();
+    fn alloc_def_type_addr(&mut self, def_id: DefId, level: QLevel) -> TypeAddr {
+        let index = self.next_type_addr();
         // note: this will be overwritten later
         self.schema.types.push(TypeData {
             typename: String::new(),
@@ -317,7 +317,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
             }),
         });
         self.schema
-            .type_index_by_def
+            .type_addr_by_def
             .insert((def_id, level.as_query_level()), index);
         index
     }
@@ -327,7 +327,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
             QLevel::Node => self.make_node_type(def_id),
             QLevel::Edge { rel_params } => {
                 let type_info = self.partial_ontology.get_type_info(def_id);
-                let edge_index = self.alloc_def_type_index(def_id, level);
+                let edge_addr = self.alloc_def_type_addr(def_id, level);
                 let node_ref = self.get_def_type_ref(def_id, QLevel::Node);
 
                 let mut field_namespace = GraphqlNamespace::default();
@@ -354,14 +354,14 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                     let typename = self.namespace.edge(Some(rel_type_info), type_info);
 
                     self.lazy_tasks.push(LazyTask::HarvestFields {
-                        type_index: edge_index,
+                        type_addr: edge_addr,
                         def_id: rel_def_id,
                         property_field_producer: PropertyFieldProducer::EdgeProperty,
                         is_entrypoint: true,
                     });
 
-                    NewType::Indexed(
-                        edge_index,
+                    NewType::Addr(
+                        edge_addr,
                         TypeData {
                             typename,
                             input_typename: Some(
@@ -378,8 +378,8 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                         },
                     )
                 } else {
-                    NewType::Indexed(
-                        edge_index,
+                    NewType::Addr(
+                        edge_addr,
                         TypeData {
                             typename: self.namespace.edge(None, type_info),
                             input_typename: Some(self.namespace.edge_input(None, type_info)),
@@ -397,10 +397,10 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
             }
             QLevel::Connection { rel_params } => {
                 let type_info = self.partial_ontology.get_type_info(def_id);
-                let connection_index = self.alloc_def_type_index(def_id, level);
+                let connection_index = self.alloc_def_type_addr(def_id, level);
                 let edge_ref = self.get_def_type_ref(def_id, QLevel::Edge { rel_params });
 
-                NewType::Indexed(
+                NewType::Addr(
                     connection_index,
                     TypeData {
                         typename: self.namespace.connection(type_info),
@@ -440,7 +440,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
         match repr_kind {
             ReprKind::Unit | ReprKind::Struct | ReprKind::StructIntersection(_) => {
                 let type_info = self.partial_ontology.get_type_info(def_id);
-                let type_index = self.alloc_def_type_index(def_id, QLevel::Node);
+                let type_addr = self.alloc_def_type_addr(def_id, QLevel::Node);
 
                 let operator_addr = self
                     .serde_generator
@@ -448,7 +448,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                     .unwrap();
 
                 self.lazy_tasks.push(LazyTask::HarvestFields {
-                    type_index,
+                    type_addr,
                     def_id: type_info.def_id,
                     property_field_producer: PropertyFieldProducer::Property,
                     is_entrypoint: true,
@@ -466,8 +466,8 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                     }),
                 });
 
-                NewType::Indexed(
-                    type_index,
+                NewType::Addr(
+                    type_addr,
                     TypeData {
                         typename: self.namespace.typename(type_info),
                         input_typename: Some(self.namespace.input(type_info)),
@@ -478,7 +478,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
             }
             ReprKind::Union(variants) | ReprKind::StructUnion(variants) => {
                 let type_info = self.partial_ontology.get_type_info(def_id);
-                let node_index = self.alloc_def_type_index(def_id, QLevel::Node);
+                let node_index = self.alloc_def_type_addr(def_id, QLevel::Node);
 
                 let mut needs_scalar = false;
                 let mut type_variants = vec![];
@@ -490,8 +490,8 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                             break;
                         }
                         _ => match self.get_def_type_ref(*variant_def_id, QLevel::Node) {
-                            UnitTypeRef::Indexed(type_index) => {
-                                type_variants.push(type_index);
+                            UnitTypeRef::Addr(type_addr) => {
+                                type_variants.push(type_addr);
                             }
                             UnitTypeRef::NativeScalar(_) => {
                                 needs_scalar = true;
@@ -506,7 +506,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                     .gen_addr(gql_serde_key(def_id))
                     .unwrap();
 
-                NewType::Indexed(
+                NewType::Addr(
                     node_index,
                     TypeData {
                         typename: self.namespace.typename(type_info),
@@ -530,10 +530,10 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                     .serde_generator
                     .gen_addr(gql_serde_key(def_id))
                     .unwrap();
-                let type_index = self.alloc_def_type_index(def_id, QLevel::Node);
+                let type_addr = self.alloc_def_type_addr(def_id, QLevel::Node);
 
-                NewType::Indexed(
-                    type_index,
+                NewType::Addr(
+                    type_addr,
                     TypeData {
                         typename: self.namespace.typename(type_info),
                         input_typename: Some(self.namespace.input(type_info)),
@@ -553,10 +553,10 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                     })
                 } else {
                     let type_info = self.partial_ontology.get_type_info(def_id);
-                    let type_index = self.alloc_def_type_index(type_info.def_id, QLevel::Node);
-                    self.schema.i64_custom_scalar = Some(type_index);
-                    NewType::Indexed(
-                        type_index,
+                    let type_addr = self.alloc_def_type_addr(type_info.def_id, QLevel::Node);
+                    self.schema.i64_custom_scalar = Some(type_addr);
+                    NewType::Addr(
+                        type_addr,
                         TypeData {
                             // FIXME: Must make sure that domain typenames take precedence over generated ones
                             typename: smart_format!("_ontol_i64"),
@@ -835,7 +835,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
     pub fn add_entity_queries_and_mutations(&mut self, entity_data: EntityData) {
         let type_info = self.partial_ontology.get_type_info(entity_data.node_def_id);
 
-        let node_ref = UnitTypeRef::Indexed(entity_data.type_index);
+        let node_ref = UnitTypeRef::Addr(entity_data.type_addr);
         let connection_ref = self.get_def_type_ref(
             entity_data.node_def_id,
             QLevel::Connection { rel_params: None },
@@ -873,7 +873,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 FieldData {
                     kind: FieldKind::CreateMutation {
                         input: argument::Input {
-                            type_index: entity_data.type_index,
+                            type_addr: entity_data.type_addr,
                             def_id: entity_data.node_def_id,
                             operator_addr: entity_operator_addr,
                             typing_purpose: TypingPurpose::Input,
@@ -888,7 +888,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 FieldData {
                     kind: FieldKind::UpdateMutation {
                         input: argument::Input {
-                            type_index: entity_data.type_index,
+                            type_addr: entity_data.type_addr,
                             def_id: entity_data.node_def_id,
                             operator_addr: entity_operator_addr,
                             typing_purpose: TypingPurpose::PartialInput,
@@ -921,7 +921,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
     }
 }
 
-pub(super) fn object_data_mut(index: TypeIndex, schema: &mut GraphqlSchema) -> &mut ObjectData {
+pub(super) fn object_data_mut(index: TypeAddr, schema: &mut GraphqlSchema) -> &mut ObjectData {
     let type_data = schema.types.get_mut(index.0 as usize).unwrap();
     match &mut type_data.kind {
         TypeKind::Object(object_data) => object_data,

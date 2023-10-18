@@ -3,12 +3,12 @@ use serde::{Deserialize, Serialize};
 use crate::{interface::serde::operator::SerdeOperatorAddr, DefId};
 
 use super::{
-    data::{TypeIndex, UnitTypeRef},
+    data::{TypeAddr, UnitTypeRef},
     schema::TypingPurpose,
 };
 
 pub enum ArgKind {
-    Indexed(TypeIndex),
+    Addr(TypeAddr),
     Operator(SerdeOperatorAddr),
 }
 
@@ -28,7 +28,7 @@ pub trait DomainFieldArg: FieldArg {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Input {
-    pub type_index: TypeIndex,
+    pub type_addr: TypeAddr,
     pub def_id: DefId,
     pub operator_addr: SerdeOperatorAddr,
     pub typing_purpose: TypingPurpose,
@@ -50,7 +50,7 @@ impl DomainFieldArg for Input {
     }
 
     fn kind(&self) -> ArgKind {
-        ArgKind::Indexed(self.type_index)
+        ArgKind::Addr(self.type_addr)
     }
 }
 
@@ -73,7 +73,7 @@ impl DomainFieldArg for Id {
 
     fn kind(&self) -> ArgKind {
         match &self.unit_type_ref {
-            UnitTypeRef::Indexed(type_index) => ArgKind::Indexed(*type_index),
+            UnitTypeRef::Addr(type_addr) => ArgKind::Addr(*type_addr),
             UnitTypeRef::NativeScalar(_) => ArgKind::Operator(self.operator_addr),
         }
     }

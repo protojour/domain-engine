@@ -4,8 +4,8 @@ use juniper::graphql_value;
 use ontol_runtime::{
     interface::graphql::{
         data::{
-            FieldKind, ObjectData, ObjectKind, TypeData, TypeIndex, TypeKind, TypeModifier,
-            TypeRef, UnionData,
+            FieldKind, ObjectData, ObjectKind, TypeAddr, TypeData, TypeKind, TypeModifier, TypeRef,
+            UnionData,
         },
         schema::TypingPurpose,
     },
@@ -70,11 +70,11 @@ impl<'v> ::juniper::GraphQLValue<GqlScalar> for AttributeType<'v> {
     ) -> juniper::ExecutionResult<GqlScalar> {
         match &info.type_data().kind {
             TypeKind::Union(union_data) => {
-                let (variant_type_index, _) = self.find_union_variant(union_data, &info.schema_ctx);
+                let (variant_type_addr, _) = self.find_union_variant(union_data, &info.schema_ctx);
                 self.resolve(
                     &info
                         .schema_ctx
-                        .get_schema_type(variant_type_index, TypingPurpose::Selection),
+                        .get_schema_type(variant_type_addr, TypingPurpose::Selection),
                     selection_set,
                     executor,
                 )
@@ -117,7 +117,7 @@ impl<'v> juniper::GraphQLType<GqlScalar> for AttributeType<'v> {
         let mut reg = RegistryCtx::new(&info.schema_ctx, registry);
         match &info.type_data().kind {
             TypeKind::Object(_) => {
-                let fields = reg.get_fields(info.type_index);
+                let fields = reg.get_fields(info.type_addr);
                 let mut builder = registry.build_object_type::<Self>(info, &fields);
                 if let Some(description) = info.description() {
                     builder = builder.description(&description);
@@ -128,10 +128,10 @@ impl<'v> juniper::GraphQLType<GqlScalar> for AttributeType<'v> {
                 let types: Vec<_> = union_data
                     .variants
                     .iter()
-                    .map(|type_index| {
+                    .map(|type_addr| {
                         reg.registry.get_type::<AttributeType>(&SchemaType {
                             schema_ctx: info.schema_ctx.clone(),
-                            type_index: *type_index,
+                            type_addr: *type_addr,
                             typing_purpose: TypingPurpose::Selection,
                         })
                     })
@@ -176,16 +176,16 @@ impl<'v> AttributeType<'v> {
         &self,
         union_data: &'s UnionData,
         ctx: &'s SchemaCtx,
-    ) -> (TypeIndex, &'s TypeData) {
-        for variant_type_index in &union_data.variants {
-            let variant_type_data = ctx.schema.type_data(*variant_type_index);
+    ) -> (TypeAddr, &'s TypeData) {
+        for variant_type_addr in &union_data.variants {
+            let variant_type_data = ctx.schema.type_data(*variant_type_addr);
             match &variant_type_data.kind {
                 TypeKind::Object(ObjectData {
                     kind: ObjectKind::Node(node_data),
                     ..
                 }) => {
                     if node_data.def_id == self.attr.value.type_def_id {
-                        return (*variant_type_index, variant_type_data);
+                        return (*variant_type_addr, variant_type_data);
                     }
                 }
                 _ => panic!("Unsupported union variant"),
@@ -300,10 +300,10 @@ impl<'v> AttributeType<'v> {
             }
         };
 
-        match schema_ctx.lookup_type_index(type_ref.unit) {
-            Ok(type_index) => {
-                let type_info = schema_ctx.get_schema_type(type_index, TypingPurpose::Selection);
-                match &schema_ctx.type_data(type_info.type_index).kind {
+        match schema_ctx.lookup_type_by_addr(type_ref.unit) {
+            Ok(type_addr) => {
+                let type_info = schema_ctx.get_schema_type(type_addr, TypingPurpose::Selection);
+                match &schema_ctx.type_data(type_info.type_addr).kind {
                     TypeKind::CustomScalar(scalar_data) => {
                         let gql_scalar = schema_ctx
                             .ontology

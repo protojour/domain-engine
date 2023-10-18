@@ -19,7 +19,7 @@ pub mod serde {
 
 pub mod graphql {
     use ontol_runtime::interface::graphql::data::{
-        NativeScalarRef, NodeData, ObjectData, ObjectKind, ScalarData, TypeData, TypeIndex,
+        NativeScalarRef, NodeData, ObjectData, ObjectKind, ScalarData, TypeAddr, TypeData,
         TypeKind, UnitTypeRef,
     };
 
@@ -33,7 +33,7 @@ pub mod graphql {
     }
 
     pub trait UnitTypeRefExt {
-        fn indexed(&self) -> TypeIndex;
+        fn addr(&self) -> TypeAddr;
         fn native_scalar(&self) -> &NativeScalarRef;
     }
 
@@ -66,11 +66,11 @@ pub mod graphql {
 
     impl UnitTypeRefExt for UnitTypeRef {
         #[track_caller]
-        fn indexed(&self) -> TypeIndex {
-            let UnitTypeRef::Indexed(index) = self else {
-                panic!("not an indexed type: {self:?}");
+        fn addr(&self) -> TypeAddr {
+            let UnitTypeRef::Addr(type_addr) = self else {
+                panic!("not an addressed type: {self:?}");
             };
-            *index
+            *type_addr
         }
 
         #[track_caller]

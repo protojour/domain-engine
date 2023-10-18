@@ -33,7 +33,7 @@ impl juniper::GraphQLType<GqlScalar> for QueryType {
         GqlScalar: 'r,
     {
         let mut reg = RegistryCtx::new(&info.schema_ctx, registry);
-        let fields = reg.get_fields(info.type_index);
+        let fields = reg.get_fields(info.type_addr);
 
         registry
             .build_object_type::<Self>(info, &fields)
