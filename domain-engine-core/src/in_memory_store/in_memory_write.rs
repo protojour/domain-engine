@@ -3,23 +3,21 @@ use std::collections::BTreeMap;
 use ontol_runtime::{
     condition::Condition,
     interface::serde::{
-        operator::{AliasOperator, SerdeOperator, SerdeOperatorId},
+        operator::SerdeOperatorId,
         processor::{ProcessorLevel, ProcessorMode},
     },
     ontology::{DataRelationshipInfo, DataRelationshipKind, Ontology, ValueCardinality},
     select::{EntitySelect, Select, StructOrUnionSelect},
     smart_format,
-    text_like_types::TextLikeType,
     value::{Attribute, Data, PropertyId, Value, ValueDebug},
     value_generator::ValueGenerator,
     Role,
 };
 use smartstring::alias::String;
 use tracing::debug;
-use uuid::Uuid;
 
 use crate::{
-    entity_id_utils::{analyze_text_pattern, find_inherent_entity_id},
+    entity_id_utils::{find_inherent_entity_id, try_generate_entity_id, GeneratedId},
     in_memory_store::in_memory_core::Edge,
     DomainEngine, DomainError, DomainResult,
 };
@@ -253,58 +251,13 @@ impl InMemoryStore {
         id_operator_id: SerdeOperatorId,
         value_generator: ValueGenerator,
     ) -> DomainResult<Value> {
-        match (ontology.get_serde_operator(id_operator_id), value_generator) {
-            (SerdeOperator::String(def_id), ValueGenerator::UuidV4) => {
-                let string = smart_format!("{}", Uuid::new_v4());
-                Ok(Value::new(Data::Text(string), *def_id))
-            }
-            (SerdeOperator::TextPattern(def_id), _) => {
-                match (ontology.get_text_like_type(*def_id), value_generator) {
-                    (Some(TextLikeType::Uuid), ValueGenerator::UuidV4) => Ok(Value::new(
-                        Data::OctetSequence(Uuid::new_v4().as_bytes().iter().cloned().collect()),
-                        *def_id,
-                    )),
-                    _ => Err(DomainError::TypeCannotBeUsedForIdGeneration),
-                }
-            }
-            (SerdeOperator::CapturingTextPattern(def_id), _) => {
-                if let Some(property) =
-                    analyze_text_pattern(ontology.get_text_pattern(*def_id).unwrap())
-                {
-                    let type_info = ontology.get_type_info(property.type_def_id);
-                    let id = self.generate_entity_id(
-                        ontology,
-                        type_info.operator_id.unwrap(),
-                        value_generator,
-                    )?;
-
-                    Ok(Value::new(
-                        Data::Struct(BTreeMap::from([(property.property_id, id.into())])),
-                        *def_id,
-                    ))
-                } else {
-                    Err(DomainError::TypeCannotBeUsedForIdGeneration)
-                }
-            }
-            (SerdeOperator::I64(def_id, _), ValueGenerator::Autoincrement) => {
+        match try_generate_entity_id(ontology, id_operator_id, value_generator)? {
+            GeneratedId::Generated(value) => Ok(value),
+            GeneratedId::AutoIncrementI64(def_id) => {
                 let id_value = self.int_id_counter;
                 self.int_id_counter += 1;
-                Ok(Value::new(Data::I64(id_value), *def_id))
+                Ok(Value::new(Data::I64(id_value), def_id))
             }
-            (
-                SerdeOperator::Alias(AliasOperator {
-                    def,
-                    inner_operator_id,
-                    ..
-                }),
-                _,
-            ) => {
-                let mut value =
-                    self.generate_entity_id(ontology, *inner_operator_id, value_generator)?;
-                value.type_def_id = def.def_id;
-                Ok(value)
-            }
-            _ => Err(DomainError::TypeCannotBeUsedForIdGeneration),
         }
     }
 }
