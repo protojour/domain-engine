@@ -11,7 +11,7 @@ use unimock::{unimock, Unimock};
 
 use crate::{
     expect_eq,
-    serde_utils::{inspect_de, inspect_ser},
+    serde_utils::{raw_de, raw_ser},
     type_binding::TypeBinding,
     OntolTest,
 };
@@ -95,8 +95,8 @@ impl<'on> TestMapper<'on> {
         let value = self.domain_map((from.clone(), to.clone()), input);
         let [output_binding] = self.test.bind([to.typename()]);
         let output_json = match &to {
-            Key::Unit(_) => inspect_ser(&output_binding).json(&value),
-            Key::Seq(_) => inspect_ser(&output_binding).dynamic_sequence_json(&value),
+            Key::Unit(_) => raw_ser(&output_binding).json(&value),
+            Key::Seq(_) => raw_ser(&output_binding).dynamic_sequence_json(&value),
         };
 
         expect_eq!(actual = output_json, expected = expected);
@@ -123,16 +123,16 @@ impl<'on> TestMapper<'on> {
             Some(procedure) => procedure,
             None => panic!("named map not found"),
         };
-        let param = inspect_de(&input_binding).value(input).unwrap();
+        let param = raw_de(&input_binding).value(input).unwrap();
         let value = self.run_vm(procedure, param);
 
         // The resulting value must have the runtime def_id of the requested to_key.
         expect_eq!(actual = value.type_def_id, expected = key[1].def_id);
 
         let output_json = if key[1].seq {
-            inspect_ser(&output_binding).dynamic_sequence_json(&value)
+            raw_ser(&output_binding).dynamic_sequence_json(&value)
         } else {
-            inspect_ser(&output_binding).json(&value)
+            raw_ser(&output_binding).json(&value)
         };
 
         expect_eq!(actual = output_json, expected = expected);
@@ -149,7 +149,7 @@ impl<'on> TestMapper<'on> {
         let to = to.as_key();
 
         let [input_binding, output_binding] = self.test.bind([from.typename(), to.typename()]);
-        let param = inspect_de(&input_binding).value(input).unwrap();
+        let param = raw_de(&input_binding).value(input).unwrap();
 
         fn get_map_key(key: &Key, binding: &TypeBinding) -> MapKey {
             let seq = matches!(key, Key::Seq(_));

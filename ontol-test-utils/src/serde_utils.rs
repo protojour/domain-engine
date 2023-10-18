@@ -142,11 +142,11 @@ pub fn read_de<'b, 'on>(binding: &'b TypeBinding<'on>) -> Deserializer<'b, 'on> 
     }
 }
 
-/// Make a deserializer for the `Inspect` processor mode
-pub fn inspect_de<'b, 'on>(binding: &'b TypeBinding<'on>) -> Deserializer<'b, 'on> {
+/// Make a deserializer for the `Raw` processor mode
+pub fn raw_de<'b, 'on>(binding: &'b TypeBinding<'on>) -> Deserializer<'b, 'on> {
     Deserializer {
         binding,
-        mode: ProcessorMode::Inspect,
+        mode: ProcessorMode::Raw,
         level: ProcessorLevel::new_root(),
     }
 }
@@ -169,11 +169,11 @@ pub fn read_ser<'b, 'on>(binding: &'b TypeBinding<'on>) -> Serializer<'b, 'on> {
     }
 }
 
-/// Make a serializer for the `Inspect` processor mode
-pub fn inspect_ser<'b, 'on>(binding: &'b TypeBinding<'on>) -> Serializer<'b, 'on> {
+/// Make a serializer for the `Raw` processor mode
+pub fn raw_ser<'b, 'on>(binding: &'b TypeBinding<'on>) -> Serializer<'b, 'on> {
     Serializer {
         binding,
-        mode: ProcessorMode::Inspect,
+        mode: ProcessorMode::Raw,
         level: ProcessorLevel::new_root(),
     }
 }
