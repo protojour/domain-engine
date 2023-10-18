@@ -65,7 +65,7 @@ struct PlanBuilder<'on> {
     current_join_roots: FnvHashMap<Var, DefId>,
 }
 
-pub fn compute_plans(
+pub fn compute_filter_plan(
     condition: &Condition<CondTerm>,
     ontology: &Ontology,
 ) -> PlanResult<Vec<Plan>> {
@@ -319,7 +319,7 @@ mod tests {
 
             use CondTerm::*;
 
-            let plan = compute_plans(
+            let plan = compute_filter_plan(
                 &Condition {
                     clauses: vec![
                         Clause::Root(var("a")),
@@ -380,7 +380,7 @@ mod tests {
 
             use CondTerm::*;
 
-            let plan = compute_plans(
+            let plan = compute_filter_plan(
                 &Condition {
                     clauses: vec![
                         Clause::Root(var("a")),

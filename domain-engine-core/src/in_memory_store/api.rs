@@ -11,7 +11,7 @@ use crate::data_store::DataStoreAPI;
 use crate::domain_engine::DomainEngine;
 use crate::domain_error::DomainResult;
 
-use super::store::{DynamicKey, EdgeCollection, EntityTable, InMemoryStore};
+use super::in_memory_core::{DynamicKey, EdgeCollection, EntityTable, InMemoryStore};
 
 #[derive(Debug)]
 pub struct InMemoryDb {
@@ -24,14 +24,14 @@ pub struct InMemoryDb {
 impl DataStoreAPI for InMemoryDb {
     async fn query(
         &self,
-        engine: &DomainEngine,
         query: EntitySelect,
+        engine: &DomainEngine,
     ) -> DomainResult<Vec<Attribute>> {
         Ok(self
             .store
             .read()
             .await
-            .query_entities(engine, &query)?
+            .query_entities(&query, engine)?
             .into_iter()
             .map(Into::into)
             .collect())
@@ -39,14 +39,14 @@ impl DataStoreAPI for InMemoryDb {
 
     async fn store_new_entity(
         &self,
-        engine: &DomainEngine,
         entity: Value,
         query: Select,
+        engine: &DomainEngine,
     ) -> DomainResult<Value> {
         self.store
             .write()
             .await
-            .write_new_entity(engine, entity, query)
+            .write_new_entity(entity, query, engine)
     }
 }
 

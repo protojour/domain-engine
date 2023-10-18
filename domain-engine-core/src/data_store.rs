@@ -34,15 +34,15 @@ impl DataStore {
 pub trait DataStoreAPI {
     async fn query(
         &self,
-        engine: &DomainEngine,
         select: EntitySelect,
+        engine: &DomainEngine,
     ) -> DomainResult<Vec<Attribute>>;
 
     async fn store_new_entity(
         &self,
-        engine: &DomainEngine,
         entity: Value,
         select: Select,
+        engine: &DomainEngine,
     ) -> DomainResult<Value>;
 }
 

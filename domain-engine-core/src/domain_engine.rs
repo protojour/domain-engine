@@ -119,7 +119,7 @@ impl DomainEngine {
             ontology.get_type_info(cur_def_id)
         );
 
-        let mut edges = data_store.api().query(self, select).await?;
+        let mut edges = data_store.api().query(select, self).await?;
 
         if resolve_path.is_empty() {
             return Ok(edges);
@@ -162,7 +162,7 @@ impl DomainEngine {
 
         self.get_data_store()?
             .api()
-            .store_new_entity(self, entity, select)
+            .store_new_entity(entity, select, self)
             .await
     }
 
@@ -233,7 +233,7 @@ impl DomainEngine {
             _ => todo!("Basically apply the same operation as above, but refactor"),
         }
 
-        let edges = data_store.api().query(self, entity_query.select).await?;
+        let edges = data_store.api().query(entity_query.select, self).await?;
 
         debug!("Cardinality: {:?}", entity_query.cardinality);
 
