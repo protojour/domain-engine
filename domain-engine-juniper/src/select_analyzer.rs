@@ -60,12 +60,12 @@ impl<'a> SelectAnalyzer<'a> {
         match &field_data.kind {
             FieldKind::Map {
                 key,
-                input_operator_id,
+                input_operator_addr,
                 scalar_input_name,
                 queries: map_queries,
             } => {
                 let input = ArgsWrapper::new(look_ahead.arguments()).domain_deserialize(
-                    *input_operator_id,
+                    *input_operator_addr,
                     scalar_input_name.as_deref(),
                     TypingPurpose::Selection,
                     &self.schema_ctx.ontology,

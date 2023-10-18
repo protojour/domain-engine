@@ -51,7 +51,7 @@ impl<'b, 'on> Deserializer<'b, 'on> {
             .binding
             .ontology()
             .new_serde_processor(
-                self.binding.serde_operator_id(),
+                self.binding.serde_operator_addr(),
                 self.mode,
                 self.level,
                 &DOMAIN_PROFILE,
@@ -116,9 +116,9 @@ impl<'b, 'on> Serializer<'b, 'on> {
             .ontology()
             .new_serde_processor(
                 if dynamic_seq {
-                    self.binding.ontology().dynamic_sequence_operator_id()
+                    self.binding.ontology().dynamic_sequence_operator_addr()
                 } else {
-                    self.binding.serde_operator_id()
+                    self.binding.serde_operator_addr()
                 },
                 self.mode,
                 self.level,

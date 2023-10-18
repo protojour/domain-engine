@@ -60,11 +60,11 @@ struct FakeGenerator<'a, R: Rng> {
 impl<'a, R: Rng> FakeGenerator<'a, R> {
     pub fn fake_value(&mut self, def_id: DefId) -> Result<Value, Error> {
         let type_info = self.ontology.get_type_info(def_id);
-        let operator_id = type_info.operator_id.ok_or(Error::NoSerializationInfo)?;
+        let addr = type_info.operator_addr.ok_or(Error::NoSerializationInfo)?;
 
         Ok(self
             .fake_attribute(self.ontology.new_serde_processor(
-                operator_id,
+                addr,
                 self.processor_mode,
                 ProcessorLevel::new_root_with_recursion_limit(32),
                 &DOMAIN_PROFILE,
@@ -163,7 +163,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                     Ok(Value::new(Data::Sequence(vec![]), seq_op.def.def_id).into())
                 } else {
                     let variant = &seq_op.ranges[0];
-                    let attr = self.fake_attribute(processor.narrow(variant.operator_id))?;
+                    let attr = self.fake_attribute(processor.narrow(variant.addr))?;
 
                     Ok(Value::new(Data::Sequence([attr].into()), seq_op.def.def_id).into())
                 }
@@ -174,17 +174,17 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                 for range in &seq_op.ranges {
                     if let Some(rep) = range.finite_repetition {
                         for _ in 0..(rep as usize) {
-                            seq.push(self.fake_attribute(processor.new_child(range.operator_id)?)?);
+                            seq.push(self.fake_attribute(processor.new_child(range.addr)?)?);
                         }
                     } else {
-                        seq.push(self.fake_attribute(processor.new_child(range.operator_id)?)?);
+                        seq.push(self.fake_attribute(processor.new_child(range.addr)?)?);
                     }
                 }
 
                 Value::new(Data::Sequence(seq), seq_op.def.def_id)
             }
             SerdeOperator::Alias(alias_op) => {
-                return self.fake_attribute(processor.narrow(alias_op.inner_operator_id));
+                return self.fake_attribute(processor.narrow(alias_op.inner_addr));
             }
             SerdeOperator::Union(union_op) => {
                 return match union_op.variants(self.processor_mode, processor.level()) {
@@ -193,28 +193,26 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                         let index: usize = self.rng.gen_range(0..variants.len());
                         let variant = &variants[index];
 
-                        self.fake_attribute(processor.narrow(variant.operator_id))
+                        self.fake_attribute(processor.narrow(variant.addr))
                     }
                 }
             }
             SerdeOperator::Struct(struct_op) => {
                 let mut attrs = BTreeMap::default();
                 for (_, property) in &struct_op.properties {
-                    let attr =
-                        self.fake_attribute(processor.new_child(property.value_operator_id)?)?;
+                    let attr = self.fake_attribute(processor.new_child(property.value_addr)?)?;
                     attrs.insert(property.property_id, attr);
                 }
 
                 Value::new(Data::Struct(attrs), struct_op.def.def_id)
             }
-            SerdeOperator::IdSingletonStruct(_name, inner_operator_id) => {
-                return self.fake_attribute(processor.narrow(*inner_operator_id))
+            SerdeOperator::IdSingletonStruct(_name, inner_addr) => {
+                return self.fake_attribute(processor.narrow(*inner_addr))
             }
         };
 
-        let rel_params = if let Some(rel_params_operator_id) = processor.ctx.rel_params_operator_id
-        {
-            self.fake_attribute(processor.new_child(rel_params_operator_id)?)?
+        let rel_params = if let Some(rel_params_addr) = processor.ctx.rel_params_addr {
+            self.fake_attribute(processor.new_child(rel_params_addr)?)?
                 .value
         } else {
             Value::unit()

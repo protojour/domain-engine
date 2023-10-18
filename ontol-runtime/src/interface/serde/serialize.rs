@@ -141,7 +141,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                 self.serialize_sequence(cast_ref::<Vec<_>>(value), &seq_op.ranges, serializer)
             }
             SerdeOperator::Alias(value_op) => self
-                .narrow(value_op.inner_operator_id)
+                .narrow(value_op.inner_addr)
                 .serialize_value(value, rel_params, serializer),
             SerdeOperator::Union(union_op) => match union_op.variants(self.mode, self.level) {
                 FilteredVariants::Single(id) => self
@@ -153,10 +153,10 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                     });
 
                     if let Some(variant) = variant {
-                        let processor = self.narrow(variant.operator_id);
+                        let processor = self.narrow(variant.addr);
                         debug!(
                             "serializing union variant with {:?} {processor:}",
-                            variant.operator_id
+                            variant.addr
                         );
 
                         processor.serialize_value(value, rel_params, serializer)
@@ -165,7 +165,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                     }
                 }
             },
-            SerdeOperator::IdSingletonStruct(name, inner_operator_id) => {
+            SerdeOperator::IdSingletonStruct(name, inner_addr) => {
                 let mut map = serializer.serialize_map(Some(1 + option_len(&rel_params)))?;
                 map.serialize_entry(
                     name,
@@ -173,7 +173,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                         value,
                         rel_params: None,
                         processor: self
-                            .new_child(*inner_operator_id)
+                            .new_child(*inner_addr)
                             .map_err(RecursionLimitError::to_ser_error)?,
                     },
                 )?;
@@ -207,7 +207,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                     seq.serialize_element(&Proxy {
                         value: &attribute.value,
                         rel_params: attribute.rel_params.filter_non_unit(),
-                        processor: self.narrow(range.operator_id),
+                        processor: self.narrow(range.addr),
                     })?;
                 }
             } else {
@@ -215,7 +215,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                     seq.serialize_element(&Proxy {
                         value: &attribute.value,
                         rel_params: attribute.rel_params.filter_non_unit(),
-                        processor: self.narrow(range.operator_id),
+                        processor: self.narrow(range.addr),
                     })?;
                 }
             }
@@ -233,11 +233,11 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 
         for attr in elements {
             let def_id = attr.value.type_def_id;
-            match self.ontology.get_type_info(def_id).operator_id {
-                Some(operator_id) => seq.serialize_element(&Proxy {
+            match self.ontology.get_type_info(def_id).operator_addr {
+                Some(addr) => seq.serialize_element(&Proxy {
                     value: &attr.value,
                     rel_params: None,
-                    processor: self.narrow(operator_id),
+                    processor: self.narrow(addr),
                 })?,
                 None => {
                     panic!("No processor found for {def_id:?}");
@@ -274,10 +274,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                     if serde_prop.is_optional() {
                         continue;
                     } else {
-                        match self
-                            .ontology
-                            .get_serde_operator(serde_prop.value_operator_id)
-                        {
+                        match self.ontology.get_serde_operator(serde_prop.value_addr) {
                             SerdeOperator::Struct(struct_op) => {
                                 if struct_op.properties.is_empty() {
                                     &unit_attr
@@ -314,13 +311,13 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                     processor: self
                         .new_child_with_context(
                             if is_entity_id && self.profile.raw_ids {
-                                self.ontology.raw_id_operator_id()
+                                self.ontology.raw_id_operator_addr()
                             } else {
-                                serde_prop.value_operator_id
+                                serde_prop.value_addr
                             },
                             SubProcessorContext {
                                 parent_property_id: Some(serde_prop.property_id),
-                                rel_params_operator_id: serde_prop.rel_params_operator_id,
+                                rel_params_addr: serde_prop.rel_params_addr,
                             },
                         )
                         .map_err(RecursionLimitError::to_ser_error)?,
@@ -338,16 +335,16 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         rel_params: Option<&Value>,
         map: &mut <S as Serializer>::SerializeMap,
     ) -> Result<(), <S as Serializer>::Error> {
-        match (rel_params, self.ctx.rel_params_operator_id) {
+        match (rel_params, self.ctx.rel_params_addr) {
             (None, None) => {}
-            (Some(rel_params), Some(operator_id)) => {
+            (Some(rel_params), Some(addr)) => {
                 map.serialize_entry(
                     EDGE_PROPERTY,
                     &Proxy {
                         value: rel_params,
                         rel_params: None,
                         processor: self
-                            .new_child(operator_id)
+                            .new_child(addr)
                             .map_err(RecursionLimitError::to_ser_error)?,
                     },
                 )?;

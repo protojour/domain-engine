@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use smartstring::alias::String;
 
 use crate::{
-    interface::serde::operator::SerdeOperatorId, ontology::Ontology, value::PropertyId, var::Var,
+    interface::serde::operator::SerdeOperatorAddr, ontology::Ontology, value::PropertyId, var::Var,
     DefId, MapKey, RelationshipId,
 };
 
@@ -57,7 +57,7 @@ pub enum UnitTypeRef {
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub struct NativeScalarRef {
-    pub operator_id: SerdeOperatorId,
+    pub operator_addr: SerdeOperatorAddr,
     pub kind: NativeScalarKind,
 }
 
@@ -170,25 +170,25 @@ pub enum ObjectKind {
 pub struct NodeData {
     pub def_id: DefId,
     pub entity_id: Option<DefId>,
-    pub operator_id: SerdeOperatorId,
+    pub operator_addr: SerdeOperatorAddr,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct UnionData {
     pub union_def_id: DefId,
     pub variants: Vec<TypeIndex>,
-    pub operator_id: SerdeOperatorId,
+    pub operator_addr: SerdeOperatorAddr,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct EdgeData {
-    pub node_operator_id: SerdeOperatorId,
+    pub node_operator_addr: SerdeOperatorAddr,
     pub rel_edge_ref: Option<UnitTypeRef>,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct ScalarData {
-    pub serde_operator_id: SerdeOperatorId,
+    pub operator_addr: SerdeOperatorAddr,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -220,7 +220,7 @@ pub enum FieldKind {
     },
     Map {
         key: [MapKey; 2],
-        input_operator_id: SerdeOperatorId,
+        input_operator_addr: SerdeOperatorAddr,
         /// If this string is defined, there will be a single argument with this name.
         scalar_input_name: Option<String>,
         queries: FnvHashMap<PropertyId, Var>,
@@ -240,13 +240,13 @@ pub enum FieldKind {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PropertyData {
     pub property_id: PropertyId,
-    pub value_operator_id: SerdeOperatorId,
+    pub value_operator_addr: SerdeOperatorAddr,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct IdPropertyData {
     pub relationship_id: RelationshipId,
-    pub operator_id: SerdeOperatorId,
+    pub operator_addr: SerdeOperatorAddr,
 }
 
 pub struct EntityData {

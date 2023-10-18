@@ -17,7 +17,7 @@ impl<'m> Compiler<'m> {
             seal_ctx: &self.seal_ctx,
             patterns: &self.text_patterns,
             codegen_tasks: &self.codegen_tasks,
-            operators_by_id: Default::default(),
+            operators_by_addr: Default::default(),
             operators_by_key: Default::default(),
         }
     }

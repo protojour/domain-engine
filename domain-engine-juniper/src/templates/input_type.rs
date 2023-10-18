@@ -43,7 +43,7 @@ impl juniper::GraphQLType<GqlScalar> for InputType {
                 let mut arguments = vec![];
 
                 reg.collect_operator_arguments(
-                    node_data.operator_id,
+                    node_data.operator_addr,
                     &mut arguments,
                     info.typing_purpose,
                     ArgumentFilter::default(),
@@ -57,14 +57,14 @@ impl juniper::GraphQLType<GqlScalar> for InputType {
             TypeKind::Object(ObjectData {
                 kind:
                     ObjectKind::Edge(EdgeData {
-                        node_operator_id,
+                        node_operator_addr,
                         rel_edge_ref: rel_ref,
                     }),
                 ..
             }) => {
                 let mut arguments = vec![];
                 reg.collect_operator_arguments(
-                    *node_operator_id,
+                    *node_operator_addr,
                     &mut arguments,
                     info.typing_purpose,
                     ArgumentFilter::default(),
@@ -88,7 +88,7 @@ impl juniper::GraphQLType<GqlScalar> for InputType {
             TypeKind::Union(union_data) => {
                 let mut arguments = vec![];
                 reg.collect_operator_arguments(
-                    union_data.operator_id,
+                    union_data.operator_addr,
                     &mut arguments,
                     info.typing_purpose,
                     ArgumentFilter::default(),
@@ -115,7 +115,7 @@ impl juniper::FromInputValue<GqlScalar> for InputType {
     type Error = String;
 
     fn from_input_value(_: &juniper::InputValue<GqlScalar>) -> Result<Self, Self::Error> {
-        debug!("No way to validate this here without TypeInfo/SerdeOperatorId");
+        debug!("No way to validate this here without TypeInfo/SerdeOperatorAddr");
         Ok(Self)
     }
 }

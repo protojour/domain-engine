@@ -4,7 +4,7 @@ use ontol_faker::new_constant_fake;
 use ontol_runtime::{
     interface::json_schema::build_openapi_schemas,
     interface::serde::{
-        operator::SerdeOperatorId,
+        operator::SerdeOperatorAddr,
         processor::{ProcessorLevel, ProcessorMode, DOMAIN_PROFILE},
     },
     ontology::{MapMeta, Ontology, TypeInfo},
@@ -104,7 +104,7 @@ impl WasmTypeInfo {
         let value = self
             .ontology
             .new_serde_processor(
-                operator_id(&self.inner)?,
+                operator_addr(&self.inner)?,
                 format.to_processor_mode(),
                 ProcessorLevel::new_root(),
                 &DOMAIN_PROFILE,
@@ -147,7 +147,7 @@ impl WasmValue {
 
         self.ontology
             .new_serde_processor(
-                operator_id(type_info)?,
+                operator_addr(type_info)?,
                 format.to_processor_mode(),
                 ProcessorLevel::new_root(),
                 &DOMAIN_PROFILE,
@@ -196,9 +196,9 @@ impl WasmMapper {
     }
 }
 
-pub(crate) fn operator_id(type_info: &TypeInfo) -> Result<SerdeOperatorId, WasmError> {
-    if let Some(operator_id) = type_info.operator_id {
-        Ok(operator_id)
+pub(crate) fn operator_addr(type_info: &TypeInfo) -> Result<SerdeOperatorAddr, WasmError> {
+    if let Some(addr) = type_info.operator_addr {
+        Ok(addr)
     } else {
         Err(WasmError::Generic(format!(
             "The type `{}` cannot be serialized",

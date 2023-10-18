@@ -4,7 +4,7 @@ use ::serde::{Deserialize, Serialize};
 
 use crate::DefId;
 
-use self::operator::{SerdeOperatorId, StructOperator};
+use self::operator::{SerdeOperatorAddr, StructOperator};
 
 mod deserialize;
 mod deserialize_matcher;

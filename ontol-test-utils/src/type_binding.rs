@@ -3,7 +3,7 @@ use jsonschema::JSONSchema;
 use ontol_faker::new_constant_fake;
 use ontol_runtime::{
     interface::json_schema::build_standalone_schema,
-    interface::serde::operator::SerdeOperatorId,
+    interface::serde::operator::SerdeOperatorAddr,
     interface::serde::processor::{ProcessorLevel, ProcessorMode, DOMAIN_PROFILE},
     ontology::{Ontology, TypeInfo},
     select::{Select, StructSelect},
@@ -49,14 +49,16 @@ impl<'on> TypeBinding<'on> {
         }
 
         trace!(
-            "TypeBinding::new `{type_name}` with {operator_id:?} create={processor:?}",
-            operator_id = type_info.operator_id,
-            processor = type_info.operator_id.map(|id| ontology.new_serde_processor(
-                id,
-                ProcessorMode::Create,
-                ProcessorLevel::new_root(),
-                &DOMAIN_PROFILE
-            ))
+            "TypeBinding::new `{type_name}` with {addr:?} create={processor:?}",
+            addr = type_info.operator_addr,
+            processor = type_info
+                .operator_addr
+                .map(|id| ontology.new_serde_processor(
+                    id,
+                    ProcessorMode::Create,
+                    ProcessorLevel::new_root(),
+                    &DOMAIN_PROFILE
+                ))
         );
 
         let json_schema = if ontol_test.compile_json_schema {
@@ -127,14 +129,16 @@ impl<'on> TypeBinding<'on> {
         }
     }
 
-    pub fn serde_operator_id(&self) -> SerdeOperatorId {
-        self.type_info.operator_id.expect("No serde operator id")
+    pub fn serde_operator_addr(&self) -> SerdeOperatorAddr {
+        self.type_info
+            .operator_addr
+            .expect("No serde operator addr")
     }
 
     pub fn find_property(&self, prop: &str) -> Option<PropertyId> {
         self.ontology
             .new_serde_processor(
-                self.serde_operator_id(),
+                self.serde_operator_addr(),
                 ProcessorMode::Create,
                 ProcessorLevel::new_root(),
                 &DOMAIN_PROFILE,
@@ -232,7 +236,7 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
             .binding
             .ontology
             .new_serde_processor(
-                entity_info.id_operator_id,
+                entity_info.id_operator_addr,
                 ProcessorMode::Create,
                 ProcessorLevel::new_root(),
                 &DOMAIN_PROFILE,

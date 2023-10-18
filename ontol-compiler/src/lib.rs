@@ -239,8 +239,8 @@ impl<'m> Compiler<'m> {
 
         let mut builder = Ontology::builder();
 
-        let dynamic_sequence_operator_id = serde_generator.make_dynamic_sequence_operator();
-        let raw_id_operator_id = serde_generator.make_raw_id_operator_id();
+        let dynamic_sequence_operator_addr = serde_generator.make_dynamic_sequence_addr();
+        let raw_id_operator_addr = serde_generator.make_raw_id_addr();
 
         let map_namespaces: FnvHashMap<_, _> = namespaces
             .iter_mut()
@@ -278,7 +278,7 @@ impl<'m> Compiler<'m> {
                         &mut serde_generator,
                         &data_relationships,
                     ),
-                    operator_id: serde_generator.gen_operator_id(SerdeKey::Def(SerdeDef::new(
+                    operator_addr: serde_generator.gen_addr(SerdeKey::Def(SerdeDef::new(
                         type_def_id,
                         SerdeModifier::json_default(),
                     ))),
@@ -292,7 +292,7 @@ impl<'m> Compiler<'m> {
                     public: false,
                     name: None,
                     entity_info: None,
-                    operator_id: serde_generator.gen_operator_id(SerdeKey::Def(SerdeDef::new(
+                    operator_addr: serde_generator.gen_addr(SerdeKey::Def(SerdeDef::new(
                         type_def_id,
                         SerdeModifier::json_default(),
                     ))),
@@ -364,8 +364,8 @@ impl<'m> Compiler<'m> {
             .map_meta_table(map_meta_table)
             .named_forward_maps(self.codegen_tasks.result_named_forward_maps)
             .serde_operators(serde_operators, serde_operators_per_def)
-            .dynamic_sequence_operator_id(dynamic_sequence_operator_id)
-            .raw_id_operator_id(raw_id_operator_id)
+            .dynamic_sequence_operator_addr(dynamic_sequence_operator_addr)
+            .raw_id_operator_addr(raw_id_operator_addr)
             .property_flows(property_flows)
             .string_like_types(self.defs.string_like_types)
             .text_patterns(self.text_patterns.text_patterns)
@@ -474,8 +474,8 @@ impl<'m> Compiler<'m> {
             },
             id_value_def_id: identifies_meta.relationship.subject.0,
             id_value_generator,
-            id_operator_id: serde_generator
-                .gen_operator_id(SerdeKey::Def(SerdeDef::new(
+            id_operator_addr: serde_generator
+                .gen_addr(SerdeKey::Def(SerdeDef::new(
                     identifies_meta.relationship.subject.0,
                     SerdeModifier::NONE,
                 )))

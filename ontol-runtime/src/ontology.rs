@@ -9,7 +9,7 @@ use crate::{
     config::PackageConfig,
     interface::{
         serde::{
-            operator::{SerdeOperator, SerdeOperatorId},
+            operator::{SerdeOperator, SerdeOperatorAddr},
             processor::{ProcessorLevel, ProcessorMode, ProcessorProfile, SerdeProcessor},
             SerdeKey,
         },
@@ -42,10 +42,10 @@ pub struct Ontology {
     domain_interfaces: FnvHashMap<PackageId, Vec<DomainInterface>>,
     package_config_table: FnvHashMap<PackageId, PackageConfig>,
     docs: FnvHashMap<DefId, Vec<String>>,
-    serde_operators_per_def: HashMap<SerdeKey, SerdeOperatorId>,
+    serde_operators_per_def: HashMap<SerdeKey, SerdeOperatorAddr>,
     serde_operators: Vec<SerdeOperator>,
-    dynamic_sequence_operator_id: SerdeOperatorId,
-    raw_id_operator_id: SerdeOperatorId,
+    dynamic_sequence_operator_addr: SerdeOperatorAddr,
+    raw_id_operator_addr: SerdeOperatorAddr,
     value_generators: FnvHashMap<RelationshipId, ValueGenerator>,
     property_flows: Vec<PropertyFlow>,
 }
@@ -66,8 +66,8 @@ impl Ontology {
                 lib: Lib::default(),
                 serde_operators_per_def: Default::default(),
                 serde_operators: Default::default(),
-                dynamic_sequence_operator_id: SerdeOperatorId(u32::MAX),
-                raw_id_operator_id: SerdeOperatorId(u32::MAX),
+                dynamic_sequence_operator_addr: SerdeOperatorAddr(u32::MAX),
+                raw_id_operator_addr: SerdeOperatorAddr(u32::MAX),
                 value_generators: Default::default(),
                 property_flows: Default::default(),
             },
@@ -160,13 +160,13 @@ impl Ontology {
 
     pub fn new_serde_processor(
         &self,
-        value_operator_id: SerdeOperatorId,
+        value_addr: SerdeOperatorAddr,
         mode: ProcessorMode,
         level: ProcessorLevel,
         profile: &'static ProcessorProfile,
     ) -> SerdeProcessor {
         SerdeProcessor {
-            value_operator: &self.serde_operators[value_operator_id.0 as usize],
+            value_operator: &self.serde_operators[value_addr.0 as usize],
             ctx: Default::default(),
             level,
             ontology: self,
@@ -175,16 +175,16 @@ impl Ontology {
         }
     }
 
-    pub fn get_serde_operator(&self, operator_id: SerdeOperatorId) -> &SerdeOperator {
-        &self.serde_operators[operator_id.0 as usize]
+    pub fn get_serde_operator(&self, addr: SerdeOperatorAddr) -> &SerdeOperator {
+        &self.serde_operators[addr.0 as usize]
     }
 
-    pub fn dynamic_sequence_operator_id(&self) -> SerdeOperatorId {
-        self.dynamic_sequence_operator_id
+    pub fn dynamic_sequence_operator_addr(&self) -> SerdeOperatorAddr {
+        self.dynamic_sequence_operator_addr
     }
 
-    pub fn raw_id_operator_id(&self) -> SerdeOperatorId {
-        self.raw_id_operator_id
+    pub fn raw_id_operator_addr(&self) -> SerdeOperatorAddr {
+        self.raw_id_operator_addr
     }
 
     pub fn get_value_generator(&self, relationship_id: RelationshipId) -> Option<&ValueGenerator> {
@@ -243,7 +243,7 @@ impl Domain {
             public: false,
             name: None,
             entity_info: None,
-            operator_id: None,
+            operator_addr: None,
             data_relationships: Default::default(),
         });
 
@@ -258,9 +258,9 @@ pub struct TypeInfo {
     pub name: Option<String>,
     /// Some if this type is an entity
     pub entity_info: Option<EntityInfo>,
-    /// The SerdeOperatorId used for JSON.
+    /// The SerdeOperatorAddr used for JSON.
     /// FIXME: This should really be connected to a DomainInterface.
-    pub operator_id: Option<SerdeOperatorId>,
+    pub operator_addr: Option<SerdeOperatorAddr>,
 
     pub data_relationships: IndexMap<PropertyId, DataRelationshipInfo>,
 }
@@ -279,7 +279,7 @@ impl TypeInfo {
 pub struct EntityInfo {
     pub id_relationship_id: RelationshipId,
     pub id_value_def_id: DefId,
-    pub id_operator_id: SerdeOperatorId,
+    pub id_operator_addr: SerdeOperatorAddr,
     /// Whether all inherent fields are part of the primary id of this entity.
     /// In other words: The entity has only one field, its ID.
     pub is_self_identifying: bool,
@@ -389,23 +389,20 @@ impl OntologyBuilder {
     pub fn serde_operators(
         mut self,
         operators: Vec<SerdeOperator>,
-        per_def: HashMap<SerdeKey, SerdeOperatorId>,
+        per_def: HashMap<SerdeKey, SerdeOperatorAddr>,
     ) -> Self {
         self.ontology.serde_operators = operators;
         self.ontology.serde_operators_per_def = per_def;
         self
     }
 
-    pub fn dynamic_sequence_operator_id(
-        mut self,
-        dynamic_sequence_operator_id: SerdeOperatorId,
-    ) -> Self {
-        self.ontology.dynamic_sequence_operator_id = dynamic_sequence_operator_id;
+    pub fn dynamic_sequence_operator_addr(mut self, addr: SerdeOperatorAddr) -> Self {
+        self.ontology.dynamic_sequence_operator_addr = addr;
         self
     }
 
-    pub fn raw_id_operator_id(mut self, raw_id_operator_id: SerdeOperatorId) -> Self {
-        self.ontology.raw_id_operator_id = raw_id_operator_id;
+    pub fn raw_id_operator_addr(mut self, addr: SerdeOperatorAddr) -> Self {
+        self.ontology.raw_id_operator_addr = addr;
         self
     }
 

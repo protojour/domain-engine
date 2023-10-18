@@ -42,7 +42,7 @@ fn test_relations_are_distinct_for_different_domains() {
         fn extract_prop_rel_id<'o>(binding: &TypeBinding, test: &'o OntolTest) -> RelationshipId {
             let operator = test
                 .ontology
-                .get_serde_operator(binding.serde_operator_id());
+                .get_serde_operator(binding.serde_operator_addr());
 
             match operator {
                 SerdeOperator::Struct(struct_op) => {

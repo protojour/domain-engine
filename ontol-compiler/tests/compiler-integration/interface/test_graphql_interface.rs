@@ -106,7 +106,7 @@ fn test_graphql_scalar_array() {
         let native = prop_field.field_type.unit.native_scalar();
         assert_matches!(native.kind, NativeScalarKind::String);
 
-        let operator = test.test.ontology.get_serde_operator(native.operator_id);
+        let operator = test.test.ontology.get_serde_operator(native.operator_addr);
         assert_matches!(operator, SerdeOperator::RelationSequence(_));
     });
 }
@@ -129,7 +129,7 @@ fn test_graphql_serde_renaming() {
 
         let fields: Vec<_> = test
             .ontology
-            .get_serde_operator(foo_node.operator_id)
+            .get_serde_operator(foo_node.operator_addr)
             .struct_op()
             .properties
             .keys()

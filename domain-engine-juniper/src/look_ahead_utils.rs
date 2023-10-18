@@ -3,7 +3,7 @@ use std::fmt::Display;
 use juniper::{graphql_value, LookAheadArgument, LookAheadValue, Spanning};
 use ontol_runtime::{
     interface::graphql::{argument::DomainFieldArg, schema::TypingPurpose},
-    interface::serde::{operator::SerdeOperatorId, processor::DOMAIN_PROFILE},
+    interface::serde::{operator::SerdeOperatorAddr, processor::DOMAIN_PROFILE},
     ontology::Ontology,
     smart_format,
     value::Attribute,
@@ -23,7 +23,7 @@ impl<'a> ArgsWrapper<'a> {
 
     pub fn domain_deserialize(
         &self,
-        operator_id: SerdeOperatorId,
+        operator_addr: SerdeOperatorAddr,
         scalar_input_name: Option<&str>,
         typing_purpose: TypingPurpose,
         ontology: &Ontology,
@@ -40,12 +40,12 @@ impl<'a> ArgsWrapper<'a> {
                 .spanned_value();
 
             ontology
-                .new_serde_processor(operator_id, mode, level, &DOMAIN_PROFILE)
+                .new_serde_processor(operator_addr, mode, level, &DOMAIN_PROFILE)
                 .deserialize(LookAheadValueDeserializer { value: spanned_arg })
                 .map_err(|error| juniper::FieldError::new(error, graphql_value!(None)))
         } else {
             ontology
-                .new_serde_processor(operator_id, mode, level, &DOMAIN_PROFILE)
+                .new_serde_processor(operator_addr, mode, level, &DOMAIN_PROFILE)
                 .deserialize(LookAheadArgumentsDeserializer {
                     arguments: self.arguments,
                 })
@@ -76,14 +76,19 @@ impl<'a> ArgsWrapper<'a> {
         ontology: &Ontology,
     ) -> Result<ontol_runtime::value::Attribute, juniper::FieldError<GqlScalar>> {
         let name = field_arg.name();
-        let operator_id = field_arg.operator_id();
-        self.deserialize_operator_attribute(name, operator_id, ontology, field_arg.typing_purpose())
+        let operator_addr = field_arg.operator_addr();
+        self.deserialize_operator_attribute(
+            name,
+            operator_addr,
+            ontology,
+            field_arg.typing_purpose(),
+        )
     }
 
     pub fn deserialize_operator_attribute(
         &self,
         name: &str,
-        operator_id: SerdeOperatorId,
+        operator_addr: SerdeOperatorAddr,
         ontology: &Ontology,
         typing_purpose: TypingPurpose,
     ) -> Result<ontol_runtime::value::Attribute, juniper::FieldError<GqlScalar>> {
@@ -94,7 +99,7 @@ impl<'a> ArgsWrapper<'a> {
         let (mode, level) = typing_purpose.mode_and_level();
 
         ontology
-            .new_serde_processor(operator_id, mode, level, &DOMAIN_PROFILE)
+            .new_serde_processor(operator_addr, mode, level, &DOMAIN_PROFILE)
             .deserialize(LookAheadValueDeserializer {
                 value: argument.spanned_value(),
             })

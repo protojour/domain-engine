@@ -27,13 +27,13 @@ use super::{
     processor::{
         ProcessorMode, ProcessorProfile, RecursionLimitError, SerdeProcessor, SubProcessorContext,
     },
-    SerdeOperatorId, StructOperator,
+    SerdeOperatorAddr, StructOperator,
 };
 
 enum MapKey {
     Property(SerdeProperty),
-    RelParams(SerdeOperatorId),
-    Id(SerdeOperatorId),
+    RelParams(SerdeOperatorAddr),
+    Id(SerdeOperatorAddr),
     Ignored,
 }
 
@@ -56,15 +56,15 @@ struct StructVisitor<'on, 'p> {
 }
 
 #[derive(Clone, Copy)]
-struct SpecialOperatorIds<'s> {
-    rel_params: Option<SerdeOperatorId>,
-    id: Option<(&'s str, SerdeOperatorId)>,
+struct SpecialAddrs<'s> {
+    rel_params: Option<SerdeOperatorAddr>,
+    id: Option<(&'s str, SerdeOperatorAddr)>,
 }
 
 #[derive(Clone, Copy)]
 struct PropertySet<'a> {
     properties: &'a IndexMap<String, SerdeProperty>,
-    special_operator_ids: SpecialOperatorIds<'a>,
+    special_addrs: SpecialAddrs<'a>,
     processor_mode: ProcessorMode,
     processor_profile: &'a ProcessorProfile,
     parent_property_id: Option<PropertyId>,
@@ -73,14 +73,14 @@ struct PropertySet<'a> {
 impl<'a> PropertySet<'a> {
     fn new(
         properties: &'a IndexMap<String, SerdeProperty>,
-        special_operator_ids: SpecialOperatorIds<'a>,
+        special_addrs: SpecialAddrs<'a>,
         processor_mode: ProcessorMode,
         processor_profile: &'a ProcessorProfile,
         parent_property_id: Option<PropertyId>,
     ) -> Self {
         Self {
             properties,
-            special_operator_ids,
+            special_addrs,
             processor_mode,
             processor_profile,
             parent_property_id,
@@ -91,8 +91,8 @@ impl<'a> PropertySet<'a> {
 impl<'on, 'p> SerdeProcessor<'on, 'p> {
     fn assert_no_rel_params(&self) {
         assert!(
-            self.ctx.rel_params_operator_id.is_none(),
-            "rel_params_operator_id should be None for {:?}",
+            self.ctx.rel_params_addr.is_none(),
+            "rel_params_addr should be None for {:?}",
             self.value_operator
         );
     }
@@ -204,18 +204,15 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                     .into_visitor(self),
             ),
             SerdeOperator::Alias(value_op) => {
-                let mut typed_attribute = self
-                    .narrow(value_op.inner_operator_id)
-                    .deserialize(deserializer)?;
+                let mut typed_attribute =
+                    self.narrow(value_op.inner_addr).deserialize(deserializer)?;
 
                 typed_attribute.value.type_def_id = value_op.def.def_id;
 
                 Ok(typed_attribute)
             }
             SerdeOperator::Union(union_op) => match union_op.variants(self.mode, self.level) {
-                FilteredVariants::Single(operator_id) => {
-                    self.narrow(operator_id).deserialize(deserializer)
-                }
+                FilteredVariants::Single(addr) => self.narrow(addr).deserialize(deserializer),
                 FilteredVariants::Union(variants) => deserializer.deserialize_any(
                     UnionMatcher {
                         typename: union_op.typename(),
@@ -229,7 +226,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                 ),
             },
 
-            SerdeOperator::IdSingletonStruct(_name, _inner_operator_id) => {
+            SerdeOperator::IdSingletonStruct(_name, _inner_addr) => {
                 //deserializer.deserialize_map()
                 todo!()
             }
@@ -320,7 +317,7 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
             let processor = match sequence_matcher.match_next_seq_element() {
                 Some(element_match) => self
                     .processor
-                    .narrow_with_context(element_match.element_operator_id, element_match.ctx),
+                    .narrow_with_context(element_match.element_addr, element_match.ctx),
                 None => {
                     // note: if there are more elements to deserialize,
                     // serde will automatically generate a 'trailing characters' error after returning:
@@ -404,16 +401,16 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
                 ctx: map_match.ctx,
             }
             .visit_map(map),
-            MapMatchKind::IdType(name, serde_operator_id) => {
+            MapMatchKind::IdType(name, addr) => {
                 let deserialized_map = deserialize_map(
                     self.processor,
                     map,
                     buffered_attrs,
                     &IndexMap::default(),
                     0,
-                    SpecialOperatorIds {
-                        rel_params: map_match.ctx.rel_params_operator_id,
-                        id: Some((name, serde_operator_id)),
+                    SpecialAddrs {
+                        rel_params: map_match.ctx.rel_params_addr,
+                        id: Some((name, addr)),
                     },
                 )?;
                 let id = deserialized_map
@@ -445,8 +442,8 @@ impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
             &self.struct_op.properties,
             self.struct_op
                 .required_count(self.processor.mode, self.processor.ctx.parent_property_id),
-            SpecialOperatorIds {
-                rel_params: self.ctx.rel_params_operator_id,
+            SpecialAddrs {
+                rel_params: self.ctx.rel_params_addr,
                 id: None,
             },
         )?;
@@ -466,7 +463,7 @@ fn deserialize_map<'on, 'p, 'de, A: MapAccess<'de>>(
     buffered_attrs: Vec<(String, serde_value::Value)>,
     properties: &IndexMap<String, SerdeProperty>,
     expected_required_count: usize,
-    special_operator_ids: SpecialOperatorIds,
+    special_addrs: SpecialAddrs,
 ) -> Result<DeserializedMap, A::Error> {
     let mut attributes = BTreeMap::new();
     let mut rel_params = Value::unit();
@@ -478,24 +475,24 @@ fn deserialize_map<'on, 'p, 'de, A: MapAccess<'de>>(
     for (serde_key, serde_value) in buffered_attrs {
         match PropertySet::new(
             properties,
-            special_operator_ids,
+            special_addrs,
             processor.mode,
             processor.profile,
             processor.ctx.parent_property_id,
         )
         .visit_str(&serde_key)?
         {
-            MapKey::RelParams(operator_id) => {
+            MapKey::RelParams(addr) => {
                 let Attribute { value, .. } = processor
-                    .new_child(operator_id)
+                    .new_child(addr)
                     .map_err(RecursionLimitError::to_de_error)?
                     .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
 
                 rel_params = value;
             }
-            MapKey::Id(operator_id) => {
+            MapKey::Id(addr) => {
                 let Attribute { value, .. } = processor
-                    .new_child(operator_id)
+                    .new_child(addr)
                     .map_err(RecursionLimitError::to_de_error)?
                     .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
                 id = Some(value);
@@ -503,10 +500,10 @@ fn deserialize_map<'on, 'p, 'de, A: MapAccess<'de>>(
             MapKey::Property(serde_property) => {
                 let Attribute { rel_params, value } = processor
                     .new_child_with_context(
-                        serde_property.value_operator_id,
+                        serde_property.value_addr,
                         SubProcessorContext {
                             parent_property_id: Some(serde_property.property_id),
-                            rel_params_operator_id: serde_property.rel_params_operator_id,
+                            rel_params_addr: serde_property.rel_params_addr,
                         },
                     )
                     .map_err(RecursionLimitError::to_de_error)?
@@ -525,25 +522,25 @@ fn deserialize_map<'on, 'p, 'de, A: MapAccess<'de>>(
     // parse rest of map
     while let Some(map_key) = map.next_key_seed(PropertySet::new(
         properties,
-        special_operator_ids,
+        special_addrs,
         processor.mode,
         processor.profile,
         processor.ctx.parent_property_id,
     ))? {
         match map_key {
-            MapKey::RelParams(operator_id) => {
+            MapKey::RelParams(addr) => {
                 let Attribute { value, .. } = map.next_value_seed(
                     processor
-                        .new_child(operator_id)
+                        .new_child(addr)
                         .map_err(RecursionLimitError::to_de_error)?,
                 )?;
 
                 rel_params = value;
             }
-            MapKey::Id(operator_id) => {
+            MapKey::Id(addr) => {
                 let Attribute { value, .. } = map.next_value_seed(
                     processor
-                        .new_child(operator_id)
+                        .new_child(addr)
                         .map_err(RecursionLimitError::to_de_error)?,
                 )?;
 
@@ -553,10 +550,10 @@ fn deserialize_map<'on, 'p, 'de, A: MapAccess<'de>>(
                 let attribute = map.next_value_seed(
                     processor
                         .new_child_with_context(
-                            serde_property.value_operator_id,
+                            serde_property.value_addr,
                             SubProcessorContext {
                                 parent_property_id: Some(serde_property.property_id),
-                                rel_params_operator_id: serde_property.rel_params_operator_id,
+                                rel_params_addr: serde_property.rel_params_addr,
                             },
                         )
                         .map_err(RecursionLimitError::to_de_error)?,
@@ -593,13 +590,13 @@ fn deserialize_map<'on, 'p, 'de, A: MapAccess<'de>>(
     }
 
     if observed_required_count < expected_required_count
-        || (rel_params.is_unit() != special_operator_ids.rel_params.is_none())
+        || (rel_params.is_unit() != special_addrs.rel_params.is_none())
     {
         debug!(
             "Missing attributes(mode={:?}). Rel params match: {}, special_rel: {} parent_relationship: {:?}",
             processor.mode,
             rel_params.is_unit(),
-            special_operator_ids.rel_params.is_none(),
+            special_addrs.rel_params.is_none(),
             processor.ctx.parent_property_id,
         );
         for attr in &attributes {
@@ -630,7 +627,7 @@ fn deserialize_map<'on, 'p, 'de, A: MapAccess<'de>>(
             .map(|(key, _)| DoubleQuote(key.clone()))
             .collect();
 
-        if special_operator_ids.rel_params.is_some() && rel_params.type_def_id == DefId::unit() {
+        if special_addrs.rel_params.is_some() && rel_params.type_def_id == DefId::unit() {
             items.push(DoubleQuote(EDGE_PROPERTY.into()));
         }
 
@@ -671,16 +668,16 @@ impl<'a, 'de> Visitor<'de> for PropertySet<'a> {
     fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
         match v {
             EDGE_PROPERTY => {
-                if let Some(operator_id) = self.special_operator_ids.rel_params {
-                    Ok(MapKey::RelParams(operator_id))
+                if let Some(addr) = self.special_addrs.rel_params {
+                    Ok(MapKey::RelParams(addr))
                 } else {
                     Err(Error::custom("`_edge` property not accepted here"))
                 }
             }
             _ => {
-                if let Some((property_name, operator_id)) = self.special_operator_ids.id {
+                if let Some((property_name, addr)) = self.special_addrs.id {
                     if v == property_name {
-                        return Ok(MapKey::Id(operator_id));
+                        return Ok(MapKey::Id(addr));
                     }
                 }
 

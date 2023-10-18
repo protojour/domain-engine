@@ -8,7 +8,7 @@ use ontol_runtime::{
     interface::discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
     interface::serde::operator::{
         AliasOperator, ConstructorSequenceOperator, RelationSequenceOperator, SequenceRange,
-        SerdeOperator, SerdeOperatorId, SerdeProperty, StructOperator, UnionOperator,
+        SerdeOperator, SerdeOperatorAddr, SerdeProperty, StructOperator, UnionOperator,
         ValueUnionVariant,
     },
     interface::serde::{operator::SerdePropertyFlags, SerdeDef, SerdeKey, SerdeModifier},
@@ -49,50 +49,50 @@ pub struct SerdeGenerator<'c, 'm> {
     pub patterns: &'c TextPatterns,
     pub codegen_tasks: &'c CodegenTasks<'m>,
 
-    pub(super) operators_by_id: Vec<SerdeOperator>,
-    pub(super) operators_by_key: HashMap<SerdeKey, SerdeOperatorId>,
+    pub(super) operators_by_addr: Vec<SerdeOperator>,
+    pub(super) operators_by_key: HashMap<SerdeKey, SerdeOperatorAddr>,
 }
 
 enum OperatorAllocation {
-    Allocated(SerdeOperatorId, SerdeOperator),
+    Allocated(SerdeOperatorAddr, SerdeOperator),
     Redirect(SerdeDef),
 }
 
 impl<'c, 'm> SerdeGenerator<'c, 'm> {
-    pub fn finish(self) -> (Vec<SerdeOperator>, HashMap<SerdeKey, SerdeOperatorId>) {
-        (self.operators_by_id, self.operators_by_key)
+    pub fn finish(self) -> (Vec<SerdeOperator>, HashMap<SerdeKey, SerdeOperatorAddr>) {
+        (self.operators_by_addr, self.operators_by_key)
     }
 
-    pub fn make_dynamic_sequence_operator(&mut self) -> SerdeOperatorId {
-        let operator_id = SerdeOperatorId(self.operators_by_id.len() as u32);
-        self.operators_by_id.push(SerdeOperator::DynamicSequence);
-        operator_id
+    pub fn make_dynamic_sequence_addr(&mut self) -> SerdeOperatorAddr {
+        let addr = SerdeOperatorAddr(self.operators_by_addr.len() as u32);
+        self.operators_by_addr.push(SerdeOperator::DynamicSequence);
+        addr
     }
 
-    pub fn make_raw_id_operator_id(&mut self) -> SerdeOperatorId {
-        let operator_id = SerdeOperatorId(self.operators_by_id.len() as u32);
-        self.operators_by_id.push(SerdeOperator::RawId);
-        operator_id
+    pub fn make_raw_id_addr(&mut self) -> SerdeOperatorAddr {
+        let addr = SerdeOperatorAddr(self.operators_by_addr.len() as u32);
+        self.operators_by_addr.push(SerdeOperator::RawId);
+        addr
     }
 
-    pub fn gen_operator_id(&mut self, mut key: SerdeKey) -> Option<SerdeOperatorId> {
+    pub fn gen_addr(&mut self, mut key: SerdeKey) -> Option<SerdeOperatorAddr> {
         let mut discarded_keys = vec![];
 
         loop {
-            if let Some(id) = self.operators_by_key.get(&key) {
-                return Some(*id);
+            if let Some(addr) = self.operators_by_key.get(&key) {
+                return Some(*addr);
             }
 
             match self.alloc_serde_operator_from_key(key.clone()) {
-                Some(OperatorAllocation::Allocated(operator_id, operator)) => {
-                    trace!("CREATED {operator_id:?} {key:?} {operator:?}");
-                    self.operators_by_id[operator_id.0 as usize] = operator;
+                Some(OperatorAllocation::Allocated(addr, operator)) => {
+                    trace!("CREATED {addr:?} {key:?} {operator:?}");
+                    self.operators_by_addr[addr.0 as usize] = operator;
 
                     for key in discarded_keys {
-                        self.operators_by_key.insert(key, operator_id);
+                        self.operators_by_key.insert(key, addr);
                     }
 
-                    return Some(operator_id);
+                    return Some(addr);
                 }
                 Some(OperatorAllocation::Redirect(def)) => {
                     discarded_keys.push(key);
@@ -103,13 +103,13 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         }
     }
 
-    pub fn get_operator(&self, operator_id: SerdeOperatorId) -> &SerdeOperator {
-        &self.operators_by_id[operator_id.0 as usize]
+    pub fn get_operator(&self, addr: SerdeOperatorAddr) -> &SerdeOperator {
+        &self.operators_by_addr[addr.0 as usize]
     }
 
     pub fn gen_operator(&mut self, key: SerdeKey) -> Option<&SerdeOperator> {
-        let operator_id = self.gen_operator_id(key)?;
-        Some(&self.operators_by_id[operator_id.0 as usize])
+        let addr = self.gen_addr(key)?;
+        Some(&self.operators_by_addr[addr.0 as usize])
     }
 
     fn get_property_operator(
@@ -117,13 +117,13 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         type_def_id: DefId,
         cardinality: Cardinality,
         cross_def_modifier: SerdeModifier,
-    ) -> (PropertyCardinality, SerdeOperatorId) {
+    ) -> (PropertyCardinality, SerdeOperatorAddr) {
         let default_modifier = SerdeModifier::json_default() | cross_def_modifier;
 
         match cardinality.1 {
             ValueCardinality::One => (
                 cardinality.0,
-                self.gen_operator_id(SerdeKey::Def(SerdeDef {
+                self.gen_addr(SerdeKey::Def(SerdeDef {
                     def_id: type_def_id,
                     modifier: default_modifier,
                 }))
@@ -131,7 +131,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             ),
             ValueCardinality::Many => (
                 cardinality.0,
-                self.gen_operator_id(SerdeKey::Def(SerdeDef {
+                self.gen_addr(SerdeKey::Def(SerdeDef {
                     def_id: type_def_id,
                     modifier: default_modifier | SerdeModifier::ARRAY,
                 }))
@@ -140,17 +140,17 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         }
     }
 
-    fn alloc_operator_id(&mut self, def: &SerdeDef) -> SerdeOperatorId {
-        self.alloc_operator_id_for_key(&SerdeKey::Def(*def))
+    fn alloc_addr(&mut self, def: &SerdeDef) -> SerdeOperatorAddr {
+        self.alloc_addr_for_key(&SerdeKey::Def(*def))
     }
 
-    fn alloc_operator_id_for_key(&mut self, key: &SerdeKey) -> SerdeOperatorId {
-        let operator_id = SerdeOperatorId(self.operators_by_id.len() as u32);
+    fn alloc_addr_for_key(&mut self, key: &SerdeKey) -> SerdeOperatorAddr {
+        let addr = SerdeOperatorAddr(self.operators_by_addr.len() as u32);
         // We just need a temporary placeholder for this operator,
         // this will be properly overwritten afterwards:
-        self.operators_by_id.push(SerdeOperator::Unit);
-        self.operators_by_key.insert(key.clone(), operator_id);
-        operator_id
+        self.operators_by_addr.push(SerdeOperator::Unit);
+        self.operators_by_key.insert(key.clone(), addr);
+        addr
     }
 
     fn alloc_serde_operator_from_key(&mut self, key: SerdeKey) -> Option<OperatorAllocation> {
@@ -158,9 +158,9 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             SerdeKey::Intersection(keys) => {
                 debug!("create intersection: {keys:?}");
 
-                let operator_id = self.alloc_operator_id_for_key(&key);
+                let addr = self.alloc_addr_for_key(&key);
                 let mut iterator = keys.iter();
-                let first_id = self.gen_operator_id(iterator.next()?.clone())?;
+                let first_id = self.gen_addr(iterator.next()?.clone())?;
 
                 let mut intersected_map = self
                     .find_unambiguous_struct_operator(first_id)
@@ -170,7 +170,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     .clone();
 
                 for next_key in iterator {
-                    let next_id = self.gen_operator_id(next_key.clone()).unwrap();
+                    let next_id = self.gen_addr(next_key.clone()).unwrap();
 
                     if let Ok(next_map_type) = self.find_unambiguous_struct_operator(next_id) {
                         for (key, value) in &next_map_type.properties {
@@ -188,7 +188,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 }
 
                 Some(OperatorAllocation::Allocated(
-                    operator_id,
+                    addr,
                     SerdeOperator::Struct(intersected_map),
                 ))
             }
@@ -210,8 +210,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     return None;
                 };
 
-                let object_operator_id = self
-                    .gen_operator_id(SerdeKey::Def(SerdeDef::new(
+                let object_addr = self
+                    .gen_addr(SerdeKey::Def(SerdeDef::new(
                         meta.relationship.object.0,
                         def.modifier.cross_def_flags(),
                     )))
@@ -228,20 +228,20 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     )))
                 } else {
                     Some(OperatorAllocation::Allocated(
-                        self.alloc_operator_id_for_key(&key),
-                        SerdeOperator::IdSingletonStruct(ident, object_operator_id),
+                        self.alloc_addr_for_key(&key),
+                        SerdeOperator::IdSingletonStruct(ident, object_addr),
                     ))
                 }
             }
             SerdeKey::Def(def) if def.modifier.contains(SerdeModifier::ARRAY) => {
-                let item_operator_id =
-                    self.gen_operator_id(SerdeKey::Def(def.remove_modifier(SerdeModifier::ARRAY)))?;
+                let item_addr =
+                    self.gen_addr(SerdeKey::Def(def.remove_modifier(SerdeModifier::ARRAY)))?;
 
                 Some(OperatorAllocation::Allocated(
-                    self.alloc_operator_id_for_key(&key),
+                    self.alloc_addr_for_key(&key),
                     SerdeOperator::RelationSequence(RelationSequenceOperator {
                         ranges: [SequenceRange {
-                            operator_id: item_operator_id,
+                            addr: item_addr,
                             finite_repetition: None,
                         }],
                         def: *def,
@@ -254,9 +254,9 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
     fn find_unambiguous_struct_operator(
         &self,
-        id: SerdeOperatorId,
+        id: SerdeOperatorAddr,
     ) -> Result<&StructOperator, &SerdeOperator> {
-        let operator = &self.operators_by_id[id.0 as usize];
+        let operator = &self.operators_by_addr[id.0 as usize];
         match operator {
             SerdeOperator::Struct(struct_op) => Ok(struct_op),
             SerdeOperator::Union(union_op) => {
@@ -264,13 +264,12 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 let mut result = Err(operator);
 
                 for discriminator in union_op.unfiltered_variants() {
-                    if let Ok(map_type) =
-                        self.find_unambiguous_struct_operator(discriminator.operator_id)
+                    if let Ok(map_type) = self.find_unambiguous_struct_operator(discriminator.addr)
                     {
                         result = Ok(map_type);
                         map_count += 1;
                     } else {
-                        let operator = &self.operators_by_id[discriminator.operator_id.0 as usize];
+                        let operator = &self.operators_by_addr[discriminator.addr.0 as usize];
                         debug!("SKIPPED SOMETHING: {operator:?}\n\n");
                     }
                 }
@@ -282,7 +281,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 }
             }
             SerdeOperator::Alias(value_op) => {
-                self.find_unambiguous_struct_operator(value_op.inner_operator_id)
+                self.find_unambiguous_struct_operator(value_op.inner_addr)
             }
             _ => Err(operator),
         }
@@ -323,36 +322,36 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         match type_ref {
             Type::Primitive(kind, _) => match kind {
                 PrimitiveKind::Unit => Some(OperatorAllocation::Allocated(
-                    self.alloc_operator_id(&def),
+                    self.alloc_addr(&def),
                     SerdeOperator::Unit,
                 )),
                 PrimitiveKind::Boolean => Some(OperatorAllocation::Allocated(
-                    self.alloc_operator_id(&def),
+                    self.alloc_addr(&def),
                     SerdeOperator::Boolean(def.def_id),
                 )),
                 PrimitiveKind::False => Some(OperatorAllocation::Allocated(
-                    self.alloc_operator_id(&def),
+                    self.alloc_addr(&def),
                     SerdeOperator::False(def.def_id),
                 )),
                 PrimitiveKind::True => Some(OperatorAllocation::Allocated(
-                    self.alloc_operator_id(&def),
+                    self.alloc_addr(&def),
                     SerdeOperator::True(def.def_id),
                 )),
                 PrimitiveKind::Number => None,
                 PrimitiveKind::Integer => None,
                 PrimitiveKind::I64 => Some(OperatorAllocation::Allocated(
-                    self.alloc_operator_id(&def),
+                    self.alloc_addr(&def),
                     SerdeOperator::I64(def.def_id, None),
                 )),
                 PrimitiveKind::Float => None,
                 // TODO: f32
                 PrimitiveKind::F32 => None,
                 PrimitiveKind::F64 => Some(OperatorAllocation::Allocated(
-                    self.alloc_operator_id(&def),
+                    self.alloc_addr(&def),
                     SerdeOperator::F64(def.def_id, None),
                 )),
                 PrimitiveKind::Text => Some(OperatorAllocation::Allocated(
-                    self.alloc_operator_id(&def),
+                    self.alloc_addr(&def),
                     SerdeOperator::String(def.def_id),
                 )),
             },
@@ -363,7 +362,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 let literal = self.defs.get_string_representation(*def_id);
 
                 Some(OperatorAllocation::Allocated(
-                    self.alloc_operator_id(&def),
+                    self.alloc_addr(&def),
                     SerdeOperator::StringConstant(literal.into(), def.def_id),
                 ))
             }
@@ -372,12 +371,12 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 assert!(self.patterns.text_patterns.contains_key(&def.def_id));
 
                 Some(OperatorAllocation::Allocated(
-                    self.alloc_operator_id(&def),
+                    self.alloc_addr(&def),
                     SerdeOperator::TextPattern(*def_id),
                 ))
             }
             Type::TextLike(_, _) => Some(OperatorAllocation::Allocated(
-                self.alloc_operator_id(&def),
+                self.alloc_addr(&def),
                 SerdeOperator::TextPattern(def.def_id),
             )),
             Type::EmptySequence(_) => {
@@ -413,7 +412,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 SerdeModifier::NONE
             ) {
                 Some(OperatorAllocation::Allocated(
-                    self.alloc_operator_id(&def),
+                    self.alloc_addr(&def),
                     SerdeOperator::Struct(StructOperator {
                         typename: typename.into(),
                         def,
@@ -433,7 +432,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         match &repr.kind {
             ReprKind::Scalar(def_id, ReprScalarKind::I64(range), _span) => {
                 Some(OperatorAllocation::Allocated(
-                    self.alloc_operator_id(&def),
+                    self.alloc_addr(&def),
                     // Use the I32 operator for GraphQL purposes (if the integer range is within i32's range)
                     if *range.start() >= (i32::MIN as i64) && *range.end() <= (i32::MAX as i64) {
                         let range = RangeInclusive::new(*range.start() as i32, *range.end() as i32);
@@ -460,7 +459,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             ReprKind::Scalar(def_id, ReprScalarKind::F64(range), _span) => {
                 let f64_range = range.start().into_inner()..=range.end().into_inner();
                 Some(OperatorAllocation::Allocated(
-                    self.alloc_operator_id(&def),
+                    self.alloc_addr(&def),
                     SerdeOperator::F64(
                         *def_id,
                         if f64_range == (f64::MIN..=f64::MAX) {
@@ -480,7 +479,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                     panic!("Self-scalar without fmt: {def_id:?}");
                 } else {
-                    let (requirement, inner_operator_id) = self.get_property_operator(
+                    let (requirement, inner_addr) = self.get_property_operator(
                         *def_id,
                         (PropertyCardinality::Mandatory, ValueCardinality::One),
                         def.modifier.cross_def_flags(),
@@ -490,14 +489,14 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         panic!("Scalar cardinality must be mandatory, fix this during type check");
                     }
 
-                    let operator_id = self.alloc_operator_id(&def);
+                    let addr = self.alloc_addr(&def);
 
                     Some(OperatorAllocation::Allocated(
-                        operator_id,
+                        addr,
                         SerdeOperator::Alias(AliasOperator {
                             typename: typename.into(),
                             def,
-                            inner_operator_id,
+                            inner_addr,
                         }),
                     ))
                 }
@@ -523,9 +522,9 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 )
             }
             ReprKind::Union(_) | ReprKind::StructUnion(_) => {
-                let operator_id = self.alloc_operator_id(&def);
+                let addr = self.alloc_addr(&def);
                 Some(OperatorAllocation::Allocated(
-                    operator_id,
+                    addr,
                     if def.modifier.contains(SerdeModifier::UNION) {
                         self.create_union_operator(def, typename, properties)
                     } else {
@@ -542,9 +541,9 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     let mut element_iterator = sequence.elements().peekable();
 
                     while let Some((_, element)) = element_iterator.next() {
-                        let operator_id = match element {
+                        let addr = match element {
                             None => self
-                                .gen_operator_id(SerdeKey::Def(SerdeDef::new(
+                                .gen_addr(SerdeKey::Def(SerdeDef::new(
                                     DefId::unit(),
                                     def.modifier.cross_def_flags(),
                                 )))
@@ -552,7 +551,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             Some(relationship_id) => {
                                 let meta = self.defs.relationship_meta(relationship_id);
 
-                                self.gen_operator_id(SerdeKey::Def(
+                                self.gen_addr(SerdeKey::Def(
                                     def.with_def(meta.relationship.object.0),
                                 ))
                                 .expect("no inner operator")
@@ -560,19 +559,19 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         };
 
                         if element_iterator.peek().is_some() || !sequence.is_infinite() {
-                            sequence_range_builder.push_required_operator(operator_id);
+                            sequence_range_builder.push_required_operator(addr);
                         } else {
                             // last operator is infinite and accepts zero or more items
-                            sequence_range_builder.push_infinite_operator(operator_id);
+                            sequence_range_builder.push_infinite_operator(addr);
                         }
                     }
 
                     let ranges = sequence_range_builder.build();
                     trace!("sequence ranges: {:#?}", ranges);
 
-                    let operator_id = self.alloc_operator_id(&def);
+                    let addr = self.alloc_addr(&def);
                     Some(OperatorAllocation::Allocated(
-                        operator_id,
+                        addr,
                         SerdeOperator::ConstructorSequence(ConstructorSequenceOperator {
                             ranges,
                             def,
@@ -598,7 +597,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             let Some(identifies_relationship_id) = properties.identified_by else {
                 return Some(OperatorAllocation::Redirect(def.remove_modifier(union_mod)));
             };
-            let Some(id_operator_id) = self.gen_operator_id(SerdeKey::Def(SerdeDef::new(
+            let Some(id_addr) = self.gen_addr(SerdeKey::Def(SerdeDef::new(
                 def.def_id,
                 SerdeModifier::PRIMARY_ID | def.modifier.cross_def_flags(),
             ))) else {
@@ -610,23 +609,20 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             let identifies_meta = self.defs.relationship_meta(identifies_relationship_id);
 
             // prevent recursion
-            let new_operator_id = self.alloc_operator_id(&def);
+            let new_addr = self.alloc_addr(&def);
 
             // Create a union between { '_id' } and the map properties itself
-            let struct_properties_operator_id = self
-                .gen_operator_id(SerdeKey::Def(struct_def))
+            let struct_properties_addr = self
+                .gen_addr(SerdeKey::Def(struct_def))
                 .expect("No property struct operator");
 
-            let id_property_name =
-                match self.operators_by_id.get(id_operator_id.0 as usize).unwrap() {
-                    SerdeOperator::IdSingletonStruct(id_property_name, _) => {
-                        id_property_name.clone()
-                    }
-                    other => panic!("id operator was not an Id: {other:?}"),
-                };
+            let id_property_name = match self.operators_by_addr.get(id_addr.0 as usize).unwrap() {
+                SerdeOperator::IdSingletonStruct(id_property_name, _) => id_property_name.clone(),
+                other => panic!("id operator was not an Id: {other:?}"),
+            };
 
             Some(OperatorAllocation::Allocated(
-                new_operator_id,
+                new_addr,
                 SerdeOperator::Union(UnionOperator::new(
                     typename.into(),
                     def,
@@ -643,7 +639,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                                     def.modifier.cross_def_flags(),
                                 ),
                             },
-                            operator_id: id_operator_id,
+                            addr: id_addr,
                         },
                         ValueUnionVariant {
                             discriminator: VariantDiscriminator {
@@ -651,17 +647,17 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                                 purpose: VariantPurpose::Data,
                                 serde_def: struct_def,
                             },
-                            operator_id: struct_properties_operator_id,
+                            addr: struct_properties_addr,
                         },
                     ],
                 )),
             ))
         } else {
             // prevent recursion
-            let new_operator_id = self.alloc_operator_id(&def);
+            let new_addr = self.alloc_addr(&def);
 
             Some(OperatorAllocation::Allocated(
-                new_operator_id,
+                new_addr,
                 self.create_struct_operator(def, typename, properties),
             ))
         }
@@ -718,15 +714,15 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 )))
             }
         } else if modifier.contains(SerdeModifier::INHERENT_PROPS) {
-            let operator_id = self.alloc_operator_id(&def);
+            let addr = self.alloc_addr(&def);
             Some(OperatorAllocation::Allocated(
-                operator_id,
+                addr,
                 self.create_struct_operator(def, typename, properties),
             ))
         } else {
             let (value_def, _span) = members[0];
 
-            let (requirement, inner_operator_id) = self.get_property_operator(
+            let (requirement, inner_addr) = self.get_property_operator(
                 value_def,
                 (PropertyCardinality::Mandatory, ValueCardinality::One),
                 def.modifier.cross_def_flags(),
@@ -736,14 +732,14 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 panic!("Value properties must be mandatory, fix this during type check");
             }
 
-            let operator_id = self.alloc_operator_id(&def);
+            let addr = self.alloc_addr(&def);
 
             Some(OperatorAllocation::Allocated(
-                operator_id,
+                addr,
                 SerdeOperator::Alias(AliasOperator {
                     typename: typename.into(),
                     def,
-                    inner_operator_id,
+                    inner_addr,
                 }),
             ))
         }
@@ -762,7 +758,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         };
 
         Some(OperatorAllocation::Allocated(
-            self.alloc_operator_id(&def),
+            self.alloc_addr(&def),
             operator,
         ))
     }
@@ -799,10 +795,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             ));
 
             union_builder
-                .build(self, |this, operator_id, result_type| {
+                .build(self, |this, addr, result_type| {
                     if root_types.contains(&result_type) {
                         // Make the intersection:
-                        this.gen_operator_id(SerdeKey::Intersection(Box::new(
+                        this.gen_addr(SerdeKey::Intersection(Box::new(
                             [
                                 inherent_properties_key.clone(),
                                 SerdeKey::Def(def.with_def(result_type)),
@@ -811,13 +807,13 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         )))
                         .expect("No inner operator")
                     } else {
-                        operator_id
+                        addr
                     }
                 })
                 .unwrap()
         } else {
             union_builder
-                .build(self, |_this, operator_id, _result_type| operator_id)
+                .build(self, |_this, addr, _result_type| addr)
                 .unwrap()
         };
 
@@ -859,15 +855,16 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     .expect("Object property has no name"),
             };
 
-            let (property_cardinality, value_operator_id) = self.get_property_operator(
+            let (property_cardinality, value_addr) = self.get_property_operator(
                 type_def_id,
                 property.cardinality,
                 def.modifier.cross_def_flags(),
             );
 
-            let rel_params_operator_id = match &meta.relationship.rel_params {
-                RelParams::Type(def_id) => self
-                    .gen_operator_id(SerdeKey::Def(SerdeDef::new(*def_id, def.modifier.reset()))),
+            let rel_params_addr = match &meta.relationship.rel_params {
+                RelParams::Type(def_id) => {
+                    self.gen_addr(SerdeKey::Def(SerdeDef::new(*def_id, def.modifier.reset())))
+                }
                 RelParams::Unit => None,
                 _ => todo!(),
             };
@@ -914,10 +911,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 prop_key,
                 SerdeProperty {
                     property_id: *property_id,
-                    value_operator_id,
+                    value_addr,
                     flags,
                     value_generator,
-                    rel_params_operator_id,
+                    rel_params_addr,
                 },
                 def.modifier,
             );

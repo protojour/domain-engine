@@ -136,11 +136,11 @@ fn test_repr_valid_mesh1() {
         let [meters, length] = test.bind(["si.meters", "length"]);
 
         assert!(
-            meters.type_info.operator_id.is_none(),
+            meters.type_info.operator_addr.is_none(),
             "meters is an abstract type"
         );
         assert!(
-            length.type_info.operator_id.is_some(),
+            length.type_info.operator_addr.is_some(),
             "length is a concrete type"
         );
     });

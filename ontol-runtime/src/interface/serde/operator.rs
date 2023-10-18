@@ -21,10 +21,10 @@ use super::{
     SerdeDef,
 };
 
-/// SerdeOperatorId is an index into a vector of SerdeOperators.
+/// SerdeOperatorAddr is an index into a vector of SerdeOperators.
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, DebugExtras)]
 #[debug_single_tuple_inline]
-pub struct SerdeOperatorId(pub u32);
+pub struct SerdeOperatorAddr(pub u32);
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum SerdeOperator {
@@ -68,7 +68,7 @@ pub enum SerdeOperator {
     Struct(StructOperator),
 
     /// A map with one property: The ID of an entity.
-    IdSingletonStruct(String, SerdeOperatorId),
+    IdSingletonStruct(String, SerdeOperatorAddr),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -107,7 +107,7 @@ impl ConstructorSequenceOperator {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SequenceRange {
     /// Operator to use for this range
-    pub operator_id: SerdeOperatorId,
+    pub addr: SerdeOperatorAddr,
     /// If this range is finite, this represents the number of repetitions.
     /// If None, this range is infinite and accepts 0 or more items.
     /// An infinite range must be the last range in the sequence to make any sense.
@@ -118,7 +118,7 @@ pub struct SequenceRange {
 pub struct AliasOperator {
     pub typename: String,
     pub def: SerdeDef,
-    pub inner_operator_id: SerdeOperatorId,
+    pub inner_addr: SerdeOperatorAddr,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -173,7 +173,7 @@ impl UnionOperator {
 
     fn filtered_variants(variants: &[ValueUnionVariant]) -> FilteredVariants<'_> {
         if variants.len() == 1 {
-            FilteredVariants::Single(variants[0].operator_id)
+            FilteredVariants::Single(variants[0].addr)
         } else {
             FilteredVariants::Union(variants)
         }
@@ -185,7 +185,7 @@ impl UnionOperator {
 }
 
 pub enum FilteredVariants<'e> {
-    Single(SerdeOperatorId),
+    Single(SerdeOperatorAddr),
     /// Should serialize one of the union members
     Union(&'e [ValueUnionVariant]),
 }
@@ -193,7 +193,7 @@ pub enum FilteredVariants<'e> {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ValueUnionVariant {
     pub discriminator: VariantDiscriminator,
-    pub operator_id: SerdeOperatorId,
+    pub addr: SerdeOperatorAddr,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -230,8 +230,8 @@ pub struct SerdeProperty {
     /// The ID of this property
     pub property_id: PropertyId,
 
-    /// The operator id for the value of this property
-    pub value_operator_id: SerdeOperatorId,
+    /// The operator addr for the value of this property
+    pub value_addr: SerdeOperatorAddr,
 
     /// Various flags
     pub flags: SerdePropertyFlags,
@@ -239,7 +239,7 @@ pub struct SerdeProperty {
     /// Value generator
     pub value_generator: Option<ValueGenerator>,
 
-    pub rel_params_operator_id: Option<SerdeOperatorId>,
+    pub rel_params_addr: Option<SerdeOperatorAddr>,
 }
 
 impl SerdeProperty {

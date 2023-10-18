@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use ontol_runtime::{
     interface::serde::{
-        operator::{FilteredVariants, SerdeOperator, SerdeOperatorId, SerdeProperty},
+        operator::{FilteredVariants, SerdeOperator, SerdeOperatorAddr, SerdeProperty},
         processor::{ProcessorLevel, ProcessorMode},
     },
     ontology::TypeInfo,
@@ -35,8 +35,8 @@ impl<'e> Generator<'e> {
         match &mut value.data {
             Data::Struct(struct_map) => {
                 let type_info = ontology.get_type_info(value.type_def_id);
-                if let Some(operator_id) = type_info.operator_id {
-                    self.generate_struct_values(struct_map, type_info, operator_id);
+                if let Some(addr) = type_info.operator_addr {
+                    self.generate_struct_values(struct_map, type_info, addr);
                 }
 
                 // recurse into sub-properties
@@ -59,9 +59,9 @@ impl<'e> Generator<'e> {
         &self,
         struct_map: &mut BTreeMap<PropertyId, Attribute>,
         type_info: &TypeInfo,
-        operator_id: SerdeOperatorId,
+        addr: SerdeOperatorAddr,
     ) {
-        let operator = self.engine.ontology().get_serde_operator(operator_id);
+        let operator = self.engine.ontology().get_serde_operator(addr);
         let id_relationship = type_info
             .entity_info
             .as_ref()
@@ -128,8 +128,8 @@ impl<'e> Generator<'e> {
             }
             SerdeOperator::Union(union_op) => {
                 match union_op.variants(ProcessorMode::Create, ProcessorLevel::new_root()) {
-                    FilteredVariants::Single(child_operator_id) => {
-                        self.generate_struct_values(struct_map, type_info, child_operator_id);
+                    FilteredVariants::Single(child_addr) => {
+                        self.generate_struct_values(struct_map, type_info, child_addr);
                     }
                     FilteredVariants::Union(_) => panic!("BUG"),
                 }
@@ -142,7 +142,7 @@ impl<'e> Generator<'e> {
         let operator = self
             .engine
             .ontology()
-            .get_serde_operator(property.value_operator_id);
+            .get_serde_operator(property.value_addr);
         self.operator_def_id(operator)
     }
 
@@ -166,8 +166,8 @@ impl<'e> Generator<'e> {
             SerdeOperator::Alias(alias_op) => alias_op.def.def_id,
             SerdeOperator::Union(union_op) => union_op.union_def().def_id,
             SerdeOperator::Struct(struct_op) => struct_op.def.def_id,
-            SerdeOperator::IdSingletonStruct(_, operator_id) => {
-                self.operator_def_id(self.engine.ontology().get_serde_operator(*operator_id))
+            SerdeOperator::IdSingletonStruct(_, addr) => {
+                self.operator_def_id(self.engine.ontology().get_serde_operator(*addr))
             }
         }
     }

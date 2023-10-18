@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{interface::serde::operator::SerdeOperatorId, DefId};
+use crate::{interface::serde::operator::SerdeOperatorAddr, DefId};
 
 use super::{
     data::{TypeIndex, UnitTypeRef},
@@ -9,7 +9,7 @@ use super::{
 
 pub enum ArgKind {
     Indexed(TypeIndex),
-    Operator(SerdeOperatorId),
+    Operator(SerdeOperatorAddr),
 }
 
 pub trait FieldArg {
@@ -21,7 +21,7 @@ pub trait DomainFieldArg: FieldArg {
         TypingPurpose::Input
     }
 
-    fn operator_id(&self) -> SerdeOperatorId;
+    fn operator_addr(&self) -> SerdeOperatorAddr;
 
     fn kind(&self) -> ArgKind;
 }
@@ -30,7 +30,7 @@ pub trait DomainFieldArg: FieldArg {
 pub struct Input {
     pub type_index: TypeIndex,
     pub def_id: DefId,
-    pub operator_id: SerdeOperatorId,
+    pub operator_addr: SerdeOperatorAddr,
     pub typing_purpose: TypingPurpose,
 }
 
@@ -45,8 +45,8 @@ impl DomainFieldArg for Input {
         self.typing_purpose
     }
 
-    fn operator_id(&self) -> SerdeOperatorId {
-        self.operator_id
+    fn operator_addr(&self) -> SerdeOperatorAddr {
+        self.operator_addr
     }
 
     fn kind(&self) -> ArgKind {
@@ -56,7 +56,7 @@ impl DomainFieldArg for Input {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Id {
-    pub operator_id: SerdeOperatorId,
+    pub operator_addr: SerdeOperatorAddr,
     pub unit_type_ref: UnitTypeRef,
 }
 
@@ -67,14 +67,14 @@ impl FieldArg for Id {
 }
 
 impl DomainFieldArg for Id {
-    fn operator_id(&self) -> SerdeOperatorId {
-        self.operator_id
+    fn operator_addr(&self) -> SerdeOperatorAddr {
+        self.operator_addr
     }
 
     fn kind(&self) -> ArgKind {
         match &self.unit_type_ref {
             UnitTypeRef::Indexed(type_index) => ArgKind::Indexed(*type_index),
-            UnitTypeRef::NativeScalar(_) => ArgKind::Operator(self.operator_id),
+            UnitTypeRef::NativeScalar(_) => ArgKind::Operator(self.operator_addr),
         }
     }
 }

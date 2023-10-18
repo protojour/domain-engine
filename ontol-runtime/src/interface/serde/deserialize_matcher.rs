@@ -13,7 +13,7 @@ use crate::{
 use super::{
     operator::{FilteredVariants, SequenceRange, SerdeOperator, ValueUnionVariant},
     processor::{ProcessorLevel, ProcessorMode, SubProcessorContext},
-    SerdeOperatorId, StructOperator,
+    SerdeOperatorAddr, StructOperator,
 };
 
 pub struct ExpectingMatching<'v>(pub &'v dyn ValueMatcher);
@@ -25,7 +25,7 @@ impl<'v> Display for ExpectingMatching<'v> {
 }
 
 pub struct SeqElementMatch {
-    pub element_operator_id: SerdeOperatorId,
+    pub element_addr: SerdeOperatorAddr,
     pub ctx: SubProcessorContext,
 }
 
@@ -320,7 +320,7 @@ impl<'on> SequenceMatcher<'on> {
                     self.repetition_cursor += 1;
 
                     return Some(SeqElementMatch {
-                        element_operator_id: range.operator_id,
+                        element_addr: range.addr,
                         ctx: self.ctx,
                     });
                 } else {
@@ -335,7 +335,7 @@ impl<'on> SequenceMatcher<'on> {
                 }
             } else {
                 return Some(SeqElementMatch {
-                    element_operator_id: range.operator_id,
+                    element_addr: range.addr,
                     ctx: self.ctx,
                 });
             }
@@ -383,7 +383,7 @@ impl<'on> ValueMatcher for UnionMatcher<'on> {
                     .variants
                     .iter()
                     .map(|discriminator| self.ontology.new_serde_processor(
-                        discriminator.operator_id,
+                        discriminator.addr,
                         self.mode,
                         ProcessorLevel::new_root(),
                         &DOMAIN_PROFILE,
@@ -448,7 +448,7 @@ impl<'on> ValueMatcher for UnionMatcher<'on> {
     fn match_sequence(&self) -> Result<SequenceMatcher, ()> {
         for variant in self.variants {
             if variant.discriminator.discriminant == Discriminant::IsSequence {
-                match self.ontology.get_serde_operator(variant.operator_id) {
+                match self.ontology.get_serde_operator(variant.addr) {
                     SerdeOperator::RelationSequence(seq_op) => {
                         return Ok(SequenceMatcher::new(
                             &seq_op.ranges,
@@ -530,7 +530,7 @@ pub struct MapMatch<'on> {
 #[derive(Debug)]
 pub enum MapMatchKind<'on> {
     StructType(&'on StructOperator),
-    IdType(&'on str, SerdeOperatorId),
+    IdType(&'on str, SerdeOperatorAddr),
 }
 
 impl<'on> MapMatcher<'on> {
@@ -568,12 +568,12 @@ impl<'on> MapMatcher<'on> {
             .iter()
             .find(|variant| match_fn(&variant.discriminator.discriminant))
             .map(
-                |variant| match self.ontology.get_serde_operator(variant.operator_id) {
+                |variant| match self.ontology.get_serde_operator(variant.addr) {
                     SerdeOperator::Struct(struct_op) => {
                         MapMatchResult::Match(self.new_match(MapMatchKind::StructType(struct_op)))
                     }
-                    SerdeOperator::IdSingletonStruct(name, operator_id) => MapMatchResult::Match(
-                        self.new_match(MapMatchKind::IdType(name.as_str(), *operator_id)),
+                    SerdeOperator::IdSingletonStruct(name, addr) => MapMatchResult::Match(
+                        self.new_match(MapMatchKind::IdType(name.as_str(), *addr)),
                     ),
                     SerdeOperator::Union(union_op) => {
                         match union_op.variants(self.mode, self.level) {
@@ -606,15 +606,15 @@ impl<'on> MapMatcher<'on> {
                 variant.discriminator.discriminant,
                 Discriminant::StructFallback
             ) {
-                match self.ontology.get_serde_operator(variant.operator_id) {
+                match self.ontology.get_serde_operator(variant.addr) {
                     SerdeOperator::Struct(struct_op) => {
                         return MapMatchResult::Match(
                             self.new_match(MapMatchKind::StructType(struct_op)),
                         )
                     }
-                    SerdeOperator::IdSingletonStruct(name, operator_id) => {
+                    SerdeOperator::IdSingletonStruct(name, addr) => {
                         return MapMatchResult::Match(
-                            self.new_match(MapMatchKind::IdType(name.as_str(), *operator_id)),
+                            self.new_match(MapMatchKind::IdType(name.as_str(), *addr)),
                         )
                     }
                     other => panic!("Matched discriminator is not a map type: {other:?}"),

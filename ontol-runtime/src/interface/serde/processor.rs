@@ -6,7 +6,7 @@ use crate::{
     value::PropertyId,
 };
 
-use super::operator::{FilteredVariants, SerdeOperator, SerdeOperatorId};
+use super::operator::{FilteredVariants, SerdeOperator, SerdeOperatorAddr};
 
 #[derive(Copy, Clone, Debug)]
 pub enum ProcessorMode {
@@ -103,7 +103,7 @@ pub struct SubProcessorContext {
     /// Generally, non-unit edge data can only be represented on a relation between two map types.
     /// The parent (often the subject) map has an attribute that is another child map.
     /// The edge data would be injected in the child map as the `_edge` property.
-    pub rel_params_operator_id: Option<SerdeOperatorId>,
+    pub rel_params_addr: Option<SerdeOperatorAddr>,
 }
 
 /// SerdeProcessor handles serializing and deserializing domain types in an optimized way.
@@ -131,26 +131,22 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
     }
 
     /// Return a processor that helps to _narrow the value_ that this processor represents.
-    pub fn narrow(&self, operator_id: SerdeOperatorId) -> Self {
+    pub fn narrow(&self, addr: SerdeOperatorAddr) -> Self {
         Self {
             ontology: self.ontology,
             profile: self.profile,
-            value_operator: self.ontology.get_serde_operator(operator_id),
+            value_operator: self.ontology.get_serde_operator(addr),
             ctx: self.ctx,
             mode: self.mode,
             level: self.level,
         }
     }
 
-    pub fn narrow_with_context(
-        &self,
-        operator_id: SerdeOperatorId,
-        ctx: SubProcessorContext,
-    ) -> Self {
+    pub fn narrow_with_context(&self, addr: SerdeOperatorAddr, ctx: SubProcessorContext) -> Self {
         Self {
             ontology: self.ontology,
             profile: self.profile,
-            value_operator: self.ontology.get_serde_operator(operator_id),
+            value_operator: self.ontology.get_serde_operator(addr),
             ctx,
             mode: self.mode,
             level: self.level,
@@ -158,11 +154,11 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
     }
 
     /// Return a processor that processes a new value that is a child value of this processor.
-    pub fn new_child(&self, operator_id: SerdeOperatorId) -> Result<Self, RecursionLimitError> {
+    pub fn new_child(&self, addr: SerdeOperatorAddr) -> Result<Self, RecursionLimitError> {
         Ok(Self {
             ontology: self.ontology,
             profile: self.profile,
-            value_operator: self.ontology.get_serde_operator(operator_id),
+            value_operator: self.ontology.get_serde_operator(addr),
             ctx: Default::default(),
             mode: self.mode,
             level: self.level.child()?,
@@ -171,13 +167,13 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 
     pub fn new_child_with_context(
         &self,
-        operator_id: SerdeOperatorId,
+        addr: SerdeOperatorAddr,
         ctx: SubProcessorContext,
     ) -> Result<Self, RecursionLimitError> {
         Ok(Self {
             ontology: self.ontology,
             profile: self.profile,
-            value_operator: self.ontology.get_serde_operator(operator_id),
+            value_operator: self.ontology.get_serde_operator(addr),
             ctx,
             mode: self.mode,
             level: self.level.child()?,
@@ -191,14 +187,10 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
     fn search_property(&self, prop: &str, operator: &'on SerdeOperator) -> Option<PropertyId> {
         match operator {
             SerdeOperator::Union(union_op) => match union_op.variants(self.mode, self.level) {
-                FilteredVariants::Single(operator_id) => {
-                    self.narrow(operator_id).find_property(prop)
-                }
+                FilteredVariants::Single(addr) => self.narrow(addr).find_property(prop),
                 FilteredVariants::Union(variants) => {
                     for variant in variants {
-                        if let Some(property_id) =
-                            self.narrow(variant.operator_id).find_property(prop)
-                        {
+                        if let Some(property_id) = self.narrow(variant.addr).find_property(prop) {
                             return Some(property_id);
                         }
                     }
@@ -217,11 +209,11 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 
 impl<'on, 'p> Debug for SerdeProcessor<'on, 'p> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // This structure might contain cycles (through operator id),
+        // This structure might contain cycles (through operator addr),
         // so just print the topmost level.
         f.debug_struct("SerdeProcessor")
             .field("operator", self.value_operator)
-            .field("rel_params_operator_id", &self.ctx.rel_params_operator_id)
+            .field("rel_params_addr", &self.ctx.rel_params_addr)
             .finish()
     }
 }
@@ -247,7 +239,7 @@ impl<'on, 'p> Display for SerdeProcessor<'on, 'p> {
                 write!(f, "RawId")
             }
             SerdeOperator::RelationSequence(seq_op) => {
-                write!(f, "[{}..]", self.narrow(seq_op.ranges[0].operator_id))
+                write!(f, "[{}..]", self.narrow(seq_op.ranges[0].addr))
             }
             SerdeOperator::ConstructorSequence(seq_op) => {
                 let mut processors = vec![];
@@ -255,12 +247,12 @@ impl<'on, 'p> Display for SerdeProcessor<'on, 'p> {
                 for range in &seq_op.ranges {
                     if let Some(finite_repetition) = range.finite_repetition {
                         for _ in 0..finite_repetition {
-                            processors.push(self.narrow(range.operator_id));
+                            processors.push(self.narrow(range.addr));
                         }
                         finite = true;
                     } else {
                         finite = false;
-                        processors.push(self.narrow(range.operator_id));
+                        processors.push(self.narrow(range.addr));
                     }
                 }
 

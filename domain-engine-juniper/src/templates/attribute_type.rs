@@ -308,7 +308,7 @@ impl<'v> AttributeType<'v> {
                         let gql_scalar = schema_ctx
                             .ontology
                             .new_serde_processor(
-                                scalar_data.serde_operator_id,
+                                scalar_data.operator_addr,
                                 ProcessorMode::Read,
                                 ProcessorLevel::new_root(),
                                 &DOMAIN_PROFILE,
@@ -328,12 +328,12 @@ impl<'v> AttributeType<'v> {
                 type_ref.modifier,
                 schema_ctx
                     .ontology
-                    .get_serde_operator(scalar_ref.operator_id),
+                    .get_serde_operator(scalar_ref.operator_addr),
             ) {
                 (TypeModifier::Array(..), SerdeOperator::RelationSequence(operator)) => {
                     let attributes = attribute.value.cast_ref::<Vec<_>>();
                     let processor = schema_ctx.ontology.new_serde_processor(
-                        operator.ranges[0].operator_id,
+                        operator.ranges[0].addr,
                         ProcessorMode::Read,
                         ProcessorLevel::new_root(),
                         &DOMAIN_PROFILE,
@@ -357,7 +357,7 @@ impl<'v> AttributeType<'v> {
                     let scalar = schema_ctx
                         .ontology
                         .new_serde_processor(
-                            scalar_ref.operator_id,
+                            scalar_ref.operator_addr,
                             ProcessorMode::Read,
                             ProcessorLevel::new_root(),
                             &DOMAIN_PROFILE,

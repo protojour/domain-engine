@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use ontol_runtime::{
     interface::discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
     interface::serde::{
-        operator::{SerdeOperator, SerdeOperatorId, ValueUnionVariant},
+        operator::{SerdeOperator, SerdeOperatorAddr, ValueUnionVariant},
         SerdeDef, SerdeKey,
     },
     smart_format, DefId,
@@ -31,7 +31,11 @@ impl UnionBuilder {
     pub fn build(
         self,
         generator: &mut SerdeGenerator,
-        mut map_operator_fn: impl FnMut(&mut SerdeGenerator, SerdeOperatorId, DefId) -> SerdeOperatorId,
+        mut map_operator_fn: impl FnMut(
+            &mut SerdeGenerator,
+            SerdeOperatorAddr,
+            DefId,
+        ) -> SerdeOperatorAddr,
     ) -> Result<Vec<ValueUnionVariant>, String> {
         // sanity check
         let mut ambiguous_discriminant_debug: BTreeMap<Discriminant, usize> = Default::default();
@@ -45,7 +49,7 @@ impl UnionBuilder {
         for candidate in &mut variant_candidates {
             let result_type = candidate.discriminator.serde_def.def_id;
 
-            candidate.operator_id = map_operator_fn(generator, candidate.operator_id, result_type);
+            candidate.addr = map_operator_fn(generator, candidate.addr, result_type);
 
             match &mut candidate.discriminator.discriminant {
                 Discriminant::StructFallback => {
@@ -91,25 +95,25 @@ impl UnionBuilder {
         discriminator: &VariantDiscriminator,
         generator: &mut SerdeGenerator,
     ) -> Result<(), String> {
-        let operator_id = match generator.gen_operator_id(SerdeKey::Def(
+        let addr = match generator.gen_addr(SerdeKey::Def(
             self.def.with_def(discriminator.serde_def.def_id),
         )) {
-            Some(operator_id) => operator_id,
+            Some(addr) => addr,
             None => return Ok(()),
         };
 
         // Push with empty scope ('root scope')
-        self.push_discriminator(discriminator, operator_id, &[], generator)
+        self.push_discriminator(discriminator, addr, &[], generator)
     }
 
     fn push_discriminator(
         &mut self,
         discriminator: &VariantDiscriminator,
-        operator_id: SerdeOperatorId,
+        addr: SerdeOperatorAddr,
         scope: &[&VariantDiscriminator],
         generator: &SerdeGenerator,
     ) -> Result<(), String> {
-        let operator = &generator.operators_by_id[operator_id.0 as usize];
+        let operator = &generator.operators_by_addr[addr.0 as usize];
         match operator {
             SerdeOperator::Union(union_op) => {
                 for variant in union_op.unfiltered_variants() {
@@ -119,7 +123,7 @@ impl UnionBuilder {
 
                     self.push_discriminator(
                         &variant.discriminator,
-                        variant.operator_id,
+                        variant.addr,
                         &child_scope,
                         generator,
                     )?;
@@ -136,7 +140,7 @@ impl UnionBuilder {
                                 .or_default()
                                 .push(ValueUnionVariant {
                                     discriminator: (*scoping).clone(),
-                                    operator_id,
+                                    addr,
                                 });
 
                             Ok(())
@@ -150,7 +154,7 @@ impl UnionBuilder {
                             .or_default()
                             .push(ValueUnionVariant {
                                 discriminator: discriminator.clone(),
-                                operator_id,
+                                addr,
                             });
                         Ok(())
                     }

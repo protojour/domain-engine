@@ -11,7 +11,7 @@ use ontol_runtime::{
         schema::{QueryLevel, TypingPurpose},
     },
     interface::serde::operator::{
-        FilteredVariants, SerdeOperator, SerdeOperatorId, SerdePropertyFlags,
+        FilteredVariants, SerdeOperator, SerdeOperatorAddr, SerdePropertyFlags,
     },
     value::PropertyId,
     Role,
@@ -81,12 +81,12 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
 
     pub fn collect_operator_arguments(
         &mut self,
-        operator_id: SerdeOperatorId,
+        operator_addr: SerdeOperatorAddr,
         output: &mut Vec<juniper::meta::Argument<'r, GqlScalar>>,
         typing_purpose: TypingPurpose,
         filter: ArgumentFilter,
     ) -> Result<(), CollectOperatorError> {
-        let serde_operator = self.schema_ctx.ontology.get_serde_operator(operator_id);
+        let serde_operator = self.schema_ctx.ontology.get_serde_operator(operator_addr);
 
         match serde_operator {
             SerdeOperator::Struct(struct_op) => {
@@ -108,8 +108,8 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
 
                     output.push(self.get_operator_argument(
                         name,
-                        property.value_operator_id,
-                        property.rel_params_operator_id,
+                        property.value_addr,
+                        property.rel_params_addr,
                         property.flags,
                         TypeModifier::Unit(match typing_purpose {
                             TypingPurpose::PartialInput => Optionality::Optional,
@@ -129,9 +129,9 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             SerdeOperator::Union(union_op) => {
                 let (mode, level) = typing_purpose.mode_and_level();
                 match union_op.variants(mode, level) {
-                    FilteredVariants::Single(operator_id) => {
+                    FilteredVariants::Single(operator_addr) => {
                         self.collect_operator_arguments(
-                            operator_id,
+                            operator_addr,
                             output,
                             typing_purpose,
                             filter,
@@ -144,7 +144,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         // as a documentation layer anyway.
                         for variant in variants {
                             self.collect_operator_arguments(
-                                variant.operator_id,
+                                variant.addr,
                                 output,
                                 TypingPurpose::PartialInput,
                                 ArgumentFilter {
@@ -156,7 +156,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         }
                         for variant in variants {
                             self.collect_operator_arguments(
-                                variant.operator_id,
+                                variant.addr,
                                 output,
                                 TypingPurpose::PartialInput,
                                 ArgumentFilter {
@@ -173,7 +173,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             }
             SerdeOperator::Alias(alias_op) => {
                 self.collect_operator_arguments(
-                    alias_op.inner_operator_id,
+                    alias_op.inner_addr,
                     output,
                     typing_purpose,
                     filter,
@@ -181,11 +181,11 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
 
                 Ok(())
             }
-            SerdeOperator::IdSingletonStruct(property_name, id_operator_id) => {
+            SerdeOperator::IdSingletonStruct(property_name, id_operator_addr) => {
                 if filter.filter_property(property_name, None, output) {
                     output.push(self.get_operator_argument(
                         property_name,
-                        *id_operator_id,
+                        *id_operator_addr,
                         None,
                         SerdePropertyFlags::ENTITY_ID,
                         TypeModifier::Unit(Optionality::Optional),
@@ -201,12 +201,12 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
     pub fn get_operator_argument(
         &mut self,
         name: &str,
-        operator_id: SerdeOperatorId,
-        rel_params: Option<SerdeOperatorId>,
+        operator_addr: SerdeOperatorAddr,
+        rel_params: Option<SerdeOperatorAddr>,
         property_flags: SerdePropertyFlags,
         modifier: TypeModifier,
     ) -> juniper::meta::Argument<'r, GqlScalar> {
-        let operator = self.schema_ctx.ontology.get_serde_operator(operator_id);
+        let operator = self.schema_ctx.ontology.get_serde_operator(operator_addr);
 
         trace!("register argument '{name}': {operator:?}");
 
@@ -252,7 +252,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                     ),
                     None => self.get_operator_argument(
                         name,
-                        seq_op.ranges[0].operator_id,
+                        seq_op.ranges[0].addr,
                         rel_params,
                         property_flags,
                         TypeModifier::Array(modifier.unit_optionality(), Optionality::Mandatory),
@@ -270,7 +270,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             }
             SerdeOperator::Alias(alias_op) => self.get_operator_argument(
                 name,
-                alias_op.inner_operator_id,
+                alias_op.inner_addr,
                 rel_params,
                 property_flags,
                 modifier,
@@ -340,7 +340,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                     .arg::<Option<std::string::String>>(after.name(), &()),
             ]),
             FieldKind::Map {
-                input_operator_id,
+                input_operator_addr,
                 scalar_input_name,
                 ..
             } => {
@@ -348,7 +348,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 if let Some(scalar_input_name) = scalar_input_name {
                     let argument = self.get_operator_argument(
                         scalar_input_name,
-                        *input_operator_id,
+                        *input_operator_addr,
                         None,
                         SerdePropertyFlags::empty(),
                         TypeModifier::Unit(Optionality::Mandatory),
@@ -356,7 +356,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                     arguments.push(argument);
                 } else {
                     self.collect_operator_arguments(
-                        *input_operator_id,
+                        *input_operator_addr,
                         &mut arguments,
                         TypingPurpose::Input,
                         ArgumentFilter::default(),
@@ -390,9 +390,9 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                     .schema_ctx
                     .get_schema_type(type_index, argument.typing_purpose()),
             ),
-            ArgKind::Operator(operator_id) => self.get_operator_argument(
+            ArgKind::Operator(addr) => self.get_operator_argument(
                 argument.name(),
-                operator_id,
+                addr,
                 None,
                 SerdePropertyFlags::default(),
                 TypeModifier::Unit(Optionality::Mandatory),

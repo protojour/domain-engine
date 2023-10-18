@@ -8,7 +8,7 @@ use smartstring::alias::String;
 use urlencoding::encode;
 
 use crate::interface::serde::operator::{
-    SequenceRange, SerdeOperator, SerdeOperatorId, StructOperator, UnionOperator,
+    SequenceRange, SerdeOperator, SerdeOperatorAddr, StructOperator, UnionOperator,
 };
 use crate::interface::serde::processor::ProcessorMode;
 use crate::ontology::TypeInfo;
@@ -29,8 +29,8 @@ pub fn build_openapi_schemas<'e>(
 
     for (_, def_id) in &domain.type_names {
         let type_info = domain.type_info(*def_id);
-        if let Some(operator_id) = &type_info.operator_id {
-            graph_builder.visit(*operator_id, ontology);
+        if let Some(operator_addr) = &type_info.operator_addr {
+            graph_builder.visit(*operator_addr, ontology);
         }
     }
 
@@ -48,13 +48,13 @@ pub fn build_standalone_schema<'e>(
 ) -> Result<StandaloneJsonSchema<'e>, &'static str> {
     let mut graph_builder = SchemaGraphBuilder::default();
 
-    let operator_id = type_info
-        .operator_id
-        .ok_or("no serde operator id available")?;
-    graph_builder.visit(operator_id, ontology);
+    let operator_addr = type_info
+        .operator_addr
+        .ok_or("no serde operator addr available")?;
+    graph_builder.visit(operator_addr, ontology);
 
     Ok(StandaloneJsonSchema {
-        operator_id,
+        operator_addr,
         def_id: type_info.def_id,
         defs: graph_builder.graph,
         ontology,
@@ -62,11 +62,11 @@ pub fn build_standalone_schema<'e>(
     })
 }
 
-type DefMap = BTreeMap<SerdeDef, SerdeOperatorId>;
+type DefMap = BTreeMap<SerdeDef, SerdeOperatorAddr>;
 
 /// Includes all the schemas in a domain, for use in OpenApi
 pub struct OpenApiSchemas<'e> {
-    schema_graph: BTreeMap<SerdeDef, SerdeOperatorId>,
+    schema_graph: BTreeMap<SerdeDef, SerdeOperatorAddr>,
     package_id: PackageId,
     ontology: &'e Ontology,
 }
@@ -81,21 +81,21 @@ impl<'e> Serialize for OpenApiSchemas<'e> {
             link_anchor: LinkAnchor::ComponentsSchemas,
             ontology: self.ontology,
             docs: None,
-            rel_params_operator_id: None,
+            rel_params_operator_addr: None,
             mode: ProcessorMode::Create,
         };
 
         // serialize schema definitions belonging to the domain package first
-        for (def_id, operator_id) in self.schema_graph.range(
+        for (def_id, operator_addr) in self.schema_graph.range(
             SerdeDef::new(DefId(package_id, 0), SerdeModifier::NONE)
                 ..SerdeDef::new(DefId(next_package_id, 0), SerdeModifier::NONE),
         ) {
-            map.serialize_entry(&ctx.format_key(*def_id), &ctx.definition(*operator_id))?;
+            map.serialize_entry(&ctx.format_key(*def_id), &ctx.definition(*operator_addr))?;
         }
 
-        for (serde_def, operator_id) in &self.schema_graph {
+        for (serde_def, operator_addr) in &self.schema_graph {
             if serde_def.def_id.0 != self.package_id {
-                map.serialize_entry(&ctx.format_key(*serde_def), &ctx.definition(*operator_id))?;
+                map.serialize_entry(&ctx.format_key(*serde_def), &ctx.definition(*operator_addr))?;
             }
         }
 
@@ -105,9 +105,9 @@ impl<'e> Serialize for OpenApiSchemas<'e> {
 
 /// Schema for a single type, for use in JSON schema
 pub struct StandaloneJsonSchema<'e> {
-    operator_id: SerdeOperatorId,
+    operator_addr: SerdeOperatorAddr,
     def_id: DefId,
-    defs: BTreeMap<SerdeDef, SerdeOperatorId>,
+    defs: BTreeMap<SerdeDef, SerdeOperatorAddr>,
     ontology: &'e Ontology,
     mode: ProcessorMode,
 }
@@ -119,13 +119,13 @@ impl<'e> Serialize for StandaloneJsonSchema<'e> {
             link_anchor: LinkAnchor::Defs,
             ontology: self.ontology,
             docs: docs.as_deref(),
-            rel_params_operator_id: None,
+            rel_params_operator_addr: None,
             mode: self.mode,
         };
 
         SchemaReference {
             ctx,
-            operator_id: self.operator_id,
+            operator_addr: self.operator_addr,
             def_map: if self.defs.is_empty() {
                 None
             } else {
@@ -141,22 +141,22 @@ struct SchemaCtx<'e> {
     link_anchor: LinkAnchor,
     ontology: &'e Ontology,
     docs: Option<&'e str>,
-    rel_params_operator_id: Option<SerdeOperatorId>,
+    rel_params_operator_addr: Option<SerdeOperatorAddr>,
     mode: ProcessorMode,
 }
 
 impl<'e> SchemaCtx<'e> {
-    fn definition(self, operator_id: SerdeOperatorId) -> SchemaDefinition<'e> {
+    fn definition(self, operator_addr: SerdeOperatorAddr) -> SchemaDefinition<'e> {
         SchemaDefinition {
             ctx: self,
-            value_operator: self.ontology.get_serde_operator(operator_id),
+            value_operator: self.ontology.get_serde_operator(operator_addr),
         }
     }
 
-    fn reference(&self, link: SerdeOperatorId) -> SchemaReference<'static, 'e> {
+    fn reference(&self, link: SerdeOperatorAddr) -> SchemaReference<'static, 'e> {
         SchemaReference {
             ctx: *self,
-            operator_id: link,
+            operator_addr: link,
             def_map: None,
         }
     }
@@ -168,12 +168,12 @@ impl<'e> SchemaCtx<'e> {
     fn singleton_object(
         &self,
         property_name: impl Into<String>,
-        operator_id: SerdeOperatorId,
+        operator_addr: SerdeOperatorAddr,
     ) -> SingletonObjectSchema<'e> {
         SingletonObjectSchema {
             ctx: *self,
             property_name: property_name.into(),
-            operator_id,
+            operator_addr,
         }
     }
 
@@ -185,11 +185,11 @@ impl<'e> SchemaCtx<'e> {
         }
     }
 
-    fn with_rel_params(&self, rel_params_operator_id: Option<SerdeOperatorId>) -> Self {
+    fn with_rel_params(&self, rel_params_operator_addr: Option<SerdeOperatorAddr>) -> Self {
         Self {
             link_anchor: self.link_anchor,
             ontology: self.ontology,
-            rel_params_operator_id,
+            rel_params_operator_addr,
             docs: self.docs,
             mode: self.mode,
         }
@@ -199,7 +199,7 @@ impl<'e> SchemaCtx<'e> {
         Self {
             link_anchor: self.link_anchor,
             ontology: self.ontology,
-            rel_params_operator_id: self.rel_params_operator_id,
+            rel_params_operator_addr: self.rel_params_operator_addr,
             docs,
             mode: self.mode,
         }
@@ -382,7 +382,7 @@ fn serialize_schema_inline<S: Serializer>(
 
             let range = &seq_op.ranges[0];
             // normal array: all items are uniform
-            map.serialize_entry("items", &ctx.reference(range.operator_id))?;
+            map.serialize_entry("items", &ctx.reference(range.addr))?;
         }
         SerdeOperator::ConstructorSequence(seq_op) => {
             map.serialize_entry("type", "array")?;
@@ -408,11 +408,11 @@ fn serialize_schema_inline<S: Serializer>(
                     }
                 } else if len == 1 {
                     // normal array: all items are uniform
-                    map.serialize_entry("items", &ctx.reference(last_range.operator_id))?;
+                    map.serialize_entry("items", &ctx.reference(last_range.addr))?;
                 } else {
                     // tuple followed by array
                     map.serialize_entry("prefixItems", &ctx.items_ref_links(&ranges[..len - 1]))?;
-                    map.serialize_entry("items", &ctx.reference(last_range.operator_id))?;
+                    map.serialize_entry("items", &ctx.reference(last_range.addr))?;
                     if let Some(min) = len_range.start {
                         map.serialize_entry("minItems", &min)?;
                     }
@@ -422,7 +422,7 @@ fn serialize_schema_inline<S: Serializer>(
         SerdeOperator::Alias(value_op) => {
             serialize_schema_inline::<S>(
                 ctx,
-                ctx.ontology.get_serde_operator(value_op.inner_operator_id),
+                ctx.ontology.get_serde_operator(value_op.inner_addr),
                 None,
                 map,
             )?;
@@ -436,7 +436,7 @@ fn serialize_schema_inline<S: Serializer>(
                 },
             )?;
         }
-        SerdeOperator::IdSingletonStruct(_name, _inner_operator_id) => {
+        SerdeOperator::IdSingletonStruct(_name, _inner_operator_addr) => {
             panic!("BUG: Id not handled here")
         }
         SerdeOperator::Struct(struct_op) => {
@@ -474,13 +474,13 @@ fn serialize_schema_inline<S: Serializer>(
 #[derive(Clone, Copy)]
 struct SchemaReference<'d, 'e> {
     ctx: SchemaCtx<'e>,
-    operator_id: SerdeOperatorId,
+    operator_addr: SerdeOperatorAddr,
     def_map: Option<&'d DefMap>,
 }
 
 impl<'d, 'e> Serialize for SchemaReference<'d, 'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let value_operator = self.ctx.ontology.get_serde_operator(self.operator_id);
+        let value_operator = self.ctx.ontology.get_serde_operator(self.operator_addr);
 
         match value_operator {
             SerdeOperator::Unit
@@ -515,8 +515,8 @@ impl<'d, 'e> Serialize for SchemaReference<'d, 'e> {
             SerdeOperator::Union(union_op) => self
                 .compose(self.ctx.ref_link(union_op.union_def()))
                 .serialize(serializer),
-            SerdeOperator::IdSingletonStruct(name, id_operator_id) => self
-                .compose(self.ctx.singleton_object(name.as_str(), *id_operator_id))
+            SerdeOperator::IdSingletonStruct(name, id_operator_addr) => self
+                .compose(self.ctx.singleton_object(name.as_str(), *id_operator_addr))
                 .serialize(serializer),
             SerdeOperator::Struct(struct_op) => self
                 .compose(self.ctx.ref_link(struct_op.def))
@@ -529,7 +529,7 @@ impl<'d, 'e> SchemaReference<'d, 'e> {
     fn compose<T: Serialize>(&self, inner: T) -> Compose<T> {
         Compose {
             ctx: self.ctx,
-            operator_id: self.operator_id,
+            operator_addr: self.operator_addr,
             inner,
             def_map: self.def_map,
         }
@@ -538,14 +538,14 @@ impl<'d, 'e> SchemaReference<'d, 'e> {
 
 struct Compose<'d, 'e, T> {
     ctx: SchemaCtx<'e>,
-    operator_id: SerdeOperatorId,
+    operator_addr: SerdeOperatorAddr,
     inner: T,
     def_map: Option<&'d DefMap>,
 }
 
 impl<'d, 'e, T: Serialize> Serialize for Compose<'d, 'e, T> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        if let Some(rel_params_operator_id) = self.ctx.rel_params_operator_id {
+        if let Some(rel_params_operator_addr) = self.ctx.rel_params_operator_addr {
             let mut map = serializer.serialize_map(Some(1))?;
 
             // Remove the rel params to avoid infinite recursion!
@@ -556,8 +556,8 @@ impl<'d, 'e, T: Serialize> Serialize for Compose<'d, 'e, T> {
                 // note: serializing a tuple results in a sequence:
                 &(
                     // This reference should eventually hit the else clause below, because new ctx has no rel_params:
-                    ctx.reference(self.operator_id),
-                    ctx.singleton_object("_edge", rel_params_operator_id),
+                    ctx.reference(self.operator_addr),
+                    ctx.singleton_object("_edge", rel_params_operator_addr),
                 ),
             )?;
 
@@ -581,7 +581,7 @@ impl<'d, 'e, T: Serialize> Serialize for Compose<'d, 'e, T> {
 struct ClosedMap<'d, 'e, T> {
     ctx: SchemaCtx<'e>,
     inner: T,
-    def_map: Option<&'d BTreeMap<SerdeDef, SerdeOperatorId>>,
+    def_map: Option<&'d BTreeMap<SerdeDef, SerdeOperatorAddr>>,
 }
 
 impl<'d, 'e, T: Serialize> Serialize for ClosedMap<'d, 'e, T> {
@@ -611,7 +611,7 @@ impl<'e> Serialize for UnionRefLinks<'e> {
             // BUG: Must filter variants
             .unfiltered_variants()
         {
-            seq.serialize_element(&self.ctx.reference(discriminator.operator_id))?;
+            seq.serialize_element(&self.ctx.reference(discriminator.addr))?;
         }
 
         seq.end()
@@ -629,7 +629,7 @@ impl<'e> Serialize for ArrayItemsRefLinks<'e> {
         for range in self.ranges {
             if let Some(repetition) = range.finite_repetition {
                 for _ in 0..repetition {
-                    seq.serialize_element(&self.ctx.reference(range.operator_id))?;
+                    seq.serialize_element(&self.ctx.reference(range.addr))?;
                 }
             }
         }
@@ -655,9 +655,9 @@ impl<'e> Serialize for MapProperties<'e> {
                 key,
                 &self
                     .ctx
-                    .with_rel_params(property.rel_params_operator_id)
+                    .with_rel_params(property.rel_params_addr)
                     .with_docs(docs.as_deref())
-                    .reference(property.value_operator_id),
+                    .reference(property.value_addr),
             )?;
         }
         map.end()
@@ -684,7 +684,7 @@ impl<'e> Serialize for RequiredMapProperties<'e> {
 struct SingletonObjectSchema<'e> {
     ctx: SchemaCtx<'e>,
     property_name: String,
-    operator_id: SerdeOperatorId,
+    operator_addr: SerdeOperatorAddr,
 }
 
 impl<'e> Serialize for SingletonObjectSchema<'e> {
@@ -692,7 +692,7 @@ impl<'e> Serialize for SingletonObjectSchema<'e> {
         let mut map = serializer.serialize_map(None)?;
         let prop = self.property_name.as_str();
 
-        let properties: HashMap<_, _> = [(prop, self.ctx.reference(self.operator_id))].into();
+        let properties: HashMap<_, _> = [(prop, self.ctx.reference(self.operator_addr))].into();
 
         map.serialize_entry("type", "object")?;
         map.serialize_entry("properties", &properties)?;
@@ -719,7 +719,7 @@ impl<'e> Serialize for RefLink<'e> {
 // { "$defs": { .. } }
 struct Defs<'d, 'e> {
     ctx: SchemaCtx<'e>,
-    def_map: &'d BTreeMap<SerdeDef, SerdeOperatorId>,
+    def_map: &'d BTreeMap<SerdeDef, SerdeOperatorAddr>,
 }
 
 impl<'d, 'e> Defs<'d, 'e> {
@@ -740,10 +740,10 @@ impl<'d, 'e> Serialize for Defs<'d, 'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut map = serializer.serialize_map(None)?;
 
-        for (def_id, operator_id) in self.def_map {
+        for (def_id, operator_addr) in self.def_map {
             map.serialize_entry(
                 &self.ctx.format_key(*def_id),
-                &self.ctx.definition(*operator_id),
+                &self.ctx.definition(*operator_addr),
             )?;
         }
 
@@ -753,17 +753,17 @@ impl<'d, 'e> Serialize for Defs<'d, 'e> {
 
 #[derive(Default)]
 struct SchemaGraphBuilder {
-    graph: BTreeMap<SerdeDef, SerdeOperatorId>,
-    visited: FnvHashSet<SerdeOperatorId>,
+    graph: BTreeMap<SerdeDef, SerdeOperatorAddr>,
+    visited: FnvHashSet<SerdeOperatorAddr>,
 }
 
 impl SchemaGraphBuilder {
-    fn visit(&mut self, operator_id: SerdeOperatorId, ontology: &Ontology) {
-        if !self.mark_visited(operator_id) {
+    fn visit(&mut self, addr: SerdeOperatorAddr, ontology: &Ontology) {
+        if !self.mark_visited(addr) {
             return;
         }
 
-        let operator = ontology.get_serde_operator(operator_id);
+        let operator = ontology.get_serde_operator(addr);
 
         match operator {
             SerdeOperator::Unit
@@ -780,55 +780,55 @@ impl SchemaGraphBuilder {
             | SerdeOperator::DynamicSequence
             | SerdeOperator::RawId => {}
             SerdeOperator::ConstructorSequence(seq_op) => {
-                self.add_to_graph(seq_op.def, operator_id);
+                self.add_to_graph(seq_op.def, addr);
                 for range in &seq_op.ranges {
-                    self.visit(range.operator_id, ontology);
+                    self.visit(range.addr, ontology);
                 }
             }
             SerdeOperator::RelationSequence(seq_op) => {
                 for range in &seq_op.ranges {
-                    self.visit(range.operator_id, ontology);
+                    self.visit(range.addr, ontology);
                 }
             }
             SerdeOperator::Alias(value_op) => {
-                self.add_to_graph(value_op.def, operator_id);
-                self.visit(value_op.inner_operator_id, ontology);
+                self.add_to_graph(value_op.def, addr);
+                self.visit(value_op.inner_addr, ontology);
             }
             SerdeOperator::Union(union_op) => {
-                self.add_to_graph(union_op.union_def(), operator_id);
+                self.add_to_graph(union_op.union_def(), addr);
 
                 for discriminator in union_op.unfiltered_variants() {
-                    self.visit(discriminator.operator_id, ontology);
+                    self.visit(discriminator.addr, ontology);
                 }
             }
-            SerdeOperator::IdSingletonStruct(_, id_operator_id) => {
+            SerdeOperator::IdSingletonStruct(_, id_operator_addr) => {
                 // id is not represented in the graph
-                self.visit(*id_operator_id, ontology);
+                self.visit(*id_operator_addr, ontology);
             }
             SerdeOperator::Struct(struct_op) => {
-                self.add_to_graph(struct_op.def, operator_id);
+                self.add_to_graph(struct_op.def, addr);
 
                 for (_, property) in &struct_op.properties {
-                    self.visit(property.value_operator_id, ontology);
-                    if let Some(operator_id) = &property.rel_params_operator_id {
-                        self.visit(*operator_id, ontology);
+                    self.visit(property.value_addr, ontology);
+                    if let Some(addr) = &property.rel_params_addr {
+                        self.visit(*addr, ontology);
                     }
                 }
             }
         }
     }
 
-    fn add_to_graph(&mut self, serde_def: SerdeDef, operator_id: SerdeOperatorId) {
-        if self.graph.insert(serde_def, operator_id).is_some() {
+    fn add_to_graph(&mut self, serde_def: SerdeDef, operator_addr: SerdeOperatorAddr) {
+        if self.graph.insert(serde_def, operator_addr).is_some() {
             // panic!("{def_id:?} was already in graph");
         }
     }
 
-    fn mark_visited(&mut self, operator_id: SerdeOperatorId) -> bool {
-        if self.visited.contains(&operator_id) {
+    fn mark_visited(&mut self, operator_addr: SerdeOperatorAddr) -> bool {
+        if self.visited.contains(&operator_addr) {
             false
         } else {
-            self.visited.insert(operator_id);
+            self.visited.insert(operator_addr);
             true
         }
     }

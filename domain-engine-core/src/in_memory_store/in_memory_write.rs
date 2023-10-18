@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use ontol_runtime::{
     condition::Condition,
     interface::serde::{
-        operator::SerdeOperatorId,
+        operator::SerdeOperatorAddr,
         processor::{ProcessorLevel, ProcessorMode, DOMAIN_PROFILE},
     },
     ontology::{DataRelationshipInfo, DataRelationshipKind, Ontology, ValueCardinality},
@@ -85,7 +85,7 @@ impl InMemoryStore {
                 if let Some(value_generator) = entity_info.id_value_generator {
                     let id = self.generate_entity_id(
                         ontology,
-                        entity_info.id_operator_id,
+                        entity_info.id_operator_addr,
                         value_generator,
                     )?;
                     (id, true)
@@ -196,11 +196,11 @@ impl InMemoryStore {
                 )?;
             } else if entity_data.is_none() {
                 let type_info = ontology.get_type_info(value.type_def_id);
-                let repr = if let Some(operator_id) = type_info.operator_id {
+                let repr = if let Some(operator_addr) = type_info.operator_addr {
                     // TODO: Easier way to report values in "human readable"/JSON format
 
                     let processor = ontology.new_serde_processor(
-                        operator_id,
+                        operator_addr,
                         ProcessorMode::Read,
                         ProcessorLevel::new_root(),
                         &DOMAIN_PROFILE,
@@ -249,10 +249,10 @@ impl InMemoryStore {
     fn generate_entity_id(
         &mut self,
         ontology: &Ontology,
-        id_operator_id: SerdeOperatorId,
+        id_operator_addr: SerdeOperatorAddr,
         value_generator: ValueGenerator,
     ) -> DomainResult<Value> {
-        match try_generate_entity_id(ontology, id_operator_id, value_generator)? {
+        match try_generate_entity_id(ontology, id_operator_addr, value_generator)? {
             GeneratedId::Generated(value) => Ok(value),
             GeneratedId::AutoIncrementI64(def_id) => {
                 let id_value = self.int_id_counter;

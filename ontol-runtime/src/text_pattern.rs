@@ -58,8 +58,8 @@ impl TextPattern {
                         let type_info = ontology.get_type_info(property.type_def_id);
                         let processor = ontology.new_serde_processor(
                             type_info
-                                .operator_id
-                                .expect("No operator id for pattern constant part"),
+                                .operator_addr
+                                .expect("No operator addr for pattern constant part"),
                             ProcessorMode::Create,
                             ProcessorLevel::new_root(),
                             &DOMAIN_PROFILE,

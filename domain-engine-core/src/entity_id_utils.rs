@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use ontol_runtime::{
-    interface::serde::operator::{AliasOperator, SerdeOperator, SerdeOperatorId},
+    interface::serde::operator::{AliasOperator, SerdeOperator, SerdeOperatorAddr},
     ontology::Ontology,
     smart_format,
     text_like_types::TextLikeType,
@@ -43,10 +43,13 @@ pub enum GeneratedId {
 
 pub fn try_generate_entity_id(
     ontology: &Ontology,
-    id_operator_id: SerdeOperatorId,
+    id_operator_addr: SerdeOperatorAddr,
     value_generator: ValueGenerator,
 ) -> DomainResult<GeneratedId> {
-    match (ontology.get_serde_operator(id_operator_id), value_generator) {
+    match (
+        ontology.get_serde_operator(id_operator_addr),
+        value_generator,
+    ) {
         (SerdeOperator::String(def_id), ValueGenerator::UuidV4) => {
             let string = smart_format!("{}", Uuid::new_v4());
             Ok(GeneratedId::Generated(Value::new(
@@ -72,7 +75,7 @@ pub fn try_generate_entity_id(
                 let type_info = ontology.get_type_info(property.type_def_id);
                 match try_generate_entity_id(
                     ontology,
-                    type_info.operator_id.unwrap(),
+                    type_info.operator_addr.unwrap(),
                     value_generator,
                 )? {
                     GeneratedId::Generated(id) => Ok(GeneratedId::Generated(Value::new(
@@ -92,12 +95,10 @@ pub fn try_generate_entity_id(
         }
         (
             SerdeOperator::Alias(AliasOperator {
-                def,
-                inner_operator_id,
-                ..
+                def, inner_addr, ..
             }),
             _,
-        ) => match try_generate_entity_id(ontology, *inner_operator_id, value_generator)? {
+        ) => match try_generate_entity_id(ontology, *inner_addr, value_generator)? {
             GeneratedId::Generated(mut value) => {
                 value.type_def_id = def.def_id;
                 Ok(GeneratedId::Generated(value))

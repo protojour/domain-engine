@@ -83,7 +83,7 @@ fn main() -> anyhow::Result<()> {
 
     let from_type = ontology.get_type_info(from.def_id);
     let from_processor = ontology.new_serde_processor(
-        from_type.operator_id.expect("No deserializer found"),
+        from_type.operator_addr.expect("No deserializer found"),
         ProcessorMode::Read,
         ProcessorLevel::new_root(),
         &DOMAIN_PROFILE,
@@ -102,7 +102,7 @@ fn main() -> anyhow::Result<()> {
     };
     let to_type = ontology.get_type_info(to.def_id);
     let to_processor = ontology.new_serde_processor(
-        to_type.operator_id.expect("No deserializer found"),
+        to_type.operator_addr.expect("No deserializer found"),
         ProcessorMode::Create,
         ProcessorLevel::new_root(),
         &DOMAIN_PROFILE,

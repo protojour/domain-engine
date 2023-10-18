@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     interface::serde::{
-        operator::SerdeOperatorId,
+        operator::SerdeOperatorAddr,
         processor::{ProcessorLevel, ProcessorMode},
     },
     DefId, PackageId,
@@ -64,6 +64,10 @@ impl TypingPurpose {
 #[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub enum QueryLevel {
     Node,
-    Edge { rel_params: Option<SerdeOperatorId> },
-    Connection { rel_params: Option<SerdeOperatorId> },
+    Edge {
+        rel_params: Option<SerdeOperatorAddr>,
+    },
+    Connection {
+        rel_params: Option<SerdeOperatorAddr>,
+    },
 }
