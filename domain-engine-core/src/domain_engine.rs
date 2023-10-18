@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    condition::{Clause, CondTerm, Condition},
+    condition::{Clause, CondTerm},
     interface::serde::processor::ProcessorMode,
     ontology::{Ontology, PropertyCardinality, ValueCardinality},
     select::{EntitySelect, Select, StructOrUnionSelect},
@@ -83,13 +83,15 @@ impl DomainEngine {
             match vm.run([input_value]) {
                 VmState::Complete(value) => return Ok(value.into()),
                 VmState::Yielded(Yield::Match(match_var, condition)) => {
-                    let Some(entity_query) = queries.remove(&match_var) else {
+                    let Some(mut entity_query) = queries.remove(&match_var) else {
                         panic!("No selection for {match_var}");
                     };
 
-                    input_value = self
-                        .exec_map_query(match_var, entity_query, condition)
-                        .await?;
+                    // Merge the condition into the select
+                    assert!(entity_query.select.condition.clauses.is_empty());
+                    entity_query.select.condition = condition;
+
+                    input_value = self.exec_map_query(match_var, entity_query).await?;
                 }
             }
         }
@@ -168,15 +170,16 @@ impl DomainEngine {
         &self,
         match_var: Var,
         mut entity_query: EntityQuery,
-        condition: Condition<CondTerm>,
     ) -> DomainResult<ontol_runtime::value::Value> {
         let data_store = self.get_data_store()?;
 
-        debug!("Match condition:\n{condition:#?}");
+        debug!("Match condition:\n{:#?}", entity_query.select.condition);
 
         match &entity_query.select.source {
             StructOrUnionSelect::Struct(struct_select) => {
-                let inner_entity_def_id = condition
+                let inner_entity_def_id = entity_query
+                    .select
+                    .condition
                     .clauses
                     .iter()
                     .find_map(|clause| {

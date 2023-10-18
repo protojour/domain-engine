@@ -1,21 +1,15 @@
 use std::sync::Arc;
 
-use domain_engine_core::{data_store::DataStoreAPIMock, DomainEngine};
+use domain_engine_core::DomainEngine;
 use domain_engine_juniper::{context::ServiceCtx, Schema};
-use domain_engine_test_utils::graphql::{gql_ctx_mock_data_store, Exec, TestCompileSchema};
-use fnv::FnvHashMap;
+use domain_engine_test_utils::graphql::{Exec, TestCompileSchema};
 use juniper::{graphql_value, InputValue};
-use ontol_runtime::{
-    config::DataStoreConfig,
-    select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
-    DefId, PackageId,
-};
+use ontol_runtime::config::DataStoreConfig;
 use ontol_test_utils::{
     examples::conduit::{BLOG_POST_PUBLIC, CONDUIT_DB},
-    expect_eq, OntolTest, SourceName, TestPackages,
+    expect_eq, SourceName, TestPackages,
 };
 use test_log::test;
-use unimock::{matching, MockFn};
 
 const ROOT: SourceName = SourceName::root();
 
@@ -224,7 +218,6 @@ async fn test_graphql_conduit_db_query_article_with_tags() {
 }
 
 struct BlogPostConduit {
-    test: OntolTest,
     domain_engine: Arc<DomainEngine>,
     db_schema: Schema,
     blog_schema: Schema,
@@ -242,7 +235,6 @@ impl BlogPostConduit {
                     .build::<crate::TestDataStoreFactory>()
                     .await,
             ),
-            test,
             db_schema,
             blog_schema,
         }
@@ -401,66 +393,6 @@ async fn test_graphql_blog_post_conduit_tags() {
                 ]
             }
         })),
-    );
-}
-
-#[test(tokio::test)]
-async fn test_graphql_blog_post_conduit_no_join_mocked() {
-    let ctx = BlogPostConduit::new().await;
-    expect_eq!(
-        actual = "{
-            BlogPostList {
-                edges {
-                    node {
-                        contents
-                    }
-                }
-            }
-        }"
-        .exec(
-            &ctx.blog_schema,
-            &gql_ctx_mock_data_store(
-                &ctx.test,
-                CONDUIT_DB.0,
-                DataStoreAPIMock::query
-                    .next_call(matching!(
-                        _,
-                        // The purpose of this is to check that the data store
-                        // receives a correctly structured query.
-                        // Note: The hard coded PropertyIds used below are unstable
-                        // and will likely change if the ONTOL files change.
-                        // Just update as necessary, the point is the structure, not the property IDs.
-                        eq!(&EntitySelect {
-                            source: StructOrUnionSelect::Struct(StructSelect {
-                                def_id: DefId(PackageId(2), 21),
-                                properties: FnvHashMap::from_iter([
-                                    // This is the "body" property:
-                                    ("S:2:31".parse().unwrap(), Select::Leaf),
-                                    (
-                                        // This is the `author` property:
-                                        "S:2:55".parse().unwrap(),
-                                        Select::Struct(StructSelect {
-                                            def_id: DefId(PackageId(2), 7),
-                                            properties: FnvHashMap::from_iter([(
-                                                // This is the `username` property:
-                                                "S:2:12".parse().unwrap(),
-                                                Select::Leaf
-                                            )])
-                                        })
-                                    )
-                                ]),
-                            }),
-                            cursor: None,
-                            limit: 20,
-                        })
-                    ))
-                    .returns(Ok(vec![]))
-            )
-            .await,
-            []
-        )
-        .await,
-        expected = Ok(graphql_value!({ "BlogPostList": { "edges": [] } }))
     );
 }
 

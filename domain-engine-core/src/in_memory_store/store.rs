@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
+    condition::Condition,
     interface::serde::{
         operator::{AliasOperator, SerdeOperator, SerdeOperatorId},
         processor::{ProcessorLevel, ProcessorMode},
@@ -290,6 +291,7 @@ impl InMemoryStore {
                     engine,
                     &EntitySelect {
                         source: StructOrUnionSelect::Struct(struct_select),
+                        condition: Condition::default(),
                         limit: u32::MAX,
                         cursor: None,
                     },

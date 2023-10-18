@@ -2,6 +2,7 @@ use domain_engine_core::EntityQuery;
 use fnv::FnvHashMap;
 use juniper::LookAheadMethods;
 use ontol_runtime::{
+    condition::Condition,
     interface::graphql::{
         argument::FieldArg,
         data::{
@@ -167,6 +168,7 @@ impl<'a> SelectAnalyzer<'a> {
                         select: match self.analyze_data(look_ahead, type_data) {
                             Select::Struct(struct_select) => Select::Entity(EntitySelect {
                                 source: StructOrUnionSelect::Struct(struct_select),
+                                condition: Condition::default(),
                                 limit: 1,
                                 cursor: None,
                             }),
@@ -188,12 +190,14 @@ impl<'a> SelectAnalyzer<'a> {
                             select: match select {
                                 Select::Struct(object) => Select::Entity(EntitySelect {
                                     source: StructOrUnionSelect::Struct(object),
+                                    condition: Condition::default(),
                                     limit: self.default_limit(),
                                     cursor: None,
                                 }),
                                 Select::StructUnion(def_id, variants) => {
                                     Select::Entity(EntitySelect {
                                         source: StructOrUnionSelect::Union(def_id, variants),
+                                        condition: Condition::default(),
                                         limit: self.default_limit(),
                                         cursor: None,
                                     })
@@ -244,12 +248,14 @@ impl<'a> SelectAnalyzer<'a> {
                     select: match select {
                         Some(Select::Struct(object)) => Select::Entity(EntitySelect {
                             source: StructOrUnionSelect::Struct(object),
+                            condition: Condition::default(),
                             limit,
                             cursor,
                         }),
                         Some(Select::StructUnion(def_id, variants)) => {
                             Select::Entity(EntitySelect {
                                 source: StructOrUnionSelect::Union(def_id, variants),
+                                condition: Condition::default(),
                                 limit,
                                 cursor,
                             })

@@ -1,9 +1,13 @@
 use fnv::FnvHashMap;
 use smartstring::alias::String;
 
-use crate::{value::PropertyId, DefId};
+use crate::{
+    condition::{CondTerm, Condition},
+    value::PropertyId,
+    DefId,
+};
 
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Debug)]
 pub enum Select {
     EntityId,
     Leaf,
@@ -12,14 +16,15 @@ pub enum Select {
     Entity(EntitySelect),
 }
 
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Debug)]
 pub struct EntitySelect {
     pub source: StructOrUnionSelect,
+    pub condition: Condition<CondTerm>,
     pub limit: u32,
     pub cursor: Option<String>,
 }
 
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Debug)]
 pub enum StructOrUnionSelect {
     Struct(StructSelect),
     Union(DefId, Vec<StructSelect>),
@@ -34,7 +39,7 @@ impl StructOrUnionSelect {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Debug)]
 pub struct StructSelect {
     pub def_id: DefId,
     pub properties: FnvHashMap<PropertyId, Select>,
@@ -50,6 +55,7 @@ impl From<StructSelect> for EntitySelect {
     fn from(value: StructSelect) -> Self {
         EntitySelect {
             source: StructOrUnionSelect::Struct(value),
+            condition: Condition::default(),
             limit: 20,
             cursor: None,
         }
