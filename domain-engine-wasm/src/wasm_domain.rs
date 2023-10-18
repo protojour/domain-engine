@@ -3,10 +3,7 @@ use std::sync::Arc;
 use ontol_faker::new_constant_fake;
 use ontol_runtime::{
     interface::json_schema::build_openapi_schemas,
-    interface::serde::{
-        operator::SerdeOperatorAddr,
-        processor::{ProcessorLevel, ProcessorMode, DOMAIN_PROFILE},
-    },
+    interface::serde::{operator::SerdeOperatorAddr, processor::ProcessorMode},
     ontology::{MapMeta, Ontology, TypeInfo},
     value::Value,
     vm::VmState,
@@ -103,12 +100,7 @@ impl WasmTypeInfo {
     pub fn new_value(&self, js_value: JsValue, format: JsonFormat) -> Result<WasmValue, WasmError> {
         let value = self
             .ontology
-            .new_serde_processor(
-                operator_addr(&self.inner)?,
-                format.to_processor_mode(),
-                ProcessorLevel::new_root(),
-                &DOMAIN_PROFILE,
-            )
+            .new_serde_processor(operator_addr(&self.inner)?, format.to_processor_mode())
             .deserialize(serde_wasm_bindgen::Deserializer::from(js_value))
             .map(|attr| attr.value)
             .map_err(|err| WasmError::Generic(format!("Deserialization failed: {err}")))?;
@@ -146,12 +138,7 @@ impl WasmValue {
         let type_info = self.ontology.get_type_info(self.value.type_def_id);
 
         self.ontology
-            .new_serde_processor(
-                operator_addr(type_info)?,
-                format.to_processor_mode(),
-                ProcessorLevel::new_root(),
-                &DOMAIN_PROFILE,
-            )
+            .new_serde_processor(operator_addr(type_info)?, format.to_processor_mode())
             .serialize_value(&self.value, None, &js_serializer())
             .map_err(|err| WasmError::Generic(format!("Serialization failed: {err}")))
     }

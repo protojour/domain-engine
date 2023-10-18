@@ -3,7 +3,7 @@ use std::fmt::Display;
 use juniper::{graphql_value, LookAheadArgument, LookAheadValue, Spanning};
 use ontol_runtime::{
     interface::graphql::{argument::DomainFieldArg, schema::TypingPurpose},
-    interface::serde::{operator::SerdeOperatorAddr, processor::DOMAIN_PROFILE},
+    interface::serde::operator::SerdeOperatorAddr,
     ontology::Ontology,
     smart_format,
     value::Attribute,
@@ -40,12 +40,14 @@ impl<'a> ArgsWrapper<'a> {
                 .spanned_value();
 
             ontology
-                .new_serde_processor(operator_addr, mode, level, &DOMAIN_PROFILE)
+                .new_serde_processor(operator_addr, mode)
+                .with_level(level)
                 .deserialize(LookAheadValueDeserializer { value: spanned_arg })
                 .map_err(|error| juniper::FieldError::new(error, graphql_value!(None)))
         } else {
             ontology
-                .new_serde_processor(operator_addr, mode, level, &DOMAIN_PROFILE)
+                .new_serde_processor(operator_addr, mode)
+                .with_level(level)
                 .deserialize(LookAheadArgumentsDeserializer {
                     arguments: self.arguments,
                 })
@@ -99,7 +101,8 @@ impl<'a> ArgsWrapper<'a> {
         let (mode, level) = typing_purpose.mode_and_level();
 
         ontology
-            .new_serde_processor(operator_addr, mode, level, &DOMAIN_PROFILE)
+            .new_serde_processor(operator_addr, mode)
+            .with_level(level)
             .deserialize(LookAheadValueDeserializer {
                 value: argument.spanned_value(),
             })

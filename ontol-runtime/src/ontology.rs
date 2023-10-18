@@ -10,7 +10,7 @@ use crate::{
     interface::{
         serde::{
             operator::{SerdeOperator, SerdeOperatorAddr},
-            processor::{ProcessorLevel, ProcessorMode, ProcessorProfile, SerdeProcessor},
+            processor::{ProcessorLevel, ProcessorMode, SerdeProcessor, DOMAIN_PROFILE},
             SerdeKey,
         },
         DomainInterface,
@@ -162,15 +162,13 @@ impl Ontology {
         &self,
         value_addr: SerdeOperatorAddr,
         mode: ProcessorMode,
-        level: ProcessorLevel,
-        profile: &'static ProcessorProfile,
     ) -> SerdeProcessor {
         SerdeProcessor {
             value_operator: &self.serde_operators[value_addr.0 as usize],
             ctx: Default::default(),
-            level,
+            level: ProcessorLevel::new_root(),
             ontology: self,
-            profile,
+            profile: &DOMAIN_PROFILE,
             mode,
         }
     }

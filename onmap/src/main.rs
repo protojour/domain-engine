@@ -6,10 +6,7 @@ use clap::{Parser, ValueEnum};
 use clap_stdin::FileOrStdin;
 use domain_engine_core::system::SystemAPI;
 use ontol_runtime::{
-    interface::serde::processor::{ProcessorLevel, ProcessorMode, DOMAIN_PROFILE},
-    ontology::Ontology,
-    vm::VmState,
-    MapKey, PackageId,
+    interface::serde::processor::ProcessorMode, ontology::Ontology, vm::VmState, MapKey, PackageId,
 };
 use serde::de::DeserializeSeed;
 
@@ -85,8 +82,6 @@ fn main() -> anyhow::Result<()> {
     let from_processor = ontology.new_serde_processor(
         from_type.operator_addr.expect("No deserializer found"),
         ProcessorMode::Read,
-        ProcessorLevel::new_root(),
-        &DOMAIN_PROFILE,
     );
     let data = match args.format {
         Format::Json => from_processor
@@ -104,8 +99,6 @@ fn main() -> anyhow::Result<()> {
     let to_processor = ontology.new_serde_processor(
         to_type.operator_addr.expect("No deserializer found"),
         ProcessorMode::Create,
-        ProcessorLevel::new_root(),
-        &DOMAIN_PROFILE,
     );
     let mut buf: Vec<u8> = vec![];
     match args.format {

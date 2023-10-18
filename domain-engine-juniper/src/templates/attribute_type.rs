@@ -9,10 +9,7 @@ use ontol_runtime::{
         },
         schema::TypingPurpose,
     },
-    interface::serde::{
-        operator::SerdeOperator,
-        processor::{ProcessorLevel, ProcessorMode, DOMAIN_PROFILE},
-    },
+    interface::serde::{operator::SerdeOperator, processor::ProcessorMode},
     value::{Attribute, Data, PropertyId, Value},
     DefId,
 };
@@ -307,12 +304,7 @@ impl<'v> AttributeType<'v> {
                     TypeKind::CustomScalar(scalar_data) => {
                         let gql_scalar = schema_ctx
                             .ontology
-                            .new_serde_processor(
-                                scalar_data.operator_addr,
-                                ProcessorMode::Read,
-                                ProcessorLevel::new_root(),
-                                &DOMAIN_PROFILE,
-                            )
+                            .new_serde_processor(scalar_data.operator_addr, ProcessorMode::Read)
                             .serialize_value(&attribute.value, None, GqlScalarSerializer)?;
 
                         Ok(juniper::Value::Scalar(gql_scalar))
@@ -332,12 +324,9 @@ impl<'v> AttributeType<'v> {
             ) {
                 (TypeModifier::Array(..), SerdeOperator::RelationSequence(operator)) => {
                     let attributes = attribute.value.cast_ref::<Vec<_>>();
-                    let processor = schema_ctx.ontology.new_serde_processor(
-                        operator.ranges[0].addr,
-                        ProcessorMode::Read,
-                        ProcessorLevel::new_root(),
-                        &DOMAIN_PROFILE,
-                    );
+                    let processor = schema_ctx
+                        .ontology
+                        .new_serde_processor(operator.ranges[0].addr, ProcessorMode::Read);
 
                     let graphql_values: Vec<juniper::Value<GqlScalar>> = attributes
                         .iter()
@@ -356,12 +345,7 @@ impl<'v> AttributeType<'v> {
                 _ => {
                     let scalar = schema_ctx
                         .ontology
-                        .new_serde_processor(
-                            scalar_ref.operator_addr,
-                            ProcessorMode::Read,
-                            ProcessorLevel::new_root(),
-                            &DOMAIN_PROFILE,
-                        )
+                        .new_serde_processor(scalar_ref.operator_addr, ProcessorMode::Read)
                         .serialize_value(&attribute.value, None, GqlScalarSerializer)?;
 
                     Ok(juniper::Value::Scalar(scalar))

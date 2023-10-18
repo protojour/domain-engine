@@ -4,7 +4,7 @@ use fake::{Fake, Faker};
 use ontol_runtime::{
     interface::serde::{
         operator::{FilteredVariants, SerdeOperator},
-        processor::{ProcessorLevel, ProcessorMode, SerdeProcessor, DOMAIN_PROFILE},
+        processor::{ProcessorLevel, ProcessorMode, SerdeProcessor},
     },
     ontology::Ontology,
     text_like_types::TextLikeType,
@@ -63,12 +63,11 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
         let addr = type_info.operator_addr.ok_or(Error::NoSerializationInfo)?;
 
         Ok(self
-            .fake_attribute(self.ontology.new_serde_processor(
-                addr,
-                self.processor_mode,
-                ProcessorLevel::new_root_with_recursion_limit(32),
-                &DOMAIN_PROFILE,
-            ))?
+            .fake_attribute(
+                self.ontology
+                    .new_serde_processor(addr, self.processor_mode)
+                    .with_level(ProcessorLevel::new_root_with_recursion_limit(32)),
+            )?
             .value)
     }
 

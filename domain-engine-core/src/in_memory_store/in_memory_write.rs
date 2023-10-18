@@ -2,10 +2,7 @@ use std::collections::BTreeMap;
 
 use ontol_runtime::{
     condition::Condition,
-    interface::serde::{
-        operator::SerdeOperatorAddr,
-        processor::{ProcessorLevel, ProcessorMode, DOMAIN_PROFILE},
-    },
+    interface::serde::{operator::SerdeOperatorAddr, processor::ProcessorMode},
     ontology::{DataRelationshipInfo, DataRelationshipKind, Ontology, ValueCardinality},
     select::{EntitySelect, Select, StructOrUnionSelect},
     smart_format,
@@ -199,12 +196,8 @@ impl InMemoryStore {
                 let repr = if let Some(operator_addr) = type_info.operator_addr {
                     // TODO: Easier way to report values in "human readable"/JSON format
 
-                    let processor = ontology.new_serde_processor(
-                        operator_addr,
-                        ProcessorMode::Read,
-                        ProcessorLevel::new_root(),
-                        &DOMAIN_PROFILE,
-                    );
+                    let processor =
+                        ontology.new_serde_processor(operator_addr, ProcessorMode::Read);
 
                     let mut buf: Vec<u8> = vec![];
                     processor

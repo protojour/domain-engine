@@ -31,7 +31,7 @@ pub struct ProcessorProfile {
 }
 
 /// The standard profile for domain serialization/deserialization
-pub static DOMAIN_PROFILE: ProcessorProfile = ProcessorProfile {
+pub(crate) static DOMAIN_PROFILE: ProcessorProfile = ProcessorProfile {
     overridden_id_property_key: None,
     ignored_property_keys: &[],
     raw_ids: false,
@@ -126,42 +126,45 @@ pub struct SerdeProcessor<'on, 'p> {
 }
 
 impl<'on, 'p> SerdeProcessor<'on, 'p> {
+    /// Get the current processor level
     pub fn level(&self) -> ProcessorLevel {
         self.level
+    }
+
+    /// Set the processor profile to be used with this processor
+    pub fn with_profile(self, profile: &'p ProcessorProfile) -> Self {
+        Self { profile, ..self }
+    }
+
+    /// Set the processor level to be used with this processor
+    pub fn with_level(self, level: ProcessorLevel) -> Self {
+        Self { level, ..self }
     }
 
     /// Return a processor that helps to _narrow the value_ that this processor represents.
     pub fn narrow(&self, addr: SerdeOperatorAddr) -> Self {
         Self {
-            ontology: self.ontology,
-            profile: self.profile,
             value_operator: self.ontology.get_serde_operator(addr),
-            ctx: self.ctx,
-            mode: self.mode,
-            level: self.level,
+            ..*self
         }
     }
 
+    /// Return a processor that helps to _narrow the value_ that this processor represents.
     pub fn narrow_with_context(&self, addr: SerdeOperatorAddr, ctx: SubProcessorContext) -> Self {
         Self {
-            ontology: self.ontology,
-            profile: self.profile,
             value_operator: self.ontology.get_serde_operator(addr),
             ctx,
-            mode: self.mode,
-            level: self.level,
+            ..*self
         }
     }
 
-    /// Return a processor that processes a new value that is a child value of this processor.
+    /// Return a processor that processes a new value that is a child value (i.e. increases the recursion level) of this processor.
     pub fn new_child(&self, addr: SerdeOperatorAddr) -> Result<Self, RecursionLimitError> {
         Ok(Self {
-            ontology: self.ontology,
-            profile: self.profile,
             value_operator: self.ontology.get_serde_operator(addr),
             ctx: Default::default(),
-            mode: self.mode,
             level: self.level.child()?,
+            ..*self
         })
     }
 
@@ -171,12 +174,10 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         ctx: SubProcessorContext,
     ) -> Result<Self, RecursionLimitError> {
         Ok(Self {
-            ontology: self.ontology,
-            profile: self.profile,
             value_operator: self.ontology.get_serde_operator(addr),
             ctx,
-            mode: self.mode,
             level: self.level.child()?,
+            ..*self
         })
     }
 
