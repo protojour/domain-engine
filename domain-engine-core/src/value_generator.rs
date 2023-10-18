@@ -159,7 +159,8 @@ impl<'e> Generator<'e> {
             | SerdeOperator::StringConstant(_, def_id)
             | SerdeOperator::TextPattern(def_id)
             | SerdeOperator::CapturingTextPattern(def_id) => *def_id,
-            SerdeOperator::Dynamic => panic!(),
+            SerdeOperator::DynamicSequence => panic!("DynamicSequence"),
+            SerdeOperator::RawId => panic!("RawId"),
             SerdeOperator::RelationSequence(_) => panic!(),
             SerdeOperator::ConstructorSequence(seq_op) => seq_op.def.def_id,
             SerdeOperator::Alias(alias_op) => alias_op.def.def_id,

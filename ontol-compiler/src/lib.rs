@@ -240,6 +240,7 @@ impl<'m> Compiler<'m> {
         let mut builder = Ontology::builder();
 
         let dynamic_sequence_operator_id = serde_generator.make_dynamic_sequence_operator();
+        let raw_id_operator_id = serde_generator.make_raw_id_operator_id();
 
         let map_namespaces: FnvHashMap<_, _> = namespaces
             .iter_mut()
@@ -364,6 +365,7 @@ impl<'m> Compiler<'m> {
             .named_forward_maps(self.codegen_tasks.result_named_forward_maps)
             .serde_operators(serde_operators, serde_operators_per_def)
             .dynamic_sequence_operator_id(dynamic_sequence_operator_id)
+            .raw_id_operator_id(raw_id_operator_id)
             .property_flows(property_flows)
             .string_like_types(self.defs.string_like_types)
             .text_patterns(self.text_patterns.text_patterns)

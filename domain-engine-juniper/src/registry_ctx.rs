@@ -237,7 +237,8 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             SerdeOperator::CapturingTextPattern(_) => {
                 self.modified_arg::<String>(name, modifier, &())
             }
-            SerdeOperator::Dynamic => panic!("No dynamic sequence expected here"),
+            SerdeOperator::DynamicSequence => panic!("No dynamic sequence expected here"),
+            SerdeOperator::RawId => panic!("No raw id expected here"),
             SerdeOperator::RelationSequence(seq_op) => {
                 match self
                     .schema_ctx

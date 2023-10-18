@@ -65,7 +65,13 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
     pub fn make_dynamic_sequence_operator(&mut self) -> SerdeOperatorId {
         let operator_id = SerdeOperatorId(self.operators_by_id.len() as u32);
-        self.operators_by_id.push(SerdeOperator::Dynamic);
+        self.operators_by_id.push(SerdeOperator::DynamicSequence);
+        operator_id
+    }
+
+    pub fn make_raw_id_operator_id(&mut self) -> SerdeOperatorId {
+        let operator_id = SerdeOperatorId(self.operators_by_id.len() as u32);
+        self.operators_by_id.push(SerdeOperator::RawId);
         operator_id
     }
 

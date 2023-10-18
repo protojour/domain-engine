@@ -116,7 +116,7 @@ impl<'b, 'on> Serializer<'b, 'on> {
             .ontology()
             .new_serde_processor(
                 if dynamic_seq {
-                    self.binding.ontology().dynamic_operator_id()
+                    self.binding.ontology().dynamic_sequence_operator_id()
                 } else {
                     self.binding.serde_operator_id()
                 },

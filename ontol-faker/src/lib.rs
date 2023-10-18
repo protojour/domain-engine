@@ -152,8 +152,11 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
 
                 Value::new(data, *def_id)
             }
-            SerdeOperator::Dynamic => {
+            SerdeOperator::DynamicSequence => {
                 return Ok(Value::new(Data::Sequence([].into()), DefId::unit()).into());
+            }
+            SerdeOperator::RawId => {
+                panic!("Unable to fake RawId")
             }
             SerdeOperator::RelationSequence(seq_op) => {
                 return if processor.level().current_level() > SENSIBLE_RECURSION_LEVEL {

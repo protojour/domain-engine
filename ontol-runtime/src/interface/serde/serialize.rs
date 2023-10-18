@@ -101,7 +101,11 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 
                 serializer.serialize_str(&buf)
             }
-            SerdeOperator::Dynamic => match &value.data {
+            SerdeOperator::DynamicSequence => match &value.data {
+                Data::Sequence(vec) => self.serialize_dynamic_sequence(vec, serializer),
+                _ => panic!("Not a sequence"),
+            },
+            SerdeOperator::RawId => match &value.data {
                 Data::Text(string) => serializer.serialize_str(string),
                 data @ Data::OctetSequence(_) => {
                     let mut buf = String::new();
@@ -118,7 +122,16 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 
                     serializer.serialize_str(&buf)
                 }
-                Data::Sequence(vec) => self.serialize_dynamic_sequence(vec, serializer),
+                Data::Struct(map) => {
+                    if map.len() != 1 {
+                        return Err(S::Error::custom(smart_format!(
+                            "struct-based raw id needs exactly one property"
+                        )));
+                    }
+
+                    let (_, attribute) = map.iter().next().unwrap();
+                    self.serialize_value(&attribute.value, rel_params, serializer)
+                }
                 _ => todo!(),
             },
             SerdeOperator::RelationSequence(seq_op) => {
@@ -301,7 +314,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                     processor: self
                         .new_child_with_context(
                             if is_entity_id && self.profile.raw_ids {
-                                self.ontology.dynamic_operator_id()
+                                self.ontology.raw_id_operator_id()
                             } else {
                                 serde_prop.value_operator_id
                             },

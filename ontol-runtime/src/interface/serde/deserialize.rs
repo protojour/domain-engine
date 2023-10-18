@@ -191,7 +191,10 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                 }
                 .into_visitor_no_params(self),
             ),
-            SerdeOperator::Dynamic => Err(Error::custom("Cannot deserialize dynamic sequence")),
+            SerdeOperator::DynamicSequence => {
+                Err(Error::custom("Cannot deserialize dynamic sequence"))
+            }
+            SerdeOperator::RawId => Err(Error::custom("Cannot deserialize raw id")),
             SerdeOperator::RelationSequence(seq_op) => deserializer.deserialize_seq(
                 SequenceMatcher::new(&seq_op.ranges, seq_op.def.def_id, self.ctx)
                     .into_visitor(self),

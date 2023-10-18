@@ -362,8 +362,14 @@ fn serialize_schema_inline<S: Serializer>(
                 map.serialize_entry("description", docs)?;
             }
         }
-        SerdeOperator::Dynamic => {
+        SerdeOperator::DynamicSequence => {
             map.serialize_entry("type", "array")?;
+            if let Some(docs) = ctx.docs {
+                map.serialize_entry("description", docs)?;
+            }
+        }
+        SerdeOperator::RawId => {
+            map.serialize_entry("type", &["string", "number"])?;
             if let Some(docs) = ctx.docs {
                 map.serialize_entry("description", docs)?;
             }
@@ -488,7 +494,8 @@ impl<'d, 'e> Serialize for SchemaReference<'d, 'e> {
             | SerdeOperator::StringConstant(..)
             | SerdeOperator::TextPattern(_)
             | SerdeOperator::CapturingTextPattern(_)
-            | SerdeOperator::Dynamic => {
+            | SerdeOperator::DynamicSequence
+            | SerdeOperator::RawId => {
                 // These are inline schemas
                 let mut map = serializer.serialize_map(None)?;
                 serialize_schema_inline::<S>(&self.ctx, value_operator, self.def_map, &mut map)?;
@@ -770,7 +777,8 @@ impl SchemaGraphBuilder {
             | SerdeOperator::StringConstant(..)
             | SerdeOperator::TextPattern(_)
             | SerdeOperator::CapturingTextPattern(_)
-            | SerdeOperator::Dynamic => {}
+            | SerdeOperator::DynamicSequence
+            | SerdeOperator::RawId => {}
             SerdeOperator::ConstructorSequence(seq_op) => {
                 self.add_to_graph(seq_op.def, operator_id);
                 for range in &seq_op.ranges {
