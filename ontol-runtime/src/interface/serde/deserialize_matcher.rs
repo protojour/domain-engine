@@ -2,7 +2,7 @@ use std::{fmt::Display, ops::RangeInclusive};
 
 use crate::{
     format_utils::{Backticks, LogicOp, Missing},
-    interface::discriminator::Discriminant,
+    interface::{discriminator::Discriminant, serde::processor::DOMAIN_PROFILE},
     ontology::Ontology,
     text_like_types::ParseError,
     text_pattern::TextPattern,
@@ -385,7 +385,8 @@ impl<'on> ValueMatcher for UnionMatcher<'on> {
                     .map(|discriminator| self.ontology.new_serde_processor(
                         discriminator.operator_id,
                         self.mode,
-                        ProcessorLevel::new_root()
+                        ProcessorLevel::new_root(),
+                        &DOMAIN_PROFILE,
                     ))
                     .collect(),
                 logic_op: LogicOp::Or,

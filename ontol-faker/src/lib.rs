@@ -4,7 +4,7 @@ use fake::{Fake, Faker};
 use ontol_runtime::{
     interface::serde::{
         operator::{FilteredVariants, SerdeOperator},
-        processor::{ProcessorLevel, ProcessorMode, SerdeProcessor},
+        processor::{ProcessorLevel, ProcessorMode, SerdeProcessor, DOMAIN_PROFILE},
     },
     ontology::Ontology,
     text_like_types::TextLikeType,
@@ -67,6 +67,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                 operator_id,
                 self.processor_mode,
                 ProcessorLevel::new_root_with_recursion_limit(32),
+                &DOMAIN_PROFILE,
             ))?
             .value)
     }
@@ -151,7 +152,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
 
                 Value::new(data, *def_id)
             }
-            SerdeOperator::DynamicSequence => {
+            SerdeOperator::Dynamic => {
                 return Ok(Value::new(Data::Sequence([].into()), DefId::unit()).into());
             }
             SerdeOperator::RelationSequence(seq_op) => {

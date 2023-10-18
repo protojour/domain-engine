@@ -4,7 +4,7 @@ use ontol_runtime::{
     condition::Condition,
     interface::serde::{
         operator::SerdeOperatorId,
-        processor::{ProcessorLevel, ProcessorMode},
+        processor::{ProcessorLevel, ProcessorMode, DOMAIN_PROFILE},
     },
     ontology::{DataRelationshipInfo, DataRelationshipKind, Ontology, ValueCardinality},
     select::{EntitySelect, Select, StructOrUnionSelect},
@@ -203,6 +203,7 @@ impl InMemoryStore {
                         operator_id,
                         ProcessorMode::Read,
                         ProcessorLevel::new_root(),
+                        &DOMAIN_PROFILE,
                     );
 
                     let mut buf: Vec<u8> = vec![];

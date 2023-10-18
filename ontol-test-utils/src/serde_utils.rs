@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use ontol_runtime::{
-    interface::serde::processor::{ProcessorLevel, ProcessorMode},
+    interface::serde::processor::{ProcessorLevel, ProcessorMode, DOMAIN_PROFILE},
     value::{Attribute, Data, PropertyId, Value},
     DefId,
 };
@@ -50,7 +50,12 @@ impl<'b, 'on> Deserializer<'b, 'on> {
         let attribute_result = self
             .binding
             .ontology()
-            .new_serde_processor(self.binding.serde_operator_id(), self.mode, self.level)
+            .new_serde_processor(
+                self.binding.serde_operator_id(),
+                self.mode,
+                self.level,
+                &DOMAIN_PROFILE,
+            )
             .deserialize(&mut serde_json::Deserializer::from_str(&json_string));
 
         match self.binding.json_schema() {
@@ -111,12 +116,13 @@ impl<'b, 'on> Serializer<'b, 'on> {
             .ontology()
             .new_serde_processor(
                 if dynamic_seq {
-                    self.binding.ontology().dynamic_sequence_operator_id()
+                    self.binding.ontology().dynamic_operator_id()
                 } else {
                     self.binding.serde_operator_id()
                 },
                 self.mode,
                 self.level,
+                &DOMAIN_PROFILE,
             )
             .serialize_value(value, None, &mut serde_json::Serializer::new(&mut buf))
             .expect("serialization failed");

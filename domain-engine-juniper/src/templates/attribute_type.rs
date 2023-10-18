@@ -11,7 +11,7 @@ use ontol_runtime::{
     },
     interface::serde::{
         operator::SerdeOperator,
-        processor::{ProcessorLevel, ProcessorMode},
+        processor::{ProcessorLevel, ProcessorMode, DOMAIN_PROFILE},
     },
     value::{Attribute, Data, PropertyId, Value},
     DefId,
@@ -311,6 +311,7 @@ impl<'v> AttributeType<'v> {
                                 scalar_data.serde_operator_id,
                                 ProcessorMode::Read,
                                 ProcessorLevel::new_root(),
+                                &DOMAIN_PROFILE,
                             )
                             .serialize_value(&attribute.value, None, GqlScalarSerializer)?;
 
@@ -335,6 +336,7 @@ impl<'v> AttributeType<'v> {
                         operator.ranges[0].operator_id,
                         ProcessorMode::Read,
                         ProcessorLevel::new_root(),
+                        &DOMAIN_PROFILE,
                     );
 
                     let graphql_values: Vec<juniper::Value<GqlScalar>> = attributes
@@ -358,6 +360,7 @@ impl<'v> AttributeType<'v> {
                             scalar_ref.operator_id,
                             ProcessorMode::Read,
                             ProcessorLevel::new_root(),
+                            &DOMAIN_PROFILE,
                         )
                         .serialize_value(&attribute.value, None, GqlScalarSerializer)?;
 

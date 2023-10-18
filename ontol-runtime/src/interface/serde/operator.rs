@@ -44,10 +44,9 @@ pub enum SerdeOperator {
     /// Deserializes into a Struct if there are capture groups:
     CapturingTextPattern(DefId),
 
-    /// Special operator for serialization, can serialize a sequence of anything,
-    /// by using dynamic lookup.
-    /// Does not support deserialization.
-    DynamicSequence,
+    /// Special operator for serialization, serializes each value
+    /// in a raw manner based on its runtime type information.
+    Dynamic,
 
     /// A sequence representing a relationship between one subject and many objects.
     /// This is simple and does not support any tuples.
@@ -250,6 +249,11 @@ impl SerdeProperty {
     #[inline]
     pub fn is_read_only(&self) -> bool {
         self.flags.contains(SerdePropertyFlags::READ_ONLY)
+    }
+
+    #[inline]
+    pub fn is_entity_id(&self) -> bool {
+        self.flags.contains(SerdePropertyFlags::ENTITY_ID)
     }
 
     #[inline]

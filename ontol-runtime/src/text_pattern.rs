@@ -7,7 +7,7 @@ use smartstring::alias::String;
 use tracing::{debug, error};
 
 use crate::{
-    interface::serde::processor::{ProcessorLevel, ProcessorMode},
+    interface::serde::processor::{ProcessorLevel, ProcessorMode, DOMAIN_PROFILE},
     ontology::Ontology,
     smart_format,
     text_like_types::ParseError,
@@ -62,6 +62,7 @@ impl TextPattern {
                                 .expect("No operator id for pattern constant part"),
                             ProcessorMode::Create,
                             ProcessorLevel::new_root(),
+                            &DOMAIN_PROFILE,
                         );
 
                         let attribute = processor

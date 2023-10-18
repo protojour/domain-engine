@@ -5,7 +5,7 @@ use ontol_runtime::{
     interface::json_schema::build_openapi_schemas,
     interface::serde::{
         operator::SerdeOperatorId,
-        processor::{ProcessorLevel, ProcessorMode},
+        processor::{ProcessorLevel, ProcessorMode, DOMAIN_PROFILE},
     },
     ontology::{MapMeta, Ontology, TypeInfo},
     value::Value,
@@ -107,6 +107,7 @@ impl WasmTypeInfo {
                 operator_id(&self.inner)?,
                 format.to_processor_mode(),
                 ProcessorLevel::new_root(),
+                &DOMAIN_PROFILE,
             )
             .deserialize(serde_wasm_bindgen::Deserializer::from(js_value))
             .map(|attr| attr.value)
@@ -149,6 +150,7 @@ impl WasmValue {
                 operator_id(type_info)?,
                 format.to_processor_mode(),
                 ProcessorLevel::new_root(),
+                &DOMAIN_PROFILE,
             )
             .serialize_value(&self.value, None, &js_serializer())
             .map_err(|err| WasmError::Generic(format!("Serialization failed: {err}")))

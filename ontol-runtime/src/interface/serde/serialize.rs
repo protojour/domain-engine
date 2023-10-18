@@ -27,7 +27,7 @@ const UNIT_ATTR: Attribute = Attribute {
     rel_params: Value::unit(),
 };
 
-impl<'on> SerdeProcessor<'on> {
+impl<'on, 'p> SerdeProcessor<'on, 'p> {
     /// Serialize a value using this processor.
     pub fn serialize_value<S: Serializer>(
         &self,
@@ -101,9 +101,26 @@ impl<'on> SerdeProcessor<'on> {
 
                 serializer.serialize_str(&buf)
             }
-            SerdeOperator::DynamicSequence => {
-                self.serialize_dynamic_sequence(cast_ref::<Vec<_>>(value), serializer)
-            }
+            SerdeOperator::Dynamic => match &value.data {
+                Data::Text(string) => serializer.serialize_str(string),
+                data @ Data::OctetSequence(_) => {
+                    let mut buf = String::new();
+                    write!(
+                        &mut buf,
+                        "{}",
+                        FormatDataAsText {
+                            data,
+                            type_def_id: value.type_def_id,
+                            ontology: self.ontology
+                        }
+                    )
+                    .map_err(|_| S::Error::custom("Conversion to text failed"))?;
+
+                    serializer.serialize_str(&buf)
+                }
+                Data::Sequence(vec) => self.serialize_dynamic_sequence(vec, serializer),
+                _ => todo!(),
+            },
             SerdeOperator::RelationSequence(seq_op) => {
                 self.serialize_sequence(cast_ref::<Vec<_>>(value), &seq_op.ranges, serializer)
             }
@@ -158,7 +175,7 @@ impl<'on> SerdeProcessor<'on> {
     }
 }
 
-impl<'on> SerdeProcessor<'on> {
+impl<'on, 'p> SerdeProcessor<'on, 'p> {
     fn serialize_sequence<S: Serializer>(
         &self,
         elements: &[Attribute],
@@ -269,6 +286,13 @@ impl<'on> SerdeProcessor<'on> {
                 }
             };
 
+            let is_entity_id = serde_prop.is_entity_id();
+
+            let name = match (is_entity_id, self.profile.overridden_id_property_key) {
+                (true, Some(id_key)) => id_key,
+                _ => name.as_str(),
+            };
+
             map.serialize_entry(
                 name,
                 &Proxy {
@@ -276,7 +300,11 @@ impl<'on> SerdeProcessor<'on> {
                     rel_params: attribute.rel_params.filter_non_unit(),
                     processor: self
                         .new_child_with_context(
-                            serde_prop.value_operator_id,
+                            if is_entity_id && self.profile.raw_ids {
+                                self.ontology.dynamic_operator_id()
+                            } else {
+                                serde_prop.value_operator_id
+                            },
                             SubProcessorContext {
                                 parent_property_id: Some(serde_prop.property_id),
                                 rel_params_operator_id: serde_prop.rel_params_operator_id,
@@ -330,13 +358,13 @@ fn option_len<T>(opt: &Option<T>) -> usize {
     }
 }
 
-struct Proxy<'v, 'on> {
+struct Proxy<'v, 'on, 'p> {
     value: &'v Value,
     rel_params: Option<&'v Value>,
-    processor: SerdeProcessor<'on>,
+    processor: SerdeProcessor<'on, 'p>,
 }
 
-impl<'v, 'on> serde::Serialize for Proxy<'v, 'on> {
+impl<'v, 'on, 'p> serde::Serialize for Proxy<'v, 'on, 'p> {
     fn serialize<S>(&self, serializer: S) -> Res<S>
     where
         S: serde::Serializer,

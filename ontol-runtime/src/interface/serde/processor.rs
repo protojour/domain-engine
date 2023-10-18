@@ -24,6 +24,19 @@ pub struct ProcessorLevel {
     recursion_limit: u16,
 }
 
+pub struct ProcessorProfile {
+    pub overridden_id_property_key: Option<&'static str>,
+    pub ignored_property_keys: &'static [&'static str],
+    pub raw_ids: bool,
+}
+
+/// The standard profile for domain serialization/deserialization
+pub static DOMAIN_PROFILE: ProcessorProfile = ProcessorProfile {
+    overridden_id_property_key: None,
+    ignored_property_keys: &[],
+    raw_ids: false,
+};
+
 /// Maximum number of nested/recursive operators.
 const DEFAULT_RECURSION_LIMIT: u16 = 128;
 
@@ -97,7 +110,7 @@ pub struct SubProcessorContext {
 /// Each serde-enabled type has its own operator, which is cached
 /// in the runtime ontology.
 #[derive(Clone, Copy)]
-pub struct SerdeProcessor<'on> {
+pub struct SerdeProcessor<'on, 'p> {
     /// The operator used for (de)serializing this value
     pub value_operator: &'on SerdeOperator,
 
@@ -106,11 +119,13 @@ pub struct SerdeProcessor<'on> {
     /// The ontology, via which new SerdeOperators can be created.
     pub(crate) ontology: &'on Ontology,
 
+    pub(crate) profile: &'p ProcessorProfile,
+
     pub(crate) mode: ProcessorMode,
     pub(crate) level: ProcessorLevel,
 }
 
-impl<'on> SerdeProcessor<'on> {
+impl<'on, 'p> SerdeProcessor<'on, 'p> {
     pub fn level(&self) -> ProcessorLevel {
         self.level
     }
@@ -119,6 +134,7 @@ impl<'on> SerdeProcessor<'on> {
     pub fn narrow(&self, operator_id: SerdeOperatorId) -> Self {
         Self {
             ontology: self.ontology,
+            profile: self.profile,
             value_operator: self.ontology.get_serde_operator(operator_id),
             ctx: self.ctx,
             mode: self.mode,
@@ -133,6 +149,7 @@ impl<'on> SerdeProcessor<'on> {
     ) -> Self {
         Self {
             ontology: self.ontology,
+            profile: self.profile,
             value_operator: self.ontology.get_serde_operator(operator_id),
             ctx,
             mode: self.mode,
@@ -144,6 +161,7 @@ impl<'on> SerdeProcessor<'on> {
     pub fn new_child(&self, operator_id: SerdeOperatorId) -> Result<Self, RecursionLimitError> {
         Ok(Self {
             ontology: self.ontology,
+            profile: self.profile,
             value_operator: self.ontology.get_serde_operator(operator_id),
             ctx: Default::default(),
             mode: self.mode,
@@ -158,6 +176,7 @@ impl<'on> SerdeProcessor<'on> {
     ) -> Result<Self, RecursionLimitError> {
         Ok(Self {
             ontology: self.ontology,
+            profile: self.profile,
             value_operator: self.ontology.get_serde_operator(operator_id),
             ctx,
             mode: self.mode,
@@ -196,7 +215,7 @@ impl<'on> SerdeProcessor<'on> {
     }
 }
 
-impl<'on> Debug for SerdeProcessor<'on> {
+impl<'on, 'p> Debug for SerdeProcessor<'on, 'p> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // This structure might contain cycles (through operator id),
         // so just print the topmost level.
@@ -207,7 +226,7 @@ impl<'on> Debug for SerdeProcessor<'on> {
     }
 }
 
-impl<'on> Display for SerdeProcessor<'on> {
+impl<'on, 'p> Display for SerdeProcessor<'on, 'p> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.value_operator {
             SerdeOperator::Unit => write!(f, "unit"),
@@ -221,7 +240,7 @@ impl<'on> Display for SerdeProcessor<'on> {
             SerdeOperator::TextPattern(_) | SerdeOperator::CapturingTextPattern(_) => {
                 write!(f, "`text_pattern`")
             }
-            SerdeOperator::DynamicSequence => {
+            SerdeOperator::Dynamic => {
                 write!(f, "[?..]")
             }
             SerdeOperator::RelationSequence(seq_op) => {

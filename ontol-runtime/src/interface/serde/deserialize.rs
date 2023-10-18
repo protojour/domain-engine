@@ -24,7 +24,9 @@ use super::{
         UnionMatcher, UnitMatcher, ValueMatcher,
     },
     operator::{FilteredVariants, SerdeOperator, SerdeProperty},
-    processor::{ProcessorMode, RecursionLimitError, SerdeProcessor, SubProcessorContext},
+    processor::{
+        ProcessorMode, ProcessorProfile, RecursionLimitError, SerdeProcessor, SubProcessorContext,
+    },
     SerdeOperatorId, StructOperator,
 };
 
@@ -32,6 +34,7 @@ enum MapKey {
     Property(SerdeProperty),
     RelParams(SerdeOperatorId),
     Id(SerdeOperatorId),
+    Ignored,
 }
 
 struct DeserializedMap {
@@ -40,13 +43,13 @@ struct DeserializedMap {
     rel_params: Value,
 }
 
-pub(super) struct MatcherVisitor<'on, M> {
-    processor: SerdeProcessor<'on>,
+pub(super) struct MatcherVisitor<'on, 'p, M> {
+    processor: SerdeProcessor<'on, 'p>,
     matcher: M,
 }
 
-struct StructVisitor<'on> {
-    processor: SerdeProcessor<'on>,
+struct StructVisitor<'on, 'p> {
+    processor: SerdeProcessor<'on, 'p>,
     buffered_attrs: Vec<(String, serde_value::Value)>,
     struct_op: &'on StructOperator,
     ctx: SubProcessorContext,
@@ -59,30 +62,33 @@ struct SpecialOperatorIds<'s> {
 }
 
 #[derive(Clone, Copy)]
-struct PropertySet<'s> {
-    properties: &'s IndexMap<String, SerdeProperty>,
-    special_operator_ids: SpecialOperatorIds<'s>,
+struct PropertySet<'a> {
+    properties: &'a IndexMap<String, SerdeProperty>,
+    special_operator_ids: SpecialOperatorIds<'a>,
     processor_mode: ProcessorMode,
+    processor_profile: &'a ProcessorProfile,
     parent_property_id: Option<PropertyId>,
 }
 
-impl<'s> PropertySet<'s> {
+impl<'a> PropertySet<'a> {
     fn new(
-        properties: &'s IndexMap<String, SerdeProperty>,
-        special_operator_ids: SpecialOperatorIds<'s>,
+        properties: &'a IndexMap<String, SerdeProperty>,
+        special_operator_ids: SpecialOperatorIds<'a>,
         processor_mode: ProcessorMode,
+        processor_profile: &'a ProcessorProfile,
         parent_property_id: Option<PropertyId>,
     ) -> Self {
         Self {
             properties,
             special_operator_ids,
             processor_mode,
+            processor_profile,
             parent_property_id,
         }
     }
 }
 
-impl<'on> SerdeProcessor<'on> {
+impl<'on, 'p> SerdeProcessor<'on, 'p> {
     fn assert_no_rel_params(&self) {
         assert!(
             self.ctx.rel_params_operator_id.is_none(),
@@ -92,21 +98,24 @@ impl<'on> SerdeProcessor<'on> {
     }
 }
 
-trait IntoVisitor: ValueMatcher + Sized {
-    fn into_visitor(self, processor: SerdeProcessor) -> MatcherVisitor<Self> {
+trait IntoVisitor<'on, 'p>: ValueMatcher + Sized {
+    fn into_visitor(self, processor: SerdeProcessor<'on, 'p>) -> MatcherVisitor<'on, 'p, Self> {
         MatcherVisitor {
             processor,
             matcher: self,
         }
     }
 
-    fn into_visitor_no_params(self, processor: SerdeProcessor) -> MatcherVisitor<Self> {
+    fn into_visitor_no_params(
+        self,
+        processor: SerdeProcessor<'on, 'p>,
+    ) -> MatcherVisitor<'on, 'p, Self> {
         processor.assert_no_rel_params();
         self.into_visitor(processor)
     }
 }
 
-impl<M: ValueMatcher + Sized> IntoVisitor for M {}
+impl<'on, 'p, M: ValueMatcher + Sized> IntoVisitor<'on, 'p> for M {}
 
 /// The serde implementation deserializes Attributes instead of Values.
 ///
@@ -117,7 +126,7 @@ impl<M: ValueMatcher + Sized> IntoVisitor for M {}
 ///
 /// This is also the reason that only map types may be related through parameterized relationships.
 /// Other types only support unparameterized relationships.
-impl<'on, 'de> DeserializeSeed<'de> for SerdeProcessor<'on> {
+impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
     type Value = Attribute;
 
     fn deserialize<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
@@ -182,9 +191,7 @@ impl<'on, 'de> DeserializeSeed<'de> for SerdeProcessor<'on> {
                 }
                 .into_visitor_no_params(self),
             ),
-            SerdeOperator::DynamicSequence => {
-                Err(Error::custom("Cannot deserialize dynamic sequence"))
-            }
+            SerdeOperator::Dynamic => Err(Error::custom("Cannot deserialize dynamic sequence")),
             SerdeOperator::RelationSequence(seq_op) => deserializer.deserialize_seq(
                 SequenceMatcher::new(&seq_op.ranges, seq_op.def.def_id, self.ctx)
                     .into_visitor(self),
@@ -233,7 +240,7 @@ impl<'on, 'de> DeserializeSeed<'de> for SerdeProcessor<'on> {
     }
 }
 
-impl<'on, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, M> {
+impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> {
     type Value = Attribute;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -419,7 +426,7 @@ impl<'on, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, M> {
     }
 }
 
-impl<'on, 'de> Visitor<'de> for StructVisitor<'on> {
+impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
     type Value = Attribute;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -450,8 +457,8 @@ impl<'on, 'de> Visitor<'de> for StructVisitor<'on> {
     }
 }
 
-fn deserialize_map<'on, 'de, A: MapAccess<'de>>(
-    processor: SerdeProcessor<'on>,
+fn deserialize_map<'on, 'p, 'de, A: MapAccess<'de>>(
+    processor: SerdeProcessor<'on, 'p>,
     mut map: A,
     buffered_attrs: Vec<(String, serde_value::Value)>,
     properties: &IndexMap<String, SerdeProperty>,
@@ -470,6 +477,7 @@ fn deserialize_map<'on, 'de, A: MapAccess<'de>>(
             properties,
             special_operator_ids,
             processor.mode,
+            processor.profile,
             processor.ctx.parent_property_id,
         )
         .visit_str(&serde_key)?
@@ -507,6 +515,7 @@ fn deserialize_map<'on, 'de, A: MapAccess<'de>>(
 
                 attributes.insert(serde_property.property_id, Attribute { rel_params, value });
             }
+            MapKey::Ignored => {}
         }
     }
 
@@ -515,6 +524,7 @@ fn deserialize_map<'on, 'de, A: MapAccess<'de>>(
         properties,
         special_operator_ids,
         processor.mode,
+        processor.profile,
         processor.ctx.parent_property_id,
     ))? {
         match map_key {
@@ -555,6 +565,7 @@ fn deserialize_map<'on, 'de, A: MapAccess<'de>>(
 
                 attributes.insert(serde_property.property_id, attribute);
             }
+            MapKey::Ignored => {}
         }
     }
 
@@ -639,7 +650,7 @@ fn deserialize_map<'on, 'de, A: MapAccess<'de>>(
     })
 }
 
-impl<'s, 'de> DeserializeSeed<'de> for PropertySet<'s> {
+impl<'a, 'de> DeserializeSeed<'de> for PropertySet<'a> {
     type Value = MapKey;
 
     fn deserialize<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
@@ -647,7 +658,7 @@ impl<'s, 'de> DeserializeSeed<'de> for PropertySet<'s> {
     }
 }
 
-impl<'s, 'de> Visitor<'de> for PropertySet<'s> {
+impl<'a, 'de> Visitor<'de> for PropertySet<'a> {
     type Value = MapKey;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -668,6 +679,20 @@ impl<'s, 'de> Visitor<'de> for PropertySet<'s> {
                     if v == property_name {
                         return Ok(MapKey::Id(operator_id));
                     }
+                }
+
+                if Some(v) == self.processor_profile.overridden_id_property_key {
+                    for (_, prop) in self.properties {
+                        if prop.is_entity_id() {
+                            return Ok(MapKey::Property(*prop));
+                        }
+                    }
+
+                    return Err(Error::custom(format!("unknown property `{v}`")));
+                }
+
+                if self.processor_profile.ignored_property_keys.contains(&v) {
+                    return Ok(MapKey::Ignored);
                 }
 
                 let serde_property = self.properties.get(v).ok_or_else(|| {

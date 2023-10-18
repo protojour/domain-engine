@@ -4,7 +4,7 @@ use ontol_faker::new_constant_fake;
 use ontol_runtime::{
     interface::json_schema::build_standalone_schema,
     interface::serde::operator::SerdeOperatorId,
-    interface::serde::processor::{ProcessorLevel, ProcessorMode},
+    interface::serde::processor::{ProcessorLevel, ProcessorMode, DOMAIN_PROFILE},
     ontology::{Ontology, TypeInfo},
     select::{Select, StructSelect},
     value::{Attribute, Data, PropertyId, Value},
@@ -54,7 +54,8 @@ impl<'on> TypeBinding<'on> {
             processor = type_info.operator_id.map(|id| ontology.new_serde_processor(
                 id,
                 ProcessorMode::Create,
-                ProcessorLevel::new_root()
+                ProcessorLevel::new_root(),
+                &DOMAIN_PROFILE
             ))
         );
 
@@ -136,6 +137,7 @@ impl<'on> TypeBinding<'on> {
                 self.serde_operator_id(),
                 ProcessorMode::Create,
                 ProcessorLevel::new_root(),
+                &DOMAIN_PROFILE,
             )
             .find_property(prop)
     }
@@ -233,6 +235,7 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
                 entity_info.id_operator_id,
                 ProcessorMode::Create,
                 ProcessorLevel::new_root(),
+                &DOMAIN_PROFILE,
             )
             .deserialize(&mut serde_json::Deserializer::from_str(
                 &serde_json::to_string(&json).unwrap(),

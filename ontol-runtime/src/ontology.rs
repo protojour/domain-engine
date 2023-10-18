@@ -10,7 +10,7 @@ use crate::{
     interface::{
         serde::{
             operator::{SerdeOperator, SerdeOperatorId},
-            processor::{ProcessorLevel, ProcessorMode, SerdeProcessor},
+            processor::{ProcessorLevel, ProcessorMode, ProcessorProfile, SerdeProcessor},
             SerdeKey,
         },
         DomainInterface,
@@ -44,7 +44,7 @@ pub struct Ontology {
     docs: FnvHashMap<DefId, Vec<String>>,
     serde_operators_per_def: HashMap<SerdeKey, SerdeOperatorId>,
     serde_operators: Vec<SerdeOperator>,
-    dynamic_sequence_operator_id: SerdeOperatorId,
+    dynamic_operator_id: SerdeOperatorId,
     value_generators: FnvHashMap<RelationshipId, ValueGenerator>,
     property_flows: Vec<PropertyFlow>,
 }
@@ -65,7 +65,7 @@ impl Ontology {
                 lib: Lib::default(),
                 serde_operators_per_def: Default::default(),
                 serde_operators: Default::default(),
-                dynamic_sequence_operator_id: SerdeOperatorId(u32::MAX),
+                dynamic_operator_id: SerdeOperatorId(u32::MAX),
                 value_generators: Default::default(),
                 property_flows: Default::default(),
             },
@@ -161,12 +161,14 @@ impl Ontology {
         value_operator_id: SerdeOperatorId,
         mode: ProcessorMode,
         level: ProcessorLevel,
+        profile: &'static ProcessorProfile,
     ) -> SerdeProcessor {
         SerdeProcessor {
             value_operator: &self.serde_operators[value_operator_id.0 as usize],
             ctx: Default::default(),
             level,
             ontology: self,
+            profile,
             mode,
         }
     }
@@ -175,8 +177,8 @@ impl Ontology {
         &self.serde_operators[operator_id.0 as usize]
     }
 
-    pub fn dynamic_sequence_operator_id(&self) -> SerdeOperatorId {
-        self.dynamic_sequence_operator_id
+    pub fn dynamic_operator_id(&self) -> SerdeOperatorId {
+        self.dynamic_operator_id
     }
 
     pub fn get_value_generator(&self, relationship_id: RelationshipId) -> Option<&ValueGenerator> {
@@ -392,7 +394,7 @@ impl OntologyBuilder {
         mut self,
         dynamic_sequence_operator_id: SerdeOperatorId,
     ) -> Self {
-        self.ontology.dynamic_sequence_operator_id = dynamic_sequence_operator_id;
+        self.ontology.dynamic_operator_id = dynamic_sequence_operator_id;
         self
     }
 
