@@ -250,10 +250,20 @@ impl<'a, 'de> de::Deserializer<'de> for LookAheadValueDeserializer<'a> {
         }
     }
 
+    fn deserialize_option<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        match &self.value.item {
+            LookAheadValue::Null => visitor.visit_none::<Error>().context(self.value),
+            _ => {
+                let value = self.value.clone();
+                visitor.visit_some(self).context(&value)
+            }
+        }
+    }
+
     serde::forward_to_deserialize_any!(
         bool u8 u16 u32 u64 i8 i16 i32 i64 f32 f64 char str string unit
         seq bytes byte_buf map unit_struct
-        tuple_struct struct tuple ignored_any identifier option newtype_struct enum
+        tuple_struct struct tuple ignored_any identifier newtype_struct enum
     );
 }
 
