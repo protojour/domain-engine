@@ -25,7 +25,8 @@ use super::{
     },
     operator::{FilteredVariants, SerdeOperator, SerdeProperty},
     processor::{
-        ProcessorMode, ProcessorProfile, RecursionLimitError, SerdeProcessor, SubProcessorContext,
+        ProcessorMode, ProcessorProfile, RecursionLimitError, ScalarFormat, SerdeProcessor,
+        SubProcessorContext,
     },
     SerdeOperatorAddr, StructOperator,
 };
@@ -140,27 +141,54 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                 .deserialize_bool(BooleanMatcher::True(*def_id).into_visitor_no_params(self)),
             (SerdeOperator::Boolean(def_id), _) => deserializer
                 .deserialize_bool(BooleanMatcher::Boolean(*def_id).into_visitor_no_params(self)),
-            (SerdeOperator::I64(def_id, range), _) => deserializer.deserialize_i64(
-                NumberMatcher {
-                    def_id: *def_id,
-                    range: range.clone(),
-                }
-                .into_visitor_no_params(self),
-            ),
-            (SerdeOperator::I32(def_id, range), _) => deserializer.deserialize_i32(
-                NumberMatcher {
-                    def_id: *def_id,
-                    range: range.clone(),
-                }
-                .into_visitor_no_params(self),
-            ),
-            (SerdeOperator::F64(def_id, range), _) => deserializer.deserialize_f64(
-                NumberMatcher {
-                    def_id: *def_id,
-                    range: range.clone(),
-                }
-                .into_visitor_no_params(self),
-            ),
+            (SerdeOperator::I64(def_id, range), ScalarFormat::DomainTransparent) => deserializer
+                .deserialize_i64(
+                    NumberMatcher {
+                        def_id: *def_id,
+                        range: range.clone(),
+                    }
+                    .into_visitor_no_params(self),
+                ),
+            (SerdeOperator::I64(def_id, range), ScalarFormat::RawText) => deserializer
+                .deserialize_str(
+                    NumberMatcher {
+                        def_id: *def_id,
+                        range: range.clone(),
+                    }
+                    .into_visitor_no_params(self),
+                ),
+            (SerdeOperator::I32(def_id, range), ScalarFormat::DomainTransparent) => deserializer
+                .deserialize_i32(
+                    NumberMatcher {
+                        def_id: *def_id,
+                        range: range.clone(),
+                    }
+                    .into_visitor_no_params(self),
+                ),
+            (SerdeOperator::I32(def_id, range), ScalarFormat::RawText) => deserializer
+                .deserialize_str(
+                    NumberMatcher {
+                        def_id: *def_id,
+                        range: range.clone(),
+                    }
+                    .into_visitor_no_params(self),
+                ),
+            (SerdeOperator::F64(def_id, range), ScalarFormat::DomainTransparent) => deserializer
+                .deserialize_f64(
+                    NumberMatcher {
+                        def_id: *def_id,
+                        range: range.clone(),
+                    }
+                    .into_visitor_no_params(self),
+                ),
+            (SerdeOperator::F64(def_id, range), ScalarFormat::RawText) => deserializer
+                .deserialize_str(
+                    NumberMatcher {
+                        def_id: *def_id,
+                        range: range.clone(),
+                    }
+                    .into_visitor_no_params(self),
+                ),
             (SerdeOperator::String(def_id), _) => deserializer.deserialize_str(
                 StringMatcher {
                     def_id: *def_id,

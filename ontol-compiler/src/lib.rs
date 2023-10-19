@@ -40,16 +40,15 @@ use crate::{def::RelParams, type_check::repr::repr_model::ReprKind};
 
 pub mod error;
 pub mod hir_unify;
-pub mod interface;
 pub mod mem;
 pub mod ontology_graph;
 pub mod package;
 pub mod source;
-pub mod typed_hir;
 
 mod codegen;
 mod compiler_queries;
 mod def;
+mod interface;
 mod lowering;
 mod map;
 mod map_arm_def_inference;
@@ -63,6 +62,7 @@ mod sequence;
 mod strings;
 mod text_patterns;
 mod type_check;
+mod typed_hir;
 mod types;
 
 /// Temporary configuration: Use the new flat unifier

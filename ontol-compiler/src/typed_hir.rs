@@ -23,8 +23,6 @@ impl ontol_hir::Lang for TypedHir {
     }
 }
 
-pub type TypedHirKind<'m> = ontol_hir::Kind<'m, TypedHir>;
-
 pub type TypedArena<'m> = ontol_hir::arena::Arena<'m, TypedHir>;
 pub type TypedNodeRef<'h, 'm> = ontol_hir::arena::NodeRef<'h, 'm, TypedHir>;
 pub type TypedRootNode<'m> = ontol_hir::RootNode<'m, TypedHir>;

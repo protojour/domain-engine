@@ -31,7 +31,7 @@ pub struct ProcessorProfile {
     pub id_format: ScalarFormat,
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, Debug)]
 pub enum ScalarFormat {
     /// Serialize scalars just like the domain says
     #[default]

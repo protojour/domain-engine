@@ -133,6 +133,10 @@ impl ValueMatcher for NumberMatcher<i64> {
             type_def_id: self.def_id,
         })
     }
+
+    fn match_str(&self, str: &str) -> Result<Value, ()> {
+        self.match_i64(str.parse().map_err(|_| ())?)
+    }
 }
 
 impl ValueMatcher for NumberMatcher<i32> {
@@ -157,6 +161,10 @@ impl ValueMatcher for NumberMatcher<i32> {
             data: Data::I64(value as i64),
             type_def_id: self.def_id,
         })
+    }
+
+    fn match_str(&self, str: &str) -> Result<Value, ()> {
+        self.match_i64(str.parse().map_err(|_| ())?)
     }
 }
 
@@ -184,6 +192,10 @@ impl ValueMatcher for NumberMatcher<f64> {
             data: Data::F64(value),
             type_def_id: self.def_id,
         })
+    }
+
+    fn match_str(&self, str: &str) -> Result<Value, ()> {
+        self.match_f64(str.parse().map_err(|_| ())?)
     }
 }
 

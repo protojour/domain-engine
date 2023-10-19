@@ -3,7 +3,9 @@ use ontol_runtime::{
     interface::serde::processor::{ProcessorProfile, ScalarFormat},
     value::Data,
 };
-use ontol_test_utils::{assert_error_msg, assert_json_io_matches, serde_helper::*, TestCompile};
+use ontol_test_utils::{
+    assert_error_msg, assert_json_io_matches, expect_eq, serde_helper::*, TestCompile,
+};
 use serde_json::json;
 use test_log::test;
 
@@ -416,38 +418,54 @@ fn test_serde_with_raw_id_overridde_profile() {
 
     "
     pub def foo {
-        rel .'id'|id: {
+        rel .'prefix_id'|id: {
             fmt '' => 'prefix/' => uuid => .
         }
     }
+
+    pub def bar {
+        rel .'int_id'|id: { rel .is: i64 }
+    }
     "
     .compile_then(|test| {
-        let [foo] = test.bind(["foo"]);
+        let [foo, bar] = test.bind(["foo", "bar"]);
 
-        let input = serde_json::json!({
-            "IGNORE1": 1,
-            "__ID": "a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8",
-            "IGNORE2": 2
-        });
-        let value = ontol_test_utils::serde_helper::serde_create(&foo)
+        let foo_value = serde_create(&foo)
             .with_profile(processor_profile.clone())
-            .to_value(input.clone())
+            .to_value(json!({
+                "IGNORE1": 1,
+                "__ID": "a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8",
+                "IGNORE2": 2
+            }))
             .unwrap();
 
-        pretty_assertions::assert_eq!(
-            serde_json::json!({
-                "__ID": "a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8",
-            }),
-            ontol_test_utils::serde_helper::serde_create(&foo)
+        expect_eq!(
+            actual = serde_create(&foo)
                 .with_profile(processor_profile.clone())
-                .as_json(&value)
+                .as_json(&foo_value),
+            expected = json!({ "__ID": "a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8" })
         );
 
-        pretty_assertions::assert_eq!(
-            serde_json::json!({
-                "id": "prefix/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8",
-            }),
-            ontol_test_utils::serde_helper::serde_create(&foo).as_json(&value)
+        expect_eq!(
+            actual = serde_create(&foo).as_json(&foo_value),
+            expected = json!({ "prefix_id": "prefix/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8" }),
+        );
+
+        let bar_value = serde_create(&bar)
+            .with_profile(processor_profile.clone())
+            .to_value(json!({ "__ID": "1337" }))
+            .unwrap();
+
+        expect_eq!(
+            actual = ontol_test_utils::serde_helper::serde_create(&bar)
+                .with_profile(processor_profile.clone())
+                .as_json(&bar_value),
+            expected = json!({ "__ID": "1337" })
+        );
+
+        expect_eq!(
+            actual = serde_create(&bar).as_json(&bar_value),
+            expected = json!({ "int_id": 1337 }),
         );
     });
 }
