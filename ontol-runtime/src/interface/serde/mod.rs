@@ -8,6 +8,7 @@ use self::operator::{SerdeOperatorAddr, StructOperator};
 
 mod deserialize;
 mod deserialize_matcher;
+mod deserialize_struct;
 mod serialize;
 
 pub mod operator;
