@@ -4,7 +4,7 @@ use serde::{
 };
 use smartstring::alias::String;
 use std::fmt::Write;
-use tracing::debug;
+use tracing::trace;
 
 use crate::{
     cast::Cast,
@@ -36,7 +36,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         rel_params: Option<&Value>,
         serializer: S,
     ) -> Res<S> {
-        debug!("serializing op={:?}", self.value_operator);
+        trace!("serializing op={:?}", self.value_operator);
 
         match (self.value_operator, self.scalar_format()) {
             (SerdeOperator::Unit, _) => {
@@ -113,7 +113,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 
                     if let Some(variant) = variant {
                         let processor = self.narrow(variant.addr);
-                        debug!(
+                        trace!(
                             "serializing union variant with {:?} {processor:}",
                             variant.addr
                         );

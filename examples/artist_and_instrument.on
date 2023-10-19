@@ -21,3 +21,10 @@ pub def plays {
 }
 
 rel [artist] 'plays'(rel .is: plays)::'played_by' [instrument]
+
+map artists_by_name {
+    { 'name': x }
+    artist: [
+        ..artist match { 'name': x }
+    ]
+}

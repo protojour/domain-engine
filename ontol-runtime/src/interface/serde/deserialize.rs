@@ -4,7 +4,7 @@ use serde::{
     Deserializer,
 };
 use smartstring::alias::String;
-use tracing::debug;
+use tracing::trace;
 
 use crate::{
     interface::serde::{
@@ -317,7 +317,7 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
     }
 
     fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
-        debug!("visit map\n");
+        trace!("visit map\n");
         let mut matcher = self
             .matcher
             .match_map()
@@ -358,7 +358,7 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
             buffered_attrs.push((property, value));
         };
 
-        debug!("matched map: {map_match:?} buffered attrs: {buffered_attrs:?}");
+        trace!("matched map: {map_match:?} buffered attrs: {buffered_attrs:?}");
 
         // delegate to the real map visitor
         match map_match.kind {

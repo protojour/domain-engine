@@ -6,6 +6,7 @@ pub mod system;
 mod domain_engine;
 mod filter;
 mod in_memory_store;
+mod match_utils;
 mod resolve_path;
 mod select_data_flow;
 mod value_generator;

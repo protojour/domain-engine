@@ -1,9 +1,11 @@
 use domain_engine_core::DomainEngine;
+use domain_engine_test_utils::exec_named_map_json;
 use ontol_runtime::{config::DataStoreConfig, select::Select};
 use ontol_test_utils::{
     assert_error_msg,
     examples::{conduit::CONDUIT_DB, Root, ARTIST_AND_INSTRUMENT},
     expect_eq,
+    json_utils::{json_map, json_prop},
     serde_helper::{serde_create, serde_read},
     type_binding::TypeBinding,
     SourceName, TestCompile, TestPackages,
@@ -336,5 +338,43 @@ async fn test_artist_and_instrument_fmt_id_generation() {
     expect_eq!(
         actual = serde_read(&artist_id).as_json(&explicit_id),
         expected = json!("artist/67e55044-10b1-426f-9247-bb680e5fe0c8")
+    );
+}
+
+#[test(tokio::test)]
+async fn test_artist_and_instrument_filter_condition() {
+    let test = artist_and_instrument().compile();
+    let domain_engine = DomainEngine::test_builder(test.ontology.clone())
+        .build::<crate::TestDataStoreFactory>()
+        .await;
+    let [artist] = test.bind(["artist"]);
+
+    let entities = vec![
+        json!({ "name": "Larry Young" }),
+        json!({ "name": "Woody Shaw" }),
+        json!({ "name": "Joe Henderson" }),
+    ];
+
+    for json in &entities {
+        domain_engine
+            .store_new_entity(
+                serde_create(&artist).to_value(json.clone()).unwrap(),
+                Select::EntityId,
+            )
+            .await
+            .unwrap();
+    }
+
+    fn extract_names(value: serde_json::Value) -> serde_json::Value {
+        json_map(value, |value| json_prop(value, "name"))
+    }
+
+    let by_name = (artist.def_id().package_id(), "artists_by_name");
+
+    expect_eq!(
+        actual = extract_names(
+            exec_named_map_json(by_name, json!({ "name": "N/A" }), &domain_engine).await
+        ),
+        expected = json!(["Larry Young", "Woody Shaw", "Joe Henderson"])
     );
 }

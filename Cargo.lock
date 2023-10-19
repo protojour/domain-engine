@@ -574,6 +574,7 @@ dependencies = [
  "bit-set",
  "chrono",
  "domain-engine-test-templates",
+ "domain-engine-test-utils",
  "fnv",
  "indexmap",
  "itertools",
@@ -632,9 +633,13 @@ dependencies = [
  "async-trait",
  "domain-engine-core",
  "domain-engine-juniper",
+ "fnv",
  "graphql-parser",
  "juniper",
+ "ontol-runtime",
  "ontol-test-utils",
+ "serde",
+ "serde_json",
  "unimock",
 ]
 

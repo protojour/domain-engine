@@ -17,6 +17,7 @@ use type_binding::TypeBinding;
 
 pub mod diagnostics;
 pub mod examples;
+pub mod json_utils;
 pub mod serde_helper;
 pub mod test_extensions;
 pub mod test_map;

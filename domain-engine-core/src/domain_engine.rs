@@ -2,20 +2,20 @@ use std::sync::Arc;
 
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    condition::{Clause, CondTerm},
     interface::serde::processor::ProcessorMode,
     ontology::{Ontology, PropertyCardinality, ValueCardinality},
-    select::{EntitySelect, Select, StructOrUnionSelect},
+    select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
     value::{Attribute, Data, Value},
     var::Var,
     vm::{proc::Yield, VmState},
     DefId, MapKey, PackageId,
 };
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::{
     data_store::{DataStore, DataStoreFactory},
     domain_error::DomainResult,
+    match_utils::find_entity_id_in_condition_for_var,
     resolve_path::{ProbeOptions, ResolverGraph},
     select_data_flow::translate_entity_select,
     system::{SystemAPI, TestSystem},
@@ -83,9 +83,25 @@ impl DomainEngine {
             match vm.run([input_value]) {
                 VmState::Complete(value) => return Ok(value.into()),
                 VmState::Yielded(Yield::Match(match_var, condition)) => {
-                    let Some(mut entity_query) = queries.remove(&match_var) else {
-                        panic!("No selection for {match_var}");
-                    };
+                    let mut entity_query = queries.remove(&match_var).unwrap_or_else(|| {
+                        warn!("Autodetecting query as no query was passed");
+                        let def_id = find_entity_id_in_condition_for_var(&condition, match_var)
+                            .expect("Unable to detect an entity being queried");
+
+                        // FIXME: We have to properly detect the cardinality
+                        EntityQuery {
+                            cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Many),
+                            select: EntitySelect {
+                                source: StructOrUnionSelect::Struct(StructSelect {
+                                    def_id,
+                                    properties: Default::default(),
+                                }),
+                                condition: Default::default(),
+                                limit: self.config.default_limit,
+                                cursor: None,
+                            },
+                        }
+                    });
 
                     // Merge the condition into the select
                     assert!(entity_query.select.condition.clauses.is_empty());
@@ -177,23 +193,9 @@ impl DomainEngine {
 
         match &entity_query.select.source {
             StructOrUnionSelect::Struct(struct_select) => {
-                let inner_entity_def_id = entity_query
-                    .select
-                    .condition
-                    .clauses
-                    .iter()
-                    .find_map(|clause| {
-                        if let Clause::IsEntity(CondTerm::Var(entity_var), def_id) = clause {
-                            if *entity_var == match_var {
-                                Some(*def_id)
-                            } else {
-                                None
-                            }
-                        } else {
-                            None
-                        }
-                    })
-                    .expect("Root entity DefId not found in condition clauses");
+                let inner_entity_def_id =
+                    find_entity_id_in_condition_for_var(&entity_query.select.condition, match_var)
+                        .expect("Root entity DefId not found in condition clauses");
 
                 // TODO: The probe algorithm here needs to work differently.
                 // The map statement (currently) knows about the data store type
