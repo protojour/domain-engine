@@ -10,14 +10,14 @@ use tracing::error;
 
 use crate::type_binding::{TypeBinding, TEST_JSON_SCHEMA_VALIDATION};
 
-pub struct Deserializer<'b, 'on> {
+pub struct SerdeHelper<'b, 'on> {
     binding: &'b TypeBinding<'on>,
     mode: ProcessorMode,
     level: ProcessorLevel,
     profile: ProcessorProfile,
 }
 
-impl<'b, 'on> Deserializer<'b, 'on> {
+impl<'b, 'on> SerdeHelper<'b, 'on> {
     pub fn with_profile(self, profile: ProcessorProfile) -> Self {
         Self { profile, ..self }
     }
@@ -91,19 +91,6 @@ impl<'b, 'on> Deserializer<'b, 'on> {
             }),
         }
     }
-}
-
-pub struct Serializer<'b, 'on> {
-    binding: &'b TypeBinding<'on>,
-    mode: ProcessorMode,
-    level: ProcessorLevel,
-    profile: ProcessorProfile,
-}
-
-impl<'b, 'on> Serializer<'b, 'on> {
-    pub fn with_profile(self, profile: ProcessorProfile) -> Self {
-        Self { profile, ..self }
-    }
 
     pub fn as_json(&self, value: &Value) -> serde_json::Value {
         self.serialize_json(value, false)
@@ -137,9 +124,9 @@ impl<'b, 'on> Serializer<'b, 'on> {
     }
 }
 
-/// Make a deserializer for the data creation processor mode
-pub fn create_de<'b, 'on>(binding: &'b TypeBinding<'on>) -> Deserializer<'b, 'on> {
-    Deserializer {
+/// Make a helper for the data creation processor mode
+pub fn serde_create<'b, 'on>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 'on> {
+    SerdeHelper {
         binding,
         mode: ProcessorMode::Create,
         level: ProcessorLevel::new_root(),
@@ -147,9 +134,9 @@ pub fn create_de<'b, 'on>(binding: &'b TypeBinding<'on>) -> Deserializer<'b, 'on
     }
 }
 
-/// Make a deserializer for the `Read` processor mode
-pub fn read_de<'b, 'on>(binding: &'b TypeBinding<'on>) -> Deserializer<'b, 'on> {
-    Deserializer {
+/// Make a helper for the `Read` processor mode
+pub fn serde_read<'b, 'on>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 'on> {
+    SerdeHelper {
         binding,
         mode: ProcessorMode::Read,
         level: ProcessorLevel::new_root(),
@@ -157,39 +144,9 @@ pub fn read_de<'b, 'on>(binding: &'b TypeBinding<'on>) -> Deserializer<'b, 'on> 
     }
 }
 
-/// Make a deserializer for the `Raw` processor mode
-pub fn raw_de<'b, 'on>(binding: &'b TypeBinding<'on>) -> Deserializer<'b, 'on> {
-    Deserializer {
-        binding,
-        mode: ProcessorMode::Raw,
-        level: ProcessorLevel::new_root(),
-        profile: ProcessorProfile::default(),
-    }
-}
-
-/// Make a serializer for the data creation processor mode
-pub fn create_ser<'b, 'on>(binding: &'b TypeBinding<'on>) -> Serializer<'b, 'on> {
-    Serializer {
-        binding,
-        mode: ProcessorMode::Create,
-        level: ProcessorLevel::new_root(),
-        profile: ProcessorProfile::default(),
-    }
-}
-
-/// Make a serializer for the `Read` processor mode
-pub fn read_ser<'b, 'on>(binding: &'b TypeBinding<'on>) -> Serializer<'b, 'on> {
-    Serializer {
-        binding,
-        mode: ProcessorMode::Read,
-        level: ProcessorLevel::new_root(),
-        profile: ProcessorProfile::default(),
-    }
-}
-
-/// Make a serializer for the `Raw` processor mode
-pub fn raw_ser<'b, 'on>(binding: &'b TypeBinding<'on>) -> Serializer<'b, 'on> {
-    Serializer {
+/// Make a helper for the `Raw` processor mode
+pub fn serde_raw<'b, 'on>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 'on> {
+    SerdeHelper {
         binding,
         mode: ProcessorMode::Raw,
         level: ProcessorLevel::new_root(),

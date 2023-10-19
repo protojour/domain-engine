@@ -13,7 +13,7 @@ use ontol_runtime::{
 use serde::de::DeserializeSeed;
 use tracing::{debug, trace, warn};
 
-use crate::{serde_utils::create_de, OntolTest};
+use crate::{serde_helper::serde_create, OntolTest};
 
 /// This test asserts that JSON schemas accept the same things that
 /// ONTOL's own deserializer does.
@@ -195,7 +195,7 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
     }
 
     fn data(mut self, json: serde_json::Value) -> Self {
-        let value = create_de(self.binding).to_value(json).unwrap();
+        let value = serde_create(self.binding).to_value(json).unwrap();
         self.value.type_def_id = value.type_def_id;
         match (&mut self.value.data, value) {
             (Data::Unit, value) => {

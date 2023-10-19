@@ -4,7 +4,7 @@ use ontol_test_utils::{
         stix::{STIX, STIX_COMMON, STIX_META, STIX_OPEN_VOCAB},
         Root, SI,
     },
-    serde_utils::*,
+    serde_helper::*,
     TestCompile, TestPackages,
 };
 use serde_json::json;
@@ -19,7 +19,7 @@ fn test_stix_lite() {
     let test = stix_bundle().compile();
     let [attack_pattern] = test.bind(["attack-pattern"]);
     assert_error_msg!(
-        create_de(&attack_pattern).to_data(json!({
+        serde_create(&attack_pattern).to_data(json!({
             "type": "attack-pattern",
         })),
         r#"missing properties, expected all of "name", "spec_version", "created", "modified" at line 1 column 25"#

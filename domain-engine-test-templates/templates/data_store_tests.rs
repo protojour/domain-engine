@@ -4,7 +4,7 @@ use ontol_test_utils::{
     assert_error_msg,
     examples::{conduit::CONDUIT_DB, Root, ARTIST_AND_INSTRUMENT},
     expect_eq,
-    serde_utils::{create_de, read_de, read_ser},
+    serde_helper::{serde_create, serde_read},
     type_binding::TypeBinding,
     SourceName, TestCompile, TestPackages,
 };
@@ -33,7 +33,7 @@ async fn test_conduit_db_id_generation() {
 
     domain_engine
         .store_new_entity(
-            create_de(&user)
+            serde_create(&user)
                 .to_value(json!({
                     "username": "u1",
                     "email": "a@b",
@@ -48,7 +48,7 @@ async fn test_conduit_db_id_generation() {
     let explicit_user_id = domain_engine
         .store_new_entity(
             // Store with the Read processor which supports specifying ID upfront
-            read_de(&user)
+            serde_read(&user)
                 .to_value(json!({
                     "user_id": "67e55044-10b1-426f-9247-bb680e5fe0c8",
                     "username": "u2",
@@ -68,7 +68,7 @@ async fn test_conduit_db_id_generation() {
 
     let article_id: Uuid = domain_engine
         .store_new_entity(
-            create_de(&article)
+            serde_create(&article)
                 .to_value(json!({
                     "slug": "foo",
                     "title": "Foo",
@@ -87,7 +87,7 @@ async fn test_conduit_db_id_generation() {
 
     domain_engine
         .store_new_entity(
-            create_de(&comment)
+            serde_create(&comment)
                 .to_value(json!({
                     "body": "Comment body",
                     "author": {
@@ -105,7 +105,7 @@ async fn test_conduit_db_id_generation() {
 
     domain_engine
         .store_new_entity(
-            create_de(&tag_entity)
+            serde_create(&tag_entity)
                 .to_value(json!({ "tag": "foo" }))
                 .unwrap(),
             Select::EntityId,
@@ -124,7 +124,7 @@ async fn test_conduit_db_store_entity_tree() {
 
     let pre_existing_user_id: Uuid = domain_engine
         .store_new_entity(
-            create_de(&user_type)
+            serde_create(&user_type)
                 .to_value(json!({
                     "username": "pre-existing",
                     "email": "pre@existing",
@@ -139,7 +139,7 @@ async fn test_conduit_db_store_entity_tree() {
 
     let article_id: Uuid = domain_engine
         .store_new_entity(
-            create_de(&article_type)
+            serde_create(&article_type)
                 .to_value(json!({
                     "slug": "foo",
                     "title": "Foo",
@@ -186,7 +186,7 @@ async fn test_conduit_db_store_entity_tree() {
         .cast_into::<Uuid>();
 
     expect_eq!(
-        actual = read_ser(&user_type).as_json(
+        actual = serde_read(&user_type).as_json(
             &domain_engine
                 .query_entities(
                     user_type
@@ -210,7 +210,7 @@ async fn test_conduit_db_store_entity_tree() {
     );
 
     expect_eq!(
-        actual = read_ser(&user_type).as_json(
+        actual = serde_read(&user_type).as_json(
             &domain_engine
                 .query_entities(
                     user_type
@@ -272,7 +272,7 @@ async fn test_conduit_db_unresolved_foreign_key() {
     assert_error_msg!(
         domain_engine
             .store_new_entity(
-                create_de(&article)
+                serde_create(&article)
                     .to_value(json!({
                         "slug": "foo",
                         "title": "Foo",
@@ -309,7 +309,7 @@ async fn test_artist_and_instrument_fmt_id_generation() {
 
     let generated_id = domain_engine
         .store_new_entity(
-            create_de(&artist)
+            serde_create(&artist)
                 .to_value(json!({"name": "Igor Stravinskij" }))
                 .unwrap(),
             Select::EntityId,
@@ -317,12 +317,12 @@ async fn test_artist_and_instrument_fmt_id_generation() {
         .await
         .unwrap();
 
-    let generated_id_json = read_ser(&artist_id).as_json(&generated_id);
+    let generated_id_json = serde_read(&artist_id).as_json(&generated_id);
     assert!(generated_id_json.as_str().unwrap().starts_with("artist/"));
 
     let explicit_id = domain_engine
         .store_new_entity(
-            read_de(&artist)
+            serde_read(&artist)
                 .to_value(json!({
                     "ID": "artist/67e55044-10b1-426f-9247-bb680e5fe0c8",
                     "name": "Karlheinz Stockhausen"
@@ -334,7 +334,7 @@ async fn test_artist_and_instrument_fmt_id_generation() {
         .unwrap();
 
     expect_eq!(
-        actual = read_ser(&artist_id).as_json(&explicit_id),
+        actual = serde_read(&artist_id).as_json(&explicit_id),
         expected = json!("artist/67e55044-10b1-426f-9247-bb680e5fe0c8")
     );
 }

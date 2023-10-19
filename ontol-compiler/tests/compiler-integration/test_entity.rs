@@ -3,7 +3,7 @@ use ontol_test_utils::{
     assert_error_msg, assert_json_io_matches,
     examples::{ARTIST_AND_INSTRUMENT, GUITAR_SYNTH_UNION},
     expect_eq,
-    serde_utils::*,
+    serde_helper::*,
     TestCompile,
 };
 use serde_json::json;
@@ -53,7 +53,7 @@ fn inherent_id_no_autogen() {
 
         let entity: Value = foo.entity_builder(json!("id"), json!({ "key": "id" })).into();
         expect_eq!(
-            actual = read_ser(&foo).as_json(&entity),
+            actual = serde_read(&foo).as_json(&entity),
             expected = json!({ "key": "id" }),
         );
     });
@@ -74,7 +74,7 @@ fn inherent_id_autogen() {
 
         let entity: Value = foo.entity_builder(json!("generated_id"), json!({})).into();
         expect_eq!(
-            actual = read_ser(&foo).as_json(&entity),
+            actual = serde_read(&foo).as_json(&entity),
             expected = json!({ "key": "generated_id" }),
         );
     });
@@ -96,7 +96,7 @@ fn id_and_inherent_property_inline_type() {
         });
         // Since there is no `.rel gen: auto` for the id, it is required:
         assert_error_msg!(
-            create_de(&foo).to_data(json!({
+            serde_create(&foo).to_data(json!({
                 "children": [{ "key": "inner" }]
             })),
             r#"missing properties, expected "key" at line 1 column 30"#
@@ -153,7 +153,7 @@ fn artist_and_instrument_error_artist() {
     let test = ARTIST_AND_INSTRUMENT.1.compile();
     let [artist] = test.bind(["artist"]);
     assert_error_msg!(
-        create_de(&artist).to_data(json!({
+        serde_create(&artist).to_data(json!({
             "name": "Herbie Hancock",
             "plays": [{ "name": "piano" }]
         })),
@@ -180,7 +180,7 @@ fn artist_and_instrument_id_as_relation_object() {
         ]
     });
 
-    let john = create_de(&artist)
+    let john = serde_create(&artist)
         .to_value(json!({
                 "name": "John McLaughlin",
                 "plays": [
@@ -201,12 +201,12 @@ fn artist_and_instrument_id_as_relation_object() {
 
     // The value of the `plays` attribute is an `artist-id`
     expect_eq!(
-        actual = create_ser(&instrument_id).as_json(&plays_attributes[0].value),
+        actual = serde_create(&instrument_id).as_json(&plays_attributes[0].value),
         expected = json!(example_id)
     );
 
     assert_error_msg!(
-        create_de(&artist).to_data(json!({
+        serde_create(&artist).to_data(json!({
             "name": "Santana",
             "plays": [
                 {
@@ -217,7 +217,7 @@ fn artist_and_instrument_id_as_relation_object() {
         r#"invalid type: string "junk", expected string matching /(?:\A(?:instrument/)((?:[0-9A-Fa-f]{32}|(?:[0-9A-Fa-f]{8}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{12})))\z)/ at line 1 column 40"#
     );
     assert_error_msg!(
-        create_de(&artist).to_data(json!({
+        serde_create(&artist).to_data(json!({
             "name": "Robert Fripp",
             "plays": [{ "ID": example_id }]
         })),
@@ -226,14 +226,14 @@ fn artist_and_instrument_id_as_relation_object() {
 
     // The following tests show that { "ID" } and the property map is a type union:
     assert_error_msg!(
-        create_de(&artist).to_data(json!({
+        serde_create(&artist).to_data(json!({
             "name": "Tony Levin",
             "plays": [{ "ID": example_id, "name": "Chapman stick" }]
         })),
         r#"unknown property `name` at line 1 column 92"#
     );
     assert_error_msg!(
-        create_de(&artist).to_data(json!({
+        serde_create(&artist).to_data(json!({
             "name": "Allan Holdsworth",
             "plays": [{ "name": "Synthaxe", "ID": example_id }]
         })),
@@ -254,7 +254,7 @@ fn test_entity_self_relationship_optional_object() {
     .compile_then(|test| {
         let [node] = test.bind(["node"]);
         assert_error_msg!(
-            create_de(&node).to_data(json!({})),
+            serde_create(&node).to_data(json!({})),
             r#"missing properties, expected "name" at line 1 column 2"#
         );
 
@@ -291,7 +291,7 @@ fn test_entity_self_relationship_mandatory_object() {
     .compile_then(|test| {
         let [node] = test.bind(["node"]);
         assert_error_msg!(
-            create_de(&node).to_data(json!({})),
+            serde_create(&node).to_data(json!({})),
             r#"missing properties, expected "parent" at line 1 column 2"#
         );
     });
@@ -349,7 +349,7 @@ fn entity_union_in_relation_with_ids() {
         ]
     });
 
-    let artist_value = create_de(&artist).to_value(json.clone()).unwrap();
+    let artist_value = serde_create(&artist).to_value(json.clone()).unwrap();
 
     let plays_attributes = artist_value
         .get_attribute_value(plays)

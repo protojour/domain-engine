@@ -3,7 +3,7 @@ use ontol_runtime::{
     interface::serde::processor::{ProcessorProfile, ScalarFormat},
     value::Data,
 };
-use ontol_test_utils::{assert_error_msg, assert_json_io_matches, serde_utils::*, TestCompile};
+use ontol_test_utils::{assert_error_msg, assert_json_io_matches, serde_helper::*, TestCompile};
 use serde_json::json;
 use test_log::test;
 
@@ -42,11 +42,11 @@ fn test_serde_booleans() {
         assert_json_io_matches!(b, Create, true);
 
         assert_error_msg!(
-            create_de(&f).to_data(json!(true)),
+            serde_create(&f).to_data(json!(true)),
             "invalid type: boolean `true`, expected false at line 1 column 4"
         );
         assert_error_msg!(
-            create_de(&t).to_data(json!(false)),
+            serde_create(&t).to_data(json!(false)),
             "invalid type: boolean `false`, expected true at line 1 column 5"
         );
     });
@@ -191,7 +191,7 @@ fn test_serde_infinite_sequence() {
         assert_json_io_matches!(foo, Create, [42, 43, "a", "b", null, 44]);
         assert_json_io_matches!(foo, Create, [42, 43, "a", "b", null, 44, 45, 46]);
         assert_error_msg!(
-            create_de(&foo).to_data(json!([77])),
+            serde_create(&foo).to_data(json!([77])),
             "invalid length 1, expected sequence with minimum length 6 at line 1 column 4"
         );
     });
@@ -205,16 +205,16 @@ fn test_serde_uuid() {
     .compile_then(|test| {
         let [my_id] = test.bind(["my_id"]);
         assert_matches!(
-            create_de(&my_id).to_data(json!("a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
+            serde_create(&my_id).to_data(json!("a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
             Ok(Data::OctetSequence(_))
         );
         assert_json_io_matches!(my_id, Create, "a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8");
         assert_error_msg!(
-            create_de(&my_id).to_data(json!(42)),
+            serde_create(&my_id).to_data(json!(42)),
             "invalid type: integer `42`, expected `uuid` at line 1 column 2"
         );
         assert_error_msg!(
-            create_de(&my_id).to_data(json!("foobar")),
+            serde_create(&my_id).to_data(json!("foobar")),
             r#"invalid type: string "foobar", expected `uuid` at line 1 column 8"#
         );
     });
@@ -228,7 +228,7 @@ fn test_serde_datetime() {
     .compile_then(|test| {
         let [my_dt] = test.bind(["my_dt"]);
         assert_matches!(
-            create_de(&my_dt).to_data(json!("1983-10-01T01:31:32.59+01:00")),
+            serde_create(&my_dt).to_data(json!("1983-10-01T01:31:32.59+01:00")),
             Ok(Data::ChronoDateTime(_))
         );
         assert_json_io_matches!(
@@ -237,11 +237,11 @@ fn test_serde_datetime() {
             "1983-10-01T01:31:32.59+01:00" == "1983-10-01T00:31:32.590+00:00"
         );
         assert_error_msg!(
-            create_de(&my_dt).to_data(json!(42)),
+            serde_create(&my_dt).to_data(json!(42)),
             "invalid type: integer `42`, expected `datetime` at line 1 column 2"
         );
         assert_error_msg!(
-            create_de(&my_dt).to_data(json!("foobar")),
+            serde_create(&my_dt).to_data(json!("foobar")),
             r#"invalid type: string "foobar", expected `datetime` at line 1 column 8"#
         );
     });
@@ -275,7 +275,7 @@ fn test_i64_range_constrained() {
         assert_json_io_matches!(percentage, Create, 0 == 0);
         assert_json_io_matches!(percentage, Create, 100 == 100);
         assert_error_msg!(
-            create_de(&percentage).to_data_variant(json!(1000)),
+            serde_create(&percentage).to_data_variant(json!(1000)),
             r#"invalid type: integer `1000`, expected integer in range 0..=100 at line 1 column 4"#
         );
     });
@@ -295,7 +295,7 @@ fn test_integer_range_constrained() {
         assert_json_io_matches!(foo, Create, 0 == 0);
         assert_json_io_matches!(foo, Create, (-1) == (-1));
         assert_error_msg!(
-            create_de(&foo).to_data_variant(json!(-2)),
+            serde_create(&foo).to_data_variant(json!(-2)),
             r#"invalid type: integer `-2`, expected integer in range -1..=1 at line 1 column 2"#
         );
     });
@@ -317,7 +317,7 @@ fn test_f64_range_constrained() {
         assert_json_io_matches!(fraction, Create, 0.5 == 0.5);
         assert_json_io_matches!(fraction, Create, 1.0 == 1.0);
         assert_error_msg!(
-            create_de(&fraction).to_data_variant(json!(3.14)),
+            serde_create(&fraction).to_data_variant(json!(3.14)),
             r#"invalid type: floating point `3.14`, expected float in range 0..=1 at line 1 column 4"#
         );
     });
@@ -429,7 +429,7 @@ fn test_serde_with_raw_id_overridde_profile() {
             "__ID": "a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8",
             "IGNORE2": 2
         });
-        let value = ontol_test_utils::serde_utils::create_de(&foo)
+        let value = ontol_test_utils::serde_helper::serde_create(&foo)
             .with_profile(processor_profile.clone())
             .to_value(input.clone())
             .unwrap();
@@ -438,7 +438,7 @@ fn test_serde_with_raw_id_overridde_profile() {
             serde_json::json!({
                 "__ID": "a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8",
             }),
-            ontol_test_utils::serde_utils::create_ser(&foo)
+            ontol_test_utils::serde_helper::serde_create(&foo)
                 .with_profile(processor_profile.clone())
                 .as_json(&value)
         );
@@ -447,7 +447,7 @@ fn test_serde_with_raw_id_overridde_profile() {
             serde_json::json!({
                 "id": "prefix/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8",
             }),
-            ontol_test_utils::serde_utils::create_ser(&foo).as_json(&value)
+            ontol_test_utils::serde_helper::serde_create(&foo).as_json(&value)
         );
     });
 }
