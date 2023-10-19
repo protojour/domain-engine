@@ -43,7 +43,7 @@ impl<'m> LevelBuilder<'m> {
                 // with differing type.
                 for (_, nodes) in &merged_match_arms.match_arms {
                     if let Some(node) = nodes.last() {
-                        ty = &unifier.hir_arena[*node].meta().ty;
+                        ty = unifier.hir_arena[*node].meta().ty;
                     }
                 }
 
