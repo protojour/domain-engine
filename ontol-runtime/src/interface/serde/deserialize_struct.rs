@@ -131,7 +131,8 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
                 id = Some(value);
             }
             PropertyKey::Property(serde_property) => {
-                let Attribute { rel_params, value } = processor
+                let deserializer = serde_value::ValueDeserializer::new(serde_value);
+                let property_processor = processor
                     .new_child_with_context(
                         serde_property.value_addr,
                         SubProcessorContext {
@@ -140,14 +141,21 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
                             rel_params_addr: serde_property.rel_params_addr,
                         },
                     )
-                    .map_err(RecursionLimitError::to_de_error)?
-                    .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
+                    .map_err(RecursionLimitError::to_de_error)?;
 
-                if !serde_property.is_optional() {
+                if serde_property.is_optional() {
+                    if let Some(attr) =
+                        deserializer.deserialize_option(property_processor.to_option_processor())?
+                    {
+                        attributes.insert(serde_property.property_id, attr);
+                    }
+                } else {
+                    attributes.insert(
+                        serde_property.property_id,
+                        property_processor.deserialize(deserializer)?,
+                    );
                     observed_required_count += 1;
                 }
-
-                attributes.insert(serde_property.property_id, Attribute { rel_params, value });
             }
             PropertyKey::Ignored => {}
         }
@@ -181,24 +189,30 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
                 id = Some(value);
             }
             PropertyKey::Property(serde_property) => {
-                let attribute = map.next_value_seed(
-                    processor
-                        .new_child_with_context(
-                            serde_property.value_addr,
-                            SubProcessorContext {
-                                parent_property_id: Some(serde_property.property_id),
-                                parent_property_flags: serde_property.flags,
-                                rel_params_addr: serde_property.rel_params_addr,
-                            },
-                        )
-                        .map_err(RecursionLimitError::to_de_error)?,
-                )?;
+                let property_processor = processor
+                    .new_child_with_context(
+                        serde_property.value_addr,
+                        SubProcessorContext {
+                            parent_property_id: Some(serde_property.property_id),
+                            parent_property_flags: serde_property.flags,
+                            rel_params_addr: serde_property.rel_params_addr,
+                        },
+                    )
+                    .map_err(RecursionLimitError::to_de_error)?;
 
-                if !serde_property.is_optional() {
+                if serde_property.is_optional() {
+                    if let Some(attr) =
+                        map.next_value_seed(property_processor.to_option_processor())?
+                    {
+                        attributes.insert(serde_property.property_id, attr);
+                    }
+                } else {
+                    attributes.insert(
+                        serde_property.property_id,
+                        map.next_value_seed(property_processor)?,
+                    );
                     observed_required_count += 1;
                 }
-
-                attributes.insert(serde_property.property_id, attribute);
             }
             PropertyKey::Ignored => {
                 let _value: serde_value::Value = map.next_value()?;

@@ -18,7 +18,7 @@ fn test_serde_empty_type() {
 }
 
 #[test]
-fn test_serde_value_type() {
+fn test_serde_type_alias() {
     "
     pub def foo { rel .is: text }
     "
@@ -55,13 +55,28 @@ fn test_serde_booleans() {
 }
 
 #[test]
-fn test_serde_map_type() {
+fn test_serde_struct_type() {
     "
     pub def foo { rel .'a': text }
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, { "a": "string" });
+    });
+}
+
+#[test]
+fn test_serde_struct_optional_field() {
+    "
+    pub def foo {
+        rel .'a'?: text
+    }
+    "
+    .compile_then(|test| {
+        let [foo] = test.bind(["foo"]);
+        assert_json_io_matches!(foo, Create, {} == {});
+        assert_json_io_matches!(foo, Create, { "a": null } == {});
+        assert_json_io_matches!(foo, Create, { "a": "A" });
     });
 }
 
