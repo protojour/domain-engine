@@ -48,8 +48,6 @@ pub enum SerdeOperator {
     /// in a raw manner based on its runtime type information.
     DynamicSequence,
 
-    RawId,
-
     /// A sequence representing a relationship between one subject and many objects.
     /// This is simple and does not support any tuples.
     RelationSequence(RelationSequenceOperator),

@@ -8,10 +8,11 @@ use tracing::debug;
 
 use crate::{
     cast::Cast,
-    interface::serde::processor::RecursionLimitError,
+    interface::serde::processor::{RecursionLimitError, ScalarFormat},
     smart_format,
-    text_pattern::FormatPattern,
+    text_pattern::{FormatPattern, TextPatternConstantPart},
     value::{Attribute, Data, FormatDataAsText, Value},
+    DefId,
 };
 
 use super::{
@@ -36,20 +37,21 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         serializer: S,
     ) -> Res<S> {
         debug!("serializing op={:?}", self.value_operator);
-        match self.value_operator {
-            SerdeOperator::Unit => {
+
+        match (self.value_operator, self.scalar_format()) {
+            (SerdeOperator::Unit, _) => {
                 cast_ref::<()>(value);
                 serializer.serialize_unit()
             }
-            SerdeOperator::False(_) => serializer.serialize_bool(false),
-            SerdeOperator::True(_) => serializer.serialize_bool(true),
-            SerdeOperator::Boolean(_) => serializer.serialize_bool(*cast_ref::<bool>(value)),
-            SerdeOperator::I64(..) => match &value.data {
+            (SerdeOperator::False(_), _) => serializer.serialize_bool(false),
+            (SerdeOperator::True(_), _) => serializer.serialize_bool(true),
+            (SerdeOperator::Boolean(_), _) => serializer.serialize_bool(*cast_ref::<bool>(value)),
+            (SerdeOperator::I64(..), ScalarFormat::DomainTransparent) => match &value.data {
                 Data::I64(int) => serializer.serialize_i64(*int),
                 Data::F64(f) => serializer.serialize_i64((*f).round() as i64),
                 other => panic!("BUG: Serialize expected number, got {other:?}"),
             },
-            SerdeOperator::I32(..) => {
+            (SerdeOperator::I32(..), ScalarFormat::DomainTransparent) => {
                 let int_i64: i64 = match &value.data {
                     Data::I64(int) => *int,
                     Data::F64(f) => (*f).round() as i64,
@@ -60,90 +62,47 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                     S::Error::custom(smart_format!("overflow when converting to i32: {err:?}"))
                 })?)
             }
-            SerdeOperator::F64(..) => match &value.data {
+            (SerdeOperator::F64(..), ScalarFormat::DomainTransparent) => match &value.data {
                 Data::I64(num) => serializer.serialize_f64(*num as f64),
                 Data::F64(f) => serializer.serialize_f64(*f),
                 other => panic!("BUG: Serialize expected number, got {other:?}"),
             },
-            SerdeOperator::String(def_id)
-            | SerdeOperator::StringConstant(_, def_id)
-            | SerdeOperator::TextPattern(def_id) => match &value.data {
+            (
+                SerdeOperator::I32(def_id, ..)
+                | SerdeOperator::I64(def_id, ..)
+                | SerdeOperator::F64(def_id, ..),
+                ScalarFormat::RawText,
+            ) => self.serialize_as_text_formatted(value, *def_id, serializer),
+            (
+                SerdeOperator::String(def_id)
+                | SerdeOperator::StringConstant(_, def_id)
+                | SerdeOperator::TextPattern(def_id),
+                _,
+            ) => match &value.data {
                 Data::Text(s) => serializer.serialize_str(s),
-                data => {
-                    let mut buf = String::new();
-                    write!(
-                        &mut buf,
-                        "{}",
-                        FormatDataAsText {
-                            data,
-                            type_def_id: *def_id,
-                            ontology: self.ontology
-                        }
-                    )
-                    .map_err(|_| S::Error::custom("Conversion to text failed"))?;
-
-                    serializer.serialize_str(&buf)
-                }
+                _ => self.serialize_as_text_formatted(value, *def_id, serializer),
             },
-            SerdeOperator::CapturingTextPattern(def_id) => {
-                let pattern = &self.ontology.text_patterns.get(def_id).unwrap();
-                let mut buf = String::new();
-                write!(
-                    &mut buf,
-                    "{}",
-                    FormatPattern {
-                        pattern,
-                        data: &value.data,
-                        ontology: self.ontology
-                    }
-                )
-                .map_err(|_| S::Error::custom("Failed to serialize capturing text pattern"))?;
-
-                serializer.serialize_str(&buf)
+            (
+                SerdeOperator::CapturingTextPattern(pattern_def_id),
+                ScalarFormat::DomainTransparent,
+            ) => self.serialize_as_pattern_formatted(value, *pattern_def_id, serializer),
+            (SerdeOperator::CapturingTextPattern(pattern_def_id), ScalarFormat::RawText) => {
+                self.serialize_pattern_as_raw_text(value, *pattern_def_id, serializer)
             }
-            SerdeOperator::DynamicSequence => match &value.data {
+            (SerdeOperator::DynamicSequence, _) => match &value.data {
                 Data::Sequence(vec) => self.serialize_dynamic_sequence(vec, serializer),
                 _ => panic!("Not a sequence"),
             },
-            SerdeOperator::RawId => match &value.data {
-                Data::Text(string) => serializer.serialize_str(string),
-                data @ Data::OctetSequence(_) => {
-                    let mut buf = String::new();
-                    write!(
-                        &mut buf,
-                        "{}",
-                        FormatDataAsText {
-                            data,
-                            type_def_id: value.type_def_id,
-                            ontology: self.ontology
-                        }
-                    )
-                    .map_err(|_| S::Error::custom("Conversion to text failed"))?;
-
-                    serializer.serialize_str(&buf)
-                }
-                Data::Struct(map) => {
-                    if map.len() != 1 {
-                        return Err(S::Error::custom(smart_format!(
-                            "struct-based raw id needs exactly one property"
-                        )));
-                    }
-
-                    let (_, attribute) = map.iter().next().unwrap();
-                    self.serialize_value(&attribute.value, rel_params, serializer)
-                }
-                _ => todo!(),
-            },
-            SerdeOperator::RelationSequence(seq_op) => {
+            (SerdeOperator::RelationSequence(seq_op), _) => {
                 self.serialize_sequence(cast_ref::<Vec<_>>(value), &seq_op.ranges, serializer)
             }
-            SerdeOperator::ConstructorSequence(seq_op) => {
+            (SerdeOperator::ConstructorSequence(seq_op), _) => {
                 self.serialize_sequence(cast_ref::<Vec<_>>(value), &seq_op.ranges, serializer)
             }
-            SerdeOperator::Alias(value_op) => self
+            (SerdeOperator::Alias(value_op), _) => self
                 .narrow(value_op.inner_addr)
                 .serialize_value(value, rel_params, serializer),
-            SerdeOperator::Union(union_op) => match union_op.variants(self.mode, self.level) {
+            (SerdeOperator::Union(union_op), _) => match union_op.variants(self.mode, self.level) {
                 FilteredVariants::Single(id) => self
                     .narrow(id)
                     .serialize_value(value, rel_params, serializer),
@@ -165,7 +124,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                     }
                 }
             },
-            SerdeOperator::IdSingletonStruct(name, inner_addr) => {
+            (SerdeOperator::IdSingletonStruct(name, inner_addr), _) => {
                 let mut map = serializer.serialize_map(Some(1 + option_len(&rel_params)))?;
                 map.serialize_entry(
                     name,
@@ -181,7 +140,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 
                 map.end()
             }
-            SerdeOperator::Struct(struct_op) => {
+            (SerdeOperator::Struct(struct_op), _) => {
                 self.serialize_struct(struct_op, rel_params, value, serializer)
             }
         }
@@ -189,6 +148,93 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 }
 
 impl<'on, 'p> SerdeProcessor<'on, 'p> {
+    fn serialize_as_text_formatted<S: Serializer>(
+        &self,
+        value: &Value,
+        operator_def_id: DefId,
+        serializer: S,
+    ) -> Res<S> {
+        let mut buf = String::new();
+        write!(
+            &mut buf,
+            "{}",
+            FormatDataAsText {
+                data: &value.data,
+                type_def_id: operator_def_id,
+                ontology: self.ontology
+            }
+        )
+        .map_err(|_| S::Error::custom("Conversion to text failed"))?;
+
+        serializer.serialize_str(&buf)
+    }
+
+    fn serialize_as_pattern_formatted<S: Serializer>(
+        &self,
+        value: &Value,
+        pattern_def_id: DefId,
+        serializer: S,
+    ) -> Res<S> {
+        let pattern = &self.ontology.text_patterns.get(&pattern_def_id).unwrap();
+        let mut buf = String::new();
+        write!(
+            &mut buf,
+            "{}",
+            FormatPattern {
+                pattern,
+                data: &value.data,
+                ontology: self.ontology
+            }
+        )
+        .map_err(|_| S::Error::custom("Failed to serialize capturing text pattern"))?;
+
+        serializer.serialize_str(&buf)
+    }
+
+    fn serialize_pattern_as_raw_text<S: Serializer>(
+        &self,
+        value: &Value,
+        pattern_def_id: DefId,
+        serializer: S,
+    ) -> Res<S> {
+        match &value.data {
+            Data::Struct(attrs) => {
+                let pattern = &self.ontology.text_patterns.get(&pattern_def_id).unwrap();
+                let mut pattern_property = None;
+
+                for part in &pattern.constant_parts {
+                    if let TextPatternConstantPart::Property(property) = part {
+                        if pattern_property.is_some() {
+                            return self.serialize_as_pattern_formatted(
+                                value,
+                                pattern_def_id,
+                                serializer,
+                            );
+                        }
+
+                        pattern_property = Some(property);
+                    }
+                }
+
+                match pattern_property {
+                    Some(pattern_property) => {
+                        let attr = attrs.get(&pattern_property.property_id).ok_or_else(|| {
+                            S::Error::custom("property not present in pattern struct")
+                        })?;
+
+                        self.serialize_as_text_formatted(
+                            &attr.value,
+                            pattern_property.type_def_id,
+                            serializer,
+                        )
+                    }
+                    None => self.serialize_as_text_formatted(value, pattern_def_id, serializer),
+                }
+            }
+            _ => self.serialize_as_text_formatted(value, pattern_def_id, serializer),
+        }
+    }
+
     fn serialize_sequence<S: Serializer>(
         &self,
         elements: &[Attribute],
@@ -310,13 +356,10 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                     rel_params: attribute.rel_params.filter_non_unit(),
                     processor: self
                         .new_child_with_context(
-                            if is_entity_id && self.profile.raw_ids {
-                                self.ontology.raw_id_operator_addr()
-                            } else {
-                                serde_prop.value_addr
-                            },
+                            serde_prop.value_addr,
                             SubProcessorContext {
                                 parent_property_id: Some(serde_prop.property_id),
+                                parent_property_flags: serde_prop.flags,
                                 rel_params_addr: serde_prop.rel_params_addr,
                             },
                         )

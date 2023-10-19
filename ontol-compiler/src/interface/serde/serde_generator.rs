@@ -69,12 +69,6 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         addr
     }
 
-    pub fn make_raw_id_addr(&mut self) -> SerdeOperatorAddr {
-        let addr = SerdeOperatorAddr(self.operators_by_addr.len() as u32);
-        self.operators_by_addr.push(SerdeOperator::RawId);
-        addr
-    }
-
     pub fn gen_addr(&mut self, mut key: SerdeKey) -> Option<SerdeOperatorAddr> {
         let mut discarded_keys = vec![];
 

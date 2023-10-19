@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use ontol_runtime::{
-    interface::serde::processor::{ProcessorLevel, ProcessorMode},
+    interface::serde::processor::{ProcessorLevel, ProcessorMode, ProcessorProfile},
     value::{Attribute, Data, PropertyId, Value},
     DefId,
 };
@@ -14,20 +14,25 @@ pub struct Deserializer<'b, 'on> {
     binding: &'b TypeBinding<'on>,
     mode: ProcessorMode,
     level: ProcessorLevel,
+    profile: ProcessorProfile,
 }
 
 impl<'b, 'on> Deserializer<'b, 'on> {
-    pub fn data(&self, json: serde_json::Value) -> Result<Data, serde_json::Error> {
-        let value = self.value(json)?;
+    pub fn with_profile(self, profile: ProcessorProfile) -> Self {
+        Self { profile, ..self }
+    }
+
+    pub fn to_data(&self, json: serde_json::Value) -> Result<Data, serde_json::Error> {
+        let value = self.to_value(json)?;
         assert_eq!(value.type_def_id, self.binding.type_info.def_id);
         Ok(value.data)
     }
 
-    pub fn data_map(
+    pub fn to_data_map(
         &self,
         json: serde_json::Value,
     ) -> Result<BTreeMap<PropertyId, Attribute>, serde_json::Error> {
-        let value = self.value(json)?;
+        let value = self.to_value(json)?;
         assert_eq!(value.type_def_id, self.binding.type_info.def_id);
         match value.data {
             Data::Struct(attrs) => Ok(attrs),
@@ -38,13 +43,13 @@ impl<'b, 'on> Deserializer<'b, 'on> {
     /// Deserialize data, but expect that the resulting type DefId
     /// is not the same as the nominal one for the TypeBinding.
     /// (i.e. it should deserialize to a _variant_ of the type)
-    pub fn data_variant(&self, json: serde_json::Value) -> Result<Data, serde_json::Error> {
-        let value = self.value(json)?;
+    pub fn to_data_variant(&self, json: serde_json::Value) -> Result<Data, serde_json::Error> {
+        let value = self.to_value(json)?;
         assert_ne!(value.type_def_id, self.binding.type_info.def_id);
         Ok(value.data)
     }
 
-    pub fn value(&self, json: serde_json::Value) -> Result<Value, serde_json::Error> {
+    pub fn to_value(&self, json: serde_json::Value) -> Result<Value, serde_json::Error> {
         let json_string = serde_json::to_string(&json).unwrap();
 
         let attribute_result = self
@@ -52,6 +57,7 @@ impl<'b, 'on> Deserializer<'b, 'on> {
             .ontology()
             .new_serde_processor(self.binding.serde_operator_addr(), self.mode)
             .with_level(self.level)
+            .with_profile(&self.profile)
             .deserialize(&mut serde_json::Deserializer::from_str(&json_string));
 
         match self.binding.json_schema() {
@@ -91,18 +97,23 @@ pub struct Serializer<'b, 'on> {
     binding: &'b TypeBinding<'on>,
     mode: ProcessorMode,
     level: ProcessorLevel,
+    profile: ProcessorProfile,
 }
 
 impl<'b, 'on> Serializer<'b, 'on> {
-    pub fn json(&self, value: &Value) -> serde_json::Value {
+    pub fn with_profile(self, profile: ProcessorProfile) -> Self {
+        Self { profile, ..self }
+    }
+
+    pub fn as_json(&self, value: &Value) -> serde_json::Value {
         self.serialize_json(value, false)
     }
 
-    pub fn data_json(&self, data: &Data) -> serde_json::Value {
-        self.json(&Value::new(data.clone(), self.binding.type_info.def_id))
+    pub fn data_as_json(&self, data: &Data) -> serde_json::Value {
+        self.as_json(&Value::new(data.clone(), self.binding.type_info.def_id))
     }
 
-    pub fn dynamic_sequence_json(&self, value: &Value) -> serde_json::Value {
+    pub fn dynamic_seq_as_json(&self, value: &Value) -> serde_json::Value {
         self.serialize_json(value, true)
     }
 
@@ -119,6 +130,7 @@ impl<'b, 'on> Serializer<'b, 'on> {
                 self.mode,
             )
             .with_level(self.level)
+            .with_profile(&self.profile)
             .serialize_value(value, None, &mut serde_json::Serializer::new(&mut buf))
             .expect("serialization failed");
         serde_json::from_slice(&buf).unwrap()
@@ -131,6 +143,7 @@ pub fn create_de<'b, 'on>(binding: &'b TypeBinding<'on>) -> Deserializer<'b, 'on
         binding,
         mode: ProcessorMode::Create,
         level: ProcessorLevel::new_root(),
+        profile: ProcessorProfile::default(),
     }
 }
 
@@ -140,6 +153,7 @@ pub fn read_de<'b, 'on>(binding: &'b TypeBinding<'on>) -> Deserializer<'b, 'on> 
         binding,
         mode: ProcessorMode::Read,
         level: ProcessorLevel::new_root(),
+        profile: ProcessorProfile::default(),
     }
 }
 
@@ -149,6 +163,7 @@ pub fn raw_de<'b, 'on>(binding: &'b TypeBinding<'on>) -> Deserializer<'b, 'on> {
         binding,
         mode: ProcessorMode::Raw,
         level: ProcessorLevel::new_root(),
+        profile: ProcessorProfile::default(),
     }
 }
 
@@ -158,6 +173,7 @@ pub fn create_ser<'b, 'on>(binding: &'b TypeBinding<'on>) -> Serializer<'b, 'on>
         binding,
         mode: ProcessorMode::Create,
         level: ProcessorLevel::new_root(),
+        profile: ProcessorProfile::default(),
     }
 }
 
@@ -167,6 +183,7 @@ pub fn read_ser<'b, 'on>(binding: &'b TypeBinding<'on>) -> Serializer<'b, 'on> {
         binding,
         mode: ProcessorMode::Read,
         level: ProcessorLevel::new_root(),
+        profile: ProcessorProfile::default(),
     }
 }
 
@@ -176,5 +193,6 @@ pub fn raw_ser<'b, 'on>(binding: &'b TypeBinding<'on>) -> Serializer<'b, 'on> {
         binding,
         mode: ProcessorMode::Raw,
         level: ProcessorLevel::new_root(),
+        profile: ProcessorProfile::default(),
     }
 }

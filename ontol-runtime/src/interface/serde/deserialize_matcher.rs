@@ -1,18 +1,21 @@
-use std::{fmt::Display, ops::RangeInclusive};
+use std::{collections::BTreeMap, fmt::Display, ops::RangeInclusive};
+
+use serde::de::{value::StrDeserializer, DeserializeSeed};
+use tracing::error;
 
 use crate::{
     format_utils::{Backticks, LogicOp, Missing},
     interface::discriminator::Discriminant,
     ontology::Ontology,
     text_like_types::ParseError,
-    text_pattern::TextPattern,
+    text_pattern::{TextPattern, TextPatternConstantPart},
     value::{Data, Value},
     DefId,
 };
 
 use super::{
     operator::{FilteredVariants, SequenceRange, SerdeOperator, ValueUnionVariant},
-    processor::{ProcessorLevel, ProcessorMode, SubProcessorContext},
+    processor::{ProcessorLevel, ProcessorMode, ScalarFormat, SubProcessorContext},
     SerdeOperatorAddr, StructOperator,
 };
 
@@ -249,6 +252,7 @@ pub struct CapturingTextPatternMatcher<'on> {
     pub pattern: &'on TextPattern,
     pub def_id: DefId,
     pub ontology: &'on Ontology,
+    pub scalar_format: ScalarFormat,
 }
 
 impl<'on> ValueMatcher for CapturingTextPatternMatcher<'on> {
@@ -257,11 +261,44 @@ impl<'on> ValueMatcher for CapturingTextPatternMatcher<'on> {
     }
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
-        let data = self
-            .pattern
-            .try_capturing_match(str, self.ontology)
-            .map_err(|_| ())?;
-        Ok(Value::new(data, self.def_id))
+        match self.scalar_format {
+            ScalarFormat::DomainTransparent => {
+                let data = self
+                    .pattern
+                    .try_capturing_match(str, self.ontology)
+                    .map_err(|_| ())?;
+                Ok(Value::new(data, self.def_id))
+            }
+
+            ScalarFormat::RawText => {
+                let mut attrs = BTreeMap::new();
+
+                for part in &self.pattern.constant_parts {
+                    if let TextPatternConstantPart::Property(property) = part {
+                        if !attrs.is_empty() {
+                            error!("A value was already read");
+                            return Err(());
+                        }
+
+                        let type_info = self.ontology.get_type_info(property.type_def_id);
+                        let processor = self.ontology.new_serde_processor(
+                            type_info
+                                .operator_addr
+                                .expect("No operator addr for pattern constant part"),
+                            ProcessorMode::Create,
+                        );
+
+                        let attribute = processor
+                            .deserialize(StrDeserializer::<serde_json::Error>::new(str))
+                            .map_err(|_| ())?;
+
+                        attrs.insert(property.property_id, attribute);
+                    }
+                }
+
+                Ok(Value::new(Data::Struct(attrs), self.def_id))
+            }
+        }
     }
 }
 

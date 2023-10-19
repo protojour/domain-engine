@@ -953,7 +953,6 @@ fn get_native_scalar_kind(
         op @ (SerdeOperator::Union(_)
         | SerdeOperator::Struct(_)
         | SerdeOperator::DynamicSequence
-        | SerdeOperator::RawId
         | SerdeOperator::RelationSequence(_)
         | SerdeOperator::ConstructorSequence(_)) => panic!("not a native scalar: {op:?}"),
     }

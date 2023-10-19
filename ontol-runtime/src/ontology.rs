@@ -45,7 +45,6 @@ pub struct Ontology {
     serde_operators_per_def: HashMap<SerdeKey, SerdeOperatorAddr>,
     serde_operators: Vec<SerdeOperator>,
     dynamic_sequence_operator_addr: SerdeOperatorAddr,
-    raw_id_operator_addr: SerdeOperatorAddr,
     value_generators: FnvHashMap<RelationshipId, ValueGenerator>,
     property_flows: Vec<PropertyFlow>,
 }
@@ -67,7 +66,6 @@ impl Ontology {
                 serde_operators_per_def: Default::default(),
                 serde_operators: Default::default(),
                 dynamic_sequence_operator_addr: SerdeOperatorAddr(u32::MAX),
-                raw_id_operator_addr: SerdeOperatorAddr(u32::MAX),
                 value_generators: Default::default(),
                 property_flows: Default::default(),
             },
@@ -179,10 +177,6 @@ impl Ontology {
 
     pub fn dynamic_sequence_operator_addr(&self) -> SerdeOperatorAddr {
         self.dynamic_sequence_operator_addr
-    }
-
-    pub fn raw_id_operator_addr(&self) -> SerdeOperatorAddr {
-        self.raw_id_operator_addr
     }
 
     pub fn get_value_generator(&self, relationship_id: RelationshipId) -> Option<&ValueGenerator> {
@@ -396,11 +390,6 @@ impl OntologyBuilder {
 
     pub fn dynamic_sequence_operator_addr(mut self, addr: SerdeOperatorAddr) -> Self {
         self.ontology.dynamic_sequence_operator_addr = addr;
-        self
-    }
-
-    pub fn raw_id_operator_addr(mut self, addr: SerdeOperatorAddr) -> Self {
-        self.ontology.raw_id_operator_addr = addr;
         self
     }
 

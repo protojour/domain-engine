@@ -19,7 +19,7 @@ fn test_fake_primitives() {
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         expect_eq!(
-            actual = read_ser(&foo).json(&foo.new_fake(ProcessorMode::Raw)),
+            actual = read_ser(&foo).as_json(&foo.new_fake(ProcessorMode::Raw)),
             expected = json!({
                 "s": "mollitia sit porro tenetur",
                 "i": 2117826670,
@@ -39,7 +39,7 @@ fn test_fake_text_like_types() {
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         expect_eq!(
-            actual = read_ser(&foo).json(&foo.new_fake(ProcessorMode::Raw)),
+            actual = read_ser(&foo).as_json(&foo.new_fake(ProcessorMode::Raw)),
             expected = json!({
                 "id": "042da2de-98c0-64cf-94c2-5463ca1c3fbe",
                 "created_at": "1943-07-25T19:00:15.149284864+00:00",
@@ -53,7 +53,7 @@ fn test_fake_geojson() {
     let test = TestPackages::with_sources([GEOJSON.root(), WGS]).compile();
     let [geometry] = test.bind(["Geometry"]);
     expect_eq!(
-        actual = read_ser(&geometry).json(&geometry.new_fake(ProcessorMode::Raw)),
+        actual = read_ser(&geometry).as_json(&geometry.new_fake(ProcessorMode::Raw)),
         expected = json!({
             "type": "Polygon",
             "coordinates": [
@@ -72,7 +72,7 @@ fn test_fake_guitar_synth() {
     let test = GUITAR_SYNTH_UNION.1.compile();
     let [artist] = test.bind(["artist"]);
     expect_eq!(
-        actual = read_ser(&artist).json(&artist.new_fake(ProcessorMode::Raw)),
+        actual = read_ser(&artist).as_json(&artist.new_fake(ProcessorMode::Raw)),
         expected = json!({
             "artist-id": "mollitia sit porro tenetur",
             "name": "delectus molestias aspernatur voluptatem reprehenderit",

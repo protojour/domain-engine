@@ -195,7 +195,7 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
     }
 
     fn data(mut self, json: serde_json::Value) -> Self {
-        let value = create_de(self.binding).value(json).unwrap();
+        let value = create_de(self.binding).to_value(json).unwrap();
         self.value.type_def_id = value.type_def_id;
         match (&mut self.value.data, value) {
             (Data::Unit, value) => {

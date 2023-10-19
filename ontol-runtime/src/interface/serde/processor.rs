@@ -6,7 +6,7 @@ use crate::{
     value::PropertyId,
 };
 
-use super::operator::{FilteredVariants, SerdeOperator, SerdeOperatorAddr};
+use super::operator::{FilteredVariants, SerdeOperator, SerdeOperatorAddr, SerdePropertyFlags};
 
 #[derive(Copy, Clone, Debug)]
 pub enum ProcessorMode {
@@ -24,17 +24,28 @@ pub struct ProcessorLevel {
     recursion_limit: u16,
 }
 
+#[derive(Clone, Default)]
 pub struct ProcessorProfile {
     pub overridden_id_property_key: Option<&'static str>,
     pub ignored_property_keys: &'static [&'static str],
-    pub raw_ids: bool,
+    pub id_format: ScalarFormat,
+}
+
+#[derive(Clone, Copy, Default)]
+pub enum ScalarFormat {
+    /// Serialize scalars just like the domain says
+    #[default]
+    DomainTransparent,
+    /// Serialize scalars as raw strings without any domain context
+    /// Example: `fmt '' => 'prefix/' => uuid => id` becomes just an UUID-as-string.
+    RawText,
 }
 
 /// The standard profile for domain serialization/deserialization
 pub(crate) static DOMAIN_PROFILE: ProcessorProfile = ProcessorProfile {
     overridden_id_property_key: None,
     ignored_property_keys: &[],
-    raw_ids: false,
+    id_format: ScalarFormat::DomainTransparent,
 };
 
 /// Maximum number of nested/recursive operators.
@@ -96,6 +107,7 @@ impl RecursionLimitError {
 #[derive(Clone, Copy, Default, Debug)]
 pub struct SubProcessorContext {
     pub parent_property_id: Option<PropertyId>,
+    pub parent_property_flags: SerdePropertyFlags,
 
     /// The edge properties used for (de)serializing the _edge data_
     /// related to this value when it's associated with a "parent value" through a relation.
@@ -181,6 +193,18 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         })
     }
 
+    pub fn scalar_format(&self) -> ScalarFormat {
+        if self
+            .ctx
+            .parent_property_flags
+            .contains(SerdePropertyFlags::ENTITY_ID)
+        {
+            self.profile.id_format
+        } else {
+            ScalarFormat::DomainTransparent
+        }
+    }
+
     pub fn find_property(&self, prop: &str) -> Option<PropertyId> {
         self.search_property(prop, self.value_operator)
     }
@@ -235,9 +259,6 @@ impl<'on, 'p> Display for SerdeProcessor<'on, 'p> {
             }
             SerdeOperator::DynamicSequence => {
                 write!(f, "[?..]")
-            }
-            SerdeOperator::RawId => {
-                write!(f, "RawId")
             }
             SerdeOperator::RelationSequence(seq_op) => {
                 write!(f, "[{}..]", self.narrow(seq_op.ranges[0].addr))

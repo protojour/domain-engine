@@ -59,12 +59,13 @@ macro_rules! assert_json_io_matches {
     };
     ($binding:expr, Create, $input:tt == $expected_output:tt) => {
         let input = serde_json::json!($input);
-        let value = match ontol_test_utils::serde_utils::create_de(&$binding).value(input.clone()) {
-            Ok(value) => value,
-            Err(err) => panic!("deserialize failed: {err}"),
-        };
+        let value =
+            match ontol_test_utils::serde_utils::create_de(&$binding).to_value(input.clone()) {
+                Ok(value) => value,
+                Err(err) => panic!("deserialize failed: {err}"),
+            };
         tracing::debug!("deserialized value: {value:#?}");
-        let output = ontol_test_utils::serde_utils::create_ser(&$binding).json(&value);
+        let output = ontol_test_utils::serde_utils::create_ser(&$binding).as_json(&value);
 
         pretty_assertions::assert_eq!(serde_json::json!($expected_output), output);
     };

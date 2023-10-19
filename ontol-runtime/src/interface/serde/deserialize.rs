@@ -130,52 +130,52 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
     type Value = Attribute;
 
     fn deserialize<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
-        match self.value_operator {
-            SerdeOperator::Unit => {
+        match (self.value_operator, self.scalar_format()) {
+            (SerdeOperator::Unit, _) => {
                 deserializer.deserialize_unit(UnitMatcher.into_visitor_no_params(self))
             }
-            SerdeOperator::False(def_id) => deserializer
+            (SerdeOperator::False(def_id), _) => deserializer
                 .deserialize_bool(BooleanMatcher::False(*def_id).into_visitor_no_params(self)),
-            SerdeOperator::True(def_id) => deserializer
+            (SerdeOperator::True(def_id), _) => deserializer
                 .deserialize_bool(BooleanMatcher::True(*def_id).into_visitor_no_params(self)),
-            SerdeOperator::Boolean(def_id) => deserializer
+            (SerdeOperator::Boolean(def_id), _) => deserializer
                 .deserialize_bool(BooleanMatcher::Boolean(*def_id).into_visitor_no_params(self)),
-            SerdeOperator::I64(def_id, range) => deserializer.deserialize_i64(
+            (SerdeOperator::I64(def_id, range), _) => deserializer.deserialize_i64(
                 NumberMatcher {
                     def_id: *def_id,
                     range: range.clone(),
                 }
                 .into_visitor_no_params(self),
             ),
-            SerdeOperator::I32(def_id, range) => deserializer.deserialize_i32(
+            (SerdeOperator::I32(def_id, range), _) => deserializer.deserialize_i32(
                 NumberMatcher {
                     def_id: *def_id,
                     range: range.clone(),
                 }
                 .into_visitor_no_params(self),
             ),
-            SerdeOperator::F64(def_id, range) => deserializer.deserialize_f64(
+            (SerdeOperator::F64(def_id, range), _) => deserializer.deserialize_f64(
                 NumberMatcher {
                     def_id: *def_id,
                     range: range.clone(),
                 }
                 .into_visitor_no_params(self),
             ),
-            SerdeOperator::String(def_id) => deserializer.deserialize_str(
+            (SerdeOperator::String(def_id), _) => deserializer.deserialize_str(
                 StringMatcher {
                     def_id: *def_id,
                     ontology: self.ontology,
                 }
                 .into_visitor_no_params(self),
             ),
-            SerdeOperator::StringConstant(literal, def_id) => deserializer.deserialize_str(
+            (SerdeOperator::StringConstant(literal, def_id), _) => deserializer.deserialize_str(
                 ConstantStringMatcher {
                     literal,
                     def_id: *def_id,
                 }
                 .into_visitor_no_params(self),
             ),
-            SerdeOperator::TextPattern(def_id) => deserializer.deserialize_str(
+            (SerdeOperator::TextPattern(def_id), _) => deserializer.deserialize_str(
                 TextPatternMatcher {
                     pattern: self.ontology.text_patterns.get(def_id).unwrap(),
                     def_id: *def_id,
@@ -183,27 +183,28 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                 }
                 .into_visitor_no_params(self),
             ),
-            SerdeOperator::CapturingTextPattern(def_id) => deserializer.deserialize_str(
-                CapturingTextPatternMatcher {
-                    pattern: self.ontology.text_patterns.get(def_id).unwrap(),
-                    def_id: *def_id,
-                    ontology: self.ontology,
-                }
-                .into_visitor_no_params(self),
-            ),
-            SerdeOperator::DynamicSequence => {
+            (SerdeOperator::CapturingTextPattern(def_id), scalar_format) => deserializer
+                .deserialize_str(
+                    CapturingTextPatternMatcher {
+                        pattern: self.ontology.text_patterns.get(def_id).unwrap(),
+                        def_id: *def_id,
+                        ontology: self.ontology,
+                        scalar_format,
+                    }
+                    .into_visitor_no_params(self),
+                ),
+            (SerdeOperator::DynamicSequence, _) => {
                 Err(Error::custom("Cannot deserialize dynamic sequence"))
             }
-            SerdeOperator::RawId => Err(Error::custom("Cannot deserialize raw id")),
-            SerdeOperator::RelationSequence(seq_op) => deserializer.deserialize_seq(
+            (SerdeOperator::RelationSequence(seq_op), _) => deserializer.deserialize_seq(
                 SequenceMatcher::new(&seq_op.ranges, seq_op.def.def_id, self.ctx)
                     .into_visitor(self),
             ),
-            SerdeOperator::ConstructorSequence(seq_op) => deserializer.deserialize_seq(
+            (SerdeOperator::ConstructorSequence(seq_op), _) => deserializer.deserialize_seq(
                 SequenceMatcher::new(&seq_op.ranges, seq_op.def.def_id, self.ctx)
                     .into_visitor(self),
             ),
-            SerdeOperator::Alias(value_op) => {
+            (SerdeOperator::Alias(value_op), _) => {
                 let mut typed_attribute =
                     self.narrow(value_op.inner_addr).deserialize(deserializer)?;
 
@@ -211,7 +212,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
 
                 Ok(typed_attribute)
             }
-            SerdeOperator::Union(union_op) => match union_op.variants(self.mode, self.level) {
+            (SerdeOperator::Union(union_op), _) => match union_op.variants(self.mode, self.level) {
                 FilteredVariants::Single(addr) => self.narrow(addr).deserialize(deserializer),
                 FilteredVariants::Union(variants) => deserializer.deserialize_any(
                     UnionMatcher {
@@ -225,12 +226,11 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                     .into_visitor(self),
                 ),
             },
-
-            SerdeOperator::IdSingletonStruct(_name, _inner_addr) => {
+            (SerdeOperator::IdSingletonStruct(_name, _inner_addr), _) => {
                 //deserializer.deserialize_map()
                 todo!()
             }
-            SerdeOperator::Struct(struct_op) => deserializer.deserialize_map(StructVisitor {
+            (SerdeOperator::Struct(struct_op), _) => deserializer.deserialize_map(StructVisitor {
                 processor: self,
                 buffered_attrs: Default::default(),
                 struct_op,
@@ -503,6 +503,7 @@ fn deserialize_map<'on, 'p, 'de, A: MapAccess<'de>>(
                         serde_property.value_addr,
                         SubProcessorContext {
                             parent_property_id: Some(serde_property.property_id),
+                            parent_property_flags: serde_property.flags,
                             rel_params_addr: serde_property.rel_params_addr,
                         },
                     )
@@ -553,6 +554,7 @@ fn deserialize_map<'on, 'p, 'de, A: MapAccess<'de>>(
                             serde_property.value_addr,
                             SubProcessorContext {
                                 parent_property_id: Some(serde_property.property_id),
+                                parent_property_flags: serde_property.flags,
                                 rel_params_addr: serde_property.rel_params_addr,
                             },
                         )
@@ -565,7 +567,9 @@ fn deserialize_map<'on, 'p, 'de, A: MapAccess<'de>>(
 
                 attributes.insert(serde_property.property_id, attribute);
             }
-            MapKey::Ignored => {}
+            MapKey::Ignored => {
+                let _value: serde_value::Value = map.next_value()?;
+            }
         }
     }
 

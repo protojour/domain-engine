@@ -167,6 +167,8 @@ impl<'d, 'o> Display for FormatDataAsText<'d, 'o> {
         } else {
             match self.data {
                 Data::Text(s) => write!(f, "{s}"),
+                Data::I64(int) => write!(f, "{int}"),
+                Data::F64(float) => write!(f, "{float}"),
                 Data::OctetSequence(vec) => write!(f, "b'{vec:x?}'"),
                 Data::ChronoDateTime(datetime) => {
                     // FIXME: A way to not do this via String

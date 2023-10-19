@@ -34,7 +34,7 @@ async fn test_conduit_db_id_generation() {
     domain_engine
         .store_new_entity(
             create_de(&user)
-                .value(json!({
+                .to_value(json!({
                     "username": "u1",
                     "email": "a@b",
                     "password_hash": "s3cr3t",
@@ -49,7 +49,7 @@ async fn test_conduit_db_id_generation() {
         .store_new_entity(
             // Store with the Read processor which supports specifying ID upfront
             read_de(&user)
-                .value(json!({
+                .to_value(json!({
                     "user_id": "67e55044-10b1-426f-9247-bb680e5fe0c8",
                     "username": "u2",
                     "email": "c@d",
@@ -69,7 +69,7 @@ async fn test_conduit_db_id_generation() {
     let article_id: Uuid = domain_engine
         .store_new_entity(
             create_de(&article)
-                .value(json!({
+                .to_value(json!({
                     "slug": "foo",
                     "title": "Foo",
                     "description": "An article",
@@ -88,7 +88,7 @@ async fn test_conduit_db_id_generation() {
     domain_engine
         .store_new_entity(
             create_de(&comment)
-                .value(json!({
+                .to_value(json!({
                     "body": "Comment body",
                     "author": {
                         "user_id": "67e55044-10b1-426f-9247-bb680e5fe0c8",
@@ -106,7 +106,7 @@ async fn test_conduit_db_id_generation() {
     domain_engine
         .store_new_entity(
             create_de(&tag_entity)
-                .value(json!({ "tag": "foo" }))
+                .to_value(json!({ "tag": "foo" }))
                 .unwrap(),
             Select::EntityId,
         )
@@ -125,7 +125,7 @@ async fn test_conduit_db_store_entity_tree() {
     let pre_existing_user_id: Uuid = domain_engine
         .store_new_entity(
             create_de(&user_type)
-                .value(json!({
+                .to_value(json!({
                     "username": "pre-existing",
                     "email": "pre@existing",
                     "password_hash": "s3cr3t",
@@ -140,7 +140,7 @@ async fn test_conduit_db_store_entity_tree() {
     let article_id: Uuid = domain_engine
         .store_new_entity(
             create_de(&article_type)
-                .value(json!({
+                .to_value(json!({
                     "slug": "foo",
                     "title": "Foo",
                     "description": "An article",
@@ -186,7 +186,7 @@ async fn test_conduit_db_store_entity_tree() {
         .cast_into::<Uuid>();
 
     expect_eq!(
-        actual = read_ser(&user_type).json(
+        actual = read_ser(&user_type).as_json(
             &domain_engine
                 .query_entities(
                     user_type
@@ -210,7 +210,7 @@ async fn test_conduit_db_store_entity_tree() {
     );
 
     expect_eq!(
-        actual = read_ser(&user_type).json(
+        actual = read_ser(&user_type).as_json(
             &domain_engine
                 .query_entities(
                     user_type
@@ -273,7 +273,7 @@ async fn test_conduit_db_unresolved_foreign_key() {
         domain_engine
             .store_new_entity(
                 create_de(&article)
-                    .value(json!({
+                    .to_value(json!({
                         "slug": "foo",
                         "title": "Foo",
                         "description": "An article",
@@ -310,20 +310,20 @@ async fn test_artist_and_instrument_fmt_id_generation() {
     let generated_id = domain_engine
         .store_new_entity(
             create_de(&artist)
-                .value(json!({"name": "Igor Stravinskij" }))
+                .to_value(json!({"name": "Igor Stravinskij" }))
                 .unwrap(),
             Select::EntityId,
         )
         .await
         .unwrap();
 
-    let generated_id_json = read_ser(&artist_id).json(&generated_id);
+    let generated_id_json = read_ser(&artist_id).as_json(&generated_id);
     assert!(generated_id_json.as_str().unwrap().starts_with("artist/"));
 
     let explicit_id = domain_engine
         .store_new_entity(
             read_de(&artist)
-                .value(json!({
+                .to_value(json!({
                     "ID": "artist/67e55044-10b1-426f-9247-bb680e5fe0c8",
                     "name": "Karlheinz Stockhausen"
                 }))
@@ -334,7 +334,7 @@ async fn test_artist_and_instrument_fmt_id_generation() {
         .unwrap();
 
     expect_eq!(
-        actual = read_ser(&artist_id).json(&explicit_id),
+        actual = read_ser(&artist_id).as_json(&explicit_id),
         expected = json!("artist/67e55044-10b1-426f-9247-bb680e5fe0c8")
     );
 }
