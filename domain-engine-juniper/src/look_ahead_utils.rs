@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use juniper::{graphql_value, LookAheadArgument, LookAheadValue, Spanning};
+use juniper::{graphql_value, parser::SourcePosition, LookAheadArgument, LookAheadValue, Spanning};
 use ontol_runtime::{
     interface::graphql::{argument::DomainFieldArg, schema::TypingPurpose},
     interface::serde::operator::SerdeOperatorAddr,
@@ -151,14 +151,14 @@ impl de::Error for Error {
 }
 
 trait ErrorContext {
-    fn context<'a>(self, ctx_value: &'a Spanning<LookAheadValue<'a, GqlScalar>>) -> Self;
+    fn context(self, pos: &SourcePosition) -> Self;
 }
 
 impl<T> ErrorContext for Result<T, Error> {
-    fn context<'a>(self, ctx_value: &'a Spanning<LookAheadValue<'a, GqlScalar>>) -> Self {
+    fn context(self, pos: &SourcePosition) -> Self {
         self.map_err(|mut error| {
             if error.start.is_none() {
-                error.start = Some(ctx_value.start);
+                error.start = Some(*pos);
             }
             error
         })
@@ -203,29 +203,31 @@ impl<'a, 'de> de::Deserializer<'de> for LookAheadValueDeserializer<'a> {
 
     fn deserialize_any<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
         match &self.value.item {
-            LookAheadValue::Null => visitor.visit_none::<Error>().context(self.value),
-            LookAheadValue::Scalar(GqlScalar::Unit) => visitor.visit_unit().context(self.value),
+            LookAheadValue::Null => visitor.visit_none::<Error>().context(&self.value.start),
+            LookAheadValue::Scalar(GqlScalar::Unit) => {
+                visitor.visit_unit().context(&self.value.start)
+            }
             LookAheadValue::Scalar(GqlScalar::I32(value)) => {
-                visitor.visit_i32(*value).context(self.value)
+                visitor.visit_i32(*value).context(&self.value.start)
             }
             LookAheadValue::Scalar(GqlScalar::I64(value)) => {
-                visitor.visit_i64(*value).context(self.value)
+                visitor.visit_i64(*value).context(&self.value.start)
             }
             LookAheadValue::Scalar(GqlScalar::F64(value)) => {
-                visitor.visit_f64(*value).context(self.value)
+                visitor.visit_f64(*value).context(&self.value.start)
             }
             LookAheadValue::Scalar(GqlScalar::Boolean(value)) => {
-                visitor.visit_bool(*value).context(self.value)
+                visitor.visit_bool(*value).context(&self.value.start)
             }
             LookAheadValue::Scalar(GqlScalar::String(value)) => {
-                visitor.visit_str(value).context(self.value)
+                visitor.visit_str(value).context(&self.value.start)
             }
             LookAheadValue::Enum(value) => visitor.visit_str(value),
             LookAheadValue::List(vec) => {
                 let mut iterator = vec.iter().fuse();
                 let value = visitor
                     .visit_seq(SeqDeserializer::<_>::new(&mut iterator))
-                    .context(self.value)?;
+                    .context(&self.value.start)?;
                 match iterator.next() {
                     Some(item) => Err(Error {
                         msg: "trailing characters".into(),
@@ -238,7 +240,7 @@ impl<'a, 'de> de::Deserializer<'de> for LookAheadValueDeserializer<'a> {
                 let mut iterator = vec.iter().fuse();
                 let value = visitor
                     .visit_map(ObjectDeserializer::<_>::new(&mut iterator))
-                    .context(self.value)?;
+                    .context(&self.value.start)?;
                 match iterator.next() {
                     Some((key, _)) => Err(Error {
                         msg: "trailing characters".into(),
@@ -252,10 +254,10 @@ impl<'a, 'de> de::Deserializer<'de> for LookAheadValueDeserializer<'a> {
 
     fn deserialize_option<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
         match &self.value.item {
-            LookAheadValue::Null => visitor.visit_none::<Error>().context(self.value),
+            LookAheadValue::Null => visitor.visit_none::<Error>().context(&self.value.start),
             _ => {
-                let value = self.value.clone();
-                visitor.visit_some(self).context(&value)
+                let pos = self.value.start;
+                visitor.visit_some(self).context(&pos)
             }
         }
     }
