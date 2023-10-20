@@ -16,21 +16,21 @@ use super::condition_utils::{get_clause_vars, TermVars};
 /// A concrete "execution plan" for filtering
 #[derive(Debug, PartialEq, Eq)]
 #[allow(unused)]
-pub enum Plan {
+pub enum PlanEntry {
     /// A root plan that filters specific entities
-    EntitiesOf(DefId, Vec<Plan>),
+    EntitiesOf(DefId, Vec<PlanEntry>),
     /// A root plan that is the output edge of a Join (many input edges).
     /// The UniVar specifies the id of the join.
     /// The semantics is that the match must be for the _same entity_, but from different input paths.
-    JoinRoot(Var, Vec<Plan>),
-    /// An scalar attribute that matches the given plans
-    Attr(PropertyId, Vec<Plan>),
+    JoinRoot(Var, Vec<PlanEntry>),
+    /// A scalar attribute that matches the given plans
+    Attr(PropertyId, Vec<PlanEntry>),
     /// A scalar multi-attribute where every attribute matches the given plans
-    AllAttrs(PropertyId, Vec<Plan>),
+    AllAttrs(PropertyId, Vec<PlanEntry>),
     /// A graph edge attribute which matches the given attribute plan
-    Edge(PropertyId, EdgeAttr<Vec<Plan>>),
+    Edge(PropertyId, EdgeAttr<Vec<PlanEntry>>),
     /// A multi-graph edge attribute which matches the given attribute plan
-    AllEdges(PropertyId, EdgeAttr<Vec<Plan>>),
+    AllEdges(PropertyId, EdgeAttr<Vec<PlanEntry>>),
     /// Expression must match the given scalar
     Eq(Scalar),
     /// Expression must be an element in the given set of scalars
@@ -68,7 +68,7 @@ struct PlanBuilder<'on> {
 pub fn compute_filter_plan(
     condition: &Condition<CondTerm>,
     ontology: &Ontology,
-) -> PlanResult<Vec<Plan>> {
+) -> PlanResult<Vec<PlanEntry>> {
     let clauses = &condition.clauses;
     let mut output = vec![];
 
@@ -103,7 +103,7 @@ pub fn compute_filter_plan(
                     &mut plan_builder,
                 )?;
 
-                output.push(Plan::JoinRoot(var, join_plans));
+                output.push(PlanEntry::JoinRoot(var, join_plans));
             }
         }
     }
@@ -114,7 +114,7 @@ pub fn compute_filter_plan(
 fn compute_plan(
     clauses: &[&Clause<CondTerm>],
     builder: &mut PlanBuilder,
-) -> Option<PlanResult<Plan>> {
+) -> Option<PlanResult<PlanEntry>> {
     let root_var = clauses.iter().find_map(|clause| match clause {
         Clause::Root(var) => Some(*var),
         _ => None,
@@ -132,7 +132,7 @@ fn compute_plan(
         clauses,
         builder,
     ) {
-        Ok(sub_plans) => Some(Ok(Plan::EntitiesOf(entity_def_id, sub_plans))),
+        Ok(sub_plans) => Some(Ok(PlanEntry::EntitiesOf(entity_def_id, sub_plans))),
         Err(error) => Some(Err(error)),
     }
 }
@@ -146,8 +146,8 @@ fn sub_plans(
     origin: Origin,
     clauses: &[&Clause<CondTerm>],
     builder: &mut PlanBuilder,
-) -> PlanResult<Vec<Plan>> {
-    let mut plans: Vec<Plan> = vec![];
+) -> PlanResult<Vec<PlanEntry>> {
+    let mut plans: Vec<PlanEntry> = vec![];
 
     let type_info = builder.ontology.get_type_info(origin.def_id);
 
@@ -169,10 +169,10 @@ fn sub_plans(
                 match data_relationship.kind {
                     DataRelationshipKind::Tree => match data_relationship.cardinality.1 {
                         ValueCardinality::One => {
-                            plans.push(Plan::Attr(*property_id, val_plans));
+                            plans.push(PlanEntry::Attr(*property_id, val_plans));
                         }
                         ValueCardinality::Many => {
-                            plans.push(Plan::AllAttrs(*property_id, val_plans));
+                            plans.push(PlanEntry::AllAttrs(*property_id, val_plans));
                         }
                     },
                     DataRelationshipKind::EntityGraph { rel_params } => {
@@ -187,10 +187,10 @@ fn sub_plans(
 
                         match data_relationship.cardinality.1 {
                             ValueCardinality::One => {
-                                plans.push(Plan::Edge(*property_id, attribute));
+                                plans.push(PlanEntry::Edge(*property_id, attribute));
                             }
                             ValueCardinality::Many => {
-                                plans.push(Plan::AllEdges(*property_id, attribute));
+                                plans.push(PlanEntry::AllEdges(*property_id, attribute));
                             }
                         }
                     }
@@ -205,7 +205,7 @@ fn sub_plans(
                     CondTerm::Wildcard => {}
                     CondTerm::Var(_) => todo!(),
                     CondTerm::Value(value) => {
-                        plans.push(Plan::Eq(value_to_scalar(value)?));
+                        plans.push(PlanEntry::Eq(value_to_scalar(value)?));
                     }
                 }
             }
@@ -221,7 +221,7 @@ fn term_plans(
     target: DefId,
     clauses: &[&Clause<CondTerm>],
     builder: &mut PlanBuilder,
-) -> PlanResult<Vec<Plan>> {
+) -> PlanResult<Vec<PlanEntry>> {
     let mut plans = vec![];
     match term {
         CondTerm::Wildcard => {}
@@ -233,7 +233,7 @@ fn term_plans(
                 .unwrap_or_default()
                 > 1
             {
-                plans.push(Plan::Join(*var));
+                plans.push(PlanEntry::Join(*var));
                 builder.current_join_roots.insert(*var, target);
             } else {
                 plans.extend(sub_plans(
@@ -247,7 +247,7 @@ fn term_plans(
             }
         }
         CondTerm::Value(value) => {
-            plans.push(Plan::Eq(value_to_scalar(value)?));
+            plans.push(PlanEntry::Eq(value_to_scalar(value)?));
         }
     }
     Ok(plans)
@@ -336,17 +336,17 @@ mod tests {
 
             expect_eq!(
                 actual = plan,
-                expected = vec![Plan::EntitiesOf(
+                expected = vec![PlanEntry::EntitiesOf(
                     foo.def_id(),
                     vec![
-                        Plan::Attr(x, vec![Plan::Eq(Scalar::Text("match1".into()))]),
-                        Plan::AllEdges(
+                        PlanEntry::Attr(x, vec![PlanEntry::Eq(Scalar::Text("match1".into()))]),
+                        PlanEntry::AllEdges(
                             bars,
                             EdgeAttr {
                                 rel: vec![],
-                                val: vec![Plan::Attr(
+                                val: vec![PlanEntry::Attr(
                                     y,
-                                    vec![Plan::Eq(Scalar::Text("match2".into()))]
+                                    vec![PlanEntry::Eq(Scalar::Text("match2".into()))]
                                 )],
                             }
                         )
@@ -401,36 +401,36 @@ mod tests {
             expect_eq!(
                 actual = plan,
                 expected = vec![
-                    Plan::EntitiesOf(
+                    PlanEntry::EntitiesOf(
                         foo.def_id(),
                         vec![
-                            Plan::AllEdges(
+                            PlanEntry::AllEdges(
                                 bars_x,
                                 EdgeAttr {
                                     rel: vec![],
                                     val: vec![
-                                        Plan::Attr(y, vec![Plan::Eq(text("match1"))]),
-                                        Plan::AllEdges(
+                                        PlanEntry::Attr(y, vec![PlanEntry::Eq(text("match1"))]),
+                                        PlanEntry::AllEdges(
                                             foos,
                                             EdgeAttr {
                                                 rel: vec![],
-                                                val: vec![Plan::Join(var("d"))]
+                                                val: vec![PlanEntry::Join(var("d"))]
                                             }
                                         )
                                     ],
                                 }
                             ),
-                            Plan::AllEdges(
+                            PlanEntry::AllEdges(
                                 bars_y,
                                 EdgeAttr {
                                     rel: vec![],
                                     val: vec![
-                                        Plan::Attr(y, vec![Plan::Eq(text("match2"))]),
-                                        Plan::AllEdges(
+                                        PlanEntry::Attr(y, vec![PlanEntry::Eq(text("match2"))]),
+                                        PlanEntry::AllEdges(
                                             foos,
                                             EdgeAttr {
                                                 rel: vec![],
-                                                val: vec![Plan::Join(var("d"))]
+                                                val: vec![PlanEntry::Join(var("d"))]
                                             }
                                         )
                                     ],
@@ -438,9 +438,9 @@ mod tests {
                             ),
                         ]
                     ),
-                    Plan::JoinRoot(
+                    PlanEntry::JoinRoot(
                         var("d"),
-                        vec![Plan::Attr(x, vec![Plan::Eq(text("match3"))])]
+                        vec![PlanEntry::Attr(x, vec![PlanEntry::Eq(text("match3"))])]
                     )
                 ]
             );

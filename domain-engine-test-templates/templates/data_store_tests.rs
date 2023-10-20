@@ -375,6 +375,13 @@ async fn test_artist_and_instrument_filter_condition() {
         actual = extract_names(
             exec_named_map_json(by_name, json!({ "name": "N/A" }), &domain_engine).await
         ),
-        expected = json!(["Larry Young", "Woody Shaw", "Joe Henderson"])
+        expected = json!([])
+    );
+
+    expect_eq!(
+        actual = extract_names(
+            exec_named_map_json(by_name, json!({ "name": "Larry Young" }), &domain_engine).await
+        ),
+        expected = json!(["Larry Young"])
     );
 }

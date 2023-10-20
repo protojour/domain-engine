@@ -5,13 +5,13 @@ use ontol_runtime::{
     ontology::{DataRelationshipKind, PropertyCardinality, TypeInfo, ValueCardinality},
     select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
     value::{Attribute, Data, PropertyId, Value},
-    Role,
+    DefId, Role,
 };
 use tracing::{debug, error};
 
 use crate::{
     entity_id_utils::find_inherent_entity_id,
-    filter::plan::{compute_filter_plan, Plan},
+    filter::plan::{compute_filter_plan, PlanEntry, Scalar},
     DomainEngine, DomainError, DomainResult,
 };
 
@@ -50,10 +50,19 @@ impl InMemoryStore {
             .ok_or(DomainError::NotAnEntity(struct_select.def_id))?;
 
         let filter_plan = compute_filter_plan(condition, engine.ontology()).unwrap();
+        debug!("eval filter plan: {filter_plan:#?}");
 
         let raw_props_vec: Vec<_> = collection
             .iter()
-            .filter(|(key, props)| self.exec_filter_plan(key, props, &filter_plan))
+            .filter(|(_key, props)| {
+                self.eval_filter_plan(
+                    &DbVal::Struct {
+                        type_def_id: type_info.def_id,
+                        map: props,
+                    },
+                    &filter_plan,
+                )
+            })
             .map(|(key, props)| (key.clone(), props.clone()))
             .collect();
 
@@ -237,12 +246,110 @@ impl InMemoryStore {
         }
     }
 
-    fn exec_filter_plan(
-        &self,
-        _key: &DynamicKey,
-        _props: &BTreeMap<PropertyId, Attribute>,
-        _filter_plan: &[Plan],
-    ) -> bool {
+    fn eval_filter_plan(&self, val: &DbVal, plan: &[PlanEntry]) -> bool {
+        if plan.is_empty() {
+            return true;
+        }
+
+        for entry in plan {
+            if self.eval_filter_plan_entry(val, entry) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn eval_filter_plan_entry(&self, val: &DbVal, entry: &PlanEntry) -> bool {
+        match (entry, val) {
+            (PlanEntry::EntitiesOf(def_id, entries), DbVal::Struct { type_def_id, .. }) => {
+                if def_id != type_def_id {
+                    return false;
+                }
+
+                if entries.is_empty() {
+                    return true;
+                }
+
+                for entry in entries {
+                    if !self.eval_filter_plan_entry(val, entry) {
+                        return false;
+                    }
+                }
+
+                true
+            }
+            (PlanEntry::JoinRoot(..), _) => todo!(),
+            (PlanEntry::Attr(prop_id, entries), DbVal::Struct { map, .. }) => {
+                let Some(attr) = map.get(prop_id) else {
+                    return false;
+                };
+
+                self.eval_attr_entries(attr, entries)
+            }
+            (PlanEntry::AllAttrs(prop_id, entries), DbVal::Struct { map, .. }) => {
+                let Some(attr) = map.get(prop_id) else {
+                    return false;
+                };
+                let Data::Sequence(seq) = &attr.value.data else {
+                    return false;
+                };
+
+                for attr in seq {
+                    if !self.eval_attr_entries(attr, entries) {
+                        return false;
+                    }
+                }
+
+                true
+            }
+            (PlanEntry::Edge(..), _) => todo!(),
+            (PlanEntry::AllEdges(..), _) => todo!(),
+            (PlanEntry::Eq(pred_scalar), DbVal::Scalar(val_scalar)) => {
+                match (&val_scalar.data, pred_scalar) {
+                    (Data::Text(data), Scalar::Text(pred)) => data.as_str() == pred.as_ref(),
+                    _ => false,
+                }
+            }
+            (PlanEntry::In(..), _) => todo!(),
+            (PlanEntry::Join(_), _) => todo!(),
+            _ => false,
+        }
+    }
+
+    fn eval_attr_entries(&self, attr: &Attribute, entries: &[PlanEntry]) -> bool {
+        if entries.is_empty() {
+            return true;
+        }
+
+        for entry in entries {
+            if !self.eval_filter_plan_entry(&DbVal::from_value(&attr.value), entry) {
+                return false;
+            }
+        }
+
         true
+    }
+}
+
+enum DbVal<'d> {
+    Struct {
+        type_def_id: DefId,
+        map: &'d BTreeMap<PropertyId, Attribute>,
+    },
+    Sequence(&'d [Attribute]),
+    Scalar(&'d Value),
+}
+
+impl<'d> DbVal<'d> {
+    fn from_value(value: &'d Value) -> Self {
+        match &value.data {
+            Data::Struct(map) => Self::Struct {
+                type_def_id: value.type_def_id,
+                map,
+            },
+            Data::Sequence(seq) => Self::Sequence(seq),
+            _ => Self::Scalar(value),
+        }
     }
 }
