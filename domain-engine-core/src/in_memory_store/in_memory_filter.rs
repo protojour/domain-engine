@@ -113,9 +113,7 @@ impl InMemoryStore {
                 Ok(Proof::Proven)
             }
             (PlanEntry::JoinRoot(var, sub_entries), _) => {
-                let Some(join_table_entry) = join_table.joins.remove(var) else {
-                    return Err(Disproven);
-                };
+                let join_table_entry = join_table.joins.remove(var).ok_or(Disproven)?;
                 let observed_count = join_table_entry.in_subplans.iter().count();
 
                 let mut proof = Proof::Proven;
@@ -142,16 +140,11 @@ impl InMemoryStore {
                 Ok(proof)
             }
             (PlanEntry::Attr(prop_id, entries), FilterVal::Struct { map, .. }) => {
-                let Some(attr) = map.get(prop_id) else {
-                    return Err(Disproven);
-                };
-
+                let attr = map.get(prop_id).ok_or(Disproven)?;
                 self.eval_attr_entries(attr, entries, join_table)
             }
             (PlanEntry::AllAttrs(prop_id, entries), FilterVal::Struct { map, .. }) => {
-                let Some(attr) = map.get(prop_id) else {
-                    return Err(Disproven);
-                };
+                let attr = map.get(prop_id).ok_or(Disproven)?;
                 let Data::Sequence(seq) = &attr.value.data else {
                     return Err(Disproven);
                 };
@@ -165,10 +158,10 @@ impl InMemoryStore {
                 Ok(proof)
             }
             (PlanEntry::Edge(prop_id, edge_attr), FilterVal::Struct { key: Some(key), .. }) => {
-                let Some(edge_collection) = self.edge_collections.get(&prop_id.relationship_id)
-                else {
-                    return Err(Disproven);
-                };
+                let edge_collection = self
+                    .edge_collections
+                    .get(&prop_id.relationship_id)
+                    .ok_or(Disproven)?;
 
                 let (key, rel_params) = match prop_id.role {
                     Role::Subject => edge_collection.edges.iter().find_map(|edge| {
