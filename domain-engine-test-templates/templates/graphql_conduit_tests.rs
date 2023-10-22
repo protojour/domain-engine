@@ -343,7 +343,7 @@ async fn test_graphql_blog_post_conduit_implicit_join_named_query() {
 
     expect_eq!(
         actual = r#"{
-            posts(written_by: "me") {
+            posts(written_by: "teh_user") {
                 contents
                 written_by
             }
@@ -358,6 +358,18 @@ async fn test_graphql_blog_post_conduit_implicit_join_named_query() {
                 }
             ]
         })),
+    );
+
+    expect_eq!(
+        actual = r#"{
+            posts(written_by: "someone_else") {
+                contents
+                written_by
+            }
+        }"#
+        .exec(&ctx.blog_schema, &ctx.gql_context(), [])
+        .await,
+        expected = Ok(graphql_value!({ "posts": [] })),
     );
 }
 

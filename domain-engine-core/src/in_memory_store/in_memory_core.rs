@@ -67,4 +67,18 @@ impl InMemoryStore {
         let collection = self.collections.get(&def_id)?;
         collection.get(dynamic_key)
     }
+
+    // FIXME: This shouldn't be necessary..
+    // The edge collections should store the DefId together with DynamicKey
+    pub fn look_up_entity_unknown_def_id(
+        &self,
+        dynamic_key: &DynamicKey,
+    ) -> Option<(DefId, &BTreeMap<PropertyId, Attribute>)> {
+        self.collections.iter().find_map(|collection| {
+            collection
+                .1
+                .get(dynamic_key)
+                .map(|props| (*collection.0, props))
+        })
+    }
 }
