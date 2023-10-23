@@ -7,7 +7,7 @@ use ontol_runtime::{
     },
     interface::{
         graphql::{
-            argument,
+            argument::{self, MapInputArg},
             data::{
                 EdgeData, EntityData, FieldData, FieldKind, NativeScalarKind, NativeScalarRef,
                 NodeData, ObjectData, ObjectKind, Optionality, PropertyData, ScalarData, TypeAddr,
@@ -720,8 +720,8 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 FieldData::mandatory(
                     FieldKind::Connection {
                         property_id: Some(property_id),
-                        first: argument::First,
-                        after: argument::After,
+                        first: argument::FirstArg,
+                        after: argument::AfterArg,
                     },
                     connection_ref,
                 )
@@ -785,7 +785,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
             })
             .collect();
 
-        let scalar_input_name = match self
+        let input_arg = match self
             .serde_generator
             .seal_ctx
             .get_repr_kind(&input_key.def_id)
@@ -800,18 +800,29 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                         _ => return,
                     };
 
-                Some(scalar_input_name)
+                MapInputArg {
+                    operator_addr: input_operator_addr,
+                    scalar_input_name: Some(scalar_input_name),
+                }
             }
-            _ => None,
+            _ => {
+                let _unit_type_ref = self.get_def_type_ref(input_key.def_id, QLevel::Node);
+
+                MapInputArg {
+                    operator_addr: input_operator_addr,
+                    scalar_input_name: None,
+                }
+            }
         };
 
         let field_data = if output_key.seq {
             FieldData {
                 kind: FieldKind::MapConnection {
                     key: [*input_key, *output_key],
-                    input_operator_addr,
-                    scalar_input_name,
                     queries,
+                    input_arg,
+                    first_arg: argument::FirstArg,
+                    after_arg: argument::AfterArg,
                 },
                 field_type: TypeRef {
                     modifier: TypeModifier::Unit(Optionality::Mandatory),
@@ -825,9 +836,8 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
             FieldData {
                 kind: FieldKind::MapFind {
                     key: [*input_key, *output_key],
-                    input_operator_addr,
-                    scalar_input_name,
                     queries,
+                    input_arg,
                 },
                 field_type: TypeRef {
                     modifier: TypeModifier::Unit(Optionality::Optional),
@@ -867,8 +877,8 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 FieldData::mandatory(
                     FieldKind::Connection {
                         property_id: None,
-                        first: argument::First,
-                        after: argument::After,
+                        first: argument::FirstArg,
+                        after: argument::AfterArg,
                     },
                     connection_ref,
                 ),
@@ -881,7 +891,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 self.namespace.create(type_info),
                 FieldData {
                     kind: FieldKind::CreateMutation {
-                        input: argument::Input {
+                        input: argument::InputArg {
                             type_addr: entity_data.type_addr,
                             def_id: entity_data.node_def_id,
                             operator_addr: entity_operator_addr,
@@ -896,13 +906,13 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 self.namespace.update(type_info),
                 FieldData {
                     kind: FieldKind::UpdateMutation {
-                        input: argument::Input {
+                        input: argument::InputArg {
                             type_addr: entity_data.type_addr,
                             def_id: entity_data.node_def_id,
                             operator_addr: entity_operator_addr,
                             typing_purpose: TypingPurpose::PartialInput,
                         },
-                        id: argument::Id {
+                        id: argument::IdArg {
                             operator_addr: id_operator_addr,
                             unit_type_ref: id_unit_type_ref,
                         },
@@ -915,7 +925,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 self.namespace.delete(type_info),
                 FieldData {
                     kind: FieldKind::DeleteMutation {
-                        id: argument::Id {
+                        id: argument::IdArg {
                             operator_addr: id_operator_addr,
                             unit_type_ref: id_unit_type_ref,
                         },

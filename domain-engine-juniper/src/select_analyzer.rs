@@ -9,7 +9,6 @@ use ontol_runtime::{
             FieldData, FieldKind, NodeData, ObjectData, ObjectKind, Optionality, TypeData,
             TypeKind, TypeModifier, TypeRef,
         },
-        schema::TypingPurpose,
     },
     ontology::{Cardinality, PropertyCardinality, ValueCardinality},
     select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
@@ -18,7 +17,7 @@ use ontol_runtime::{
     DefId, MapKey, RelationshipId,
 };
 use smartstring::alias::String;
-use tracing::debug;
+use tracing::trace;
 
 use crate::{context::SchemaCtx, gql_scalar::GqlScalar, look_ahead_utils::ArgsWrapper, ServiceCtx};
 
@@ -60,22 +59,20 @@ impl<'a> SelectAnalyzer<'a> {
         match &field_data.kind {
             FieldKind::MapConnection {
                 key,
-                input_operator_addr,
-                scalar_input_name,
+                input_arg,
                 queries: map_queries,
+                ..
             }
             | FieldKind::MapFind {
                 key,
-                input_operator_addr,
-                scalar_input_name,
+                input_arg,
                 queries: map_queries,
             } => {
-                let input = ArgsWrapper::new(look_ahead.arguments()).domain_deserialize(
-                    *input_operator_addr,
-                    scalar_input_name.as_deref(),
-                    TypingPurpose::Selection,
-                    &self.schema_ctx.ontology,
-                )?;
+                let input = ArgsWrapper::new(look_ahead.arguments())
+                    .deserialize_domain_field_arg_as_attribute(
+                        input_arg,
+                        &self.schema_ctx.ontology,
+                    )?;
 
                 let mut output_queries: FnvHashMap<Var, EntityQuery> = Default::default();
 
@@ -187,13 +184,25 @@ impl<'a> SelectAnalyzer<'a> {
                 }
             }
             (
-                FieldKind::MapConnection { .. },
+                FieldKind::MapConnection {
+                    first_arg,
+                    after_arg,
+                    ..
+                },
                 Ok(TypeData {
                     kind: TypeKind::Object(object_data),
                     ..
                 }),
             ) => {
-                // TODO: Pagination
+                let args_wrapper = ArgsWrapper::new(look_ahead.arguments());
+
+                let limit = args_wrapper
+                    .deserialize::<u32>(first_arg.name())
+                    .unwrap()
+                    .unwrap_or(self.default_limit());
+                let cursor = args_wrapper
+                    .deserialize::<String>(after_arg.name())
+                    .unwrap();
 
                 let mut select = None;
 
@@ -213,15 +222,15 @@ impl<'a> SelectAnalyzer<'a> {
                         Some(Select::Struct(object)) => Select::Entity(EntitySelect {
                             source: StructOrUnionSelect::Struct(object),
                             condition: Condition::default(),
-                            limit: self.default_limit(),
-                            cursor: None,
+                            limit,
+                            cursor,
                         }),
                         Some(Select::StructUnion(def_id, variants)) => {
                             Select::Entity(EntitySelect {
                                 source: StructOrUnionSelect::Union(def_id, variants),
                                 condition: Condition::default(),
-                                limit: self.default_limit(),
-                                cursor: None,
+                                limit,
+                                cursor,
                             })
                         }
                         Some(Select::Entity(_) | Select::EntityId) => panic!("Select in select"),
@@ -377,7 +386,7 @@ impl<'a> SelectAnalyzer<'a> {
 
                     let applies_for = field_look_ahead.applies_for();
 
-                    debug!("union field `{field_name}` applies for: {applies_for:?}",);
+                    trace!("union field `{field_name}` applies for: {applies_for:?}",);
 
                     if let Some(applies_for) = applies_for {
                         let variant_type_data = union_data

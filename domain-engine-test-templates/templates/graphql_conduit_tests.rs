@@ -355,7 +355,7 @@ async fn test_graphql_blog_post_conduit_implicit_join_named_query() {
 
     expect_eq!(
         actual = r#"{
-            posts(written_by: "teh_user") {
+            posts(input: { written_by: "teh_user" }) {
                 edges {
                     node {
                         contents
@@ -382,7 +382,7 @@ async fn test_graphql_blog_post_conduit_implicit_join_named_query() {
 
     expect_eq!(
         actual = r#"{
-            posts(written_by: "someone_else") {
+            posts(input: { written_by: "someone_else" }) {
                 edges {
                     node {
                         contents

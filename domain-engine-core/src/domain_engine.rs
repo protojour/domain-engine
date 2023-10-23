@@ -189,7 +189,7 @@ impl DomainEngine {
     ) -> DomainResult<ontol_runtime::value::Value> {
         let data_store = self.get_data_store()?;
 
-        debug!("Match condition:\n{:#?}", entity_query.select.condition);
+        debug!("match condition:\n{:#?}", entity_query.select.condition);
 
         match &entity_query.select.source {
             StructOrUnionSelect::Struct(struct_select) => {
@@ -237,7 +237,7 @@ impl DomainEngine {
 
         let edges = data_store.api().query(entity_query.select, self).await?;
 
-        debug!("Cardinality: {:?}", entity_query.cardinality);
+        debug!("cardinality: {:?}", entity_query.cardinality);
 
         match entity_query.cardinality.1 {
             ValueCardinality::One => match (edges.into_iter().next(), entity_query.cardinality.0) {

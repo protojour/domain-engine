@@ -2,11 +2,8 @@ use std::fmt::Display;
 
 use juniper::{graphql_value, parser::SourcePosition, LookAheadArgument, LookAheadValue, Spanning};
 use ontol_runtime::{
-    interface::graphql::{argument::DomainFieldArg, schema::TypingPurpose},
-    interface::serde::operator::SerdeOperatorAddr,
-    ontology::Ontology,
-    smart_format,
-    value::Attribute,
+    interface::graphql::argument, interface::graphql::schema::TypingPurpose,
+    interface::serde::operator::SerdeOperatorAddr, ontology::Ontology, smart_format,
 };
 use serde::de::{self, DeserializeSeed, IntoDeserializer};
 
@@ -19,40 +16,6 @@ pub struct ArgsWrapper<'a> {
 impl<'a> ArgsWrapper<'a> {
     pub fn new(arguments: &'a [LookAheadArgument<'a, GqlScalar>]) -> Self {
         Self { arguments }
-    }
-
-    pub fn domain_deserialize(
-        &self,
-        operator_addr: SerdeOperatorAddr,
-        scalar_input_name: Option<&str>,
-        typing_purpose: TypingPurpose,
-        ontology: &Ontology,
-    ) -> Result<Attribute, juniper::FieldError<GqlScalar>> {
-        let (mode, level) = typing_purpose.mode_and_level();
-
-        if let Some(_scalar_input_name) = scalar_input_name {
-            let spanned_arg = self
-                .arguments
-                .first()
-                .ok_or_else(|| {
-                    juniper::FieldError::new("Expected single argument", graphql_value!(None))
-                })?
-                .spanned_value();
-
-            ontology
-                .new_serde_processor(operator_addr, mode)
-                .with_level(level)
-                .deserialize(LookAheadValueDeserializer { value: spanned_arg })
-                .map_err(|error| juniper::FieldError::new(error, graphql_value!(None)))
-        } else {
-            ontology
-                .new_serde_processor(operator_addr, mode)
-                .with_level(level)
-                .deserialize(LookAheadArgumentsDeserializer {
-                    arguments: self.arguments,
-                })
-                .map_err(|error| juniper::FieldError::new(error, graphql_value!(None)))
-        }
     }
 
     pub fn deserialize<'de, T: serde::Deserialize<'de>>(
@@ -74,7 +37,7 @@ impl<'a> ArgsWrapper<'a> {
 
     pub fn deserialize_domain_field_arg_as_attribute(
         &self,
-        field_arg: &dyn DomainFieldArg,
+        field_arg: &dyn argument::DomainFieldArg,
         ontology: &Ontology,
     ) -> Result<ontol_runtime::value::Attribute, juniper::FieldError<GqlScalar>> {
         let name = field_arg.name();
@@ -163,35 +126,6 @@ impl<T> ErrorContext for Result<T, Error> {
             error
         })
     }
-}
-
-struct LookAheadArgumentsDeserializer<'a> {
-    arguments: &'a [LookAheadArgument<'a, GqlScalar>],
-}
-
-impl<'a, 'de> de::Deserializer<'de> for LookAheadArgumentsDeserializer<'a> {
-    type Error = Error;
-
-    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        let mut iterator = self.arguments.iter().fuse();
-        let value = visitor.visit_map(ArgsDeserializer::<_>::new(&mut iterator))?;
-        match iterator.next() {
-            Some(arg) => Err(Error {
-                msg: "trailing characters".into(),
-                start: Some(arg.spanned_value().start),
-            }),
-            None => Ok(value),
-        }
-    }
-
-    serde::forward_to_deserialize_any!(
-        bool u8 u16 u32 u64 i8 i16 i32 i64 f32 f64 char str string unit
-        seq bytes byte_buf map unit_struct
-        tuple_struct struct tuple ignored_any identifier option newtype_struct enum
-    );
 }
 
 struct LookAheadValueDeserializer<'a> {
@@ -304,53 +238,6 @@ where
         match self.iter.size_hint() {
             (lower, Some(upper)) if lower == upper => Some(upper),
             _ => None,
-        }
-    }
-}
-
-struct ArgsDeserializer<'a, 'i, I> {
-    iter: &'i mut std::iter::Fuse<I>,
-    state: MapState<&'a Spanning<LookAheadValue<'a, GqlScalar>>>,
-    _count: usize,
-}
-
-impl<'a, 'i, I: Iterator> ArgsDeserializer<'a, 'i, I> {
-    fn new(iter: &'i mut std::iter::Fuse<I>) -> Self {
-        Self {
-            iter,
-            state: MapState::NextKey,
-            _count: 0,
-        }
-    }
-}
-
-impl<'a, 'i, 'de, I> de::MapAccess<'de> for ArgsDeserializer<'a, 'i, I>
-where
-    I: Iterator<Item = &'a LookAheadArgument<'a, GqlScalar>>,
-{
-    type Error = Error;
-
-    fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
-    where
-        K: de::DeserializeSeed<'de>,
-    {
-        match (self.iter.next(), &self.state) {
-            (Some(arg), MapState::NextKey) => {
-                self.state = MapState::NextValue(arg.spanned_value());
-                seed.deserialize(arg.name().into_deserializer()).map(Some)
-            }
-            (None, MapState::NextKey) => Ok(None),
-            (_, MapState::NextValue(_)) => panic!("should call next_value"),
-        }
-    }
-
-    fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::DeserializeSeed<'de>,
-    {
-        match std::mem::take(&mut self.state) {
-            MapState::NextValue(value) => seed.deserialize(LookAheadValueDeserializer { value }),
-            MapState::NextKey => panic!("should call next_key"),
         }
     }
 }

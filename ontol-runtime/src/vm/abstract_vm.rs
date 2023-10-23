@@ -1,5 +1,5 @@
 use bit_vec::BitVec;
-use tracing::debug;
+use tracing::trace;
 
 use super::proc::{GetAttrFlags, OpCodeCondTerm};
 use crate::{
@@ -79,7 +79,7 @@ pub trait Processor {
 
 impl<'o, P: Processor> AbstractVm<'o, P> {
     pub fn new(ontology: &'o Ontology, procedure: Procedure) -> Self {
-        debug!("AbstractVm::new({procedure:?})");
+        trace!("AbstractVm::new({procedure:?})");
         Self {
             program_counter: procedure.address.0 as usize,
             proc_address: procedure.address.0 as usize,

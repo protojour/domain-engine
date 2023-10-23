@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use smartstring::alias::String;
 
 use crate::{interface::serde::operator::SerdeOperatorAddr, DefId};
 
@@ -27,20 +28,20 @@ pub trait DomainFieldArg: FieldArg {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Input {
+pub struct InputArg {
     pub type_addr: TypeAddr,
     pub def_id: DefId,
     pub operator_addr: SerdeOperatorAddr,
     pub typing_purpose: TypingPurpose,
 }
 
-impl FieldArg for Input {
+impl FieldArg for InputArg {
     fn name(&self) -> &str {
         "input"
     }
 }
 
-impl DomainFieldArg for Input {
+impl DomainFieldArg for InputArg {
     fn typing_purpose(&self) -> TypingPurpose {
         self.typing_purpose
     }
@@ -55,18 +56,48 @@ impl DomainFieldArg for Input {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Id {
+pub struct MapInputArg {
+    pub operator_addr: SerdeOperatorAddr,
+    /// If this string is defined, there will be a single argument with this name.
+    pub scalar_input_name: Option<String>,
+}
+
+impl FieldArg for MapInputArg {
+    fn name(&self) -> &str {
+        match &self.scalar_input_name {
+            Some(name) => name,
+            None => "input",
+        }
+    }
+}
+
+impl DomainFieldArg for MapInputArg {
+    fn typing_purpose(&self) -> TypingPurpose {
+        TypingPurpose::Input
+    }
+
+    fn operator_addr(&self) -> SerdeOperatorAddr {
+        self.operator_addr
+    }
+
+    fn kind(&self) -> ArgKind {
+        ArgKind::Operator(self.operator_addr)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct IdArg {
     pub operator_addr: SerdeOperatorAddr,
     pub unit_type_ref: UnitTypeRef,
 }
 
-impl FieldArg for Id {
+impl FieldArg for IdArg {
     fn name(&self) -> &str {
         "id"
     }
 }
 
-impl DomainFieldArg for Id {
+impl DomainFieldArg for IdArg {
     fn operator_addr(&self) -> SerdeOperatorAddr {
         self.operator_addr
     }
@@ -80,18 +111,18 @@ impl DomainFieldArg for Id {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct First;
+pub struct FirstArg;
 
-impl FieldArg for First {
+impl FieldArg for FirstArg {
     fn name(&self) -> &str {
         "first"
     }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct After;
+pub struct AfterArg;
 
-impl FieldArg for After {
+impl FieldArg for AfterArg {
     fn name(&self) -> &str {
         "after"
     }
