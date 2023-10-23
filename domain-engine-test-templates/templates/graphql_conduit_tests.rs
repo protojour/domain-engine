@@ -23,7 +23,7 @@ fn conduit_db_only() -> TestPackages {
 async fn test_graphql_conduit_db() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
-    let gql_context: ServiceCtx = DomainEngine::test_builder(test.ontology.clone())
+    let ctx: ServiceCtx = DomainEngine::test_builder(test.ontology.clone())
         .build::<crate::TestDataStoreFactory>()
         .await
         .into();
@@ -40,7 +40,7 @@ async fn test_graphql_conduit_db() {
                 username
             }
         }"#
-        .exec(DbgTag("mutation"), &schema, &gql_context, [])
+        .exec([], &schema, &ctx, DbgTag("mutation"))
         .await,
         expected = Ok(graphql_value!({
             "createUser": {
@@ -62,7 +62,7 @@ async fn test_graphql_conduit_db() {
                 }
             }
         }"
-        .exec(DbgTag("list"), &schema, &gql_context, [])
+        .exec([], &schema, &ctx, DbgTag("list"))
         .await,
         expected = Ok(graphql_value!({
             "UserList": {
@@ -85,7 +85,7 @@ async fn test_graphql_conduit_db() {
 async fn test_graphql_conduit_db_create_with_foreign_reference() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
-    let gql_context: ServiceCtx = DomainEngine::test_builder(test.ontology.clone())
+    let ctx: ServiceCtx = DomainEngine::test_builder(test.ontology.clone())
         .build::<crate::TestDataStoreFactory>()
         .await
         .into();
@@ -101,7 +101,7 @@ async fn test_graphql_conduit_db_create_with_foreign_reference() {
             user_id
         }
     }"#
-    .exec(DbgTag("create_u1"), &schema, &gql_context, [])
+    .exec([], &schema, &ctx, DbgTag("create_u1"))
     .await
     .unwrap();
 
@@ -135,10 +135,10 @@ async fn test_graphql_conduit_db_create_with_foreign_reference() {
             }
         }"#
         .exec(
-            DbgTag("new_article"),
+            [("authorId".to_owned(), InputValue::Scalar(user_id))],
             &schema,
-            &gql_context,
-            [("authorId".to_owned(), InputValue::Scalar(user_id))]
+            &ctx,
+            DbgTag("new_article")
         )
         .await,
         expected = Ok(graphql_value!({
@@ -156,7 +156,7 @@ async fn test_graphql_conduit_db_create_with_foreign_reference() {
 async fn test_graphql_conduit_db_query_article_with_tags() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
-    let gql_context: ServiceCtx = DomainEngine::test_builder(test.ontology.clone())
+    let ctx: ServiceCtx = DomainEngine::test_builder(test.ontology.clone())
         .build::<crate::TestDataStoreFactory>()
         .await
         .into();
@@ -179,7 +179,7 @@ async fn test_graphql_conduit_db_query_article_with_tags() {
             slug
         }
     }"#
-    .exec(DbgTag("mut"), &schema, &gql_context, [])
+    .exec([], &schema, &ctx, DbgTag("mut"))
     .await
     .unwrap();
 
@@ -199,7 +199,7 @@ async fn test_graphql_conduit_db_query_article_with_tags() {
                 }
             }
         }"#
-        .exec(DbgTag("list"), &schema, &gql_context, [])
+        .exec([], &schema, &ctx, DbgTag("list"))
         .await,
         expected = Ok(graphql_value!({
             "ArticleList": {
@@ -242,7 +242,7 @@ impl BlogPostConduit {
         }
     }
 
-    fn gql_context(&self) -> ServiceCtx {
+    fn ctx(&self) -> ServiceCtx {
         ServiceCtx {
             domain_engine: self.domain_engine.clone(),
         }
@@ -269,10 +269,10 @@ impl BlogPostConduit {
                 }
             }"#
             .exec(
-                DbgTag("create_db_article"),
+                [],
                 &self.db_schema,
-                &self.gql_context(),
-                []
+                &self.ctx(),
+                DbgTag("create_db_article")
             )
             .await,
             expected = Ok(graphql_value!({
@@ -302,10 +302,10 @@ impl BlogPostConduit {
                 }
             }"#
             .exec(
-                DbgTag("create_db_article_with_tag"),
+                [],
                 &self.db_schema,
-                &self.gql_context(),
-                []
+                &self.ctx(),
+                DbgTag("create_db_article_with_tag"),
             )
             .await,
             expected = Ok(graphql_value!({
@@ -317,8 +317,8 @@ impl BlogPostConduit {
 
 #[test(tokio::test)]
 async fn test_graphql_blog_post_conduit_implicit_join() {
-    let ctx = BlogPostConduit::new().await;
-    ctx.create_db_article().await;
+    let test = BlogPostConduit::new().await;
+    test.create_db_article().await;
 
     expect_eq!(
         actual = "{
@@ -331,7 +331,7 @@ async fn test_graphql_blog_post_conduit_implicit_join() {
                 }
             }
         }"
-        .exec(DbgTag("list"), &ctx.blog_schema, &ctx.gql_context(), [])
+        .exec([], &test.blog_schema, &test.ctx(), DbgTag("list"))
         .await,
         expected = Ok(graphql_value!({
             "BlogPostList": {
@@ -350,8 +350,8 @@ async fn test_graphql_blog_post_conduit_implicit_join() {
 
 #[test(tokio::test)]
 async fn test_graphql_blog_post_conduit_implicit_join_named_query() {
-    let ctx = BlogPostConduit::new().await;
-    ctx.create_db_article().await;
+    let test = BlogPostConduit::new().await;
+    test.create_db_article().await;
 
     expect_eq!(
         actual = r#"{
@@ -360,7 +360,7 @@ async fn test_graphql_blog_post_conduit_implicit_join_named_query() {
                 written_by
             }
         }"#
-        .exec(DbgTag("teh_user"), &ctx.blog_schema, &ctx.gql_context(), [])
+        .exec([], &test.blog_schema, &test.ctx(), DbgTag("teh_user"))
         .await,
         expected = Ok(graphql_value!({
             "posts": [
@@ -379,12 +379,7 @@ async fn test_graphql_blog_post_conduit_implicit_join_named_query() {
                 written_by
             }
         }"#
-        .exec(
-            DbgTag("someone_else"),
-            &ctx.blog_schema,
-            &ctx.gql_context(),
-            []
-        )
+        .exec([], &test.blog_schema, &test.ctx(), DbgTag("someone_else"))
         .await,
         expected = Ok(graphql_value!({ "posts": [] })),
     );
@@ -392,8 +387,8 @@ async fn test_graphql_blog_post_conduit_implicit_join_named_query() {
 
 #[test(tokio::test)]
 async fn test_graphql_blog_post_conduit_tags() {
-    let ctx = BlogPostConduit::new().await;
-    ctx.create_db_article_with_tag().await;
+    let test = BlogPostConduit::new().await;
+    test.create_db_article_with_tag().await;
 
     expect_eq!(
         actual = "{
@@ -407,7 +402,7 @@ async fn test_graphql_blog_post_conduit_tags() {
                 }
             }
         }"
-        .exec(DbgTag("list"), &ctx.blog_schema, &ctx.gql_context(), [])
+        .exec([], &test.blog_schema, &test.ctx(), DbgTag("list"))
         .await,
         expected = Ok(graphql_value!({
             "BlogPostList": {
@@ -427,8 +422,8 @@ async fn test_graphql_blog_post_conduit_tags() {
 
 #[test(tokio::test)]
 async fn test_graphql_blog_post_conduit_no_join_real() {
-    let ctx = BlogPostConduit::new().await;
-    ctx.create_db_article().await;
+    let test = BlogPostConduit::new().await;
+    test.create_db_article().await;
 
     expect_eq!(
         actual = "{
@@ -440,7 +435,7 @@ async fn test_graphql_blog_post_conduit_no_join_real() {
                 }
             }
         }"
-        .exec(DbgTag("list"), &ctx.blog_schema, &ctx.gql_context(), [])
+        .exec([], &test.blog_schema, &test.ctx(), DbgTag("list"))
         .await,
         expected = Ok(graphql_value!({
             "BlogPostList": {

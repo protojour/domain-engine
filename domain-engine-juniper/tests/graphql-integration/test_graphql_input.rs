@@ -30,7 +30,7 @@ async fn test_graphql_input_deserialization_error() {
                 prop
             }
         }"#
-        .exec(DbgTag("mutation"), &schema, &ctx, [])
+        .exec([], &schema, &ctx, DbgTag("mutation"))
         .await,
         r#"Execution: invalid type: string "invalid", expected "const" in input at line 4 column 26 (field at line 2 column 12)"#
     );
@@ -67,10 +67,10 @@ async fn test_graphql_input_constructor_sequence_as_json_scalar() {
             }
         }"#
         .exec(
-            DbgTag("mutation"),
+            [],
             &schema,
             &gql_ctx_mock_data_store(&test, ROOT, ()).await,
-            []
+            DbgTag("mutation"),
         )
         .await,
         expected = Ok(graphql_value!({

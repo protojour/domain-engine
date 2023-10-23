@@ -86,10 +86,10 @@ async fn test_graphql_int_scalars() {
             }
         }"
         .exec(
-            DbgTag("list"),
+            [],
             &schema,
             &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
-            []
+            DbgTag("list"),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -112,7 +112,7 @@ async fn test_graphql_int_scalars() {
             }
         }"
         .exec(
-            DbgTag("mutation"),
+            [],
             &schema,
             &gql_ctx_mock_data_store(
                 &test,
@@ -122,7 +122,7 @@ async fn test_graphql_int_scalars() {
                     .returns(Ok(entity.into())),
             )
             .await,
-            []
+            DbgTag("mutation"),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -154,10 +154,10 @@ async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
             }
         }"
         .exec(
-            DbgTag("list"),
+            [],
             &schema,
             &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
-            []
+            DbgTag("list"),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -222,10 +222,10 @@ async fn test_inner_struct() {
             }
         }"
         .exec(
-            DbgTag("list"),
+            [],
             &schema,
             &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
-            []
+            DbgTag("list"),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -250,7 +250,7 @@ async fn test_inner_struct() {
             }
         }"#
         .exec(
-            DbgTag("mutation"),
+            [],
             &schema,
             &gql_ctx_mock_data_store(
                 &test,
@@ -260,7 +260,7 @@ async fn test_inner_struct() {
                     .returns(Ok(entity.into()))
             )
             .await,
-            []
+            DbgTag("list"),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -301,10 +301,10 @@ async fn test_docs_introspection() {
             }
         }"#
         .exec(
-            DbgTag("inspect"),
+            [],
             &schema,
             &gql_ctx_mock_data_store(&test, ROOT, ()).await,
-            []
+            DbgTag("inspect"),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -368,7 +368,7 @@ async fn test_graphql_artist_and_instrument_connections() {
             }
         }"
         .exec(
-            DbgTag("artistList"),
+            [],
             &schema,
             &gql_ctx_mock_data_store(
                 &test,
@@ -378,7 +378,7 @@ async fn test_graphql_artist_and_instrument_connections() {
                     .returns(Ok(vec![ziggy.clone()]))
             )
             .await,
-            []
+            DbgTag("artistList"),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -423,10 +423,10 @@ async fn test_graphql_artist_and_instrument_connections() {
             }
         }"
         .exec(
-            DbgTag("instrumentList"),
+            [],
             &schema,
             &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
-            []
+            DbgTag("instrumentList"),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -462,7 +462,7 @@ async fn test_graphql_artist_and_instrument_connections() {
             }
         "#
         .exec(
-            DbgTag("createartist"),
+            [],
             &schema,
             &gql_ctx_mock_data_store(
                 &test,
@@ -472,7 +472,7 @@ async fn test_graphql_artist_and_instrument_connections() {
                     .returns(Ok(ziggy.value))
             )
             .await,
-            []
+            DbgTag("createartist"),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -530,7 +530,7 @@ async fn test_graphql_guitar_synth_union_selection() {
             }
         }"
         .exec(
-            DbgTag("artistList"),
+            [],
             &schema,
             &gql_ctx_mock_data_store(
                 &test,
@@ -540,7 +540,7 @@ async fn test_graphql_guitar_synth_union_selection() {
                     .returns(Ok(vec![artist_entity]))
             )
             .await,
-            []
+            DbgTag("artistList"),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -642,7 +642,7 @@ async fn test_graphql_guitar_synth_union_input_exec() {
             }
         "#
         .exec(
-            DbgTag("createArtist"),
+            [],
             &schema,
             &gql_ctx_mock_data_store(
                 &test,
@@ -652,7 +652,7 @@ async fn test_graphql_guitar_synth_union_input_exec() {
                     .returns(Ok(ziggy))
             )
             .await,
-            []
+            DbgTag("createArtist"),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -693,10 +693,10 @@ async fn test_graphql_guitar_synth_union_input_error_span() {
             }
         "#
         .exec(
-            DbgTag("createartist"),
+            [],
             &schema,
             &gql_ctx_mock_data_store(&test, ROOT, ()).await,
-            []
+            DbgTag("createartist"),
         )
         .await,
         expected = Err(TestError::Execution(vec![expected_error])),
@@ -732,10 +732,10 @@ async fn test_graphql_municipalities() {
             }
         }"
         .exec(
-            DbgTag("list"),
+            [],
             &schema,
             &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
-            []
+            DbgTag("list"),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -770,10 +770,10 @@ async fn test_graphql_municipalities_named_query() {
         }
     }"#
     .exec(
-        DbgTag("OSL"),
+        [],
         &schema,
         &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
-        [],
+        DbgTag("OSL"),
     )
     .await
     .unwrap_err();

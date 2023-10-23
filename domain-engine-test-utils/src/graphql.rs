@@ -101,10 +101,10 @@ pub async fn gql_ctx_mock_data_store(
 pub trait Exec {
     async fn exec(
         self,
-        tag: DbgTag,
+        variables: impl Into<juniper::Variables<GqlScalar>> + Send,
         schema: &Schema,
         context: &ServiceCtx,
-        variables: impl Into<juniper::Variables<GqlScalar>> + Send,
+        tag: DbgTag,
     ) -> Result<juniper::Value<GqlScalar>, TestError>;
 }
 
@@ -114,10 +114,10 @@ impl Exec for &'static str {
     #[allow(unused)]
     async fn exec(
         self,
-        tag: DbgTag,
+        variables: impl Into<juniper::Variables<GqlScalar>> + Send,
         schema: &Schema,
         context: &ServiceCtx,
-        variables: impl Into<juniper::Variables<GqlScalar>> + Send,
+        tag: DbgTag,
     ) -> Result<juniper::Value<GqlScalar>, TestError> {
         let variables = variables.into();
         match juniper::execute(self, None, schema, &variables, context).await {
