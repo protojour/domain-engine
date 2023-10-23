@@ -8,14 +8,14 @@ use ontol_runtime::{
     smart_format,
     value::{Attribute, Data, PropertyId, Value, ValueDebug},
     value_generator::ValueGenerator,
-    Role,
+    DefId, Role,
 };
 use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
     entity_id_utils::{find_inherent_entity_id, try_generate_entity_id, GeneratedId},
-    in_memory_store::in_memory_core::Edge,
+    in_memory_store::in_memory_core::{Edge, EntityKey},
     DomainEngine, DomainError, DomainResult,
 };
 
@@ -120,6 +120,7 @@ impl InMemoryStore {
                         match data_relationship.cardinality.1 {
                             ValueCardinality::One => {
                                 self.insert_entity_relationship(
+                                    type_info.def_id,
                                     &entity_key,
                                     property_id,
                                     attribute,
@@ -135,6 +136,7 @@ impl InMemoryStore {
 
                                 for attribute in attributes {
                                     self.insert_entity_relationship(
+                                        type_info.def_id,
                                         &entity_key,
                                         property_id,
                                         attribute,
@@ -157,6 +159,7 @@ impl InMemoryStore {
 
     fn insert_entity_relationship(
         &mut self,
+        entity_def_id: DefId,
         entity_key: &DynamicKey,
         property_id: PropertyId,
         attribute: Attribute,
@@ -170,8 +173,14 @@ impl InMemoryStore {
         let rel_params = attribute.rel_params;
 
         let foreign_key = if value.type_def_id == data_relationship.target {
+            let def_id = value.type_def_id;
             let foreign_id = self.write_new_entity_inner(value, engine)?;
-            Self::extract_dynamic_key(&foreign_id.data)?
+            let dynamic_key = Self::extract_dynamic_key(&foreign_id.data)?;
+
+            EntityKey {
+                type_def_id: def_id,
+                dynamic_key,
+            }
         } else {
             // This is for creating a relationship to an existing entity,
             // using only a primary key.
@@ -214,7 +223,10 @@ impl InMemoryStore {
                 return Err(DomainError::UnresolvedForeignKey(repr));
             }
 
-            foreign_key
+            EntityKey {
+                type_def_id: type_info.def_id,
+                dynamic_key: foreign_key,
+            }
         };
 
         let edge_collection = self
@@ -225,7 +237,10 @@ impl InMemoryStore {
         match property_id.role {
             Role::Subject => {
                 edge_collection.edges.push(Edge {
-                    from: entity_key.clone(),
+                    from: EntityKey {
+                        type_def_id: entity_def_id,
+                        dynamic_key: entity_key.clone(),
+                    },
                     to: foreign_key,
                     params: rel_params,
                 });
@@ -233,7 +248,10 @@ impl InMemoryStore {
             Role::Object => {
                 edge_collection.edges.push(Edge {
                     from: foreign_key,
-                    to: entity_key.clone(),
+                    to: EntityKey {
+                        type_def_id: entity_def_id,
+                        dynamic_key: entity_key.clone(),
+                    },
                     params: rel_params,
                 });
             }

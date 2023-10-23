@@ -14,7 +14,7 @@ use crate::{
     in_memory_store::in_memory_filter::FilterVal, DomainEngine, DomainError, DomainResult,
 };
 
-use super::in_memory_core::{DynamicKey, InMemoryStore};
+use super::in_memory_core::{DynamicKey, EntityKey, InMemoryStore};
 
 impl InMemoryStore {
     pub fn query_entities(
@@ -57,8 +57,8 @@ impl InMemoryStore {
                 self.eval_filter_plan(
                     &FilterVal::Struct {
                         type_def_id: type_info.def_id,
-                        key: Some(key),
-                        map: props,
+                        dynamic_key: Some(key),
+                        prop_tree: props,
                     },
                     &filter_plan,
                 )
@@ -134,7 +134,7 @@ impl InMemoryStore {
             Role::Subject => edge_collection
                 .edges
                 .iter()
-                .filter(|edge| &edge.from == parent_key)
+                .filter(|edge| &edge.from.dynamic_key == parent_key)
                 .map(|edge| -> DomainResult<Attribute> {
                     let entity = self.sub_query_entity(&edge.to, select, engine)?;
                     Ok(Attribute {
@@ -146,7 +146,7 @@ impl InMemoryStore {
             Role::Object => edge_collection
                 .edges
                 .iter()
-                .filter(|edge| &edge.to == parent_key)
+                .filter(|edge| &edge.to.dynamic_key == parent_key)
                 .map(|edge| -> DomainResult<Attribute> {
                     let entity = self.sub_query_entity(&edge.from, select, engine)?;
                     Ok(Attribute {
@@ -160,7 +160,7 @@ impl InMemoryStore {
 
     fn sub_query_entity(
         &self,
-        entity_key: &DynamicKey,
+        entity_key: &EntityKey,
         select: &Select,
         engine: &DomainEngine,
     ) -> DomainResult<Value> {
@@ -175,22 +175,18 @@ impl InMemoryStore {
             }
         }
 
-        // Find the def_id of the dynamic key. This is a little inefficient.
-        let (def_id, properties) = self
+        let properties = self
             .collections
-            .iter()
-            .find_map(|(def_id, collection)| {
-                collection
-                    .get(entity_key)
-                    .map(|properties| (*def_id, properties.clone()))
-            })
+            .get(&entity_key.type_def_id)
+            .ok_or(DomainError::InherentIdNotFound)?
+            .get(&entity_key.dynamic_key)
             .ok_or(DomainError::InherentIdNotFound)?;
 
-        let type_info = engine.ontology().get_type_info(def_id);
+        let type_info = engine.ontology().get_type_info(entity_key.type_def_id);
         let entity_info = type_info
             .entity_info
             .as_ref()
-            .ok_or(DomainError::NotAnEntity(def_id))?;
+            .ok_or(DomainError::NotAnEntity(entity_key.type_def_id))?;
 
         match select {
             Select::Leaf => {
@@ -216,10 +212,10 @@ impl InMemoryStore {
 
                 self.apply_struct_select(
                     type_info,
-                    entity_key,
-                    properties,
+                    &entity_key.dynamic_key,
+                    properties.clone(),
                     &StructSelect {
-                        def_id,
+                        def_id: entity_key.type_def_id,
                         properties: select_properties,
                     },
                     engine,
@@ -228,7 +224,7 @@ impl InMemoryStore {
             Select::StructUnion(_, _) => todo!(),
             Select::EntityId => todo!(),
             Select::Entity(entity_select) => {
-                let entity_key = entity_key.clone();
+                let entity_key = entity_key.dynamic_key.clone();
                 let entities = self.query_entities(entity_select, engine)?;
                 for entity in entities {
                     let id = find_inherent_entity_id(engine.ontology(), &entity)?;

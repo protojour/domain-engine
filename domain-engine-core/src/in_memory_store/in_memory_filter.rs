@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use bit_set::BitSet;
 use fnv::FnvHashMap;
@@ -10,25 +10,36 @@ use ontol_runtime::{
 
 use crate::filter::plan::{PlanEntry, Scalar};
 
-use super::in_memory_core::{DynamicKey, InMemoryStore};
+use super::in_memory_core::{DynamicKey, EntityKey, InMemoryStore};
 
 pub(super) enum FilterVal<'d> {
     Struct {
         type_def_id: DefId,
-        key: Option<&'d DynamicKey>,
-        map: &'d BTreeMap<PropertyId, Attribute>,
+        dynamic_key: Option<&'d DynamicKey>,
+        prop_tree: &'d BTreeMap<PropertyId, Attribute>,
     },
     Sequence(&'d [Attribute]),
     Scalar(&'d Value),
 }
 
 impl<'d> FilterVal<'d> {
+    fn from_entity(
+        entity_key: &'d EntityKey,
+        prop_tree: &'d BTreeMap<PropertyId, Attribute>,
+    ) -> Self {
+        Self::Struct {
+            type_def_id: entity_key.type_def_id,
+            dynamic_key: Some(&entity_key.dynamic_key),
+            prop_tree,
+        }
+    }
+
     fn from_value(value: &'d Value) -> Self {
         match &value.data {
             Data::Struct(map) => Self::Struct {
                 type_def_id: value.type_def_id,
-                key: None,
-                map,
+                dynamic_key: None,
+                prop_tree: map,
             },
             Data::Sequence(seq) => Self::Sequence(seq),
             _ => Self::Scalar(value),
@@ -65,7 +76,7 @@ struct JoinTable {
 #[derive(Default)]
 struct JoinTableEntry {
     in_subplans: BitSet,
-    keys: BTreeMap<(DefId, DynamicKey), usize>,
+    keys: HashMap<EntityKey, usize>,
 }
 
 impl InMemoryStore {
@@ -114,22 +125,19 @@ impl InMemoryStore {
             }
             (PlanEntry::JoinRoot(var, sub_entries), _) => {
                 let join_table_entry = join_table.joins.remove(var).ok_or(Disproven)?;
+
                 let observed_count = join_table_entry.in_subplans.iter().count();
 
                 let mut proof = Proof::Proven;
 
-                for ((type_def_id, dynamic_key), count) in join_table_entry.keys {
+                for (typed_key, count) in join_table_entry.keys {
                     if count < observed_count {
                         return Err(Disproven);
                     }
 
                     let filter_val = self
-                        .look_up_entity(type_def_id, &dynamic_key)
-                        .map(|props| FilterVal::Struct {
-                            type_def_id,
-                            key: Some(&dynamic_key),
-                            map: props,
-                        })
+                        .look_up_entity(typed_key.type_def_id, &typed_key.dynamic_key)
+                        .map(|prop_tree| FilterVal::from_entity(&typed_key, prop_tree))
                         .ok_or(Disproven)?;
 
                     for entry in sub_entries {
@@ -139,11 +147,11 @@ impl InMemoryStore {
 
                 Ok(proof)
             }
-            (PlanEntry::Attr(prop_id, entries), FilterVal::Struct { map, .. }) => {
+            (PlanEntry::Attr(prop_id, entries), FilterVal::Struct { prop_tree: map, .. }) => {
                 let attr = map.get(prop_id).ok_or(Disproven)?;
                 self.eval_attr_entries(attr, entries, join_table)
             }
-            (PlanEntry::AllAttrs(prop_id, entries), FilterVal::Struct { map, .. }) => {
+            (PlanEntry::AllAttrs(prop_id, entries), FilterVal::Struct { prop_tree: map, .. }) => {
                 let attr = map.get(prop_id).ok_or(Disproven)?;
                 let Data::Sequence(seq) = &attr.value.data else {
                     return Err(Disproven);
@@ -157,22 +165,28 @@ impl InMemoryStore {
 
                 Ok(proof)
             }
-            (PlanEntry::Edge(prop_id, edge_attr), FilterVal::Struct { key: Some(key), .. }) => {
+            (
+                PlanEntry::Edge(prop_id, edge_attr),
+                FilterVal::Struct {
+                    dynamic_key: Some(key),
+                    ..
+                },
+            ) => {
                 let edge_collection = self
                     .edge_collections
                     .get(&prop_id.relationship_id)
                     .ok_or(Disproven)?;
 
-                let (key, rel_params) = match prop_id.role {
+                let (target_key, rel_params) = match prop_id.role {
                     Role::Subject => edge_collection.edges.iter().find_map(|edge| {
-                        if edge.from == **key {
+                        if edge.from.dynamic_key == **key {
                             Some((&edge.to, FilterVal::from_value(&edge.params)))
                         } else {
                             None
                         }
                     }),
                     Role::Object => edge_collection.edges.iter().find_map(|edge| {
-                        if edge.to == **key {
+                        if edge.to.dynamic_key == **key {
                             Some((&edge.from, FilterVal::from_value(&edge.params)))
                         } else {
                             None
@@ -182,12 +196,8 @@ impl InMemoryStore {
                 .ok_or(Disproven)?;
 
                 let entity = self
-                    .look_up_entity_unknown_def_id(key)
-                    .map(|(type_def_id, props)| FilterVal::Struct {
-                        type_def_id,
-                        key: Some(key),
-                        map: props,
-                    })
+                    .look_up_entity(target_key.type_def_id, &target_key.dynamic_key)
+                    .map(|prop_tree| FilterVal::from_entity(&target_key, prop_tree))
                     .ok_or(Disproven)?;
 
                 let mut proof = Proof::Proven;
@@ -220,7 +230,7 @@ impl InMemoryStore {
                 PlanEntry::Join(var),
                 FilterVal::Struct {
                     type_def_id,
-                    key: Some(key),
+                    dynamic_key: Some(dynamic_key),
                     ..
                 },
             ) => {
@@ -230,7 +240,13 @@ impl InMemoryStore {
                 let join = join_table.joins.entry(*var).or_default();
                 join.in_subplans.insert(join_table.current_subplan);
 
-                let observed_count = join.keys.entry((*type_def_id, (*key).clone())).or_default();
+                let observed_count = join
+                    .keys
+                    .entry(EntityKey {
+                        type_def_id: *type_def_id,
+                        dynamic_key: (*dynamic_key).clone(),
+                    })
+                    .or_default();
                 (*observed_count) += 1;
 
                 Ok(Proof::Maybe)

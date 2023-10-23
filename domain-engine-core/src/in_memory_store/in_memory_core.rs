@@ -14,7 +14,6 @@ use crate::{DomainError, DomainResult};
 #[derive(Debug)]
 pub(super) struct InMemoryStore {
     pub collections: FnvHashMap<DefId, EntityTable<DynamicKey>>,
-    #[allow(unused)]
     pub edge_collections: FnvHashMap<RelationshipId, EdgeCollection>,
     pub int_id_counter: i64,
 }
@@ -34,11 +33,16 @@ pub(super) struct EdgeCollection {
 }
 
 #[derive(Debug)]
-#[allow(unused)]
 pub(super) struct Edge {
-    pub from: DynamicKey,
-    pub to: DynamicKey,
+    pub from: EntityKey,
+    pub to: EntityKey,
     pub params: Value,
+}
+
+#[derive(Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub(super) struct EntityKey {
+    pub type_def_id: DefId,
+    pub dynamic_key: DynamicKey,
 }
 
 impl InMemoryStore {
@@ -66,19 +70,5 @@ impl InMemoryStore {
     ) -> Option<&BTreeMap<PropertyId, Attribute>> {
         let collection = self.collections.get(&def_id)?;
         collection.get(dynamic_key)
-    }
-
-    // FIXME: This shouldn't be necessary..
-    // The edge collections should store the DefId together with DynamicKey
-    pub fn look_up_entity_unknown_def_id(
-        &self,
-        dynamic_key: &DynamicKey,
-    ) -> Option<(DefId, &BTreeMap<PropertyId, Attribute>)> {
-        self.collections.iter().find_map(|collection| {
-            collection
-                .1
-                .get(dynamic_key)
-                .map(|props| (*collection.0, props))
-        })
     }
 }
