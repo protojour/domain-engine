@@ -260,6 +260,7 @@ impl<'v> AttributeType<'v> {
                     executor,
                 )
             }
+            (FieldKind::Property(_), Data::Unit) => Ok(juniper::Value::Null),
             (FieldKind::Id(id_property_data), Data::Struct(attrs)) => Self::resolve_property(
                 attrs,
                 PropertyId::subject(id_property_data.relationship_id),

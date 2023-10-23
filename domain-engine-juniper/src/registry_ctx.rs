@@ -335,7 +335,33 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 self.registry
                     .arg::<Option<std::string::String>>(after.name(), &()),
             ]),
-            FieldKind::Map {
+            FieldKind::MapConnection {
+                input_operator_addr,
+                scalar_input_name,
+                ..
+            } => {
+                let mut arguments = vec![];
+                if let Some(scalar_input_name) = scalar_input_name {
+                    let argument = self.get_operator_argument(
+                        scalar_input_name,
+                        *input_operator_addr,
+                        None,
+                        SerdePropertyFlags::empty(),
+                        TypeModifier::Unit(Optionality::Mandatory),
+                    );
+                    arguments.push(argument);
+                } else {
+                    self.collect_operator_arguments(
+                        *input_operator_addr,
+                        &mut arguments,
+                        TypingPurpose::Input,
+                        ArgumentFilter::default(),
+                    )
+                    .unwrap();
+                }
+                Some(arguments)
+            }
+            FieldKind::MapFind {
                 input_operator_addr,
                 scalar_input_name,
                 ..

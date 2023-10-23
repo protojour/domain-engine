@@ -785,7 +785,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
             })
             .collect();
 
-        let field_kind = match self
+        let scalar_input_name = match self
             .serde_generator
             .seal_ctx
             .get_repr_kind(&input_key.def_id)
@@ -800,31 +800,40 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                         _ => return,
                     };
 
-                FieldKind::Map {
-                    key: [*input_key, *output_key],
-                    input_operator_addr,
-                    scalar_input_name: Some(scalar_input_name),
-                    queries,
-                }
+                Some(scalar_input_name)
             }
-            _ => FieldKind::Map {
-                key: [*input_key, *output_key],
-                input_operator_addr,
-                scalar_input_name: None,
-                queries,
-            },
+            _ => None,
         };
 
-        let field_data = FieldData {
-            kind: field_kind,
-            field_type: TypeRef {
-                modifier: if output_key.seq {
-                    TypeModifier::Array(Optionality::Mandatory, Optionality::Mandatory)
-                } else {
-                    TypeModifier::Unit(Optionality::Mandatory)
+        let field_data = if output_key.seq {
+            FieldData {
+                kind: FieldKind::MapConnection {
+                    key: [*input_key, *output_key],
+                    input_operator_addr,
+                    scalar_input_name,
+                    queries,
                 },
-                unit: self.get_def_type_ref(output_key.def_id, QLevel::Node),
-            },
+                field_type: TypeRef {
+                    modifier: TypeModifier::Unit(Optionality::Mandatory),
+                    unit: self.get_def_type_ref(
+                        output_key.def_id,
+                        QLevel::Connection { rel_params: None },
+                    ),
+                },
+            }
+        } else {
+            FieldData {
+                kind: FieldKind::MapFind {
+                    key: [*input_key, *output_key],
+                    input_operator_addr,
+                    scalar_input_name,
+                    queries,
+                },
+                field_type: TypeRef {
+                    modifier: TypeModifier::Unit(Optionality::Optional),
+                    unit: self.get_def_type_ref(output_key.def_id, QLevel::Node),
+                },
+            }
         };
 
         object_data_mut(self.schema.query, self.schema)

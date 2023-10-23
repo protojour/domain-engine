@@ -356,32 +356,44 @@ async fn test_graphql_blog_post_conduit_implicit_join_named_query() {
     expect_eq!(
         actual = r#"{
             posts(written_by: "teh_user") {
-                contents
-                written_by
+                edges {
+                    node {
+                        contents
+                        written_by
+                    }
+                }
             }
         }"#
         .exec([], &test.blog_schema, &test.ctx(), DbgTag("teh_user"))
         .await,
         expected = Ok(graphql_value!({
-            "posts": [
-                {
-                    "contents": "THE BODY",
-                    "written_by": "teh_user",
-                }
-            ]
+            "posts": {
+                "edges": [
+                    {
+                        "node": {
+                            "contents": "THE BODY",
+                            "written_by": "teh_user",
+                        }
+                    }
+                ]
+            }
         })),
     );
 
     expect_eq!(
         actual = r#"{
             posts(written_by: "someone_else") {
-                contents
-                written_by
+                edges {
+                    node {
+                        contents
+                        written_by
+                    }
+                }
             }
         }"#
         .exec([], &test.blog_schema, &test.ctx(), DbgTag("someone_else"))
         .await,
-        expected = Ok(graphql_value!({ "posts": [] })),
+        expected = Ok(graphql_value!({ "posts": { "edges": [] } })),
     );
 }
 

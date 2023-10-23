@@ -213,17 +213,27 @@ pub enum FieldKind {
     Id(IdPropertyData),
     Node,
     Edges,
-    Connection {
-        property_id: Option<PropertyId>,
-        first: argument::First,
-        after: argument::After,
-    },
-    Map {
+    /// A connection from a map statement
+    MapConnection {
         key: [MapKey; 2],
         input_operator_addr: SerdeOperatorAddr,
         /// If this string is defined, there will be a single argument with this name.
         scalar_input_name: Option<String>,
         queries: FnvHashMap<PropertyId, Var>,
+    },
+    /// A find query from a map statement (zero or one return)
+    MapFind {
+        key: [MapKey; 2],
+        input_operator_addr: SerdeOperatorAddr,
+        /// If this string is defined, there will be a single argument with this name.
+        scalar_input_name: Option<String>,
+        queries: FnvHashMap<PropertyId, Var>,
+    },
+    /// FIXME: Deprecated:
+    Connection {
+        property_id: Option<PropertyId>,
+        first: argument::First,
+        after: argument::After,
     },
     CreateMutation {
         input: argument::Input,

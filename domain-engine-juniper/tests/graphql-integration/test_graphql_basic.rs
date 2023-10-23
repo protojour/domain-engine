@@ -751,7 +751,7 @@ async fn test_graphql_municipalities_named_query() {
     let (test, [schema]) = TestPackages::with_sources([(ROOT, MUNICIPALITIES.1), GEOJSON, WGS])
         .compile_schemas([ROOT]);
 
-    let error = r#"{
+    let value = r#"{
         municipality(code: "OSL") {
             code
             geometry {
@@ -776,17 +776,13 @@ async fn test_graphql_municipalities_named_query() {
         DbgTag("OSL"),
     )
     .await
-    .unwrap_err();
+    .unwrap();
 
-    let TestError::Execution(exec_errors) = error else {
-        panic!();
-    };
-    expect_eq!(
-        actual = format!(
-            "{}",
-            exec_errors.into_iter().next().unwrap().error().message()
-        ),
-        expected = "Entity not found"
+    assert_eq!(
+        value,
+        graphql_value!({
+            "municipality": null
+        })
     );
 }
 

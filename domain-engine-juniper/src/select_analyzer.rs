@@ -58,7 +58,13 @@ impl<'a> SelectAnalyzer<'a> {
         field_data: &FieldData,
     ) -> Result<AnalyzedQuery, juniper::FieldError<GqlScalar>> {
         match &field_data.kind {
-            FieldKind::Map {
+            FieldKind::MapConnection {
+                key,
+                input_operator_addr,
+                scalar_input_name,
+                queries: map_queries,
+            }
+            | FieldKind::MapFind {
                 key,
                 input_operator_addr,
                 scalar_input_name,
@@ -154,7 +160,7 @@ impl<'a> SelectAnalyzer<'a> {
             &field_data.kind,
             self.schema_ctx.lookup_type_data(field_data.field_type.unit),
         ) {
-            (FieldKind::Map { .. }, Ok(type_data)) => {
+            (FieldKind::MapFind { .. }, Ok(type_data)) => {
                 match (field_data.field_type.modifier, type_data) {
                     (TypeModifier::Unit(optionality), type_data) => KeyedPropertySelection {
                         key: unit_property(),
@@ -175,41 +181,52 @@ impl<'a> SelectAnalyzer<'a> {
                             select => select,
                         },
                     },
-                    (
-                        TypeModifier::Array(..),
-                        TypeData {
-                            kind: TypeKind::Object(_),
-                            ..
-                        },
-                    ) => {
-                        let select = self.analyze_data(look_ahead, type_data);
-
-                        KeyedPropertySelection {
-                            key: unit_property(),
-                            cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Many),
-                            select: match select {
-                                Select::Struct(object) => Select::Entity(EntitySelect {
-                                    source: StructOrUnionSelect::Struct(object),
-                                    condition: Condition::default(),
-                                    limit: self.default_limit(),
-                                    cursor: None,
-                                }),
-                                Select::StructUnion(def_id, variants) => {
-                                    Select::Entity(EntitySelect {
-                                        source: StructOrUnionSelect::Union(def_id, variants),
-                                        condition: Condition::default(),
-                                        limit: self.default_limit(),
-                                        cursor: None,
-                                    })
-                                }
-                                Select::Entity(_) | Select::EntityId => {
-                                    panic!("Select in select")
-                                }
-                                Select::Leaf => Select::Leaf,
-                            },
-                        }
+                    (TypeModifier::Array(..), _) => {
+                        panic!("Should be a MapConnection");
                     }
-                    _ => todo!(),
+                }
+            }
+            (
+                FieldKind::MapConnection { .. },
+                Ok(TypeData {
+                    kind: TypeKind::Object(object_data),
+                    ..
+                }),
+            ) => {
+                // TODO: Pagination
+
+                let mut select = None;
+
+                for field_look_ahead in look_ahead.children() {
+                    let field_name = field_look_ahead.field_name();
+                    let field_data = object_data.fields.get(field_name).unwrap();
+
+                    if let FieldKind::Edges = &field_data.kind {
+                        select = Some(self.analyze_selection(field_look_ahead, field_data).select);
+                    }
+                }
+
+                KeyedPropertySelection {
+                    key: unit_property(),
+                    cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Many),
+                    select: match select {
+                        Some(Select::Struct(object)) => Select::Entity(EntitySelect {
+                            source: StructOrUnionSelect::Struct(object),
+                            condition: Condition::default(),
+                            limit: self.default_limit(),
+                            cursor: None,
+                        }),
+                        Some(Select::StructUnion(def_id, variants)) => {
+                            Select::Entity(EntitySelect {
+                                source: StructOrUnionSelect::Union(def_id, variants),
+                                condition: Condition::default(),
+                                limit: self.default_limit(),
+                                cursor: None,
+                            })
+                        }
+                        Some(Select::Entity(_) | Select::EntityId) => panic!("Select in select"),
+                        Some(Select::Leaf) | None => Select::Leaf,
+                    },
                 }
             }
             (
@@ -228,7 +245,7 @@ impl<'a> SelectAnalyzer<'a> {
                 let limit = args_wrapper
                     .deserialize::<u32>(first.name())
                     .unwrap()
-                    .unwrap_or(self.service_ctx.domain_engine.config().default_limit);
+                    .unwrap_or(self.default_limit());
                 let cursor = args_wrapper.deserialize::<String>(after.name()).unwrap();
 
                 let mut select = None;
