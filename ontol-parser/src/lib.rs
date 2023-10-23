@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 use ast::Statement;
 use chumsky::{prelude::*, Stream};
 

@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 use std::{fmt::Debug, ops::Index};
 
 use arena::{Arena, NodeRef};

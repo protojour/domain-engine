@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 use std::{fs::File, path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context};

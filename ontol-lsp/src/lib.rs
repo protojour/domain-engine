@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 use docs::get_core_completions;
 use ontol_parser::ast::{Statement, Visibility};
 use serde::{Deserialize, Serialize};

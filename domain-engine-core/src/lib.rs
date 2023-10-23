@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 pub mod data_store;
 pub mod domain_error;
 pub mod entity_id_utils;

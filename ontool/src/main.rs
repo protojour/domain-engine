@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 use ariadne::{ColorGenerator, Label, Report, ReportKind, Source};
 use clap::{Args, Parser, Subcommand};
 use ontol_compiler::{

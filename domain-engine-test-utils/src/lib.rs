@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 use std::fmt::Debug;
 
 use domain_engine_core::DomainEngine;

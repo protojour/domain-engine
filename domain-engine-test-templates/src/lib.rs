@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 use std::{env, fs, path::Path};
 
 pub fn include_data_store_tests() {
