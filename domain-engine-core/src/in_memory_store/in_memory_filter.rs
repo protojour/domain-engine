@@ -197,7 +197,7 @@ impl InMemoryStore {
 
                 let entity = self
                     .look_up_entity(target_key.type_def_id, &target_key.dynamic_key)
-                    .map(|prop_tree| FilterVal::from_entity(&target_key, prop_tree))
+                    .map(|prop_tree| FilterVal::from_entity(target_key, prop_tree))
                     .ok_or(Disproven)?;
 
                 let mut proof = Proof::Proven;
