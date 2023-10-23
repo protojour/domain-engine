@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use domain_engine_core::DomainEngine;
 use fnv::FnvHashMap;
 use ontol_runtime::{interface::serde::processor::ProcessorMode, value::Data, PackageId};
@@ -5,6 +7,14 @@ use serde::de::DeserializeSeed;
 
 pub mod graphql;
 pub mod parser_document_utils;
+
+pub struct DbgTag(pub &'static str);
+
+impl Debug for DbgTag {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 pub async fn exec_named_map_json(
     (package_id, name): (PackageId, &str),

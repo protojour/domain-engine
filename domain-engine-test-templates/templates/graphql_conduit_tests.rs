@@ -3,6 +3,7 @@ use std::sync::Arc;
 use domain_engine_core::DomainEngine;
 use domain_engine_juniper::{context::ServiceCtx, Schema};
 use domain_engine_test_utils::graphql::{Exec, TestCompileSchema};
+use domain_engine_test_utils::DbgTag;
 use juniper::{graphql_value, InputValue};
 use ontol_runtime::config::DataStoreConfig;
 use ontol_test_utils::{
@@ -39,7 +40,7 @@ async fn test_graphql_conduit_db() {
                 username
             }
         }"#
-        .exec(&schema, &gql_context, [])
+        .exec(DbgTag("mutation"), &schema, &gql_context, [])
         .await,
         expected = Ok(graphql_value!({
             "createUser": {
@@ -61,7 +62,7 @@ async fn test_graphql_conduit_db() {
                 }
             }
         }"
-        .exec(&schema, &gql_context, [])
+        .exec(DbgTag("list"), &schema, &gql_context, [])
         .await,
         expected = Ok(graphql_value!({
             "UserList": {
@@ -100,7 +101,7 @@ async fn test_graphql_conduit_db_create_with_foreign_reference() {
             user_id
         }
     }"#
-    .exec(&schema, &gql_context, [])
+    .exec(DbgTag("create_u1"), &schema, &gql_context, [])
     .await
     .unwrap();
 
@@ -134,6 +135,7 @@ async fn test_graphql_conduit_db_create_with_foreign_reference() {
             }
         }"#
         .exec(
+            DbgTag("new_article"),
             &schema,
             &gql_context,
             [("authorId".to_owned(), InputValue::Scalar(user_id))]
@@ -177,7 +179,7 @@ async fn test_graphql_conduit_db_query_article_with_tags() {
             slug
         }
     }"#
-    .exec(&schema, &gql_context, [])
+    .exec(DbgTag("mut"), &schema, &gql_context, [])
     .await
     .unwrap();
 
@@ -197,7 +199,7 @@ async fn test_graphql_conduit_db_query_article_with_tags() {
                 }
             }
         }"#
-        .exec(&schema, &gql_context, [])
+        .exec(DbgTag("list"), &schema, &gql_context, [])
         .await,
         expected = Ok(graphql_value!({
             "ArticleList": {
@@ -266,7 +268,12 @@ impl BlogPostConduit {
                     slug
                 }
             }"#
-            .exec(&self.db_schema, &self.gql_context(), [])
+            .exec(
+                DbgTag("create_db_article"),
+                &self.db_schema,
+                &self.gql_context(),
+                []
+            )
             .await,
             expected = Ok(graphql_value!({
                 "createArticle": { "slug": "the-slug" }
@@ -294,7 +301,12 @@ impl BlogPostConduit {
                     slug
                 }
             }"#
-            .exec(&self.db_schema, &self.gql_context(), [])
+            .exec(
+                DbgTag("create_db_article_with_tag"),
+                &self.db_schema,
+                &self.gql_context(),
+                []
+            )
             .await,
             expected = Ok(graphql_value!({
                 "createArticle": { "slug": "the-slug" }
@@ -319,7 +331,7 @@ async fn test_graphql_blog_post_conduit_implicit_join() {
                 }
             }
         }"
-        .exec(&ctx.blog_schema, &ctx.gql_context(), [])
+        .exec(DbgTag("list"), &ctx.blog_schema, &ctx.gql_context(), [])
         .await,
         expected = Ok(graphql_value!({
             "BlogPostList": {
@@ -348,7 +360,7 @@ async fn test_graphql_blog_post_conduit_implicit_join_named_query() {
                 written_by
             }
         }"#
-        .exec(&ctx.blog_schema, &ctx.gql_context(), [])
+        .exec(DbgTag("teh_user"), &ctx.blog_schema, &ctx.gql_context(), [])
         .await,
         expected = Ok(graphql_value!({
             "posts": [
@@ -367,7 +379,12 @@ async fn test_graphql_blog_post_conduit_implicit_join_named_query() {
                 written_by
             }
         }"#
-        .exec(&ctx.blog_schema, &ctx.gql_context(), [])
+        .exec(
+            DbgTag("someone_else"),
+            &ctx.blog_schema,
+            &ctx.gql_context(),
+            []
+        )
         .await,
         expected = Ok(graphql_value!({ "posts": [] })),
     );
@@ -390,7 +407,7 @@ async fn test_graphql_blog_post_conduit_tags() {
                 }
             }
         }"
-        .exec(&ctx.blog_schema, &ctx.gql_context(), [])
+        .exec(DbgTag("list"), &ctx.blog_schema, &ctx.gql_context(), [])
         .await,
         expected = Ok(graphql_value!({
             "BlogPostList": {
@@ -423,7 +440,7 @@ async fn test_graphql_blog_post_conduit_no_join_real() {
                 }
             }
         }"
-        .exec(&ctx.blog_schema, &ctx.gql_context(), [])
+        .exec(DbgTag("list"), &ctx.blog_schema, &ctx.gql_context(), [])
         .await,
         expected = Ok(graphql_value!({
             "BlogPostList": {

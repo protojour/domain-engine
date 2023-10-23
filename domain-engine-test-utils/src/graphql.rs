@@ -1,4 +1,7 @@
-use std::{fmt::Display, sync::Arc};
+use std::{
+    fmt::{Debug, Display},
+    sync::Arc,
+};
 
 use domain_engine_core::{
     data_store::{DataStoreAPIMock, DefaultDataStoreFactory},
@@ -9,6 +12,8 @@ use domain_engine_juniper::{
 };
 use ontol_test_utils::{OntolTest, SourceName, TestCompile};
 use unimock::*;
+
+use crate::DbgTag;
 
 pub trait TestCompileSchema {
     fn compile_schemas<const N: usize>(
@@ -96,6 +101,7 @@ pub async fn gql_ctx_mock_data_store(
 pub trait Exec {
     async fn exec(
         self,
+        tag: DbgTag,
         schema: &Schema,
         context: &ServiceCtx,
         variables: impl Into<juniper::Variables<GqlScalar>> + Send,
@@ -104,8 +110,11 @@ pub trait Exec {
 
 #[async_trait::async_trait]
 impl Exec for &'static str {
+    #[tracing::instrument(skip(self, schema, context, variables))]
+    #[allow(unused)]
     async fn exec(
         self,
+        tag: DbgTag,
         schema: &Schema,
         context: &ServiceCtx,
         variables: impl Into<juniper::Variables<GqlScalar>> + Send,

@@ -640,6 +640,7 @@ dependencies = [
  "ontol-test-utils",
  "serde",
  "serde_json",
+ "tracing",
  "unimock",
 ]
 

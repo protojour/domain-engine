@@ -20,6 +20,7 @@ use domain_engine_test_utils::{
     parser_document_utils::{
         find_input_object_type, find_object_field, find_object_type, FieldInfo,
     },
+    DbgTag,
 };
 
 const ROOT: SourceName = SourceName::root();
@@ -85,6 +86,7 @@ async fn test_graphql_int_scalars() {
             }
         }"
         .exec(
+            DbgTag("list"),
             &schema,
             &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
             []
@@ -110,13 +112,14 @@ async fn test_graphql_int_scalars() {
             }
         }"
         .exec(
+            DbgTag("mutation"),
             &schema,
             &gql_ctx_mock_data_store(
                 &test,
                 ROOT,
                 DataStoreAPIMock::store_new_entity
                     .next_call(matching!(_, _, _))
-                    .returns(Ok(entity.into()))
+                    .returns(Ok(entity.into())),
             )
             .await,
             []
@@ -151,6 +154,7 @@ async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
             }
         }"
         .exec(
+            DbgTag("list"),
             &schema,
             &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
             []
@@ -218,6 +222,7 @@ async fn test_inner_struct() {
             }
         }"
         .exec(
+            DbgTag("list"),
             &schema,
             &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
             []
@@ -245,6 +250,7 @@ async fn test_inner_struct() {
             }
         }"#
         .exec(
+            DbgTag("mutation"),
             &schema,
             &gql_ctx_mock_data_store(
                 &test,
@@ -294,7 +300,12 @@ async fn test_docs_introspection() {
                 }
             }
         }"#
-        .exec(&schema, &gql_ctx_mock_data_store(&test, ROOT, ()).await, [])
+        .exec(
+            DbgTag("inspect"),
+            &schema,
+            &gql_ctx_mock_data_store(&test, ROOT, ()).await,
+            []
+        )
         .await,
         expected = Ok(graphql_value!({
             "__type": {
@@ -357,6 +368,7 @@ async fn test_graphql_artist_and_instrument_connections() {
             }
         }"
         .exec(
+            DbgTag("artistList"),
             &schema,
             &gql_ctx_mock_data_store(
                 &test,
@@ -411,6 +423,7 @@ async fn test_graphql_artist_and_instrument_connections() {
             }
         }"
         .exec(
+            DbgTag("instrumentList"),
             &schema,
             &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
             []
@@ -449,6 +462,7 @@ async fn test_graphql_artist_and_instrument_connections() {
             }
         "#
         .exec(
+            DbgTag("createartist"),
             &schema,
             &gql_ctx_mock_data_store(
                 &test,
@@ -516,6 +530,7 @@ async fn test_graphql_guitar_synth_union_selection() {
             }
         }"
         .exec(
+            DbgTag("artistList"),
             &schema,
             &gql_ctx_mock_data_store(
                 &test,
@@ -627,6 +642,7 @@ async fn test_graphql_guitar_synth_union_input_exec() {
             }
         "#
         .exec(
+            DbgTag("createArtist"),
             &schema,
             &gql_ctx_mock_data_store(
                 &test,
@@ -676,7 +692,12 @@ async fn test_graphql_guitar_synth_union_input_error_span() {
                 }
             }
         "#
-        .exec(&schema, &gql_ctx_mock_data_store(&test, ROOT, ()).await, [])
+        .exec(
+            DbgTag("createartist"),
+            &schema,
+            &gql_ctx_mock_data_store(&test, ROOT, ()).await,
+            []
+        )
         .await,
         expected = Err(TestError::Execution(vec![expected_error])),
     );
@@ -711,6 +732,7 @@ async fn test_graphql_municipalities() {
             }
         }"
         .exec(
+            DbgTag("list"),
             &schema,
             &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
             []
@@ -748,6 +770,7 @@ async fn test_graphql_municipalities_named_query() {
         }
     }"#
     .exec(
+        DbgTag("OSL"),
         &schema,
         &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
         [],
