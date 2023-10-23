@@ -32,7 +32,7 @@ lsp-types = "0.94.0"
 regex = "1.9.1"
 substring = "1.4.5"
 tower-lsp = { version = "0.20.0" }
-futures-util = { version = "0.3.28", features = ["futures-io", "tokio-io", "io"] }
+futures-util = { version = "0.3.28", features = ["futures-io", "io"] }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 js-sys = { version = "0.3.64", optional = true }
 wasm-bindgen = { version = "0.2.87", optional = true }

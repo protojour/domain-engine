@@ -24,7 +24,7 @@ either.workspace = true
 bit-set.workspace = true
 ena = "0.14"
 bumpalo = "3"
-regex-syntax = "0.7"
+regex-syntax = "0.8"
 regex = "1"
 patricia_tree = "0.6"
 derive-debug-extras = { version = "0.2", features = ["auto-debug-single-tuple-inline"] }
