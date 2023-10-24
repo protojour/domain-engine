@@ -17,9 +17,10 @@ use tracing::trace;
 
 use crate::{
     context::{SchemaCtx, SchemaType},
-    gql_scalar::{GqlScalar, GqlScalarSerializer},
+    gql_scalar::GqlScalar,
     registry_ctx::RegistryCtx,
     templates::{resolve_schema_type_field, sequence_type::SequenceType},
+    value_serializer::JuniperValueSerializer,
     ServiceCtx,
 };
 
@@ -302,14 +303,10 @@ impl<'v> AttributeType<'v> {
             Ok(type_addr) => {
                 let type_info = schema_ctx.get_schema_type(type_addr, TypingPurpose::Selection);
                 match &schema_ctx.type_data(type_info.type_addr).kind {
-                    TypeKind::CustomScalar(scalar_data) => {
-                        let gql_scalar = schema_ctx
-                            .ontology
-                            .new_serde_processor(scalar_data.operator_addr, ProcessorMode::Read)
-                            .serialize_value(&attribute.value, None, GqlScalarSerializer)?;
-
-                        Ok(juniper::Value::Scalar(gql_scalar))
-                    }
+                    TypeKind::CustomScalar(scalar_data) => Ok(schema_ctx
+                        .ontology
+                        .new_serde_processor(scalar_data.operator_addr, ProcessorMode::Read)
+                        .serialize_value(&attribute.value, None, JuniperValueSerializer)?),
                     TypeKind::Object(_) | TypeKind::Union(_) => resolve_schema_type_field(
                         AttributeType { attr: attribute },
                         type_info,
@@ -332,25 +329,20 @@ impl<'v> AttributeType<'v> {
                     let graphql_values: Vec<juniper::Value<GqlScalar>> = attributes
                         .iter()
                         .map(|attr| -> juniper::ExecutionResult<GqlScalar> {
-                            let scalar = processor.serialize_value(
+                            Ok(processor.serialize_value(
                                 &attr.value,
                                 None,
-                                GqlScalarSerializer,
-                            )?;
-                            Ok(juniper::Value::Scalar(scalar))
+                                JuniperValueSerializer,
+                            )?)
                         })
                         .collect::<Result<_, _>>()?;
 
                     Ok(juniper::Value::List(graphql_values))
                 }
-                _ => {
-                    let scalar = schema_ctx
-                        .ontology
-                        .new_serde_processor(scalar_ref.operator_addr, ProcessorMode::Read)
-                        .serialize_value(&attribute.value, None, GqlScalarSerializer)?;
-
-                    Ok(juniper::Value::Scalar(scalar))
-                }
+                _ => Ok(schema_ctx
+                    .ontology
+                    .new_serde_processor(scalar_ref.operator_addr, ProcessorMode::Read)
+                    .serialize_value(&attribute.value, None, JuniperValueSerializer)?),
             },
         }
     }

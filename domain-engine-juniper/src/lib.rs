@@ -16,6 +16,7 @@ mod macros;
 mod registry_ctx;
 mod select_analyzer;
 mod templates;
+mod value_serializer;
 
 pub mod juniper {
     pub use ::juniper::*;
