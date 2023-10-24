@@ -1,5 +1,5 @@
 use domain_engine_core::DomainEngine;
-use domain_engine_test_utils::exec_named_map_json;
+use domain_engine_test_utils::{DomainEngineTestExt, TestFindQuery};
 use ontol_runtime::{config::DataStoreConfig, select::Select};
 use ontol_test_utils::{
     assert_error_msg,
@@ -27,13 +27,13 @@ fn artist_and_instrument() -> TestPackages {
 #[test(tokio::test)]
 async fn test_conduit_db_id_generation() {
     let test = conduit_db().compile();
-    let domain_engine = DomainEngine::test_builder(test.ontology.clone())
+    let engine = DomainEngine::test_builder(test.ontology.clone())
         .build::<crate::TestDataStoreFactory>()
         .await;
     let [user, article, comment, tag_entity] =
         test.bind(["User", "Article", "Comment", "TagEntity"]);
 
-    domain_engine
+    engine
         .store_new_entity(
             serde_create(&user)
                 .to_value(json!({
@@ -47,7 +47,7 @@ async fn test_conduit_db_id_generation() {
         .await
         .unwrap();
 
-    let explicit_user_id = domain_engine
+    let explicit_user_id = engine
         .store_new_entity(
             // Store with the Read processor which supports specifying ID upfront
             serde_read(&user)
@@ -68,7 +68,7 @@ async fn test_conduit_db_id_generation() {
         expected = "OctetSequence([103, 229, 80, 68, 16, 177, 66, 111, 146, 71, 187, 104, 14, 95, 224, 200])"
     );
 
-    let article_id: Uuid = domain_engine
+    let article_id: Uuid = engine
         .store_new_entity(
             serde_create(&article)
                 .to_value(json!({
@@ -87,7 +87,7 @@ async fn test_conduit_db_id_generation() {
         .unwrap()
         .cast_into();
 
-    domain_engine
+    engine
         .store_new_entity(
             serde_create(&comment)
                 .to_value(json!({
@@ -105,7 +105,7 @@ async fn test_conduit_db_id_generation() {
         .await
         .unwrap();
 
-    domain_engine
+    engine
         .store_new_entity(
             serde_create(&tag_entity)
                 .to_value(json!({ "tag": "foo" }))
@@ -119,12 +119,12 @@ async fn test_conduit_db_id_generation() {
 #[test(tokio::test)]
 async fn test_conduit_db_store_entity_tree() {
     let test = conduit_db().compile();
-    let domain_engine = DomainEngine::test_builder(test.ontology.clone())
+    let engine = DomainEngine::test_builder(test.ontology.clone())
         .build::<crate::TestDataStoreFactory>()
         .await;
     let [user_type, article_type, comment_type] = test.bind(["User", "Article", "Comment"]);
 
-    let pre_existing_user_id: Uuid = domain_engine
+    let pre_existing_user_id: Uuid = engine
         .store_new_entity(
             serde_create(&user_type)
                 .to_value(json!({
@@ -139,7 +139,7 @@ async fn test_conduit_db_store_entity_tree() {
         .unwrap()
         .cast_into();
 
-    let article_id: Uuid = domain_engine
+    let article_id: Uuid = engine
         .store_new_entity(
             serde_create(&article_type)
                 .to_value(json!({
@@ -174,7 +174,7 @@ async fn test_conduit_db_store_entity_tree() {
         .unwrap()
         .cast_into();
 
-    let users = domain_engine
+    let users = engine
         .query_entities(user_type.struct_select([]).into())
         .await
         .unwrap();
@@ -189,7 +189,7 @@ async fn test_conduit_db_store_entity_tree() {
 
     expect_eq!(
         actual = serde_read(&user_type).as_json(
-            &domain_engine
+            &engine
                 .query_entities(
                     user_type
                         .struct_select([("authored_articles", Select::Leaf)])
@@ -214,7 +214,7 @@ async fn test_conduit_db_store_entity_tree() {
 
     expect_eq!(
         actual = serde_read(&user_type).as_json(
-            &domain_engine
+            &engine
                 .query_entities(
                     user_type
                         .struct_select([(
@@ -268,13 +268,13 @@ async fn test_conduit_db_store_entity_tree() {
 #[test(tokio::test)]
 async fn test_conduit_db_unresolved_foreign_key() {
     let test = conduit_db().compile();
-    let domain_engine = DomainEngine::test_builder(test.ontology.clone())
+    let engine = DomainEngine::test_builder(test.ontology.clone())
         .build::<crate::TestDataStoreFactory>()
         .await;
     let [article] = test.bind(["Article"]);
 
     assert_error_msg!(
-        domain_engine
+        engine
             .store_new_entity(
                 serde_create(&article)
                     .to_value(json!({
@@ -297,7 +297,7 @@ async fn test_conduit_db_unresolved_foreign_key() {
 #[test(tokio::test)]
 async fn test_artist_and_instrument_fmt_id_generation() {
     let test = artist_and_instrument().compile();
-    let domain_engine = DomainEngine::test_builder(test.ontology.clone())
+    let engine = DomainEngine::test_builder(test.ontology.clone())
         .build::<crate::TestDataStoreFactory>()
         .await;
     let [artist] = test.bind(["artist"]);
@@ -311,7 +311,7 @@ async fn test_artist_and_instrument_fmt_id_generation() {
         &test.ontology,
     );
 
-    let generated_id = domain_engine
+    let generated_id = engine
         .store_new_entity(
             serde_create(&artist)
                 .to_value(json!({"name": "Igor Stravinskij" }))
@@ -324,7 +324,7 @@ async fn test_artist_and_instrument_fmt_id_generation() {
     let generated_id_json = serde_read(&artist_id).as_json(&generated_id);
     assert!(generated_id_json.as_str().unwrap().starts_with("artist/"));
 
-    let explicit_id = domain_engine
+    let explicit_id = engine
         .store_new_entity(
             serde_read(&artist)
                 .to_value(json!({
@@ -344,9 +344,9 @@ async fn test_artist_and_instrument_fmt_id_generation() {
 }
 
 #[test(tokio::test)]
-async fn test_artist_and_instrument_filter_condition() {
+async fn test_artist_and_instrument_pagination() {
     let test = artist_and_instrument().compile();
-    let domain_engine = DomainEngine::test_builder(test.ontology.clone())
+    let engine = DomainEngine::test_builder(test.ontology.clone())
         .build::<crate::TestDataStoreFactory>()
         .await;
     let [artist] = test.bind(["artist"]);
@@ -358,7 +358,60 @@ async fn test_artist_and_instrument_filter_condition() {
     ];
 
     for json in &entities {
-        domain_engine
+        engine
+            .store_new_entity(
+                serde_create(&artist).to_value(json.clone()).unwrap(),
+                Select::EntityId,
+            )
+            .await
+            .unwrap();
+    }
+
+    fn extract_names(value: serde_json::Value) -> serde_json::Value {
+        json_map(value, |value| json_prop(value, "name"))
+    }
+
+    let by_name = (artist.def_id().package_id(), "artists");
+
+    expect_eq!(
+        actual = extract_names(
+            engine
+                .exec_named_map_json(by_name, json!({}), TestFindQuery::default().limit(1))
+                .await
+        ),
+        expected = json!(["Larry Young"])
+    );
+
+    expect_eq!(
+        actual = extract_names(
+            engine
+                .exec_named_map_json(
+                    by_name,
+                    json!({}),
+                    TestFindQuery::default().limit(1).offset(1)
+                )
+                .await
+        ),
+        expected = json!(["Woody Shaw"])
+    );
+}
+
+#[test(tokio::test)]
+async fn test_artist_and_instrument_filter_condition() {
+    let test = artist_and_instrument().compile();
+    let engine = DomainEngine::test_builder(test.ontology.clone())
+        .build::<crate::TestDataStoreFactory>()
+        .await;
+    let [artist] = test.bind(["artist"]);
+
+    let entities = vec![
+        json!({ "name": "Larry Young" }),
+        json!({ "name": "Woody Shaw" }),
+        json!({ "name": "Joe Henderson" }),
+    ];
+
+    for json in &entities {
+        engine
             .store_new_entity(
                 serde_create(&artist).to_value(json.clone()).unwrap(),
                 Select::EntityId,
@@ -375,14 +428,22 @@ async fn test_artist_and_instrument_filter_condition() {
 
     expect_eq!(
         actual = extract_names(
-            exec_named_map_json(by_name, json!({ "name": "N/A" }), &domain_engine).await
+            engine
+                .exec_named_map_json(by_name, json!({ "name": "N/A" }), TestFindQuery::default())
+                .await
         ),
         expected = json!([])
     );
 
     expect_eq!(
         actual = extract_names(
-            exec_named_map_json(by_name, json!({ "name": "Larry Young" }), &domain_engine).await
+            engine
+                .exec_named_map_json(
+                    by_name,
+                    json!({ "name": "Larry Young" }),
+                    TestFindQuery::default()
+                )
+                .await
         ),
         expected = json!(["Larry Young"])
     );

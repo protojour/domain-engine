@@ -72,7 +72,7 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
                     mut queries,
                     field_type,
                 } => {
-                    let attribute = executor
+                    let value = executor
                         .context()
                         .domain_engine
                         .exec_map(key, input, &mut queries)
@@ -80,16 +80,18 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
                         .await?;
 
                     debug_span.in_scope(|| {
-                        debug!("query result: {}", ValueDebug(&attribute.value));
+                        debug!("query result: {}", ValueDebug(&value));
 
                         if matches!(field_type.modifier, TypeModifier::Array(..)) {
-                            let Data::Sequence(seq) = &attribute.value.data else {
+                            let Data::Sequence(seq) = &value.data else {
                                 panic!("Not a sequence")
                             };
                             resolve_schema_type_field(SequenceType { seq }, schema_type, executor)
                         } else {
                             resolve_schema_type_field(
-                                AttributeType { attr: &attribute },
+                                AttributeType {
+                                    attr: &value.into(),
+                                },
                                 schema_type,
                                 executor,
                             )

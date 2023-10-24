@@ -36,6 +36,8 @@ impl Default for Config {
 
 #[derive(Debug)]
 pub struct EntityQuery {
+    // FIXME: The cardinality should not be provided externally like this.
+    // The map procedure itself should know about it.
     pub cardinality: Cardinality,
     pub select: EntitySelect,
 }

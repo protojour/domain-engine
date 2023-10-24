@@ -70,7 +70,7 @@ impl DomainEngine {
         key: [MapKey; 2],
         input: Attribute,
         queries: &mut (dyn FindEntityQuery + Send),
-    ) -> DomainResult<Attribute> {
+    ) -> DomainResult<Value> {
         let proc = self
             .ontology
             .get_mapper_proc(key)
@@ -81,7 +81,7 @@ impl DomainEngine {
 
         loop {
             match vm.run([input_value]) {
-                VmState::Complete(value) => return Ok(value.into()),
+                VmState::Complete(value) => return Ok(value),
                 VmState::Yielded(Yield::Match(match_var, condition)) => {
                     let mut entity_query = queries.find_query(match_var, &condition);
 
