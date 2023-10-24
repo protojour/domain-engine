@@ -768,6 +768,12 @@ async fn test_graphql_municipalities_named_query() {
         schema: &Schema,
         ctx: &ServiceCtx,
     ) -> Result<juniper::Value<GqlScalar>, TestError> {
+        // NOTE: Here it's apparent that geojson can't be modelled
+        // in GraphQL. Geometry is a union where many of the variants
+        // have a "coordinates" field of differing types.
+        // GraphQL requires the client to make field aliases when the types are different.
+        // But with the aliases, the returned JSON is no longer geojson.
+        // See also https://gitlab.com/protojour/memoriam/domain-engine/-/issues/7.
         r#"{
             municipality(code: "OSL") {
                 code
@@ -818,7 +824,13 @@ async fn test_graphql_municipalities_named_query() {
         )
         .await,
         expected = Ok(graphql_value!({
-            "municipality": null
+            "municipality": {
+                "code": "OSL",
+                "geometry": {
+                    "__typename": "_geojson_Point",
+                    "point_coordinates": [10.738889, 59.913333]
+                }
+            }
         }))
     );
 }

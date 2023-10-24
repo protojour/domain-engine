@@ -33,7 +33,7 @@ impl ser::Serializer for JuniperValueSerializer {
     type Ok = juniper::Value<GqlScalar>;
     type Error = SerializeError;
 
-    type SerializeSeq = Impossible;
+    type SerializeSeq = JuniperListSerializer;
     type SerializeTuple = Impossible;
     type SerializeTupleStruct = Impossible;
     type SerializeTupleVariant = Impossible;
@@ -159,11 +159,17 @@ impl ser::Serializer for JuniperValueSerializer {
     }
 
     fn serialize_none(self) -> SerResult {
-        panic!("not used")
+        Ok(GqlScalar::Unit.into())
     }
 
-    fn serialize_seq(self, _: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
-        panic!("not a sequence")
+    fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
+        Ok(JuniperListSerializer {
+            elements: if let Some(len) = len {
+                Vec::with_capacity(len)
+            } else {
+                vec![]
+            },
+        })
     }
 
     fn serialize_tuple(self, _: usize) -> Result<Self::SerializeTuple, Self::Error> {
@@ -209,5 +215,26 @@ impl ser::Serializer for JuniperValueSerializer {
         _: usize,
     ) -> Result<Self::SerializeStructVariant, Self::Error> {
         panic!("not a scalar")
+    }
+}
+
+pub struct JuniperListSerializer {
+    elements: Vec<juniper::Value<GqlScalar>>,
+}
+
+impl ser::SerializeSeq for JuniperListSerializer {
+    type Ok = juniper::Value<GqlScalar>;
+    type Error = SerializeError;
+
+    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+    where
+        T: serde::Serialize,
+    {
+        self.elements.push(value.serialize(JuniperValueSerializer)?);
+        Ok(())
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        Ok(juniper::Value::List(self.elements))
     }
 }
