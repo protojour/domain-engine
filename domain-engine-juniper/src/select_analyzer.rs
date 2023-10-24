@@ -197,10 +197,10 @@ impl<'a> SelectAnalyzer<'a> {
                 let args_wrapper = ArgsWrapper::new(look_ahead.arguments());
 
                 let limit = args_wrapper
-                    .deserialize::<u32>(first_arg.name())
+                    .deserialize::<usize>(first_arg.name())
                     .unwrap()
                     .unwrap_or(self.default_limit());
-                let cursor = args_wrapper
+                let _cursor = args_wrapper
                     .deserialize::<String>(after_arg.name())
                     .unwrap();
 
@@ -223,14 +223,14 @@ impl<'a> SelectAnalyzer<'a> {
                             source: StructOrUnionSelect::Struct(object),
                             condition: Condition::default(),
                             limit,
-                            cursor,
+                            cursor: None,
                         }),
                         Some(Select::StructUnion(def_id, variants)) => {
                             Select::Entity(EntitySelect {
                                 source: StructOrUnionSelect::Union(def_id, variants),
                                 condition: Condition::default(),
                                 limit,
-                                cursor,
+                                cursor: None,
                             })
                         }
                         Some(Select::Entity(_) | Select::EntityId) => panic!("Select in select"),
@@ -252,10 +252,10 @@ impl<'a> SelectAnalyzer<'a> {
                 let args_wrapper = ArgsWrapper::new(look_ahead.arguments());
 
                 let limit = args_wrapper
-                    .deserialize::<u32>(first.name())
+                    .deserialize::<usize>(first.name())
                     .unwrap()
                     .unwrap_or(self.default_limit());
-                let cursor = args_wrapper.deserialize::<String>(after.name()).unwrap();
+                let _cursor = args_wrapper.deserialize::<String>(after.name()).unwrap();
 
                 let mut select = None;
 
@@ -276,14 +276,14 @@ impl<'a> SelectAnalyzer<'a> {
                             source: StructOrUnionSelect::Struct(object),
                             condition: Condition::default(),
                             limit,
-                            cursor,
+                            cursor: None,
                         }),
                         Some(Select::StructUnion(def_id, variants)) => {
                             Select::Entity(EntitySelect {
                                 source: StructOrUnionSelect::Union(def_id, variants),
                                 condition: Condition::default(),
                                 limit,
-                                cursor,
+                                cursor: None,
                             })
                         }
                         Some(Select::Entity(_) | Select::EntityId) => panic!("Select in select"),
@@ -442,7 +442,7 @@ impl<'a> SelectAnalyzer<'a> {
         }
     }
 
-    fn default_limit(&self) -> u32 {
+    fn default_limit(&self) -> usize {
         self.service_ctx.domain_engine.config().default_limit
     }
 }

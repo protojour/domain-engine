@@ -34,23 +34,23 @@ impl InMemoryStore {
             Select::EntityId => Ok(entity_id),
             Select::Struct(struct_select) => {
                 let target_dynamic_key = Self::extract_dynamic_key(&entity_id.data)?;
-                let entities = self.query_entities(
+                let entity_seq = self.query_entities(
                     &EntitySelect {
                         source: StructOrUnionSelect::Struct(struct_select),
                         condition: Condition::default(),
-                        limit: u32::MAX,
+                        limit: usize::MAX,
                         cursor: None,
                     },
                     engine,
                 )?;
 
-                for entity in entities {
-                    let id = find_inherent_entity_id(engine.ontology(), &entity)?;
+                for attr in entity_seq.attrs {
+                    let id = find_inherent_entity_id(engine.ontology(), &attr.value)?;
                     if let Some(id) = id {
                         let dynamic_key = Self::extract_dynamic_key(&id.data)?;
 
                         if dynamic_key == target_dynamic_key {
-                            return Ok(entity);
+                            return Ok(attr.value);
                         }
                     }
                 }

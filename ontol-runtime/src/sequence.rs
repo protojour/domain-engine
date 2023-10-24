@@ -19,11 +19,18 @@ impl Sequence {
             sub_seq: None,
         }
     }
+
+    pub fn new_with_capacity(cap: usize) -> Self {
+        Self {
+            attrs: ThinVec::with_capacity(cap),
+            sub_seq: None,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
 pub struct SubSequence {
-    pub next_cursor: Cursor,
+    pub next_cursor: Option<Cursor>,
     pub total_len: Option<usize>,
 }
 

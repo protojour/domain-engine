@@ -1,10 +1,11 @@
 use std::collections::BTreeMap;
 
+use itertools::Itertools;
 use ontol_runtime::{
     condition::{CondTerm, Condition},
     ontology::{DataRelationshipKind, PropertyCardinality, TypeInfo, ValueCardinality},
     select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
-    sequence::Sequence,
+    sequence::{Cursor, Sequence, SubSequence},
     value::{Attribute, Data, PropertyId, Value},
     Role,
 };
@@ -22,11 +23,15 @@ impl InMemoryStore {
         &self,
         select: &EntitySelect,
         engine: &DomainEngine,
-    ) -> DomainResult<Vec<Value>> {
+    ) -> DomainResult<Sequence> {
         match &select.source {
-            StructOrUnionSelect::Struct(struct_select) => {
-                self.query_single_entity_collection(struct_select, &select.condition, engine)
-            }
+            StructOrUnionSelect::Struct(struct_select) => self.query_single_entity_collection(
+                struct_select,
+                &select.condition,
+                select.limit,
+                select.cursor.as_ref(),
+                engine,
+            ),
             StructOrUnionSelect::Union(..) => todo!(),
         }
     }
@@ -35,8 +40,10 @@ impl InMemoryStore {
         &self,
         struct_select: &StructSelect,
         condition: &Condition<CondTerm>,
+        limit: usize,
+        next_cursor: Option<&Cursor>,
         engine: &DomainEngine,
-    ) -> DomainResult<Vec<Value>> {
+    ) -> DomainResult<Sequence> {
         debug!("query single entity collection: {struct_select:?}");
         let collection = self
             .collections
@@ -52,7 +59,7 @@ impl InMemoryStore {
         let filter_plan = compute_filter_plan(condition, engine.ontology()).unwrap();
         debug!("eval filter plan: {filter_plan:#?}");
 
-        let raw_props_vec: Vec<_> = collection
+        let mut raw_props_vec = collection
             .iter()
             .filter(|(key, props)| {
                 self.eval_filter_plan(
@@ -65,14 +72,47 @@ impl InMemoryStore {
                 )
             })
             .map(|(key, props)| (key.clone(), props.clone()))
-            .collect();
+            .collect_vec();
 
-        raw_props_vec
-            .into_iter()
-            .map(|(entity_key, properties)| {
-                self.apply_struct_select(type_info, &entity_key, properties, struct_select, engine)
-            })
-            .collect()
+        let total_size = raw_props_vec.len();
+
+        let offset = match next_cursor {
+            None => 0,
+            Some(Cursor::Offset(offset)) => *offset,
+            Some(Cursor::Custom(_)) => {
+                return Err(DomainError::NotImplemented);
+            }
+        };
+        let mut next_cursor = None;
+
+        if offset + limit < total_size {
+            next_cursor = Some(Cursor::Offset(offset + limit))
+        }
+        if offset > 0 {
+            raw_props_vec = raw_props_vec.into_iter().skip(offset).take(limit).collect();
+        } else if limit < total_size {
+            raw_props_vec = raw_props_vec.into_iter().take(limit).collect();
+        }
+
+        let mut entity_sequence = Sequence::new_with_capacity(raw_props_vec.len());
+        entity_sequence.sub_seq = Some(Box::new(SubSequence {
+            next_cursor,
+            total_len: Some(total_size),
+        }));
+
+        for (entity_key, properties) in raw_props_vec {
+            let value = self.apply_struct_select(
+                type_info,
+                &entity_key,
+                properties,
+                struct_select,
+                engine,
+            )?;
+
+            entity_sequence.attrs.push(value.into());
+        }
+
+        Ok(entity_sequence)
     }
 
     fn apply_struct_select(
@@ -230,14 +270,14 @@ impl InMemoryStore {
             Select::EntityId => todo!(),
             Select::Entity(entity_select) => {
                 let entity_key = entity_key.dynamic_key.clone();
-                let entities = self.query_entities(entity_select, engine)?;
-                for entity in entities {
-                    let id = find_inherent_entity_id(engine.ontology(), &entity)?;
+                let entity_seq = self.query_entities(entity_select, engine)?;
+                for entity_attr in entity_seq.attrs {
+                    let id = find_inherent_entity_id(engine.ontology(), &entity_attr.value)?;
                     if let Some(id) = id {
                         let dynamic_key = Self::extract_dynamic_key(&id.data)?;
 
                         if dynamic_key == entity_key {
-                            return Ok(entity);
+                            return Ok(entity_attr.value);
                         }
                     }
                 }

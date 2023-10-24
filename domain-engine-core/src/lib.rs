@@ -18,7 +18,7 @@ pub use domain_error::{DomainError, DomainResult};
 use ontol_runtime::{ontology::Cardinality, select::EntitySelect};
 
 pub struct Config {
-    pub default_limit: u32,
+    pub default_limit: usize,
 }
 
 impl Default for Config {
