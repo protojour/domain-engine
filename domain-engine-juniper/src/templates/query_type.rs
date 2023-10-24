@@ -69,13 +69,13 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
                 AnalyzedQuery::NamedMap {
                     key,
                     input,
-                    queries,
+                    mut queries,
                     field_type,
                 } => {
                     let attribute = executor
                         .context()
                         .domain_engine
-                        .exec_map(key, input, queries)
+                        .exec_map(key, input, &mut queries)
                         .instrument(debug_span.clone())
                         .await?;
 

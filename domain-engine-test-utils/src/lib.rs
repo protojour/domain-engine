@@ -2,9 +2,16 @@
 
 use std::fmt::Debug;
 
-use domain_engine_core::DomainEngine;
-use fnv::FnvHashMap;
-use ontol_runtime::{interface::serde::processor::ProcessorMode, value::Data, PackageId};
+use domain_engine_core::{DomainEngine, EntityQuery};
+use ontol_runtime::{
+    condition::{CondTerm, Condition},
+    interface::serde::processor::ProcessorMode,
+    ontology::{PropertyCardinality, ValueCardinality},
+    select::{EntitySelect, StructOrUnionSelect, StructSelect},
+    value::Data,
+    var::Var,
+    PackageId,
+};
 use serde::de::DeserializeSeed;
 
 pub mod graphql;
@@ -37,7 +44,7 @@ pub async fn exec_named_map_json(
         .expect("Deserialize input failed");
 
     let output = domain_engine
-        .exec_map([from, to], input, FnvHashMap::default())
+        .exec_map([from, to], input, &mut TestFindQuery)
         .await
         .expect("Exec map failed");
 
@@ -58,4 +65,28 @@ pub async fn exec_named_map_json(
         .expect("Serialize output failed");
 
     serde_json::from_slice(&json_buf).unwrap()
+}
+
+struct TestFindQuery;
+
+impl domain_engine_core::FindEntityQuery for TestFindQuery {
+    fn find_query(&mut self, match_var: Var, condition: &Condition<CondTerm>) -> EntityQuery {
+        let def_id = domain_engine_core::match_utils::find_entity_id_in_condition_for_var(
+            condition, match_var,
+        )
+        .expect("Unable to detect an entity being queried");
+
+        EntityQuery {
+            cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Many),
+            select: EntitySelect {
+                source: StructOrUnionSelect::Struct(StructSelect {
+                    def_id,
+                    properties: Default::default(),
+                }),
+                condition: Default::default(),
+                limit: 20,
+                cursor: None,
+            },
+        }
+    }
 }

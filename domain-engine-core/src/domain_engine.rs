@@ -1,17 +1,16 @@
 use std::sync::Arc;
 
-use fnv::FnvHashMap;
 use ontol_runtime::{
     interface::serde::processor::ProcessorMode,
     ontology::{Ontology, PropertyCardinality, ValueCardinality},
-    select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
+    select::{EntitySelect, Select, StructOrUnionSelect},
     sequence::Sequence,
     value::{Attribute, Data, Value},
     var::Var,
     vm::{proc::Yield, VmState},
     DefId, MapKey, PackageId,
 };
-use tracing::{debug, warn};
+use tracing::debug;
 
 use crate::{
     data_store::{DataStore, DataStoreFactory},
@@ -21,7 +20,7 @@ use crate::{
     select_data_flow::translate_entity_select,
     system::{SystemAPI, TestSystem},
     value_generator::Generator,
-    Config, DomainError, EntityQuery,
+    Config, DomainError, EntityQuery, FindEntityQuery,
 };
 
 pub struct DomainEngine {
@@ -70,7 +69,7 @@ impl DomainEngine {
         &self,
         key: [MapKey; 2],
         input: Attribute,
-        mut queries: FnvHashMap<Var, EntityQuery>,
+        queries: &mut (dyn FindEntityQuery + Send),
     ) -> DomainResult<Attribute> {
         let proc = self
             .ontology
@@ -84,25 +83,7 @@ impl DomainEngine {
             match vm.run([input_value]) {
                 VmState::Complete(value) => return Ok(value.into()),
                 VmState::Yielded(Yield::Match(match_var, condition)) => {
-                    let mut entity_query = queries.remove(&match_var).unwrap_or_else(|| {
-                        warn!("Autodetecting query as no query was passed");
-                        let def_id = find_entity_id_in_condition_for_var(&condition, match_var)
-                            .expect("Unable to detect an entity being queried");
-
-                        // FIXME: We have to properly detect the cardinality
-                        EntityQuery {
-                            cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Many),
-                            select: EntitySelect {
-                                source: StructOrUnionSelect::Struct(StructSelect {
-                                    def_id,
-                                    properties: Default::default(),
-                                }),
-                                condition: Default::default(),
-                                limit: self.config.default_limit,
-                                cursor: None,
-                            },
-                        }
-                    });
+                    let mut entity_query = queries.find_query(match_var, &condition);
 
                     // Merge the condition into the select
                     assert!(entity_query.select.condition.clauses.is_empty());
