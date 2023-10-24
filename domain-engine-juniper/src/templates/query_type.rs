@@ -1,7 +1,7 @@
 use domain_engine_core::DomainError;
 use ontol_runtime::{
     interface::graphql::{
-        data::{Optionality, TypeModifier},
+        data::{FieldData, FieldKind, Optionality, TypeModifier, TypeRef},
         schema::TypingPurpose,
     },
     value::{Attribute, Data, Value, ValueDebug},
@@ -15,9 +15,7 @@ use crate::{
     macros::impl_graphql_value,
     registry_ctx::RegistryCtx,
     select_analyzer::{AnalyzedQuery, SelectAnalyzer},
-    templates::{
-        attribute_type::AttributeType, resolve_schema_type_field, sequence_type::SequenceType,
-    },
+    templates::{attribute_type::AttributeType, resolve_schema_type_field},
 };
 
 pub struct QueryType;
@@ -74,7 +72,6 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
                     key,
                     input,
                     mut selects,
-                    field_type,
                 } => {
                     let value = executor
                         .context()
@@ -86,33 +83,28 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
                     debug_span.in_scope(|| {
                         debug!("query result: {}", ValueDebug(&value));
 
-                        match field_type.modifier {
-                            TypeModifier::Unit(optionality) => {
-                                if let Optionality::Mandatory = optionality {
-                                    if value.is_unit() {
-                                        return Err(DomainError::EntityNotFound.into());
+                        if value.is_unit()
+                            && matches!(
+                                query_field,
+                                FieldData {
+                                    kind: FieldKind::MapFind { .. },
+                                    field_type: TypeRef {
+                                        modifier: TypeModifier::Unit(Optionality::Mandatory),
+                                        ..
                                     }
                                 }
-
-                                resolve_schema_type_field(
-                                    AttributeType {
-                                        attr: &value.into(),
-                                    },
-                                    schema_type,
-                                    executor,
-                                )
-                            }
-                            TypeModifier::Array(..) => {
-                                let Data::Sequence(seq) = &value.data else {
-                                    panic!("Not a sequence")
-                                };
-                                resolve_schema_type_field(
-                                    SequenceType { seq },
-                                    schema_type,
-                                    executor,
-                                )
-                            }
+                            )
+                        {
+                            return Err(DomainError::EntityNotFound.into());
                         }
+
+                        resolve_schema_type_field(
+                            AttributeType {
+                                attr: &value.into(),
+                            },
+                            schema_type,
+                            executor,
+                        )
                     })
                 }
                 AnalyzedQuery::ClassicConnection(entity_query) => {

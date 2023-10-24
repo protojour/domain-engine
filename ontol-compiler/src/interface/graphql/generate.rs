@@ -57,39 +57,28 @@ pub fn generate_graphql_schema<'c>(
         return None;
     }
 
-    let mut schema = GraphqlSchema {
-        package_id,
-        query: TypeAddr(0),
-        mutation: TypeAddr(0),
-        i64_custom_scalar: None,
-        json_scalar: TypeAddr(0),
-        types: Vec::with_capacity(domain.type_names.len()),
-        type_addr_by_def: FnvHashMap::with_capacity_and_hasher(
-            domain.type_names.len(),
-            Default::default(),
-        ),
-    };
+    let mut schema = new_schema_with_capacity(package_id, domain.type_names.len());
     let mut namespace = GraphqlNamespace::with_domain_disambiguation(DomainDisambiguation {
         root_domain: package_id,
         ontology: partial_ontology,
     });
-    let relations = serde_generator.relations;
-    let defs = serde_generator.defs;
-    let seal_ctx = serde_generator.seal_ctx;
-    let mut builder = Builder {
-        lazy_tasks: vec![],
-        schema: &mut schema,
-        namespace: &mut namespace,
-        partial_ontology,
-        serde_generator,
-        relations,
-        defs,
-        seal_ctx,
+    let mut builder = {
+        let relations = serde_generator.relations;
+        let defs = serde_generator.defs;
+        let seal_ctx = serde_generator.seal_ctx;
+        Builder {
+            lazy_tasks: vec![],
+            schema: &mut schema,
+            namespace: &mut namespace,
+            partial_ontology,
+            serde_generator,
+            relations,
+            defs,
+            seal_ctx,
+        }
     };
 
-    builder.register_json_scalar();
-    builder.register_query();
-    builder.register_mutation();
+    builder.register_fundamental_types();
 
     for (_, def_id) in &domain.type_names {
         let type_info = domain.type_info(*def_id);
@@ -162,6 +151,20 @@ fn entity_check(schema: &GraphqlSchema, type_ref: UnitTypeRef) -> Option<EntityD
     }
 }
 
+enum LazyTask {
+    HarvestFields {
+        type_addr: TypeAddr,
+        def_id: DefId,
+        property_field_producer: PropertyFieldProducer,
+        is_entrypoint: bool,
+    },
+}
+
+enum NewType {
+    Addr(TypeAddr, TypeData),
+    NativeScalar(NativeScalarRef),
+}
+
 struct Builder<'a, 's, 'c, 'm> {
     /// Avoid deep recursion by pushing tasks to be performed later to this task list
     lazy_tasks: Vec<LazyTask>,
@@ -179,20 +182,6 @@ struct Builder<'a, 's, 'c, 'm> {
     defs: &'c Defs<'m>,
     /// The compiler's sealed type information
     seal_ctx: &'c SealCtx,
-}
-
-enum LazyTask {
-    HarvestFields {
-        type_addr: TypeAddr,
-        def_id: DefId,
-        property_field_producer: PropertyFieldProducer,
-        is_entrypoint: bool,
-    },
-}
-
-enum NewType {
-    Addr(TypeAddr, TypeData),
-    NativeScalar(NativeScalarRef),
 }
 
 impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
@@ -242,23 +231,10 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
         }
     }
 
-    fn register_json_scalar(&mut self) {
-        let index = self.next_type_addr();
+    fn register_fundamental_types(&mut self) {
+        self.schema.query = self.next_type_addr();
         self.schema.types.push(TypeData {
-            typename: "_ontol_json".into(),
-            input_typename: None,
-            partial_input_typename: None,
-            kind: TypeKind::CustomScalar(ScalarData {
-                operator_addr: SerdeOperatorAddr(0),
-            }),
-        });
-        self.schema.json_scalar = index;
-    }
-
-    fn register_query(&mut self) {
-        let index = self.next_type_addr();
-        self.schema.types.push(TypeData {
-            typename: "Query".into(),
+            typename: self.namespace.unique_literal("Query"),
             input_typename: None,
             partial_input_typename: None,
             kind: TypeKind::Object(ObjectData {
@@ -266,13 +242,10 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 kind: ObjectKind::Query,
             }),
         });
-        self.schema.query = index;
-    }
 
-    pub fn register_mutation(&mut self) {
-        let index = self.next_type_addr();
+        self.schema.mutation = self.next_type_addr();
         self.schema.types.push(TypeData {
-            typename: "Mutation".into(),
+            typename: self.namespace.unique_literal("Mutation"),
             input_typename: None,
             partial_input_typename: None,
             kind: TypeKind::Object(ObjectData {
@@ -280,7 +253,27 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 kind: ObjectKind::Mutation,
             }),
         });
-        self.schema.mutation = index;
+
+        self.schema.page_info = self.next_type_addr();
+        self.schema.types.push(TypeData {
+            typename: self.namespace.unique_literal("PageInfo"),
+            input_typename: None,
+            partial_input_typename: None,
+            kind: TypeKind::Object(ObjectData {
+                fields: Default::default(),
+                kind: ObjectKind::PageInfo,
+            }),
+        });
+
+        self.schema.json_scalar = self.next_type_addr();
+        self.schema.types.push(TypeData {
+            typename: self.namespace.unique_literal("_ontol_json"),
+            input_typename: None,
+            partial_input_typename: None,
+            kind: TypeKind::CustomScalar(ScalarData {
+                operator_addr: SerdeOperatorAddr(0),
+            }),
+        });
     }
 
     pub fn get_def_type_ref(&mut self, def_id: DefId, level: QLevel) -> UnitTypeRef {
@@ -407,14 +400,25 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                         input_typename: None,
                         partial_input_typename: None,
                         kind: TypeKind::Object(ObjectData {
-                            fields: [(
-                                smart_format!("edges"),
-                                FieldData {
-                                    kind: FieldKind::Edges,
-                                    field_type: TypeRef::mandatory(edge_ref)
-                                        .to_array(Optionality::Optional),
-                                },
-                            )]
+                            fields: [
+                                (
+                                    smart_format!("edges"),
+                                    FieldData {
+                                        kind: FieldKind::Edges,
+                                        field_type: TypeRef::mandatory(edge_ref)
+                                            .to_array(Optionality::Optional),
+                                    },
+                                ),
+                                (
+                                    smart_format!("pageInfo"),
+                                    FieldData {
+                                        kind: FieldKind::PageInfo,
+                                        field_type: TypeRef::mandatory(UnitTypeRef::Addr(
+                                            self.schema.page_info,
+                                        )),
+                                    },
+                                ),
+                            ]
                             .into(),
                             kind: ObjectKind::Connection,
                         }),
@@ -1027,4 +1031,17 @@ fn gql_array_serde_key(def_id: DefId) -> SerdeKey {
         def_id,
         SerdeModifier::graphql_default() | SerdeModifier::ARRAY,
     ))
+}
+
+fn new_schema_with_capacity(package_id: PackageId, cap: usize) -> GraphqlSchema {
+    GraphqlSchema {
+        package_id,
+        query: TypeAddr(0),
+        mutation: TypeAddr(0),
+        page_info: TypeAddr(0),
+        i64_custom_scalar: None,
+        json_scalar: TypeAddr(0),
+        types: Vec::with_capacity(cap),
+        type_addr_by_def: FnvHashMap::with_capacity_and_hasher(cap, Default::default()),
+    }
 }

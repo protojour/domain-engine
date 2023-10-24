@@ -16,6 +16,7 @@ pub struct GraphqlSchema {
     pub package_id: PackageId,
     pub query: TypeAddr,
     pub mutation: TypeAddr,
+    pub page_info: TypeAddr,
     pub json_scalar: TypeAddr,
     pub i64_custom_scalar: Option<TypeAddr>,
     pub types: Vec<TypeData>,

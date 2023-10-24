@@ -120,6 +120,10 @@ impl TypeData {
                 ..
             }) => None,
             TypeKind::Object(ObjectData {
+                kind: ObjectKind::PageInfo,
+                ..
+            }) => None,
+            TypeKind::Object(ObjectData {
                 kind: ObjectKind::Connection,
                 ..
             }) => None,
@@ -162,6 +166,7 @@ pub enum ObjectKind {
     Node(NodeData),
     Edge(EdgeData),
     Connection,
+    PageInfo,
     Query,
     Mutation,
 }
@@ -213,6 +218,7 @@ pub enum FieldKind {
     Id(IdPropertyData),
     Node,
     Edges,
+    PageInfo,
     /// A connection from a map statement
     MapConnection {
         key: [MapKey; 2],

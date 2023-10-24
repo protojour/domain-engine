@@ -48,6 +48,11 @@ async fn test_graphql_int_scalars() {
         rel .'small': smallint
         rel .'big': i64
     }
+
+    map foos {
+        {}
+        foo: [..foo match {}]
+    }
     "
     .compile_schemas([ROOT]);
 
@@ -79,7 +84,7 @@ async fn test_graphql_int_scalars() {
 
     expect_eq!(
         actual = "{
-            fooList {
+            foos(input: {}) {
                 edges {
                     node {
                         small
@@ -92,11 +97,11 @@ async fn test_graphql_int_scalars() {
             [],
             &schema,
             &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
-            DbgTag("list"),
+            DbgTag("foos"),
         )
         .await,
         expected = Ok(graphql_value!({
-            "fooList": {
+            "foos": {
                 "edges": [],
             },
         })),
@@ -143,12 +148,16 @@ async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
     pub def foo {
         rel .'id'(rel .gen: auto)|id: { rel .is: text }
     }
+    map foos {
+        {}
+        foo: [..foo match {}]
+    }
     "
     .compile_schemas([ROOT]);
 
     expect_eq!(
         actual = "{
-            fooList {
+            foos(input: {}) {
                 edges {
                     node {
                         id
@@ -164,7 +173,7 @@ async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
         )
         .await,
         expected = Ok(graphql_value!({
-            "fooList": {
+            "foos": {
                 "edges": [],
             },
         })),
@@ -352,7 +361,7 @@ async fn test_graphql_artist_and_instrument_connections() {
 
     expect_eq!(
         actual = "{
-            artistList {
+            artists(input: {}) {
                 edges {
                     node {
                         ID
@@ -381,11 +390,11 @@ async fn test_graphql_artist_and_instrument_connections() {
                     .returns(Ok(Sequence::new([ziggy.clone()])))
             )
             .await,
-            DbgTag("artistList"),
+            DbgTag("artists"),
         )
         .await,
         expected = Ok(graphql_value!({
-            "artistList": {
+            "artists": {
                 "edges": [{
                     "node": {
                         "ID": "artist/88832e20-8c6e-46b4-af79-27b19b889a58",
@@ -409,7 +418,7 @@ async fn test_graphql_artist_and_instrument_connections() {
 
     expect_eq!(
         actual = "{
-            instrumentList {
+            instruments(input: {}) {
                 edges {
                     node {
                         ID
@@ -429,11 +438,11 @@ async fn test_graphql_artist_and_instrument_connections() {
             [],
             &schema,
             &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
-            DbgTag("instrumentList"),
+            DbgTag("instruments"),
         )
         .await,
         expected = Ok(graphql_value!({
-            "instrumentList": {
+            "instruments": {
                 "edges": []
             },
         })),

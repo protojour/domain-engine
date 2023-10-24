@@ -6,7 +6,7 @@ use ontol_runtime::{
         argument::FieldArg,
         data::{
             FieldData, FieldKind, NodeData, ObjectData, ObjectKind, TypeData, TypeKind,
-            TypeModifier, TypeRef,
+            TypeModifier,
         },
     },
     select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
@@ -35,7 +35,6 @@ pub enum AnalyzedQuery {
         key: [MapKey; 2],
         input: Attribute,
         selects: FnvHashMap<Var, EntitySelect>,
-        field_type: TypeRef,
     },
     ClassicConnection(EntitySelect),
 }
@@ -85,7 +84,6 @@ impl<'a> SelectAnalyzer<'a> {
                     key: *key,
                     input,
                     selects: output_selects,
-                    field_type: field_data.field_type,
                 })
             }
             _ => match self.analyze_selection(look_ahead, field_data).select {
@@ -350,6 +348,7 @@ impl<'a> SelectAnalyzer<'a> {
                 }
                 ObjectKind::Edge(_)
                 | ObjectKind::Connection
+                | ObjectKind::PageInfo
                 | ObjectKind::Query
                 | ObjectKind::Mutation => panic!("Bug in ONTOL interface schema"),
             },
