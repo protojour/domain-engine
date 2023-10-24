@@ -1,5 +1,5 @@
 use domain_engine_core::data_store::DataStoreAPIMock;
-use domain_engine_juniper::gql_scalar::GqlScalar;
+use domain_engine_juniper::{context::ServiceCtx, gql_scalar::GqlScalar, Schema};
 use juniper::{graphql_value, parser::SourcePosition, ExecutionError, FieldError};
 use ontol_runtime::value::{Attribute, Value};
 use ontol_test_utils::{
@@ -750,39 +750,76 @@ async fn test_graphql_municipalities() {
 async fn test_graphql_municipalities_named_query() {
     let (test, [schema]) = TestPackages::with_sources([(ROOT, MUNICIPALITIES.1), GEOJSON, WGS])
         .compile_schemas([ROOT]);
-
-    let value = r#"{
-        municipality(code: "OSL") {
-            code
-            geometry {
-                __typename
-                ... on _geojson_Polygon {
-                    coordinates
+    let [municipality] = test.bind(["municipality"]);
+    let osl: Attribute = municipality
+        .entity_builder(
+            json!("OSL"),
+            json!({
+                "code": "OSL",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [10.738889, 59.913333],
                 }
-                ... on _geojson_GeometryCollection {
-                    geometries {
-                        ... on _geojson_Polygon {
-                            coordinates
+            }),
+        )
+        .into();
+
+    async fn fetch_osl(
+        schema: &Schema,
+        ctx: &ServiceCtx,
+    ) -> Result<juniper::Value<GqlScalar>, TestError> {
+        r#"{
+            municipality(code: "OSL") {
+                code
+                geometry {
+                    __typename
+                    ... on _geojson_Point {
+                        point_coordinates: coordinates
+                    }
+                    ... on _geojson_Polygon {
+                        polygon_coordinates: coordinates
+                    }
+                    ... on _geojson_GeometryCollection {
+                        geometries {
+                            ... on _geojson_Polygon {
+                                coordinates
+                            }
                         }
                     }
                 }
             }
-        }
-    }"#
-    .exec(
-        [],
-        &schema,
-        &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
-        DbgTag("OSL"),
-    )
-    .await
-    .unwrap();
+        }"#
+        .exec([], schema, ctx, DbgTag("OSL"))
+        .await
+    }
 
-    assert_eq!(
-        value,
-        graphql_value!({
+    expect_eq!(
+        actual = fetch_osl(
+            &schema,
+            &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await
+        )
+        .await,
+        expected = Ok(graphql_value!({
             "municipality": null
-        })
+        }))
+    );
+
+    expect_eq!(
+        actual = fetch_osl(
+            &schema,
+            &gql_ctx_mock_data_store(
+                &test,
+                ROOT,
+                DataStoreAPIMock::query
+                    .next_call(matching!(_))
+                    .returns(Ok(vec![osl.clone()]))
+            )
+            .await
+        )
+        .await,
+        expected = Ok(graphql_value!({
+            "municipality": null
+        }))
     );
 }
 

@@ -323,7 +323,7 @@ impl ser::Serializer for GqlScalarSerializer {
     }
 
     fn serialize_seq(self, _: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
-        panic!("not a scalar")
+        panic!("not a sequence")
     }
 
     fn serialize_tuple(self, _: usize) -> Result<Self::SerializeTuple, Self::Error> {

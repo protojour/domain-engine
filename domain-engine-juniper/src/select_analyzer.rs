@@ -414,7 +414,8 @@ impl<'a> SelectAnalyzer<'a> {
                         };
 
                         let variant_map = union_map.entry(def_id).or_default();
-                        let field_data = fields.get(field_name).unwrap();
+                        let field_data =
+                            fields.get(field_look_ahead.field_name_unaliased()).unwrap();
 
                         let KeyedPropertySelection {
                             key: property_id,
