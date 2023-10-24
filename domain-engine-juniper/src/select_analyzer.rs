@@ -5,11 +5,10 @@ use ontol_runtime::{
     interface::graphql::{
         argument::FieldArg,
         data::{
-            FieldData, FieldKind, NodeData, ObjectData, ObjectKind, Optionality, TypeData,
-            TypeKind, TypeModifier, TypeRef,
+            FieldData, FieldKind, NodeData, ObjectData, ObjectKind, TypeData, TypeKind,
+            TypeModifier, TypeRef,
         },
     },
-    ontology::{Cardinality, PropertyCardinality, ValueCardinality},
     select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
     value::{Attribute, PropertyId},
     var::Var,
@@ -22,7 +21,6 @@ use crate::{context::SchemaCtx, gql_scalar::GqlScalar, look_ahead_utils::ArgsWra
 
 pub struct KeyedPropertySelection {
     pub key: PropertyId,
-    pub cardinality: Cardinality,
     pub select: Select,
 }
 
@@ -152,15 +150,8 @@ impl<'a> SelectAnalyzer<'a> {
         ) {
             (FieldKind::MapFind { .. }, Ok(type_data)) => {
                 match (field_data.field_type.modifier, type_data) {
-                    (TypeModifier::Unit(optionality), type_data) => KeyedPropertySelection {
+                    (TypeModifier::Unit(_), type_data) => KeyedPropertySelection {
                         key: unit_property(),
-                        cardinality: (
-                            match optionality {
-                                Optionality::Mandatory => PropertyCardinality::Mandatory,
-                                Optionality::Optional => PropertyCardinality::Optional,
-                            },
-                            ValueCardinality::One,
-                        ),
                         select: match self.analyze_data(look_ahead, type_data) {
                             Select::Struct(struct_select) => Select::Entity(EntitySelect {
                                 source: StructOrUnionSelect::Struct(struct_select),
@@ -210,7 +201,6 @@ impl<'a> SelectAnalyzer<'a> {
 
                 KeyedPropertySelection {
                     key: unit_property(),
-                    cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Many),
                     select: match select {
                         Some(Select::Struct(object)) => Select::Entity(EntitySelect {
                             source: StructOrUnionSelect::Struct(object),
@@ -263,7 +253,6 @@ impl<'a> SelectAnalyzer<'a> {
 
                 KeyedPropertySelection {
                     key: property_id.unwrap_or(unit_property()),
-                    cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Many),
                     select: match select {
                         Some(Select::Struct(object)) => Select::Entity(EntitySelect {
                             source: StructOrUnionSelect::Struct(object),
@@ -304,7 +293,6 @@ impl<'a> SelectAnalyzer<'a> {
 
                 selection.unwrap_or_else(|| KeyedPropertySelection {
                     key: unit_property(),
-                    cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Many),
                     select: Select::Leaf,
                 })
             }
@@ -315,22 +303,18 @@ impl<'a> SelectAnalyzer<'a> {
                 Ok(type_data),
             ) => KeyedPropertySelection {
                 key: unit_property(),
-                cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
                 select: self.analyze_data(look_ahead, type_data),
             },
             (FieldKind::Property(property_data), Ok(type_data)) => KeyedPropertySelection {
                 key: property_data.property_id,
-                cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
                 select: self.analyze_data(look_ahead, type_data),
             },
             (FieldKind::Property(property_data), Err(_scalar_ref)) => KeyedPropertySelection {
                 key: property_data.property_id,
-                cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
                 select: Select::Leaf,
             },
             (FieldKind::Id(id_property_data), Err(_scalar_ref)) => KeyedPropertySelection {
                 key: PropertyId::subject(id_property_data.relationship_id),
-                cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
                 select: Select::Leaf,
             },
             (kind, res) => panic!("unhandled: {kind:?} res is ok: {}", res.is_ok()),
@@ -354,7 +338,6 @@ impl<'a> SelectAnalyzer<'a> {
                         let KeyedPropertySelection {
                             key: property_id,
                             select: selection,
-                            cardinality: _,
                         } = self.analyze_selection(field_look_ahead, field_data);
 
                         properties.insert(property_id, selection);
@@ -413,7 +396,6 @@ impl<'a> SelectAnalyzer<'a> {
                         let KeyedPropertySelection {
                             key: property_id,
                             select: selection,
-                            cardinality: _,
                         } = self.analyze_selection(field_look_ahead, field_data);
 
                         variant_map.insert(property_id, selection);
