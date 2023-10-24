@@ -12,6 +12,7 @@ pub mod format_utils;
 pub mod interface;
 pub mod ontology;
 pub mod select;
+pub mod sequence;
 pub mod text_like_types;
 pub mod text_pattern;
 pub mod value;

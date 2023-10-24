@@ -107,7 +107,7 @@ impl Cast<Vec<Attribute>> for Value {
 
     fn cast_into(self) -> Vec<Attribute> {
         match self.data {
-            Data::Sequence(seq) => seq.attrs,
+            Data::Sequence(seq) => seq.attrs.into_iter().collect(),
             _ => panic!("not an vector"),
         }
     }

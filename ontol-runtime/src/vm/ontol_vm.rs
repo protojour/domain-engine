@@ -3,14 +3,16 @@ use std::{array, collections::BTreeMap};
 use bit_vec::BitVec;
 use regex::Captures;
 use smartstring::alias::String;
+use thin_vec::ThinVec;
 use tracing::{trace, Level};
 
 use crate::{
     cast::Cast,
     condition::{Clause, CondTerm, Condition},
     ontology::Ontology,
+    sequence::Sequence,
     text_pattern::TextPattern,
-    value::{Attribute, Data, PropertyId, Sequence, Value, ValueDebug},
+    value::{Attribute, Data, PropertyId, Value, ValueDebug},
     var::Var,
     vm::abstract_vm::{AbstractVm, Processor, VmDebug},
     vm::proc::{BuiltinProc, Local, Procedure},
@@ -282,18 +284,15 @@ impl Processor for OntolProcessor {
             let value_attributes =
                 extract_regex_captures(&captures, group_filter, self.text_def_id)
                     .into_iter()
-                    .map(Attribute::from)
-                    .collect();
+                    .map(Attribute::from);
             attrs.push(Attribute::from(Value::new(
-                Data::Sequence(Sequence {
-                    attrs: value_attributes,
-                }),
+                Data::Sequence(Sequence::new(value_attributes)),
                 self.text_def_id,
             )));
         }
 
         self.stack.push(Value::new(
-            Data::Sequence(Sequence { attrs }),
+            Data::Sequence(Sequence::new(attrs)),
             self.text_def_id,
         ));
     }
@@ -359,7 +358,7 @@ impl OntolProcessor {
                 Data::Text(a + b)
             }
             BuiltinProc::NewStruct => Data::Struct([].into()),
-            BuiltinProc::NewSeq => Data::Sequence(Sequence { attrs: vec![] }),
+            BuiltinProc::NewSeq => Data::Sequence(Sequence::new(vec![])),
             BuiltinProc::NewUnit => Data::Unit,
             BuiltinProc::NewCondition => Data::Condition(Condition::default()),
         }
@@ -400,7 +399,7 @@ impl OntolProcessor {
     }
 
     #[inline(always)]
-    fn sequence_local_mut(&mut self, local: Local) -> &mut Vec<Attribute> {
+    fn sequence_local_mut(&mut self, local: Local) -> &mut ThinVec<Attribute> {
         match &mut self.local_mut(local).data {
             Data::Sequence(seq) => &mut seq.attrs,
             _ => panic!("Value at {local:?} is not a sequence"),
@@ -650,12 +649,10 @@ mod tests {
         let ontology = Ontology::builder().lib(lib).build();
         let output = OntolVm::new_domainless(&ontology, proc)
             .run([Value::new(
-                Data::Sequence(Sequence {
-                    attrs: vec![
-                        Value::new(Data::I64(1), def_id(0)).into(),
-                        Value::new(Data::I64(2), def_id(0)).into(),
-                    ],
-                }),
+                Data::Sequence(Sequence::new(vec![
+                    Value::new(Data::I64(1), def_id(0)).into(),
+                    Value::new(Data::I64(2), def_id(0)).into(),
+                ])),
                 def_id(0),
             )])
             .unwrap();
@@ -716,12 +713,10 @@ mod tests {
                         (
                             prop_b,
                             Value::new(
-                                Data::Sequence(Sequence {
-                                    attrs: vec![
-                                        Value::new(Data::Text("b0".into()), def_id(0)).into(),
-                                        Value::new(Data::Text("b1".into()), def_id(0)).into(),
-                                    ],
-                                }),
+                                Data::Sequence(Sequence::new(vec![
+                                    Value::new(Data::Text("b0".into()), def_id(0)).into(),
+                                    Value::new(Data::Text("b1".into()), def_id(0)).into(),
+                                ])),
                                 def_id(0),
                             )
                             .into(),

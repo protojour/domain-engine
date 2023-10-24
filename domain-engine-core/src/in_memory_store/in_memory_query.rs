@@ -4,7 +4,8 @@ use ontol_runtime::{
     condition::{CondTerm, Condition},
     ontology::{DataRelationshipKind, PropertyCardinality, TypeInfo, ValueCardinality},
     select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
-    value::{Attribute, Data, PropertyId, Sequence, Value},
+    sequence::Sequence,
+    value::{Attribute, Data, PropertyId, Value},
     Role,
 };
 use tracing::{debug, error};
@@ -108,7 +109,7 @@ impl InMemoryStore {
                         properties.insert(
                             *property_id,
                             Value::new(
-                                Data::Sequence(Sequence { attrs }),
+                                Data::Sequence(Sequence::new(attrs)),
                                 data_relationship.target,
                             )
                             .into(),

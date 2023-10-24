@@ -12,6 +12,7 @@ use crate::{
     cast::Cast,
     condition::{CondTerm, Condition},
     ontology::Ontology,
+    sequence::Sequence,
     DefId, PackageId, RelationshipId, Role,
 };
 
@@ -44,7 +45,7 @@ impl Value {
             .map(|attr| attr.value.type_def_id)
             .unwrap_or(DefId::unit());
         Self {
-            data: Data::Sequence(Sequence { attrs }),
+            data: Data::Sequence(Sequence::new(attrs)),
             type_def_id,
         }
     }
@@ -131,6 +132,8 @@ pub enum Data {
     ChronoTime(chrono::NaiveTime),
 
     /// A collection of attributes keyed by property.
+    // TODO: Change to some HashMap with cheap hash function, without
+    // extending size_of::<Data>().
     Struct(BTreeMap<PropertyId, Attribute>),
 
     /// A sequence of attributes.
@@ -152,11 +155,6 @@ impl Data {
             denom.into(),
         )))
     }
-}
-
-#[derive(Clone, Debug)]
-pub struct Sequence {
-    pub attrs: Vec<Attribute>,
 }
 
 pub struct FormatDataAsText<'d, 'o> {

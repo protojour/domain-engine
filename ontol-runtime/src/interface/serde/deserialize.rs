@@ -11,7 +11,8 @@ use crate::{
         deserialize_matcher::MapMatchResult,
         deserialize_struct::{deserialize_struct, SpecialAddrs, StructVisitor},
     },
-    value::{Attribute, Data, Sequence, Value},
+    sequence::Sequence,
+    value::{Attribute, Data, Value},
 };
 
 use super::{
@@ -290,7 +291,7 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
                     // note: if there are more elements to deserialize,
                     // serde will automatically generate a 'trailing characters' error after returning:
                     return Ok(Value {
-                        data: Data::Sequence(Sequence { attrs }),
+                        data: Data::Sequence(Sequence::new(attrs)),
                         type_def_id: sequence_matcher.type_def_id,
                     }
                     .into());
@@ -304,7 +305,7 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
                 None => {
                     return if sequence_matcher.match_seq_end().is_ok() {
                         Ok(Value {
-                            data: Data::Sequence(Sequence { attrs }),
+                            data: Data::Sequence(Sequence::new(attrs)),
                             type_def_id: sequence_matcher.type_def_id,
                         }
                         .into())

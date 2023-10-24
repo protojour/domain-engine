@@ -1,4 +1,4 @@
-use ontol_runtime::value::Sequence;
+use ontol_runtime::sequence::Sequence;
 
 use crate::{context::SchemaType, gql_scalar::GqlScalar, ServiceCtx};
 
