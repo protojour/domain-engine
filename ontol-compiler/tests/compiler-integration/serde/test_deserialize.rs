@@ -248,7 +248,7 @@ fn deserialize_finite_non_uniform_sequence() {
         let [foo] = test.bind(["foo"]);
         assert_matches!(
             serde_create(&foo).to_data(json!([42, "a"])),
-            Ok(Data::Sequence(vec)) if vec.len() == 2
+            Ok(Data::Sequence(seq)) if seq.attrs.len() == 2
         );
         assert_error_msg!(
             serde_create(&foo).to_data(json!([77])),
@@ -275,7 +275,7 @@ fn deserialize_finite_uniform_sequence() {
         let [foo] = test.bind(["foo"]);
         assert_matches!(
             serde_create(&foo).to_data(json!([42, 42])),
-            Ok(Data::Sequence(vector)) if vector.len() == 2
+            Ok(Data::Sequence(seq)) if seq.attrs.len() == 2
         );
         assert_error_msg!(
             serde_create(&foo).to_data(json!([77])),

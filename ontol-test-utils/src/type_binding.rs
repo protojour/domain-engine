@@ -7,7 +7,7 @@ use ontol_runtime::{
     interface::serde::processor::ProcessorMode,
     ontology::{Ontology, TypeInfo},
     select::{Select, StructSelect},
-    value::{Attribute, Data, PropertyId, Value},
+    value::{Attribute, Data, PropertyId, Sequence, Value},
     DefId, PackageId,
 };
 use serde::de::DeserializeSeed;
@@ -255,7 +255,7 @@ pub trait ToSequence {
 impl ToSequence for Vec<Attribute> {
     fn to_sequence_attribute(self, ty: &TypeBinding) -> Attribute {
         Value {
-            data: Data::Sequence(self),
+            data: Data::Sequence(Sequence { attrs: self }),
             type_def_id: ty.type_info.def_id,
         }
         .to_attr(Value::unit())

@@ -105,7 +105,12 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
                         .await?;
 
                     let attribute = Attribute {
-                        value: Value::new(Data::Sequence(entity_attributes), DefId::unit()),
+                        value: Value::new(
+                            Data::Sequence(ontol_runtime::value::Sequence {
+                                attrs: entity_attributes,
+                            }),
+                            DefId::unit(),
+                        ),
                         rel_params: Value::unit(),
                     };
 

@@ -129,12 +129,12 @@ impl InMemoryStore {
                                 )?;
                             }
                             ValueCardinality::Many => {
-                                let attributes = match attribute.value.data {
-                                    Data::Sequence(attributes) => attributes,
+                                let seq = match attribute.value.data {
+                                    Data::Sequence(seq) => seq,
                                     _ => panic!("Expected sequence for ValueCardinality::Many"),
                                 };
 
-                                for attribute in attributes {
+                                for attribute in seq.attrs {
                                     self.insert_entity_relationship(
                                         type_info.def_id,
                                         &entity_key,

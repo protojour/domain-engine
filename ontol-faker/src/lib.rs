@@ -11,7 +11,7 @@ use ontol_runtime::{
     ontology::Ontology,
     text_like_types::TextLikeType,
     text_pattern::TextPattern,
-    value::{Attribute, Data, Value},
+    value::{Attribute, Data, Sequence, Value},
     DefId,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -154,32 +154,46 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                 Value::new(data, *def_id)
             }
             SerdeOperator::DynamicSequence => {
-                return Ok(Value::new(Data::Sequence([].into()), DefId::unit()).into());
+                return Ok(Value::new(
+                    Data::Sequence(Sequence { attrs: [].into() }),
+                    DefId::unit(),
+                )
+                .into());
             }
             SerdeOperator::RelationSequence(seq_op) => {
                 return if processor.level().current_level() > SENSIBLE_RECURSION_LEVEL {
-                    Ok(Value::new(Data::Sequence(vec![]), seq_op.def.def_id).into())
+                    Ok(Value::new(
+                        Data::Sequence(Sequence { attrs: vec![] }),
+                        seq_op.def.def_id,
+                    )
+                    .into())
                 } else {
                     let variant = &seq_op.ranges[0];
                     let attr = self.fake_attribute(processor.narrow(variant.addr))?;
 
-                    Ok(Value::new(Data::Sequence([attr].into()), seq_op.def.def_id).into())
+                    Ok(Value::new(
+                        Data::Sequence(Sequence {
+                            attrs: [attr].into(),
+                        }),
+                        seq_op.def.def_id,
+                    )
+                    .into())
                 }
             }
             SerdeOperator::ConstructorSequence(seq_op) => {
-                let mut seq = vec![];
+                let mut attrs = vec![];
 
                 for range in &seq_op.ranges {
                     if let Some(rep) = range.finite_repetition {
                         for _ in 0..(rep as usize) {
-                            seq.push(self.fake_attribute(processor.new_child(range.addr)?)?);
+                            attrs.push(self.fake_attribute(processor.new_child(range.addr)?)?);
                         }
                     } else {
-                        seq.push(self.fake_attribute(processor.new_child(range.addr)?)?);
+                        attrs.push(self.fake_attribute(processor.new_child(range.addr)?)?);
                     }
                 }
 
-                Value::new(Data::Sequence(seq), seq_op.def.def_id)
+                Value::new(Data::Sequence(Sequence { attrs }), seq_op.def.def_id)
             }
             SerdeOperator::Alias(alias_op) => {
                 return self.fake_attribute(processor.narrow(alias_op.inner_addr));

@@ -41,7 +41,7 @@ impl<'d> FilterVal<'d> {
                 dynamic_key: None,
                 prop_tree: map,
             },
-            Data::Sequence(seq) => Self::Sequence(seq),
+            Data::Sequence(seq) => Self::Sequence(&seq.attrs),
             _ => Self::Scalar(value),
         }
     }
@@ -159,7 +159,7 @@ impl InMemoryStore {
 
                 let mut proof = Proof::Proven;
 
-                for attr in seq {
+                for attr in &seq.attrs {
                     proof.merge(self.eval_attr_entries(attr, entries, join_table)?);
                 }
 

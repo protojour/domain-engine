@@ -45,8 +45,8 @@ impl<'e> Generator<'e> {
                     self.generate_values(&mut attribute.value);
                 }
             }
-            Data::Sequence(vec) => {
-                for attribute in vec {
+            Data::Sequence(seq) => {
+                for attribute in &mut seq.attrs {
                     self.generate_values(&mut attribute.rel_params);
                     self.generate_values(&mut attribute.value);
                 }

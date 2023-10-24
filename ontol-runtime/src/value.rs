@@ -32,19 +32,19 @@ impl Value {
     }
 
     pub fn sequence_of(values: impl IntoIterator<Item = Value>) -> Self {
-        let attributes: Vec<_> = values
+        let attrs: Vec<_> = values
             .into_iter()
             .map(|value| Attribute {
                 value,
                 rel_params: Self::unit(),
             })
             .collect();
-        let type_def_id = attributes
+        let type_def_id = attrs
             .first()
             .map(|attr| attr.value.type_def_id)
             .unwrap_or(DefId::unit());
         Self {
-            data: Data::Sequence(attributes),
+            data: Data::Sequence(Sequence { attrs }),
             type_def_id,
         }
     }
@@ -140,7 +140,7 @@ pub enum Data {
     ///
     /// Some sequences will be uniform (all elements have the same type).
     /// Other sequences will behave more like tuples.
-    Sequence(Vec<Attribute>),
+    Sequence(Sequence),
 
     Condition(Condition<CondTerm>),
 }
@@ -152,6 +152,11 @@ impl Data {
             denom.into(),
         )))
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct Sequence {
+    pub attrs: Vec<Attribute>,
 }
 
 pub struct FormatDataAsText<'d, 'o> {
@@ -303,9 +308,9 @@ impl<'v> Display for ValueDebug<'v> {
                 }
                 write!(f, "}}")
             }
-            Data::Sequence(s) => {
+            Data::Sequence(seq) => {
                 write!(f, "[")?;
-                let mut iter = s.iter().peekable();
+                let mut iter = seq.attrs.iter().peekable();
                 while let Some(attr) = iter.next() {
                     write!(f, "{}", AttrDebug(attr),)?;
 

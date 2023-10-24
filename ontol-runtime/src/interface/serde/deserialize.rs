@@ -11,7 +11,7 @@ use crate::{
         deserialize_matcher::MapMatchResult,
         deserialize_struct::{deserialize_struct, SpecialAddrs, StructVisitor},
     },
-    value::{Attribute, Data, Value},
+    value::{Attribute, Data, Sequence, Value},
 };
 
 use super::{
@@ -279,7 +279,7 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
             .match_sequence()
             .map_err(|_| Error::invalid_type(Unexpected::Seq, &self))?;
 
-        let mut output = vec![];
+        let mut attrs = vec![];
 
         loop {
             let processor = match sequence_matcher.match_next_seq_element() {
@@ -290,7 +290,7 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
                     // note: if there are more elements to deserialize,
                     // serde will automatically generate a 'trailing characters' error after returning:
                     return Ok(Value {
-                        data: Data::Sequence(output),
+                        data: Data::Sequence(Sequence { attrs }),
                         type_def_id: sequence_matcher.type_def_id,
                     }
                     .into());
@@ -299,17 +299,17 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
 
             match seq.next_element_seed(processor)? {
                 Some(attribute) => {
-                    output.push(attribute);
+                    attrs.push(attribute);
                 }
                 None => {
                     return if sequence_matcher.match_seq_end().is_ok() {
                         Ok(Value {
-                            data: Data::Sequence(output),
+                            data: Data::Sequence(Sequence { attrs }),
                             type_def_id: sequence_matcher.type_def_id,
                         }
                         .into())
                     } else {
-                        Err(Error::invalid_length(output.len(), &self))
+                        Err(Error::invalid_length(attrs.len(), &self))
                     };
                 }
             }

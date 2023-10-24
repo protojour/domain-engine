@@ -10,7 +10,7 @@ use crate::{
     condition::{Clause, CondTerm, Condition},
     ontology::Ontology,
     text_pattern::TextPattern,
-    value::{Attribute, Data, PropertyId, Value, ValueDebug},
+    value::{Attribute, Data, PropertyId, Sequence, Value, ValueDebug},
     var::Var,
     vm::abstract_vm::{AbstractVm, Processor, VmDebug},
     vm::proc::{BuiltinProc, Local, Procedure},
@@ -276,7 +276,7 @@ impl Processor for OntolProcessor {
             panic!("Not a string");
         };
 
-        let mut output_sequence: Vec<Attribute> = Vec::new();
+        let mut attrs: Vec<Attribute> = Vec::new();
 
         for captures in text_pattern.regex.captures_iter(haystack) {
             let value_attributes =
@@ -284,14 +284,16 @@ impl Processor for OntolProcessor {
                     .into_iter()
                     .map(Attribute::from)
                     .collect();
-            output_sequence.push(Attribute::from(Value::new(
-                Data::Sequence(value_attributes),
+            attrs.push(Attribute::from(Value::new(
+                Data::Sequence(Sequence {
+                    attrs: value_attributes,
+                }),
                 self.text_def_id,
             )));
         }
 
         self.stack.push(Value::new(
-            Data::Sequence(output_sequence),
+            Data::Sequence(Sequence { attrs }),
             self.text_def_id,
         ));
     }
@@ -357,7 +359,7 @@ impl OntolProcessor {
                 Data::Text(a + b)
             }
             BuiltinProc::NewStruct => Data::Struct([].into()),
-            BuiltinProc::NewSeq => Data::Sequence(vec![]),
+            BuiltinProc::NewSeq => Data::Sequence(Sequence { attrs: vec![] }),
             BuiltinProc::NewUnit => Data::Unit,
             BuiltinProc::NewCondition => Data::Condition(Condition::default()),
         }
@@ -400,7 +402,7 @@ impl OntolProcessor {
     #[inline(always)]
     fn sequence_local_mut(&mut self, local: Local) -> &mut Vec<Attribute> {
         match &mut self.local_mut(local).data {
-            Data::Sequence(seq) => seq,
+            Data::Sequence(seq) => &mut seq.attrs,
             _ => panic!("Value at {local:?} is not a sequence"),
         }
     }
@@ -648,10 +650,12 @@ mod tests {
         let ontology = Ontology::builder().lib(lib).build();
         let output = OntolVm::new_domainless(&ontology, proc)
             .run([Value::new(
-                Data::Sequence(vec![
-                    Value::new(Data::I64(1), def_id(0)).into(),
-                    Value::new(Data::I64(2), def_id(0)).into(),
-                ]),
+                Data::Sequence(Sequence {
+                    attrs: vec![
+                        Value::new(Data::I64(1), def_id(0)).into(),
+                        Value::new(Data::I64(2), def_id(0)).into(),
+                    ],
+                }),
                 def_id(0),
             )])
             .unwrap();
@@ -660,6 +664,7 @@ mod tests {
             panic!();
         };
         let output = seq
+            .attrs
             .into_iter()
             .map(|attr| attr.value.cast_into())
             .collect::<Vec<i64>>();
@@ -711,10 +716,12 @@ mod tests {
                         (
                             prop_b,
                             Value::new(
-                                Data::Sequence(vec![
-                                    Value::new(Data::Text("b0".into()), def_id(0)).into(),
-                                    Value::new(Data::Text("b1".into()), def_id(0)).into(),
-                                ]),
+                                Data::Sequence(Sequence {
+                                    attrs: vec![
+                                        Value::new(Data::Text("b0".into()), def_id(0)).into(),
+                                        Value::new(Data::Text("b1".into()), def_id(0)).into(),
+                                    ],
+                                }),
                                 def_id(0),
                             )
                             .into(),

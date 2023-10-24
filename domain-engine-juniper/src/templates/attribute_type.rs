@@ -10,7 +10,7 @@ use ontol_runtime::{
         schema::TypingPurpose,
     },
     interface::serde::{operator::SerdeOperator, processor::ProcessorMode},
-    value::{Attribute, Data, PropertyId, Value},
+    value::{Attribute, Data, PropertyId, Sequence, Value},
     DefId,
 };
 use tracing::trace;
@@ -239,7 +239,10 @@ impl<'v> AttributeType<'v> {
                     ),
                     None => {
                         let empty = Attribute {
-                            value: Value::new(Data::Sequence(vec![]), DefId::unit()),
+                            value: Value::new(
+                                Data::Sequence(Sequence { attrs: vec![] }),
+                                DefId::unit(),
+                            ),
                             rel_params: Value::unit(),
                         };
 

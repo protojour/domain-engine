@@ -5,7 +5,7 @@ use ontol_runtime::{
     interface::serde::processor::ProcessorMode,
     ontology::{Ontology, PropertyCardinality, ValueCardinality},
     select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
-    value::{Attribute, Data, Value},
+    value::{Attribute, Data, Sequence, Value},
     var::Var,
     vm::{proc::Yield, VmState},
     DefId, MapKey, PackageId,
@@ -246,7 +246,7 @@ impl DomainEngine {
                 (None, PropertyCardinality::Mandatory) => Err(DomainError::EntityNotFound),
             },
             ValueCardinality::Many => Ok(Value {
-                data: Data::Sequence(edges),
+                data: Data::Sequence(Sequence { attrs: edges }),
                 type_def_id: DefId::unit(),
             }),
         }

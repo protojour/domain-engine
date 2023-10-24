@@ -4,7 +4,7 @@ use ontol_runtime::{
     condition::{CondTerm, Condition},
     ontology::{DataRelationshipKind, PropertyCardinality, TypeInfo, ValueCardinality},
     select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
-    value::{Attribute, Data, PropertyId, Value},
+    value::{Attribute, Data, PropertyId, Sequence, Value},
     Role,
 };
 use tracing::{debug, error};
@@ -95,19 +95,23 @@ impl InMemoryStore {
                     continue;
                 }
 
-                let attributes =
+                let attrs =
                     self.sub_query_attributes(*property_id, subselect, entity_key, engine)?;
 
                 match data_relationship.cardinality.1 {
                     ValueCardinality::One => {
-                        if let Some(attribute) = attributes.into_iter().next() {
+                        if let Some(attribute) = attrs.into_iter().next() {
                             properties.insert(*property_id, attribute);
                         }
                     }
                     ValueCardinality::Many => {
                         properties.insert(
                             *property_id,
-                            Value::new(Data::Sequence(attributes), data_relationship.target).into(),
+                            Value::new(
+                                Data::Sequence(Sequence { attrs }),
+                                data_relationship.target,
+                            )
+                            .into(),
                         );
                     }
                 }
