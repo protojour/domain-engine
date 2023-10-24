@@ -10,6 +10,7 @@ use domain_engine_core::{
 use domain_engine_juniper::{
     context::ServiceCtx, create_graphql_schema, gql_scalar::GqlScalar, Schema,
 };
+use ontol_runtime::sequence::Sequence;
 use ontol_test_utils::{OntolTest, SourceName, TestCompile};
 use unimock::*;
 
@@ -79,7 +80,7 @@ impl Display for TestError {
 pub fn mock_data_store_query_entities_empty() -> impl unimock::Clause {
     DataStoreAPIMock::query
         .next_call(matching!(_, _))
-        .returns(Ok(vec![]))
+        .returns(Ok(Sequence::new([])))
 }
 
 pub async fn gql_ctx_mock_data_store(

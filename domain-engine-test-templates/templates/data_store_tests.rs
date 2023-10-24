@@ -179,7 +179,7 @@ async fn test_conduit_db_store_entity_tree() {
         .await
         .unwrap();
 
-    let new_user_id = users[1]
+    let new_user_id = users.attrs[1]
         .value
         .get_attribute(user_type.find_property("user_id").unwrap())
         .unwrap()
@@ -196,7 +196,8 @@ async fn test_conduit_db_store_entity_tree() {
                         .into(),
                 )
                 .await
-                .unwrap()[1]
+                .unwrap()
+                .attrs[1]
                 .value
         ),
         expected = json!({
@@ -228,7 +229,8 @@ async fn test_conduit_db_store_entity_tree() {
                         .into(),
                 )
                 .await
-                .unwrap()[1]
+                .unwrap()
+                .attrs[1]
                 .value
         ),
         expected = json!({

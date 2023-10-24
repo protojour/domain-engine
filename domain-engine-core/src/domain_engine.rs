@@ -114,7 +114,7 @@ impl DomainEngine {
         }
     }
 
-    pub async fn query_entities(&self, mut select: EntitySelect) -> DomainResult<Vec<Attribute>> {
+    pub async fn query_entities(&self, mut select: EntitySelect) -> DomainResult<Sequence> {
         let data_store = self.get_data_store()?;
         let ontology = self.ontology();
 
@@ -136,10 +136,10 @@ impl DomainEngine {
             ontology.get_type_info(cur_def_id)
         );
 
-        let mut edges = data_store.api().query(select, self).await?;
+        let mut edge_seq = data_store.api().query(select, self).await?;
 
         if resolve_path.is_empty() {
-            return Ok(edges);
+            return Ok(edge_seq);
         }
 
         // Transform result
@@ -148,7 +148,7 @@ impl DomainEngine {
                 .get_mapper_proc([cur_def_id.into(), (next_def_id).into()])
                 .expect("No mapping procedure for query output");
 
-            for attr in edges.iter_mut() {
+            for attr in edge_seq.attrs.iter_mut() {
                 let mut vm = ontology.new_vm(procedure);
                 let param = attr.value.take();
 
@@ -169,7 +169,7 @@ impl DomainEngine {
 
         assert_eq!(cur_def_id, original_def_id);
 
-        Ok(edges)
+        Ok(edge_seq)
     }
 
     pub async fn store_new_entity(&self, mut entity: Value, select: Select) -> DomainResult<Value> {
@@ -236,18 +236,21 @@ impl DomainEngine {
             _ => todo!("Basically apply the same operation as above, but refactor"),
         }
 
-        let edges = data_store.api().query(entity_query.select, self).await?;
+        let edge_seq = data_store.api().query(entity_query.select, self).await?;
 
         debug!("cardinality: {:?}", entity_query.cardinality);
 
         match entity_query.cardinality.1 {
-            ValueCardinality::One => match (edges.into_iter().next(), entity_query.cardinality.0) {
+            ValueCardinality::One => match (
+                edge_seq.attrs.into_iter().next(),
+                entity_query.cardinality.0,
+            ) {
                 (Some(attribute), _) => Ok(attribute.value),
                 (None, PropertyCardinality::Optional) => Ok(Value::unit()),
                 (None, PropertyCardinality::Mandatory) => Err(DomainError::EntityNotFound),
             },
             ValueCardinality::Many => Ok(Value {
-                data: Data::Sequence(Sequence::new(edges)),
+                data: Data::Sequence(edge_seq),
                 type_def_id: DefId::unit(),
             }),
         }

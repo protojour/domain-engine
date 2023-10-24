@@ -1,7 +1,10 @@
 use domain_engine_core::data_store::DataStoreAPIMock;
 use domain_engine_juniper::{context::ServiceCtx, gql_scalar::GqlScalar, Schema};
 use juniper::{graphql_value, parser::SourcePosition, ExecutionError, FieldError};
-use ontol_runtime::value::{Attribute, Value};
+use ontol_runtime::{
+    sequence::Sequence,
+    value::{Attribute, Value},
+};
 use ontol_test_utils::{
     examples::{ARTIST_AND_INSTRUMENT, GEOJSON, GUITAR_SYNTH_UNION, MUNICIPALITIES, WGS},
     expect_eq,
@@ -375,7 +378,7 @@ async fn test_graphql_artist_and_instrument_connections() {
                 ROOT,
                 DataStoreAPIMock::query
                     .next_call(matching!(_))
-                    .returns(Ok(vec![ziggy.clone()]))
+                    .returns(Ok(Sequence::new([ziggy.clone()])))
             )
             .await,
             DbgTag("artistList"),
@@ -537,7 +540,7 @@ async fn test_graphql_guitar_synth_union_selection() {
                 ROOT,
                 DataStoreAPIMock::query
                     .next_call(matching!(_, _))
-                    .returns(Ok(vec![artist_entity]))
+                    .returns(Ok(Sequence::new([artist_entity])))
             )
             .await,
             DbgTag("artistList"),
@@ -818,7 +821,7 @@ async fn test_graphql_municipalities_named_query() {
                 ROOT,
                 DataStoreAPIMock::query
                     .next_call(matching!(_))
-                    .returns(Ok(vec![osl.clone()]))
+                    .returns(Ok(Sequence::new([osl.clone()])))
             )
             .await
         )

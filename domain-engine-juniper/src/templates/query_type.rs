@@ -1,6 +1,5 @@
 use ontol_runtime::{
     interface::graphql::{data::TypeModifier, schema::TypingPurpose},
-    sequence::Sequence,
     value::{Attribute, Data, Value, ValueDebug},
     DefId,
 };
@@ -98,7 +97,7 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
                     })
                 }
                 AnalyzedQuery::ClassicConnection(entity_query) => {
-                    let entity_attributes = executor
+                    let entity_sequence = executor
                         .context()
                         .domain_engine
                         .query_entities(entity_query)
@@ -106,10 +105,7 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
                         .await?;
 
                     let attribute = Attribute {
-                        value: Value::new(
-                            Data::Sequence(Sequence::new(entity_attributes)),
-                            DefId::unit(),
-                        ),
+                        value: Value::new(Data::Sequence(entity_sequence), DefId::unit()),
                         rel_params: Value::unit(),
                     };
 

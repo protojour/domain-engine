@@ -2,7 +2,8 @@ use fnv::FnvHashMap;
 use ontol_runtime::{
     ontology::Ontology,
     select::{EntitySelect, Select},
-    value::{Attribute, Value},
+    sequence::Sequence,
+    value::Value,
     DefId, PackageId, RelationshipId,
 };
 use tokio::sync::RwLock;
@@ -22,19 +23,15 @@ pub struct InMemoryDb {
 
 #[async_trait::async_trait]
 impl DataStoreAPI for InMemoryDb {
-    async fn query(
-        &self,
-        query: EntitySelect,
-        engine: &DomainEngine,
-    ) -> DomainResult<Vec<Attribute>> {
-        Ok(self
-            .store
-            .read()
-            .await
-            .query_entities(&query, engine)?
-            .into_iter()
-            .map(Into::into)
-            .collect())
+    async fn query(&self, query: EntitySelect, engine: &DomainEngine) -> DomainResult<Sequence> {
+        Ok(Sequence::new(
+            self.store
+                .read()
+                .await
+                .query_entities(&query, engine)?
+                .into_iter()
+                .map(Into::into),
+        ))
     }
 
     async fn store_new_entity(

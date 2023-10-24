@@ -2,7 +2,8 @@ use ontol_runtime::{
     config::DataStoreConfig,
     ontology::Ontology,
     select::{EntitySelect, Select},
-    value::{Attribute, Value},
+    sequence::Sequence,
+    value::Value,
     PackageId,
 };
 use unimock::unimock;
@@ -32,11 +33,7 @@ impl DataStore {
 #[unimock(api = DataStoreAPIMock)]
 #[async_trait::async_trait]
 pub trait DataStoreAPI {
-    async fn query(
-        &self,
-        select: EntitySelect,
-        engine: &DomainEngine,
-    ) -> DomainResult<Vec<Attribute>>;
+    async fn query(&self, select: EntitySelect, engine: &DomainEngine) -> DomainResult<Sequence>;
 
     async fn store_new_entity(
         &self,
