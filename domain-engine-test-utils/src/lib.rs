@@ -2,11 +2,10 @@
 
 use std::fmt::Debug;
 
-use domain_engine_core::{DomainEngine, EntityQuery};
+use domain_engine_core::DomainEngine;
 use ontol_runtime::{
     condition::{CondTerm, Condition},
     interface::serde::processor::ProcessorMode,
-    ontology::{Cardinality, PropertyCardinality, ValueCardinality},
     select::{EntitySelect, StructOrUnionSelect, StructSelect},
     sequence::Cursor,
     value::{Data, Value},
@@ -98,19 +97,11 @@ async fn test_exec_named_map(
 }
 
 pub struct TestFindQuery {
-    cardinality: Cardinality,
     limit: usize,
     cursor: Option<Cursor>,
 }
 
 impl TestFindQuery {
-    pub fn return_single(self) -> Self {
-        Self {
-            cardinality: (PropertyCardinality::Optional, ValueCardinality::One),
-            ..self
-        }
-    }
-
     pub fn limit(self, limit: usize) -> Self {
         Self { limit, ..self }
     }
@@ -126,31 +117,27 @@ impl TestFindQuery {
 impl Default for TestFindQuery {
     fn default() -> Self {
         Self {
-            cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Many),
             limit: 20,
             cursor: None,
         }
     }
 }
 
-impl domain_engine_core::FindEntityQuery for TestFindQuery {
-    fn find_query(&mut self, match_var: Var, condition: &Condition<CondTerm>) -> EntityQuery {
+impl domain_engine_core::FindEntitySelect for TestFindQuery {
+    fn find_select(&mut self, match_var: Var, condition: &Condition<CondTerm>) -> EntitySelect {
         let def_id = domain_engine_core::match_utils::find_entity_id_in_condition_for_var(
             condition, match_var,
         )
         .expect("Unable to detect an entity being queried");
 
-        EntityQuery {
-            cardinality: self.cardinality,
-            select: EntitySelect {
-                source: StructOrUnionSelect::Struct(StructSelect {
-                    def_id,
-                    properties: Default::default(),
-                }),
-                condition: Default::default(),
-                limit: self.limit,
-                cursor: self.cursor.clone(),
-            },
+        EntitySelect {
+            source: StructOrUnionSelect::Struct(StructSelect {
+                def_id,
+                properties: Default::default(),
+            }),
+            condition: Default::default(),
+            limit: self.limit,
+            cursor: self.cursor.clone(),
         }
     }
 }

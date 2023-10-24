@@ -4,7 +4,7 @@ use tracing::trace;
 use super::proc::{GetAttrFlags, OpCodeCondTerm};
 use crate::{
     condition::Clause,
-    ontology::Ontology,
+    ontology::{Ontology, ValueCardinality},
     text_pattern::TextPattern,
     value::PropertyId,
     var::Var,
@@ -74,7 +74,11 @@ pub trait Processor {
     );
     fn assert_true(&mut self);
     fn push_cond_clause(&mut self, cond_local: Local, clause: &Clause<OpCodeCondTerm>);
-    fn yield_match_condition(&mut self, var: Var) -> Self::Yield;
+    fn yield_match_condition(
+        &mut self,
+        var: Var,
+        value_cardinality: ValueCardinality,
+    ) -> Self::Yield;
 }
 
 impl<'o, P: Processor> AbstractVm<'o, P> {
@@ -241,9 +245,9 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                     processor.push_cond_clause(*cond_local, clause);
                     self.program_counter += 1;
                 }
-                OpCode::MatchCondition(var) => {
+                OpCode::MatchCondition(var, cardinality) => {
                     self.program_counter += 1;
-                    return Some(processor.yield_match_condition(*var));
+                    return Some(processor.yield_match_condition(*var, *cardinality));
                 }
                 OpCode::Panic(message) => {
                     panic!("{message}");

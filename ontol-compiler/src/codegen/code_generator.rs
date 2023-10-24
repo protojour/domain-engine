@@ -3,6 +3,7 @@ use fnv::FnvHashMap;
 use ontol_hir::{EvalCondTerm, HasDefault, PropPattern, PropVariant, StructFlags};
 use ontol_runtime::{
     condition::Clause,
+    ontology::ValueCardinality,
     smart_format,
     value::PropertyId,
     var::Var,
@@ -265,6 +266,11 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 if flags.contains(StructFlags::MATCH) {
                     // warn!("Skipping match-struct for now");
 
+                    let value_cardinality = match ty {
+                        Type::Seq(..) => ValueCardinality::Many,
+                        _ => ValueCardinality::One,
+                    };
+
                     let condition_local = block.op(
                         OpCode::CallBuiltin(BuiltinProc::NewCondition, DefId::unit()),
                         Delta(1),
@@ -280,7 +286,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     self.scope.remove(&binder.hir().var);
                     block.pop_until(condition_local, span, self.builder);
                     block.op(
-                        OpCode::MatchCondition(binder.0.var),
+                        OpCode::MatchCondition(binder.0.var, value_cardinality),
                         Delta(0),
                         span,
                         self.builder,

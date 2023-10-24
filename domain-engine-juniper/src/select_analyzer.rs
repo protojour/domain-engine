@@ -1,4 +1,3 @@
-use domain_engine_core::EntityQuery;
 use fnv::FnvHashMap;
 use juniper::LookAheadMethods;
 use ontol_runtime::{
@@ -37,7 +36,7 @@ pub enum AnalyzedQuery {
     NamedMap {
         key: [MapKey; 2],
         input: Attribute,
-        queries: FnvHashMap<Var, EntityQuery>,
+        selects: FnvHashMap<Var, EntitySelect>,
         field_type: TypeRef,
     },
     ClassicConnection(EntitySelect),
@@ -74,20 +73,20 @@ impl<'a> SelectAnalyzer<'a> {
                         &self.schema_ctx.ontology,
                     )?;
 
-                let mut output_queries: FnvHashMap<Var, EntityQuery> = Default::default();
+                let mut output_selects: FnvHashMap<Var, EntitySelect> = Default::default();
 
                 self.analyze_map(
                     look_ahead,
                     field_data,
                     unit_property(),
                     map_queries,
-                    &mut output_queries,
+                    &mut output_selects,
                 );
 
                 Ok(AnalyzedQuery::NamedMap {
                     key: *key,
                     input,
-                    queries: output_queries,
+                    selects: output_selects,
                     field_type: field_data.field_type,
                 })
             }
@@ -118,20 +117,14 @@ impl<'a> SelectAnalyzer<'a> {
         field_data: &FieldData,
         parent_property: PropertyId,
         input_queries: &FnvHashMap<PropertyId, Var>,
-        output_queries: &mut FnvHashMap<Var, EntityQuery>,
+        output_selects: &mut FnvHashMap<Var, EntitySelect>,
     ) {
         match input_queries.get(&parent_property) {
             Some(var) => {
                 let selection = self.analyze_selection(look_ahead, field_data);
                 match selection.select {
                     Select::Entity(entity_select) => {
-                        output_queries.insert(
-                            *var,
-                            EntityQuery {
-                                cardinality: selection.cardinality,
-                                select: entity_select,
-                            },
-                        );
+                        output_selects.insert(*var, entity_select);
                     }
                     select => panic!("BUG: not an entity select: {select:?}"),
                 }

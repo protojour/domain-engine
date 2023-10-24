@@ -9,7 +9,7 @@ use tracing::{trace, Level};
 use crate::{
     cast::Cast,
     condition::{Clause, CondTerm, Condition},
-    ontology::Ontology,
+    ontology::{Ontology, ValueCardinality},
     sequence::Sequence,
     text_pattern::TextPattern,
     value::{Attribute, Data, PropertyId, Value, ValueDebug},
@@ -326,9 +326,13 @@ impl Processor for OntolProcessor {
         condition.clauses.push(clause);
     }
 
-    fn yield_match_condition(&mut self, var: Var) -> Self::Yield {
+    fn yield_match_condition(
+        &mut self,
+        var: Var,
+        value_cardinality: ValueCardinality,
+    ) -> Self::Yield {
         match self.stack.pop().unwrap().data {
-            Data::Condition(condition) => Yield::Match(var, condition),
+            Data::Condition(condition) => Yield::Match(var, value_cardinality, condition),
             _ => panic!("Top of stack is not a condition"),
         }
     }

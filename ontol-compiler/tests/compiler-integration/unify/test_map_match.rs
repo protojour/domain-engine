@@ -1,5 +1,5 @@
 use indoc::indoc;
-use ontol_runtime::{format_utils::Literal, value::Value};
+use ontol_runtime::{format_utils::Literal, ontology::ValueCardinality, value::Value};
 use ontol_test_utils::{test_map::YielderMock, TestCompile};
 use serde_json::json;
 use test_log::test;
@@ -38,12 +38,15 @@ fn test_map_match_scalar_key() {
         let [foo] = test.bind(["foo"]);
         test.mapper(
             YielderMock::yield_match
-                .next_call(matching!(eq!(&Literal(indoc! { r#"
-                    (root $b)
-                    (is-entity $b def@1:3)
-                    (attr $b S:1:4 (_ Text("input")))
-                    "#
-                }))))
+                .next_call(matching!(
+                    eq!(&ValueCardinality::One),
+                    eq!(&Literal(indoc! { r#"
+                        (root $b)
+                        (is-entity $b def@1:3)
+                        (attr $b S:1:4 (_ Text("input")))
+                        "#
+                    }))
+                ))
                 .returns(Value::from(
                     foo.value_builder(json!({ "key": "x", "prop": "y" })),
                 )),
@@ -76,11 +79,14 @@ fn test_map_match_parameterless_query() {
         let [foo] = test.bind(["foo"]);
         test.mapper(
             YielderMock::yield_match
-                .next_call(matching!(eq!(&Literal(indoc! { "
-                    (root $c)
-                    (is-entity $c def@1:3)
-                    "
-                }))))
+                .next_call(matching!(
+                    eq!(&ValueCardinality::Many),
+                    eq!(&Literal(indoc! { "
+                        (root $c)
+                        (is-entity $c def@1:3)
+                        "
+                    }))
+                ))
                 .returns(Value::sequence_of([foo
                     .value_builder(json!({ "key": "key", "prop": "test" }))
                     .into()])),
@@ -122,13 +128,16 @@ fn test_map_match_anonymous_query_mandatory_parameters() {
         let [foo] = test.bind(["foo"]);
         test.mapper(
             YielderMock::yield_match
-                .next_call(matching!(eq!(&Literal(indoc! { r#"
-                    (root $e)
-                    (is-entity $e def@1:3)
-                    (attr $e S:1:6 (_ Text("A")))
-                    (attr $e S:1:7 (_ Text("B")))
-                    "#
-                }))))
+                .next_call(matching!(
+                    eq!(&ValueCardinality::Many),
+                    eq!(&Literal(indoc! { r#"
+                        (root $e)
+                        (is-entity $e def@1:3)
+                        (attr $e S:1:6 (_ Text("A")))
+                        (attr $e S:1:7 (_ Text("B")))
+                        "#
+                    }))
+                ))
                 .returns(Value::sequence_of([foo
                     .value_builder(json!({ "key": "key", "prop_a": "a!", "prop_b": "b!" }))
                     .into()])),
@@ -176,12 +185,15 @@ fn test_map_match_anonymous_with_translation() {
         let [foo] = test.bind(["foo"]);
         test.mapper(
             YielderMock::yield_match
-                .next_call(matching!(eq!(&Literal(indoc! { r#"
-                    (root $d)
-                    (is-entity $d def@1:3)
-                    (attr $d S:1:6 (_ Text("X")))
-                    "#
-                }))))
+                .next_call(matching!(
+                    eq!(&ValueCardinality::Many),
+                    eq!(&Literal(indoc! { r#"
+                        (root $d)
+                        (is-entity $d def@1:3)
+                        (attr $d S:1:6 (_ Text("X")))
+                        "#
+                    }))
+                ))
                 .returns(Value::sequence_of([foo
                     .value_builder(json!({ "key": "key", "foo": "x!" }))
                     .into()])),

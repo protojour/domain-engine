@@ -19,7 +19,6 @@ pub use domain_engine::DomainEngine;
 pub use domain_error::{DomainError, DomainResult};
 use ontol_runtime::{
     condition::{CondTerm, Condition},
-    ontology::Cardinality,
     select::EntitySelect,
     var::Var,
 };
@@ -34,20 +33,12 @@ impl Default for Config {
     }
 }
 
-#[derive(Debug)]
-pub struct EntityQuery {
-    // FIXME: The cardinality should not be provided externally like this.
-    // The map procedure itself should know about it.
-    pub cardinality: Cardinality,
-    pub select: EntitySelect,
+pub trait FindEntitySelect {
+    fn find_select(&mut self, match_var: Var, condition: &Condition<CondTerm>) -> EntitySelect;
 }
 
-pub trait FindEntityQuery {
-    fn find_query(&mut self, match_var: Var, condition: &Condition<CondTerm>) -> EntityQuery;
-}
-
-impl<A: BuildHasher> FindEntityQuery for HashMap<Var, EntityQuery, A> {
-    fn find_query(&mut self, match_var: Var, _condition: &Condition<CondTerm>) -> EntityQuery {
+impl<A: BuildHasher> FindEntitySelect for HashMap<Var, EntitySelect, A> {
+    fn find_select(&mut self, match_var: Var, _condition: &Condition<CondTerm>) -> EntitySelect {
         self.remove(&match_var).unwrap()
     }
 }

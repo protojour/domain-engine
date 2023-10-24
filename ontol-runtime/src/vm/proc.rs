@@ -7,6 +7,7 @@ use smartstring::alias::String;
 
 use crate::{
     condition::{Clause, CondTerm, Condition},
+    ontology::ValueCardinality,
     value::PropertyId,
     var::Var,
     DefId,
@@ -118,7 +119,7 @@ pub enum OpCode {
     /// Push a condition clause into the condition at local
     PushCondClause(Local, Clause<OpCodeCondTerm>),
     /// Execute a match on a datastore, using the condition at top of stack
-    MatchCondition(Var),
+    MatchCondition(Var, ValueCardinality),
     Panic(String),
 }
 
@@ -176,7 +177,7 @@ impl GetAttrFlags {
 }
 
 pub enum Yield {
-    Match(Var, Condition<CondTerm>),
+    Match(Var, ValueCardinality, Condition<CondTerm>),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
