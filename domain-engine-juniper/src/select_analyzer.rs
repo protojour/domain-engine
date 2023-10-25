@@ -5,7 +5,7 @@ use juniper::{FieldError, LookAheadMethods, LookAheadSelection};
 use ontol_runtime::{
     condition::Condition,
     interface::graphql::{
-        argument::FieldArg,
+        argument::{AfterArg, FieldArg, FirstArg},
         data::{
             ConnectionData, EdgeData, FieldData, FieldKind, NodeData, ObjectData, ObjectKind,
             TypeData, TypeKind, TypeModifier,
@@ -163,6 +163,7 @@ impl<'a> SelectAnalyzer<'a> {
                                 condition: Condition::default(),
                                 limit: 1,
                                 after_cursor: None,
+                                include_total_len: false,
                             }),
                             select => select,
                         },
@@ -182,82 +183,24 @@ impl<'a> SelectAnalyzer<'a> {
                     kind: TypeKind::Object(object_data),
                     ..
                 }),
-            ) => {
-                let args_wrapper = ArgsWrapper::new(look_ahead.arguments());
-
-                let limit = args_wrapper
-                    .deserialize_optional::<usize>(first_arg.name())?
-                    .unwrap_or(self.default_limit());
-                let after_cursor =
-                    args_wrapper.deserialize_optional::<GraphQLCursor>(after_arg.name())?;
-
-                let mut inner_select = Select::Leaf;
-
-                for field_look_ahead in look_ahead.children() {
-                    let field_name = field_look_ahead.field_name_unaliased();
-                    let field_data = object_data.fields.get(field_name).unwrap();
-
-                    if let FieldKind::Edges | FieldKind::Nodes = &field_data.kind {
-                        merge_selects(
-                            &mut inner_select,
-                            self.analyze_selection(field_look_ahead, field_data)?.select,
-                        );
-                    }
-                }
-
-                Ok(KeyedPropertySelection {
-                    key: unit_property(),
-                    select: self.mk_entity_select(
-                        inner_select,
-                        limit,
-                        after_cursor,
-                        object_data,
-                    )?,
-                })
-            }
+            ) => Ok(KeyedPropertySelection {
+                key: unit_property(),
+                select: self.analyze_connection(look_ahead, first_arg, after_arg, object_data)?,
+            }),
             (
-                FieldKind::PropertyConnection {
+                FieldKind::ConnectionProperty {
                     property_id,
-                    first,
-                    after,
+                    first_arg: first,
+                    after_arg: after,
                 },
                 Ok(TypeData {
                     kind: TypeKind::Object(object_data),
                     ..
                 }),
-            ) => {
-                let args_wrapper = ArgsWrapper::new(look_ahead.arguments());
-
-                let limit = args_wrapper
-                    .deserialize_optional::<usize>(first.name())?
-                    .unwrap_or(self.default_limit());
-                let after_cursor =
-                    args_wrapper.deserialize_optional::<GraphQLCursor>(after.name())?;
-
-                let mut inner_select = Select::Leaf;
-
-                for field_look_ahead in look_ahead.children() {
-                    let field_name = field_look_ahead.field_name_unaliased();
-                    let field_data = object_data.fields.get(field_name).unwrap();
-
-                    if let FieldKind::Edges | FieldKind::Nodes = &field_data.kind {
-                        merge_selects(
-                            &mut inner_select,
-                            self.analyze_selection(field_look_ahead, field_data)?.select,
-                        );
-                    }
-                }
-
-                Ok(KeyedPropertySelection {
-                    key: *property_id,
-                    select: self.mk_entity_select(
-                        inner_select,
-                        limit,
-                        after_cursor,
-                        object_data,
-                    )?,
-                })
-            }
+            ) => Ok(KeyedPropertySelection {
+                key: *property_id,
+                select: self.analyze_connection(look_ahead, first, after, object_data)?,
+            }),
             (
                 FieldKind::Edges,
                 Ok(TypeData {
@@ -305,6 +248,50 @@ impl<'a> SelectAnalyzer<'a> {
             }),
             (kind, res) => panic!("unhandled: {kind:?} res is ok: {}", res.is_ok()),
         }
+    }
+
+    fn analyze_connection(
+        &self,
+        look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
+        first_arg: &FirstArg,
+        after_arg: &AfterArg,
+        connection_object_data: &ObjectData,
+    ) -> Result<Select, FieldError<GqlScalar>> {
+        let args_wrapper = ArgsWrapper::new(look_ahead.arguments());
+
+        let limit = args_wrapper
+            .deserialize_optional::<usize>(first_arg.name())?
+            .unwrap_or(self.default_limit());
+        let after_cursor = args_wrapper.deserialize_optional::<GraphQLCursor>(after_arg.name())?;
+
+        let mut inner_select = Select::Leaf;
+        let mut include_total_len = false;
+
+        for field_look_ahead in look_ahead.children() {
+            let field_name = field_look_ahead.field_name_unaliased();
+            let field_data = connection_object_data.fields.get(field_name).unwrap();
+
+            match &field_data.kind {
+                FieldKind::Nodes | FieldKind::Edges => {
+                    merge_selects(
+                        &mut inner_select,
+                        self.analyze_selection(field_look_ahead, field_data)?.select,
+                    );
+                }
+                FieldKind::TotalCount => {
+                    include_total_len = true;
+                }
+                _ => {}
+            }
+        }
+
+        self.mk_entity_select(
+            inner_select,
+            limit,
+            after_cursor,
+            include_total_len,
+            connection_object_data,
+        )
     }
 
     pub fn analyze_data(
@@ -417,6 +404,7 @@ impl<'a> SelectAnalyzer<'a> {
         mut inner_select: Select,
         limit: usize,
         after_cursor: Option<GraphQLCursor>,
+        include_total_len: bool,
         object_data: &ObjectData,
     ) -> Result<Select, FieldError<GqlScalar>> {
         let mut empty_handled = false;
@@ -430,6 +418,7 @@ impl<'a> SelectAnalyzer<'a> {
                         condition: Condition::default(),
                         limit,
                         after_cursor,
+                        include_total_len,
                     }))
                 }
                 Select::StructUnion(def_id, variants) => {
@@ -438,6 +427,7 @@ impl<'a> SelectAnalyzer<'a> {
                         condition: Condition::default(),
                         limit,
                         after_cursor,
+                        include_total_len,
                     }))
                 }
                 Select::Entity(_) | Select::EntityId => panic!("Select in select"),

@@ -478,6 +478,25 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                                         )),
                                     },
                                 ),
+                                (
+                                    smart_format!("totalCount"),
+                                    FieldData {
+                                        kind: FieldKind::TotalCount,
+                                        field_type: TypeRef {
+                                            modifier: TypeModifier::Unit(Optionality::Mandatory),
+                                            unit: UnitTypeRef::NativeScalar(NativeScalarRef {
+                                                operator_addr: self
+                                                    .serde_generator
+                                                    .gen_addr(SerdeKey::Def(SerdeDef::new(
+                                                        self.primitives.i64,
+                                                        SerdeModifier::NONE,
+                                                    )))
+                                                    .unwrap(),
+                                                kind: NativeScalarKind::Int(self.primitives.i64),
+                                            }),
+                                        },
+                                    },
+                                ),
                             ]
                             .into(),
                             kind: ObjectKind::Connection(ConnectionData { node_type_addr }),
@@ -782,10 +801,10 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 trace!("Connection `{prop_key}` of prop {property_id:?}");
 
                 FieldData::mandatory(
-                    FieldKind::PropertyConnection {
+                    FieldKind::ConnectionProperty {
                         property_id,
-                        first: argument::FirstArg,
-                        after: argument::AfterArg,
+                        first_arg: argument::FirstArg,
+                        after_arg: argument::AfterArg,
                     },
                     connection_ref,
                 )

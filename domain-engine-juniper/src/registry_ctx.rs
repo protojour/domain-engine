@@ -327,7 +327,11 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         field_kind: &FieldKind,
     ) -> Option<Vec<juniper::meta::Argument<'r, GqlScalar>>> {
         match field_kind {
-            FieldKind::PropertyConnection { first, after, .. } => Some(vec![
+            FieldKind::ConnectionProperty {
+                first_arg: first,
+                after_arg: after,
+                ..
+            } => Some(vec![
                 self.registry.arg::<Option<i32>>(first.name(), &()),
                 self.registry
                     .arg::<Option<std::string::String>>(after.name(), &()),
@@ -358,7 +362,8 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             | FieldKind::Edges
             | FieldKind::Nodes
             | FieldKind::PageInfo
-            | FieldKind::Node => None,
+            | FieldKind::Node
+            | FieldKind::TotalCount => None,
         }
     }
 

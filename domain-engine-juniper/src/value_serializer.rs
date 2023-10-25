@@ -154,8 +154,8 @@ impl ser::Serializer for JuniperValueSerializer {
         panic!("not used")
     }
 
-    fn serialize_some<T: ?Sized + ser::Serialize>(self, _: &T) -> SerResult {
-        panic!("not used")
+    fn serialize_some<T: ?Sized + ser::Serialize>(self, some: &T) -> SerResult {
+        some.serialize(self)
     }
 
     fn serialize_none(self) -> SerResult {

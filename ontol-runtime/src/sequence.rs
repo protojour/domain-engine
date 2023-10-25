@@ -45,6 +45,12 @@ pub struct SubSequence {
     pub total_len: Option<usize>,
 }
 
+impl SubSequence {
+    pub fn total_len(&self) -> Option<usize> {
+        self.total_len
+    }
+}
+
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Cursor {
     Offset(usize),

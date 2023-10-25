@@ -22,6 +22,7 @@ pub struct EntitySelect {
     pub condition: Condition<CondTerm>,
     pub limit: usize,
     pub after_cursor: Option<Cursor>,
+    pub include_total_len: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -52,6 +53,7 @@ impl StructSelect {
             condition: Condition::default(),
             limit,
             after_cursor,
+            include_total_len: false,
         }
     }
 }
@@ -69,6 +71,7 @@ impl From<StructSelect> for EntitySelect {
             condition: Condition::default(),
             limit: 20,
             after_cursor: None,
+            include_total_len: false,
         }
     }
 }

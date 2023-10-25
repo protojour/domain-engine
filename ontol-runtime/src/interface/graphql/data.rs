@@ -235,6 +235,7 @@ pub enum FieldKind {
     Edges,
     Nodes,
     PageInfo,
+    TotalCount,
     /// A connection from a map statement
     MapConnection {
         key: [MapKey; 2],
@@ -249,10 +250,10 @@ pub enum FieldKind {
         queries: FnvHashMap<PropertyId, Var>,
         input_arg: argument::MapInputArg,
     },
-    PropertyConnection {
+    ConnectionProperty {
         property_id: PropertyId,
-        first: argument::FirstArg,
-        after: argument::AfterArg,
+        first_arg: argument::FirstArg,
+        after_arg: argument::AfterArg,
     },
     CreateMutation {
         input: argument::InputArg,

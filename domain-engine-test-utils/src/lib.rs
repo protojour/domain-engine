@@ -99,6 +99,7 @@ async fn test_exec_named_map(
 pub struct TestFindQuery {
     limit: usize,
     after_cursor: Option<Cursor>,
+    include_total_len: bool,
 }
 
 impl TestFindQuery {
@@ -112,6 +113,13 @@ impl TestFindQuery {
             ..self
         }
     }
+
+    pub fn with_total_len(self) -> Self {
+        Self {
+            include_total_len: true,
+            ..self
+        }
+    }
 }
 
 impl Default for TestFindQuery {
@@ -119,6 +127,7 @@ impl Default for TestFindQuery {
         Self {
             limit: 20,
             after_cursor: None,
+            include_total_len: false,
         }
     }
 }
@@ -138,6 +147,7 @@ impl domain_engine_core::FindEntitySelect for TestFindQuery {
             condition: Default::default(),
             limit: self.limit,
             after_cursor: self.after_cursor.clone(),
+            include_total_len: self.include_total_len,
         }
     }
 }

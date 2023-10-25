@@ -10,10 +10,11 @@ use ontol_runtime::{
         schema::TypingPurpose,
     },
     interface::serde::{operator::SerdeOperator, processor::ProcessorMode},
-    sequence::Sequence,
+    sequence::{Sequence, SubSequence},
     value::{Attribute, Data, PropertyId, Value},
     DefId,
 };
+use serde::Serialize;
 use tracing::trace;
 
 use crate::{
@@ -208,36 +209,25 @@ impl<'v> AttributeType<'v> {
 
         trace!("resolve object field `{field_name}`: {:?}", self.attr);
 
-        match (&field_data.kind, &self.attr.value.data) {
-            (FieldKind::Node, Data::Struct(_)) => resolve_schema_type_field(
+        match (&self.attr.value.data, &field_data.kind) {
+            (Data::Struct(_), FieldKind::Node) => resolve_schema_type_field(
                 self,
                 schema_ctx
                     .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
                     .unwrap(),
                 executor,
             ),
-            (FieldKind::Edges, Data::Sequence(seq)) => resolve_schema_type_field(
-                SequenceType { seq },
-                schema_ctx
-                    .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
-                    .unwrap(),
-                executor,
-            ),
-            (FieldKind::Nodes, Data::Sequence(seq)) => resolve_schema_type_field(
-                SequenceType { seq },
-                schema_ctx
-                    .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
-                    .unwrap(),
-                executor,
-            ),
-            (FieldKind::PageInfo, Data::Sequence(seq)) => resolve_schema_type_field(
-                PageInfoType { seq },
-                schema_ctx
-                    .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
-                    .unwrap(),
-                executor,
-            ),
-            (FieldKind::PropertyConnection { property_id, .. }, Data::Struct(attrs)) => {
+            (Data::Struct(attrs), FieldKind::Property(property_data)) => {
+                trace!("lookup property {field_name} => {:?}", property_data);
+                Self::resolve_property(
+                    attrs,
+                    property_data.property_id,
+                    field_type,
+                    schema_ctx,
+                    executor,
+                )
+            }
+            (Data::Struct(attrs), FieldKind::ConnectionProperty { property_id, .. }) => {
                 let type_info = schema_ctx
                     .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
                     .unwrap();
@@ -262,25 +252,41 @@ impl<'v> AttributeType<'v> {
                     }
                 }
             }
-            (FieldKind::Property(property_data), Data::Struct(attrs)) => {
-                trace!("lookup property {field_name} => {:?}", property_data);
-                Self::resolve_property(
-                    attrs,
-                    property_data.property_id,
-                    field_type,
-                    schema_ctx,
-                    executor,
-                )
-            }
-            (FieldKind::Property(_), Data::Unit) => Ok(juniper::Value::Null),
-            (FieldKind::Id(id_property_data), Data::Struct(attrs)) => Self::resolve_property(
+            (Data::Struct(attrs), FieldKind::Id(id_property_data)) => Self::resolve_property(
                 attrs,
                 PropertyId::subject(id_property_data.relationship_id),
                 field_type,
                 schema_ctx,
                 executor,
             ),
-            (FieldKind::EdgeProperty(property_data), _) => match &self.attr.rel_params.data {
+            (Data::Sequence(seq), FieldKind::Edges) => resolve_schema_type_field(
+                SequenceType { seq },
+                schema_ctx
+                    .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
+                    .unwrap(),
+                executor,
+            ),
+            (Data::Sequence(seq), FieldKind::Nodes) => resolve_schema_type_field(
+                SequenceType { seq },
+                schema_ctx
+                    .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
+                    .unwrap(),
+                executor,
+            ),
+            (Data::Sequence(seq), FieldKind::PageInfo) => resolve_schema_type_field(
+                PageInfoType { seq },
+                schema_ctx
+                    .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
+                    .unwrap(),
+                executor,
+            ),
+            (Data::Sequence(seq), FieldKind::TotalCount) => Ok(seq
+                .sub_seq
+                .as_deref()
+                .and_then(SubSequence::total_len)
+                .serialize(JuniperValueSerializer)?),
+            (Data::Unit, FieldKind::Property(_)) => Ok(juniper::Value::Null),
+            (_, FieldKind::EdgeProperty(property_data)) => match &self.attr.rel_params.data {
                 Data::Struct(rel_attrs) => Self::resolve_property(
                     rel_attrs,
                     property_data.property_id,

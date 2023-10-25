@@ -40,6 +40,7 @@ impl InMemoryStore {
                         condition: Condition::default(),
                         limit: usize::MAX,
                         after_cursor: None,
+                        include_total_len: false,
                     },
                     engine,
                 )?;

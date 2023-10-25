@@ -30,6 +30,7 @@ impl InMemoryStore {
                 &select.condition,
                 select.limit,
                 select.after_cursor.as_ref(),
+                select.include_total_len,
                 engine,
             ),
             StructOrUnionSelect::Union(..) => todo!(),
@@ -42,6 +43,7 @@ impl InMemoryStore {
         condition: &Condition<CondTerm>,
         limit: usize,
         after_cursor: Option<&Cursor>,
+        include_total_len: bool,
         engine: &DomainEngine,
     ) -> DomainResult<Sequence> {
         debug!("query single entity collection: {struct_select:?}");
@@ -104,7 +106,11 @@ impl InMemoryStore {
         entity_sequence.sub_seq = Some(Box::new(SubSequence {
             end_cursor,
             has_next,
-            total_len: Some(total_size),
+            total_len: if include_total_len {
+                Some(total_size)
+            } else {
+                None
+            },
         }));
 
         for (entity_key, properties) in raw_props_vec {

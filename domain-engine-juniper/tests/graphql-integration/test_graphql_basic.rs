@@ -237,6 +237,7 @@ async fn test_graphql_basic_pagination() {
                 DataStoreAPIMock::query
                     .next_call(matching!(_, _))
                     .answers(|(entity_select, _)| {
+                        assert_eq!(entity_select.include_total_len, false);
                         assert_eq!(entity_select.limit, 42);
                         assert_eq!(entity_select.after_cursor, Some(Cursor::Offset(1)));
 
@@ -258,6 +259,54 @@ async fn test_graphql_basic_pagination() {
             "foos": {
                 "pageInfo": {
                     "endCursor": "bz0y",
+                    "hasNextPage": true
+                }
+            },
+        })),
+    );
+
+    expect_eq!(
+        actual = r#"{
+            foos(first: 1) {
+                totalCount
+                pageInfo {
+                    endCursor
+                    hasNextPage
+                }
+            }
+        }"#
+        .exec(
+            [],
+            &schema,
+            &gql_ctx_mock_data_store(
+                &test,
+                ROOT,
+                DataStoreAPIMock::query
+                    .next_call(matching!(_, _))
+                    .answers(|(entity_select, _)| {
+                        assert_eq!(entity_select.include_total_len, true);
+                        assert_eq!(entity_select.limit, 1);
+                        assert_eq!(entity_select.after_cursor, None);
+
+                        Ok(Sequence::new_sub(
+                            [],
+                            SubSequence {
+                                end_cursor: Some(Cursor::Offset(1)),
+                                has_next: true,
+                                total_len: Some(42),
+                            },
+                        ))
+                    })
+            )
+            .await,
+            DbgTag("paginated"),
+        )
+        .await,
+        expected = Ok(graphql_value!({
+            "foos": {
+                "totalCount": 42,
+                "pageInfo": {
+                    "endCursor": "bz0x",
                     "hasNextPage": true
                 }
             },
