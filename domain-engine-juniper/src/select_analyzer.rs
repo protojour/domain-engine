@@ -12,7 +12,7 @@ use ontol_runtime::{
         },
     },
     select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
-    value::{Attribute, PropertyId},
+    value::{PropertyId, Value},
     var::Var,
     DefId, MapKey, RelationshipId,
 };
@@ -34,13 +34,10 @@ pub struct SelectAnalyzer<'a> {
 }
 
 #[derive(Debug)]
-pub enum AnalyzedQuery {
-    NamedMap {
-        key: [MapKey; 2],
-        input: Attribute,
-        selects: FnvHashMap<Var, EntitySelect>,
-    },
-    ClassicConnection(EntitySelect),
+pub struct AnalyzedQuery {
+    pub map_key: [MapKey; 2],
+    pub input: Value,
+    pub selects: FnvHashMap<Var, EntitySelect>,
 }
 
 impl<'a> SelectAnalyzer<'a> {
@@ -72,7 +69,8 @@ impl<'a> SelectAnalyzer<'a> {
                     .deserialize_domain_field_arg_as_attribute(
                         input_arg,
                         &self.schema_ctx.ontology,
-                    )?;
+                    )?
+                    .value;
 
                 let mut output_selects: FnvHashMap<Var, EntitySelect> = Default::default();
 
@@ -84,18 +82,13 @@ impl<'a> SelectAnalyzer<'a> {
                     &mut output_selects,
                 )?;
 
-                Ok(AnalyzedQuery::NamedMap {
-                    key: *key,
+                Ok(AnalyzedQuery {
+                    map_key: *key,
                     input,
                     selects: output_selects,
                 })
             }
-            _ => match self.analyze_selection(look_ahead, field_data)?.select {
-                Select::Entity(entity_select) => {
-                    Ok(AnalyzedQuery::ClassicConnection(entity_select))
-                }
-                select => panic!("BUG: not an entity select: {select:?}"),
-            },
+            _ => panic!(),
         }
     }
 

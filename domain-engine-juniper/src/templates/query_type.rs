@@ -4,10 +4,9 @@ use ontol_runtime::{
         data::{FieldData, FieldKind, Optionality, TypeModifier, TypeRef},
         schema::TypingPurpose,
     },
-    value::{Attribute, Data, Value, ValueDebug},
-    DefId,
+    value::ValueDebug,
 };
-use tracing::{debug, debug_span, Instrument};
+use tracing::{debug_span, trace, Instrument};
 
 use crate::{
     context::SchemaType,
@@ -58,79 +57,55 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
             let schema_ctx = &info.schema_ctx;
             let query_field = info.type_data().fields().unwrap().get(field_name).unwrap();
 
-            let analyzed_query = debug_span.in_scope(|| {
-                SelectAnalyzer::new(schema_ctx, executor.context())
-                    .analyze_look_ahead(&executor.look_ahead(), query_field)
-            })?;
-
-            let schema_type = schema_ctx
-                .find_schema_type_by_unit(query_field.field_type.unit, TypingPurpose::Selection)
-                .unwrap();
-
-            match analyzed_query {
-                AnalyzedQuery::NamedMap {
-                    key,
+            let output = {
+                let AnalyzedQuery {
+                    map_key,
                     input,
                     mut selects,
-                } => {
-                    let value = executor
-                        .context()
-                        .domain_engine
-                        .exec_map(key, input.value, &mut selects)
-                        .instrument(debug_span.clone())
-                        .await?;
+                } = debug_span.in_scope(|| {
+                    SelectAnalyzer::new(schema_ctx, executor.context())
+                        .analyze_look_ahead(&executor.look_ahead(), query_field)
+                })?;
 
-                    debug_span.in_scope(|| {
-                        debug!("query result: {}", ValueDebug(&value));
+                executor
+                    .context()
+                    .domain_engine
+                    .exec_map(map_key, input, &mut selects)
+                    .instrument(debug_span.clone())
+                    .await?
+            };
 
-                        if value.is_unit()
-                            && matches!(
-                                query_field,
-                                FieldData {
-                                    kind: FieldKind::MapFind { .. },
-                                    field_type: TypeRef {
-                                        modifier: TypeModifier::Unit(Optionality::Mandatory),
-                                        ..
-                                    }
-                                }
-                            )
-                        {
-                            return Err(DomainError::EntityNotFound.into());
+            debug_span.in_scope(|| {
+                trace!("query result: {}", ValueDebug(&output));
+
+                if output.is_unit()
+                    && matches!(
+                        query_field,
+                        FieldData {
+                            kind: FieldKind::MapFind { .. },
+                            field_type: TypeRef {
+                                modifier: TypeModifier::Unit(Optionality::Mandatory),
+                                ..
+                            }
                         }
-
-                        resolve_schema_type_field(
-                            AttributeType {
-                                attr: &value.into(),
-                            },
-                            schema_type,
-                            executor,
-                        )
-                    })
+                    )
+                {
+                    return Err(DomainError::EntityNotFound.into());
                 }
-                AnalyzedQuery::ClassicConnection(entity_query) => {
-                    let entity_sequence = executor
-                        .context()
-                        .domain_engine
-                        .query_entities(entity_query)
-                        .instrument(debug_span.clone())
-                        .await?;
 
-                    let attribute = Attribute {
-                        value: Value::new(Data::Sequence(entity_sequence), DefId::unit()),
-                        rel_params: Value::unit(),
-                    };
-
-                    debug_span.in_scope(|| {
-                        debug!("query result: {}", ValueDebug(&attribute.value));
-
-                        resolve_schema_type_field(
-                            AttributeType { attr: &attribute },
-                            schema_type,
-                            executor,
+                resolve_schema_type_field(
+                    AttributeType {
+                        attr: &output.into(),
+                    },
+                    schema_ctx
+                        .find_schema_type_by_unit(
+                            query_field.field_type.unit,
+                            TypingPurpose::Selection,
                         )
-                    })
-                }
-            }
+                        .unwrap(),
+                    executor,
+                )
+            })
         })
     }
 }
