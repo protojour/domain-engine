@@ -2,11 +2,31 @@
 
 use std::sync::Arc;
 
-use context::{SchemaCtx, ServiceCtx};
+use context::{SchemaCtx, SchemaType, ServiceCtx};
+use domain_engine_core::DomainError;
 use gql_scalar::GqlScalar;
-use ontol_runtime::{interface::DomainInterface, ontology::Ontology, PackageId};
+use juniper::LookAheadMethods;
+use look_ahead_utils::ArgsWrapper;
+use ontol_runtime::{
+    interface::{
+        graphql::{
+            data::{FieldData, FieldKind, Optionality, TypeModifier, TypeRef},
+            schema::TypingPurpose,
+        },
+        DomainInterface,
+    },
+    ontology::Ontology,
+    select::{Select, StructOrUnionSelect},
+    value::ValueDebug,
+    PackageId,
+};
 use thiserror::Error;
-use tracing::debug;
+use tracing::{debug, trace};
+
+use crate::{
+    select_analyzer::{AnalyzedQuery, SelectAnalyzer},
+    templates::{attribute_type::AttributeType, resolve_schema_type_field},
+};
 
 pub mod context;
 pub mod cursor_util;
@@ -69,30 +89,136 @@ pub fn create_graphql_schema(
     Ok(juniper_schema)
 }
 
-/// Just some test code to be able to look at some macro expansions
-#[cfg(test)]
-mod test_derivations {
-    #[derive(juniper::GraphQLInputObject)]
-    struct TestInputObject {
-        a: i32,
-        b: String,
+/// Execute a GraphQL query on the Domain Engine
+async fn query(
+    type_info: &SchemaType,
+    field_name: &str,
+    executor: &juniper::Executor<'_, '_, ServiceCtx, GqlScalar>,
+) -> juniper::ExecutionResult<GqlScalar> {
+    let schema_ctx = &type_info.schema_ctx;
+    let query_field = type_info
+        .type_data()
+        .fields()
+        .unwrap()
+        .get(field_name)
+        .unwrap();
+
+    let output = {
+        let service_ctx = executor.context();
+        let AnalyzedQuery {
+            map_key,
+            input,
+            mut selects,
+        } = SelectAnalyzer::new(schema_ctx, service_ctx)
+            .analyze_look_ahead(&executor.look_ahead(), query_field)?;
+
+        service_ctx
+            .domain_engine
+            .exec_map(map_key, input, &mut selects)
+            .await?
+    };
+
+    trace!("query result: {}", ValueDebug(&output));
+
+    if output.is_unit()
+        && matches!(
+            query_field,
+            FieldData {
+                kind: FieldKind::MapFind { .. },
+                field_type: TypeRef {
+                    modifier: TypeModifier::Unit(Optionality::Mandatory),
+                    ..
+                }
+            }
+        )
+    {
+        return Err(DomainError::EntityNotFound.into());
     }
 
-    struct TestMutation;
+    resolve_schema_type_field(
+        AttributeType {
+            attr: &output.into(),
+        },
+        schema_ctx
+            .find_schema_type_by_unit(query_field.field_type.unit, TypingPurpose::Selection)
+            .unwrap(),
+        executor,
+    )
+}
 
-    #[juniper::graphql_object]
-    impl TestMutation {
-        fn update_input_object(_obj: TestInputObject) -> f64 {
-            42.0
+/// Execute a GraphQL mutation on the Domain Engine
+async fn mutation(
+    type_info: &SchemaType,
+    field_name: &str,
+    executor: &juniper::Executor<'_, '_, ServiceCtx, GqlScalar>,
+) -> juniper::ExecutionResult<GqlScalar> {
+    let schema_ctx = &type_info.schema_ctx;
+    let service_ctx = executor.context();
+    let ontology = type_info.ontology();
+
+    let look_ahead = executor.look_ahead();
+    let args_wrapper = ArgsWrapper::new(look_ahead.arguments());
+    let query_analyzer = SelectAnalyzer::new(schema_ctx, service_ctx);
+
+    let field_data = type_info
+        .type_data()
+        .fields()
+        .unwrap()
+        .get(field_name)
+        .unwrap();
+
+    match &field_data.kind {
+        FieldKind::CreateMutation { input } => {
+            let input_attribute =
+                args_wrapper.deserialize_domain_field_arg_as_attribute(input, ontology)?;
+            let struct_query = query_analyzer.analyze_struct_select(&look_ahead, field_data)?;
+            let query = match struct_query {
+                StructOrUnionSelect::Struct(struct_query) => Select::Struct(struct_query),
+                StructOrUnionSelect::Union(def_id, structs) => Select::StructUnion(def_id, structs),
+            };
+
+            trace!(
+                "CREATE {} -> {query:#?}",
+                ValueDebug(&input_attribute.value)
+            );
+
+            let value = service_ctx
+                .domain_engine
+                .store_new_entity(input_attribute.value, query)
+                .await?;
+
+            resolve_schema_type_field(
+                AttributeType {
+                    attr: &value.into(),
+                },
+                schema_ctx
+                    .find_schema_type_by_unit(field_data.field_type.unit, TypingPurpose::Selection)
+                    .unwrap(),
+                executor,
+            )
         }
+        FieldKind::UpdateMutation { id, input } => {
+            let id_attribute =
+                args_wrapper.deserialize_domain_field_arg_as_attribute(id, ontology)?;
+            let input_attribute =
+                args_wrapper.deserialize_domain_field_arg_as_attribute(input, ontology)?;
 
-        fn option_ret(_obj: TestInputObject) -> Option<f64> {
-            Some(42.0)
+            let query = query_analyzer.analyze_struct_select(&look_ahead, field_data);
+
+            trace!(
+                "UPDATE {} -> {} -> {query:#?}",
+                ValueDebug(&id_attribute.value),
+                ValueDebug(&input_attribute.value)
+            );
+            Ok(juniper::Value::Null)
         }
-    }
+        FieldKind::DeleteMutation { id } => {
+            let id_value = args_wrapper.deserialize_domain_field_arg_as_attribute(id, ontology)?;
 
-    #[juniper::graphql_union]
-    trait TestUnion {
-        fn as_mutation(&self) -> Option<&TestMutation>;
+            trace!("DELETE {id_value:?}");
+
+            Ok(juniper::Value::Null)
+        }
+        _ => panic!(),
     }
 }
