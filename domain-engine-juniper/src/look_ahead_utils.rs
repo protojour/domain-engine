@@ -5,7 +5,10 @@ use ontol_runtime::{
     interface::graphql::argument, interface::graphql::schema::TypingPurpose,
     interface::serde::operator::SerdeOperatorAddr, ontology::Ontology, smart_format,
 };
-use serde::de::{self, DeserializeSeed, IntoDeserializer};
+use serde::{
+    de::{self, DeserializeSeed, IntoDeserializer},
+    Deserialize,
+};
 
 use crate::gql_scalar::GqlScalar;
 
@@ -18,19 +21,24 @@ impl<'a> ArgsWrapper<'a> {
         Self { arguments }
     }
 
-    pub fn deserialize<'de, T: serde::Deserialize<'de>>(
+    pub fn deserialize_optional<'de, T: serde::Deserialize<'de>>(
         &self,
         name: &str,
     ) -> Result<Option<T>, juniper::FieldError<GqlScalar>> {
         match self.find_argument(name) {
             None => Ok(None),
             Some(argument) => {
-                let value = T::deserialize(LookAheadValueDeserializer {
+                let value = Option::<T>::deserialize(LookAheadValueDeserializer {
                     value: argument.spanned_value(),
                 })
-                .map_err(|error| juniper::FieldError::new(error, graphql_value!(None)))?;
+                .map_err(|error| {
+                    juniper::FieldError::new(
+                        smart_format!("`{name}`: {error}"),
+                        graphql_value!(None),
+                    )
+                })?;
 
-                Ok(Some(value))
+                Ok(value)
             }
         }
     }

@@ -20,6 +20,13 @@ impl Sequence {
         }
     }
 
+    pub fn new_sub(attrs: impl IntoIterator<Item = Attribute>, sub_seq: SubSequence) -> Self {
+        Self {
+            attrs: attrs.into_iter().collect(),
+            sub_seq: Some(Box::new(sub_seq)),
+        }
+    }
+
     pub fn new_with_capacity(cap: usize) -> Self {
         Self {
             attrs: ThinVec::with_capacity(cap),
@@ -38,7 +45,7 @@ pub struct SubSequence {
     pub total_len: Option<usize>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Cursor {
     Offset(usize),
     Custom(Box<[u8]>),

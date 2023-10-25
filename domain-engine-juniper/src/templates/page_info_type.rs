@@ -1,7 +1,7 @@
 use ontol_runtime::sequence::Sequence;
 
 use crate::{
-    context::SchemaType, cursor_util::cursor_to_scalar, gql_scalar::GqlScalar, ServiceCtx,
+    context::SchemaType, cursor_util::serialize_cursor, gql_scalar::GqlScalar, ServiceCtx,
 };
 
 pub struct PageInfoType<'v> {
@@ -42,7 +42,7 @@ impl<'v> juniper::GraphQLValue<GqlScalar> for PageInfoType<'v> {
                     .and_then(|sub_seq| sub_seq.end_cursor.as_ref());
 
                 let value = match end_cursor {
-                    Some(next_cursor) => juniper::Value::Scalar(cursor_to_scalar(next_cursor)),
+                    Some(next_cursor) => juniper::Value::Scalar(serialize_cursor(next_cursor)),
                     None => juniper::Value::Null,
                 };
 

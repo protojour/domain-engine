@@ -2,7 +2,7 @@ use domain_engine_core::data_store::DataStoreAPIMock;
 use domain_engine_juniper::{context::ServiceCtx, gql_scalar::GqlScalar, Schema};
 use juniper::{graphql_value, parser::SourcePosition, ExecutionError, FieldError};
 use ontol_runtime::{
-    sequence::Sequence,
+    sequence::{Cursor, Sequence, SubSequence},
     value::{Attribute, Value},
 };
 use ontol_test_utils::{
@@ -195,7 +195,7 @@ async fn test_graphql_basic_pagination() {
 
     expect_eq!(
         actual = "{
-            foos(input: {}) {
+            foos(input: {}, first: null, after: null) {
                 pageInfo {
                     endCursor
                     hasNextPage
@@ -206,7 +206,7 @@ async fn test_graphql_basic_pagination() {
             [],
             &schema,
             &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
-            DbgTag("list"),
+            DbgTag("no pagination"),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -214,6 +214,51 @@ async fn test_graphql_basic_pagination() {
                 "pageInfo": {
                     "endCursor": null,
                     "hasNextPage": false
+                }
+            },
+        })),
+    );
+
+    expect_eq!(
+        actual = r#"{
+            foos(input: {}, first: 42, after: "bz0x") {
+                pageInfo {
+                    endCursor
+                    hasNextPage
+                }
+            }
+        }"#
+        .exec(
+            [],
+            &schema,
+            &gql_ctx_mock_data_store(
+                &test,
+                ROOT,
+                DataStoreAPIMock::query
+                    .next_call(matching!(_, _))
+                    .answers(|(entity_select, _)| {
+                        assert_eq!(entity_select.limit, 42);
+                        assert_eq!(entity_select.after_cursor, Some(Cursor::Offset(1)));
+
+                        Ok(Sequence::new_sub(
+                            [],
+                            SubSequence {
+                                end_cursor: Some(Cursor::Offset(2)),
+                                has_next: true,
+                                total_len: Some(42),
+                            },
+                        ))
+                    })
+            )
+            .await,
+            DbgTag("paginated"),
+        )
+        .await,
+        expected = Ok(graphql_value!({
+            "foos": {
+                "pageInfo": {
+                    "endCursor": "bz0y",
+                    "hasNextPage": true
                 }
             },
         })),
