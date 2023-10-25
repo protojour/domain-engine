@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
 use domain_engine_core::DomainEngine;
-use domain_engine_juniper::{
-    context::ServiceCtx, cursor_util::serialize_cursor, gql_scalar::GqlScalar, Schema,
-};
+use domain_engine_juniper::{context::ServiceCtx, cursor_util::serialize_cursor, Schema};
 use domain_engine_test_utils::graphql::{Exec, TestCompileSchema};
 use domain_engine_test_utils::DbgTag;
 use juniper::{graphql_value, InputValue};
@@ -377,7 +375,7 @@ async fn test_graphql_blog_post_conduit_paginated() {
     }
 
     let after = serialize_cursor(&Cursor::Offset(0));
-    assert_eq!(after, GqlScalar::String("bz0w".into()));
+    assert_eq!(after, "bz0w".into());
 
     expect_eq!(
         actual = r#"

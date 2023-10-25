@@ -45,6 +45,12 @@ impl From<smartstring::alias::String> for GqlScalar {
     }
 }
 
+impl From<&str> for GqlScalar {
+    fn from(value: &str) -> Self {
+        Self::String(value.into())
+    }
+}
+
 impl From<GqlScalar> for juniper::Value<GqlScalar> {
     fn from(value: GqlScalar) -> Self {
         juniper::Value::Scalar(value)
