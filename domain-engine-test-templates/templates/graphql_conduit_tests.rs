@@ -1,11 +1,14 @@
 use std::sync::Arc;
 
 use domain_engine_core::DomainEngine;
-use domain_engine_juniper::{context::ServiceCtx, Schema};
+use domain_engine_juniper::{
+    context::ServiceCtx, cursor_util::serialize_cursor, gql_scalar::GqlScalar, Schema,
+};
 use domain_engine_test_utils::graphql::{Exec, TestCompileSchema};
 use domain_engine_test_utils::DbgTag;
 use juniper::{graphql_value, InputValue};
 use ontol_runtime::config::DataStoreConfig;
+use ontol_runtime::sequence::Cursor;
 use ontol_test_utils::{
     examples::conduit::{BLOG_POST_PUBLIC, CONDUIT_DB},
     expect_eq, SourceName, TestPackages,
@@ -367,28 +370,37 @@ async fn test_graphql_blog_post_conduit_implicit_join() {
 /// The purpose of this test is to ensure that SubSequence information
 /// is threaded through the domain engine pipeline.
 #[test(tokio::test)]
-// BUG: thread SubSequence through domain engine
-#[should_panic = "assertion failed"]
 async fn test_graphql_blog_post_conduit_paginated() {
     let test = BlogPostConduit::new().await;
     for _ in 0..3 {
         test.create_db_article().await;
     }
 
+    let after = serialize_cursor(&Cursor::Offset(0));
+    assert_eq!(after, GqlScalar::String("bz0w".into()));
+
     expect_eq!(
-        actual = r#"{
-            posts(input: { written_by: "teh_user" }, first: 1, after: "bz0w") {
-                nodes {
-                    contents
-                    written_by
+        actual = r#"
+            query paginated_posts($after: String) {
+                posts(input: { written_by: "teh_user" }, first: 1, after: $after) {
+                    nodes {
+                        contents
+                        written_by
+                    }
+                    pageInfo {
+                        hasNextPage
+                        endCursor
+                    }
+                    totalCount
                 }
-                pageInfo {
-                    hasNextPage
-                }
-                totalCount
             }
-        }"#
-        .exec([], &test.blog_schema, &test.ctx(), DbgTag("teh_user"))
+        "#
+        .exec(
+            [("after".to_owned(), InputValue::Scalar(after))],
+            &test.blog_schema,
+            &test.ctx(),
+            DbgTag("paginated")
+        )
         .await,
         expected = Ok(graphql_value!({
             "posts": {

@@ -64,6 +64,7 @@ pub trait Processor {
     fn append_string(&mut self, to: Local);
     fn cond_predicate(&mut self, predicate: &Predicate) -> bool;
     fn move_seq_vals_to_stack(&mut self, source: Local);
+    fn set_sub_seq(&mut self, target: Local, source: Local);
     fn type_pun(&mut self, local: Option<Local>, def_id: DefId);
     fn regex_capture(&mut self, local: Local, text_pattern: &TextPattern, index_filter: &BitVec);
     fn regex_capture_iter(
@@ -211,6 +212,10 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                 }
                 OpCode::MoveSeqValsToStack(local) => {
                     processor.move_seq_vals_to_stack(*local);
+                    self.program_counter += 1;
+                }
+                OpCode::SetSubSeq(target, source) => {
+                    processor.set_sub_seq(*target, *source);
                     self.program_counter += 1;
                 }
                 OpCode::TypePunTop(def_id) => {

@@ -503,6 +503,21 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 );
                 block.pop_until(seq_local, span, self.builder);
             }
+            ontol_hir::Kind::SetSubSeq(target, source) => {
+                let Ok(target_local) = self.var_local(*target) else {
+                    return;
+                };
+                let Ok(source_local) = self.var_local(*source) else {
+                    return;
+                };
+
+                block.op(
+                    OpCode::SetSubSeq(target_local, source_local),
+                    Delta(0),
+                    span,
+                    self.builder,
+                );
+            }
             ontol_hir::Kind::ForEach(seq_var, (rel_binding, val_binding), nodes) => {
                 let Ok(seq_local) = self.var_local(*seq_var) else {
                     return;

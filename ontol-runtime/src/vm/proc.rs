@@ -101,6 +101,7 @@ pub enum OpCode {
     /// Take the sequence stored at Local, replace it with unit, and push all its values onto the stack.
     /// These sequences must have a size known in advance, typically temporary storage.
     MoveSeqValsToStack(Local),
+    SetSubSeq(Local, Local),
     /// Overwrite runtime type info with a new type (the local on the top of stack)
     TypePunTop(DefId),
     /// Overwrite runtime type info with a new type

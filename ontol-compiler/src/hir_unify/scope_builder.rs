@@ -236,7 +236,8 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
             | ontol_hir::Kind::MatchProp(..)
             | ontol_hir::Kind::MatchRegex(..)
             | ontol_hir::Kind::StringPush(..)
-            | ontol_hir::Kind::PushCondClause(..) => {
+            | ontol_hir::Kind::PushCondClause(..)
+            | ontol_hir::Kind::SetSubSeq(..) => {
                 unimplemented!("BUG: {} is an output node", self.hir_arena.node_ref(node))
             }
         }

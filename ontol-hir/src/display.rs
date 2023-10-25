@@ -156,6 +156,10 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
                 self.print_rparen(multi, f)?;
                 Ok(multi)
             }
+            Kind::SetSubSeq(target, source) => {
+                write!(f, "{sep}(set-sub-seq {} {})", target, source)?;
+                Ok(Multiline(false))
+            }
             Kind::ForEach(var, (rel, val), children) => {
                 write!(f, "{indent}(for-each {var} ({rel} {val})")?;
                 let multi = self.print_all(Sep::Space, self.kinds(children), f)?;

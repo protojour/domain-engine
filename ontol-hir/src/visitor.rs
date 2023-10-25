@@ -135,6 +135,10 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                     self.visit_node(index, child);
                 }
             }
+            Kind::SetSubSeq(target, source) => {
+                self.visit_var(*target);
+                self.visit_var(*source);
+            }
             Kind::ForEach(seq_var, (rel, val), body) => {
                 self.visit_var(*seq_var);
                 self.traverse_pattern_binding(rel);

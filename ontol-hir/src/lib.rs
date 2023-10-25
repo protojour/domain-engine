@@ -182,6 +182,7 @@ pub enum Kind<'a, L: Lang> {
     /// A sequence with associated binder. The value is the sequence.
     /// TODO: This can be done with Let!
     Sequence(L::Data<'a, Binder>, Nodes),
+    SetSubSeq(Var, Var),
     /// Iterate attributes in sequence var,
     ForEach(Var, (Binding<'a, L>, Binding<'a, L>), Nodes),
     /// Push an attribute to the end of a sequence

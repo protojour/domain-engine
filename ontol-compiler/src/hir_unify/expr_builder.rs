@@ -193,7 +193,8 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
             | ontol_hir::Kind::ForEach(..)
             | ontol_hir::Kind::StringPush(..)
             | ontol_hir::Kind::SeqPush(..)
-            | ontol_hir::Kind::PushCondClause(..) => {
+            | ontol_hir::Kind::PushCondClause(..)
+            | ontol_hir::Kind::SetSubSeq(..) => {
                 unimplemented!("BUG: {} is an output node", node_ref)
             }
         }

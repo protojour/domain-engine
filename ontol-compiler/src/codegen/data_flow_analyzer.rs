@@ -252,8 +252,9 @@ where
                 }
                 var_set
             }
-            ontol_hir::Kind::Regex(..) => VarSet::default(),
-            ontol_hir::Kind::PushCondClause(..) => VarSet::default(),
+            ontol_hir::Kind::Regex(..)
+            | ontol_hir::Kind::PushCondClause(..)
+            | ontol_hir::Kind::SetSubSeq(..) => VarSet::default(),
         }
     }
 

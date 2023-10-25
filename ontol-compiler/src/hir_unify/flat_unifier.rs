@@ -238,6 +238,11 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                         )
                     };
 
+                    let inherit_sub_seq = self.mk_node(
+                        ontol_hir::Kind::SetSubSeq(target_seq_var, source_seq_var),
+                        unit_meta,
+                    );
+
                     {
                         let source_let = self.mk_node(
                             ontol_hir::Kind::Let(
@@ -248,7 +253,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                                     input_meta,
                                 ),
                                 input,
-                                [for_each].into_iter().collect(),
+                                [inherit_sub_seq, for_each].into_iter().collect(),
                             ),
                             input_meta,
                         );

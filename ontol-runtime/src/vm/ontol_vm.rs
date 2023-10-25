@@ -3,7 +3,6 @@ use std::{array, collections::BTreeMap};
 use bit_vec::BitVec;
 use regex::Captures;
 use smartstring::alias::String;
-use thin_vec::ThinVec;
 use tracing::{trace, Level};
 
 use crate::{
@@ -129,11 +128,11 @@ impl Processor for OntolProcessor {
         let i = *self.int_local_mut(index) as usize;
         let seq = self.sequence_local_mut(seq);
 
-        if seq.len() <= i {
+        if seq.attrs.len() <= i {
             false
         } else {
             let mut attr = Value::unit().to_unit_attr();
-            std::mem::swap(&mut seq[i], &mut attr);
+            std::mem::swap(&mut seq.attrs[i], &mut attr);
 
             self.stack.push(attr.rel_params);
             self.stack.push(attr.value);
@@ -212,7 +211,7 @@ impl Processor for OntolProcessor {
     fn append_attr2(&mut self, seq: Local) {
         let [rel_params, value]: [Value; 2] = self.pop_n();
         let seq = self.sequence_local_mut(seq);
-        seq.push(Attribute { value, rel_params });
+        seq.attrs.push(Attribute { value, rel_params });
     }
 
     #[inline(always)]
@@ -236,10 +235,15 @@ impl Processor for OntolProcessor {
     }
 
     fn move_seq_vals_to_stack(&mut self, source: Local) {
-        let sequence = std::mem::take(self.sequence_local_mut(source));
+        let sequence = std::mem::take(&mut self.sequence_local_mut(source).attrs);
         *self.local_mut(source) = Value::unit();
         self.stack
             .extend(sequence.into_iter().map(|attr| attr.value));
+    }
+
+    fn set_sub_seq(&mut self, target: Local, source: Local) {
+        let sub_seq = self.sequence_local_mut(source).sub_seq.clone();
+        self.sequence_local_mut(target).sub_seq = sub_seq;
     }
 
     #[inline(always)]
@@ -403,9 +407,9 @@ impl OntolProcessor {
     }
 
     #[inline(always)]
-    fn sequence_local_mut(&mut self, local: Local) -> &mut ThinVec<Attribute> {
+    fn sequence_local_mut(&mut self, local: Local) -> &mut Sequence {
         match &mut self.local_mut(local).data {
-            Data::Sequence(seq) => &mut seq.attrs,
+            Data::Sequence(seq) => seq,
             _ => panic!("Value at {local:?} is not a sequence"),
         }
     }
