@@ -23,7 +23,6 @@ use domain_engine_test_utils::{
     parser_document_utils::{
         find_input_object_type, find_object_field, find_object_type, FieldInfo,
     },
-    DbgTag,
 };
 
 const ROOT: SourceName = SourceName::root();
@@ -97,7 +96,6 @@ async fn test_graphql_int_scalars() {
             [],
             &schema,
             &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
-            DbgTag("foos"),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -130,7 +128,6 @@ async fn test_graphql_int_scalars() {
                     .returns(Ok(entity.into())),
             )
             .await,
-            DbgTag("mutation"),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -169,7 +166,6 @@ async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
             [],
             &schema,
             &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
-            DbgTag("list"),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -206,7 +202,6 @@ async fn test_graphql_basic_pagination() {
             [],
             &schema,
             &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
-            DbgTag("no pagination"),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -252,7 +247,6 @@ async fn test_graphql_basic_pagination() {
                     })
             )
             .await,
-            DbgTag("paginated"),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -299,7 +293,6 @@ async fn test_graphql_basic_pagination() {
                     })
             )
             .await,
-            DbgTag("totalCount"),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -347,7 +340,6 @@ async fn test_graphql_nodes() {
                     .returns(Ok(Sequence::new([attr.clone()])))
             )
             .await,
-            DbgTag("foos"),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -422,7 +414,6 @@ async fn test_inner_struct() {
             [],
             &schema,
             &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
-            DbgTag("list"),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -457,7 +448,6 @@ async fn test_inner_struct() {
                     .returns(Ok(entity.into()))
             )
             .await,
-            DbgTag("list"),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -497,12 +487,7 @@ async fn test_docs_introspection() {
                 }
             }
         }"#
-        .exec(
-            [],
-            &schema,
-            &gql_ctx_mock_data_store(&test, ROOT, ()).await,
-            DbgTag("inspect"),
-        )
+        .exec([], &schema, &gql_ctx_mock_data_store(&test, ROOT, ()).await)
         .await,
         expected = Ok(graphql_value!({
             "__type": {
@@ -574,8 +559,7 @@ async fn test_graphql_artist_and_instrument_connections() {
                     .next_call(matching!(_))
                     .returns(Ok(Sequence::new([ziggy.clone()])))
             )
-            .await,
-            DbgTag("artists"),
+            .await
         )
         .await,
         expected = Ok(graphql_value!({
@@ -623,7 +607,6 @@ async fn test_graphql_artist_and_instrument_connections() {
             [],
             &schema,
             &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
-            DbgTag("instruments"),
         )
         .await,
         expected = Ok(graphql_value!({
@@ -668,8 +651,7 @@ async fn test_graphql_artist_and_instrument_connections() {
                     .next_call(matching!(_, _, _))
                     .returns(Ok(ziggy.value))
             )
-            .await,
-            DbgTag("createartist"),
+            .await
         )
         .await,
         expected = Ok(graphql_value!({
@@ -736,8 +718,7 @@ async fn test_graphql_guitar_synth_union_selection() {
                     .next_call(matching!(_, _))
                     .returns(Ok(Sequence::new([artist_entity])))
             )
-            .await,
-            DbgTag("artists"),
+            .await
         )
         .await,
         expected = Ok(graphql_value!({
@@ -848,8 +829,7 @@ async fn test_graphql_guitar_synth_union_input_exec() {
                     .next_call(matching!(_, _, _))
                     .returns(Ok(ziggy))
             )
-            .await,
-            DbgTag("createArtist"),
+            .await
         )
         .await,
         expected = Ok(graphql_value!({
@@ -889,12 +869,7 @@ async fn test_graphql_guitar_synth_union_input_error_span() {
                 }
             }
         "#
-        .exec(
-            [],
-            &schema,
-            &gql_ctx_mock_data_store(&test, ROOT, ()).await,
-            DbgTag("createartist"),
-        )
+        .exec([], &schema, &gql_ctx_mock_data_store(&test, ROOT, ()).await)
         .await,
         expected = Err(TestError::Execution(vec![expected_error])),
     );
@@ -931,8 +906,7 @@ async fn test_graphql_municipalities() {
         .exec(
             [],
             &schema,
-            &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
-            DbgTag("list"),
+            &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await
         )
         .await,
         expected = Ok(graphql_value!({
@@ -992,7 +966,7 @@ async fn test_graphql_municipalities_named_query() {
                 }
             }
         }"#
-        .exec([], schema, ctx, DbgTag("OSL"))
+        .exec([], schema, ctx)
         .await
     }
 

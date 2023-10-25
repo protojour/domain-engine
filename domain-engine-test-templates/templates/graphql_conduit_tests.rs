@@ -3,7 +3,6 @@ use std::sync::Arc;
 use domain_engine_core::DomainEngine;
 use domain_engine_juniper::{context::ServiceCtx, cursor_util::serialize_cursor, Schema};
 use domain_engine_test_utils::graphql::{Exec, TestCompileSchema};
-use domain_engine_test_utils::DbgTag;
 use juniper::{graphql_value, InputValue};
 use ontol_runtime::config::DataStoreConfig;
 use ontol_runtime::sequence::Cursor;
@@ -41,7 +40,7 @@ async fn test_graphql_conduit_db() {
                 username
             }
         }"#
-        .exec([], &schema, &ctx, DbgTag("mutation"))
+        .exec([], &schema, &ctx)
         .await,
         expected = Ok(graphql_value!({
             "createUser": {
@@ -63,7 +62,7 @@ async fn test_graphql_conduit_db() {
                 }
             }
         }"
-        .exec([], &schema, &ctx, DbgTag("list"))
+        .exec([], &schema, &ctx)
         .await,
         expected = Ok(graphql_value!({
             "users": {
@@ -102,7 +101,7 @@ async fn test_graphql_conduit_db_create_with_foreign_reference() {
             user_id
         }
     }"#
-    .exec([], &schema, &ctx, DbgTag("create_u1"))
+    .exec([], &schema, &ctx)
     .await
     .unwrap();
 
@@ -138,8 +137,7 @@ async fn test_graphql_conduit_db_create_with_foreign_reference() {
         .exec(
             [("authorId".to_owned(), InputValue::Scalar(user_id))],
             &schema,
-            &ctx,
-            DbgTag("new_article")
+            &ctx
         )
         .await,
         expected = Ok(graphql_value!({
@@ -180,7 +178,7 @@ async fn test_graphql_conduit_db_query_article_with_tags() {
             slug
         }
     }"#
-    .exec([], &schema, &ctx, DbgTag("mut"))
+    .exec([], &schema, &ctx)
     .await
     .unwrap();
 
@@ -200,7 +198,7 @@ async fn test_graphql_conduit_db_query_article_with_tags() {
                 }
             }
         }"#
-        .exec([], &schema, &ctx, DbgTag("list"))
+        .exec([], &schema, &ctx)
         .await,
         expected = Ok(graphql_value!({
             "articles": {
@@ -269,12 +267,7 @@ impl BlogPostConduit {
                     slug
                 }
             }"#
-            .exec(
-                [],
-                &self.db_schema,
-                &self.ctx(),
-                DbgTag("create_db_article")
-            )
+            .exec([], &self.db_schema, &self.ctx())
             .await,
             expected = Ok(graphql_value!({
                 "createArticle": { "slug": "the-slug" }
@@ -302,12 +295,7 @@ impl BlogPostConduit {
                     slug
                 }
             }"#
-            .exec(
-                [],
-                &self.db_schema,
-                &self.ctx(),
-                DbgTag("create_db_article_with_tag"),
-            )
+            .exec([], &self.db_schema, &self.ctx())
             .await,
             expected = Ok(graphql_value!({
                 "createArticle": { "slug": "the-slug" }
@@ -332,7 +320,7 @@ async fn test_graphql_blog_post_conduit_implicit_join() {
                 }
             }
         }"#
-        .exec([], &test.blog_schema, &test.ctx(), DbgTag("teh_user"))
+        .exec([], &test.blog_schema, &test.ctx())
         .await,
         expected = Ok(graphql_value!({
             "posts": {
@@ -359,7 +347,7 @@ async fn test_graphql_blog_post_conduit_implicit_join() {
                 }
             }
         }"#
-        .exec([], &test.blog_schema, &test.ctx(), DbgTag("someone_else"))
+        .exec([], &test.blog_schema, &test.ctx())
         .await,
         expected = Ok(graphql_value!({ "posts": { "edges": [] } })),
     );
@@ -396,8 +384,7 @@ async fn test_graphql_blog_post_conduit_paginated() {
         .exec(
             [("after".to_owned(), InputValue::Scalar(after))],
             &test.blog_schema,
-            &test.ctx(),
-            DbgTag("paginated")
+            &test.ctx()
         )
         .await,
         expected = Ok(graphql_value!({
@@ -435,7 +422,7 @@ async fn test_graphql_blog_post_conduit_tags() {
                 }
             }
         }"
-        .exec([], &test.blog_schema, &test.ctx(), DbgTag("list"))
+        .exec([], &test.blog_schema, &test.ctx())
         .await,
         expected = Ok(graphql_value!({
             "posts": {
@@ -468,7 +455,7 @@ async fn test_graphql_blog_post_conduit_no_join_real() {
                 }
             }
         }"
-        .exec([], &test.blog_schema, &test.ctx(), DbgTag("list"))
+        .exec([], &test.blog_schema, &test.ctx())
         .await,
         expected = Ok(graphql_value!({
             "posts": {

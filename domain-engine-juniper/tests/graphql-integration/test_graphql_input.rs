@@ -1,7 +1,4 @@
-use domain_engine_test_utils::{
-    graphql::{gql_ctx_mock_data_store, Exec, TestCompileSchema},
-    DbgTag,
-};
+use domain_engine_test_utils::graphql::{gql_ctx_mock_data_store, Exec, TestCompileSchema};
 use ontol_test_utils::{assert_error_msg, SourceName};
 use test_log::test;
 
@@ -29,7 +26,7 @@ async fn test_graphql_input_deserialization_error() {
                 prop
             }
         }"#
-        .exec([], &schema, &ctx, DbgTag("mutation"))
+        .exec([], &schema, &ctx)
         .await,
         r#"Execution: invalid type: string "invalid", expected "const" in input at line 4 column 26 (field at line 2 column 12)"#
     );
@@ -64,12 +61,7 @@ async fn test_graphql_input_constructor_sequence_as_json_scalar() {
             prop
         }
     }"#
-    .exec(
-        [],
-        &schema,
-        &gql_ctx_mock_data_store(&test, ROOT, ()).await,
-        DbgTag("mutation"),
-    )
+    .exec([], &schema, &gql_ctx_mock_data_store(&test, ROOT, ()).await)
     .await
     .unwrap();
 }

@@ -14,8 +14,6 @@ use ontol_runtime::sequence::Sequence;
 use ontol_test_utils::{OntolTest, SourceName, TestCompile};
 use unimock::*;
 
-use crate::DbgTag;
-
 pub trait TestCompileSchema {
     fn compile_schemas<const N: usize>(
         self,
@@ -105,20 +103,16 @@ pub trait Exec {
         variables: impl Into<juniper::Variables<GqlScalar>> + Send,
         schema: &Schema,
         context: &ServiceCtx,
-        tag: DbgTag,
     ) -> Result<juniper::Value<GqlScalar>, TestError>;
 }
 
 #[async_trait::async_trait]
 impl Exec for &'static str {
-    #[tracing::instrument(skip(self, schema, context, variables))]
-    #[allow(unused)]
     async fn exec(
         self,
         variables: impl Into<juniper::Variables<GqlScalar>> + Send,
         schema: &Schema,
         context: &ServiceCtx,
-        tag: DbgTag,
     ) -> Result<juniper::Value<GqlScalar>, TestError> {
         let variables = variables.into();
         match juniper::execute(self, None, schema, &variables, context).await {

@@ -1,7 +1,5 @@
 #![forbid(unsafe_code)]
 
-use std::fmt::Debug;
-
 use domain_engine_core::DomainEngine;
 use ontol_runtime::{
     condition::{CondTerm, Condition},
@@ -16,14 +14,6 @@ use serde::de::DeserializeSeed;
 
 pub mod graphql;
 pub mod parser_document_utils;
-
-pub struct DbgTag(pub &'static str);
-
-impl Debug for DbgTag {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
 
 #[async_trait::async_trait]
 pub trait DomainEngineTestExt {
