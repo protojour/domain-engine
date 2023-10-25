@@ -125,7 +125,7 @@ impl ser::Serializer for JuniperValueSerializer {
     }
 
     fn serialize_unit(self) -> SerResult {
-        Ok(GqlScalar::Unit.into())
+        Ok(juniper::Value::Null)
     }
 
     fn serialize_unit_struct(self, _name: &'static str) -> SerResult {
@@ -159,7 +159,7 @@ impl ser::Serializer for JuniperValueSerializer {
     }
 
     fn serialize_none(self) -> SerResult {
-        Ok(GqlScalar::Unit.into())
+        Ok(juniper::Value::Null)
     }
 
     fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {

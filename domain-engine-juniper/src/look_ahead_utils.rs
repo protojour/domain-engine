@@ -146,9 +146,6 @@ impl<'a, 'de> de::Deserializer<'de> for LookAheadValueDeserializer<'a> {
     fn deserialize_any<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
         match &self.value.item {
             LookAheadValue::Null => visitor.visit_none::<Error>().context(&self.value.start),
-            LookAheadValue::Scalar(GqlScalar::Unit) => {
-                visitor.visit_unit().context(&self.value.start)
-            }
             LookAheadValue::Scalar(GqlScalar::I32(value)) => {
                 visitor.visit_i32(*value).context(&self.value.start)
             }

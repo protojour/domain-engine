@@ -6,7 +6,6 @@ use smartstring::alias::String;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum GqlScalar {
-    Unit,
     /// The standard Int type for GraphQL is an i32.
     I32(i32),
     /// Memoriam supports the i64 custom scalar in GraphQL.
@@ -55,7 +54,6 @@ impl From<GqlScalar> for juniper::Value<GqlScalar> {
 impl Display for GqlScalar {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Unit => write!(f, "{{}}"),
             Self::I32(i) => write!(f, "{i}"),
             Self::I64(i) => write!(f, "{i}"),
             Self::F64(f64) => write!(f, "{f64}"),
@@ -125,7 +123,6 @@ impl ser::Serialize for GqlScalar {
         S: ser::Serializer,
     {
         match self {
-            Self::Unit => serializer.serialize_unit(),
             Self::I32(i) => serializer.serialize_i32(*i),
             Self::I64(i) => serializer.serialize_i64(*i),
             Self::F64(f) => serializer.serialize_f64(*f),
