@@ -349,6 +349,10 @@ async fn test_inner_struct() {
         rel foo_id identifies: .
         rel .'inner': inner
     }
+    map foos {
+        {}
+        foo: [..foo match {}]
+    }
     "
     .compile_schemas([ROOT]);
 
@@ -357,12 +361,10 @@ async fn test_inner_struct() {
 
     expect_eq!(
         actual = "{
-            fooList {
-                edges {
-                    node {
-                        inner {
-                            prop
-                        }
+            foos {
+                nodes {
+                    inner {
+                        prop
                     }
                 }
             }
@@ -375,8 +377,8 @@ async fn test_inner_struct() {
         )
         .await,
         expected = Ok(graphql_value!({
-            "fooList": {
-                "edges": [],
+            "foos": {
+                "nodes": [],
             },
         })),
     );
@@ -655,7 +657,7 @@ async fn test_graphql_guitar_synth_union_selection() {
 
     expect_eq!(
         actual = "{
-            artistList {
+            artists {
                 edges {
                     node {
                         plays {
@@ -686,11 +688,11 @@ async fn test_graphql_guitar_synth_union_selection() {
                     .returns(Ok(Sequence::new([artist_entity])))
             )
             .await,
-            DbgTag("artistList"),
+            DbgTag("artists"),
         )
         .await,
         expected = Ok(graphql_value!({
-            "artistList": {
+            "artists": {
                 "edges": [{
                     "node": {
                         "plays": {
@@ -856,7 +858,7 @@ async fn test_graphql_municipalities() {
 
     expect_eq!(
         actual = "{
-            municipalityList {
+            municipalities {
                 edges {
                     node {
                         code
@@ -885,7 +887,7 @@ async fn test_graphql_municipalities() {
         )
         .await,
         expected = Ok(graphql_value!({
-            "municipalityList": {
+            "municipalities": {
                 "edges": []
             }
         })),

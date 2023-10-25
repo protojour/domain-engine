@@ -24,3 +24,8 @@ pub def artist {
     rel .'name': text
     rel [.] 'plays'::'played-by' [instrument]
 }
+
+map artists {
+    {}
+    artist: [..artist match {}]
+}

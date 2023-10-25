@@ -950,7 +950,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
 
         let id_unit_type_ref = self.get_def_type_ref(entity_data.id_def_id, QLevel::Node);
 
-        {
+        if true {
             let query = object_data_mut(self.schema.query, self.schema);
             query.fields.insert(
                 self.namespace.list(type_info),

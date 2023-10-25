@@ -2,8 +2,7 @@ use domain_engine_test_utils::{
     graphql::{gql_ctx_mock_data_store, Exec, TestCompileSchema},
     DbgTag,
 };
-use juniper::graphql_value;
-use ontol_test_utils::{assert_error_msg, expect_eq, SourceName};
+use ontol_test_utils::{assert_error_msg, SourceName};
 use test_log::test;
 
 const ROOT: SourceName = SourceName::root();
@@ -55,28 +54,22 @@ async fn test_graphql_input_constructor_sequence_as_json_scalar() {
     "
     .compile_schemas([SourceName::root()]);
 
-    expect_eq!(
-        actual = r#"
-        mutation {
-            createfoo(
-                input: {
-                    prop: [42, "text"]
-                }
-            ) {
-                prop
+    r#"
+    mutation {
+        createfoo(
+            input: {
+                prop: [42, "text"]
             }
-        }"#
-        .exec(
-            [],
-            &schema,
-            &gql_ctx_mock_data_store(&test, ROOT, ()).await,
-            DbgTag("mutation"),
-        )
-        .await,
-        expected = Ok(graphql_value!({
-            "municipalityList": {
-                "edges": []
-            }
-        })),
-    );
+        ) {
+            prop
+        }
+    }"#
+    .exec(
+        [],
+        &schema,
+        &gql_ctx_mock_data_store(&test, ROOT, ()).await,
+        DbgTag("mutation"),
+    )
+    .await
+    .unwrap();
 }

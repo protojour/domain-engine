@@ -15,9 +15,7 @@ map municipality {
     municipality match { 'code': code }
 }
 
-// map municipalityList {
-//     args { 'first': first , 'after': after }
-//     [
-//         ..municipality match(first, after) {}
-//     ]
-// }
+map municipalities {
+    {}
+    municipality: [..municipality match {}]
+}
