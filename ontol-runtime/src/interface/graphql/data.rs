@@ -233,6 +233,7 @@ pub enum FieldKind {
     Id(IdPropertyData),
     Node,
     Edges,
+    Nodes,
     PageInfo,
     /// A connection from a map statement
     MapConnection {

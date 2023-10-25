@@ -1,3 +1,5 @@
+use std::collections::hash_map::Entry;
+
 use fnv::FnvHashMap;
 use juniper::{FieldError, LookAheadMethods, LookAheadSelection};
 use ontol_runtime::{
@@ -189,15 +191,17 @@ impl<'a> SelectAnalyzer<'a> {
                 let after_cursor =
                     args_wrapper.deserialize_optional::<GraphQLCursor>(after_arg.name())?;
 
-                let mut inner_select = None;
+                let mut inner_select = Select::Leaf;
 
                 for field_look_ahead in look_ahead.children() {
                     let field_name = field_look_ahead.field_name_unaliased();
                     let field_data = object_data.fields.get(field_name).unwrap();
 
-                    if let FieldKind::Edges = &field_data.kind {
-                        inner_select =
-                            Some(self.analyze_selection(field_look_ahead, field_data)?.select);
+                    if let FieldKind::Edges | FieldKind::Nodes = &field_data.kind {
+                        merge_selects(
+                            &mut inner_select,
+                            self.analyze_selection(field_look_ahead, field_data)?.select,
+                        );
                     }
                 }
 
@@ -230,15 +234,17 @@ impl<'a> SelectAnalyzer<'a> {
                 let after_cursor =
                     args_wrapper.deserialize_optional::<GraphQLCursor>(after.name())?;
 
-                let mut inner_select = None;
+                let mut inner_select = Select::Leaf;
 
                 for field_look_ahead in look_ahead.children() {
                     let field_name = field_look_ahead.field_name_unaliased();
                     let field_data = object_data.fields.get(field_name).unwrap();
 
-                    if let FieldKind::Edges = &field_data.kind {
-                        inner_select =
-                            Some(self.analyze_selection(field_look_ahead, field_data)?.select);
+                    if let FieldKind::Edges | FieldKind::Nodes = &field_data.kind {
+                        merge_selects(
+                            &mut inner_select,
+                            self.analyze_selection(field_look_ahead, field_data)?.select,
+                        );
                     }
                 }
 
@@ -277,6 +283,7 @@ impl<'a> SelectAnalyzer<'a> {
             }
             (
                 FieldKind::Node
+                | FieldKind::Nodes
                 | FieldKind::CreateMutation { .. }
                 | FieldKind::UpdateMutation { .. },
                 Ok(type_data),
@@ -407,7 +414,7 @@ impl<'a> SelectAnalyzer<'a> {
 
     fn mk_entity_select(
         &self,
-        mut inner_select: Option<Select>,
+        mut inner_select: Select,
         limit: usize,
         after_cursor: Option<GraphQLCursor>,
         object_data: &ObjectData,
@@ -417,7 +424,7 @@ impl<'a> SelectAnalyzer<'a> {
 
         loop {
             match inner_select {
-                Some(Select::Struct(object)) => {
+                Select::Struct(object) => {
                     return Ok(Select::Entity(EntitySelect {
                         source: StructOrUnionSelect::Struct(object),
                         condition: Condition::default(),
@@ -425,7 +432,7 @@ impl<'a> SelectAnalyzer<'a> {
                         after_cursor,
                     }))
                 }
-                Some(Select::StructUnion(def_id, variants)) => {
+                Select::StructUnion(def_id, variants) => {
                     return Ok(Select::Entity(EntitySelect {
                         source: StructOrUnionSelect::Union(def_id, variants),
                         condition: Condition::default(),
@@ -433,12 +440,12 @@ impl<'a> SelectAnalyzer<'a> {
                         after_cursor,
                     }))
                 }
-                Some(Select::Entity(_) | Select::EntityId) => panic!("Select in select"),
-                Some(Select::Leaf) | None if !empty_handled => {
-                    inner_select = Some(self.empty_entity_select(object_data)?);
+                Select::Entity(_) | Select::EntityId => panic!("Select in select"),
+                Select::Leaf if !empty_handled => {
+                    inner_select = self.empty_entity_select(object_data)?;
                     empty_handled = true;
                 }
-                Some(Select::Leaf) | None => return Ok(Select::Leaf),
+                Select::Leaf => return Ok(Select::Leaf),
             }
         }
     }
@@ -465,4 +472,39 @@ impl<'a> SelectAnalyzer<'a> {
 
 const fn unit_property() -> PropertyId {
     PropertyId::subject(RelationshipId(DefId::unit()))
+}
+
+fn merge_selects(existing: &mut Select, new: Select) {
+    match (existing, new) {
+        (Select::Struct(existing), Select::Struct(new)) => {
+            merge_struct_selects(existing, new);
+        }
+        (Select::StructUnion(_, existing_selects), Select::StructUnion(_, new_selects)) => {
+            for new_select in new_selects {
+                let existing_select = existing_selects
+                    .iter_mut()
+                    .find(|sel| sel.def_id == new_select.def_id);
+
+                if let Some(existing_select) = existing_select {
+                    merge_struct_selects(existing_select, new_select);
+                } else {
+                    existing_selects.push(new_select);
+                }
+            }
+        }
+        (existing, new) => {
+            *existing = new;
+        }
+    }
+}
+
+fn merge_struct_selects(existing: &mut StructSelect, new: StructSelect) {
+    for (property_id, new_select) in new.properties {
+        match existing.properties.entry(property_id) {
+            Entry::Vacant(vacant) => {
+                vacant.insert(new_select);
+            }
+            Entry::Occupied(mut occupied) => merge_selects(occupied.get_mut(), new_select),
+        }
+    }
 }

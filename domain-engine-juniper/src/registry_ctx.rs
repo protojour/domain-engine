@@ -359,6 +359,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             | FieldKind::EdgeProperty(_)
             | FieldKind::Id(_)
             | FieldKind::Edges
+            | FieldKind::Nodes
             | FieldKind::PageInfo
             | FieldKind::Node => None,
         }

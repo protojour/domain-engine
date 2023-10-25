@@ -209,7 +209,21 @@ impl<'v> AttributeType<'v> {
         trace!("resolve object field `{field_name}`: {:?}", self.attr);
 
         match (&field_data.kind, &self.attr.value.data) {
+            (FieldKind::Node, Data::Struct(_)) => resolve_schema_type_field(
+                self,
+                schema_ctx
+                    .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
+                    .unwrap(),
+                executor,
+            ),
             (FieldKind::Edges, Data::Sequence(seq)) => resolve_schema_type_field(
+                SequenceType { seq },
+                schema_ctx
+                    .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
+                    .unwrap(),
+                executor,
+            ),
+            (FieldKind::Nodes, Data::Sequence(seq)) => resolve_schema_type_field(
                 SequenceType { seq },
                 schema_ctx
                     .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
@@ -218,13 +232,6 @@ impl<'v> AttributeType<'v> {
             ),
             (FieldKind::PageInfo, Data::Sequence(seq)) => resolve_schema_type_field(
                 PageInfoType { seq },
-                schema_ctx
-                    .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
-                    .unwrap(),
-                executor,
-            ),
-            (FieldKind::Node, Data::Struct(_)) => resolve_schema_type_field(
-                self,
                 schema_ctx
                     .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
                     .unwrap(),

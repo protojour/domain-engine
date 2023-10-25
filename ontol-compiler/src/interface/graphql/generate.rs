@@ -240,7 +240,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
     fn register_fundamental_types(&mut self) {
         self.schema.query = self.next_type_addr();
         self.schema.types.push(TypeData {
-            typename: self.namespace.unique_literal("Query"),
+            typename: "Query".into(),
             input_typename: None,
             partial_input_typename: None,
             kind: TypeKind::Object(ObjectData {
@@ -251,7 +251,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
 
         self.schema.mutation = self.next_type_addr();
         self.schema.types.push(TypeData {
-            typename: self.namespace.unique_literal("Mutation"),
+            typename: "Mutation".into(),
             input_typename: None,
             partial_input_typename: None,
             kind: TypeKind::Object(ObjectData {
@@ -263,7 +263,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
         {
             self.schema.page_info = self.next_type_addr();
             self.schema.types.push(TypeData {
-                typename: self.namespace.unique_literal("PageInfo"),
+                typename: "PageInfo".into(),
                 input_typename: None,
                 partial_input_typename: None,
                 kind: TypeKind::Object(ObjectData {
@@ -453,6 +453,14 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                         partial_input_typename: None,
                         kind: TypeKind::Object(ObjectData {
                             fields: [
+                                (
+                                    smart_format!("nodes"),
+                                    FieldData {
+                                        kind: FieldKind::Nodes,
+                                        field_type: TypeRef::mandatory(node_ref)
+                                            .to_array(Optionality::Optional),
+                                    },
+                                ),
                                 (
                                     smart_format!("edges"),
                                     FieldData {

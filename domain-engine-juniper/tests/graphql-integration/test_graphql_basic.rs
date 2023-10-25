@@ -265,6 +265,55 @@ async fn test_graphql_basic_pagination() {
     );
 }
 
+#[test(tokio::test)]
+async fn test_graphql_nodes() {
+    let (test, [schema]) = "
+    pub def foo {
+        rel .'id'(rel .gen: auto)|id: { rel .is: text }
+    }
+    map foos {
+        {}
+        foo: [..foo match {}]
+    }
+    "
+    .compile_schemas([ROOT]);
+    let [foo] = test.bind(["foo"]);
+    let attr: Attribute = foo.entity_builder(json!("id"), json!({})).into();
+
+    expect_eq!(
+        actual = "{
+            foos(input: {}) {
+                nodes { id }
+                edges { node { id } }
+            }
+        }"
+        .exec(
+            [],
+            &schema,
+            &gql_ctx_mock_data_store(
+                &test,
+                ROOT,
+                DataStoreAPIMock::query
+                    .next_call(matching!(_))
+                    .returns(Ok(Sequence::new([attr.clone()])))
+            )
+            .await,
+            DbgTag("foos"),
+        )
+        .await,
+        expected = Ok(graphql_value!({
+            "foos": {
+                "nodes": [
+                    { "id": "id" }
+                ],
+                "edges": [{
+                    "node": { "id": "id" }
+                }]
+            },
+        })),
+    );
+}
+
 #[test]
 fn test_graphql_value_type_as_field() {
     "
