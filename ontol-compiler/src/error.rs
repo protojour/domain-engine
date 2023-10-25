@@ -65,6 +65,7 @@ pub enum CompileError {
     UnionInNamedRelationshipNotSupported,
     UnsupportedCardinality,
     InvalidCardinaltyCombinationInUnion,
+    InferenceCardinalityMismatch,
     CannotConvertMissingMapping { input: String, output: String },
     NonEntityInReverseRelationship,
     OverlappingSequenceIndexes,
@@ -189,6 +190,9 @@ impl std::fmt::Display for CompileError {
             Self::UnsupportedCardinality => write!(f, "unsupported cardinality"),
             Self::InvalidCardinaltyCombinationInUnion => {
                 write!(f, "invalid cardinality combination in union")
+            }
+            Self::InferenceCardinalityMismatch => {
+                write!(f, "cardinality mismatch")
             }
             Self::CannotConvertMissingMapping { input, output } => write!(
                 f,

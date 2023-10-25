@@ -297,3 +297,18 @@ fn map_error_def_inference_ambiguity() {
         expect_eq!(actual = errors[1].span_text, expected = "'a'");
     })
 }
+
+#[test]
+fn map_error_inference_cardinality_mismatch() {
+    r"
+    def foo {
+        rel .'a': text
+        rel .'b': text
+    }
+    map {
+        { 'a'?: x } // ERROR cardinality mismatch
+        foo match { 'a': x }
+    }
+    "
+    .compile_fail();
+}

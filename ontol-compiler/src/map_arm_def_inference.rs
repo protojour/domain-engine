@@ -23,6 +23,7 @@ pub struct MapArmTypeInferred {
 
 struct VarRelationship {
     val_def_id: DefId,
+    bind_option: bool,
 }
 
 pub struct MapArmDefInferencer<'c, 'm> {
@@ -101,6 +102,13 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                 if let Some(var_relationship) =
                     self.find_source_var_relationship(source_vars, *var, &pattern_attr.value.span)
                 {
+                    if pattern_attr.bind_option != var_relationship.bind_option {
+                        self.error(
+                            CompileError::InferenceCardinalityMismatch,
+                            &pattern_attr.value.span,
+                        );
+                    }
+
                     let relationship = Relationship {
                         relation_def_id: pattern_attr.key.0,
                         subject: (parent_def_id, pattern_attr.value.span),
@@ -217,10 +225,10 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                                 .relationship
                                 .by(prop_id.role.opposite());
 
-                            output
-                                .entry(*pat_var)
-                                .or_default()
-                                .push(VarRelationship { val_def_id });
+                            output.entry(*pat_var).or_default().push(VarRelationship {
+                                val_def_id,
+                                bind_option: attr.bind_option,
+                            });
                         }
                         _ => {}
                     }
