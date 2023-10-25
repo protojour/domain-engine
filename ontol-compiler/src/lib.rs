@@ -199,17 +199,17 @@ impl<'m> Compiler<'m> {
 
         for def_id in lowered.root_defs {
             if lowered.map_defs.contains(&def_id) {
-                if let Some(arm_inference) = self.check_map_arm_def_inference(def_id) {
-                    self.type_check().check_def_sealed(arm_inference.source.1);
+                if let Some(inference_info) = self.check_map_arm_def_inference(def_id) {
+                    self.type_check().check_def_sealed(inference_info.source.1);
                     let new_defs = self
                         .map_arm_def_inferencer(def_id)
-                        .infer_map_arm_type(arm_inference);
+                        .infer_map_arm_type(inference_info);
 
                     for def_id in new_defs {
                         self.type_check().check_def_shallow(def_id);
                     }
 
-                    self.type_check().check_def_sealed(arm_inference.target.1);
+                    self.type_check().check_def_sealed(inference_info.target.1);
                 }
             }
 

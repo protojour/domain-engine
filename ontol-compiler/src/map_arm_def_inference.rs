@@ -14,8 +14,10 @@ use crate::{
 };
 
 #[derive(Clone, Copy)]
-pub struct MapArmInferenceInfo {
+pub struct MapArmTypeInferred {
+    /// The inferred type
     pub target: (PatId, DefId),
+    /// The opposing arm that's not inferred
     pub source: (PatId, DefId),
 }
 
@@ -33,7 +35,7 @@ pub struct MapArmDefInferencer<'c, 'm> {
 }
 
 impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
-    pub fn infer_map_arm_type(&mut self, info: MapArmInferenceInfo) -> Vec<DefId> {
+    pub fn infer_map_arm_type(&mut self, info: MapArmTypeInferred) -> Vec<DefId> {
         let target_pattern = self.patterns.table.get(&info.target.0).unwrap();
 
         // Force creation of properties and table:
@@ -102,10 +104,11 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                     let relationship = Relationship {
                         relation_def_id: pattern_attr.key.0,
                         subject: (parent_def_id, pattern_attr.value.span),
-                        subject_cardinality: (
-                            PropertyCardinality::Mandatory,
-                            ValueCardinality::One,
-                        ),
+                        subject_cardinality: if pattern_attr.bind_option {
+                            (PropertyCardinality::Optional, ValueCardinality::One)
+                        } else {
+                            (PropertyCardinality::Mandatory, ValueCardinality::One)
+                        },
                         object: (var_relationship.val_def_id, pattern_attr.value.span),
                         object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
                         object_prop: None,
@@ -248,10 +251,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
 }
 
 impl<'m> Compiler<'m> {
-    pub fn check_map_arm_def_inference(
-        &mut self,
-        map_def_id: DefId,
-    ) -> Option<MapArmInferenceInfo> {
+    pub fn check_map_arm_def_inference(&mut self, map_def_id: DefId) -> Option<MapArmTypeInferred> {
         let DefKind::Mapping { arms, .. } = &self.defs.table.get(&map_def_id).unwrap().kind else {
             panic!();
         };
@@ -292,13 +292,13 @@ impl<'m> Compiler<'m> {
                 None
             }
             [InfStatus::Infer(target_def_id), InfStatus::Source(source_def_id)] => {
-                Some(MapArmInferenceInfo {
+                Some(MapArmTypeInferred {
                     target: (arms[0], target_def_id),
                     source: (arms[1], source_def_id),
                 })
             }
             [InfStatus::Source(source_def_id), InfStatus::Infer(target_def_id)] => {
-                Some(MapArmInferenceInfo {
+                Some(MapArmTypeInferred {
                     target: (arms[1], target_def_id),
                     source: (arms[0], source_def_id),
                 })

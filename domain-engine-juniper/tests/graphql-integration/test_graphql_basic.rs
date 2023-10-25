@@ -299,7 +299,7 @@ async fn test_graphql_basic_pagination() {
                     })
             )
             .await,
-            DbgTag("paginated"),
+            DbgTag("totalCount"),
         )
         .await,
         expected = Ok(graphql_value!({
