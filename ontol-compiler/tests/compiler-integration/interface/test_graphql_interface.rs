@@ -148,8 +148,8 @@ fn test_graphql_artist_and_instrument() {
     let (schema, test) = schema_test(&test, ROOT_SRC_NAME);
     let query_object = test.query_object_data();
 
-    let artist_list_field = query_object.fields.get("artistList").unwrap();
-    let artist_connection = schema.type_data(artist_list_field.field_type.unit.addr());
+    let artists_field = query_object.fields.get("artists").unwrap();
+    let artist_connection = schema.type_data(artists_field.field_type.unit.addr());
 
     expect_eq!(
         actual = artist_connection.typename,

@@ -51,7 +51,7 @@ async fn test_graphql_conduit_db() {
 
     expect_eq!(
         actual = "{
-            UserList {
+            users {
                 edges {
                     node {
                         username
@@ -65,7 +65,7 @@ async fn test_graphql_conduit_db() {
         .exec([], &schema, &ctx, DbgTag("list"))
         .await,
         expected = Ok(graphql_value!({
-            "UserList": {
+            "users": {
                 "edges": [
                     {
                         "node": {
@@ -185,7 +185,7 @@ async fn test_graphql_conduit_db_query_article_with_tags() {
 
     expect_eq!(
         actual = r#"{
-            ArticleList {
+            articles {
                 edges {
                     node {
                         tags {
@@ -202,7 +202,7 @@ async fn test_graphql_conduit_db_query_article_with_tags() {
         .exec([], &schema, &ctx, DbgTag("list"))
         .await,
         expected = Ok(graphql_value!({
-            "ArticleList": {
+            "articles": {
                 "edges": [{
                     "node": {
                         "tags": {
@@ -322,7 +322,7 @@ async fn test_graphql_blog_post_conduit_implicit_join() {
 
     expect_eq!(
         actual = "{
-            BlogPostList {
+            posts {
                 edges {
                     node {
                         contents
@@ -334,7 +334,7 @@ async fn test_graphql_blog_post_conduit_implicit_join() {
         .exec([], &test.blog_schema, &test.ctx(), DbgTag("list"))
         .await,
         expected = Ok(graphql_value!({
-            "BlogPostList": {
+            "posts": {
                 "edges": [
                     {
                         "node": {
@@ -355,7 +355,7 @@ async fn test_graphql_blog_post_conduit_implicit_join_named_query() {
 
     expect_eq!(
         actual = r#"{
-            posts(input: { written_by: "teh_user" }) {
+            posts_by(input: { written_by: "teh_user" }) {
                 edges {
                     node {
                         contents
@@ -367,7 +367,7 @@ async fn test_graphql_blog_post_conduit_implicit_join_named_query() {
         .exec([], &test.blog_schema, &test.ctx(), DbgTag("teh_user"))
         .await,
         expected = Ok(graphql_value!({
-            "posts": {
+            "posts_by": {
                 "edges": [
                     {
                         "node": {
@@ -382,7 +382,7 @@ async fn test_graphql_blog_post_conduit_implicit_join_named_query() {
 
     expect_eq!(
         actual = r#"{
-            posts(input: { written_by: "someone_else" }) {
+            posts_by(input: { written_by: "someone_else" }) {
                 edges {
                     node {
                         contents
@@ -393,7 +393,7 @@ async fn test_graphql_blog_post_conduit_implicit_join_named_query() {
         }"#
         .exec([], &test.blog_schema, &test.ctx(), DbgTag("someone_else"))
         .await,
-        expected = Ok(graphql_value!({ "posts": { "edges": [] } })),
+        expected = Ok(graphql_value!({ "posts_by": { "edges": [] } })),
     );
 }
 
@@ -404,7 +404,7 @@ async fn test_graphql_blog_post_conduit_tags() {
 
     expect_eq!(
         actual = "{
-            BlogPostList {
+            posts {
                 edges {
                     node {
                         contents
@@ -417,7 +417,7 @@ async fn test_graphql_blog_post_conduit_tags() {
         .exec([], &test.blog_schema, &test.ctx(), DbgTag("list"))
         .await,
         expected = Ok(graphql_value!({
-            "BlogPostList": {
+            "posts": {
                 "edges": [
                     {
                         "node": {
@@ -439,7 +439,7 @@ async fn test_graphql_blog_post_conduit_no_join_real() {
 
     expect_eq!(
         actual = "{
-            BlogPostList {
+            posts {
                 edges {
                     node {
                         contents
@@ -450,7 +450,7 @@ async fn test_graphql_blog_post_conduit_no_join_real() {
         .exec([], &test.blog_schema, &test.ctx(), DbgTag("list"))
         .await,
         expected = Ok(graphql_value!({
-            "BlogPostList": {
+            "posts": {
                 "edges": [
                     {
                         "node": {

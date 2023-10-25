@@ -27,6 +27,12 @@ map {
 }
 
 map posts {
+    {}
+    BlogPost: [..db.Article match {}]
+}
+
+// TODO: This should just be `posts` since written by is optional
+map posts_by {
     {
         'written_by'?: by
     }

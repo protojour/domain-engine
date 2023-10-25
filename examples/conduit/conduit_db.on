@@ -47,3 +47,13 @@ rel Article 'favorited_by'::'favorited'? [User]
 rel [TagEntity] 'tagged'::'tags' [Article]
 rel [Comment] 'comment_on'::'comments'? Article
 rel [Comment] 'author'::'authored_comments'? User
+
+map users {
+    {}
+    User: [..User match {}]
+}
+
+map articles {
+    {}
+    Article: [..Article match {}]
+}
