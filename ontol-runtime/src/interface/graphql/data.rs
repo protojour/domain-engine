@@ -249,9 +249,8 @@ pub enum FieldKind {
         queries: FnvHashMap<PropertyId, Var>,
         input_arg: argument::MapInputArg,
     },
-    /// FIXME: Deprecated:
-    Connection {
-        property_id: Option<PropertyId>,
+    PropertyConnection {
+        property_id: PropertyId,
         first: argument::FirstArg,
         after: argument::AfterArg,
     },

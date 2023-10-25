@@ -237,13 +237,7 @@ impl<'v> AttributeType<'v> {
                     .unwrap(),
                 executor,
             ),
-            (
-                FieldKind::Connection {
-                    property_id: Some(property_id),
-                    ..
-                },
-                Data::Struct(attrs),
-            ) => {
+            (FieldKind::PropertyConnection { property_id, .. }, Data::Struct(attrs)) => {
                 let type_info = schema_ctx
                     .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
                     .unwrap();

@@ -216,7 +216,7 @@ impl<'a> SelectAnalyzer<'a> {
                 })
             }
             (
-                FieldKind::Connection {
+                FieldKind::PropertyConnection {
                     property_id,
                     first,
                     after,
@@ -249,7 +249,7 @@ impl<'a> SelectAnalyzer<'a> {
                 }
 
                 Ok(KeyedPropertySelection {
-                    key: property_id.unwrap_or(unit_property()),
+                    key: *property_id,
                     select: self.mk_entity_select(
                         inner_select,
                         limit,

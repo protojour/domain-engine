@@ -38,10 +38,6 @@ impl<'o> GraphqlNamespace<'o> {
         self.concat(&[&Typename(type_info)])
     }
 
-    pub fn list(&mut self, type_info: &TypeInfo) -> String {
-        self.concat(&[&Typename(type_info), &"List"])
-    }
-
     pub fn create(&mut self, type_info: &TypeInfo) -> String {
         self.concat(&[&"create", &Typename(type_info)])
     }

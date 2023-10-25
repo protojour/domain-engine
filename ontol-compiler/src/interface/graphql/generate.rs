@@ -782,8 +782,8 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 trace!("Connection `{prop_key}` of prop {property_id:?}");
 
                 FieldData::mandatory(
-                    FieldKind::Connection {
-                        property_id: Some(property_id),
+                    FieldKind::PropertyConnection {
+                        property_id,
                         first: argument::FirstArg,
                         after: argument::AfterArg,
                     },
@@ -935,10 +935,6 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
         let type_info = self.partial_ontology.get_type_info(entity_data.node_def_id);
 
         let node_ref = UnitTypeRef::Addr(entity_data.type_addr);
-        let connection_ref = self.get_def_type_ref(
-            entity_data.node_def_id,
-            QLevel::Connection { rel_params: None },
-        );
 
         let entity_operator_addr = self
             .serde_generator
@@ -949,21 +945,6 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
         let id_operator_addr = id_type_info.operator_addr.expect("No id_operator_addr");
 
         let id_unit_type_ref = self.get_def_type_ref(entity_data.id_def_id, QLevel::Node);
-
-        if false {
-            let query = object_data_mut(self.schema.query, self.schema);
-            query.fields.insert(
-                self.namespace.list(type_info),
-                FieldData::mandatory(
-                    FieldKind::Connection {
-                        property_id: None,
-                        first: argument::FirstArg,
-                        after: argument::AfterArg,
-                    },
-                    connection_ref,
-                ),
-            );
-        }
 
         {
             let mutation = object_data_mut(self.schema.mutation, self.schema);
