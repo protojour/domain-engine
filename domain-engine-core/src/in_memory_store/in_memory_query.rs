@@ -85,12 +85,6 @@ impl InMemoryStore {
                 return Err(DomainError::NotImplemented);
             }
         };
-        let mut end_cursor = None;
-        let has_next = start_offset + limit < total_size;
-
-        if start_offset + limit < total_size && limit > 0 {
-            end_cursor = Some(Cursor::Offset(start_offset + limit - 1))
-        }
 
         if start_offset > 0 {
             raw_props_vec = raw_props_vec
@@ -103,9 +97,14 @@ impl InMemoryStore {
         }
 
         let mut entity_sequence = Sequence::new_with_capacity(raw_props_vec.len());
+
         entity_sequence.sub_seq = Some(Box::new(SubSequence {
-            end_cursor,
-            has_next,
+            end_cursor: if limit > 0 {
+                Some(Cursor::Offset(start_offset + limit - 1))
+            } else {
+                after_cursor.cloned()
+            },
+            has_next: start_offset + limit < total_size,
             total_len: if include_total_len {
                 Some(total_size)
             } else {

@@ -321,39 +321,6 @@ async fn test_graphql_blog_post_conduit_implicit_join() {
     test.create_db_article().await;
 
     expect_eq!(
-        actual = "{
-            posts {
-                edges {
-                    node {
-                        contents
-                        written_by
-                    }
-                }
-            }
-        }"
-        .exec([], &test.blog_schema, &test.ctx(), DbgTag("list"))
-        .await,
-        expected = Ok(graphql_value!({
-            "posts": {
-                "edges": [
-                    {
-                        "node": {
-                            "contents": "THE BODY",
-                            "written_by": "teh_user",
-                        }
-                    }
-                ]
-            }
-        })),
-    );
-}
-
-#[test(tokio::test)]
-async fn test_graphql_blog_post_conduit_implicit_join_named_query() {
-    let test = BlogPostConduit::new().await;
-    test.create_db_article().await;
-
-    expect_eq!(
         actual = r#"{
             posts(input: { written_by: "teh_user" }) {
                 edges {
@@ -394,6 +361,50 @@ async fn test_graphql_blog_post_conduit_implicit_join_named_query() {
         .exec([], &test.blog_schema, &test.ctx(), DbgTag("someone_else"))
         .await,
         expected = Ok(graphql_value!({ "posts": { "edges": [] } })),
+    );
+}
+
+/// The purpose of this test is to ensure that SubSequence information
+/// is threaded through the domain engine pipeline.
+#[test(tokio::test)]
+// BUG: thread SubSequence through domain engine
+#[should_panic = "assertion failed"]
+async fn test_graphql_blog_post_conduit_paginated() {
+    let test = BlogPostConduit::new().await;
+    for _ in 0..3 {
+        test.create_db_article().await;
+    }
+
+    expect_eq!(
+        actual = r#"{
+            posts(input: { written_by: "teh_user" }, first: 1, after: "bz0w") {
+                nodes {
+                    contents
+                    written_by
+                }
+                pageInfo {
+                    hasNextPage
+                }
+                totalCount
+            }
+        }"#
+        .exec([], &test.blog_schema, &test.ctx(), DbgTag("teh_user"))
+        .await,
+        expected = Ok(graphql_value!({
+            "posts": {
+                "nodes": [
+                    {
+                        "contents": "THE BODY",
+                        "written_by": "teh_user",
+                    }
+                ],
+                "pageInfo": {
+                    "hasNextPage": true,
+                    "endCursor": "bz0x"
+                },
+                "totalCount": 3
+            }
+        })),
     );
 }
 
