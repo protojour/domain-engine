@@ -76,7 +76,7 @@ impl juniper::GraphQLValueAsync<GqlScalar> for QueryType {
                     let value = executor
                         .context()
                         .domain_engine
-                        .exec_map(key, input, &mut selects)
+                        .exec_map(key, input.value, &mut selects)
                         .instrument(debug_span.clone())
                         .await?;
 

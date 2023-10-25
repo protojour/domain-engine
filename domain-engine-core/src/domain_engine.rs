@@ -5,7 +5,7 @@ use ontol_runtime::{
     ontology::{Ontology, ValueCardinality},
     select::{EntitySelect, Select, StructOrUnionSelect},
     sequence::Sequence,
-    value::{Attribute, Data, Value},
+    value::{Data, Value},
     var::Var,
     vm::{proc::Yield, VmState},
     DefId, MapKey, PackageId,
@@ -68,7 +68,7 @@ impl DomainEngine {
     pub async fn exec_map(
         &self,
         key: [MapKey; 2],
-        input: Attribute,
+        mut input: Value,
         selects: &mut (dyn FindEntitySelect + Send),
     ) -> DomainResult<Value> {
         let proc = self
@@ -77,10 +77,8 @@ impl DomainEngine {
             .ok_or(DomainError::MappingProcedureNotFound)?;
         let mut vm = self.ontology.new_vm(proc);
 
-        let mut input_value = input.value;
-
         loop {
-            match vm.run([input_value]) {
+            match vm.run([input]) {
                 VmState::Complete(value) => return Ok(value),
                 VmState::Yielded(Yield::Match(match_var, value_cardinality, condition)) => {
                     let mut entity_select = selects.find_select(match_var, &condition);
@@ -89,7 +87,7 @@ impl DomainEngine {
                     assert!(entity_select.condition.clauses.is_empty());
                     entity_select.condition = condition;
 
-                    input_value = self
+                    input = self
                         .exec_map_query(match_var, value_cardinality, entity_select)
                         .await?;
                 }

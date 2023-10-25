@@ -91,7 +91,7 @@ async fn test_exec_named_map(
         .expect("Deserialize input failed");
 
     engine
-        .exec_map([from, to], input, &mut find_query)
+        .exec_map([from, to], input.value, &mut find_query)
         .await
         .expect("Exec map failed")
 }
