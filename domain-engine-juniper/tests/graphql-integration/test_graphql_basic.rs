@@ -84,7 +84,7 @@ async fn test_graphql_int_scalars() {
 
     expect_eq!(
         actual = "{
-            foos(input: {}) {
+            foos {
                 edges {
                     node {
                         small
@@ -157,7 +157,7 @@ async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
 
     expect_eq!(
         actual = "{
-            foos(input: {}) {
+            foos {
                 edges {
                     node {
                         id
@@ -195,7 +195,7 @@ async fn test_graphql_basic_pagination() {
 
     expect_eq!(
         actual = "{
-            foos(input: {}, first: null, after: null) {
+            foos(first: null, after: null) {
                 pageInfo {
                     endCursor
                     hasNextPage
@@ -221,7 +221,7 @@ async fn test_graphql_basic_pagination() {
 
     expect_eq!(
         actual = r#"{
-            foos(input: {}, first: 42, after: "bz0x") {
+            foos(first: 42, after: "bz0x") {
                 pageInfo {
                     endCursor
                     hasNextPage
@@ -282,7 +282,7 @@ async fn test_graphql_nodes() {
 
     expect_eq!(
         actual = "{
-            foos(input: {}) {
+            foos {
                 nodes { id }
                 edges { node { id } }
             }
@@ -495,7 +495,7 @@ async fn test_graphql_artist_and_instrument_connections() {
 
     expect_eq!(
         actual = "{
-            artists(input: {}) {
+            artists {
                 edges {
                     node {
                         ID
@@ -552,7 +552,7 @@ async fn test_graphql_artist_and_instrument_connections() {
 
     expect_eq!(
         actual = "{
-            instruments(input: {}) {
+            instruments {
                 edges {
                     node {
                         ID

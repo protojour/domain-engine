@@ -25,6 +25,13 @@ pub trait DomainFieldArg: FieldArg {
     fn operator_addr(&self) -> SerdeOperatorAddr;
 
     fn kind(&self) -> ArgKind;
+
+    fn default_arg(&self) -> Option<DefaultArg>;
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub enum DefaultArg {
+    EmptyObject,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -53,6 +60,10 @@ impl DomainFieldArg for InputArg {
     fn kind(&self) -> ArgKind {
         ArgKind::Addr(self.type_addr)
     }
+
+    fn default_arg(&self) -> Option<DefaultArg> {
+        None
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -60,6 +71,7 @@ pub struct MapInputArg {
     pub operator_addr: SerdeOperatorAddr,
     /// If this string is defined, there will be a single argument with this name.
     pub scalar_input_name: Option<String>,
+    pub default_arg: Option<DefaultArg>,
 }
 
 impl FieldArg for MapInputArg {
@@ -82,6 +94,10 @@ impl DomainFieldArg for MapInputArg {
 
     fn kind(&self) -> ArgKind {
         ArgKind::Operator(self.operator_addr)
+    }
+
+    fn default_arg(&self) -> Option<DefaultArg> {
+        self.default_arg.clone()
     }
 }
 
@@ -107,6 +123,10 @@ impl DomainFieldArg for IdArg {
             UnitTypeRef::Addr(type_addr) => ArgKind::Addr(*type_addr),
             UnitTypeRef::NativeScalar(_) => ArgKind::Operator(self.operator_addr),
         }
+    }
+
+    fn default_arg(&self) -> Option<DefaultArg> {
+        None
     }
 }
 

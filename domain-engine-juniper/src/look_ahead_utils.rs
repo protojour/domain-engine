@@ -2,8 +2,9 @@ use std::fmt::Display;
 
 use juniper::{graphql_value, parser::SourcePosition, LookAheadArgument, LookAheadValue, Spanning};
 use ontol_runtime::{
-    interface::graphql::argument, interface::graphql::schema::TypingPurpose,
-    interface::serde::operator::SerdeOperatorAddr, ontology::Ontology, smart_format,
+    interface::graphql::argument::{self, DefaultArg},
+    ontology::Ontology,
+    smart_format,
 };
 use serde::{
     de::{self, DeserializeSeed, IntoDeserializer},
@@ -48,36 +49,35 @@ impl<'a> ArgsWrapper<'a> {
         field_arg: &dyn argument::DomainFieldArg,
         ontology: &Ontology,
     ) -> Result<ontol_runtime::value::Attribute, juniper::FieldError<GqlScalar>> {
-        let name = field_arg.name();
-        let operator_addr = field_arg.operator_addr();
-        self.deserialize_operator_attribute(
-            name,
-            operator_addr,
-            ontology,
-            field_arg.typing_purpose(),
-        )
-    }
+        let arg_name = field_arg.name();
+        let (mode, level) = field_arg.typing_purpose().mode_and_level();
 
-    pub fn deserialize_operator_attribute(
-        &self,
-        name: &str,
-        operator_addr: SerdeOperatorAddr,
-        ontology: &Ontology,
-        typing_purpose: TypingPurpose,
-    ) -> Result<ontol_runtime::value::Attribute, juniper::FieldError<GqlScalar>> {
-        let argument = self.find_argument(name).unwrap();
+        let serde_processor = ontology
+            .new_serde_processor(field_arg.operator_addr(), mode)
+            .with_level(level);
 
-        // debug!("deserializing {value:?}");
-
-        let (mode, level) = typing_purpose.mode_and_level();
-
-        ontology
-            .new_serde_processor(operator_addr, mode)
-            .with_level(level)
-            .deserialize(LookAheadValueDeserializer {
+        let result = match self.find_argument(arg_name) {
+            Some(argument) => serde_processor.deserialize(LookAheadValueDeserializer {
                 value: argument.spanned_value(),
-            })
-            .map_err(|error| juniper::FieldError::new(error, graphql_value!(None)))
+            }),
+            None => serde_processor.deserialize(LookAheadValueDeserializer {
+                value: &Spanning {
+                    item: match field_arg.default_arg() {
+                        Some(DefaultArg::EmptyObject) => LookAheadValue::Object(vec![]),
+                        None => {
+                            return Err(juniper::FieldError::new(
+                                smart_format!("argument `{arg_name}` is missing"),
+                                graphql_value!(None),
+                            ))
+                        }
+                    },
+                    start: SourcePosition::new_origin(),
+                    end: SourcePosition::new_origin(),
+                },
+            }),
+        };
+
+        result.map_err(|error| juniper::FieldError::new(error, graphql_value!(None)))
     }
 
     fn find_argument(&self, name: &str) -> Option<&'a LookAheadArgument<'a, GqlScalar>> {

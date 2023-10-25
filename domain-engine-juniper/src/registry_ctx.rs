@@ -10,8 +10,9 @@ use ontol_runtime::{
         },
         schema::{QueryLevel, TypingPurpose},
     },
-    interface::serde::operator::{
-        FilteredVariants, SerdeOperator, SerdeOperatorAddr, SerdePropertyFlags,
+    interface::{
+        graphql::argument::DefaultArg,
+        serde::operator::{FilteredVariants, SerdeOperator, SerdeOperatorAddr, SerdePropertyFlags},
     },
     value::PropertyId,
     Role,
@@ -311,12 +312,8 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                     .get_schema_type(type_addr, TypingPurpose::Input);
 
                 match modifier.unit_optionality() {
-                    Optionality::Mandatory => {
-                        return self.registry.arg::<InputType>(name, &info);
-                    }
-                    Optionality::Optional => {
-                        return self.registry.arg::<Option<InputType>>(name, &info)
-                    }
+                    Optionality::Mandatory => self.registry.arg::<InputType>(name, &info),
+                    Optionality::Optional => self.registry.arg::<Option<InputType>>(name, &info),
                 }
             }
             SerdeOperator::IdSingletonStruct(..) => {
@@ -367,22 +364,29 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
 
     fn get_domain_field_arg(
         &mut self,
-        argument: &dyn DomainFieldArg,
+        field_arg: &dyn DomainFieldArg,
     ) -> juniper::meta::Argument<'r, GqlScalar> {
-        match argument.kind() {
-            ArgKind::Addr(type_addr) => self.registry.arg::<InputType>(
-                argument.name(),
-                &self
+        let arg = match field_arg.kind() {
+            ArgKind::Addr(type_addr) => {
+                let schema_type = self
                     .schema_ctx
-                    .get_schema_type(type_addr, argument.typing_purpose()),
-            ),
+                    .get_schema_type(type_addr, field_arg.typing_purpose());
+
+                self.registry
+                    .arg::<InputType>(field_arg.name(), &schema_type)
+            }
             ArgKind::Operator(addr) => self.get_operator_argument(
-                argument.name(),
+                field_arg.name(),
                 addr,
                 None,
                 SerdePropertyFlags::default(),
                 TypeModifier::Unit(Optionality::Mandatory),
             ),
+        };
+
+        match field_arg.default_arg() {
+            None => arg,
+            Some(DefaultArg::EmptyObject) => arg.default_value(juniper::InputValue::Object(vec![])),
         }
     }
 

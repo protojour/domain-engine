@@ -492,19 +492,22 @@ fn merge_selects(existing: &mut Select, new: Select) {
                 }
             }
         }
+        (existing @ Select::Leaf, any_other) => {
+            *existing = any_other;
+        }
         (existing, new) => {
-            *existing = new;
+            panic!("unable to merge {existing:?} and {new:?}");
         }
     }
 }
 
 fn merge_struct_selects(existing: &mut StructSelect, new: StructSelect) {
-    for (property_id, new_select) in new.properties {
+    for (property_id, new) in new.properties {
         match existing.properties.entry(property_id) {
             Entry::Vacant(vacant) => {
-                vacant.insert(new_select);
+                vacant.insert(new);
             }
-            Entry::Occupied(mut occupied) => merge_selects(occupied.get_mut(), new_select),
+            Entry::Occupied(mut occupied) => merge_selects(occupied.get_mut(), new),
         }
     }
 }
