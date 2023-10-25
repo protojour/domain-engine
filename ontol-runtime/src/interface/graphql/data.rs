@@ -55,6 +55,15 @@ pub enum UnitTypeRef {
     NativeScalar(NativeScalarRef),
 }
 
+impl UnitTypeRef {
+    pub fn unwrap_addr(&self) -> TypeAddr {
+        match self {
+            Self::Addr(addr) => *addr,
+            Self::NativeScalar(_) => panic!("Cannot get addr from native scalar"),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub struct NativeScalarRef {
     pub operator_addr: SerdeOperatorAddr,
@@ -124,7 +133,7 @@ impl TypeData {
                 ..
             }) => None,
             TypeKind::Object(ObjectData {
-                kind: ObjectKind::Connection,
+                kind: ObjectKind::Connection(_),
                 ..
             }) => None,
             TypeKind::Object(ObjectData {
@@ -165,7 +174,7 @@ pub struct ObjectData {
 pub enum ObjectKind {
     Node(NodeData),
     Edge(EdgeData),
-    Connection,
+    Connection(ConnectionData),
     PageInfo,
     Query,
     Mutation,
@@ -187,8 +196,14 @@ pub struct UnionData {
 
 #[derive(Serialize, Deserialize)]
 pub struct EdgeData {
+    pub node_type_addr: TypeAddr,
     pub node_operator_addr: SerdeOperatorAddr,
     pub rel_edge_ref: Option<UnitTypeRef>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ConnectionData {
+    pub node_type_addr: TypeAddr,
 }
 
 #[derive(Serialize, Deserialize)]

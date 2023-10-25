@@ -9,9 +9,10 @@ use ontol_runtime::{
         graphql::{
             argument::{self, MapInputArg},
             data::{
-                EdgeData, EntityData, FieldData, FieldKind, NativeScalarKind, NativeScalarRef,
-                NodeData, ObjectData, ObjectKind, Optionality, PropertyData, ScalarData, TypeAddr,
-                TypeData, TypeKind, TypeModifier, TypeRef, UnionData, UnitTypeRef,
+                ConnectionData, EdgeData, EntityData, FieldData, FieldKind, NativeScalarKind,
+                NativeScalarRef, NodeData, ObjectData, ObjectKind, Optionality, PropertyData,
+                ScalarData, TypeAddr, TypeData, TypeKind, TypeModifier, TypeRef, UnionData,
+                UnitTypeRef,
             },
             schema::{GraphqlSchema, QueryLevel, TypingPurpose},
         },
@@ -368,6 +369,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 let type_info = self.partial_ontology.get_type_info(def_id);
                 let edge_addr = self.alloc_def_type_addr(def_id, level);
                 let node_ref = self.get_def_type_ref(def_id, QLevel::Node);
+                let node_type_addr = node_ref.unwrap_addr();
 
                 let mut field_namespace = GraphqlNamespace::default();
 
@@ -410,6 +412,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                             kind: TypeKind::Object(ObjectData {
                                 fields,
                                 kind: ObjectKind::Edge(EdgeData {
+                                    node_type_addr,
                                     node_operator_addr,
                                     rel_edge_ref: Some(rel_edge_ref),
                                 }),
@@ -426,6 +429,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                             kind: TypeKind::Object(ObjectData {
                                 fields,
                                 kind: ObjectKind::Edge(EdgeData {
+                                    node_type_addr,
                                     node_operator_addr,
                                     rel_edge_ref: None,
                                 }),
@@ -438,6 +442,8 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                 let type_info = self.partial_ontology.get_type_info(def_id);
                 let connection_index = self.alloc_def_type_addr(def_id, level);
                 let edge_ref = self.get_def_type_ref(def_id, QLevel::Edge { rel_params });
+                let node_ref = self.get_def_type_ref(def_id, QLevel::Node);
+                let node_type_addr = node_ref.unwrap_addr();
 
                 NewType::Addr(
                     connection_index,
@@ -466,7 +472,7 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
                                 ),
                             ]
                             .into(),
-                            kind: ObjectKind::Connection,
+                            kind: ObjectKind::Connection(ConnectionData { node_type_addr }),
                         }),
                     },
                 )

@@ -1,15 +1,16 @@
 use fnv::FnvHashMap;
-use juniper::LookAheadMethods;
+use juniper::{LookAheadMethods, LookAheadSelection};
 use ontol_runtime::{
     condition::Condition,
     interface::graphql::{
         argument::FieldArg,
         data::{
-            FieldData, FieldKind, NodeData, ObjectData, ObjectKind, TypeData, TypeKind,
-            TypeModifier,
+            ConnectionData, EdgeData, FieldData, FieldKind, NodeData, ObjectData, ObjectKind,
+            TypeData, TypeKind, TypeModifier,
         },
     },
     select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
+    sequence::Cursor,
     value::{Attribute, PropertyId},
     var::Var,
     DefId, MapKey, RelationshipId,
@@ -150,7 +151,7 @@ impl<'a> SelectAnalyzer<'a> {
                 match (field_data.field_type.modifier, type_data) {
                     (TypeModifier::Unit(_), type_data) => KeyedPropertySelection {
                         key: unit_property(),
-                        select: match self.analyze_data(look_ahead, type_data) {
+                        select: match self.analyze_data(look_ahead, &type_data.kind) {
                             Select::Struct(struct_select) => Select::Entity(EntitySelect {
                                 source: StructOrUnionSelect::Struct(struct_select),
                                 condition: Condition::default(),
@@ -186,37 +187,21 @@ impl<'a> SelectAnalyzer<'a> {
                     .deserialize::<String>(after_arg.name())
                     .unwrap();
 
-                let mut select = None;
+                let mut inner_select = None;
 
                 for field_look_ahead in look_ahead.children() {
                     let field_name = field_look_ahead.field_name_unaliased();
                     let field_data = object_data.fields.get(field_name).unwrap();
 
                     if let FieldKind::Edges = &field_data.kind {
-                        select = Some(self.analyze_selection(field_look_ahead, field_data).select);
+                        inner_select =
+                            Some(self.analyze_selection(field_look_ahead, field_data).select);
                     }
                 }
 
                 KeyedPropertySelection {
                     key: unit_property(),
-                    select: match select {
-                        Some(Select::Struct(object)) => Select::Entity(EntitySelect {
-                            source: StructOrUnionSelect::Struct(object),
-                            condition: Condition::default(),
-                            limit,
-                            after_cursor: None,
-                        }),
-                        Some(Select::StructUnion(def_id, variants)) => {
-                            Select::Entity(EntitySelect {
-                                source: StructOrUnionSelect::Union(def_id, variants),
-                                condition: Condition::default(),
-                                limit,
-                                after_cursor: None,
-                            })
-                        }
-                        Some(Select::Entity(_) | Select::EntityId) => panic!("Select in select"),
-                        Some(Select::Leaf) | None => Select::Leaf,
-                    },
+                    select: self.mk_entity_select(inner_select, limit, None, object_data),
                 }
             }
             (
@@ -238,37 +223,21 @@ impl<'a> SelectAnalyzer<'a> {
                     .unwrap_or(self.default_limit());
                 let _cursor = args_wrapper.deserialize::<String>(after.name()).unwrap();
 
-                let mut select = None;
+                let mut inner_select = None;
 
                 for field_look_ahead in look_ahead.children() {
                     let field_name = field_look_ahead.field_name_unaliased();
                     let field_data = object_data.fields.get(field_name).unwrap();
 
                     if let FieldKind::Edges = &field_data.kind {
-                        select = Some(self.analyze_selection(field_look_ahead, field_data).select);
+                        inner_select =
+                            Some(self.analyze_selection(field_look_ahead, field_data).select);
                     }
                 }
 
                 KeyedPropertySelection {
                     key: property_id.unwrap_or(unit_property()),
-                    select: match select {
-                        Some(Select::Struct(object)) => Select::Entity(EntitySelect {
-                            source: StructOrUnionSelect::Struct(object),
-                            condition: Condition::default(),
-                            limit,
-                            after_cursor: None,
-                        }),
-                        Some(Select::StructUnion(def_id, variants)) => {
-                            Select::Entity(EntitySelect {
-                                source: StructOrUnionSelect::Union(def_id, variants),
-                                condition: Condition::default(),
-                                limit,
-                                after_cursor: None,
-                            })
-                        }
-                        Some(Select::Entity(_) | Select::EntityId) => panic!("Select in select"),
-                        Some(Select::Leaf) | None => Select::Leaf,
-                    },
+                    select: self.mk_entity_select(inner_select, limit, None, object_data),
                 }
             }
             (
@@ -301,11 +270,11 @@ impl<'a> SelectAnalyzer<'a> {
                 Ok(type_data),
             ) => KeyedPropertySelection {
                 key: unit_property(),
-                select: self.analyze_data(look_ahead, type_data),
+                select: self.analyze_data(look_ahead, &type_data.kind),
             },
             (FieldKind::Property(property_data), Ok(type_data)) => KeyedPropertySelection {
                 key: property_data.property_id,
-                select: self.analyze_data(look_ahead, type_data),
+                select: self.analyze_data(look_ahead, &type_data.kind),
             },
             (FieldKind::Property(property_data), Err(_scalar_ref)) => KeyedPropertySelection {
                 key: property_data.property_id,
@@ -322,36 +291,10 @@ impl<'a> SelectAnalyzer<'a> {
     pub fn analyze_data(
         &self,
         look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
-        type_data: &TypeData,
+        type_kind: &TypeKind,
     ) -> Select {
-        match &type_data.kind {
-            TypeKind::Object(object_data) => match &object_data.kind {
-                ObjectKind::Node(node_data) => {
-                    let mut properties: FnvHashMap<PropertyId, Select> = FnvHashMap::default();
-
-                    for field_look_ahead in look_ahead.children() {
-                        let field_name = field_look_ahead.field_name_unaliased();
-                        let field_data = object_data.fields.get(field_name).unwrap();
-
-                        let KeyedPropertySelection {
-                            key: property_id,
-                            select: selection,
-                        } = self.analyze_selection(field_look_ahead, field_data);
-
-                        properties.insert(property_id, selection);
-                    }
-
-                    Select::Struct(StructSelect {
-                        def_id: node_data.def_id,
-                        properties,
-                    })
-                }
-                ObjectKind::Edge(_)
-                | ObjectKind::Connection
-                | ObjectKind::PageInfo
-                | ObjectKind::Query
-                | ObjectKind::Mutation => panic!("Bug in ONTOL interface schema"),
-            },
+        match type_kind {
+            TypeKind::Object(object_data) => self.analyze_object_data(look_ahead, object_data),
             TypeKind::Union(union_data) => {
                 let mut union_map: FnvHashMap<DefId, FnvHashMap<PropertyId, Select>> =
                     FnvHashMap::default();
@@ -413,6 +356,89 @@ impl<'a> SelectAnalyzer<'a> {
                 assert!(look_ahead.children().is_empty());
                 Select::Leaf
             }
+        }
+    }
+
+    pub fn analyze_object_data(
+        &self,
+        look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
+        object_data: &ObjectData,
+    ) -> Select {
+        match &object_data.kind {
+            ObjectKind::Node(node_data) => {
+                let mut properties: FnvHashMap<PropertyId, Select> = FnvHashMap::default();
+
+                for field_look_ahead in look_ahead.children() {
+                    let field_name = field_look_ahead.field_name_unaliased();
+                    let field_data = object_data.fields.get(field_name).unwrap();
+
+                    let KeyedPropertySelection {
+                        key: property_id,
+                        select: selection,
+                    } = self.analyze_selection(field_look_ahead, field_data);
+
+                    properties.insert(property_id, selection);
+                }
+
+                Select::Struct(StructSelect {
+                    def_id: node_data.def_id,
+                    properties,
+                })
+            }
+            ObjectKind::Edge(_)
+            | ObjectKind::Connection(_)
+            | ObjectKind::PageInfo
+            | ObjectKind::Query
+            | ObjectKind::Mutation => panic!("Bug in ONTOL interface schema"),
+        }
+    }
+
+    fn mk_entity_select(
+        &self,
+        mut inner_select: Option<Select>,
+        limit: usize,
+        after_cursor: Option<Cursor>,
+        object_data: &ObjectData,
+    ) -> Select {
+        let mut empty_handled = false;
+
+        loop {
+            match inner_select {
+                Some(Select::Struct(object)) => {
+                    return Select::Entity(EntitySelect {
+                        source: StructOrUnionSelect::Struct(object),
+                        condition: Condition::default(),
+                        limit,
+                        after_cursor,
+                    })
+                }
+                Some(Select::StructUnion(def_id, variants)) => {
+                    return Select::Entity(EntitySelect {
+                        source: StructOrUnionSelect::Union(def_id, variants),
+                        condition: Condition::default(),
+                        limit,
+                        after_cursor,
+                    })
+                }
+                Some(Select::Entity(_) | Select::EntityId) => panic!("Select in select"),
+                Some(Select::Leaf) | None if !empty_handled => {
+                    inner_select = Some(self.empty_entity_select(object_data));
+                    empty_handled = true;
+                }
+                Some(Select::Leaf) | None => return Select::Leaf,
+            }
+        }
+    }
+
+    fn empty_entity_select(&self, object_data: &ObjectData) -> Select {
+        match &object_data.kind {
+            ObjectKind::Edge(EdgeData { node_type_addr, .. })
+            | ObjectKind::Connection(ConnectionData { node_type_addr }) => {
+                let type_data = self.schema_ctx.type_data(*node_type_addr);
+
+                self.analyze_data(&LookAheadSelection::default(), &type_data.kind)
+            }
+            _ => self.analyze_object_data(&LookAheadSelection::default(), object_data),
         }
     }
 

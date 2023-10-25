@@ -193,15 +193,9 @@ async fn test_graphql_basic_pagination() {
     "
     .compile_schemas([ROOT]);
 
-    // FIXME: Query should work without "edges"
     expect_eq!(
         actual = "{
             foos(input: {}) {
-                edges {
-                    node {
-                        id
-                    }
-                }
                 pageInfo {
                     endCursor
                     hasNextPage
@@ -217,7 +211,6 @@ async fn test_graphql_basic_pagination() {
         .await,
         expected = Ok(graphql_value!({
             "foos": {
-                "edges": [],
                 "pageInfo": {
                     "endCursor": null,
                     "hasNextPage": false

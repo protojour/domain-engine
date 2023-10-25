@@ -59,6 +59,7 @@ impl juniper::GraphQLType<GqlScalar> for InputType {
                     ObjectKind::Edge(EdgeData {
                         node_operator_addr,
                         rel_edge_ref: rel_ref,
+                        ..
                     }),
                 ..
             }) => {
