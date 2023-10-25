@@ -39,7 +39,7 @@ impl InMemoryStore {
                         source: StructOrUnionSelect::Struct(struct_select),
                         condition: Condition::default(),
                         limit: usize::MAX,
-                        cursor: None,
+                        after_cursor: None,
                     },
                     engine,
                 )?;

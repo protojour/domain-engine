@@ -98,7 +98,7 @@ async fn test_exec_named_map(
 
 pub struct TestFindQuery {
     limit: usize,
-    cursor: Option<Cursor>,
+    after_cursor: Option<Cursor>,
 }
 
 impl TestFindQuery {
@@ -106,9 +106,9 @@ impl TestFindQuery {
         Self { limit, ..self }
     }
 
-    pub fn offset(self, offset: usize) -> Self {
+    pub fn after_offset(self, after_offset: usize) -> Self {
         Self {
-            cursor: Some(Cursor::Offset(offset)),
+            after_cursor: Some(Cursor::Offset(after_offset)),
             ..self
         }
     }
@@ -118,7 +118,7 @@ impl Default for TestFindQuery {
     fn default() -> Self {
         Self {
             limit: 20,
-            cursor: None,
+            after_cursor: None,
         }
     }
 }
@@ -137,7 +137,7 @@ impl domain_engine_core::FindEntitySelect for TestFindQuery {
             }),
             condition: Default::default(),
             limit: self.limit,
-            cursor: self.cursor.clone(),
+            after_cursor: self.after_cursor.clone(),
         }
     }
 }

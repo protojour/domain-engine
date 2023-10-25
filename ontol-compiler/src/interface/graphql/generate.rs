@@ -30,6 +30,7 @@ use crate::{
     codegen::task::CodegenTasks,
     def::{DefKind, Defs, LookupRelationshipMeta, RelParams},
     interface::serde::serde_generator::SerdeGenerator,
+    primitive::Primitives,
     relation::{Properties, Relations},
     type_check::{
         repr::repr_model::{ReprKind, ReprScalarKind},
@@ -42,6 +43,7 @@ use super::graphql_namespace::{DomainDisambiguation, GraphqlNamespace};
 pub fn generate_graphql_schema<'c>(
     package_id: PackageId,
     partial_ontology: &'c Ontology,
+    primitives: &'c Primitives,
     map_namespace: Option<&'c IndexMap<&str, DefId>>,
     codegen_tasks: &'c CodegenTasks,
     serde_generator: &mut SerdeGenerator<'c, '_>,
@@ -74,6 +76,7 @@ pub fn generate_graphql_schema<'c>(
             serde_generator,
             relations,
             defs,
+            primitives,
             seal_ctx,
         }
     };
@@ -180,6 +183,8 @@ struct Builder<'a, 's, 'c, 'm> {
     relations: &'c Relations,
     /// The compiler's defs
     defs: &'c Defs<'m>,
+    /// The compiler's primitives
+    primitives: &'c Primitives,
     /// The compiler's sealed type information
     seal_ctx: &'c SealCtx,
 }
@@ -254,16 +259,57 @@ impl<'a, 's, 'c, 'm> Builder<'a, 's, 'c, 'm> {
             }),
         });
 
-        self.schema.page_info = self.next_type_addr();
-        self.schema.types.push(TypeData {
-            typename: self.namespace.unique_literal("PageInfo"),
-            input_typename: None,
-            partial_input_typename: None,
-            kind: TypeKind::Object(ObjectData {
-                fields: Default::default(),
-                kind: ObjectKind::PageInfo,
-            }),
-        });
+        {
+            self.schema.page_info = self.next_type_addr();
+            self.schema.types.push(TypeData {
+                typename: self.namespace.unique_literal("PageInfo"),
+                input_typename: None,
+                partial_input_typename: None,
+                kind: TypeKind::Object(ObjectData {
+                    fields: Default::default(),
+                    kind: ObjectKind::PageInfo,
+                }),
+            });
+            let data = object_data_mut(self.schema.page_info, self.schema);
+            data.fields.insert(
+                "endCursor".into(),
+                FieldData {
+                    kind: FieldKind::PageInfo,
+                    field_type: TypeRef {
+                        modifier: TypeModifier::Unit(Optionality::Optional),
+                        unit: UnitTypeRef::NativeScalar(NativeScalarRef {
+                            operator_addr: self
+                                .serde_generator
+                                .gen_addr(SerdeKey::Def(SerdeDef::new(
+                                    self.primitives.text,
+                                    SerdeModifier::NONE,
+                                )))
+                                .unwrap(),
+                            kind: NativeScalarKind::String,
+                        }),
+                    },
+                },
+            );
+            data.fields.insert(
+                "hasNextPage".into(),
+                FieldData {
+                    kind: FieldKind::PageInfo,
+                    field_type: TypeRef {
+                        modifier: TypeModifier::Unit(Optionality::Mandatory),
+                        unit: UnitTypeRef::NativeScalar(NativeScalarRef {
+                            operator_addr: self
+                                .serde_generator
+                                .gen_addr(SerdeKey::Def(SerdeDef::new(
+                                    self.primitives.bool,
+                                    SerdeModifier::NONE,
+                                )))
+                                .unwrap(),
+                            kind: NativeScalarKind::Boolean,
+                        }),
+                    },
+                },
+            );
+        }
 
         self.schema.json_scalar = self.next_type_addr();
         self.schema.types.push(TypeData {

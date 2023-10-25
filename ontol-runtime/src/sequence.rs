@@ -30,7 +30,11 @@ impl Sequence {
 
 #[derive(Clone, Debug)]
 pub struct SubSequence {
-    pub next_cursor: Option<Cursor>,
+    /// The cursor of the _last element_ in the sub sequence
+    pub end_cursor: Option<Cursor>,
+    /// Are there more items in the sequence _following_ the concrete subsequence?
+    pub has_next: bool,
+    /// Total number of elements in the sequence
     pub total_len: Option<usize>,
 }
 

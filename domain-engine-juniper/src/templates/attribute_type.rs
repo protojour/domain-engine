@@ -20,7 +20,9 @@ use crate::{
     context::{SchemaCtx, SchemaType},
     gql_scalar::GqlScalar,
     registry_ctx::RegistryCtx,
-    templates::{resolve_schema_type_field, sequence_type::SequenceType},
+    templates::{
+        page_info_type::PageInfoType, resolve_schema_type_field, sequence_type::SequenceType,
+    },
     value_serializer::JuniperValueSerializer,
     ServiceCtx,
 };
@@ -209,6 +211,13 @@ impl<'v> AttributeType<'v> {
         match (&field_data.kind, &self.attr.value.data) {
             (FieldKind::Edges, Data::Sequence(seq)) => resolve_schema_type_field(
                 SequenceType { seq },
+                schema_ctx
+                    .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
+                    .unwrap(),
+                executor,
+            ),
+            (FieldKind::PageInfo, Data::Sequence(seq)) => resolve_schema_type_field(
+                PageInfoType { seq },
                 schema_ctx
                     .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
                     .unwrap(),

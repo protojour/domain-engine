@@ -315,6 +315,7 @@ impl<'m> Compiler<'m> {
                 if let Some(schema) = generate_graphql_schema(
                     package_id,
                     builder.partial_ontology(),
+                    &self.primitives,
                     map_namespaces.get(&package_id),
                     &self.codegen_tasks,
                     &mut serde_generator,

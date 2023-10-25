@@ -21,7 +21,7 @@ pub struct EntitySelect {
     pub source: StructOrUnionSelect,
     pub condition: Condition<CondTerm>,
     pub limit: usize,
-    pub cursor: Option<Cursor>,
+    pub after_cursor: Option<Cursor>,
 }
 
 #[derive(Clone, Debug)]
@@ -46,12 +46,12 @@ pub struct StructSelect {
 }
 
 impl StructSelect {
-    pub fn into_entity_select(self, limit: usize, cursor: Option<Cursor>) -> EntitySelect {
+    pub fn into_entity_select(self, limit: usize, after_cursor: Option<Cursor>) -> EntitySelect {
         EntitySelect {
             source: StructOrUnionSelect::Struct(self),
             condition: Condition::default(),
             limit,
-            cursor,
+            after_cursor,
         }
     }
 }
@@ -68,7 +68,7 @@ impl From<StructSelect> for EntitySelect {
             source: StructOrUnionSelect::Struct(value),
             condition: Condition::default(),
             limit: 20,
-            cursor: None,
+            after_cursor: None,
         }
     }
 }

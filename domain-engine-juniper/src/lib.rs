@@ -11,6 +11,7 @@ use tracing::debug;
 pub mod context;
 pub mod gql_scalar;
 
+mod cursor_util;
 mod look_ahead_utils;
 mod macros;
 mod registry_ctx;

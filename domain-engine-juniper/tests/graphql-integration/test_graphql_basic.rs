@@ -180,6 +180,53 @@ async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
     );
 }
 
+#[test(tokio::test)]
+async fn test_graphql_basic_pagination() {
+    let (test, [schema]) = "
+    pub def foo {
+        rel .'id'(rel .gen: auto)|id: { rel .is: text }
+    }
+    map foos {
+        {}
+        foo: [..foo match {}]
+    }
+    "
+    .compile_schemas([ROOT]);
+
+    // FIXME: Query should work without "edges"
+    expect_eq!(
+        actual = "{
+            foos(input: {}) {
+                edges {
+                    node {
+                        id
+                    }
+                }
+                pageInfo {
+                    endCursor
+                    hasNextPage
+                }
+            }
+        }"
+        .exec(
+            [],
+            &schema,
+            &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
+            DbgTag("list"),
+        )
+        .await,
+        expected = Ok(graphql_value!({
+            "foos": {
+                "edges": [],
+                "pageInfo": {
+                    "endCursor": null,
+                    "hasNextPage": false
+                }
+            },
+        })),
+    );
+}
+
 #[test]
 fn test_graphql_value_type_as_field() {
     "

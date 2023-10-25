@@ -388,7 +388,7 @@ async fn test_artist_and_instrument_pagination() {
                 .exec_named_map_json(
                     by_name,
                     json!({}),
-                    TestFindQuery::default().limit(1).offset(1)
+                    TestFindQuery::default().limit(1).after_offset(0)
                 )
                 .await
         ),

@@ -29,7 +29,7 @@ impl InMemoryStore {
                 struct_select,
                 &select.condition,
                 select.limit,
-                select.cursor.as_ref(),
+                select.after_cursor.as_ref(),
                 engine,
             ),
             StructOrUnionSelect::Union(..) => todo!(),
@@ -41,7 +41,7 @@ impl InMemoryStore {
         struct_select: &StructSelect,
         condition: &Condition<CondTerm>,
         limit: usize,
-        next_cursor: Option<&Cursor>,
+        after_cursor: Option<&Cursor>,
         engine: &DomainEngine,
     ) -> DomainResult<Sequence> {
         debug!("query single entity collection: {struct_select:?}");
@@ -76,27 +76,34 @@ impl InMemoryStore {
 
         let total_size = raw_props_vec.len();
 
-        let offset = match next_cursor {
+        let start_offset = match after_cursor {
             None => 0,
-            Some(Cursor::Offset(offset)) => *offset,
+            Some(Cursor::Offset(after_offset)) => *after_offset + 1,
             Some(Cursor::Custom(_)) => {
                 return Err(DomainError::NotImplemented);
             }
         };
-        let mut next_cursor = None;
+        let mut end_cursor = None;
+        let has_next = start_offset + limit < total_size;
 
-        if offset + limit < total_size {
-            next_cursor = Some(Cursor::Offset(offset + limit))
+        if start_offset + limit < total_size && limit > 0 {
+            end_cursor = Some(Cursor::Offset(start_offset + limit - 1))
         }
-        if offset > 0 {
-            raw_props_vec = raw_props_vec.into_iter().skip(offset).take(limit).collect();
+
+        if start_offset > 0 {
+            raw_props_vec = raw_props_vec
+                .into_iter()
+                .skip(start_offset)
+                .take(limit)
+                .collect();
         } else if limit < total_size {
             raw_props_vec = raw_props_vec.into_iter().take(limit).collect();
         }
 
         let mut entity_sequence = Sequence::new_with_capacity(raw_props_vec.len());
         entity_sequence.sub_seq = Some(Box::new(SubSequence {
-            next_cursor,
+            end_cursor,
+            has_next,
             total_len: Some(total_size),
         }));
 

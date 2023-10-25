@@ -155,7 +155,7 @@ impl<'a> SelectAnalyzer<'a> {
                                 source: StructOrUnionSelect::Struct(struct_select),
                                 condition: Condition::default(),
                                 limit: 1,
-                                cursor: None,
+                                after_cursor: None,
                             }),
                             select => select,
                         },
@@ -189,7 +189,7 @@ impl<'a> SelectAnalyzer<'a> {
                 let mut select = None;
 
                 for field_look_ahead in look_ahead.children() {
-                    let field_name = field_look_ahead.field_name();
+                    let field_name = field_look_ahead.field_name_unaliased();
                     let field_data = object_data.fields.get(field_name).unwrap();
 
                     if let FieldKind::Edges = &field_data.kind {
@@ -204,14 +204,14 @@ impl<'a> SelectAnalyzer<'a> {
                             source: StructOrUnionSelect::Struct(object),
                             condition: Condition::default(),
                             limit,
-                            cursor: None,
+                            after_cursor: None,
                         }),
                         Some(Select::StructUnion(def_id, variants)) => {
                             Select::Entity(EntitySelect {
                                 source: StructOrUnionSelect::Union(def_id, variants),
                                 condition: Condition::default(),
                                 limit,
-                                cursor: None,
+                                after_cursor: None,
                             })
                         }
                         Some(Select::Entity(_) | Select::EntityId) => panic!("Select in select"),
@@ -241,7 +241,7 @@ impl<'a> SelectAnalyzer<'a> {
                 let mut select = None;
 
                 for field_look_ahead in look_ahead.children() {
-                    let field_name = field_look_ahead.field_name();
+                    let field_name = field_look_ahead.field_name_unaliased();
                     let field_data = object_data.fields.get(field_name).unwrap();
 
                     if let FieldKind::Edges = &field_data.kind {
@@ -256,14 +256,14 @@ impl<'a> SelectAnalyzer<'a> {
                             source: StructOrUnionSelect::Struct(object),
                             condition: Condition::default(),
                             limit,
-                            cursor: None,
+                            after_cursor: None,
                         }),
                         Some(Select::StructUnion(def_id, variants)) => {
                             Select::Entity(EntitySelect {
                                 source: StructOrUnionSelect::Union(def_id, variants),
                                 condition: Condition::default(),
                                 limit,
-                                cursor: None,
+                                after_cursor: None,
                             })
                         }
                         Some(Select::Entity(_) | Select::EntityId) => panic!("Select in select"),
@@ -281,7 +281,7 @@ impl<'a> SelectAnalyzer<'a> {
                 let mut selection = None;
 
                 for field_look_ahead in look_ahead.children() {
-                    let field_name = field_look_ahead.field_name();
+                    let field_name = field_look_ahead.field_name_unaliased();
                     let field_data = object_data.fields.get(field_name).unwrap();
 
                     if let FieldKind::Node = &field_data.kind {
@@ -330,7 +330,7 @@ impl<'a> SelectAnalyzer<'a> {
                     let mut properties: FnvHashMap<PropertyId, Select> = FnvHashMap::default();
 
                     for field_look_ahead in look_ahead.children() {
-                        let field_name = field_look_ahead.field_name();
+                        let field_name = field_look_ahead.field_name_unaliased();
                         let field_data = object_data.fields.get(field_name).unwrap();
 
                         let KeyedPropertySelection {
@@ -357,7 +357,7 @@ impl<'a> SelectAnalyzer<'a> {
                     FnvHashMap::default();
 
                 for field_look_ahead in look_ahead.children() {
-                    let field_name = field_look_ahead.field_name();
+                    let field_name = field_look_ahead.field_name_unaliased();
 
                     let applies_for = field_look_ahead.applies_for();
 
