@@ -94,7 +94,7 @@ impl<'v> ::juniper::GraphQLValue<GqlScalar> for AttributeType<'v> {
     ) -> juniper::ExecutionResult<crate::gql_scalar::GqlScalar> {
         match &info.type_data().kind {
             TypeKind::Object(object_data) => {
-                self.resolve_object_field(&info.schema_ctx, object_data, field_name, executor)
+                self.resolve_object_field(field_name, object_data, &info.schema_ctx, executor)
             }
             TypeKind::Union(_) => panic!("union should be resolved earlier"),
             TypeKind::CustomScalar(_) => {
@@ -199,9 +199,9 @@ impl<'v> AttributeType<'v> {
 
     fn resolve_object_field(
         &self,
-        schema_ctx: &Arc<SchemaCtx>,
-        object_data: &ObjectData,
         field_name: &str,
+        object_data: &ObjectData,
+        schema_ctx: &Arc<SchemaCtx>,
         executor: &juniper::Executor<ServiceCtx, GqlScalar>,
     ) -> juniper::ExecutionResult<crate::gql_scalar::GqlScalar> {
         let field_data = object_data.fields.get(field_name).unwrap();
@@ -259,20 +259,15 @@ impl<'v> AttributeType<'v> {
                 schema_ctx,
                 executor,
             ),
-            (Data::Sequence(seq), FieldKind::Edges) => resolve_schema_type_field(
-                SequenceType { seq },
-                schema_ctx
-                    .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
-                    .unwrap(),
-                executor,
-            ),
-            (Data::Sequence(seq), FieldKind::Nodes) => resolve_schema_type_field(
-                SequenceType { seq },
-                schema_ctx
-                    .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
-                    .unwrap(),
-                executor,
-            ),
+            (Data::Sequence(seq), FieldKind::Nodes | FieldKind::Edges) => {
+                resolve_schema_type_field(
+                    SequenceType { seq },
+                    schema_ctx
+                        .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
+                        .unwrap(),
+                    executor,
+                )
+            }
             (Data::Sequence(seq), FieldKind::PageInfo) => resolve_schema_type_field(
                 PageInfoType { seq },
                 schema_ctx
