@@ -1,9 +1,13 @@
 use std::sync::Arc;
 
 use domain_engine_core::DomainEngine;
-use domain_engine_juniper::{context::ServiceCtx, cursor_util::serialize_cursor, Schema};
+use domain_engine_juniper::{
+    context::ServiceCtx,
+    cursor_util::serialize_cursor,
+    juniper::{graphql_value, InputValue},
+    Schema,
+};
 use domain_engine_test_utils::graphql::{Exec, TestCompileSchema};
-use juniper::{graphql_value, InputValue};
 use ontol_runtime::config::DataStoreConfig;
 use ontol_runtime::sequence::Cursor;
 use ontol_test_utils::{
