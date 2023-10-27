@@ -4,7 +4,7 @@ use domain_engine_core::DomainEngine;
 use domain_engine_juniper::{
     context::ServiceCtx,
     cursor_util::serialize_cursor,
-    juniper::{graphql_value, InputValue},
+    juniper::{self, graphql_value, InputValue},
     Schema,
 };
 use domain_engine_test_utils::graphql::{Exec, TestCompileSchema};
