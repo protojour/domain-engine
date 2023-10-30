@@ -38,192 +38,200 @@ use 'SI' as SI
 /// RFC 4122 defines how one can distinguish between a UUIDv4 and UUIDv5 value. 
 ///
 /// The JSON MTI serialization uses the JSON String type [RFC8259] when representing identifier.
-def identifier {}
+def sdo_identifier {}
 
 def attack-pattern-id {
     fmt '' => 'attack-pattern--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def campaign-id {
     fmt '' => 'campaign--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def course-of-action-id {
     fmt '' => 'course-of-action--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def grouping-id {
     fmt '' => 'grouping--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def identity-id {
     fmt '' => 'identity--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def indicator-id {
     fmt '' => 'indicator--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def infrastructure-id {
     fmt '' => 'infrastructure--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def intrusion-set-id {
     fmt '' => 'intrusion-set--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def location-id {
     fmt '' => 'location--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def malware-id {
     fmt '' => 'malware--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def malware-analysis-id {
     fmt '' => 'malware-analysis--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def note-id {
     fmt '' => 'note--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def observed-data-id {
     fmt '' => 'observed-data--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def opinion-id {
     fmt '' => 'opinion--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def report-id {
     fmt '' => 'report--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def threat-actor-id {
     fmt '' => 'threat-actor--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def tool-id {
     fmt '' => 'tool--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def vulnerability-id {
     fmt '' => 'vulnerability--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 /// The identifier of a `marking-defifition`
 def marking-definition-id {
     fmt '' => 'marking-definition--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def artifact-id {
     fmt '' => 'artifact--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def autonomous-system-id {
     fmt '' => 'autonomous-system--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def directory-id {
     fmt '' => 'directory-id--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def domain-name-id {
     fmt '' => 'domain-name--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def email-addr-id {
     fmt '' => 'email-addr--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def email-message-id {
     fmt '' => 'email-message--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def file-id {
     fmt '' => 'file--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def ipv4-addr-id {
     fmt '' => 'ipv4-addr--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def ipv6-addr-id {
     fmt '' => 'ipv6-addr--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def mac-addr-id {
     fmt '' => 'mac-addr--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def mutex-id {
     fmt '' => 'mutex--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def network-traffic-id {
     fmt '' => 'network-traffic--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def process-id {
     fmt '' => 'process--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def software-id {
     fmt '' => 'software--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def url-id {
     fmt '' => 'url--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def user-account-id {
     fmt '' => 'user-account--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def windows-registry-key-id {
     fmt '' => 'windows-registry-key--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
 }
 
 def x509-certificate-id {
     fmt '' => 'x509-certificate-key--' => uuid => .
-    rel identifier is?: .
+    rel sdo_identifier is?: .
+}
+
+def relationship-id {
+    fmt '' => 'relationship--' => uuid => .
+}
+
+def sdo_sco_identifier {
+    rel .is: sdo_identifier
 }
 
 /// Type providing the `created_by_ref` property
@@ -455,7 +463,7 @@ pub def grouping {
     /// This is an open vocabulary and values SHOULD come from the `grouping-context-ov` vocabulary.
     rel .'context': ov.grouping-context-ov
 
-    rel .'object_refs': [identifier]
+    rel .'object_refs': [sdo_identifier]
 }
 
 /// Identities can represent actual individuals, organizations, or groups (e.g., ACME, Inc.) as well as classes of individuals, organizations, systems or groups (e.g., the finance sector).
@@ -784,7 +792,7 @@ pub def malware {
     /// The sample_refs property specifies a list of identifiers of the SCO file or artifact objects associated with this malware instance(s) or family.
     ///
     /// If is_family is false, then all samples listed in sample_refs MUST refer to the same binary data.
-    rel .'sample_refs'?: [identifier]
+    rel .'sample_refs'?: [sdo_identifier]
 }
 
 /// Malware Analysis captures the metadata and results of a particular static or dynamic analysis performed on a malware instance or family.
@@ -828,7 +836,7 @@ pub def note {
     rel .'authors'?: [common.string]
 
     /// The STIX Objects that the note is being applied to.
-    rel .'object_refs': [identifier]
+    rel .'object_refs': [sdo_identifier]
 }
 
 /// Observed Data conveys information about cyber security related entities such as files, systems, and networks using the STIX Cyber-observable Objects (SCOs).
@@ -879,7 +887,7 @@ pub def observed-data {
     /// For example, a Network Traffic object and two IPv4 Address objects related via the src_ref and dst_ref properties can be contained in the same Observed Data because they are all related and used to characterize that single entity.
     ///
     /// This property MUST NOT be present if objects is provided.
-    rel .'object_refs'?: [identifier]
+    rel .'object_refs'?: [sdo_identifier]
 }
 
 /// An Opinion is an assessment of the correctness of the information in a STIX Object produced by a different entity.
@@ -910,7 +918,7 @@ pub def opinion {
     rel .'opinion': ov.opinion-enum
 
     /// The STIX Objects that the Opinion is being applied to.
-    rel .'object_refs': [identifier]
+    rel .'object_refs': [sdo_identifier]
 }
 
 /// Reports are collections of threat intelligence focused on one or more topics, such as a description of a threat actor, malware, or attack technique, including context and related details.
@@ -942,7 +950,7 @@ pub def report {
     rel .'published': common.timestamp
 
     /// Specifies the STIX Objects that are referred to by this Report.
-    rel .'object_refs': [identifier]
+    rel .'object_refs': [sdo_identifier]
 }
 
 /// Threat Actors are actual individuals, groups, or organizations believed to be operating with malicious intent.
@@ -1191,7 +1199,7 @@ pub def domain-name {
     rel .'value': common.string
 
     // Note: Deprecated
-    // rel .'resolves_to_refs'?: [identifier]
+    // rel .'resolves_to_refs'?: [sdo_identifier]
 }
 
 /// The Email Address object represents a single email address.
@@ -1397,7 +1405,7 @@ pub def file {
     /// Specifies a list of references to other Cyber-observable Objects contained within the file, such as another file that is appended to the end of the file, or an IP address that is contained somewhere in the file.
     ///
     /// This is intended for use cases other than those targeted by the Archive extension.
-    rel .'contains_refs'?: [identifier]
+    rel .'contains_refs'?: [sdo_identifier]
 
     /// Specifies the content of the file, represented as an Artifact object.
     ///
@@ -1905,4 +1913,38 @@ pub def x509-certificate {
 
     /// Specifies any standard X.509 v3 extensions that may be used in the certificate. 
     rel .'x509_v3_extensions'?: x509-v3-extensions-type
+}
+
+pub def relationship {
+    rel .is: stix_relationship_object
+    rel .'type': 'relationship'
+    rel .'id'(rel .gen: auto)|id: relationship-id
+
+    /// The name used to identify the type of Relationship.
+    /// This value SHOULD be an exact value listed in the relationships for the source and target SDO, but MAY be any string.
+    /// The value of this property MUST be in ASCII and is limited to characters a–z (lowercase ASCII), 0–9, and hyphen (-).
+    rel .'relationship_type': common.string
+
+    /// A description that provides more details and context about the Relationship, potentially including its purpose and its key characteristics.
+    rel .'description'?: common.string
+
+    /// The id of the source (from) object. The value MUST be an ID reference to an SDO or SCO (i.e., it cannot point to an SRO, Bundle, Language Content, or Marking Definition).
+    rel .'source_ref': sdo_sco_identifier
+
+    /// The id of the target (to) object. The value MUST be an ID reference to an SDO or SCO (i.e., it cannot point to an SRO, Bundle, Language Content, or Marking Definition).
+    rel .'target_ref': sdo_sco_identifier
+
+    /// This optional timestamp represents the earliest time at which the Relationship between the objects exists.
+    /// If this property is a future timestamp, at the time the start_time property is defined, then this represents an estimate by the producer of the intelligence of the earliest time at which relationship will be asserted to be true.
+    ///
+    /// If it is not specified, then the earliest time at which the relationship between the objects exists is not defined.
+    rel .'start_time'?: common.timestamp
+
+    /// The latest time at which the Relationship between the objects exists.
+    /// If this property is a future timestamp, at the time the stop_time property is defined, then this represents an estimate by the producer of the intelligence of the latest time at which relationship will be asserted to be true.
+    ///
+    /// If start_time and stop_time are both defined, then stop_time MUST be later than the start_time value.
+    ///
+    /// If stop_time is not specified, then the latest time at which the relationship between the objects exists is either not known, not disclosed, or has no defined stop time.
+    rel .'stop_time'?: common.timestamp
 }
