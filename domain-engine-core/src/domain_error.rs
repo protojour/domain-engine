@@ -2,7 +2,7 @@ use ontol_runtime::DefId;
 use smartstring::alias::String;
 use thiserror::Error;
 
-#[derive(Error, Clone, Debug)]
+#[derive(Error, Debug)]
 pub enum DomainError {
     #[error("Mapping procedure not found")]
     MappingProcedureNotFound,
@@ -26,6 +26,8 @@ pub enum DomainError {
     UnresolvedForeignKey(String),
     #[error("Not implemented")]
     NotImplemented,
+    #[error("Datastore error: {0}")]
+    DataStore(anyhow::Error),
 }
 
 pub type DomainResult<T> = Result<T, DomainError>;
