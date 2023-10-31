@@ -70,7 +70,9 @@ fn def_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstPar
         .then(
             open('(')
                 .ignore_then(
-                    spanned(sym_set(&["pub", "open"], "modifier")).separated_by(sigil('|')),
+                    spanned(sym_set(&["pub", "open"], "modifier"))
+                        .separated_by(sigil('|'))
+                        .at_least(1),
                 )
                 .then_ignore(close(')'))
                 .or_not(),

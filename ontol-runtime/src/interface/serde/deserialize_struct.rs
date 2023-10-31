@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use indexmap::IndexMap;
 use serde::{
@@ -10,11 +10,11 @@ use tracing::debug;
 
 use crate::{
     format_utils::{DoubleQuote, LogicOp, Missing},
-    interface::serde::EDGE_PROPERTY,
+    interface::serde::{deserialize_open::OpenVisitor, EDGE_PROPERTY},
     value::{Attribute, Data, PropertyId, Value},
     value_generator::ValueGenerator,
     vm::proc::{NParams, Procedure},
-    DefId,
+    DefId, RelationshipId, Role,
 };
 
 use super::{
@@ -118,6 +118,8 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
         flags,
     };
 
+    let mut open_dict: HashMap<String, Value> = Default::default();
+
     // first parse buffered attributes, if any
     for (serde_key, serde_value) in buffered_attrs {
         match property_set.visit_str(&serde_key)? {
@@ -163,8 +165,15 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
                     observed_required_count += 1;
                 }
             }
-            PropertyKey::Open(_key) => {
-                todo!()
+            PropertyKey::Open(key) => {
+                open_dict.insert(
+                    key,
+                    serde_value::ValueDeserializer::new(serde_value).deserialize_any(
+                        OpenVisitor {
+                            ontology: processor.ontology,
+                        },
+                    )?,
+                );
             }
             PropertyKey::Ignored => {}
         }
@@ -217,7 +226,14 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
                     observed_required_count += 1;
                 }
             }
-            PropertyKey::Open(_key) => todo!(),
+            PropertyKey::Open(key) => {
+                open_dict.insert(
+                    key,
+                    map.next_value_seed(OpenVisitor {
+                        ontology: processor.ontology,
+                    })?,
+                );
+            }
             PropertyKey::Ignored => {
                 let _value: serde_value::Value = map.next_value()?;
             }
@@ -296,6 +312,22 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
         return Err(serde::de::Error::custom(format!(
             "missing properties, expected {missing_keys}"
         )));
+    }
+
+    if !open_dict.is_empty() {
+        attributes.insert(
+            PropertyId {
+                role: Role::Subject,
+                relationship_id: RelationshipId(
+                    processor.ontology.ontol_domain_meta.open_relationship,
+                ),
+            },
+            Value {
+                data: Data::Dict(Box::new(open_dict)),
+                type_def_id: DefId::unit(),
+            }
+            .into(),
+        );
     }
 
     Ok(DeserializedStruct {

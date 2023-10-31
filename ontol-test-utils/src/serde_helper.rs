@@ -1,7 +1,9 @@
 use std::collections::BTreeMap;
 
 use ontol_runtime::{
-    interface::serde::processor::{ProcessorLevel, ProcessorMode, ProcessorProfile},
+    interface::serde::processor::{
+        ProcessorLevel, ProcessorMode, ProcessorProfile, ProcessorProfileFlags,
+    },
     value::{Attribute, Data, PropertyId, Value},
     DefId,
 };
@@ -20,6 +22,18 @@ pub struct SerdeHelper<'b, 'on> {
 impl<'b, 'on> SerdeHelper<'b, 'on> {
     pub fn with_profile(self, profile: ProcessorProfile) -> Self {
         Self { profile, ..self }
+    }
+
+    pub fn enable_open_data(self) -> Self {
+        Self {
+            profile: ProcessorProfile {
+                flags: self.profile.flags
+                    | ProcessorProfileFlags::SERIALIZE_OPEN_PROPS
+                    | ProcessorProfileFlags::DESERIALIZE_OPEN_PROPS,
+                ..self.profile
+            },
+            ..self
+        }
     }
 
     pub fn to_data(&self, json: serde_json::Value) -> Result<Data, serde_json::Error> {

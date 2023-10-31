@@ -15,7 +15,7 @@ use crate::{
     var::Var,
     vm::abstract_vm::{AbstractVm, Processor, VmDebug},
     vm::proc::{BuiltinProc, Local, Procedure},
-    DefId, PackageId,
+    DefId,
 };
 
 use super::{
@@ -24,34 +24,18 @@ use super::{
 };
 
 /// Virtual machine for executing ONTOL procedures
-pub struct OntolVm<'l> {
-    abstract_vm: AbstractVm<'l, OntolProcessor>,
-    processor: OntolProcessor,
+pub struct OntolVm<'o> {
+    abstract_vm: AbstractVm<'o, OntolProcessor<'o>>,
+    processor: OntolProcessor<'o>,
 }
 
 impl<'o> OntolVm<'o> {
     pub fn new(ontology: &'o Ontology, proc: Procedure) -> Self {
-        let ontol_domain = ontology.find_domain(PackageId(0)).unwrap();
-
-        // TODO: In the future, information about primitive types could be cached inside Ontology:
-        let text_def_id = ontol_domain.type_info_by_identifier("text").unwrap().def_id;
-
         Self {
             abstract_vm: AbstractVm::new(ontology, proc),
             processor: OntolProcessor {
                 stack: Default::default(),
-                text_def_id,
-            },
-        }
-    }
-
-    #[cfg(test)]
-    pub fn new_domainless(ontology: &'o Ontology, proc: Procedure) -> Self {
-        Self {
-            abstract_vm: AbstractVm::new(ontology, proc),
-            processor: OntolProcessor {
-                stack: Default::default(),
-                text_def_id: DefId::unit(),
+                ontology,
             },
         }
     }
@@ -75,12 +59,12 @@ impl<'o> OntolVm<'o> {
     }
 }
 
-pub struct OntolProcessor {
+pub struct OntolProcessor<'o> {
     stack: Vec<Value>,
-    text_def_id: DefId,
+    ontology: &'o Ontology,
 }
 
-impl Processor for OntolProcessor {
+impl<'o> Processor for OntolProcessor<'o> {
     type Value = Value;
     type Yield = Yield;
 
@@ -262,7 +246,11 @@ impl Processor for OntolProcessor {
 
         match text_pattern.regex.captures(haystack) {
             Some(captures) => {
-                let values = extract_regex_captures(&captures, group_filter, self.text_def_id);
+                let values = extract_regex_captures(
+                    &captures,
+                    group_filter,
+                    self.ontology.ontol_domain_meta.text,
+                );
                 self.stack.extend(values);
                 self.push_true();
             }
@@ -283,21 +271,21 @@ impl Processor for OntolProcessor {
         };
 
         let mut attrs: Vec<Attribute> = Vec::new();
+        let text_def_id = self.ontology.ontol_domain_meta.text;
 
         for captures in text_pattern.regex.captures_iter(haystack) {
-            let value_attributes =
-                extract_regex_captures(&captures, group_filter, self.text_def_id)
-                    .into_iter()
-                    .map(Attribute::from);
+            let value_attributes = extract_regex_captures(&captures, group_filter, text_def_id)
+                .into_iter()
+                .map(Attribute::from);
             attrs.push(Attribute::from(Value::new(
                 Data::Sequence(Sequence::new(value_attributes)),
-                self.text_def_id,
+                text_def_id,
             )));
         }
 
         self.stack.push(Value::new(
             Data::Sequence(Sequence::new(attrs)),
-            self.text_def_id,
+            text_def_id,
         ));
     }
 
@@ -342,7 +330,7 @@ impl Processor for OntolProcessor {
     }
 }
 
-impl OntolProcessor {
+impl<'o> OntolProcessor<'o> {
     fn eval_builtin(&mut self, proc: BuiltinProc) -> Data {
         match proc {
             BuiltinProc::Add => {
@@ -457,7 +445,7 @@ impl OntolProcessor {
 
 struct Tracer;
 
-impl VmDebug<OntolProcessor> for Tracer {
+impl<'o> VmDebug<OntolProcessor<'o>> for Tracer {
     fn tick(&mut self, vm: &AbstractVm<OntolProcessor>, stack: &OntolProcessor) {
         if tracing::enabled!(Level::TRACE) {
             for (index, value) in stack.stack.iter().enumerate() {
@@ -522,7 +510,7 @@ mod tests {
         );
 
         let ontology = Ontology::builder().lib(lib).build();
-        let output = OntolVm::new_domainless(&ontology, proc)
+        let output = OntolVm::new(&ontology, proc)
             .run([Value::new(
                 Data::Struct(
                     [
@@ -592,7 +580,7 @@ mod tests {
         );
 
         let ontology = Ontology::builder().lib(lib).build();
-        let output = OntolVm::new_domainless(&ontology, mapping_proc)
+        let output = OntolVm::new(&ontology, mapping_proc)
             .run([Value::new(
                 Data::Struct(
                     [
@@ -655,7 +643,7 @@ mod tests {
         );
 
         let ontology = Ontology::builder().lib(lib).build();
-        let output = OntolVm::new_domainless(&ontology, proc)
+        let output = OntolVm::new(&ontology, proc)
             .run([Value::new(
                 Data::Sequence(Sequence::new(vec![
                     Value::new(Data::I64(1), def_id(0)).into(),
@@ -713,7 +701,7 @@ mod tests {
         );
 
         let ontology = Ontology::builder().lib(lib).build();
-        let output = OntolVm::new_domainless(&ontology, proc)
+        let output = OntolVm::new(&ontology, proc)
             .run([Value::new(
                 Data::Struct(
                     [
@@ -778,7 +766,7 @@ mod tests {
             format!(
                 "{}",
                 ValueDebug(
-                    &OntolVm::new_domainless(&ontology, proc,)
+                    &OntolVm::new(&ontology, proc)
                         .run([Value::new(Data::Struct([].into()), def_id(0))])
                         .unwrap()
                 )
@@ -790,7 +778,7 @@ mod tests {
             format!(
                 "{}",
                 ValueDebug(
-                    &OntolVm::new_domainless(&ontology, proc,)
+                    &OntolVm::new(&ontology, proc)
                         .run([Value::new(
                             Data::Struct([(prop, Value::unit().into())].into()),
                             def_id(0)
@@ -805,7 +793,7 @@ mod tests {
             format!(
                 "{}",
                 ValueDebug(
-                    &OntolVm::new_domainless(&ontology, proc,)
+                    &OntolVm::new(&ontology, proc)
                         .run([Value::new(
                             Data::Struct(
                                 [(

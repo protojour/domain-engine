@@ -1,7 +1,10 @@
 //! Tests for deserialization, including errors
 
 use assert_matches::assert_matches;
-use ontol_runtime::value::Data;
+use ontol_runtime::{
+    value::{Data, PropertyId},
+    RelationshipId, Role,
+};
 use ontol_test_utils::{assert_error_msg, serde_helper::*, TestCompile};
 use serde_json::json;
 use test_log::test;
@@ -377,5 +380,56 @@ fn union_tree() {
             serde_create(&u3).to_data_variant(json!("ugh")),
             r#"invalid type: string "ugh", expected `u3` (one of "1a", "1b", "2a", "2b") at line 1 column 5"#
         );
+    });
+}
+
+#[test]
+fn test_deserialize_open_data() {
+    "
+    def(pub|open) foo {
+        rel .'closed': i64
+    }
+    "
+    .compile_then(|test| {
+        let [foo] = test.bind(["foo"]);
+
+        let Data::Struct(map) = serde_create(&foo)
+            .enable_open_data()
+            .to_data(json!({
+                "closed": 1,
+                "int": 2,
+                "float": 3.14,
+                "bool": true,
+                "null": null,
+                "dict": {
+                    "key": "value"
+                },
+                "array": ["value"]
+            }))
+            .unwrap()
+        else {
+            panic!();
+        };
+
+        let open_data = &map
+            .get(&PropertyId {
+                role: Role::Subject,
+                relationship_id: RelationshipId(
+                    test.ontology.ontol_domain_meta().open_relationship,
+                ),
+            })
+            .unwrap()
+            .value;
+        let Data::Dict(open_data) = &open_data.data else {
+            panic!();
+        };
+
+        assert!(!open_data.contains_key("closed"));
+        assert!(open_data.contains_key("int"));
+        assert!(open_data.contains_key("float"));
+        assert!(open_data.contains_key("bool"));
+        assert!(open_data.contains_key("null"));
+        assert!(open_data.contains_key("dict"));
+        assert!(open_data.contains_key("array"));
     });
 }

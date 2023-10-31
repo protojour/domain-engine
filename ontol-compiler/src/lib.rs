@@ -21,7 +21,8 @@ use ontol_runtime::{
         DomainInterface,
     },
     ontology::{
-        DataRelationshipInfo, DataRelationshipKind, Domain, EntityInfo, MapMeta, Ontology, TypeInfo,
+        DataRelationshipInfo, DataRelationshipKind, Domain, EntityInfo, MapMeta, OntolDomainMeta,
+        Ontology, TypeInfo,
     },
     value::PropertyId,
     DefId, PackageId,
@@ -360,6 +361,13 @@ impl<'m> Compiler<'m> {
             .collect();
 
         builder
+            .ontol_domain_meta(OntolDomainMeta {
+                bool: self.primitives.bool,
+                i64: self.primitives.i64,
+                f64: self.primitives.f64,
+                text: self.primitives.text,
+                open_relationship: self.primitives.open_relationship,
+            })
             .lib(self.codegen_tasks.result_lib)
             .docs(docs)
             .const_procs(self.codegen_tasks.result_const_procs)

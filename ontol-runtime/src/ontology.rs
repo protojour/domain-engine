@@ -37,6 +37,7 @@ pub struct Ontology {
     pub(crate) text_like_types: FnvHashMap<DefId, TextLikeType>,
     pub(crate) text_patterns: FnvHashMap<DefId, TextPattern>,
     pub(crate) lib: Lib,
+    pub(crate) ontol_domain_meta: OntolDomainMeta,
 
     domain_table: FnvHashMap<PackageId, Domain>,
     domain_interfaces: FnvHashMap<PackageId, Vec<DomainInterface>>,
@@ -59,6 +60,7 @@ impl Ontology {
                 text_like_types: Default::default(),
                 text_patterns: Default::default(),
                 domain_table: Default::default(),
+                ontol_domain_meta: Default::default(),
                 domain_interfaces: Default::default(),
                 package_config_table: Default::default(),
                 docs: Default::default(),
@@ -104,6 +106,10 @@ impl Ontology {
 
     pub fn domains(&self) -> impl Iterator<Item = (&PackageId, &Domain)> {
         self.domain_table.iter()
+    }
+
+    pub fn ontol_domain_meta(&self) -> &OntolDomainMeta {
+        &self.ontol_domain_meta
     }
 
     pub fn find_domain(&self, package_id: PackageId) -> Option<&Domain> {
@@ -181,6 +187,27 @@ impl Ontology {
 
     pub fn get_value_generator(&self, relationship_id: RelationshipId) -> Option<&ValueGenerator> {
         self.value_generators.get(&relationship_id)
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct OntolDomainMeta {
+    pub bool: DefId,
+    pub i64: DefId,
+    pub f64: DefId,
+    pub text: DefId,
+    pub open_relationship: DefId,
+}
+
+impl Default for OntolDomainMeta {
+    fn default() -> Self {
+        Self {
+            bool: DefId::unit(),
+            i64: DefId::unit(),
+            f64: DefId::unit(),
+            text: DefId::unit(),
+            open_relationship: DefId::unit(),
+        }
     }
 }
 
@@ -340,6 +367,11 @@ impl OntologyBuilder {
         self.ontology
             .package_config_table
             .insert(package_id, config);
+    }
+
+    pub fn ontol_domain_meta(mut self, meta: OntolDomainMeta) -> Self {
+        self.ontology.ontol_domain_meta = meta;
+        self
     }
 
     pub fn domain_interfaces(

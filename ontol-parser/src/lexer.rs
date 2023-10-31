@@ -184,7 +184,7 @@ fn doc_comment() -> impl Parser<char, Token, Error = Simple<char>> {
 fn special_char(c: char) -> bool {
     matches!(
         c,
-        '(' | ')' | '[' | ']' | '{' | '}' | '<' | '>' | '.' | ';' | ':' | '?' | '/' | ','
+        '(' | ')' | '[' | ']' | '{' | '}' | '<' | '>' | '.' | ';' | ':' | '?' | '/' | ',' | '|'
     )
 }
 

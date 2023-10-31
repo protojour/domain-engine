@@ -1,4 +1,7 @@
-use serde::de::{DeserializeSeed, Visitor};
+use serde::{
+    de::{DeserializeSeed, Error, Visitor},
+    Deserializer,
+};
 
 use crate::value::Attribute;
 
@@ -17,10 +20,7 @@ pub struct OptionProcessor<'on, 'p> {
 impl<'on, 'p, 'de> DeserializeSeed<'de> for OptionProcessor<'on, 'p> {
     type Value = Option<Attribute>;
 
-    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
+    fn deserialize<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
         deserializer.deserialize_option(self)
     }
 }
@@ -32,24 +32,15 @@ impl<'on, 'p, 'de> Visitor<'de> for OptionProcessor<'on, 'p> {
         write!(f, "option")
     }
 
-    fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
+    fn visit_some<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
         Ok(Some(self.inner.deserialize(deserializer)?))
     }
 
-    fn visit_unit<E>(self) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
+    fn visit_unit<E: Error>(self) -> Result<Self::Value, E> {
         Ok(None)
     }
 
-    fn visit_none<E>(self) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
+    fn visit_none<E: Error>(self) -> Result<Self::Value, E> {
         Ok(None)
     }
 }
