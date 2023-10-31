@@ -1,26 +1,26 @@
-type cubic_meters {
+def cubic_meters {
     rel _ is: i64
 }
 
-type meters {
+def meters {
     rel _ is: i64
 }
 
-type meters_per_second {
+def meters_per_second {
     rel _ is: i64
 }
 
-type seconds {
+def seconds {
     rel _ is: i64
 }
 
-type water_tank {
+def water_tank {
     rel _ 'height': meters
     rel _ 'radius': meters
     rel _ 'contents': cubic_meters
 }
 
-type velocity_of_emptying {
+def velocity_of_emptying {
     rel _ 'velocity': meters_per_second
     rel _ 'duration': seconds
     rel _ 'capacity': cubic_meters

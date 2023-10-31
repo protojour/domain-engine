@@ -5,10 +5,10 @@ use test_log::test;
 #[test]
 fn test_map_simple() {
     "
-    pub def foo {
+    def(pub) foo {
         rel foo 'f': text
     }
-    pub def bar {
+    def(pub) bar {
         rel bar 'b': text
     }
     map {
@@ -33,9 +33,9 @@ fn test_map_simple() {
 #[test]
 fn test_map_value_to_primitive() {
     "
-    pub def string { rel.is: text }
-    pub def foo { rel .'a': string }
-    pub def bar { rel .'b': text }
+    def(pub) string { rel.is: text }
+    def(pub) foo { rel .'a': string }
+    def(pub) bar { rel .'b': text }
     map {
         foo { 'a': x }
         bar { 'b': x }
@@ -58,8 +58,8 @@ fn test_map_value_to_primitive() {
 #[test]
 fn test_meters() {
     "
-    pub def meters { rel .is: i64 }
-    pub def millimeters { rel .is: i64 }
+    def(pub) meters { rel .is: i64 }
+    def(pub) millimeters { rel .is: i64 }
     map {
         meters: x / 1000
         millimeters: x
@@ -76,8 +76,8 @@ fn test_meters() {
 #[test]
 fn test_temperature() {
     "
-    pub def celsius { rel .is: i64 }
-    pub def fahrenheit { rel .is: i64 }
+    def(pub) celsius { rel .is: i64 }
+    def(pub) fahrenheit { rel .is: i64 }
     map {
         celsius: x
         fahrenheit: x * 9 / 5 + 32
@@ -106,10 +106,10 @@ fn test_nested_optional_attribute() {
         years: y
     }
 
-    pub def person {
+    def(pub) person {
         rel .'age'?: years
     }
-    pub def creature {
+    def(pub) creature {
         rel .'age'?: seconds
     }
 
@@ -118,10 +118,10 @@ fn test_nested_optional_attribute() {
         creature { 'age'?: a }
     }
 
-    pub def person_container {
+    def(pub) person_container {
         rel .'person'?: person
     }
-    pub def creature_container {
+    def(pub) creature_container {
         rel .'creature'?: creature
     }
 
@@ -167,10 +167,10 @@ fn test_nested_optional_attribute() {
 #[test]
 fn test_map_value_to_struct_no_func() {
     "
-    pub def one {
+    def(pub) one {
         rel .is: text
     }
-    pub def two {
+    def(pub) two {
         rel .'a': text
     }
     map {
@@ -191,10 +191,10 @@ fn test_map_value_to_struct_no_func() {
 #[test]
 fn test_map_value_to_struct_func() {
     "
-    pub def one {
+    def(pub) one {
         rel .is: i64
     }
-    pub def two {
+    def(pub) two {
         rel .'a': i64
     }
     map {
@@ -215,8 +215,8 @@ fn test_map_value_to_struct_func() {
 #[test]
 fn test_map_into_default_field_using_default_value() {
     "
-    pub def empty {}
-    pub def target {
+    def(pub) empty {}
+    def(pub) target {
         rel .'field'(rel .default := 'Default!'): text
     }
     map {
@@ -241,10 +241,10 @@ fn test_map_into_default_field_using_default_value() {
 #[test]
 fn test_map_into_default_field_using_provided_value() {
     "
-    pub def required {
+    def(pub) required {
         rel .'field': text
     }
-    pub def target {
+    def(pub) target {
         rel .'field'(rel .default := 'Default!'): text
     }
     map {
@@ -269,8 +269,8 @@ fn test_map_into_default_field_using_provided_value() {
 #[test]
 fn test_map_into_default_field_using_map_provided() {
     "
-    pub def empty {}
-    pub def target {
+    def(pub) empty {}
+    def(pub) target {
         rel .'field'(rel .default := 'Default!'): text
     }
     map {
@@ -295,7 +295,7 @@ fn test_map_into_default_field_using_map_provided() {
 #[test]
 fn test_deep_structural_map() {
     "
-    pub def foo {
+    def(pub) foo {
         rel .'a': text
     }
     def foo_inner {
@@ -307,7 +307,7 @@ fn test_deep_structural_map() {
     }
 
     def bar_inner {}
-    pub def bar {
+    def(pub) bar {
         rel .'a': text
         rel .'b': text
         rel .'inner': bar_inner
@@ -351,10 +351,10 @@ fn test_deep_structural_map() {
 #[test]
 fn test_map_matching_sequence() {
     "
-    pub def foo {
+    def(pub) foo {
         rel .'a': [i64]
     }
-    pub def bar {
+    def(pub) bar {
         rel .'b': [i64]
     }
     map {
@@ -378,8 +378,8 @@ fn test_map_matching_sequence() {
 const MAP_IN_SEQUENCE: &str = "
 def foo { rel .'f': text }
 def bar { rel .'b': text }
-pub def foos { rel .'foos': [foo] }
-pub def bars { rel .'bars': [bar] }
+def(pub) foos { rel .'foos': [foo] }
+def(pub) bars { rel .'bars': [bar] }
 
 map {
     foos { 'foos': [..x] }
@@ -446,11 +446,11 @@ fn test_sequence_cross_parallel() {
         bar { 'b': x }
     }
 
-    pub def foos {
+    def(pub) foos {
         rel .'f1': [foo]
         rel .'f2': [foo]
     }
-    pub def bars {
+    def(pub) bars {
         rel .'b1': [bar]
         rel .'b2': [bar]
     }
@@ -484,19 +484,19 @@ fn test_sequence_inner_loop() {
         bar { 'Q': x }
     }
 
-    pub def f0 {
+    def(pub) f0 {
         rel .'a': [foo]
         rel .'b': [foo]
     }
-    pub def f1 {
+    def(pub) f1 {
         rel .'a': [f0]
         rel .'b': [f0]
     }
-    pub def b0 {
+    def(pub) b0 {
         rel .'a': [bar]
         rel .'b': [bar]
     }
-    pub def b1 {
+    def(pub) b1 {
         rel .'a': [b0]
         rel .'b': [b0]
     }
@@ -535,7 +535,7 @@ fn test_sequence_inner_loop() {
 #[test]
 fn test_sequence_flat_map1() {
     "
-    pub def foo {
+    def(pub) foo {
         rel .'a': text
 
         def foo_inner {
@@ -543,7 +543,7 @@ fn test_sequence_flat_map1() {
         }
         rel .'inner': [foo_inner]
     }
-    pub def bar {
+    def(pub) bar {
         rel .'a': text
         rel .'b': text
     }
@@ -651,11 +651,11 @@ fn test_map_complex_flow() {
     // But perhaps let's accept that this might be what the user wants.
     // For example, when two `:x`es flow into one property, we can choose the first one.
     "
-    pub def one {
+    def(pub) one {
         rel .'a': text
         rel .'b': text
     }
-    pub def two {
+    def(pub) two {
         rel .'a': text
         rel .'b': text
         rel .'c': text
@@ -692,10 +692,10 @@ fn test_map_delegation() {
             "
             use 'SI' as SI
 
-            pub def car {
+            def(pub) car {
                 rel .'length': SI.meters
             }
-            pub def vehicle {
+            def(pub) vehicle {
                 rel .'length': SI.millimeters
             }
 
@@ -708,10 +708,10 @@ fn test_map_delegation() {
         (
             SourceName("SI"),
             "
-            pub def meters {
+            def(pub) meters {
                 rel .is: i64
             }
-            pub def millimeters {
+            def(pub) millimeters {
                 rel .is: i64
             }
 
@@ -744,10 +744,10 @@ fn test_map_delegation_abstract_types() {
         (
             SourceName("SI"),
             "
-            pub def meters {
+            def(pub) meters {
                 rel .is: number
             }
-            pub def millimeters {
+            def(pub) millimeters {
                 rel .is: number
             }
 
@@ -761,7 +761,7 @@ fn test_map_delegation_abstract_types() {
             SourceName("car"),
             "
             use 'SI' as SI
-            pub def car {
+            def(pub) car {
                 rel .'length': {
                     rel .is: f64
                     rel .is: SI.meters
@@ -773,7 +773,7 @@ fn test_map_delegation_abstract_types() {
             SourceName("vehicle"),
             "
             use 'SI' as SI
-            pub def vehicle {
+            def(pub) vehicle {
                 rel .'length': {
                     rel .is: f64
                     rel .is: SI.millimeters
@@ -811,11 +811,11 @@ fn test_map_delegation_abstract_types() {
 #[test]
 fn test_map_dependent_scoping() {
     "
-    pub def one {
+    def(pub) one {
         rel .'total_weight': i64
         rel .'net_weight': i64
     }
-    pub def two {
+    def(pub) two {
         rel .'net_weight': i64
         rel .'container_weight': i64
     }
@@ -850,17 +850,17 @@ fn test_seq_scope_escape1() {
     "
     def foo {}
 
-    pub def bar {
+    def(pub) bar {
         rel .'foo': foo
         rel .'p1': [text]
     }
 
-    pub def baz {
+    def(pub) baz {
         rel .'foo': foo
         rel .'p1': [text]
     }
 
-    pub def qux {
+    def(pub) qux {
         rel .'baz': baz
     }
 
@@ -893,17 +893,17 @@ fn test_seq_scope_escape2() {
         rel .'p0': [text]
     }
 
-    pub def bar {
+    def(pub) bar {
         rel .'foo': foo
         rel .'p1': [text]
     }
 
-    pub def baz {
+    def(pub) baz {
         rel .'foo': foo
         rel .'p1': [text]
     }
 
-    pub def qux {
+    def(pub) qux {
         rel .'baz': baz
     }
 

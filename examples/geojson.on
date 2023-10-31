@@ -41,48 +41,48 @@ def position-ring {
 }
 
 /// For type "Point", the "coordinates" member is a single position.
-pub def Point {
+def(pub) Point {
     rel .'type': 'Point'
     rel .'coordinates': position
 }
 
 /// For type "MultiPoint", the "coordinates" member is an array of
 /// positions.
-pub def MultiPoint {
+def(pub) MultiPoint {
     rel .'type': 'MultiPoint'
     rel .'coordinates': [position]
 }
 
 /// For type "LineString", the "coordinates" member is an array of two or
 /// more positions.
-pub def LineString {
+def(pub) LineString {
     rel .'type': 'LineString'
     rel .'coordinates': position-list
 }
 
 /// For type "MultiLineString", the "coordinates" member is an array of
 /// LineString coordinate arrays.
-pub def MultiLineString {
+def(pub) MultiLineString {
     rel . 'type': 'MultiLineString'
     rel . 'coordinates': [position-list]
 }
 
 /// For type "Polygon", the "coordinates" member MUST be an array of
 /// linear ring coordinate arrays.
-pub def Polygon {
+def(pub) Polygon {
     rel .'type': 'Polygon'
     rel .'coordinates': position-ring
 }
 
 /// For type "MultiPolygon", the "coordinates" member is an array of
 /// Polygon coordinate arrays.
-pub def MultiPolygon {
+def(pub) MultiPolygon {
     rel .'type': 'MultiPolygon'
     rel .'coordinates': [position-ring]
 }
 
 /// LeafGeometry is a union of geometries that does not include `GeometryCollection`.
-pub def LeafGeometry {
+def(pub) LeafGeometry {
     rel .is?: Point
     rel .is?: MultiPoint
     rel .is?: LineString
@@ -96,7 +96,7 @@ pub def LeafGeometry {
 /// A GeometryCollection has a member with the name "geometries".  The
 /// value of "geometries" is an array.  Each element of this array is a
 /// GeoJSON Geometry object.  It is possible for this array to be empty.
-pub def GeometryCollection {
+def(pub) GeometryCollection {
     rel .'type': 'GeometryCollection'
     rel .'geometries': [LeafGeometry]
 }
@@ -106,7 +106,7 @@ pub def GeometryCollection {
 /// matter where it occurs in a GeoJSON text.
 ///
 /// Note: Geometry is an extension of LeafGeometry + GeometryCollection.
-pub def Geometry {
+def(pub) Geometry {
     rel .is?: Point
     rel .is?: MultiPoint
     rel .is?: LineString

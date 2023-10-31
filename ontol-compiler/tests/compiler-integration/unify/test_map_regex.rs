@@ -5,10 +5,10 @@ use test_log::test;
 #[test]
 fn test_map_regex_duplex1() {
     r#"
-    pub def foo {
+    def(pub) foo {
         rel .'input': text
     }
-    pub def bar {
+    def(pub) bar {
         rel .'first': text
         rel .'second': text
     }
@@ -39,13 +39,13 @@ fn test_map_regex_duplex1() {
 #[test]
 fn test_map_regex_alternation1() {
     r#"
-    pub def foo {
+    def(pub) foo {
         rel .'input': text
     }
     def capture {
         rel .'value': text
     }
-    pub def bar {
+    def(pub) bar {
         rel .'first'?: text
         rel .'second'?: text
     }
@@ -77,14 +77,14 @@ fn test_map_regex_alternation1() {
 #[test]
 fn test_map_regex_loop_pattern() {
     r#"
-    pub def in {
+    def(pub) in {
         rel .'input': text
     }
     def capture {
         rel .'first': text
         rel .'second': text
     }
-    pub def out {
+    def(pub) out {
         rel .'captures': [capture]
     }
     map {
@@ -123,13 +123,13 @@ fn test_map_regex_loop_pattern() {
 #[test]
 fn test_map_regex_loop_alternation() {
     r#"
-    pub def in {
+    def(pub) in {
         rel .'input': text
     }
     def capture {
         rel .'value': text
     }
-    pub def out {
+    def(pub) out {
         rel .'foo': [capture]
         rel .'bar': [capture]
     }

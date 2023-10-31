@@ -11,7 +11,7 @@ use "some_domain" as some
 // ^^^^^^^^^^^^^^^^^^^^^^^^^ comment.block.documentation.ontol
 /// It can span several lines, contain **Markdown**,
 /// and is connected to the statement below
-pub def test {
+def(pub) test {
 // <- storage.modifier.pub.ontol
 //  ^^^^ keyword.declaration.def.ontol
 //       ^^^^
@@ -40,7 +40,7 @@ pub def test {
 //                            ^ keyword.operator.sigil.ontol
 }
 
-pub def test {
+def(pub) test {
 // <- keyword.context.block.with.ontol
 //   ^^^^
     rel .'three_oh_three': 303

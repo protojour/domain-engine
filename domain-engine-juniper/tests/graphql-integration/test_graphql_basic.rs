@@ -36,13 +36,13 @@ fn test_graphql_schema_for_entityless_domain_should_not_be_generated() {
 #[test(tokio::test)]
 async fn test_graphql_int_scalars() {
     let (test, [schema]) = "
-    pub def foo_id { fmt '' => text => . }
+    def(pub) foo_id { fmt '' => text => . }
     def smallint {
         rel .is: integer
         rel .min: 0
         rel .max: 255
     }
-    pub def foo {
+    def(pub) foo {
         rel foo_id identifies: .
         rel .'small': smallint
         rel .'big': i64
@@ -142,7 +142,7 @@ async fn test_graphql_int_scalars() {
 #[test(tokio::test)]
 async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
     let (test, [schema]) = "
-    pub def foo {
+    def(pub) foo {
         rel .'id'(rel .gen: auto)|id: { rel .is: text }
     }
     map foos {
@@ -179,7 +179,7 @@ async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
 #[test(tokio::test)]
 async fn test_graphql_basic_pagination() {
     let (test, [schema]) = "
-    pub def foo {
+    def(pub) foo {
         rel .'id'(rel .gen: auto)|id: { rel .is: text }
     }
     map foos {
@@ -310,7 +310,7 @@ async fn test_graphql_basic_pagination() {
 #[test(tokio::test)]
 async fn test_graphql_nodes() {
     let (test, [schema]) = "
-    pub def foo {
+    def(pub) foo {
         rel .'id'(rel .gen: auto)|id: { rel .is: text }
     }
     map foos {
@@ -359,7 +359,7 @@ async fn test_graphql_nodes() {
 fn test_graphql_value_type_as_field() {
     "
     def foo { rel .is: text }
-    pub def bar {
+    def(pub) bar {
         rel .'id'(rel .gen: auto)|id: { rel .is: text }
         rel .'foo': foo
     }
@@ -371,7 +371,7 @@ fn test_graphql_value_type_as_field() {
 fn test_graphql_value_type_in_array() {
     "
     def foo { rel .is: text }
-    pub def bar {
+    def(pub) bar {
         rel .'id'(rel .gen: auto)|id: { rel .is: text }
         rel .'foo': [foo]
     }
@@ -382,11 +382,11 @@ fn test_graphql_value_type_in_array() {
 #[test(tokio::test)]
 async fn test_inner_struct() {
     let (test, [schema]) = "
-    pub def foo_id { fmt '' => text => . }
+    def(pub) foo_id { fmt '' => text => . }
     def inner {
         rel .'prop': text
     }
-    pub def foo {
+    def(pub) foo {
         rel foo_id identifies: .
         rel .'inner': inner
     }
@@ -468,7 +468,7 @@ async fn test_docs_introspection() {
     }
 
     /// this is a type
-    pub def PublicType {
+    def(pub) PublicType {
         rel Key identifies: .
         /// this is a field
         rel .'relation': text

@@ -16,7 +16,6 @@ pub enum Token {
     Rel,
     Fmt,
     Map,
-    Pub,
     FatArrow,
     DotDot,
     Number(String),
@@ -35,7 +34,6 @@ impl Display for Token {
             Self::Rel => write!(f, "`rel`"),
             Self::Fmt => write!(f, "`fmt`"),
             Self::Map => write!(f, "`map`"),
-            Self::Pub => write!(f, "`pub`"),
             Self::DotDot => write!(f, "`..`"),
             Self::FatArrow => write!(f, "`=>`"),
             Self::Number(_) => write!(f, "`number`"),
@@ -56,7 +54,6 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
         "fmt" => Token::Fmt,
         "map" => Token::Map,
         "unify" => Token::Map,
-        "pub" => Token::Pub,
         _ => Token::Sym(ident),
     });
 
@@ -241,7 +238,7 @@ mod tests {
     fn test_doc_comment_drops_spaces() {
         let source = "
         ///      Over here
-        pub def PubType {}
+        def(pub) PubType {}
         ";
         let tokens = lex_ok(source);
         let doc_comment = &tokens.first().unwrap();

@@ -7,7 +7,7 @@ use test_log::test;
 #[test]
 fn constant_text_pattern() {
     "
-    pub def foo {
+    def(pub) foo {
         fmt '' => 'foo' => .
     }
     "
@@ -24,7 +24,7 @@ fn constant_text_pattern() {
 #[test]
 fn concatenated_constant_string_constructor_pattern() {
     "
-    pub def foobar {
+    def(pub) foobar {
         fmt '' => 'foo' => 'bar' => .
     }
     "
@@ -41,7 +41,7 @@ fn concatenated_constant_string_constructor_pattern() {
 #[test]
 fn uuid_in_string_constructor_pattern() {
     "
-    pub def foo {
+    def(pub) foo {
         fmt '' => 'foo/' => uuid => .
     }
     "
@@ -73,7 +73,7 @@ fn test_text_pattern_constructor_union() {
     def bar {
         fmt '' => 'bar/' => uuid => .
     }
-    pub def foobar {
+    def(pub) foobar {
         rel .is?: foo
         rel .is?: bar
     }
@@ -100,7 +100,7 @@ fn test_text_pattern_constructor_union() {
 #[test]
 fn test_regex_property() {
     "
-    pub def foo {
+    def(pub) foo {
         rel .'prop': /abc*/
     }
     "
@@ -119,7 +119,7 @@ fn test_regex_property() {
 #[test]
 fn test_simple_regex_pattern_constructor() {
     "
-    pub def re {
+    def(pub) re {
         fmt '' => /a/ => /bc*/ => .
     }
     "

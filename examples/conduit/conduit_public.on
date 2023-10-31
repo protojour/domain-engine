@@ -2,21 +2,21 @@
 def username { rel .is: text }
 def article_slug { rel .is: text }
 
-pub def User {
+def(pub) User {
     rel .'email'|id: { rel .is: text }
     rel .'username': text
     rel .'bio': text
     rel .'image'?: text
 }
 
-pub def Profile {
+def(pub) Profile {
     rel .'username'|id: username
     rel .'bio': text
     rel .'image'?: text
     rel .'following': boolean
 }
 
-pub def Article {
+def(pub) Article {
     rel .'slug'|id: article_slug
     rel .'title': text
     rel .'description': text
@@ -28,7 +28,7 @@ pub def Article {
     rel .'author': Profile
 }
 
-pub def Comment {
+def(pub) Comment {
     rel .'id'|id: { rel .is: i64 }
     rel .'createdAt': datetime
     rel .'updatedAt': datetime
@@ -36,24 +36,24 @@ pub def Comment {
     rel .'author': Profile
 }
 
-pub def SingleArticle {
+def(pub) SingleArticle {
     rel .'article': Article
 }
 
-pub def MultipleArticles {
+def(pub) MultipleArticles {
     rel .'articles': [Article]
     rel .'articlesCount': i64
 }
 
-pub def SingleComment {
+def(pub) SingleComment {
     rel .'comment': Comment
 }
 
-pub def MultipleComments {
+def(pub) MultipleComments {
     rel .'comments': [Comment]
 }
 
-pub def Tags {
+def(pub) Tags {
     rel .'tags': [text]
 }
 

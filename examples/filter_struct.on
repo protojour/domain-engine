@@ -1,17 +1,17 @@
 
-type Person {
+def Person {
     rel _ 'name': string
     rel _ 'is_friends_with': [Person]
     rel _ 'works_for'?: Company
 }
-type Company {
+def Company {
     rel _ 'name': string
 }
-type Query {
+def Query {
     rel _ 'friend_works_for': string
 }
 
-type Graph {
+def Graph {
     rel _ 'person': string
     rel _ 'foaf': [string]
 }

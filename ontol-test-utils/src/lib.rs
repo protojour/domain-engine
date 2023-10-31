@@ -328,7 +328,7 @@ fn ok_validator_must_run() {
 #[test]
 #[should_panic(expected = "it works")]
 fn failure_validator_must_run() {
-    "foo // ERROR parse error: found `foo`, expected one of `use`, `def`, `rel`, `fmt`, `map`, `pub`"
+    "foo // ERROR parse error: found `foo`, expected one of `use`, `def`, `rel`, `fmt`, `map`"
         .compile_fail_then(|_| {
             panic!("it works");
         })

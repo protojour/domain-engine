@@ -486,7 +486,6 @@ impl State {
                         Token::Rel => return get_ontol_docs("rel"),
                         Token::Fmt => return get_ontol_docs("fmt"),
                         Token::Map => return get_ontol_docs("map"),
-                        Token::Pub => return get_ontol_docs("pub"),
                         Token::Sigil(sigil) => {
                             if *sigil == '?' {
                                 return get_ontol_docs("?");

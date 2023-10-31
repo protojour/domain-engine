@@ -9,7 +9,7 @@ fn json_schema_from_simple_entity() {
     def some_id { fmt '' => text => . }
 
     /// This is type entity
-    pub def entity {
+    def(pub) entity {
         rel some_id identifies: .
 
         /// This is property 'foo'

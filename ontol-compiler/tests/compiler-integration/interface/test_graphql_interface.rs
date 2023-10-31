@@ -25,7 +25,7 @@ fn test_graphql_small_range_number_becomes_int() {
         rel .min: 0
         rel .max: 100
     }
-    pub def foo {
+    def(pub) foo {
         rel .id: { fmt '' => text => . }
         rel .'prop': myint
     }
@@ -46,7 +46,7 @@ fn test_graphql_small_range_number_becomes_int() {
 #[test]
 fn test_graphql_i64_custom_scalar() {
     "
-    pub def foo {
+    def(pub) foo {
         rel .id: { fmt '' => text => . }
         rel .'prop': i64
     }
@@ -69,7 +69,7 @@ fn test_graphql_i64_custom_scalar() {
 #[test]
 fn test_graphql_default_scalar() {
     "
-    pub def foo {
+    def(pub) foo {
         rel .id: { fmt '' => text => . }
         rel .'default'(rel .default := ''): text
     }
@@ -90,7 +90,7 @@ fn test_graphql_default_scalar() {
 #[test]
 fn test_graphql_scalar_array() {
     "
-    pub def foo {
+    def(pub) foo {
         rel .id: { fmt '' => text => . }
         rel .'tags': [text]
     }
@@ -114,7 +114,7 @@ fn test_graphql_scalar_array() {
 #[test]
 fn test_graphql_serde_renaming() {
     "
-    pub def foo {
+    def(pub) foo {
         rel .id: { fmt '' => text => . }
         rel .'must-rewrite': text
         rel .'must_rewrite': text

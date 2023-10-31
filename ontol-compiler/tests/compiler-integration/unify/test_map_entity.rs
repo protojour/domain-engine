@@ -8,10 +8,10 @@ use test_log::test;
 #[test]
 fn should_map_inherent_capturing_pattern_id() {
     "
-    pub def foo {
+    def(pub) foo {
         rel .'id'|id: { fmt '' => 'foo/' => uuid => . }
     }
-    pub def bar {
+    def(pub) bar {
         rel .'id'|id: { fmt '' => 'bar/' => uuid => . }
     }
 
@@ -32,10 +32,10 @@ fn should_map_inherent_capturing_pattern_id() {
 #[test]
 fn test_extract_rel_params() {
     "
-    pub def a1_id { fmt '' => 'a1/' => uuid => . }
-    pub def a2_id { fmt '' => 'a2/' => uuid => . }
-    pub def b1_id { fmt '' => 'b1/' => uuid => . }
-    pub def b2_id { fmt '' => 'b2/' => uuid => . }
+    def(pub) a1_id { fmt '' => 'a1/' => uuid => . }
+    def(pub) a2_id { fmt '' => 'a2/' => uuid => . }
+    def(pub) b1_id { fmt '' => 'b1/' => uuid => . }
+    def(pub) b2_id { fmt '' => 'b2/' => uuid => . }
 
     def a2 {
         rel a2_id identifies: .
@@ -51,11 +51,11 @@ fn test_extract_rel_params() {
         rel .'bar': text
     }
 
-    pub def a1 {
+    def(pub) a1 {
         rel a1_id identifies: .
         rel .'foreign'(rel .is: a_edge): a2
     }
-    pub def b1 {
+    def(pub) b1 {
         rel b1_id identifies: .
         rel .'foreign': b2
     }
@@ -116,10 +116,10 @@ fn test_extract_rel_params() {
 #[test]
 fn test_rel_params_implicit_map() {
     "
-    pub def a_id { fmt '' => 'a/' => uuid => . }
-    pub def b_id { fmt '' => 'a/' => uuid => . }
-    pub def a_inner_id { fmt '' => 'a_inner/' => uuid => . }
-    pub def b_inner_id { fmt '' => 'b_inner/' => uuid => . }
+    def(pub) a_id { fmt '' => 'a/' => uuid => . }
+    def(pub) b_id { fmt '' => 'a/' => uuid => . }
+    def(pub) a_inner_id { fmt '' => 'a_inner/' => uuid => . }
+    def(pub) b_inner_id { fmt '' => 'b_inner/' => uuid => . }
 
     def a_inner {
         rel a_inner_id identifies: .
@@ -133,11 +133,11 @@ fn test_rel_params_implicit_map() {
     def a_edge { rel .'aa': text }
     def b_edge { rel .'bb': text }
 
-    pub def a {
+    def(pub) a {
         rel a_id identifies: .
         rel .'foreign'(rel .is: a_edge): a_inner
     }
-    pub def b {
+    def(pub) b {
         rel b_id identifies: .
         rel .'foreign'(rel .is: b_edge): b_inner
     }
@@ -181,11 +181,11 @@ fn test_rel_params_implicit_map() {
 #[test]
 fn test_map_relation_sequence_default_fallback() {
     "
-    pub def foo_inner { rel .'foo_id'|id: { rel .is: text } }
-    pub def bar_inner { rel .'bar_id'|id: { rel .is: text } }
+    def(pub) foo_inner { rel .'foo_id'|id: { rel .is: text } }
+    def(pub) bar_inner { rel .'bar_id'|id: { rel .is: text } }
     rel [foo_inner] 'bars'::'foos' [bar_inner]
 
-    pub def bar {
+    def(pub) bar {
         rel .'id'|id: { rel .is: text }
         rel .'foos': [text]
     }
@@ -219,11 +219,11 @@ fn test_map_relation_sequence_default_fallback() {
 }
 
 const WORK: &str = "
-pub def worker_id { fmt '' => 'worker/' => uuid => . }
-pub def tech_id { fmt '' => 'tech/' => uuid => . }
+def(pub) worker_id { fmt '' => 'worker/' => uuid => . }
+def(pub) tech_id { fmt '' => 'tech/' => uuid => . }
 
-pub def worker {}
-pub def technology {}
+def(pub) worker {}
+def(pub) technology {}
 
 def worker {
     rel .'ID': worker_id
@@ -241,11 +241,11 @@ def technology {
 ";
 
 const DEV: &str = "
-pub def lang_id { fmt '' => uuid => . }
-pub def dev_id { fmt '' => uuid => . }
+def(pub) lang_id { fmt '' => uuid => . }
+def(pub) dev_id { fmt '' => uuid => . }
 
-pub def language {}
-pub def developer {}
+def(pub) language {}
+def(pub) developer {}
 
 def language {
     rel .'id': lang_id

@@ -7,7 +7,7 @@ use smartstring::alias::String;
 use crate::ast::{
     Dot, ExprOrSeqPattern, ExprOrStructOrSeqPattern, ExprPattern, FmtStatement, MapArm, Path,
     SeqPatternElement, StructPattern, StructPatternAttr, StructPatternModifier, TypeOrPattern,
-    UnitOrSeq, UseStatement, Visibility,
+    UnitOrSeq, UseStatement,
 };
 
 use super::{
@@ -65,21 +65,37 @@ fn domain_statement() -> impl AstParser<Spanned<Statement>> {
 
 fn def_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstParser<DefStatement> {
     doc_comments()
-        .then(keyword(Token::Pub).or_not())
+        // .then(keyword(Token::Pub).or_not())
         .then(keyword(Token::Def))
+        .then(
+            open('(')
+                .ignore_then(
+                    spanned(sym_set(&["pub", "open"], "modifier")).separated_by(sigil('|')),
+                )
+                .then_ignore(close(')'))
+                .or_not(),
+        )
         .then(spanned(ident()))
         .then(spanned(
             stmt_parser.repeated().delimited_by(open('{'), close('}')),
         ))
-        .map(|((((docs, public), kw), ident), ctx_block)| DefStatement {
-            docs,
-            visibility: match public {
-                Some(span) => (Visibility::Public, span),
-                None => (Visibility::Private, kw.clone()),
-            },
-            kw,
-            ident,
-            block: ctx_block,
+        .map(|((((docs, kw), modifiers), ident), ctx_block)| {
+            let modifiers = modifiers.as_deref().unwrap_or(&[]);
+
+            DefStatement {
+                docs,
+                public: modifiers.iter().find_map(|(kw, span)| {
+                    if kw == "pub" {
+                        Some(span.clone())
+                    } else {
+                        None
+                    }
+                }),
+                open: None,
+                kw,
+                ident,
+                block: ctx_block,
+            }
         })
 }
 
@@ -506,6 +522,31 @@ fn sym(str: &'static str, label: &'static str) -> impl AstParser<String> {
                 Ok(string)
             } else {
                 Err(Simple::custom(span, format!("expected `{str}`")))
+            }
+        })
+}
+
+fn sym_set(set: &'static [&'static str], label: &'static str) -> impl AstParser<String> {
+    select! { Token::Sym(sym) => sym }
+        .labelled(label)
+        .try_map(move |string, span| {
+            if set.contains(&string.as_str()) {
+                Ok(string)
+            } else {
+                let mut msg = String::from("expected ");
+
+                let mut iterator = set.iter().peekable();
+                while let Some(candidate) = iterator.next() {
+                    msg.push('`');
+                    msg.push_str(candidate);
+                    msg.push('`');
+
+                    if iterator.peek().is_some() {
+                        msg.push_str(", ");
+                    }
+                }
+
+                Err(Simple::custom(span, msg))
             }
         })
 }

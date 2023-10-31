@@ -926,7 +926,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             self.set_def_kind(
                 def_id,
                 DefKind::Type(TypeDef {
-                    public: matches!(def_stmt.visibility.0, ast::Visibility::Public),
+                    public: def_stmt.public.is_some(),
                     ident: Some(ident),
                     rel_type_for: None,
                     concrete: true,

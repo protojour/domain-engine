@@ -1,8 +1,8 @@
-pub def user_id { rel .is: uuid }
-pub def slug { rel.is: text }
-pub def tag { rel.is: text }
+def(pub) user_id { rel .is: uuid }
+def(pub) slug { rel.is: text }
+def(pub) tag { rel.is: text }
 
-pub def User {
+def(pub) User {
     // TODO: This must be an Authly user id
     rel .'user_id'(rel .gen: auto)|id: user_id
     // TODO: This is.. an authly user name? Maybe?
@@ -20,7 +20,7 @@ pub def User {
     rel .'following'::'followed_by'? [User]
 }
 
-pub def Article {
+def(pub) Article {
     rel .'article_id'(rel .gen: auto)|id: { rel .is: uuid }
     // TODO(constraint): slug is unique
     rel .'slug': slug
@@ -31,14 +31,14 @@ pub def Article {
     rel .'updated_at'(rel .gen: update_time): datetime
 }
 
-pub def Comment {
+def(pub) Comment {
     rel .'id'(rel .gen: auto)|id: { rel .is: i64 }
     rel .'body': text
     rel .'created_at'(rel .gen: create_time): datetime
     rel .'updated_at'(rel .gen: update_time): datetime
 }
 
-pub def TagEntity {
+def(pub) TagEntity {
     rel .'tag'|id: tag
 }
 

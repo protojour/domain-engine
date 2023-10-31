@@ -1,8 +1,8 @@
 
-type a {
+def a {
     rel _ 'a': [string]
 }
-type b {
+def b {
     rel _ 'b': [string]
 }
 

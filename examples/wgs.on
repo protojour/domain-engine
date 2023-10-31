@@ -1,7 +1,7 @@
 /// Latitude lines run east-west and are parallel to each other.
 /// If you go north, latitude values increase.
 /// Finally, latitude values (Y-values) range between -90 and +90 degrees.
-pub def latitude {
+def(pub) latitude {
     rel .is: number
     rel .min: -90
     rel .max: 90
@@ -9,16 +9,16 @@ pub def latitude {
 
 /// Longitude lines run north-south. They converge at the poles.
 /// Its X-coordinates are between -180 and +180 degrees.
-pub def longitude {
+def(pub) longitude {
     rel .is: number
     rel .min: -180
     rel .max: 180
 }
 
-pub def wgs84_latitude {
+def(pub) wgs84_latitude {
     rel .is: latitude
 }
 
-pub def wgs84_longitude {
+def(pub) wgs84_longitude {
     rel .is: longitude
 }

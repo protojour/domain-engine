@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 
 use docs::get_core_completions;
-use ontol_parser::ast::{Statement, Visibility};
+use ontol_parser::ast::Statement;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use state::{
@@ -318,9 +318,9 @@ impl LanguageServer for Backend {
                         Statement::Use(stmt) => {
                             format!("use '{}' as {}", stmt.reference.0, stmt.as_ident.0)
                         }
-                        Statement::Def(stmt) => match stmt.visibility.0 {
-                            Visibility::Private => format!("def {}", stmt.ident.0),
-                            Visibility::Public => format!("pub def {}", stmt.ident.0),
+                        Statement::Def(stmt) => match &stmt.public {
+                            Some(_) => format!("def(pub) {}", stmt.ident.0),
+                            None => format!("def {}", stmt.ident.0),
                         },
                         Statement::Rel(_) => {
                             let sig = get_signature(&doc.text, range, &state.regex);

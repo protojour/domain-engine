@@ -37,8 +37,9 @@ pub struct UseStatement {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct DefStatement {
     pub docs: Vec<String>,
-    pub visibility: Spanned<Visibility>,
     pub kw: Span,
+    pub public: Option<Span>,
+    pub open: Option<Span>,
     pub ident: Spanned<String>,
     pub block: Spanned<Vec<Spanned<Statement>>>,
 }
@@ -196,12 +197,6 @@ pub enum BinaryOp {
     Sub,
     Mul,
     Div,
-}
-
-#[derive(Clone, Eq, PartialEq, Debug)]
-pub enum Visibility {
-    Private,
-    Public,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]

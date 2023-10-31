@@ -100,11 +100,11 @@ fn error_duplicate_parameter() {
 #[test]
 fn test_repr_tuple() {
     "
-    pub def tup {
+    def(pub) tup {
         rel .0..2: i64
     }
 
-    pub def bar {
+    def(pub) bar {
         rel .'tup': tup
     }
     "
@@ -114,7 +114,7 @@ fn test_repr_tuple() {
 #[test]
 fn test_repr_valid_mesh1() {
     TestPackages::with_sources([
-        (SourceName("si"), "pub def meters { rel .is: number }"),
+        (SourceName("si"), "def(pub) meters { rel .is: number }"),
         (
             SourceName::root(),
             "

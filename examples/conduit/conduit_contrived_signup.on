@@ -1,6 +1,6 @@
 use 'conduit_db' as db
 
-pub def signup {
+def(pub) signup {
     rel .'username': text
     rel .'email': text
     rel .'password': text

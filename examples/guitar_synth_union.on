@@ -1,25 +1,25 @@
-pub def guitar_id {
+def(pub) guitar_id {
     fmt '' => 'guitar/' => uuid => .
 }
-pub def synth_id {
+def(pub) synth_id {
     fmt '' => 'synth/' => uuid => .
 }
 
-pub def guitar {
+def(pub) guitar {
     rel .'instrument-id'(rel .gen: auto)|id: guitar_id
     rel .'type': 'guitar'
     rel .'string_count': i64
 }
-pub def synth {
+def(pub) synth {
     rel .'instrument-id'(rel .gen: auto)|id: synth_id
     rel .'type': 'synth'
     rel .'polyphony': i64
 }
-pub def instrument {
+def(pub) instrument {
     rel .is?: guitar
     rel .is?: synth
 }
-pub def artist {
+def(pub) artist {
     rel .'artist-id'(rel .gen: auto)|id: { fmt '' => text => . }
     rel .'name': text
     rel [.] 'plays'::'played-by' [instrument]

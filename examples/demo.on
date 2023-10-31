@@ -46,7 +46,7 @@ def ArchiveDates {
 }
 /// ## An Archived Object
 /// Comments support [Markdown](https://www.markdownguide.org/)
-pub def ArchiveObject {
+def(pub) ArchiveObject {
     /// ID of the object
     rel .'id'|id: { fmt '' => 'archive_item/' => uuid => . }
     /// Relevant dates for the object
@@ -62,7 +62,7 @@ pub def ArchiveObject {
 }
 /// ## An Archived Object Collection
 /// A collection of archived objects
-pub def ArchiveCollection {
+def(pub) ArchiveCollection {
     /// ID of the collection
     rel .'id'|id: { fmt '' => 'archive_group/' => uuid => . }
     /// Relevant dates for the collection

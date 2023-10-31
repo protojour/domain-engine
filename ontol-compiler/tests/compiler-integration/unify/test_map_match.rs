@@ -9,8 +9,8 @@ use unimock::{matching, MockFn};
 #[test]
 fn test_map_match_non_inherent_id() {
     r#"
-    pub def key { rel .is: text }
-    pub def ent { rel .id: key }
+    def(pub) key { rel .is: text }
+    def(pub) ent { rel .id: key }
     map {
         key: key
         ent match { // ERROR no properties expected
@@ -24,8 +24,8 @@ fn test_map_match_non_inherent_id() {
 #[test]
 fn test_map_match_scalar_key() {
     r#"
-    pub def key { rel .is: text }
-    pub def foo {
+    def(pub) key { rel .is: text }
+    def(pub) foo {
         rel .'key'|id: key
         rel .'prop': text
     }
@@ -65,8 +65,8 @@ fn test_map_match_scalar_key() {
 #[test]
 fn test_map_match_parameterless_query() {
     r#"
-    pub def key { rel .is: text }
-    pub def foo {
+    def(pub) key { rel .is: text }
+    def(pub) foo {
         rel .'key'|id: key
         rel .'prop': text
     }
@@ -107,8 +107,8 @@ fn test_map_match_parameterless_query() {
 #[test]
 fn test_map_match_anonymous_query_mandatory_properties() {
     r#"
-    pub def key { rel .is: text }
-    pub def foo {
+    def(pub) key { rel .is: text }
+    def(pub) foo {
         rel .'key'|id: key
         rel .'prop_a': text
         rel .'prop_b': text
@@ -162,8 +162,8 @@ fn test_map_match_anonymous_query_mandatory_properties() {
 #[test]
 fn test_map_match_anonymous_query_optional_property() {
     r#"
-    pub def key { rel .is: text }
-    pub def foo {
+    def(pub) key { rel .is: text }
+    def(pub) foo {
         rel .'key'|id: key
         rel .'prop_a': text
         rel .'prop_b': text
@@ -215,12 +215,12 @@ fn test_map_match_anonymous_query_optional_property() {
 #[test]
 fn test_map_match_anonymous_with_translation() {
     r#"
-    pub def key { rel .is: text }
-    pub def foo {
+    def(pub) key { rel .is: text }
+    def(pub) foo {
         rel .'key'|id: key
         rel .'foo': text
     }
-    pub def bar {
+    def(pub) bar {
         rel .'bar': text
     }
     map {
@@ -265,12 +265,12 @@ fn test_map_match_anonymous_with_translation() {
 #[should_panic = "not yet implemented"]
 fn test_map_sequence_filter_in_set() {
     r#"
-    pub def key { rel .is: text }
-    pub def foo {
+    def(pub) key { rel .is: text }
+    def(pub) foo {
         rel .'key'|id: key
         rel .'foo': text
     }
-    pub def bar {
+    def(pub) bar {
         rel .'bar': text
     }
     map {

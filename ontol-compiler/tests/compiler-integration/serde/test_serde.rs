@@ -11,7 +11,7 @@ use test_log::test;
 
 #[test]
 fn test_serde_empty_type() {
-    "pub def foo {}".compile_then(|test| {
+    "def(pub) foo {}".compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(foo, Create, {});
     });
@@ -20,7 +20,7 @@ fn test_serde_empty_type() {
 #[test]
 fn test_serde_type_alias() {
     "
-    pub def foo { rel .is: text }
+    def(pub) foo { rel .is: text }
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -31,9 +31,9 @@ fn test_serde_type_alias() {
 #[test]
 fn test_serde_booleans() {
     "
-    pub def f { rel .is: false }
-    pub def t { rel .is: true }
-    pub def b { rel .is: boolean }
+    def(pub) f { rel .is: false }
+    def(pub) t { rel .is: true }
+    def(pub) b { rel .is: boolean }
     "
     .compile_then(|test| {
         let [f, t, b] = test.bind(["f", "t", "b"]);
@@ -57,7 +57,7 @@ fn test_serde_booleans() {
 #[test]
 fn test_serde_struct_type() {
     "
-    pub def foo { rel .'a': text }
+    def(pub) foo { rel .'a': text }
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -68,7 +68,7 @@ fn test_serde_struct_type() {
 #[test]
 fn test_serde_struct_optional_field() {
     "
-    pub def foo {
+    def(pub) foo {
         rel .'a'?: text
     }
     "
@@ -83,7 +83,7 @@ fn test_serde_struct_optional_field() {
 #[test]
 fn test_serde_complex_type() {
     "
-    pub def foo {}
+    def(pub) foo {}
     def bar {}
     rel foo 'a': text
     rel foo 'b': bar
@@ -98,7 +98,7 @@ fn test_serde_complex_type() {
 #[test]
 fn test_serde_sequence() {
     "
-    pub def t {
+    def(pub) t {
         rel .0: text
         rel .1: i64
     }
@@ -112,7 +112,7 @@ fn test_serde_sequence() {
 #[test]
 fn test_serde_value_union1() {
     "
-    pub def u {
+    def(pub) u {
         rel .is?: 'a'
         rel .is?: 'b'
     }
@@ -131,7 +131,7 @@ fn test_serde_string_or_unit() {
         rel .is?: ()
     }
 
-    pub def foo {
+    def(pub) foo {
         rel .'a': text-or-unit
     }
     "
@@ -153,7 +153,7 @@ fn test_serde_map_union() {
         rel .'type': 'bar'
         rel .'d': i64
     }
-    pub def u {
+    def(pub) u {
         rel .is?: foo
         rel .is?: bar
     }
@@ -168,7 +168,7 @@ fn test_serde_map_union() {
 fn test_serde_noop_intersection() {
     "
     def bar {}
-    pub def foo {
+    def(pub) foo {
         rel .is: bar
         rel .'foobar': bar
     }
@@ -182,7 +182,7 @@ fn test_serde_noop_intersection() {
 #[test]
 fn test_serde_many_cardinality() {
     "
-    pub def foo {
+    def(pub) foo {
         rel .'s': [text]
     }
     "
@@ -196,7 +196,7 @@ fn test_serde_many_cardinality() {
 #[test]
 fn test_serde_infinite_sequence() {
     "
-    pub def foo {
+    def(pub) foo {
         rel .  ..2: i64
         rel . 2..4: text
         rel . 5..6: i64
@@ -217,7 +217,7 @@ fn test_serde_infinite_sequence() {
 #[test]
 fn test_serde_uuid() {
     "
-    pub def my_id { rel .is: uuid }
+    def(pub) my_id { rel .is: uuid }
     "
     .compile_then(|test| {
         let [my_id] = test.bind(["my_id"]);
@@ -240,7 +240,7 @@ fn test_serde_uuid() {
 #[test]
 fn test_serde_datetime() {
     "
-    pub def my_dt { rel .is: datetime }
+    def(pub) my_dt { rel .is: datetime }
     "
     .compile_then(|test| {
         let [my_dt] = test.bind(["my_dt"]);
@@ -267,7 +267,7 @@ fn test_serde_datetime() {
 #[test]
 fn test_integer_default() {
     "
-    pub def foo {
+    def(pub) foo {
         rel .'bar'(rel .default := 42): i64
     }
     "
@@ -281,7 +281,7 @@ fn test_integer_default() {
 #[test]
 fn test_i64_range_constrained() {
     "
-    pub def percentage {
+    def(pub) percentage {
         rel .is: i64
         rel .min: 0
         rel .max: 100
@@ -301,7 +301,7 @@ fn test_i64_range_constrained() {
 #[test]
 fn test_integer_range_constrained() {
     "
-    pub def foo {
+    def(pub) foo {
         rel .is: integer
         rel .min: -1
         rel .max: 1
@@ -321,7 +321,7 @@ fn test_integer_range_constrained() {
 #[test]
 fn test_f64_range_constrained() {
     "
-    pub def fraction {
+    def(pub) fraction {
         rel .is: f64
         rel .min: 0
         rel .max: 1
@@ -343,7 +343,7 @@ fn test_f64_range_constrained() {
 #[test]
 fn test_float_default() {
     "
-    pub def foo {
+    def(pub) foo {
         rel .'bar'(rel .default := 42): f64
     }
     "
@@ -357,7 +357,7 @@ fn test_float_default() {
 #[test]
 fn test_string_default() {
     "
-    pub def foo {
+    def(pub) foo {
         rel .'bar'(rel .default := 'baz'): text
     }
     "
@@ -371,7 +371,7 @@ fn test_string_default() {
 #[test]
 fn test_prop_union() {
     "
-    pub def vec3 {
+    def(pub) vec3 {
         /// A vector component
         rel .'x'|'y'|'z': {
             rel .is: i64
@@ -391,7 +391,7 @@ fn test_jsonml() {
     def tag_name {}
     def attributes {}
 
-    pub def element {
+    def(pub) element {
         rel .is?: tag
         rel .is?: text
     }
@@ -432,13 +432,13 @@ fn test_serde_with_raw_id_overridde_profile() {
     };
 
     "
-    pub def foo {
+    def(pub) foo {
         rel .'prefix_id'|id: {
             fmt '' => 'prefix/' => uuid => .
         }
     }
 
-    pub def bar {
+    def(pub) bar {
         rel .'int_id'|id: { rel .is: i64 }
     }
     "

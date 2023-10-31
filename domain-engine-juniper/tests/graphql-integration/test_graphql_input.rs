@@ -7,7 +7,7 @@ const ROOT: SourceName = SourceName::root();
 #[test(tokio::test)]
 async fn test_graphql_input_deserialization_error() {
     let (test, [schema]) = "
-    pub def foo {
+    def(pub) foo {
         rel .id: { fmt '' => text => . }
         rel .'prop': 'const'
     }
@@ -44,7 +44,7 @@ async fn test_graphql_input_constructor_sequence_as_json_scalar() {
         rel .1: text
     }
 
-    pub def foo {
+    def(pub) foo {
         rel .id: { fmt '' => text => . }
         rel .'prop': tuple
     }

@@ -4,7 +4,7 @@ use test_log::test;
 // BUG: This should recognize the `//` comment token
 #[test]
 fn error_lex() {
-    "; // ERROR lex error: illegal character `;`// ERROR lex error: illegal character `;`// ERROR parse error: found `/`, expected one of `use`, `def`, `rel`, `fmt`, `map`, `pub`"
+    "; // ERROR lex error: illegal character `;`// ERROR lex error: illegal character `;`// ERROR parse error: found `/`, expected one of `use`, `def`, `rel`, `fmt`, `map`"
         .compile_fail();
 }
 
@@ -13,7 +13,7 @@ fn error_comment_span() {
     // This tests that the eror span is correct
     r#"
     /// A comment - don't remove this
-    pub def union {} // ERROR variants of the union have prefixes that are prefixes of other variants
+    def(pub) union {} // ERROR variants of the union have prefixes that are prefixes of other variants
 
     def a { fmt '' => 'foo' => . }
     def b { fmt '' => 'foobar' => . }
@@ -26,14 +26,14 @@ fn error_comment_span() {
 
 #[test]
 fn error_invalid_statement() {
-    "foobar // ERROR parse error: found `foobar`, expected one of `use`, `def`, `rel`, `fmt`, `map`, `pub`"
+    "foobar // ERROR parse error: found `foobar`, expected one of `use`, `def`, `rel`, `fmt`, `map`"
         .compile_fail();
 }
 
 #[test]
 fn error_def_parse_error() {
-    "def // ERROR parse error: expected identifier".compile_fail();
-    "def {} // ERROR parse error: found `{`, expected identifier".compile_fail();
+    "def // ERROR parse error: expected `(`".compile_fail();
+    "def {} // ERROR parse error: found `{`, expected `(`".compile_fail();
 }
 
 #[test]
@@ -43,7 +43,7 @@ fn error_incomplete_statement() {
 
 #[test]
 fn error_underscore_not_allowed_at_start_of_identifier() {
-    "def _foo // ERROR parse error: found `_`, expected identifier".compile_fail();
+    "def _foo // ERROR parse error: found `_`, expected `(`".compile_fail();
 }
 
 #[test]
@@ -293,7 +293,7 @@ fn error_invalid_relation_type() {
 #[test]
 fn error_invalid_fmt_syntax() {
     "
-    fmt () => () () // ERROR parse error: found `(`, expected one of `def`, `rel`, `fmt`, `map`, `pub`, `=>`
+    fmt () => () () // ERROR parse error: found `(`, expected one of `def`, `rel`, `fmt`, `map`, `=>`
     "
     .compile_fail();
 }
@@ -367,7 +367,7 @@ fn error_compile_error_in_dependency() {
         (
             SourceName("fail"),
             "
-            ! // ERROR parse error: found `!`, expected one of `use`, `def`, `rel`, `fmt`, `map`, `pub`
+            ! // ERROR parse error: found `!`, expected one of `use`, `def`, `rel`, `fmt`, `map`
             ",
         ),
         (SourceName::root(), "use 'fail' as f"),
@@ -392,7 +392,7 @@ fn error_fail_import_private_type() {
             SourceName::root(),
             "
             use 'dep' as dep
-            pub def bar {
+            def(pub) bar {
                 rel . 'foo': dep.foo // ERROR private definition
             }
             ",
@@ -498,17 +498,17 @@ fn error_test_lazy_seal_by_map() {
 #[test]
 fn error_test_error_object_property_in_foreign_domain() {
     TestPackages::with_sources([
-        (SourceName("foreign"), "pub def foo {}"),
+        (SourceName("foreign"), "def(pub) foo {}"),
         (
             SourceName::root(),
             "
             use 'foreign' as foreign
 
-            pub def bar {
+            def(pub) bar {
                 rel .'foo': foreign.foo // This is OK
             }
 
-            pub def baz {
+            def(pub) baz {
                 rel .'foo'::'baz'
                     foreign.foo // ERROR definition is sealed and cannot be modified
             }
