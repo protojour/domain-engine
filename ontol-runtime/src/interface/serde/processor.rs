@@ -8,116 +8,6 @@ use crate::{
 
 use super::operator::{FilteredVariants, SerdeOperator, SerdeOperatorAddr, SerdePropertyFlags};
 
-#[derive(Copy, Clone, Debug)]
-pub enum ProcessorMode {
-    Create,
-    Read,
-    Update,
-    /// Used for unconditionally handling all fields.
-    /// Should not be used for serialization or deserialization at the domain interface layer.
-    Raw,
-}
-
-#[derive(Copy, Clone, Debug)]
-pub struct ProcessorLevel {
-    level: u16,
-    recursion_limit: u16,
-}
-
-#[derive(Clone, Default)]
-pub struct ProcessorProfile {
-    pub overridden_id_property_key: Option<&'static str>,
-    pub ignored_property_keys: &'static [&'static str],
-    pub id_format: ScalarFormat,
-}
-
-#[derive(Clone, Copy, Default, Debug)]
-pub enum ScalarFormat {
-    /// Serialize scalars just like the domain says
-    #[default]
-    DomainTransparent,
-    /// Serialize scalars as raw strings without any domain context
-    /// Example: `fmt '' => 'prefix/' => uuid => id` becomes just an UUID-as-string.
-    RawText,
-}
-
-/// The standard profile for domain serialization/deserialization
-pub(crate) static DOMAIN_PROFILE: ProcessorProfile = ProcessorProfile {
-    overridden_id_property_key: None,
-    ignored_property_keys: &[],
-    id_format: ScalarFormat::DomainTransparent,
-};
-
-/// Maximum number of nested/recursive operators.
-const DEFAULT_RECURSION_LIMIT: u16 = 128;
-
-impl ProcessorLevel {
-    pub const fn new_root() -> Self {
-        Self {
-            level: 0,
-            recursion_limit: DEFAULT_RECURSION_LIMIT,
-        }
-    }
-
-    pub const fn new_root_with_recursion_limit(limit: u16) -> Self {
-        Self {
-            level: 0,
-            recursion_limit: limit,
-        }
-    }
-
-    pub const fn new_child() -> Self {
-        Self {
-            level: 1,
-            recursion_limit: DEFAULT_RECURSION_LIMIT,
-        }
-    }
-
-    pub const fn child(self) -> Result<Self, RecursionLimitError> {
-        if self.level == self.recursion_limit {
-            return Err(RecursionLimitError);
-        }
-        Ok(Self {
-            level: self.level + 1,
-            recursion_limit: self.recursion_limit,
-        })
-    }
-
-    pub const fn is_root(&self) -> bool {
-        self.level == 0
-    }
-
-    pub const fn current_level(&self) -> u16 {
-        self.level
-    }
-}
-
-pub struct RecursionLimitError;
-
-impl RecursionLimitError {
-    pub fn to_ser_error<E: serde::ser::Error>(self) -> E {
-        E::custom("Recursion limit exceeded")
-    }
-
-    pub fn to_de_error<E: serde::de::Error>(self) -> E {
-        E::custom("Recursion limit exceeded")
-    }
-}
-
-#[derive(Clone, Copy, Default, Debug)]
-pub struct SubProcessorContext {
-    pub parent_property_id: Option<PropertyId>,
-    pub parent_property_flags: SerdePropertyFlags,
-
-    /// The edge properties used for (de)serializing the _edge data_
-    /// related to this value when it's associated with a "parent value" through a relation.
-    ///
-    /// Generally, non-unit edge data can only be represented on a relation between two map types.
-    /// The parent (often the subject) map has an attribute that is another child map.
-    /// The edge data would be injected in the child map as the `_edge` property.
-    pub rel_params_addr: Option<SerdeOperatorAddr>,
-}
-
 /// SerdeProcessor handles serializing and deserializing domain types in an optimized way.
 /// Each serde-enabled type has its own operator, which is cached
 /// in the runtime ontology.
@@ -230,6 +120,128 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
             _ => None,
         }
     }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum ProcessorMode {
+    Create,
+    Read,
+    Update,
+    /// Used for unconditionally handling all fields.
+    /// Should not be used for serialization or deserialization at the domain interface layer.
+    Raw,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct ProcessorLevel {
+    level: u16,
+    recursion_limit: u16,
+}
+
+#[derive(Clone, Default)]
+pub struct ProcessorProfile {
+    pub overridden_id_property_key: Option<&'static str>,
+    pub ignored_property_keys: &'static [&'static str],
+    pub id_format: ScalarFormat,
+    pub flags: ProcessorProfileFlags,
+}
+
+#[derive(Clone, Copy, Default, Debug)]
+pub enum ScalarFormat {
+    /// Serialize scalars just like the domain says
+    #[default]
+    DomainTransparent,
+    /// Serialize scalars as raw strings without any domain context
+    /// Example: `fmt '' => 'prefix/' => uuid => id` becomes just an UUID-as-string.
+    RawText,
+}
+
+bitflags::bitflags! {
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
+    pub struct ProcessorProfileFlags: u32 {
+        /// Allow serialize of open ("unknown") properties
+        const SERIALIZE_OPEN_PROPS   = 0b00000001;
+        /// Allow deserialize of open ("unknown") properties
+        const DESERIALIZE_OPEN_PROPS = 0b00000010;
+    }
+}
+
+/// The standard profile for domain serialization/deserialization
+pub(crate) static DOMAIN_PROFILE: ProcessorProfile = ProcessorProfile {
+    overridden_id_property_key: None,
+    ignored_property_keys: &[],
+    id_format: ScalarFormat::DomainTransparent,
+    flags: ProcessorProfileFlags::empty(),
+};
+
+/// Maximum number of nested/recursive operators.
+const DEFAULT_RECURSION_LIMIT: u16 = 128;
+
+impl ProcessorLevel {
+    pub const fn new_root() -> Self {
+        Self {
+            level: 0,
+            recursion_limit: DEFAULT_RECURSION_LIMIT,
+        }
+    }
+
+    pub const fn new_root_with_recursion_limit(limit: u16) -> Self {
+        Self {
+            level: 0,
+            recursion_limit: limit,
+        }
+    }
+
+    pub const fn new_child() -> Self {
+        Self {
+            level: 1,
+            recursion_limit: DEFAULT_RECURSION_LIMIT,
+        }
+    }
+
+    pub const fn child(self) -> Result<Self, RecursionLimitError> {
+        if self.level == self.recursion_limit {
+            return Err(RecursionLimitError);
+        }
+        Ok(Self {
+            level: self.level + 1,
+            recursion_limit: self.recursion_limit,
+        })
+    }
+
+    pub const fn is_root(&self) -> bool {
+        self.level == 0
+    }
+
+    pub const fn current_level(&self) -> u16 {
+        self.level
+    }
+}
+
+pub struct RecursionLimitError;
+
+impl RecursionLimitError {
+    pub fn to_ser_error<E: serde::ser::Error>(self) -> E {
+        E::custom("Recursion limit exceeded")
+    }
+
+    pub fn to_de_error<E: serde::de::Error>(self) -> E {
+        E::custom("Recursion limit exceeded")
+    }
+}
+
+#[derive(Clone, Copy, Default, Debug)]
+pub struct SubProcessorContext {
+    pub parent_property_id: Option<PropertyId>,
+    pub parent_property_flags: SerdePropertyFlags,
+
+    /// The edge properties used for (de)serializing the _edge data_
+    /// related to this value when it's associated with a "parent value" through a relation.
+    ///
+    /// Generally, non-unit edge data can only be represented on a relation between two map types.
+    /// The parent (often the subject) map has an attribute that is another child map.
+    /// The edge data would be injected in the child map as the `_edge` property.
+    pub rel_params_addr: Option<SerdeOperatorAddr>,
 }
 
 impl<'on, 'p> Debug for SerdeProcessor<'on, 'p> {

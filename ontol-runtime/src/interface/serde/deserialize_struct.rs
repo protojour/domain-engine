@@ -18,9 +18,10 @@ use crate::{
 };
 
 use super::{
-    operator::{SerdeOperatorAddr, SerdeProperty, StructOperator},
+    operator::{SerdeOperatorAddr, SerdeProperty, SerdeStructFlags, StructOperator},
     processor::{
-        ProcessorMode, ProcessorProfile, RecursionLimitError, SerdeProcessor, SubProcessorContext,
+        ProcessorMode, ProcessorProfile, ProcessorProfileFlags, RecursionLimitError,
+        SerdeProcessor, SubProcessorContext,
     },
 };
 
@@ -35,6 +36,7 @@ pub enum PropertyKey {
     Property(SerdeProperty),
     RelParams(SerdeOperatorAddr),
     Id(SerdeOperatorAddr),
+    Open(String),
     Ignored,
 }
 
@@ -57,6 +59,7 @@ struct PropertySet<'a> {
     processor_mode: ProcessorMode,
     processor_profile: &'a ProcessorProfile,
     parent_property_id: Option<PropertyId>,
+    flags: SerdeStructFlags,
 }
 
 impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
@@ -69,10 +72,11 @@ impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
     fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {
         let type_def_id = self.struct_op.def.def_id;
         let deserialized_map = deserialize_struct(
-            self.processor,
             map,
             self.buffered_attrs,
+            self.processor,
             &self.struct_op.properties,
+            self.struct_op.flags,
             self.struct_op
                 .required_count(self.processor.mode, self.processor.ctx.parent_property_id),
             SpecialAddrs {
@@ -91,10 +95,11 @@ impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
 }
 
 pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
-    processor: SerdeProcessor<'on, 'p>,
     mut map: A,
     buffered_attrs: Vec<(String, serde_value::Value)>,
+    processor: SerdeProcessor<'on, 'p>,
     properties: &IndexMap<String, SerdeProperty>,
+    flags: SerdeStructFlags,
     expected_required_count: usize,
     special_addrs: SpecialAddrs,
 ) -> Result<DeserializedStruct, A::Error> {
@@ -104,17 +109,18 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
 
     let mut observed_required_count = 0;
 
+    let property_set = PropertySet {
+        properties,
+        special_addrs,
+        processor_mode: processor.mode,
+        processor_profile: processor.profile,
+        parent_property_id: processor.ctx.parent_property_id,
+        flags,
+    };
+
     // first parse buffered attributes, if any
     for (serde_key, serde_value) in buffered_attrs {
-        match PropertySet::new(
-            properties,
-            special_addrs,
-            processor.mode,
-            processor.profile,
-            processor.ctx.parent_property_id,
-        )
-        .visit_str(&serde_key)?
-        {
+        match property_set.visit_str(&serde_key)? {
             PropertyKey::RelParams(addr) => {
                 let Attribute { value, .. } = processor
                     .new_child(addr)
@@ -157,18 +163,15 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
                     observed_required_count += 1;
                 }
             }
+            PropertyKey::Open(_key) => {
+                todo!()
+            }
             PropertyKey::Ignored => {}
         }
     }
 
     // parse rest of struct
-    while let Some(map_key) = map.next_key_seed(PropertySet::new(
-        properties,
-        special_addrs,
-        processor.mode,
-        processor.profile,
-        processor.ctx.parent_property_id,
-    ))? {
+    while let Some(map_key) = map.next_key_seed(property_set)? {
         match map_key {
             PropertyKey::RelParams(addr) => {
                 let Attribute { value, .. } = map.next_value_seed(
@@ -214,6 +217,7 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
                     observed_required_count += 1;
                 }
             }
+            PropertyKey::Open(_key) => todo!(),
             PropertyKey::Ignored => {
                 let _value: serde_value::Value = map.next_value()?;
             }
@@ -301,24 +305,6 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
     })
 }
 
-impl<'a> PropertySet<'a> {
-    fn new(
-        properties: &'a IndexMap<String, SerdeProperty>,
-        special_addrs: SpecialAddrs<'a>,
-        processor_mode: ProcessorMode,
-        processor_profile: &'a ProcessorProfile,
-        parent_property_id: Option<PropertyId>,
-    ) -> Self {
-        Self {
-            properties,
-            special_addrs,
-            processor_mode,
-            processor_profile,
-            parent_property_id,
-        }
-    }
-}
-
 impl<'a, 'de> DeserializeSeed<'de> for PropertySet<'a> {
     type Value = PropertyKey;
 
@@ -364,11 +350,20 @@ impl<'a, 'de> Visitor<'de> for PropertySet<'a> {
                     return Ok(PropertyKey::Ignored);
                 }
 
-                let serde_property = self.properties.get(v).ok_or_else(|| {
-                    // TODO: This error message could be improved to suggest valid fields.
-                    // see OneOf in serde (this is a private struct)
-                    Error::custom(format!("unknown property `{v}`"))
-                })?;
+                let Some(serde_property) = self.properties.get(v) else {
+                    return if self.flags.contains(SerdeStructFlags::OPEN_PROPS)
+                        && self
+                            .processor_profile
+                            .flags
+                            .contains(ProcessorProfileFlags::DESERIALIZE_OPEN_PROPS)
+                    {
+                        Ok(PropertyKey::Open(v.into()))
+                    } else {
+                        // TODO: This error message could be improved to suggest valid fields.
+                        // see OneOf in serde (this is a private struct)
+                        Err(Error::custom(format!("unknown property `{v}`")))
+                    };
+                };
 
                 if serde_property
                     .filter(self.processor_mode, self.parent_property_id)

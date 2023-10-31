@@ -10,6 +10,7 @@ use crate::{
     interface::serde::{
         deserialize_matcher::MapMatchResult,
         deserialize_struct::{deserialize_struct, SpecialAddrs, StructVisitor},
+        operator::SerdeStructFlags,
     },
     sequence::Sequence,
     value::{Attribute, Data, Value},
@@ -361,7 +362,7 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
 
         trace!("matched map: {map_match:?} buffered attrs: {buffered_attrs:?}");
 
-        // delegate to the real map visitor
+        // delegate to the real struct visitor
         match map_match.kind {
             MapMatchKind::StructType(struct_op) => StructVisitor {
                 processor: self.processor,
@@ -372,10 +373,11 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
             .visit_map(map),
             MapMatchKind::IdType(name, addr) => {
                 let deserialized_map = deserialize_struct(
-                    self.processor,
                     map,
                     buffered_attrs,
+                    self.processor,
                     &IndexMap::default(),
+                    SerdeStructFlags::empty(),
                     0,
                     SpecialAddrs {
                         rel_params: map_match.ctx.rel_params_addr,

@@ -198,6 +198,7 @@ pub struct ValueUnionVariant {
 pub struct StructOperator {
     pub typename: String,
     pub def: SerdeDef,
+    pub flags: SerdeStructFlags,
     pub properties: IndexMap<String, SerdeProperty>,
 }
 
@@ -285,5 +286,13 @@ bitflags::bitflags! {
         const OPTIONAL       = 0b00000001;
         const READ_ONLY      = 0b00000010;
         const ENTITY_ID      = 0b00000100;
+    }
+}
+
+bitflags::bitflags! {
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug, Serialize, Deserialize)]
+    pub struct SerdeStructFlags: u32 {
+        /// This struct operator supports open/domainless properties
+        const OPEN_PROPS       = 0b00000001;
     }
 }

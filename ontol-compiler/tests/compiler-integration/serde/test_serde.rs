@@ -1,6 +1,6 @@
 use assert_matches::assert_matches;
 use ontol_runtime::{
-    interface::serde::processor::{ProcessorProfile, ScalarFormat},
+    interface::serde::processor::{ProcessorProfile, ProcessorProfileFlags, ScalarFormat},
     value::Data,
 };
 use ontol_test_utils::{
@@ -429,6 +429,7 @@ fn test_serde_with_raw_id_overridde_profile() {
         overridden_id_property_key: Some("__ID"),
         ignored_property_keys: &["IGNORE1", "IGNORE2"],
         id_format: ScalarFormat::RawText,
+        flags: ProcessorProfileFlags::empty(),
     };
 
     "

@@ -11,7 +11,10 @@ use ontol_runtime::{
         SerdeOperator, SerdeOperatorAddr, SerdeProperty, StructOperator, UnionOperator,
         ValueUnionVariant,
     },
-    interface::serde::{operator::SerdePropertyFlags, SerdeDef, SerdeKey, SerdeModifier},
+    interface::serde::{
+        operator::{SerdePropertyFlags, SerdeStructFlags},
+        SerdeDef, SerdeKey, SerdeModifier,
+    },
     ontology::{Cardinality, PropertyCardinality, ValueCardinality},
     smart_format,
     value_generator::ValueGenerator,
@@ -401,6 +404,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         typename: &str,
         properties: Option<&Properties>,
     ) -> Option<OperatorAllocation> {
+        let repr = self.seal_ctx.repr_table.get(&def.def_id)?;
+
         let Some(properties) = properties else {
             return if matches!(
                 def.modifier - SerdeModifier::cross_def_mask(),
@@ -411,6 +416,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     SerdeOperator::Struct(StructOperator {
                         typename: typename.into(),
                         def,
+                        flags: self.struct_flags_from_def_id(def.def_id),
                         properties: Default::default(),
                     }),
                 ))
@@ -421,8 +427,6 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 )))
             };
         };
-
-        let repr = self.seal_ctx.repr_table.get(&def.def_id)?;
 
         match &repr.kind {
             ReprKind::Scalar(def_id, ReprScalarKind::I64(range), _span) => {
@@ -516,7 +520,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     members.as_slice(),
                 )
             }
-            ReprKind::Union(_) | ReprKind::StructUnion(_) => {
+            ReprKind::Union(members) | ReprKind::StructUnion(members) => {
                 let addr = self.alloc_addr(&def);
                 Some(OperatorAllocation::Allocated(
                     addr,
@@ -525,7 +529,13 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     } else {
                         // just the inherent properties are requested.
                         // Don't build a union
-                        self.create_struct_operator(def, typename, properties)
+                        self.create_struct_operator(def, typename, properties, {
+                            let mut flags = SerdeStructFlags::empty();
+                            for (def_id, _) in members {
+                                flags |= self.struct_flags_from_def_id(*def_id);
+                            }
+                            flags
+                        })
                     },
                 ))
             }
@@ -650,10 +660,11 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         } else {
             // prevent recursion
             let new_addr = self.alloc_addr(&def);
+            let flags = self.struct_flags_from_def_id(def.def_id);
 
             Some(OperatorAllocation::Allocated(
                 new_addr,
-                self.create_struct_operator(def, typename, properties),
+                self.create_struct_operator(def, typename, properties, flags),
             ))
         }
     }
@@ -710,9 +721,14 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             }
         } else if modifier.contains(SerdeModifier::INHERENT_PROPS) {
             let addr = self.alloc_addr(&def);
+            let mut flags = SerdeStructFlags::empty();
+            for (def_id, _) in members {
+                flags |= self.struct_flags_from_def_id(*def_id);
+            }
+
             Some(OperatorAllocation::Allocated(
                 addr,
-                self.create_struct_operator(def, typename, properties),
+                self.create_struct_operator(def, typename, properties, flags),
             ))
         } else {
             let (value_def, _span) = members[0];
@@ -822,10 +838,12 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         def: SerdeDef,
         typename: &str,
         properties: &Properties,
+        flags: SerdeStructFlags,
     ) -> SerdeOperator {
         let mut op = StructOperator {
             typename: typename.into(),
             def,
+            flags,
             properties: Default::default(),
         };
 
@@ -916,6 +934,17 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         }
 
         SerdeOperator::Struct(op)
+    }
+
+    fn struct_flags_from_def_id(&self, def_id: DefId) -> SerdeStructFlags {
+        let mut flags = SerdeStructFlags::empty();
+        if let DefKind::Type(type_def) = self.defs.def_kind(def_id) {
+            if type_def.open {
+                flags |= SerdeStructFlags::OPEN_PROPS;
+            }
+        }
+
+        flags
     }
 }
 
