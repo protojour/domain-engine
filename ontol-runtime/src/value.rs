@@ -1,5 +1,5 @@
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     fmt::{Debug, Display},
     str::FromStr,
 };
@@ -135,6 +135,9 @@ pub enum Data {
     // TODO: Change to some HashMap with cheap hash function, without
     // extending size_of::<Data>().
     Struct(BTreeMap<PropertyId, Attribute>),
+
+    /// A collection of arbitrary values keyed by strings.
+    Dict(Box<HashMap<String, Value>>),
 
     /// A sequence of attributes.
     ///
@@ -305,6 +308,9 @@ impl<'v> Display for ValueDebug<'v> {
                     }
                 }
                 write!(f, "}}")
+            }
+            Data::Dict(_) => {
+                write!(f, "dict")
             }
             Data::Sequence(seq) => {
                 write!(f, "[")?;
