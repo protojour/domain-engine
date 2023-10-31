@@ -226,6 +226,7 @@ impl<'m> Compiler<'m> {
         let def_id = self.defs.add_def(
             DefKind::Type(TypeDef {
                 public: true,
+                open: false,
                 ident: Some(ident),
                 rel_type_for: None,
                 concrete: true,

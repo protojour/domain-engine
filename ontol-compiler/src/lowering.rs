@@ -284,6 +284,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             let rel_def_id = self.define_anonymous_type(
                 TypeDef {
                     public: false,
+                    open: false,
                     ident: None,
                     rel_type_for: Some(RelationshipId(relationship_id)),
                     concrete: true,
@@ -400,6 +401,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             let target_def_id = self.define_anonymous_type(
                 TypeDef {
                     public: false,
+                    open: false,
                     ident: None,
                     rel_type_for: None,
                     concrete: true,
@@ -497,6 +499,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     let def_id = self.define_anonymous_type(
                         TypeDef {
                             public: false,
+                            open: false,
                             ident: None,
                             rel_type_for: None,
                             concrete: true,
@@ -633,6 +636,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let def_id = self.define_anonymous_type(
                     TypeDef {
                         public: true,
+                        open: false,
                         ident: None,
                         rel_type_for: None,
                         concrete: true,
@@ -927,6 +931,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 def_id,
                 DefKind::Type(TypeDef {
                     public: def_stmt.public.is_some(),
+                    open: def_stmt.open.is_some(),
                     ident: Some(ident),
                     rel_type_for: None,
                     concrete: true,

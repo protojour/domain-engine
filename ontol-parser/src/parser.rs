@@ -80,18 +80,23 @@ fn def_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstPar
             stmt_parser.repeated().delimited_by(open('{'), close('}')),
         ))
         .map(|((((docs, kw), modifiers), ident), ctx_block)| {
-            let modifiers = modifiers.as_deref().unwrap_or(&[]);
+            let mut public = None;
+            let mut open = None;
+
+            if let Some(modifiers) = modifiers {
+                for (sym, span) in modifiers {
+                    match sym.as_str() {
+                        "pub" => public = Some(span),
+                        "open" => open = Some(span),
+                        _ => unreachable!(),
+                    }
+                }
+            }
 
             DefStatement {
                 docs,
-                public: modifiers.iter().find_map(|(kw, span)| {
-                    if kw == "pub" {
-                        Some(span.clone())
-                    } else {
-                        None
-                    }
-                }),
-                open: None,
+                public,
+                open,
                 kw,
                 ident,
                 block: ctx_block,

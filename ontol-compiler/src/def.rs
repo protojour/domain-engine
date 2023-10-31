@@ -72,7 +72,10 @@ impl<'m> DefKind<'m> {
 
 #[derive(Debug)]
 pub struct TypeDef<'m> {
+    /// Whether the definition's identifier is exported
     pub public: bool,
+    /// Whether the definition can have an "open relationship" to arbitrary data
+    pub open: bool,
     pub ident: Option<&'m str>,
     pub rel_type_for: Option<RelationshipId>,
     /// for now: Every user-domain defined type is concrete.

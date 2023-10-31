@@ -348,7 +348,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     self.alloc_addr(&def),
                     SerdeOperator::String(def.def_id),
                 )),
-                PrimitiveKind::DomainlessData => None,
+                PrimitiveKind::OpenRelationship => None,
             },
             Type::IntConstant(_) | Type::FloatConstant(_) => todo!(),
             Type::TextConstant(def_id) => {
