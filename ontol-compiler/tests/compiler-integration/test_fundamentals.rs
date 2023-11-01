@@ -1,7 +1,7 @@
 use ontol_runtime::{interface::serde::operator::SerdeOperator, RelationshipId};
 use ontol_test_utils::{
-    assert_json_io_matches, expect_eq, type_binding::TypeBinding, OntolTest, SourceName,
-    TestCompile, TestPackages,
+    assert_json_io_matches, expect_eq, serde_helper::serde_create, type_binding::TypeBinding,
+    OntolTest, SourceName, TestCompile, TestPackages,
 };
 use test_log::test;
 
@@ -81,7 +81,7 @@ fn ontol_domain_is_defined_in_the_namespace() {
     "
     .compile_then(|test| {
         let [integer] = test.bind(["integer"]);
-        assert_json_io_matches!(integer, Create, 42);
+        assert_json_io_matches!(serde_create(&integer), 42);
     });
 }
 

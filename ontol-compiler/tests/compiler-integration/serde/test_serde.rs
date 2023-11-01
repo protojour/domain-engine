@@ -13,7 +13,7 @@ use test_log::test;
 fn test_serde_empty_type() {
     "def(pub) foo {}".compile_then(|test| {
         let [foo] = test.bind(["foo"]);
-        assert_json_io_matches!(foo, Create, {});
+        assert_json_io_matches!(serde_create(&foo), {});
     });
 }
 
@@ -24,7 +24,7 @@ fn test_serde_type_alias() {
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
-        assert_json_io_matches!(foo, Create, "string");
+        assert_json_io_matches!(serde_create(&foo), "string");
     });
 }
 
@@ -38,10 +38,10 @@ fn test_serde_booleans() {
     .compile_then(|test| {
         let [f, t, b] = test.bind(["f", "t", "b"]);
 
-        assert_json_io_matches!(f, Create, false);
-        assert_json_io_matches!(t, Create, true);
-        assert_json_io_matches!(b, Create, false);
-        assert_json_io_matches!(b, Create, true);
+        assert_json_io_matches!(serde_create(&f), false);
+        assert_json_io_matches!(serde_create(&t), true);
+        assert_json_io_matches!(serde_create(&b), false);
+        assert_json_io_matches!(serde_create(&b), true);
 
         assert_error_msg!(
             serde_create(&f).to_data(json!(true)),
@@ -61,7 +61,7 @@ fn test_serde_struct_type() {
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
-        assert_json_io_matches!(foo, Create, { "a": "string" });
+        assert_json_io_matches!(serde_create(&foo), { "a": "string" });
     });
 }
 
@@ -74,9 +74,9 @@ fn test_serde_struct_optional_field() {
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
-        assert_json_io_matches!(foo, Create, {} == {});
-        assert_json_io_matches!(foo, Create, { "a": null } == {});
-        assert_json_io_matches!(foo, Create, { "a": "A" });
+        assert_json_io_matches!(serde_create(&foo), {} == {});
+        assert_json_io_matches!(serde_create(&foo), { "a": null } == {});
+        assert_json_io_matches!(serde_create(&foo), { "a": "A" });
     });
 }
 
@@ -91,7 +91,7 @@ fn test_serde_complex_type() {
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
-        assert_json_io_matches!(foo, Create, { "a": "A", "b": { "c": "C" }});
+        assert_json_io_matches!(serde_create(&foo), { "a": "A", "b": { "c": "C" }});
     });
 }
 
@@ -105,7 +105,7 @@ fn test_serde_sequence() {
     "
     .compile_then(|test| {
         let [t] = test.bind(["t"]);
-        assert_json_io_matches!(t, Create, ["a", 1]);
+        assert_json_io_matches!(serde_create(&t), ["a", 1]);
     });
 }
 
@@ -119,7 +119,7 @@ fn test_serde_value_union1() {
     "
     .compile_then(|test| {
         let [u] = test.bind(["u"]);
-        assert_json_io_matches!(u, Create, "a");
+        assert_json_io_matches!(serde_create(&u), "a");
     });
 }
 
@@ -137,8 +137,8 @@ fn test_serde_string_or_unit() {
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
-        assert_json_io_matches!(foo, Create, { "a": "string" });
-        assert_json_io_matches!(foo, Create, { "a": null });
+        assert_json_io_matches!(serde_create(&foo), { "a": "string" });
+        assert_json_io_matches!(serde_create(&foo), { "a": null });
     });
 }
 
@@ -160,7 +160,7 @@ fn test_serde_map_union() {
     "
     .compile_then(|test| {
         let [u] = test.bind(["u"]);
-        assert_json_io_matches!(u, Create, { "type": "foo", "c": 7});
+        assert_json_io_matches!(serde_create(&u), { "type": "foo", "c": 7});
     });
 }
 
@@ -175,7 +175,7 @@ fn test_serde_noop_intersection() {
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
-        assert_json_io_matches!(foo, Create, { "foobar": {} });
+        assert_json_io_matches!(serde_create(&foo), { "foobar": {} });
     });
 }
 
@@ -188,8 +188,8 @@ fn test_serde_many_cardinality() {
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
-        assert_json_io_matches!(foo, Create, { "s": []});
-        assert_json_io_matches!(foo, Create, { "s": ["a", "b"]});
+        assert_json_io_matches!(serde_create(&foo), { "s": []});
+        assert_json_io_matches!(serde_create(&foo), { "s": ["a", "b"]});
     });
 }
 
@@ -205,8 +205,8 @@ fn test_serde_infinite_sequence() {
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
-        assert_json_io_matches!(foo, Create, [42, 43, "a", "b", null, 44]);
-        assert_json_io_matches!(foo, Create, [42, 43, "a", "b", null, 44, 45, 46]);
+        assert_json_io_matches!(serde_create(&foo), [42, 43, "a", "b", null, 44]);
+        assert_json_io_matches!(serde_create(&foo), [42, 43, "a", "b", null, 44, 45, 46]);
         assert_error_msg!(
             serde_create(&foo).to_data(json!([77])),
             "invalid length 1, expected sequence with minimum length 6 at line 1 column 4"
@@ -225,7 +225,7 @@ fn test_serde_uuid() {
             serde_create(&my_id).to_data(json!("a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
             Ok(Data::OctetSequence(_))
         );
-        assert_json_io_matches!(my_id, Create, "a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8");
+        assert_json_io_matches!(serde_create(&my_id), "a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8");
         assert_error_msg!(
             serde_create(&my_id).to_data(json!(42)),
             "invalid type: integer `42`, expected `uuid` at line 1 column 2"
@@ -249,8 +249,7 @@ fn test_serde_datetime() {
             Ok(Data::ChronoDateTime(_))
         );
         assert_json_io_matches!(
-            my_dt,
-            Create,
+            serde_create(&my_dt),
             "1983-10-01T01:31:32.59+01:00" == "1983-10-01T00:31:32.590+00:00"
         );
         assert_error_msg!(
@@ -273,8 +272,8 @@ fn test_integer_default() {
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
-        assert_json_io_matches!(foo, Create, { "bar": 1 } == { "bar": 1 });
-        assert_json_io_matches!(foo, Create, {} == { "bar": 42 });
+        assert_json_io_matches!(serde_create(&foo), { "bar": 1 } == { "bar": 1 });
+        assert_json_io_matches!(serde_create(&foo), {} == { "bar": 42 });
     });
 }
 
@@ -289,8 +288,8 @@ fn test_i64_range_constrained() {
     "
     .compile_then(|test| {
         let [percentage] = test.bind(["percentage"]);
-        assert_json_io_matches!(percentage, Create, 0 == 0);
-        assert_json_io_matches!(percentage, Create, 100 == 100);
+        assert_json_io_matches!(serde_create(&percentage), 0 == 0);
+        assert_json_io_matches!(serde_create(&percentage), 100 == 100);
         assert_error_msg!(
             serde_create(&percentage).to_data_variant(json!(1000)),
             r#"invalid type: integer `1000`, expected integer in range 0..=100 at line 1 column 4"#
@@ -309,8 +308,8 @@ fn test_integer_range_constrained() {
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
-        assert_json_io_matches!(foo, Create, 0 == 0);
-        assert_json_io_matches!(foo, Create, (-1) == (-1));
+        assert_json_io_matches!(serde_create(&foo), 0 == 0);
+        assert_json_io_matches!(serde_create(&foo), (-1) == (-1));
         assert_error_msg!(
             serde_create(&foo).to_data_variant(json!(-2)),
             r#"invalid type: integer `-2`, expected integer in range -1..=1 at line 1 column 2"#
@@ -329,10 +328,10 @@ fn test_f64_range_constrained() {
     "
     .compile_then(|test| {
         let [fraction] = test.bind(["fraction"]);
-        assert_json_io_matches!(fraction, Create, 0 == 0.0);
-        assert_json_io_matches!(fraction, Create, 0.0 == 0.0);
-        assert_json_io_matches!(fraction, Create, 0.5 == 0.5);
-        assert_json_io_matches!(fraction, Create, 1.0 == 1.0);
+        assert_json_io_matches!(serde_create(&fraction), 0 == 0.0);
+        assert_json_io_matches!(serde_create(&fraction), 0.0 == 0.0);
+        assert_json_io_matches!(serde_create(&fraction), 0.5 == 0.5);
+        assert_json_io_matches!(serde_create(&fraction), 1.0 == 1.0);
         assert_error_msg!(
             serde_create(&fraction).to_data_variant(json!(3.14)),
             r#"invalid type: floating point `3.14`, expected float in range 0..=1 at line 1 column 4"#
@@ -349,8 +348,8 @@ fn test_float_default() {
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
-        assert_json_io_matches!(foo, Create, { "bar": 1.618 } == { "bar": 1.618 });
-        assert_json_io_matches!(foo, Create, {} == { "bar": 42.0 });
+        assert_json_io_matches!(serde_create(&foo), { "bar": 1.618 } == { "bar": 1.618 });
+        assert_json_io_matches!(serde_create(&foo), {} == { "bar": 42.0 });
     });
 }
 
@@ -363,8 +362,8 @@ fn test_string_default() {
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
-        assert_json_io_matches!(foo, Create, { "bar": "yay" } == { "bar": "yay" });
-        assert_json_io_matches!(foo, Create, {} == { "bar": "baz" });
+        assert_json_io_matches!(serde_create(&foo), { "bar": "yay" } == { "bar": "yay" });
+        assert_json_io_matches!(serde_create(&foo), {} == { "bar": "baz" });
     });
 }
 
@@ -380,7 +379,7 @@ fn test_prop_union() {
     "
     .compile_then(|test| {
         let [foo] = test.bind(["vec3"]);
-        assert_json_io_matches!(foo, Create, { "x": 1, "y": 2, "z": 3 });
+        assert_json_io_matches!(serde_create(&foo), { "x": 1, "y": 2, "z": 3 });
     });
 }
 
@@ -414,10 +413,10 @@ fn test_jsonml() {
     .compile_then(|test| {
         let [element] = test.bind(["element"]);
 
-        assert_json_io_matches!(element, Create, "text");
-        assert_json_io_matches!(element, Create, ["div", {}]);
-        assert_json_io_matches!(element, Create, ["div", {}, "text"]);
-        assert_json_io_matches!(element, Create,
+        assert_json_io_matches!(serde_create(&element), "text");
+        assert_json_io_matches!(serde_create(&element), ["div", {}]);
+        assert_json_io_matches!(serde_create(&element), ["div", {}, "text"]);
+        assert_json_io_matches!(serde_create(&element),
             ["div", {}, ["em", {}, "text1"], ["strong", { "class": "foo" }]]
         );
     });

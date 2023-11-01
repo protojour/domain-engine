@@ -33,7 +33,7 @@ fn entity_without_inherent_id() {
     "
     .compile_then(|test| {
         let [entity] = test.bind(["entity"]);
-        assert_json_io_matches!(entity, Create, { "foo": "foo" });
+        assert_json_io_matches!(serde_create(&entity), { "foo": "foo" });
     });
 }
 
@@ -49,7 +49,7 @@ fn inherent_id_no_autogen() {
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
-        assert_json_io_matches!(foo, Create, { "key": "id", "children": [{ "key": "foreign_id" }] });
+        assert_json_io_matches!(serde_create(&foo), { "key": "id", "children": [{ "key": "foreign_id" }] });
 
         let entity: Value = foo.entity_builder(json!("id"), json!({ "key": "id" })).into();
         expect_eq!(
@@ -70,7 +70,7 @@ fn inherent_id_autogen() {
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
-        assert_json_io_matches!(foo, Create, { "children": [{ "key": "foreign_id" }] });
+        assert_json_io_matches!(serde_create(&foo), { "children": [{ "key": "foreign_id" }] });
 
         let entity: Value = foo.entity_builder(json!("generated_id"), json!({})).into();
         expect_eq!(
@@ -90,7 +90,7 @@ fn id_and_inherent_property_inline_type() {
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
-        assert_json_io_matches!(foo, Create, {
+        assert_json_io_matches!(serde_create(&foo), {
             "key": "outer",
             "children": [{ "key": "inner" }]
         });
@@ -118,7 +118,7 @@ fn entity_id_inline_fmt() {
 fn artist_and_instrument_io_artist() {
     let test = ARTIST_AND_INSTRUMENT.1.compile();
     let [artist] = test.bind(["artist"]);
-    assert_json_io_matches!(artist, Create, {
+    assert_json_io_matches!(serde_create(&artist), {
         "name": "Zappa",
         "plays": [
             {
@@ -135,7 +135,7 @@ fn artist_and_instrument_io_artist() {
 fn artist_and_instrument_io_instrument() {
     let test = ARTIST_AND_INSTRUMENT.1.compile();
     let [instrument] = test.bind(["instrument"]);
-    assert_json_io_matches!(instrument, Create, {
+    assert_json_io_matches!(serde_create(&instrument), {
         "name": "guitar",
         "played_by": [
             {
@@ -168,7 +168,7 @@ fn artist_and_instrument_id_as_relation_object() {
     let plays = artist.find_property("plays").unwrap();
     let example_id = "instrument/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8";
 
-    assert_json_io_matches!(artist, Create, {
+    assert_json_io_matches!(serde_create(&artist), {
         "name": "Jimi Hendrix",
         "plays": [
             {
@@ -258,16 +258,16 @@ fn test_entity_self_relationship_optional_object() {
             r#"missing properties, expected "name" at line 1 column 2"#
         );
 
-        assert_json_io_matches!(node, Create, { "name": "a" });
+        assert_json_io_matches!(serde_create(&node), { "name": "a" });
 
-        assert_json_io_matches!(node, Create, {
+        assert_json_io_matches!(serde_create(&node), {
             "name": "a",
             "children": [{
                 "name": "b",
             }]
         });
 
-        assert_json_io_matches!(node, Create, {
+        assert_json_io_matches!(serde_create(&node), {
             "name": "b",
             "parent": {
                 "name": "a",
@@ -302,8 +302,7 @@ fn entity_union_simple() {
     let test = GUITAR_SYNTH_UNION.1.compile();
     let [instrument] = test.bind(["instrument"]);
     assert_json_io_matches!(
-        instrument,
-        Create,
+        serde_create(&instrument),
         {
             "type": "synth",
             "polyphony": 8,
@@ -315,7 +314,7 @@ fn entity_union_simple() {
 fn entity_union_with_object_relation() {
     let test = GUITAR_SYNTH_UNION.1.compile();
     let [instrument] = test.bind(["instrument"]);
-    assert_json_io_matches!(instrument, Create, {
+    assert_json_io_matches!(serde_create(&instrument), {
         "type": "synth",
         "polyphony": 8,
         "played-by": [{
@@ -341,7 +340,7 @@ fn entity_union_in_relation_with_ids() {
         ]
     });
 
-    assert_json_io_matches!(artist, Create, {
+    assert_json_io_matches!(serde_create(&artist), {
         "name": "Someone",
         "plays": [
             { "instrument-id": "guitar/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8" },
@@ -381,7 +380,7 @@ fn entity_relationship_without_reverse() {
     "
     .compile_then(|test| {
         let [programmer] = test.bind(["programmer"]);
-        assert_json_io_matches!(programmer, Create, {
+        assert_json_io_matches!(serde_create(&programmer), {
             "name": "audun",
             "favorite-language": { "lang-id": "rust" }
         });
@@ -416,7 +415,7 @@ fn recursive_entity_union() {
     "
     .compile_then(|test| {
         let [lifeform] = test.bind(["lifeform"]);
-        assert_json_io_matches!(lifeform, Create, {
+        assert_json_io_matches!(serde_create(&lifeform), {
             "class": "animal",
             "eats": [
                 { "class": "plant" },

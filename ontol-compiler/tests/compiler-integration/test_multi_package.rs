@@ -1,4 +1,7 @@
-use ontol_test_utils::{assert_json_io_matches, expect_eq, SourceName, TestCompile, TestPackages};
+use ontol_test_utils::{
+    assert_json_io_matches, expect_eq, serde_helper::serde_create, SourceName, TestCompile,
+    TestPackages,
+};
 use test_log::test;
 
 #[test]
@@ -35,7 +38,7 @@ fn load_package() {
     ])
     .compile_then(|test| {
         let [bar] = test.bind(["bar"]);
-        assert_json_io_matches!(bar, Create, {
+        assert_json_io_matches!(serde_create(&bar), {
             "foo": {
                 "prop": 42
             }
@@ -83,7 +86,7 @@ fn dependency_dag() {
         expect_eq!(actual = test.ontology.domains().count(), expected = 5);
 
         let [foobar] = test.bind(["foobar"]);
-        assert_json_io_matches!(foobar, Create, {
+        assert_json_io_matches!(serde_create(&foobar), {
             "a": { "c": 42 },
             "b": { "c": 43 }
         });

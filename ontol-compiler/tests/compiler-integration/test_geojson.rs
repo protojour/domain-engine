@@ -13,21 +13,21 @@ fn test_geojson() {
         [GEOJSON.root(), WGS]
     ).compile_then(|test| {
         let [geometry] = test.bind(["Geometry"]);
-        assert_json_io_matches!(geometry, Create, {
+        assert_json_io_matches!(serde_create(&geometry), {
             "type": "Point",
             "coordinates": [1.0, 2.0]
         });
-        assert_json_io_matches!(geometry, Create, {
+        assert_json_io_matches!(serde_create(&geometry), {
             "type": "Polygon",
             "coordinates": [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [1.0, 2.0]]
         });
-        assert_json_io_matches!(geometry, Create, {
+        assert_json_io_matches!(serde_create(&geometry), {
             "type": "MultiPolygon", "coordinates": [
                 [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [1.0, 2.0]],
                 [[2.0, 3.0], [4.0, 5.0], [6.0, 7.0], [2.0, 3.0]],
             ]
         });
-        assert_json_io_matches!(geometry, Create, {
+        assert_json_io_matches!(serde_create(&geometry), {
             "type": "GeometryCollection",
             "geometries": [
                 {

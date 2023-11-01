@@ -57,18 +57,17 @@ macro_rules! assert_error_msg {
 /// With passing two JSON parameters, the left one is the input and the right one is the expected output.
 #[macro_export]
 macro_rules! assert_json_io_matches {
-    ($binding:expr, $mode:ident, $json:tt) => {
-        assert_json_io_matches!($binding, $mode, $json == $json);
+    ($serde_helper:expr, $json:tt) => {
+        assert_json_io_matches!($serde_helper, $json == $json);
     };
-    ($binding:expr, Create, $input:tt == $expected_output:tt) => {
+    ($serde_helper:expr, $input:tt == $expected_output:tt) => {
         let input = serde_json::json!($input);
-        let value =
-            match ontol_test_utils::serde_helper::serde_create(&$binding).to_value(input.clone()) {
-                Ok(value) => value,
-                Err(err) => panic!("deserialize failed: {err}"),
-            };
+        let value = match $serde_helper.to_value(input.clone()) {
+            Ok(value) => value,
+            Err(err) => panic!("deserialize failed: {err}"),
+        };
         tracing::debug!("deserialized value: {value:#?}");
-        let output = ontol_test_utils::serde_helper::serde_create(&$binding).as_json(&value);
+        let output = $serde_helper.as_json(&value);
 
         pretty_assertions::assert_eq!(serde_json::json!($expected_output), output);
     };
