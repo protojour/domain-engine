@@ -14,7 +14,7 @@ use crate::{
     value::{Attribute, Data, PropertyId, Value},
     value_generator::ValueGenerator,
     vm::proc::{NParams, Procedure},
-    DefId, RelationshipId, Role,
+    DefId,
 };
 
 use super::{
@@ -316,12 +316,10 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
 
     if !open_dict.is_empty() {
         attributes.insert(
-            PropertyId {
-                role: Role::Subject,
-                relationship_id: RelationshipId(
-                    processor.ontology.ontol_domain_meta.open_relationship,
-                ),
-            },
+            processor
+                .ontology
+                .ontol_domain_meta
+                .open_relationship_property_id(),
             Value {
                 data: Data::Dict(Box::new(open_dict)),
                 type_def_id: DefId::unit(),

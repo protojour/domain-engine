@@ -1,10 +1,7 @@
 //! Tests for deserialization, including errors
 
 use assert_matches::assert_matches;
-use ontol_runtime::{
-    value::{Data, PropertyId},
-    RelationshipId, Role,
-};
+use ontol_runtime::value::Data;
 use ontol_test_utils::{assert_error_msg, serde_helper::*, TestCompile};
 use serde_json::json;
 use test_log::test;
@@ -412,12 +409,12 @@ fn test_deserialize_open_data() {
         };
 
         let open_data = &map
-            .get(&PropertyId {
-                role: Role::Subject,
-                relationship_id: RelationshipId(
-                    test.ontology.ontol_domain_meta().open_relationship,
-                ),
-            })
+            .get(
+                &test
+                    .ontology
+                    .ontol_domain_meta()
+                    .open_relationship_property_id(),
+            )
             .unwrap()
             .value;
         let Data::Dict(open_data) = &open_data.data else {

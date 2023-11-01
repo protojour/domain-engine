@@ -24,7 +24,7 @@ use crate::{
         ontol_vm::OntolVm,
         proc::{Lib, Procedure},
     },
-    DefId, MapKey, PackageId, RelationshipId,
+    DefId, MapKey, PackageId, RelationshipId, Role,
 };
 
 /// Ontology is the ONTOL runtime environment
@@ -197,6 +197,15 @@ pub struct OntolDomainMeta {
     pub f64: DefId,
     pub text: DefId,
     pub open_relationship: DefId,
+}
+
+impl OntolDomainMeta {
+    pub fn open_relationship_property_id(&self) -> PropertyId {
+        PropertyId {
+            role: Role::Subject,
+            relationship_id: RelationshipId(self.open_relationship),
+        }
+    }
 }
 
 impl Default for OntolDomainMeta {

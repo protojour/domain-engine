@@ -378,8 +378,8 @@ fn test_prop_union() {
     }
     "
     .compile_then(|test| {
-        let [foo] = test.bind(["vec3"]);
-        assert_json_io_matches!(serde_create(&foo), { "x": 1, "y": 2, "z": 3 });
+        let [vec3] = test.bind(["vec3"]);
+        assert_json_io_matches!(serde_create(&vec3), { "x": 1, "y": 2, "z": 3 });
     });
 }
 
@@ -482,5 +482,28 @@ fn test_serde_with_raw_id_overridde_profile() {
             actual = serde_create(&bar).as_json(&bar_value),
             expected = json!({ "int_id": 1337 }),
         );
+    });
+}
+
+#[test]
+fn test_serde_open_properties() {
+    "
+    def(pub|open) foo {
+        rel .'closed': text
+    }
+    "
+    .compile_then(|test| {
+        let [foo] = test.bind(["foo"]);
+        assert_json_io_matches!(serde_create(&foo).enable_open_data(), {
+            "closed": "A",
+            "int": 2,
+            "float": 3.14,
+            "bool": true,
+            "null": null,
+            "dict": {
+                "key": "value"
+            },
+            "array": ["value"]
+        });
     });
 }

@@ -4,7 +4,7 @@ use serde::{
 };
 use smartstring::alias::String;
 use std::fmt::Write;
-use tracing::trace;
+use tracing::{error, trace, warn};
 
 use crate::{
     cast::Cast,
@@ -16,8 +16,8 @@ use crate::{
 };
 
 use super::{
-    operator::{FilteredVariants, SequenceRange, SerdeOperator},
-    processor::{SerdeProcessor, SubProcessorContext},
+    operator::{FilteredVariants, SequenceRange, SerdeOperator, SerdeStructFlags},
+    processor::{ProcessorProfileFlags, SerdeProcessor, SubProcessorContext},
     StructOperator, EDGE_PROPERTY,
 };
 
@@ -370,6 +370,42 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 
         self.serialize_rel_params::<S>(rel_params, &mut map)?;
 
+        if struct_op.flags.contains(SerdeStructFlags::OPEN_PROPS)
+            && self
+                .profile
+                .flags
+                .contains(ProcessorProfileFlags::SERIALIZE_OPEN_PROPS)
+        {
+            let open_attr = attributes.get(
+                &self
+                    .ontology
+                    .ontol_domain_meta()
+                    .open_relationship_property_id(),
+            );
+            if let Some(open_attr) = open_attr {
+                let Data::Dict(dict) = &open_attr.value.data else {
+                    panic!("Open data must be a dict");
+                };
+
+                for (key, value) in dict.iter() {
+                    if struct_op.properties.contains_key(key) {
+                        warn!("Open key `{key}` is shadowed in domain. Ignoring!");
+                        continue;
+                    }
+
+                    map.serialize_entry(
+                        key,
+                        &OpenProxy {
+                            value,
+                            processor: self
+                                .new_child_open()
+                                .map_err(RecursionLimitError::to_ser_error)?,
+                        },
+                    )?;
+                }
+            }
+        }
+
         map.end()
     }
 
@@ -402,6 +438,67 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 
         Ok(())
     }
+
+    fn serialize_open<S: Serializer>(&self, value: &Value, serializer: S) -> Res<S> {
+        match &value.data {
+            Data::Unit => serializer.serialize_unit(),
+            Data::I64(int) => {
+                if value.type_def_id == self.ontology.ontol_domain_meta.bool {
+                    if *int == 0 {
+                        serializer.serialize_bool(false)
+                    } else {
+                        serializer.serialize_bool(true)
+                    }
+                } else {
+                    serializer.serialize_i64(*int)
+                }
+            }
+            Data::F64(float) => serializer.serialize_f64(*float),
+            Data::Text(text) => serializer.serialize_str(text),
+            Data::Dict(dict) => {
+                let mut map_access = serializer.serialize_map(None)?;
+
+                for (key, value) in dict.iter() {
+                    map_access.serialize_entry(
+                        key,
+                        &OpenProxy {
+                            value,
+                            processor: self
+                                .new_child_open()
+                                .map_err(RecursionLimitError::to_ser_error)?,
+                        },
+                    )?;
+                }
+
+                map_access.end()
+            }
+            Data::Sequence(seq) => {
+                let mut seq_access = serializer.serialize_seq(Some(seq.attrs.len()))?;
+
+                for attr in &seq.attrs {
+                    seq_access.serialize_element(&OpenProxy {
+                        value: &attr.value,
+                        processor: self
+                            .new_child_open()
+                            .map_err(RecursionLimitError::to_ser_error)?,
+                    })?;
+                }
+
+                seq_access.end()
+            }
+            data => {
+                error!("Serialize open data {data:?}");
+                Err(S::Error::custom("Type not supported in open serialization"))
+            }
+        }
+    }
+
+    fn new_child_open(&self) -> Result<Self, RecursionLimitError> {
+        Ok(Self {
+            level: self.level.child()?,
+            ..*self
+        })
+    }
 }
 
 fn option_len<T>(opt: &Option<T>) -> usize {
@@ -424,6 +521,20 @@ impl<'v, 'on, 'p> serde::Serialize for Proxy<'v, 'on, 'p> {
     {
         self.processor
             .serialize_value(self.value, self.rel_params, serializer)
+    }
+}
+
+struct OpenProxy<'v, 'on, 'p> {
+    value: &'v Value,
+    processor: SerdeProcessor<'on, 'p>,
+}
+
+impl<'v, 'on, 'p> serde::Serialize for OpenProxy<'v, 'on, 'p> {
+    fn serialize<S>(&self, serializer: S) -> Res<S>
+    where
+        S: serde::Serializer,
+    {
+        self.processor.serialize_open(self.value, serializer)
     }
 }
 
