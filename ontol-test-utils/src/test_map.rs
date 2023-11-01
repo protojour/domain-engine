@@ -10,7 +10,12 @@ use ontol_runtime::{
 };
 use unimock::{unimock, Unimock};
 
-use crate::{expect_eq, serde_helper::serde_raw, type_binding::TypeBinding, OntolTest};
+use crate::{
+    expect_eq,
+    serde_helper::{serde_raw, SerdeHelper},
+    type_binding::TypeBinding,
+    OntolTest,
+};
 
 pub trait AsKey: Sized + Clone {
     fn as_key(&self) -> Key;
@@ -58,10 +63,11 @@ impl Key {
 }
 
 impl OntolTest {
-    pub fn mapper(&self, yielder_mock_clause: impl unimock::Clause) -> TestMapper<'_> {
+    pub fn mapper(&self) -> TestMapper<'_> {
         TestMapper {
             test: self,
-            yielder: Box::new(Unimock::new(yielder_mock_clause)),
+            yielder: Box::new(Unimock::new(())),
+            serde_helper_factory: Box::new(serde_raw),
         }
     }
 }
@@ -78,9 +84,27 @@ pub trait Yielder {
 pub struct TestMapper<'on> {
     test: &'on OntolTest,
     yielder: Box<dyn Yielder>,
+    serde_helper_factory: Box<dyn for<'b> Fn(&'b TypeBinding<'on>) -> SerdeHelper<'b, 'on>>,
 }
 
 impl<'on> TestMapper<'on> {
+    pub fn with_mock_yielder(self, yielder_mock_clause: impl unimock::Clause) -> Self {
+        Self {
+            yielder: Box::new(Unimock::new(yielder_mock_clause)),
+            ..self
+        }
+    }
+
+    pub fn with_serde_helper(
+        self,
+        factory: impl for<'b> Fn(&'b TypeBinding<'on>) -> SerdeHelper<'b, 'on> + 'static,
+    ) -> Self {
+        Self {
+            serde_helper_factory: Box::new(factory),
+            ..self
+        }
+    }
+
     /// Assert that the serialized output of the mapping of the json-encoded input value matches the expected json document
     #[track_caller]
     pub fn assert_map_eq(
@@ -95,8 +119,10 @@ impl<'on> TestMapper<'on> {
         let value = self.domain_map((from.clone(), to.clone()), input);
         let [output_binding] = self.test.bind([to.typename()]);
         let output_json = match &to {
-            Key::Unit(_) => serde_raw(&output_binding).as_json(&value),
-            Key::Seq(_) => serde_raw(&output_binding).dynamic_seq_as_json(&value),
+            Key::Unit(_) => (*self.serde_helper_factory)(&output_binding).as_json(&value),
+            Key::Seq(_) => {
+                (*self.serde_helper_factory)(&output_binding).dynamic_seq_as_json(&value)
+            }
         };
 
         expect_eq!(actual = output_json, expected = expected);
@@ -123,16 +149,18 @@ impl<'on> TestMapper<'on> {
             Some(procedure) => procedure,
             None => panic!("named map not found"),
         };
-        let param = serde_raw(&input_binding).to_value(input).unwrap();
+        let param = (*self.serde_helper_factory)(&input_binding)
+            .to_value(input)
+            .unwrap();
         let value = self.run_vm(procedure, param);
 
         // The resulting value must have the runtime def_id of the requested to_key.
         expect_eq!(actual = value.type_def_id, expected = key[1].def_id);
 
         let output_json = if key[1].seq {
-            serde_raw(&output_binding).dynamic_seq_as_json(&value)
+            (*self.serde_helper_factory)(&output_binding).dynamic_seq_as_json(&value)
         } else {
-            serde_raw(&output_binding).as_json(&value)
+            (*self.serde_helper_factory)(&output_binding).as_json(&value)
         };
 
         expect_eq!(actual = output_json, expected = expected);
@@ -149,7 +177,9 @@ impl<'on> TestMapper<'on> {
         let to = to.as_key();
 
         let [input_binding, output_binding] = self.test.bind([from.typename(), to.typename()]);
-        let param = serde_raw(&input_binding).to_value(input).unwrap();
+        let param = (*self.serde_helper_factory)(&input_binding)
+            .to_value(input)
+            .unwrap();
 
         fn get_map_key(key: &Key, binding: &TypeBinding) -> MapKey {
             let seq = matches!(key, Key::Seq(_));

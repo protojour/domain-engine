@@ -534,3 +534,27 @@ fn error_ambiguous_number_resolution() {
     "
     .compile_fail();
 }
+
+// BUG: FIXME: TODO: This should display a compile error!
+#[test]
+#[should_panic]
+fn test_map_open_data() {
+    "
+    def(pub) foo {
+        rel .'p0': [text]
+    }
+    def(pub) bar {
+        rel .'p1': [text]
+    }
+
+    map {
+        foo {
+            'p0': [x]
+        }
+        bar {
+            'p1': [x]
+        }
+    }
+    "
+    .compile();
+}

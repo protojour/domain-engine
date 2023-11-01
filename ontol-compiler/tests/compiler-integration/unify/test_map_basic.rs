@@ -1,4 +1,6 @@
-use ontol_test_utils::{test_map::AsKey, SourceName, TestCompile, TestPackages};
+use ontol_test_utils::{
+    serde_helper::serde_raw, test_map::AsKey, SourceName, TestCompile, TestPackages,
+};
 use serde_json::json;
 use test_log::test;
 
@@ -17,12 +19,12 @@ fn test_map_simple() {
     }
     "
     .compile_then(|test| {
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("foo", "bar"),
             json!({ "f": "my_value"}),
             json!({ "b": "my_value"}),
         );
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("bar", "foo"),
             json!({ "b": "my_value"}),
             json!({ "f": "my_value"}),
@@ -42,12 +44,12 @@ fn test_map_value_to_primitive() {
     }
     "
     .compile_then(|test| {
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("foo", "bar"),
             json!({ "a": "my_value"}),
             json!({ "b": "my_value"}),
         );
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("bar", "foo"),
             json!({ "b": "my_value"}),
             json!({ "a": "my_value"}),
@@ -66,9 +68,9 @@ fn test_meters() {
     }
     "
     .compile_then(|test| {
-        test.mapper(())
+        test.mapper()
             .assert_map_eq(("meters", "millimeters"), json!(5), json!(5000));
-        test.mapper(())
+        test.mapper()
             .assert_map_eq(("millimeters", "meters"), json!(5000), json!(5));
     });
 }
@@ -84,9 +86,9 @@ fn test_temperature() {
     }
     "
     .compile_then(|test| {
-        test.mapper(())
+        test.mapper()
             .assert_map_eq(("celsius", "fahrenheit"), json!(10), json!(50));
-        test.mapper(())
+        test.mapper()
             .assert_map_eq(("fahrenheit", "celsius"), json!(50), json!(10));
     });
 }
@@ -139,24 +141,24 @@ fn test_nested_optional_attribute() {
     }
     "
     .compile_then(|test| {
-        test.mapper(())
+        test.mapper()
             .assert_map_eq(("person", "creature"), json!({}), json!({}));
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("person", "creature"),
             json!({ "age": 42 }),
             json!({ "age": 1324512000 }),
         );
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("person_container", "creature_container"),
             json!({}),
             json!({}),
         );
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("person_container", "creature_container"),
             json!({ "person": {} }),
             json!({ "creature": {} }),
         );
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("person_container", "creature_container"),
             json!({ "person": { "age": 42 } }),
             json!({ "creature": { "age": 1324512000 } }),
@@ -181,9 +183,9 @@ fn test_map_value_to_struct_no_func() {
     }
     "
     .compile_then(|test| {
-        test.mapper(())
+        test.mapper()
             .assert_map_eq(("one", "two"), json!("foo"), json!({ "a": "foo" }));
-        test.mapper(())
+        test.mapper()
             .assert_map_eq(("two", "one"), json!({ "a": "foo" }), json!("foo"));
     });
 }
@@ -205,9 +207,9 @@ fn test_map_value_to_struct_func() {
     }
     "
     .compile_then(|test| {
-        test.mapper(())
+        test.mapper()
             .assert_map_eq(("one", "two"), json!(2), json!({ "a": 4 }));
-        test.mapper(())
+        test.mapper()
             .assert_map_eq(("two", "one"), json!({ "a": 4 }), json!(2));
     });
 }
@@ -225,12 +227,12 @@ fn test_map_into_default_field_using_default_value() {
     }
     "
     .compile_then(|test| {
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("empty", "target"),
             json!({}),
             json!({ "field": "Default!" }),
         );
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("target", "empty"),
             json!({ "field": "whatever" }),
             json!({}),
@@ -253,12 +255,12 @@ fn test_map_into_default_field_using_provided_value() {
     }
     "
     .compile_then(|test| {
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("required", "target"),
             json!({ "field": "This" }),
             json!({ "field": "This" }),
         );
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("target", "required"),
             json!({ "field": "This" }),
             json!({ "field": "This" }),
@@ -279,12 +281,12 @@ fn test_map_into_default_field_using_map_provided() {
     }
     "
     .compile_then(|test| {
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("empty", "target"),
             json!({}),
             json!({ "field": "Mapped!" }),
         );
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("target", "empty"),
             json!({ "field": "whatever" }),
             json!({}),
@@ -335,12 +337,12 @@ fn test_deep_structural_map() {
     }
     "
     .compile_then(|test| {
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("foo", "bar"),
             json!({ "a": "A", "inner": { "b": "B", "c": "C" }}),
             json!({ "a": "A", "b": "B", "inner": { "c": "C" }}),
         );
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("bar", "foo"),
             json!({ "a": "A", "b": "B", "inner": { "c": "C" }}),
             json!({ "a": "A", "inner": { "b": "B", "c": "C" }}),
@@ -367,9 +369,9 @@ fn test_map_matching_sequence() {
     }
     "
     .compile_then(|test| {
-        test.mapper(())
+        test.mapper()
             .assert_map_eq(("foo", "bar"), json!({ "a": [42] }), json!({ "b": [42] }));
-        test.mapper(())
+        test.mapper()
             .assert_map_eq(("bar", "foo"), json!({ "b": [42] }), json!({ "a": [42] }));
     });
 }
@@ -394,12 +396,12 @@ map {
 #[test]
 fn test_map_in_sequence_item_empty() {
     let test = MAP_IN_SEQUENCE.compile();
-    test.mapper(()).assert_map_eq(
+    test.mapper().assert_map_eq(
         ("foos", "bars"),
         json!({ "foos": [] }),
         json!({ "bars": [] }),
     );
-    test.mapper(()).assert_map_eq(
+    test.mapper().assert_map_eq(
         ("bars", "foos"),
         json!({ "bars": [] }),
         json!({ "foos": [] }),
@@ -409,12 +411,12 @@ fn test_map_in_sequence_item_empty() {
 #[test]
 fn test_map_in_sequence_item_one() {
     let test = MAP_IN_SEQUENCE.compile();
-    test.mapper(()).assert_map_eq(
+    test.mapper().assert_map_eq(
         ("foos", "bars"),
         json!({ "foos": [{ "f": "42" }] }),
         json!({ "bars": [{ "b": "42" }] }),
     );
-    test.mapper(()).assert_map_eq(
+    test.mapper().assert_map_eq(
         ("bars", "foos"),
         json!({ "bars": [{ "b": "42" }] }),
         json!({ "foos": [{ "f": "42" }] }),
@@ -424,12 +426,12 @@ fn test_map_in_sequence_item_one() {
 #[test]
 fn test_map_in_sequence_item_many() {
     let test = MAP_IN_SEQUENCE.compile();
-    test.mapper(()).assert_map_eq(
+    test.mapper().assert_map_eq(
         ("foos", "bars"),
         json!({ "foos": [{ "f": "42" }, { "f": "84" }] }),
         json!({ "bars": [{ "b": "42" }, { "b": "84" }] }),
     );
-    test.mapper(()).assert_map_eq(
+    test.mapper().assert_map_eq(
         ("bars", "foos"),
         json!({ "bars": [{ "b": "42" }, { "b": "84" }] }),
         json!({ "foos": [{ "f": "42" }, { "f": "84" }] }),
@@ -466,7 +468,7 @@ fn test_sequence_cross_parallel() {
     }
     "
     .compile_then(|test| {
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("foos", "bars"),
             json!({ "f1": [{ "f": "1A" }, { "f": "1B" }], "f2": [{ "f": "2" }] }),
             json!({ "b1": [{ "b": "1A" }, { "b": "1B" }], "b2": [{ "b": "2" }] }),
@@ -524,7 +526,7 @@ fn test_sequence_inner_loop() {
     }
     "
     .compile_then(|test| {
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("f1", "b1"),
             json!({ "a": [{ "a": [{ "P": "0" }], "b": [{ "P": "1" }]}], "b": [{ "a": [{ "P": "2" }], "b": [{ "P": "3" }]}]}),
             json!({ "a": [{ "a": [{ "Q": "0" }], "b": [{ "Q": "1" }]}], "b": [{ "a": [{ "Q": "2" }], "b": [{ "Q": "3" }]}]}),
@@ -564,7 +566,7 @@ fn test_sequence_flat_map1() {
     }
     "
     .compile_then(|test| {
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("foo", "bar".seq()),
             json!({ "a": "A", "inner": [{ "b": "B0" }, { "b": "B1" }] }),
             json!([{ "a": "A", "b": "B0" }, { "a": "A", "b": "B1" }]),
@@ -595,7 +597,7 @@ fn test_sequence_composer_no_iteration() {
     }
     "
     .compile_then(|test| {
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("foo", "bar"),
             json!({
                 "a": 1,
@@ -630,7 +632,7 @@ fn test_sequence_composer_with_iteration() {
     }
     "
     .compile_then(|test| {
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("foo", "bar"),
             json!({
                 "a": 1,
@@ -676,7 +678,7 @@ fn test_map_complex_flow() {
     }
     "
     .compile_then(|test| {
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("one", "two"),
             json!({ "a": "X", "b": "Y" }),
             json!({ "a": "X", "b": "Y", "c": "X", "d": "Y" }),
@@ -723,12 +725,12 @@ fn test_map_delegation() {
         ),
     ])
     .compile_then(|test| {
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("car", "vehicle"),
             json!({ "length": 3 }),
             json!({ "length": 3000 }),
         );
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("vehicle", "car"),
             json!({ "length": 2000 }),
             json!({ "length": 2 }),
@@ -795,12 +797,12 @@ fn test_map_delegation_abstract_types() {
         ),
     ])
     .compile_then(|test| {
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("c.car", "c.vehicle"),
             json!({ "length": 3 }),
             json!({ "length": 3000 }),
         );
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("v.vehicle", "c.car"),
             json!({ "length": 2000 }),
             json!({ "length": 2 }),
@@ -832,12 +834,12 @@ fn test_map_dependent_scoping() {
     }
     "
     .compile_then(|test| {
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("one", "two"),
             json!({ "total_weight": 100, "net_weight": 75 }),
             json!({ "net_weight": 75, "container_weight": 25 }),
         );
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("two", "one"),
             json!({ "net_weight": 75, "container_weight": 25 }),
             json!({ "total_weight": 100, "net_weight": 75 }),
@@ -878,7 +880,7 @@ fn test_seq_scope_escape1() {
     }
     "
     .compile_then(|test| {
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("bar", "qux"),
             json!({ "foo": {}, "p1": ["1"] }),
             json!({ "baz": { "foo": {}, "p1": ["1"] } }),
@@ -925,10 +927,41 @@ fn test_seq_scope_escape2() {
     }
     "
     .compile_then(|test| {
-        test.mapper(()).assert_map_eq(
+        test.mapper().assert_map_eq(
             ("bar", "qux"),
             json!({ "foo": { "p0": ["0"] }, "p1": ["1"] }),
             json!({ "baz": { "foo": { "p0": ["0"] }, "p1": ["1"] } }),
         );
+    });
+}
+
+#[test]
+fn test_map_open_data() {
+    "
+    def(pub|open) foo {
+        rel .'p0': [text]
+    }
+    def(pub|open) bar {
+        rel .'p1': [text]
+    }
+
+    map {
+        foo {
+            'p0': [..x]
+        }
+        bar {
+            'p1': [..x]
+        }
+    }
+    "
+    .compile_then(|test| {
+        test.mapper()
+            .with_serde_helper(|type_binding| serde_raw(type_binding).enable_open_data())
+            .assert_map_eq(
+                ("foo", "bar"),
+                json!({ "p0": ["X"], "open": { "key": "value" } }),
+                // FIXME: Should contain "open" key
+                json!({ "p1": ["X"] }),
+            );
     });
 }
