@@ -12,9 +12,25 @@ use crate::{
     DefId,
 };
 
+use super::processor::{ProcessorLevel, RecursionLimitError};
+
 #[derive(Clone, Copy)]
 pub struct OpenVisitor<'o> {
-    pub ontology: &'o Ontology,
+    ontology: &'o Ontology,
+    level: ProcessorLevel,
+}
+
+impl<'o> OpenVisitor<'o> {
+    pub fn new(ontology: &'o Ontology, level: ProcessorLevel) -> Result<Self, RecursionLimitError> {
+        Ok(Self {
+            ontology,
+            level: level.child()?,
+        })
+    }
+
+    fn child(self) -> Result<Self, RecursionLimitError> {
+        Self::new(self.ontology, self.level)
+    }
 }
 
 impl<'o, 'de> DeserializeSeed<'de> for OpenVisitor<'o> {
@@ -84,7 +100,9 @@ impl<'o, 'de> Visitor<'de> for OpenVisitor<'o> {
             None => Sequence::new([]),
         };
 
-        while let Some(value) = seq_access.next_element_seed(self)? {
+        while let Some(value) =
+            seq_access.next_element_seed(self.child().map_err(RecursionLimitError::to_de_error)?)?
+        {
             sequence.attrs.push(Attribute::from(value));
         }
 
@@ -97,12 +115,14 @@ impl<'o, 'de> Visitor<'de> for OpenVisitor<'o> {
     fn visit_map<A: MapAccess<'de>>(self, mut map_access: A) -> Result<Self::Value, A::Error> {
         let mut dict = HashMap::default();
 
-        while let Some(key) = map_access.next_key_seed(self)? {
+        let child = self.child().map_err(RecursionLimitError::to_de_error)?;
+
+        while let Some(key) = map_access.next_key_seed(child)? {
             let Data::Text(key) = key.data else {
                 return Err(A::Error::custom("Dictionary keys must be text"));
             };
 
-            dict.insert(key, map_access.next_value_seed(self)?);
+            dict.insert(key, map_access.next_value_seed(child)?);
         }
 
         Ok(Value {

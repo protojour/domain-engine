@@ -169,9 +169,8 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
                 open_dict.insert(
                     key,
                     serde_value::ValueDeserializer::new(serde_value).deserialize_any(
-                        OpenVisitor {
-                            ontology: processor.ontology,
-                        },
+                        OpenVisitor::new(processor.ontology, processor.level)
+                            .map_err(RecursionLimitError::to_de_error)?,
                     )?,
                 );
             }
@@ -229,9 +228,10 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
             PropertyKey::Open(key) => {
                 open_dict.insert(
                     key,
-                    map.next_value_seed(OpenVisitor {
-                        ontology: processor.ontology,
-                    })?,
+                    map.next_value_seed(
+                        OpenVisitor::new(processor.ontology, processor.level)
+                            .map_err(RecursionLimitError::to_de_error)?,
+                    )?,
                 );
             }
             PropertyKey::Ignored => {
