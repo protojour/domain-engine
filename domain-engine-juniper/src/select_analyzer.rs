@@ -68,7 +68,7 @@ impl<'a> SelectAnalyzer<'a> {
                 let input = ArgsWrapper::new(look_ahead.arguments())
                     .deserialize_domain_field_arg_as_attribute(
                         input_arg,
-                        &self.schema_ctx.ontology,
+                        (self.schema_ctx, self.service_ctx),
                     )?
                     .value;
 

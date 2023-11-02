@@ -146,6 +146,12 @@ pub struct ProcessorProfile {
     pub flags: ProcessorProfileFlags,
 }
 
+impl ProcessorProfile {
+    pub fn with_flags(self, flags: ProcessorProfileFlags) -> Self {
+        Self { flags, ..self }
+    }
+}
+
 #[derive(Clone, Copy, Default, Debug)]
 pub enum ScalarFormat {
     /// Serialize scalars just like the domain says

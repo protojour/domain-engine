@@ -6,9 +6,12 @@ use std::sync::Arc;
 
 use domain_engine_core::DomainEngine;
 use ontol_runtime::{
-    interface::graphql::{
-        data::{NativeScalarRef, TypeAddr, TypeData, TypeKind, UnitTypeRef},
-        schema::{GraphqlSchema, QueryLevel, TypingPurpose},
+    interface::{
+        graphql::{
+            data::{NativeScalarRef, TypeAddr, TypeData, TypeKind, UnitTypeRef},
+            schema::{GraphqlSchema, QueryLevel, TypingPurpose},
+        },
+        serde::processor::ProcessorProfileFlags,
     },
     ontology::Ontology,
     DefId, PackageId,
@@ -19,13 +22,24 @@ use ontol_runtime::{
 /// it's responsible for resolving queries and mutations.
 #[derive(Clone)]
 pub struct ServiceCtx {
-    pub domain_engine: Arc<DomainEngine>,
+    pub(crate) domain_engine: Arc<DomainEngine>,
+    pub(crate) serde_processor_profile_flags: ProcessorProfileFlags,
+}
+
+impl ServiceCtx {
+    pub fn with_serde_processor_profile_flags(self, flags: ProcessorProfileFlags) -> Self {
+        Self {
+            serde_processor_profile_flags: flags,
+            ..self
+        }
+    }
 }
 
 impl From<DomainEngine> for ServiceCtx {
     fn from(value: DomainEngine) -> Self {
         Self {
             domain_engine: Arc::new(value),
+            serde_processor_profile_flags: Default::default(),
         }
     }
 }
@@ -34,6 +48,7 @@ impl From<Arc<DomainEngine>> for ServiceCtx {
     fn from(value: Arc<DomainEngine>) -> Self {
         Self {
             domain_engine: value,
+            serde_processor_profile_flags: Default::default(),
         }
     }
 }

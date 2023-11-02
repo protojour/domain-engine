@@ -154,7 +154,7 @@ async fn mutation(
 ) -> juniper::ExecutionResult<GqlScalar> {
     let schema_ctx = &type_info.schema_ctx;
     let service_ctx = executor.context();
-    let ontology = type_info.ontology();
+    let ctx = (schema_ctx.as_ref(), service_ctx);
 
     let look_ahead = executor.look_ahead();
     let args_wrapper = ArgsWrapper::new(look_ahead.arguments());
@@ -170,7 +170,7 @@ async fn mutation(
     match &field_data.kind {
         FieldKind::CreateMutation { input } => {
             let input_attribute =
-                args_wrapper.deserialize_domain_field_arg_as_attribute(input, ontology)?;
+                args_wrapper.deserialize_domain_field_arg_as_attribute(input, ctx)?;
             let struct_query = query_analyzer.analyze_struct_select(&look_ahead, field_data)?;
             let query = match struct_query {
                 StructOrUnionSelect::Struct(struct_query) => Select::Struct(struct_query),
@@ -198,10 +198,9 @@ async fn mutation(
             )
         }
         FieldKind::UpdateMutation { id, input } => {
-            let id_attribute =
-                args_wrapper.deserialize_domain_field_arg_as_attribute(id, ontology)?;
+            let id_attribute = args_wrapper.deserialize_domain_field_arg_as_attribute(id, ctx)?;
             let input_attribute =
-                args_wrapper.deserialize_domain_field_arg_as_attribute(input, ontology)?;
+                args_wrapper.deserialize_domain_field_arg_as_attribute(input, ctx)?;
 
             let query = query_analyzer.analyze_struct_select(&look_ahead, field_data);
 
@@ -213,7 +212,7 @@ async fn mutation(
             Ok(juniper::Value::Null)
         }
         FieldKind::DeleteMutation { id } => {
-            let id_value = args_wrapper.deserialize_domain_field_arg_as_attribute(id, ontology)?;
+            let id_value = args_wrapper.deserialize_domain_field_arg_as_attribute(id, ctx)?;
 
             trace!("DELETE {id_value:?}");
 

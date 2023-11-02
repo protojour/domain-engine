@@ -2,6 +2,7 @@ use domain_engine_core::data_store::DataStoreAPIMock;
 use domain_engine_juniper::{context::ServiceCtx, gql_scalar::GqlScalar, Schema};
 use juniper::{graphql_value, parser::SourcePosition, ExecutionError, FieldError};
 use ontol_runtime::{
+    interface::serde::processor::ProcessorProfileFlags,
     sequence::{Cursor, Sequence, SubSequence},
     value::{Attribute, Value},
 };
@@ -1030,4 +1031,72 @@ fn test_graphql_municipalities_geojson_union() {
             FieldInfo::from(("geometries", "_geojson_LeafGeometryUnionInput!")),
         ]
     );
+}
+
+#[test(tokio::test)]
+async fn test_graphql_open_data() {
+    let (test, [schema]) = "
+    def(pub|open) foo {
+        rel .'id'(rel .gen: auto)|id: { rel .is: text }
+    }
+    map foos {
+        {}
+        foo: [..foo match {}]
+    }
+    "
+    .compile_schemas([ROOT]);
+    let [foo] = test.bind(["foo"]);
+    let entity: Value = foo.entity_builder(json!("the-id"), json!({})).into();
+
+    expect_eq!(
+        actual = r#"
+            mutation {
+                createfoo(input: { open_prop: "hei" }) {
+                    id
+                }
+            }
+        "#
+        .exec(
+            [],
+            &schema,
+            &gql_ctx_mock_data_store(
+                &test,
+                ROOT,
+                DataStoreAPIMock::store_new_entity
+                    .next_call(matching!(_, _, _))
+                    .returns(Ok(entity))
+            )
+            .await
+            .with_serde_processor_profile_flags(ProcessorProfileFlags::DESERIALIZE_OPEN_PROPS)
+        )
+        .await,
+        expected = Ok(graphql_value!({
+            "createfoo": {
+                "id": "the-id"
+            }
+        })),
+    );
+
+    // expect_eq!(
+    //     actual = "{
+    //         foos {
+    //             edges {
+    //                 node {
+    //                     id
+    //                 }
+    //             }
+    //         }
+    //     }"
+    //     .exec(
+    //         [],
+    //         &schema,
+    //         &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
+    //     )
+    //     .await,
+    //     expected = Ok(graphql_value!({
+    //         "foos": {
+    //             "edges": [],
+    //         },
+    //     })),
+    // );
 }

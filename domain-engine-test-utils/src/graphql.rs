@@ -1,7 +1,4 @@
-use std::{
-    fmt::{Debug, Display},
-    sync::Arc,
-};
+use std::fmt::{Debug, Display};
 
 use domain_engine_core::{
     data_store::{DataStoreAPIMock, DefaultDataStoreFactory},
@@ -86,14 +83,11 @@ pub async fn gql_ctx_mock_data_store(
     data_store_package: SourceName,
     setup: impl unimock::Clause,
 ) -> ServiceCtx {
-    ServiceCtx {
-        domain_engine: Arc::new(
-            DomainEngine::test_builder(ontol_test.ontology.clone())
-                .mock_data_store(ontol_test.get_package_id(data_store_package.0), setup)
-                .build::<DefaultDataStoreFactory>()
-                .await,
-        ),
-    }
+    DomainEngine::test_builder(ontol_test.ontology.clone())
+        .mock_data_store(ontol_test.get_package_id(data_store_package.0), setup)
+        .build::<DefaultDataStoreFactory>()
+        .await
+        .into()
 }
 
 #[async_trait::async_trait]

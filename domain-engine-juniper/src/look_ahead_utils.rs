@@ -2,8 +2,10 @@ use std::fmt::Display;
 
 use juniper::{graphql_value, parser::SourcePosition, LookAheadArgument, LookAheadValue, Spanning};
 use ontol_runtime::{
-    interface::graphql::argument::{self, DefaultArg},
-    ontology::Ontology,
+    interface::{
+        graphql::argument::{self, DefaultArg},
+        serde::processor::ProcessorProfile,
+    },
     smart_format,
 };
 use serde::{
@@ -11,7 +13,10 @@ use serde::{
     Deserialize,
 };
 
-use crate::gql_scalar::GqlScalar;
+use crate::{
+    context::{SchemaCtx, ServiceCtx},
+    gql_scalar::GqlScalar,
+};
 
 pub struct ArgsWrapper<'a> {
     arguments: &'a [LookAheadArgument<'a, GqlScalar>],
@@ -47,14 +52,18 @@ impl<'a> ArgsWrapper<'a> {
     pub fn deserialize_domain_field_arg_as_attribute(
         &self,
         field_arg: &dyn argument::DomainFieldArg,
-        ontology: &Ontology,
+        (schema_ctx, service_ctx): (&SchemaCtx, &ServiceCtx),
     ) -> Result<ontol_runtime::value::Attribute, juniper::FieldError<GqlScalar>> {
         let arg_name = field_arg.name();
         let (mode, level) = field_arg.typing_purpose().mode_and_level();
 
-        let serde_processor = ontology
+        let processor_profile =
+            ProcessorProfile::default().with_flags(service_ctx.serde_processor_profile_flags);
+        let serde_processor = schema_ctx
+            .ontology
             .new_serde_processor(field_arg.operator_addr(), mode)
-            .with_level(level);
+            .with_level(level)
+            .with_profile(&processor_profile);
 
         let result = match self.find_argument(arg_name) {
             Some(argument) => serde_processor.deserialize(LookAheadValueDeserializer {

@@ -246,9 +246,7 @@ impl BlogPostConduit {
     }
 
     fn ctx(&self) -> ServiceCtx {
-        ServiceCtx {
-            domain_engine: self.domain_engine.clone(),
-        }
+        self.domain_engine.clone().into()
     }
 
     async fn create_db_article(&self) {
