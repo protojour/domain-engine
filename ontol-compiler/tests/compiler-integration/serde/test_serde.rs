@@ -1,11 +1,14 @@
 use assert_matches::assert_matches;
 use ontol_runtime::{
-    interface::serde::processor::{ProcessorProfile, ProcessorProfileFlags, ScalarFormat},
+    interface::serde::processor::{
+        ProcessorLevel, ProcessorMode, ProcessorProfile, ProcessorProfileFlags, ScalarFormat,
+    },
     value::Data,
 };
 use ontol_test_utils::{
     assert_error_msg, assert_json_io_matches, expect_eq, serde_helper::*, TestCompile,
 };
+use serde::de::DeserializeSeed;
 use serde_json::json;
 use test_log::test;
 
@@ -505,5 +508,37 @@ fn test_serde_open_properties() {
             },
             "array": ["value"]
         });
+    });
+}
+
+#[test]
+fn test_serde_recursion_limit() {
+    "
+    def(pub) foo {
+        rel .'child': foo
+    }
+    "
+    .compile_then(|test| {
+        const RECURSION_LIMIT: u16 = 32;
+        let mut json = String::new();
+
+        for _ in 0..RECURSION_LIMIT + 1 {
+            json.push_str(r#"{ "child": "#);
+        }
+
+        let [foo] = test.bind(["foo"]);
+        let error = test
+            .ontology
+            .new_serde_processor(foo.serde_operator_addr(), ProcessorMode::Create)
+            .with_level(ProcessorLevel::new_root_with_recursion_limit(
+                RECURSION_LIMIT,
+            ))
+            .deserialize(&mut serde_json::Deserializer::from_str(&json))
+            .unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "Recursion limit exceeded at line 1 column 361"
+        );
     });
 }
