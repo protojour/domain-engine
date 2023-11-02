@@ -143,6 +143,10 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
+            Kind::MoveRestAttrs(target, source) => {
+                write!(f, "{sep}(move-rest-attrs {} {})", target, source)?;
+                Ok(Multiline(false))
+            }
             Kind::MatchProp(struct_var, id, arms) => {
                 write!(f, "{indent}(match-prop {struct_var} {id}")?;
                 let multi = self.print_all(Sep::Space, arms.iter(), f)?;
@@ -156,8 +160,8 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
                 self.print_rparen(multi, f)?;
                 Ok(multi)
             }
-            Kind::SetSubSeq(target, source) => {
-                write!(f, "{sep}(set-sub-seq {} {})", target, source)?;
+            Kind::CopySubSeq(target, source) => {
+                write!(f, "{sep}(copy-sub-seq {} {})", target, source)?;
                 Ok(Multiline(false))
             }
             Kind::ForEach(var, (rel, val), children) => {

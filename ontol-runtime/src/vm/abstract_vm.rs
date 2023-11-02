@@ -57,6 +57,7 @@ pub trait Processor {
     fn get_attr(&mut self, source: Local, key: PropertyId, flags: GetAttrFlags);
     fn put_attr1(&mut self, target: Local, key: PropertyId);
     fn put_attr2(&mut self, target: Local, key: PropertyId);
+    fn move_rest_attrs(&mut self, target: Local, source: Local);
     fn push_i64(&mut self, k: i64, result_type: DefId);
     fn push_f64(&mut self, k: f64, result_type: DefId);
     fn push_string(&mut self, k: &str, result_type: DefId);
@@ -176,6 +177,10 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                     processor.put_attr2(*target, *property_id);
                     self.program_counter += 1;
                 }
+                OpCode::MoveRestAttrs(target, source) => {
+                    processor.move_rest_attrs(*target, *source);
+                    self.program_counter += 1;
+                }
                 OpCode::I64(k, result_type) => {
                     processor.push_i64(*k, *result_type);
                     self.program_counter += 1;
@@ -214,7 +219,7 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                     processor.move_seq_vals_to_stack(*local);
                     self.program_counter += 1;
                 }
-                OpCode::SetSubSeq(target, source) => {
+                OpCode::CopySubSeq(target, source) => {
                     processor.set_sub_seq(*target, *source);
                     self.program_counter += 1;
                 }

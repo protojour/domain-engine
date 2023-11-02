@@ -60,6 +60,7 @@ fn test_unify_basic_struct() {
                     )
                 )
             )
+            (move-rest-attrs $c $b)
         )"
     };
     assert_eq!(expected, output);
@@ -140,6 +141,7 @@ fn test_unify_deep_structural_map() {
                     )
                 )
             )
+            (move-rest-attrs $d $f)
         )"
     };
     assert_eq!(expected, output);
@@ -177,6 +179,7 @@ fn test_unify_two_prop_struct() {
                     )
                 )
             )
+            (move-rest-attrs $d $c)
         )"
     };
     assert_eq!(expected, output);
@@ -215,6 +218,7 @@ fn test_unify_struct_in_struct_scope() {
                     )
                 )
             )
+            (move-rest-attrs $d $c)
         )"
     };
     assert_eq!(expected, output);
@@ -243,6 +247,7 @@ fn test_unify_struct_map_prop() {
                     )
                 )
             )
+            (move-rest-attrs $c $b)
         )"
     };
     assert_eq!(expected, output);
@@ -453,6 +458,7 @@ fn test_unify_basic_seq_prop_no_default() {
                     )
                 )
             )
+            (move-rest-attrs $c $b)
         )"
     };
     assert_eq!(expected, output);
@@ -501,6 +507,7 @@ fn test_unify_basic_seq_prop_element_iter_mix() {
                     )
                 )
             )
+            (move-rest-attrs $f $e)
         )"
     };
     assert_eq!(expected, output);
@@ -575,6 +582,7 @@ fn test_unify_seq_prop_deep() {
                     )
                 )
             )
+            (move-rest-attrs $d $b)
         )"
     };
     assert_eq!(expected, output);
@@ -666,6 +674,7 @@ fn test_unify_seq_prop_merge_rel_and_val_zwizzle() {
                     )
                 )
             )
+            (move-rest-attrs $i $e)
         )"
     };
     assert_eq!(expected, output);
@@ -704,6 +713,7 @@ fn test_unify_basic_seq_prop_default_value() {
                     )
                 )
             )
+            (move-rest-attrs $c $b)
         )"
     };
     assert_eq!(expected, output);
@@ -866,6 +876,7 @@ fn test_unify_opt_props1() {
                 )
                 (())
             )
+            (move-rest-attrs $c $b)
         )"
     };
     assert_eq!(expected, output);
@@ -922,6 +933,7 @@ fn test_unify_opt_props2() {
                 )
                 (())
             )
+            (move-rest-attrs $d $b)
         )"
     };
     assert_eq!(expected, output);
@@ -1005,6 +1017,7 @@ fn test_unify_opt_props3() {
                     )
                 )
             )
+            (move-rest-attrs $f $c)
         )"
     };
     assert_eq!(expected, output);
@@ -1097,6 +1110,7 @@ fn test_unify_opt_props4() {
                     )
                 )
             )
+            (move-rest-attrs $f $c)
         )"
     };
     assert_eq!(expected, output);
@@ -1130,6 +1144,7 @@ fn test_unify_opt_rel_and_val1() {
                 )
                 (())
             )
+            (move-rest-attrs $d $c)
         )"
     };
     assert_eq!(expected, output);
@@ -1174,6 +1189,7 @@ fn test_unify_opt_rel_and_val_struct_merge1() {
                 )
                 (())
             )
+            (move-rest-attrs $f $c)
         )"
     };
     assert_eq!(expected, output);
@@ -1222,6 +1238,7 @@ fn test_unify_prop_variants() {
                 )
                 (())
             )
+            (move-rest-attrs $f $e)
         )"
     };
     assert_eq!(expected, output);
@@ -1310,6 +1327,7 @@ mod dependent_scoping {
                         )
                     )
                 )
+                (move-rest-attrs $c $f)
             )"
         };
         // FIXME: The backwards code does not trigger fallback to the classic unifier,
@@ -1341,6 +1359,7 @@ mod dependent_scoping {
                         )
                     )
                 )
+                (move-rest-attrs $c $f)
             )"
         };
         assert_eq!(expected, output);
@@ -1397,6 +1416,7 @@ mod unify_seq_scope_escape_1 {
                         )
                     )
                 )
+                (move-rest-attrs $d $c)
             )"
         };
         assert_eq!(expected, output);
@@ -1427,6 +1447,7 @@ mod unify_seq_scope_escape_1 {
                 (prop $c S:1:0
                     (#u #u)
                 )
+                (move-rest-attrs $c $d)
             )"
         };
         assert_eq!(expected, output);
@@ -1525,6 +1546,7 @@ mod unify_seq_scope_escape_2 {
                         )
                     )
                 )
+                (move-rest-attrs $g $e)
             )"
         };
         assert_eq!(expected, output);
@@ -1564,6 +1586,7 @@ fn test_unify_regex_capture1() {
                     )
                 )
             )
+            (move-rest-attrs $c $b)
         )"
     };
     assert_eq!(expected, output);
@@ -1607,6 +1630,7 @@ fn test_unify_regex_capture2() {
                     )
                 )
             )
+            (move-rest-attrs $d $c)
         )"
     };
     assert_eq!(expected, output);
@@ -1657,6 +1681,7 @@ fn test_unify_regex_loop1() {
                     )
                 )
             )
+            (move-rest-attrs $d $c)
         )"
     };
     assert_eq!(expected, output);
@@ -1717,6 +1742,7 @@ fn test_unify_regex_loop2() {
                     )
                 )
             )
+            (move-rest-attrs $e $d)
         )"
     };
     assert_eq!(expected, output);
@@ -1796,6 +1822,7 @@ fn test_unify_regex_loop3() {
                     )
                 )
             )
+            (move-rest-attrs $e $d)
         )"
     };
     assert_eq!(expected, output);

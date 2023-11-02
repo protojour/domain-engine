@@ -86,6 +86,8 @@ pub enum OpCode {
     PutAttr1(Local, PropertyId),
     /// Pop 2 stack values, rel_params (top) then value, and move it into the specified local struct.
     PutAttr2(Local, PropertyId),
+    /// Move rest attrs from the second local into the first local.
+    MoveRestAttrs(Local, Local),
     /// Pop 2 stack values, rel_params (top) then value, and append resulting attribute to sequence
     AppendAttr2(Local),
     /// Pop 1 stack value, which must be Data::String, and append to local which must also be a string
@@ -101,7 +103,7 @@ pub enum OpCode {
     /// Take the sequence stored at Local, replace it with unit, and push all its values onto the stack.
     /// These sequences must have a size known in advance, typically temporary storage.
     MoveSeqValsToStack(Local),
-    SetSubSeq(Local, Local),
+    CopySubSeq(Local, Local),
     /// Overwrite runtime type info with a new type (the local on the top of stack)
     TypePunTop(DefId),
     /// Overwrite runtime type info with a new type

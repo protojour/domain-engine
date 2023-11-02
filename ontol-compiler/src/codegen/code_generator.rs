@@ -330,6 +330,21 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     }
                 }
             }
+            ontol_hir::Kind::MoveRestAttrs(target, source) => {
+                let Ok(target_local) = self.var_local(*target) else {
+                    return;
+                };
+                let Ok(source_local) = self.var_local(*source) else {
+                    return;
+                };
+
+                block.op(
+                    OpCode::MoveRestAttrs(target_local, source_local),
+                    Delta(0),
+                    span,
+                    self.builder,
+                );
+            }
             ontol_hir::Kind::MatchProp(struct_var, prop_id, arms) => {
                 let Ok(struct_local) = self.var_local(*struct_var) else {
                     return;
@@ -503,7 +518,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 );
                 block.pop_until(seq_local, span, self.builder);
             }
-            ontol_hir::Kind::SetSubSeq(target, source) => {
+            ontol_hir::Kind::CopySubSeq(target, source) => {
                 let Ok(target_local) = self.var_local(*target) else {
                     return;
                 };
@@ -512,7 +527,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 };
 
                 block.op(
-                    OpCode::SetSubSeq(target_local, source_local),
+                    OpCode::CopySubSeq(target_local, source_local),
                     Delta(0),
                     span,
                     self.builder,

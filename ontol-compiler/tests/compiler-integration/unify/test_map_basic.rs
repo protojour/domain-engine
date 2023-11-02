@@ -936,7 +936,7 @@ fn test_seq_scope_escape2() {
 }
 
 #[test]
-fn test_map_open_data() {
+fn test_map_open_data_on_root_struct() {
     "
     def(pub|open) foo {
         rel .'p0': [text]
@@ -955,13 +955,14 @@ fn test_map_open_data() {
     }
     "
     .compile_then(|test| {
-        test.mapper()
-            .with_serde_helper(|type_binding| serde_raw(type_binding).enable_open_data())
-            .assert_map_eq(
-                ("foo", "bar"),
-                json!({ "p0": ["X"], "open": { "key": "value" } }),
-                // FIXME: Should contain "open" key
-                json!({ "p1": ["X"] }),
-            );
+        let mapper = test
+            .mapper()
+            .with_serde_helper(|type_binding| serde_raw(type_binding).enable_open_data());
+
+        mapper.assert_map_eq(
+            ("foo", "bar"),
+            json!({ "p0": ["X"], "open": { "key": "value" } }),
+            json!({ "p1": ["X"], "open": { "key": "value" }}),
+        );
     });
 }

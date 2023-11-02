@@ -177,12 +177,15 @@ pub enum Kind<'a, L: Lang> {
     Struct(L::Data<'a, Binder>, StructFlags, Nodes),
     /// A property definition associated with a struct var in scope
     Prop(Optional, Var, PropertyId, SmallVec<[PropVariant<'a, L>; 1]>),
+    /// Move rest of attributes into the first var, from the second var
+    MoveRestAttrs(Var, Var),
     /// A property matcher/unpacker associated with a struct var
     MatchProp(Var, PropertyId, SmallVec<[(PropPattern<'a, L>, Nodes); 1]>),
     /// A sequence with associated binder. The value is the sequence.
     /// TODO: This can be done with Let!
     Sequence(L::Data<'a, Binder>, Nodes),
-    SetSubSeq(Var, Var),
+    /// Copy a SubSequence into the the first variable, copied from the second variable
+    CopySubSeq(Var, Var),
     /// Iterate attributes in sequence var,
     ForEach(Var, (Binding<'a, L>, Binding<'a, L>), Nodes),
     /// Push an attribute to the end of a sequence

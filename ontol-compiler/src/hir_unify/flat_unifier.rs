@@ -239,7 +239,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                     };
 
                     let inherit_sub_seq = self.mk_node(
-                        ontol_hir::Kind::SetSubSeq(target_seq_var, source_seq_var),
+                        ontol_hir::Kind::CopySubSeq(target_seq_var, source_seq_var),
                         unit_meta,
                     );
 

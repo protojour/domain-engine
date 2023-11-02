@@ -176,6 +176,13 @@ impl<'o> Processor for OntolProcessor<'o> {
     }
 
     #[inline(always)]
+    fn move_rest_attrs(&mut self, target: Local, source: Local) {
+        let source = std::mem::take(self.struct_local_mut(source));
+        let target = self.struct_local_mut(target);
+        target.extend(source);
+    }
+
+    #[inline(always)]
     fn push_i64(&mut self, k: i64, result_type: DefId) {
         self.stack.push(Value::new(Data::I64(k), result_type));
     }
@@ -390,7 +397,7 @@ impl<'o> OntolProcessor<'o> {
     fn struct_local_mut(&mut self, local: Local) -> &mut BTreeMap<PropertyId, Attribute> {
         match &mut self.local_mut(local).data {
             Data::Struct(attrs) => attrs,
-            _ => panic!("Value at {local:?} is not a map"),
+            _ => panic!("Value at {local:?} is not a struct"),
         }
     }
 

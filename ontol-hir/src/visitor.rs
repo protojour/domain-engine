@@ -122,6 +122,10 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
             Kind::Prop(optional, struct_var, prop_id, variants) => {
                 self.visit_prop(*optional, *struct_var, *prop_id, variants, arena);
             }
+            Kind::MoveRestAttrs(target, source) => {
+                self.visit_var(*target);
+                self.visit_var(*source);
+            }
             Kind::MatchProp(struct_var, prop_id, arms) => {
                 self.visit_var(*struct_var);
                 self.visit_property_id(*prop_id);
@@ -135,7 +139,7 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                     self.visit_node(index, child);
                 }
             }
-            Kind::SetSubSeq(target, source) => {
+            Kind::CopySubSeq(target, source) => {
                 self.visit_var(*target);
                 self.visit_var(*source);
             }

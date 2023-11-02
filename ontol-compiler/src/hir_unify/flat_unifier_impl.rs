@@ -1,4 +1,5 @@
 use fnv::FnvHashMap;
+use ontol_hir::StructFlags;
 use ontol_runtime::{
     smart_format,
     var::{Var, VarSet},
@@ -162,6 +163,13 @@ pub(super) fn unify_root<'m>(
                 )?;
 
                 body.push(prop_node);
+            }
+
+            if !flags.contains(StructFlags::MATCH) {
+                body.push(unifier.mk_node(
+                    ontol_hir::Kind::MoveRestAttrs(binder.0.var, scope_meta.scope_var.0),
+                    UNIT_META,
+                ));
             }
 
             let node = UnifiedNode {

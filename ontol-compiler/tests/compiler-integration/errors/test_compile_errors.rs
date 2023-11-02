@@ -538,7 +538,7 @@ fn error_ambiguous_number_resolution() {
 // BUG: FIXME: TODO: This should display a compile error!
 #[test]
 #[should_panic]
-fn test_map_open_data() {
+fn test_map_sequence_bug() {
     "
     def(pub) foo {
         rel .'p0': [text]

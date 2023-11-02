@@ -158,7 +158,8 @@ pub fn arena_import<'m>(
     use ontol_hir::Kind::*;
 
     match kind {
-        Var(_) | Unit | I64(_) | F64(_) | Text(_) | Const(_) | SetSubSeq(..) => {
+        Var(_) | Unit | I64(_) | F64(_) | Text(_) | Const(_) | CopySubSeq(..)
+        | MoveRestAttrs(..) => {
             // No subnodes
             target.add(TypedHirData(kind.clone(), *meta))
         }
