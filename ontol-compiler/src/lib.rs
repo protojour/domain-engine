@@ -9,7 +9,7 @@ pub use error::*;
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use interface::{
-    graphql::generate::generate_graphql_schema, serde::serde_generator::SerdeGenerator,
+    graphql::generate_schema::generate_graphql_schema, serde::serde_generator::SerdeGenerator,
 };
 use lowering::Lowering;
 use mem::Mem;

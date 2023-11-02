@@ -1,0 +1,491 @@
+use fnv::FnvHashMap;
+use ontol_runtime::{
+    interface::serde::{
+        operator::{SerdeOperator, SerdeOperatorAddr},
+        SerdeDef, SerdeKey,
+    },
+    interface::{
+        graphql::{
+            argument::{self, DefaultArg, MapInputArg},
+            data::{
+                EntityData, FieldData, FieldKind, NativeScalarKind, NativeScalarRef, ObjectData,
+                ObjectKind, Optionality, PropertyData, ScalarData, TypeAddr, TypeData, TypeKind,
+                TypeModifier, TypeRef, UnitTypeRef,
+            },
+            schema::{GraphqlSchema, QueryLevel, TypingPurpose},
+        },
+        serde::SerdeModifier,
+    },
+    ontology::{Ontology, PropertyFlow, PropertyFlowData},
+    value::PropertyId,
+    var::Var,
+    DefId, MapKey,
+};
+use smartstring::alias::String;
+use tracing::trace;
+
+use crate::{
+    def::{DefKind, Defs},
+    interface::serde::serde_generator::SerdeGenerator,
+    primitive::Primitives,
+    relation::Relations,
+    type_check::{repr::repr_model::ReprKind, seal::SealCtx},
+};
+
+use super::graphql_namespace::GraphqlNamespace;
+
+pub(super) struct SchemaBuilder<'a, 's, 'c, 'm> {
+    /// Avoid deep recursion by pushing tasks to be performed later to this task list
+    pub lazy_tasks: Vec<LazyTask>,
+    /// The schema being generated
+    pub schema: &'s mut GraphqlSchema,
+    /// Tool to ensure global type names are unique
+    pub namespace: &'s mut GraphqlNamespace<'a>,
+    /// The partial ontology containing TypeInfo (does not yet have SerdeOperators)
+    pub partial_ontology: &'a Ontology,
+    /// Serde generator for generating new serialization operators
+    pub serde_generator: &'a mut SerdeGenerator<'c, 'm>,
+    /// The compiler's relations
+    pub relations: &'c Relations,
+    /// The compiler's defs
+    pub defs: &'c Defs<'m>,
+    /// The compiler's primitives
+    pub primitives: &'c Primitives,
+    /// The compiler's sealed type information
+    pub seal_ctx: &'c SealCtx,
+}
+
+pub(super) enum LazyTask {
+    HarvestFields {
+        type_addr: TypeAddr,
+        def_id: DefId,
+        property_field_producer: PropertyFieldProducer,
+        is_entrypoint: bool,
+    },
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum PropertyFieldProducer {
+    Property,
+    EdgeProperty,
+}
+
+impl PropertyFieldProducer {
+    pub fn make_property(&self, data: PropertyData) -> FieldKind {
+        match self {
+            Self::Property => FieldKind::Property(data),
+            Self::EdgeProperty => FieldKind::EdgeProperty(data),
+        }
+    }
+}
+
+pub(super) enum NewType {
+    Addr(TypeAddr, TypeData),
+    NativeScalar(NativeScalarRef),
+}
+
+/// An extension of QueryLevel used only inside the generator
+#[derive(Clone, Copy)]
+pub(super) enum QLevel {
+    Node,
+    Edge {
+        rel_params: Option<(DefId, SerdeOperatorAddr)>,
+    },
+    Connection {
+        rel_params: Option<(DefId, SerdeOperatorAddr)>,
+    },
+}
+
+impl QLevel {
+    pub fn as_query_level(&self) -> QueryLevel {
+        match self {
+            Self::Node => QueryLevel::Node,
+            Self::Edge { rel_params } => QueryLevel::Edge {
+                rel_params: rel_params.map(|(_, op_id)| op_id),
+            },
+            Self::Connection { rel_params } => QueryLevel::Connection {
+                rel_params: rel_params.map(|(_, op_id)| op_id),
+            },
+        }
+    }
+}
+
+impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
+    pub fn exec_lazy_tasks(&mut self) {
+        while !self.lazy_tasks.is_empty() {
+            for lazy_task in std::mem::take(&mut self.lazy_tasks) {
+                self.exec_lazy_task(lazy_task);
+            }
+        }
+    }
+
+    fn exec_lazy_task(&mut self, task: LazyTask) {
+        match task {
+            LazyTask::HarvestFields {
+                type_addr,
+                def_id,
+                property_field_producer,
+                is_entrypoint,
+            } => {
+                let Some(properties) = self.relations.properties_by_def_id(def_id) else {
+                    return;
+                };
+                let mut fields = Default::default();
+
+                trace!("Harvest fields for {def_id:?} / {type_addr:?}");
+
+                if is_entrypoint {
+                    let repr_kind = self.seal_ctx.get_repr_kind(&def_id).expect("NO REPR KIND");
+                    if let ReprKind::StructIntersection(members) = repr_kind {
+                        for (member_def_id, _) in members {
+                            self.lazy_tasks.push(LazyTask::HarvestFields {
+                                type_addr,
+                                def_id: *member_def_id,
+                                property_field_producer,
+                                is_entrypoint: false,
+                            });
+                        }
+                    }
+                }
+
+                self.harvest_struct_fields(
+                    properties,
+                    property_field_producer,
+                    &mut GraphqlNamespace::default(),
+                    &mut fields,
+                );
+
+                match &mut self.schema.types[type_addr.0 as usize].kind {
+                    TypeKind::Object(object_data) => {
+                        object_data.fields.extend(fields);
+                    }
+                    _ => panic!(),
+                }
+            }
+        }
+    }
+
+    pub fn register_fundamental_types(&mut self) {
+        self.schema.query = self.next_type_addr();
+        self.schema.types.push(TypeData {
+            typename: "Query".into(),
+            input_typename: None,
+            partial_input_typename: None,
+            kind: TypeKind::Object(ObjectData {
+                fields: Default::default(),
+                kind: ObjectKind::Query,
+            }),
+        });
+
+        self.schema.mutation = self.next_type_addr();
+        self.schema.types.push(TypeData {
+            typename: "Mutation".into(),
+            input_typename: None,
+            partial_input_typename: None,
+            kind: TypeKind::Object(ObjectData {
+                fields: Default::default(),
+                kind: ObjectKind::Mutation,
+            }),
+        });
+
+        {
+            self.schema.page_info = self.next_type_addr();
+            self.schema.types.push(TypeData {
+                typename: "PageInfo".into(),
+                input_typename: None,
+                partial_input_typename: None,
+                kind: TypeKind::Object(ObjectData {
+                    fields: Default::default(),
+                    kind: ObjectKind::PageInfo,
+                }),
+            });
+            let data = object_data_mut(self.schema.page_info, self.schema);
+            data.fields.insert(
+                "endCursor".into(),
+                FieldData {
+                    kind: FieldKind::PageInfo,
+                    field_type: TypeRef {
+                        modifier: TypeModifier::Unit(Optionality::Optional),
+                        unit: UnitTypeRef::NativeScalar(NativeScalarRef {
+                            operator_addr: self
+                                .serde_generator
+                                .gen_addr(SerdeKey::Def(SerdeDef::new(
+                                    self.primitives.text,
+                                    SerdeModifier::NONE,
+                                )))
+                                .unwrap(),
+                            kind: NativeScalarKind::String,
+                        }),
+                    },
+                },
+            );
+            data.fields.insert(
+                "hasNextPage".into(),
+                FieldData {
+                    kind: FieldKind::PageInfo,
+                    field_type: TypeRef {
+                        modifier: TypeModifier::Unit(Optionality::Mandatory),
+                        unit: UnitTypeRef::NativeScalar(NativeScalarRef {
+                            operator_addr: self
+                                .serde_generator
+                                .gen_addr(SerdeKey::Def(SerdeDef::new(
+                                    self.primitives.bool,
+                                    SerdeModifier::NONE,
+                                )))
+                                .unwrap(),
+                            kind: NativeScalarKind::Boolean,
+                        }),
+                    },
+                },
+            );
+        }
+
+        self.schema.json_scalar = self.next_type_addr();
+        self.schema.types.push(TypeData {
+            typename: self.namespace.unique_literal("_ontol_json"),
+            input_typename: None,
+            partial_input_typename: None,
+            kind: TypeKind::CustomScalar(ScalarData {
+                operator_addr: SerdeOperatorAddr(0),
+            }),
+        });
+    }
+
+    pub fn get_def_type_ref(&mut self, def_id: DefId, level: QLevel) -> UnitTypeRef {
+        if let Some(type_addr) = self
+            .schema
+            .type_addr_by_def
+            .get(&(def_id, level.as_query_level()))
+        {
+            return UnitTypeRef::Addr(*type_addr);
+        }
+
+        match self.make_def_type(def_id, level) {
+            NewType::Addr(type_addr, type_data) => {
+                self.schema.types[type_addr.0 as usize] = type_data;
+                UnitTypeRef::Addr(type_addr)
+            }
+            NewType::NativeScalar(scalar_ref) => UnitTypeRef::NativeScalar(scalar_ref),
+        }
+    }
+
+    fn next_type_addr(&self) -> TypeAddr {
+        TypeAddr(self.schema.types.len() as u32)
+    }
+
+    pub fn alloc_def_type_addr(&mut self, def_id: DefId, level: QLevel) -> TypeAddr {
+        let index = self.next_type_addr();
+        // note: this will be overwritten later
+        self.schema.types.push(TypeData {
+            typename: String::new(),
+            input_typename: None,
+            partial_input_typename: None,
+            kind: TypeKind::CustomScalar(ScalarData {
+                operator_addr: SerdeOperatorAddr(0),
+            }),
+        });
+        self.schema
+            .type_addr_by_def
+            .insert((def_id, level.as_query_level()), index);
+        index
+    }
+
+    pub fn add_named_map_query(
+        &mut self,
+        name: &str,
+        [input_key, output_key]: &[MapKey; 2],
+        prop_flow: &[PropertyFlow],
+    ) {
+        let input_serde_key = {
+            let mut serde_modifier = SerdeModifier::graphql_default();
+
+            if input_key.seq {
+                serde_modifier.insert(SerdeModifier::ARRAY);
+            }
+
+            SerdeKey::Def(SerdeDef::new(input_key.def_id, serde_modifier))
+        };
+
+        let input_operator_addr = self.serde_generator.gen_addr(input_serde_key).unwrap();
+
+        let queries: FnvHashMap<PropertyId, Var> = prop_flow
+            .iter()
+            .filter_map(|prop_flow| {
+                if let PropertyFlowData::Match(var) = &prop_flow.data {
+                    Some((prop_flow.id, *var))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let input_arg = match self
+            .serde_generator
+            .seal_ctx
+            .get_repr_kind(&input_key.def_id)
+        {
+            Some(ReprKind::Scalar(..)) => {
+                let scalar_input_name: String =
+                    match self.serde_generator.defs.def_kind(input_key.def_id) {
+                        DefKind::Type(type_def) => match type_def.ident {
+                            Some(ident) => ident.into(),
+                            None => return,
+                        },
+                        _ => return,
+                    };
+
+                MapInputArg {
+                    operator_addr: input_operator_addr,
+                    scalar_input_name: Some(scalar_input_name),
+                    default_arg: None,
+                }
+            }
+            _ => {
+                let _unit_type_ref = self.get_def_type_ref(input_key.def_id, QLevel::Node);
+
+                let default_arg = match self.serde_generator.get_operator(input_operator_addr) {
+                    SerdeOperator::Struct(struct_op) => {
+                        let all_optional =
+                            struct_op.properties.values().all(|prop| prop.is_optional());
+
+                        if all_optional {
+                            Some(DefaultArg::EmptyObject)
+                        } else {
+                            None
+                        }
+                    }
+                    _ => None,
+                };
+
+                MapInputArg {
+                    operator_addr: input_operator_addr,
+                    scalar_input_name: None,
+                    default_arg,
+                }
+            }
+        };
+
+        let field_data = if output_key.seq {
+            FieldData {
+                kind: FieldKind::MapConnection {
+                    key: [*input_key, *output_key],
+                    queries,
+                    input_arg,
+                    first_arg: argument::FirstArg,
+                    after_arg: argument::AfterArg,
+                },
+                field_type: TypeRef {
+                    modifier: TypeModifier::Unit(Optionality::Mandatory),
+                    unit: self.get_def_type_ref(
+                        output_key.def_id,
+                        QLevel::Connection { rel_params: None },
+                    ),
+                },
+            }
+        } else {
+            FieldData {
+                kind: FieldKind::MapFind {
+                    key: [*input_key, *output_key],
+                    queries,
+                    input_arg,
+                },
+                field_type: TypeRef {
+                    modifier: TypeModifier::Unit(Optionality::Optional),
+                    unit: self.get_def_type_ref(output_key.def_id, QLevel::Node),
+                },
+            }
+        };
+
+        object_data_mut(self.schema.query, self.schema)
+            .fields
+            .insert(name.into(), field_data);
+    }
+
+    pub fn add_entity_queries_and_mutations(&mut self, entity_data: EntityData) {
+        let type_info = self.partial_ontology.get_type_info(entity_data.node_def_id);
+
+        let node_ref = UnitTypeRef::Addr(entity_data.type_addr);
+
+        let entity_operator_addr = self
+            .serde_generator
+            .gen_addr(gql_serde_key(entity_data.node_def_id))
+            .unwrap();
+
+        let id_type_info = self.partial_ontology.get_type_info(entity_data.id_def_id);
+        let id_operator_addr = id_type_info.operator_addr.expect("No id_operator_addr");
+
+        let id_unit_type_ref = self.get_def_type_ref(entity_data.id_def_id, QLevel::Node);
+
+        {
+            let mutation = object_data_mut(self.schema.mutation, self.schema);
+            mutation.fields.insert(
+                self.namespace.create(type_info),
+                FieldData {
+                    kind: FieldKind::CreateMutation {
+                        input: argument::InputArg {
+                            type_addr: entity_data.type_addr,
+                            def_id: entity_data.node_def_id,
+                            operator_addr: entity_operator_addr,
+                            typing_purpose: TypingPurpose::Input,
+                        },
+                    },
+                    field_type: TypeRef::mandatory(node_ref),
+                },
+            );
+
+            mutation.fields.insert(
+                self.namespace.update(type_info),
+                FieldData {
+                    kind: FieldKind::UpdateMutation {
+                        input: argument::InputArg {
+                            type_addr: entity_data.type_addr,
+                            def_id: entity_data.node_def_id,
+                            operator_addr: entity_operator_addr,
+                            typing_purpose: TypingPurpose::PartialInput,
+                        },
+                        id: argument::IdArg {
+                            operator_addr: id_operator_addr,
+                            unit_type_ref: id_unit_type_ref,
+                        },
+                    },
+                    field_type: TypeRef::mandatory(node_ref),
+                },
+            );
+
+            mutation.fields.insert(
+                self.namespace.delete(type_info),
+                FieldData {
+                    kind: FieldKind::DeleteMutation {
+                        id: argument::IdArg {
+                            operator_addr: id_operator_addr,
+                            unit_type_ref: id_unit_type_ref,
+                        },
+                    },
+                    field_type: TypeRef::mandatory(UnitTypeRef::NativeScalar(NativeScalarRef {
+                        operator_addr: SerdeOperatorAddr(42),
+                        kind: NativeScalarKind::Boolean,
+                    })),
+                },
+            );
+        }
+    }
+}
+
+pub fn object_data_mut(index: TypeAddr, schema: &mut GraphqlSchema) -> &mut ObjectData {
+    let type_data = schema.types.get_mut(index.0 as usize).unwrap();
+    match &mut type_data.kind {
+        TypeKind::Object(object_data) => object_data,
+        _ => panic!("{index:?} is not an object"),
+    }
+}
+
+pub(super) fn gql_serde_key(def_id: DefId) -> SerdeKey {
+    SerdeKey::Def(SerdeDef::new(def_id, SerdeModifier::graphql_default()))
+}
+
+pub(super) fn gql_array_serde_key(def_id: DefId) -> SerdeKey {
+    SerdeKey::Def(SerdeDef::new(
+        def_id,
+        SerdeModifier::graphql_default() | SerdeModifier::ARRAY,
+    ))
+}
