@@ -14,7 +14,7 @@ use ontol_runtime::{
         serde::processor::ProcessorProfileFlags,
     },
     ontology::Ontology,
-    DefId, PackageId,
+    DefId,
 };
 
 /// ServiceCtx represents the "backend" of the GraphQL schema.
@@ -60,16 +60,12 @@ impl juniper::Context for ServiceCtx {}
 ///
 /// SchemaCtx contains the full ontol-runtime blueprint of the schema.
 /// The juniper schema is built using this information.
-pub struct SchemaCtx {
+pub(crate) struct SchemaCtx {
     pub schema: Arc<GraphqlSchema>,
     pub ontology: Arc<Ontology>,
 }
 
 impl SchemaCtx {
-    pub fn package_id(&self) -> PackageId {
-        todo!()
-    }
-
     pub fn get_schema_type(
         self: &Arc<Self>,
         type_addr: TypeAddr,
@@ -135,21 +131,21 @@ impl SchemaCtx {
 /// and by looking up this in the SchemaCtx, finds metadata about the type that it represents.
 #[derive(Clone)]
 pub struct SchemaType {
-    pub schema_ctx: Arc<SchemaCtx>,
-    pub type_addr: TypeAddr,
-    pub typing_purpose: TypingPurpose,
+    pub(crate) schema_ctx: Arc<SchemaCtx>,
+    pub(crate) type_addr: TypeAddr,
+    pub(crate) typing_purpose: TypingPurpose,
 }
 
 impl SchemaType {
-    pub fn ontology(&self) -> &Ontology {
+    pub(crate) fn ontology(&self) -> &Ontology {
         &self.schema_ctx.ontology
     }
 
-    pub fn type_data(&self) -> &TypeData {
+    pub(crate) fn type_data(&self) -> &TypeData {
         self.schema_ctx.schema.type_data(self.type_addr)
     }
 
-    pub fn typename(&self) -> &str {
+    pub(crate) fn typename(&self) -> &str {
         let type_data = &self.type_data();
         match (&type_data.kind, self.typing_purpose) {
             (TypeKind::CustomScalar(_), _) => &type_data.typename,
@@ -166,7 +162,7 @@ impl SchemaType {
         }
     }
 
-    pub fn description(&self) -> Option<String> {
+    pub(crate) fn description(&self) -> Option<String> {
         self.type_data().description(self.ontology())
     }
 }

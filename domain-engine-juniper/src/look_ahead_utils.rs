@@ -18,7 +18,7 @@ use crate::{
     gql_scalar::GqlScalar,
 };
 
-pub struct ArgsWrapper<'a> {
+pub(crate) struct ArgsWrapper<'a> {
     arguments: &'a [LookAheadArgument<'a, GqlScalar>],
 }
 

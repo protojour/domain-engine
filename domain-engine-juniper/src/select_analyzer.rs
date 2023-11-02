@@ -23,18 +23,18 @@ use crate::{
     look_ahead_utils::ArgsWrapper, ServiceCtx,
 };
 
-pub struct KeyedPropertySelection {
+pub(crate) struct KeyedPropertySelection {
     pub key: PropertyId,
     pub select: Select,
 }
 
-pub struct SelectAnalyzer<'a> {
+pub(crate) struct SelectAnalyzer<'a> {
     schema_ctx: &'a SchemaCtx,
     service_ctx: &'a ServiceCtx,
 }
 
 #[derive(Debug)]
-pub struct AnalyzedQuery {
+pub(crate) struct AnalyzedQuery {
     pub map_key: [MapKey; 2],
     pub input: Value,
     pub selects: FnvHashMap<Var, EntitySelect>,

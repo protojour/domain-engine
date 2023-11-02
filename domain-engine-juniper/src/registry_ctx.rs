@@ -26,7 +26,7 @@ use crate::{
 };
 
 /// SchemaCtx and juniper Registry combined together to provide more ergonimic API
-pub struct RegistryCtx<'a, 'r> {
+pub(crate) struct RegistryCtx<'a, 'r> {
     pub schema_ctx: &'a Arc<SchemaCtx>,
     pub registry: &'a mut juniper::Registry<'r, GqlScalar>,
 }
