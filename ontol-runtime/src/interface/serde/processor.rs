@@ -175,7 +175,7 @@ pub(crate) static DOMAIN_PROFILE: ProcessorProfile = ProcessorProfile {
 };
 
 /// Maximum number of nested/recursive operators.
-const DEFAULT_RECURSION_LIMIT: u16 = 128;
+const DEFAULT_RECURSION_LIMIT: u16 = 64;
 
 impl ProcessorLevel {
     pub const fn new_root() -> Self {
