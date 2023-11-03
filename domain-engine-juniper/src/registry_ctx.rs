@@ -364,7 +364,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             | FieldKind::PageInfo
             | FieldKind::Node
             | FieldKind::TotalCount
-            | FieldKind::OpenAttributes => None,
+            | FieldKind::OpenData => None,
         }
     }
 

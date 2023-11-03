@@ -369,20 +369,16 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 
         self.serialize_rel_params::<S>(rel_params, &mut map)?;
 
-        if struct_op.flags.contains(SerdeStructFlags::OPEN_PROPS)
+        if struct_op.flags.contains(SerdeStructFlags::OPEN_DATA)
             && self
                 .profile
                 .flags
-                .contains(ProcessorProfileFlags::SERIALIZE_OPEN_PROPS)
+                .contains(ProcessorProfileFlags::SERIALIZE_OPEN_DATA)
         {
-            let open_attr = attributes.get(
-                &self
-                    .ontology
-                    .ontol_domain_meta()
-                    .open_relationship_property_id(),
-            );
-            if let Some(open_attr) = open_attr {
-                let Data::Dict(dict) = &open_attr.value.data else {
+            if let Some(open_data_attr) =
+                attributes.get(&self.ontology.ontol_domain_meta().open_data_property_id())
+            {
+                let Data::Dict(dict) = &open_data_attr.value.data else {
                     panic!("Open data must be a dict");
                 };
 

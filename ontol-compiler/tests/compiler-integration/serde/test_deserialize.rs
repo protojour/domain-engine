@@ -409,12 +409,7 @@ fn test_deserialize_open_data() {
         };
 
         let open_data = &map
-            .get(
-                &test
-                    .ontology
-                    .ontol_domain_meta()
-                    .open_relationship_property_id(),
-            )
+            .get(&test.ontology.ontol_domain_meta().open_data_property_id())
             .unwrap()
             .value;
         let Data::Dict(open_data) = &open_data.data else {

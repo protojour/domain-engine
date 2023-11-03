@@ -351,7 +351,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     self.alloc_addr(&def),
                     SerdeOperator::String(def.def_id),
                 )),
-                PrimitiveKind::OpenRelationship => None,
+                PrimitiveKind::OpenDataRelationship => None,
             },
             Type::IntConstant(_) | Type::FloatConstant(_) => todo!(),
             Type::TextConstant(def_id) => {
@@ -940,7 +940,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         let mut flags = SerdeStructFlags::empty();
         if let DefKind::Type(type_def) = self.defs.def_kind(def_id) {
             if type_def.open {
-                flags |= SerdeStructFlags::OPEN_PROPS;
+                flags |= SerdeStructFlags::OPEN_DATA;
             }
         }
 

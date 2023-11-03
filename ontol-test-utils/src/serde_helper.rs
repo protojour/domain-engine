@@ -28,8 +28,8 @@ impl<'b, 'on> SerdeHelper<'b, 'on> {
         Self {
             profile: ProcessorProfile {
                 flags: self.profile.flags
-                    | ProcessorProfileFlags::SERIALIZE_OPEN_PROPS
-                    | ProcessorProfileFlags::DESERIALIZE_OPEN_PROPS,
+                    | ProcessorProfileFlags::SERIALIZE_OPEN_DATA
+                    | ProcessorProfileFlags::DESERIALIZE_OPEN_DATA,
                 ..self.profile
             },
             ..self

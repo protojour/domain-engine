@@ -391,11 +391,11 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             );
         }
 
-        if struct_flags.contains(SerdeStructFlags::OPEN_PROPS) {
+        if struct_flags.contains(SerdeStructFlags::OPEN_DATA) {
             fields.insert(
-                "_open_attrs".into(),
+                "_open_data".into(),
                 FieldData {
-                    kind: FieldKind::OpenAttributes,
+                    kind: FieldKind::OpenData,
                     field_type: TypeRef {
                         modifier: TypeModifier::Unit(Optionality::Optional),
                         unit: UnitTypeRef::Addr(self.schema.json_scalar),
@@ -427,7 +427,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
         if let DefKind::Type(type_def) = self.defs.def_kind(def_id) {
             if type_def.open {
-                *struct_flags |= SerdeStructFlags::OPEN_PROPS;
+                *struct_flags |= SerdeStructFlags::OPEN_DATA;
             }
         }
 

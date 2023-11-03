@@ -248,7 +248,7 @@ impl<'a> SelectAnalyzer<'a> {
                     select: Select::Leaf,
                 }))
             }
-            (FieldKind::OpenAttributes, _) => Ok(None),
+            (FieldKind::OpenData, _) => Ok(None),
             (kind, res) => panic!("unhandled: {kind:?} res is ok: {}", res.is_ok()),
         }
     }

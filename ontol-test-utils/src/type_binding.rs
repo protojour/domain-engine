@@ -249,7 +249,7 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
             .binding
             .ontology
             .ontol_domain_meta()
-            .open_relationship_property_id();
+            .open_data_property_id();
         self.merge_attribute(property_id, value.into())
     }
 

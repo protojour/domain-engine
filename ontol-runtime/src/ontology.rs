@@ -196,14 +196,14 @@ pub struct OntolDomainMeta {
     pub i64: DefId,
     pub f64: DefId,
     pub text: DefId,
-    pub open_relationship: DefId,
+    pub open_data_relationship: DefId,
 }
 
 impl OntolDomainMeta {
-    pub fn open_relationship_property_id(&self) -> PropertyId {
+    pub fn open_data_property_id(&self) -> PropertyId {
         PropertyId {
             role: Role::Subject,
-            relationship_id: RelationshipId(self.open_relationship),
+            relationship_id: RelationshipId(self.open_data_relationship),
         }
     }
 }
@@ -215,7 +215,7 @@ impl Default for OntolDomainMeta {
             i64: DefId::unit(),
             f64: DefId::unit(),
             text: DefId::unit(),
-            open_relationship: DefId::unit(),
+            open_data_relationship: DefId::unit(),
         }
     }
 }

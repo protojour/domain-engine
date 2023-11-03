@@ -366,7 +366,7 @@ impl<'m> Compiler<'m> {
                 i64: self.primitives.i64,
                 f64: self.primitives.f64,
                 text: self.primitives.text,
-                open_relationship: self.primitives.open_relationship,
+                open_data_relationship: self.primitives.open_data_relationship,
             })
             .lib(self.codegen_tasks.result_lib)
             .docs(docs)

@@ -31,7 +31,7 @@ pub enum PrimitiveKind {
     /// Set of all possible texts
     Text,
     /// Open relationship to domainless data
-    OpenRelationship,
+    OpenDataRelationship,
 }
 
 impl PrimitiveKind {
@@ -86,7 +86,7 @@ pub struct Primitives {
     pub ontol_domain: DefId,
 
     /// An open, domainless relationship between some value and arbitrary, quasi-structured data
-    pub open_relationship: DefId,
+    pub open_data_relationship: DefId,
 
     /// Builtin relations
     pub relations: OntolRelations,
@@ -158,7 +158,7 @@ impl Primitives {
             f64: defs.add_primitive(PrimitiveKind::F64, Some("f64")),
             text: defs.add_primitive(PrimitiveKind::Text, Some("text")),
             ontol_domain: defs.alloc_def_id(ONTOL_PKG),
-            open_relationship: defs.add_primitive(PrimitiveKind::OpenRelationship, None),
+            open_data_relationship: defs.add_primitive(PrimitiveKind::OpenDataRelationship, None),
 
             relations: OntolRelations {
                 is: defs.add_builtin_relation(BuiltinRelationKind::Is, Some("is")),

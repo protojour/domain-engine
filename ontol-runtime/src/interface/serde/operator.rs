@@ -293,6 +293,6 @@ bitflags::bitflags! {
     #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug, Serialize, Deserialize)]
     pub struct SerdeStructFlags: u32 {
         /// This struct operator supports open/domainless properties
-        const OPEN_PROPS       = 0b00000001;
+        const OPEN_DATA       = 0b00000001;
     }
 }

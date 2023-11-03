@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use juniper::graphql_value;
+use juniper::{graphql_value, FieldError};
 use ontol_runtime::{
     interface::graphql::{
         data::{
@@ -11,7 +11,7 @@ use ontol_runtime::{
     },
     interface::serde::{
         operator::SerdeOperator,
-        processor::{ProcessorLevel, ProcessorMode},
+        processor::{ProcessorLevel, ProcessorMode, ProcessorProfileFlags},
         serialize_raw,
     },
     sequence::{Sequence, SubSequence},
@@ -263,22 +263,30 @@ impl<'v> AttributeType<'v> {
                 schema_ctx,
                 executor,
             ),
-            (Data::Struct(attrs), FieldKind::OpenAttributes) => {
+            (Data::Struct(attrs), FieldKind::OpenData) => {
+                if !executor
+                    .context()
+                    .serde_processor_profile_flags
+                    .contains(ProcessorProfileFlags::SERIALIZE_OPEN_DATA)
+                {
+                    return Err(FieldError::new(
+                        "Open data is not available in this GraphQL context",
+                        graphql_value!(null),
+                    ));
+                }
+
                 match attrs.get(
                     &schema_ctx
                         .ontology
                         .ontol_domain_meta()
-                        .open_relationship_property_id(),
+                        .open_data_property_id(),
                 ) {
-                    Some(open_attr) => {
-                        let ontology = schema_ctx.ontology.as_ref();
-                        Ok(serialize_raw(
-                            &open_attr.value,
-                            ontology,
-                            ProcessorLevel::new_root_with_recursion_limit(32),
-                            JuniperValueSerializer,
-                        )?)
-                    }
+                    Some(open_data_attr) => Ok(serialize_raw(
+                        &open_data_attr.value,
+                        &schema_ctx.ontology,
+                        ProcessorLevel::new_root_with_recursion_limit(32),
+                        JuniperValueSerializer,
+                    )?),
                     None => Ok(juniper::Value::Null),
                 }
             }

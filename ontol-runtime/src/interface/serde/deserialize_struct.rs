@@ -316,10 +316,7 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
 
     if !open_dict.is_empty() {
         attributes.insert(
-            processor
-                .ontology
-                .ontol_domain_meta
-                .open_relationship_property_id(),
+            processor.ontology.ontol_domain_meta.open_data_property_id(),
             Value {
                 data: Data::Dict(Box::new(open_dict)),
                 type_def_id: DefId::unit(),
@@ -381,11 +378,11 @@ impl<'a, 'de> Visitor<'de> for PropertySet<'a> {
                 }
 
                 let Some(serde_property) = self.properties.get(v) else {
-                    return if self.flags.contains(SerdeStructFlags::OPEN_PROPS)
+                    return if self.flags.contains(SerdeStructFlags::OPEN_DATA)
                         && self
                             .processor_profile
                             .flags
-                            .contains(ProcessorProfileFlags::DESERIALIZE_OPEN_PROPS)
+                            .contains(ProcessorProfileFlags::DESERIALIZE_OPEN_DATA)
                     {
                         Ok(PropertyKey::Open(v.into()))
                     } else {

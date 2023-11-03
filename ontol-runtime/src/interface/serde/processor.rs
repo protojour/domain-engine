@@ -166,9 +166,9 @@ bitflags::bitflags! {
     #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
     pub struct ProcessorProfileFlags: u32 {
         /// Allow serialize of open ("unknown") properties
-        const SERIALIZE_OPEN_PROPS   = 0b00000001;
+        const SERIALIZE_OPEN_DATA   = 0b00000001;
         /// Allow deserialize of open ("unknown") properties
-        const DESERIALIZE_OPEN_PROPS = 0b00000010;
+        const DESERIALIZE_OPEN_DATA = 0b00000010;
     }
 }
 

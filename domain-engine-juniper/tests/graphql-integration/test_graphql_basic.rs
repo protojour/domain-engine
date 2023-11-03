@@ -1052,7 +1052,7 @@ async fn test_graphql_open_data() {
             mutation {
                 createfoo(input: { open_prop: "hei" }) {
                     id
-                    _open_attrs
+                    _open_data
                 }
             }
         "#
@@ -1068,15 +1068,15 @@ async fn test_graphql_open_data() {
             )
             .await
             .with_serde_processor_profile_flags(
-                ProcessorProfileFlags::DESERIALIZE_OPEN_PROPS
-                    | ProcessorProfileFlags::SERIALIZE_OPEN_PROPS
+                ProcessorProfileFlags::DESERIALIZE_OPEN_DATA
+                    | ProcessorProfileFlags::SERIALIZE_OPEN_DATA
             )
         )
         .await,
         expected = Ok(graphql_value!({
             "createfoo": {
                 "id": "the-id",
-                "_open_attrs": {
+                "_open_data": {
                     "foo": "bar"
                 }
             }
