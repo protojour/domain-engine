@@ -18,9 +18,14 @@ serde.workspace = true
 serde_json.workspace = true
 fnv.workspace = true
 thiserror.workspace = true
-juniper = { git = "https://github.com/protojour/juniper", branch = "protojour-mods", default-features = false, features = ["schema-language"] }
 base64 = "0.21"
 hex = "0.4"
+
+[dependencies.juniper]
+git = "https://github.com/protojour/juniper"
+branch = "protojour-mods"
+default-features = false
+features = ["schema-language", "protojour-disable-argument-type-check"]
 
 [dev-dependencies]
 ontol-test-utils.path = "../ontol-test-utils"
