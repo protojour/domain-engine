@@ -121,3 +121,22 @@ impl Exec for &'static str {
         }
     }
 }
+
+pub trait GraphqlTestResultExt {
+    fn unwrap_first_exec_error_msg(self) -> String;
+}
+
+impl<T: Debug> GraphqlTestResultExt for Result<T, TestError> {
+    #[track_caller]
+    fn unwrap_first_exec_error_msg(self) -> String {
+        match self.unwrap_err() {
+            TestError::Execution(errors) => {
+                let error = errors.into_iter().next().expect("No errors");
+                error.error().message().to_string()
+            }
+            TestError::GraphQL(_) => {
+                panic!("Error was a GraphQL error");
+            }
+        }
+    }
+}

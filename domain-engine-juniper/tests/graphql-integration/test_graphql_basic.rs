@@ -1,10 +1,14 @@
 use domain_engine_core::data_store::DataStoreAPIMock;
-use domain_engine_juniper::{context::ServiceCtx, gql_scalar::GqlScalar, Schema};
-use juniper::{graphql_value, parser::SourcePosition, ExecutionError, FieldError};
+use domain_engine_juniper::{
+    context::ServiceCtx,
+    gql_scalar::GqlScalar,
+    juniper::{self, graphql_value},
+    Schema,
+};
 use ontol_runtime::{
     interface::serde::processor::ProcessorProfileFlags,
     sequence::{Cursor, Sequence, SubSequence},
-    value::{Attribute, Value},
+    value::Attribute,
 };
 use ontol_test_utils::{
     examples::{ARTIST_AND_INSTRUMENT, GEOJSON, GUITAR_SYNTH_UNION, MUNICIPALITIES, WGS},
@@ -18,8 +22,8 @@ use unimock::*;
 
 use domain_engine_test_utils::{
     graphql::{
-        gql_ctx_mock_data_store, mock_data_store_query_entities_empty, Exec, TestCompileSchema,
-        TestError,
+        gql_ctx_mock_data_store, mock_data_store_query_entities_empty, Exec, GraphqlTestResultExt,
+        TestCompileSchema, TestError,
     },
     parser_document_utils::{
         find_input_object_type, find_object_field, find_object_type, FieldInfo,
@@ -77,10 +81,6 @@ async fn test_graphql_int_scalars() {
     }
 
     let [foo] = test.bind(["foo"]);
-    let entity = foo.entity_builder(
-        json!("my_id"),
-        json!({ "small": 42, "big": 112233445566778899 as i64 }),
-    );
 
     expect_eq!(
         actual = "{
@@ -106,6 +106,15 @@ async fn test_graphql_int_scalars() {
         })),
     );
 
+    let store_entity_mock = DataStoreAPIMock::store_new_entity
+        .next_call(matching!(_, _, _))
+        .returns(Ok(foo
+            .entity_builder(
+                json!("my_id"),
+                json!({ "small": 42, "big": 112233445566778899 as i64 }),
+            )
+            .into()));
+
     expect_eq!(
         actual = "mutation {
             createfoo(
@@ -121,14 +130,7 @@ async fn test_graphql_int_scalars() {
         .exec(
             [],
             &schema,
-            &gql_ctx_mock_data_store(
-                &test,
-                ROOT,
-                DataStoreAPIMock::store_new_entity
-                    .next_call(matching!(_, _, _))
-                    .returns(Ok(entity.into())),
-            )
-            .await,
+            &gql_ctx_mock_data_store(&test, ROOT, store_entity_mock).await,
         )
         .await,
         expected = Ok(graphql_value!({
@@ -320,8 +322,13 @@ async fn test_graphql_nodes() {
     }
     "
     .compile_schemas([ROOT]);
+
     let [foo] = test.bind(["foo"]);
-    let attr: Attribute = foo.entity_builder(json!("id"), json!({})).into();
+    let query_mock = DataStoreAPIMock::query
+        .next_call(matching!(_))
+        .returns(Ok(Sequence::new([foo
+            .entity_builder(json!("id"), json!({}))
+            .into()])));
 
     expect_eq!(
         actual = "{
@@ -333,14 +340,7 @@ async fn test_graphql_nodes() {
         .exec(
             [],
             &schema,
-            &gql_ctx_mock_data_store(
-                &test,
-                ROOT,
-                DataStoreAPIMock::query
-                    .next_call(matching!(_))
-                    .returns(Ok(Sequence::new([attr.clone()])))
-            )
-            .await,
+            &gql_ctx_mock_data_store(&test, ROOT, query_mock).await,
         )
         .await,
         expected = Ok(graphql_value!({
@@ -399,7 +399,6 @@ async fn test_inner_struct() {
     .compile_schemas([ROOT]);
 
     let [foo] = test.bind(["foo"]);
-    let entity = foo.entity_builder(json!("my_id"), json!({ "inner": { "prop": "yo" } }));
 
     expect_eq!(
         actual = "{
@@ -424,6 +423,12 @@ async fn test_inner_struct() {
         })),
     );
 
+    let store_entity_mock = DataStoreAPIMock::store_new_entity
+        .next_call(matching!(_, _, _))
+        .returns(Ok(foo
+            .entity_builder(json!("my_id"), json!({ "inner": { "prop": "yo" } }))
+            .into()));
+
     expect_eq!(
         actual = r#"mutation {
             createfoo(
@@ -441,14 +446,7 @@ async fn test_inner_struct() {
         .exec(
             [],
             &schema,
-            &gql_ctx_mock_data_store(
-                &test,
-                ROOT,
-                DataStoreAPIMock::store_new_entity
-                    .next_call(matching!(_, _, _))
-                    .returns(Ok(entity.into()))
-            )
-            .await,
+            &gql_ctx_mock_data_store(&test, ROOT, store_entity_mock).await,
         )
         .await,
         expected = Ok(graphql_value!({
@@ -668,24 +666,27 @@ async fn test_graphql_artist_and_instrument_connections() {
 async fn test_graphql_guitar_synth_union_selection() {
     let (test, [schema]) = GUITAR_SYNTH_UNION.1.compile_schemas([ROOT]);
     let [artist] = test.bind(["artist"]);
-    let artist_entity: Attribute = artist
-        .entity_builder(
-            json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
-            json!({
-                "name": "foobar",
-                "plays": [
-                    {
-                        "type": "synth",
-                        "polyphony": 42,
-                    },
-                    {
-                        "type": "guitar",
-                        "string_count": 91,
-                    }
-                ]
-            }),
-        )
-        .into();
+
+    let query_mock = DataStoreAPIMock::query
+        .next_call(matching!(_, _))
+        .returns(Ok(Sequence::new([artist
+            .entity_builder(
+                json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
+                json!({
+                    "name": "foobar",
+                    "plays": [
+                        {
+                            "type": "synth",
+                            "polyphony": 42,
+                        },
+                        {
+                            "type": "guitar",
+                            "string_count": 91,
+                        }
+                    ]
+                }),
+            )
+            .into()])));
 
     expect_eq!(
         actual = "{
@@ -712,14 +713,7 @@ async fn test_graphql_guitar_synth_union_selection() {
         .exec(
             [],
             &schema,
-            &gql_ctx_mock_data_store(
-                &test,
-                ROOT,
-                DataStoreAPIMock::query
-                    .next_call(matching!(_, _))
-                    .returns(Ok(Sequence::new([artist_entity])))
-            )
-            .await
+            &gql_ctx_mock_data_store(&test, ROOT, query_mock).await
         )
         .await,
         expected = Ok(graphql_value!({
@@ -786,15 +780,17 @@ fn test_graphql_guitar_synth_union_input_union_field_list() {
 async fn test_graphql_guitar_synth_union_input_exec() {
     let (test, [schema]) = GUITAR_SYNTH_UNION.1.compile_schemas([ROOT]);
     let [artist] = test.bind(["artist"]);
-    let ziggy: Value = artist
-        .entity_builder(
-            json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
-            json!({
-                "name": "Ziggy",
-                "plays": []
-            }),
-        )
-        .into();
+    let store_entity_mock = DataStoreAPIMock::store_new_entity
+        .next_call(matching!(_, _, _))
+        .returns(Ok(artist
+            .entity_builder(
+                json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
+                json!({
+                    "name": "Ziggy",
+                    "plays": []
+                }),
+            )
+            .into()));
 
     expect_eq!(
         actual = r#"
@@ -823,14 +819,7 @@ async fn test_graphql_guitar_synth_union_input_exec() {
         .exec(
             [],
             &schema,
-            &gql_ctx_mock_data_store(
-                &test,
-                ROOT,
-                DataStoreAPIMock::store_new_entity
-                    .next_call(matching!(_, _, _))
-                    .returns(Ok(ziggy))
-            )
-            .await
+            &gql_ctx_mock_data_store(&test, ROOT, store_entity_mock).await
         )
         .await,
         expected = Ok(graphql_value!({
@@ -845,14 +834,6 @@ async fn test_graphql_guitar_synth_union_input_exec() {
 #[test(tokio::test)]
 async fn test_graphql_guitar_synth_union_input_error_span() {
     let (test, [schema]) = GUITAR_SYNTH_UNION.1.compile_schemas([ROOT]);
-    let expected_error: ExecutionError<GqlScalar> = ExecutionError::new(
-        SourcePosition::new(40, 2, 16),
-        &["createartist"],
-        FieldError::new(
-            "invalid map value, expected `instrument` (one of id, id, `guitar`, `synth`) in input at line 5 column 24",
-            juniper::Value::Null
-        )
-    );
 
     expect_eq!(
         actual = r#"
@@ -871,8 +852,9 @@ async fn test_graphql_guitar_synth_union_input_error_span() {
             }
         "#
         .exec([], &schema, &gql_ctx_mock_data_store(&test, ROOT, ()).await)
-        .await,
-        expected = Err(TestError::Execution(vec![expected_error])),
+        .await
+        .unwrap_first_exec_error_msg(),
+        expected = "invalid map value, expected `instrument` (one of id, id, `guitar`, `synth`) in input at line 5 column 24"
     );
 }
 
@@ -923,18 +905,6 @@ async fn test_graphql_municipalities_named_query() {
     let (test, [schema]) = TestPackages::with_sources([(ROOT, MUNICIPALITIES.1), GEOJSON, WGS])
         .compile_schemas([ROOT]);
     let [municipality] = test.bind(["municipality"]);
-    let osl: Attribute = municipality
-        .entity_builder(
-            json!("OSL"),
-            json!({
-                "code": "OSL",
-                "geometry": {
-                    "type": "Point",
-                    "coordinates": [10.738889, 59.913333],
-                }
-            }),
-        )
-        .into();
 
     async fn fetch_osl(
         schema: &Schema,
@@ -982,17 +952,25 @@ async fn test_graphql_municipalities_named_query() {
         }))
     );
 
+    let query_mock = DataStoreAPIMock::query
+        .next_call(matching!(_, _))
+        .returns(Ok(Sequence::new([municipality
+            .entity_builder(
+                json!("OSL"),
+                json!({
+                    "code": "OSL",
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [10.738889, 59.913333],
+                    }
+                }),
+            )
+            .into()])));
+
     expect_eq!(
         actual = fetch_osl(
             &schema,
-            &gql_ctx_mock_data_store(
-                &test,
-                ROOT,
-                DataStoreAPIMock::query
-                    .next_call(matching!(_))
-                    .returns(Ok(Sequence::new([osl.clone()])))
-            )
-            .await
+            &gql_ctx_mock_data_store(&test, ROOT, query_mock).await
         )
         .await,
         expected = Ok(graphql_value!({
@@ -1042,10 +1020,12 @@ async fn test_graphql_open_data() {
     "
     .compile_schemas([ROOT]);
     let [foo] = test.bind(["foo"]);
-    let entity: Value = foo
-        .entity_builder(json!("the-id"), json!({}))
-        .with_open_data(json!({ "foo": "bar" }))
-        .into();
+    let store_entity_mock = DataStoreAPIMock::store_new_entity
+        .next_call(matching!(_, _, _))
+        .returns(Ok(foo
+            .entity_builder(json!("the-id"), json!({}))
+            .with_open_data(json!({ "foo": "bar" }))
+            .into()));
 
     expect_eq!(
         actual = r#"
@@ -1059,18 +1039,12 @@ async fn test_graphql_open_data() {
         .exec(
             [],
             &schema,
-            &gql_ctx_mock_data_store(
-                &test,
-                ROOT,
-                DataStoreAPIMock::store_new_entity
-                    .next_call(matching!(_, _, _))
-                    .returns(Ok(entity))
-            )
-            .await
-            .with_serde_processor_profile_flags(
-                ProcessorProfileFlags::DESERIALIZE_OPEN_DATA
-                    | ProcessorProfileFlags::SERIALIZE_OPEN_DATA
-            )
+            &gql_ctx_mock_data_store(&test, ROOT, store_entity_mock)
+                .await
+                .with_serde_processor_profile_flags(
+                    ProcessorProfileFlags::DESERIALIZE_OPEN_DATA
+                        | ProcessorProfileFlags::SERIALIZE_OPEN_DATA
+                )
         )
         .await,
         expected = Ok(graphql_value!({
@@ -1081,5 +1055,53 @@ async fn test_graphql_open_data() {
                 }
             }
         })),
+    );
+}
+
+#[test(tokio::test)]
+async fn test_open_data_disabled() {
+    let (test, [schema]) = "
+    def(pub|open) foo {
+        rel .'id'(rel .gen: auto)|id: { rel .is: text }
+    }
+    "
+    .compile_schemas([ROOT]);
+    let [foo] = test.bind(["foo"]);
+
+    expect_eq!(
+        actual = r#"
+            mutation {
+                createfoo(input: { open_prop: "hei" }) {
+                    id
+                }
+            }
+        "#
+        .exec([], &schema, &gql_ctx_mock_data_store(&test, ROOT, ()).await)
+        .await
+        .unwrap_first_exec_error_msg(),
+        expected = "unknown property `open_prop` in input at line 2 column 33"
+    );
+
+    let store_entity_mock = DataStoreAPIMock::store_new_entity
+        .next_call(matching!(_, _, _))
+        .returns(Ok(foo.entity_builder(json!("the-id"), json!({})).into()));
+
+    expect_eq!(
+        actual = r#"
+            mutation {
+                createfoo(input: {}) {
+                    id
+                    _open_data
+                }
+            }
+        "#
+        .exec(
+            [],
+            &schema,
+            &gql_ctx_mock_data_store(&test, ROOT, store_entity_mock).await
+        )
+        .await
+        .unwrap_first_exec_error_msg(),
+        expected = "open data is not available in this GraphQL context"
     );
 }

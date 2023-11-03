@@ -270,7 +270,7 @@ impl<'v> AttributeType<'v> {
                     .contains(ProcessorProfileFlags::SERIALIZE_OPEN_DATA)
                 {
                     return Err(FieldError::new(
-                        "Open data is not available in this GraphQL context",
+                        "open data is not available in this GraphQL context",
                         graphql_value!(null),
                     ));
                 }
