@@ -22,7 +22,6 @@ use ontol_runtime::{
     DefId, MapKey,
 };
 use smartstring::alias::String;
-use tracing::trace;
 
 use crate::{
     def::{DefKind, Defs},
@@ -60,7 +59,6 @@ pub(super) enum LazyTask {
         type_addr: TypeAddr,
         def_id: DefId,
         property_field_producer: PropertyFieldProducer,
-        is_entrypoint: bool,
     },
 }
 
@@ -125,42 +123,8 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 type_addr,
                 def_id,
                 property_field_producer,
-                is_entrypoint,
             } => {
-                let Some(properties) = self.relations.properties_by_def_id(def_id) else {
-                    return;
-                };
-                let mut fields = Default::default();
-
-                trace!("Harvest fields for {def_id:?} / {type_addr:?}");
-
-                if is_entrypoint {
-                    let repr_kind = self.seal_ctx.get_repr_kind(&def_id).expect("NO REPR KIND");
-                    if let ReprKind::StructIntersection(members) = repr_kind {
-                        for (member_def_id, _) in members {
-                            self.lazy_tasks.push(LazyTask::HarvestFields {
-                                type_addr,
-                                def_id: *member_def_id,
-                                property_field_producer,
-                                is_entrypoint: false,
-                            });
-                        }
-                    }
-                }
-
-                self.harvest_struct_fields(
-                    properties,
-                    property_field_producer,
-                    &mut GraphqlNamespace::default(),
-                    &mut fields,
-                );
-
-                match &mut self.schema.types[type_addr.0 as usize].kind {
-                    TypeKind::Object(object_data) => {
-                        object_data.fields.extend(fields);
-                    }
-                    _ => panic!(),
-                }
+                self.harvest_fields(type_addr, def_id, property_field_producer);
             }
         }
     }

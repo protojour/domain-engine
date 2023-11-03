@@ -103,8 +103,8 @@ impl<'a> SelectAnalyzer<'a> {
         match input_queries.get(&parent_property) {
             Some(var) => {
                 let selection = self.analyze_selection(look_ahead, field_data)?;
-                match selection.select {
-                    Select::Entity(entity_select) => {
+                match selection.map(|sel| sel.select) {
+                    Some(Select::Entity(entity_select)) => {
                         output_selects.insert(*var, entity_select);
                         Ok(())
                     }
@@ -128,9 +128,12 @@ impl<'a> SelectAnalyzer<'a> {
         look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
         field_data: &FieldData,
     ) -> Result<StructOrUnionSelect, FieldError<GqlScalar>> {
-        match self.analyze_selection(look_ahead, field_data)?.select {
-            Select::Struct(struct_) => Ok(StructOrUnionSelect::Struct(struct_)),
-            Select::StructUnion(def_id, variants) => {
+        match self
+            .analyze_selection(look_ahead, field_data)?
+            .map(|sel| sel.select)
+        {
+            Some(Select::Struct(struct_)) => Ok(StructOrUnionSelect::Struct(struct_)),
+            Some(Select::StructUnion(def_id, variants)) => {
                 Ok(StructOrUnionSelect::Union(def_id, variants))
             }
             select => panic!("BUG: not a struct select: {select:?}"),
@@ -141,14 +144,14 @@ impl<'a> SelectAnalyzer<'a> {
         &self,
         look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
         field_data: &FieldData,
-    ) -> Result<KeyedPropertySelection, FieldError<GqlScalar>> {
+    ) -> Result<Option<KeyedPropertySelection>, FieldError<GqlScalar>> {
         match (
             &field_data.kind,
             self.schema_ctx.lookup_type_data(field_data.field_type.unit),
         ) {
             (FieldKind::MapFind { .. }, Ok(type_data)) => {
                 match (field_data.field_type.modifier, type_data) {
-                    (TypeModifier::Unit(_), type_data) => Ok(KeyedPropertySelection {
+                    (TypeModifier::Unit(_), type_data) => Ok(Some(KeyedPropertySelection {
                         key: unit_property(),
                         select: match self.analyze_data(look_ahead, &type_data.kind)? {
                             Select::Struct(struct_select) => Select::Entity(EntitySelect {
@@ -160,7 +163,7 @@ impl<'a> SelectAnalyzer<'a> {
                             }),
                             select => select,
                         },
-                    }),
+                    })),
                     (TypeModifier::Array(..), _) => {
                         panic!("Should be a MapConnection");
                     }
@@ -176,10 +179,10 @@ impl<'a> SelectAnalyzer<'a> {
                     kind: TypeKind::Object(object_data),
                     ..
                 }),
-            ) => Ok(KeyedPropertySelection {
+            ) => Ok(Some(KeyedPropertySelection {
                 key: unit_property(),
                 select: self.analyze_connection(look_ahead, first_arg, after_arg, object_data)?,
-            }),
+            })),
             (
                 FieldKind::ConnectionProperty {
                     property_id,
@@ -190,10 +193,10 @@ impl<'a> SelectAnalyzer<'a> {
                     kind: TypeKind::Object(object_data),
                     ..
                 }),
-            ) => Ok(KeyedPropertySelection {
+            ) => Ok(Some(KeyedPropertySelection {
                 key: *property_id,
                 select: self.analyze_connection(look_ahead, first, after, object_data)?,
-            }),
+            })),
             (
                 FieldKind::Edges,
                 Ok(TypeData {
@@ -208,14 +211,14 @@ impl<'a> SelectAnalyzer<'a> {
                     let field_data = object_data.fields.get(field_name).unwrap();
 
                     if let FieldKind::Node = &field_data.kind {
-                        selection = Some(self.analyze_selection(field_look_ahead, field_data)?);
+                        selection = self.analyze_selection(field_look_ahead, field_data)?;
                     }
                 }
 
-                Ok(selection.unwrap_or_else(|| KeyedPropertySelection {
+                Ok(Some(selection.unwrap_or_else(|| KeyedPropertySelection {
                     key: unit_property(),
                     select: Select::Leaf,
-                }))
+                })))
             }
             (
                 FieldKind::Node
@@ -223,22 +226,29 @@ impl<'a> SelectAnalyzer<'a> {
                 | FieldKind::CreateMutation { .. }
                 | FieldKind::UpdateMutation { .. },
                 Ok(type_data),
-            ) => Ok(KeyedPropertySelection {
+            ) => Ok(Some(KeyedPropertySelection {
                 key: unit_property(),
                 select: self.analyze_data(look_ahead, &type_data.kind)?,
-            }),
-            (FieldKind::Property(property_data), Ok(type_data)) => Ok(KeyedPropertySelection {
-                key: property_data.property_id,
-                select: self.analyze_data(look_ahead, &type_data.kind)?,
-            }),
-            (FieldKind::Property(property_data), Err(_scalar_ref)) => Ok(KeyedPropertySelection {
-                key: property_data.property_id,
-                select: Select::Leaf,
-            }),
-            (FieldKind::Id(id_property_data), Err(_scalar_ref)) => Ok(KeyedPropertySelection {
-                key: PropertyId::subject(id_property_data.relationship_id),
-                select: Select::Leaf,
-            }),
+            })),
+            (FieldKind::Property(property_data), Ok(type_data)) => {
+                Ok(Some(KeyedPropertySelection {
+                    key: property_data.property_id,
+                    select: self.analyze_data(look_ahead, &type_data.kind)?,
+                }))
+            }
+            (FieldKind::Property(property_data), Err(_scalar_ref)) => {
+                Ok(Some(KeyedPropertySelection {
+                    key: property_data.property_id,
+                    select: Select::Leaf,
+                }))
+            }
+            (FieldKind::Id(id_property_data), Err(_scalar_ref)) => {
+                Ok(Some(KeyedPropertySelection {
+                    key: PropertyId::subject(id_property_data.relationship_id),
+                    select: Select::Leaf,
+                }))
+            }
+            (FieldKind::OpenAttributes, _) => Ok(None),
             (kind, res) => panic!("unhandled: {kind:?} res is ok: {}", res.is_ok()),
         }
     }
@@ -266,10 +276,9 @@ impl<'a> SelectAnalyzer<'a> {
 
             match &field_data.kind {
                 FieldKind::Nodes | FieldKind::Edges => {
-                    merge_selects(
-                        &mut inner_select,
-                        self.analyze_selection(field_look_ahead, field_data)?.select,
-                    );
+                    if let Some(selection) = self.analyze_selection(field_look_ahead, field_data)? {
+                        merge_selects(&mut inner_select, selection.select);
+                    }
                 }
                 FieldKind::TotalCount => {
                     include_total_len = true;
@@ -334,12 +343,11 @@ impl<'a> SelectAnalyzer<'a> {
                         let field_data =
                             fields.get(field_look_ahead.field_name_unaliased()).unwrap();
 
-                        let KeyedPropertySelection {
-                            key: property_id,
-                            select: selection,
-                        } = self.analyze_selection(field_look_ahead, field_data)?;
-
-                        variant_map.insert(property_id, selection);
+                        if let Some(selection) =
+                            self.analyze_selection(field_look_ahead, field_data)?
+                        {
+                            variant_map.insert(selection.key, selection.select);
+                        }
                     }
                 }
 
@@ -371,12 +379,9 @@ impl<'a> SelectAnalyzer<'a> {
                     let field_name = field_look_ahead.field_name_unaliased();
                     let field_data = object_data.fields.get(field_name).unwrap();
 
-                    let KeyedPropertySelection {
-                        key: property_id,
-                        select: selection,
-                    } = self.analyze_selection(field_look_ahead, field_data)?;
-
-                    properties.insert(property_id, selection);
+                    if let Some(selection) = self.analyze_selection(field_look_ahead, field_data)? {
+                        properties.insert(selection.key, selection.select);
+                    }
                 }
 
                 Ok(Select::Struct(StructSelect {

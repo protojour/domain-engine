@@ -8,13 +8,17 @@ use self::operator::{SerdeOperatorAddr, StructOperator};
 
 mod deserialize;
 mod deserialize_matcher;
-mod deserialize_open;
 mod deserialize_option;
+mod deserialize_raw;
 mod deserialize_struct;
 mod serialize;
+mod serialize_raw;
 
 pub mod operator;
 pub mod processor;
+
+pub use deserialize_raw::deserialize_raw;
+pub use serialize_raw::serialize_raw;
 
 const EDGE_PROPERTY: &str = "_edge";
 

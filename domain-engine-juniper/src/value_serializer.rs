@@ -37,7 +37,7 @@ impl ser::Serializer for JuniperValueSerializer {
     type SerializeTuple = Impossible;
     type SerializeTupleStruct = Impossible;
     type SerializeTupleVariant = Impossible;
-    type SerializeMap = Impossible;
+    type SerializeMap = JuniperObjectSerializer;
     type SerializeStruct = Impossible;
     type SerializeStructVariant = Impossible;
 
@@ -162,13 +162,9 @@ impl ser::Serializer for JuniperValueSerializer {
         Ok(juniper::Value::Null)
     }
 
-    fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
+    fn serialize_seq(self, cap: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
         Ok(JuniperListSerializer {
-            elements: if let Some(len) = len {
-                Vec::with_capacity(len)
-            } else {
-                vec![]
-            },
+            elements: Vec::with_capacity(cap.unwrap_or(0)),
         })
     }
 
@@ -194,8 +190,11 @@ impl ser::Serializer for JuniperValueSerializer {
         panic!("not a scalar")
     }
 
-    fn serialize_map(self, _: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
-        panic!("not a scalar")
+    fn serialize_map(self, cap: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
+        Ok(JuniperObjectSerializer {
+            pending_key: None,
+            object: juniper::Object::with_capacity(cap.unwrap_or(0)),
+        })
     }
 
     fn serialize_struct(
@@ -236,5 +235,40 @@ impl ser::SerializeSeq for JuniperListSerializer {
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
         Ok(juniper::Value::List(self.elements))
+    }
+}
+
+pub struct JuniperObjectSerializer {
+    pending_key: Option<juniper::Value<GqlScalar>>,
+    object: juniper::Object<GqlScalar>,
+}
+
+impl ser::SerializeMap for JuniperObjectSerializer {
+    type Ok = juniper::Value<GqlScalar>;
+    type Error = SerializeError;
+
+    fn serialize_key<T: ?Sized + serde::Serialize>(&mut self, key: &T) -> Result<(), Self::Error> {
+        assert!(self.pending_key.is_none());
+        self.pending_key = Some(key.serialize(JuniperValueSerializer)?);
+        Ok(())
+    }
+
+    fn serialize_value<T: ?Sized + serde::Serialize>(
+        &mut self,
+        value: &T,
+    ) -> Result<(), Self::Error> {
+        let juniper::Value::Scalar(GqlScalar::String(key)) = self.pending_key.take().unwrap()
+        else {
+            return Err(SerializeError(smart_format!("Key must be a string")));
+        };
+
+        let value = value.serialize(JuniperValueSerializer)?;
+
+        self.object.add_field(key, value);
+        Ok(())
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        Ok(self.object.into())
     }
 }

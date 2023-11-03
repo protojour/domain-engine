@@ -6,11 +6,14 @@ use ontol_runtime::{
             argument,
             data::{
                 ConnectionData, EdgeData, FieldData, FieldKind, NativeScalarKind, NativeScalarRef,
-                NodeData, ObjectData, ObjectKind, Optionality, PropertyData, ScalarData, TypeData,
-                TypeKind, TypeModifier, TypeRef, UnionData, UnitTypeRef,
+                NodeData, ObjectData, ObjectKind, Optionality, PropertyData, ScalarData, TypeAddr,
+                TypeData, TypeKind, TypeModifier, TypeRef, UnionData, UnitTypeRef,
             },
         },
-        serde::{operator::SerdeOperator, SerdeModifier},
+        serde::{
+            operator::{SerdeOperator, SerdeStructFlags},
+            SerdeModifier,
+        },
     },
     ontology::{PropertyCardinality, ValueCardinality},
     smart_format, DefId, Role,
@@ -64,7 +67,6 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         type_addr: edge_addr,
                         def_id: rel_def_id,
                         property_field_producer: PropertyFieldProducer::EdgeProperty,
-                        is_entrypoint: true,
                     });
 
                     NewType::Addr(
@@ -200,7 +202,6 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     type_addr,
                     def_id: type_info.def_id,
                     property_field_producer: PropertyFieldProducer::Property,
-                    is_entrypoint: true,
                 });
 
                 let type_kind = TypeKind::Object(ObjectData {
@@ -347,16 +348,88 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         }
     }
 
-    pub fn harvest_struct_fields(
+    pub fn harvest_fields(
         &mut self,
+        type_addr: TypeAddr,
+        def_id: DefId,
+        property_field_producer: PropertyFieldProducer,
+    ) {
+        trace!("Harvest fields for {def_id:?} / {type_addr:?}");
+
+        let mut struct_flags = SerdeStructFlags::empty();
+        let mut field_namespace = GraphqlNamespace::default();
+        let mut fields = Default::default();
+
+        let repr_kind = self.seal_ctx.get_repr_kind(&def_id).expect("NO REPR KIND");
+        if let ReprKind::StructIntersection(members) = repr_kind {
+            for (member_def_id, _) in members {
+                let Some(properties) = self.relations.properties_by_def_id(*member_def_id) else {
+                    continue;
+                };
+
+                self.harvest_struct_fields(
+                    def_id,
+                    properties,
+                    property_field_producer,
+                    &mut struct_flags,
+                    &mut field_namespace,
+                    &mut fields,
+                );
+            }
+        } else {
+            let Some(properties) = self.relations.properties_by_def_id(def_id) else {
+                return;
+            };
+
+            self.harvest_struct_fields(
+                def_id,
+                properties,
+                property_field_producer,
+                &mut struct_flags,
+                &mut field_namespace,
+                &mut fields,
+            );
+        }
+
+        if struct_flags.contains(SerdeStructFlags::OPEN_PROPS) {
+            fields.insert(
+                "_open_attrs".into(),
+                FieldData {
+                    kind: FieldKind::OpenAttributes,
+                    field_type: TypeRef {
+                        modifier: TypeModifier::Unit(Optionality::Optional),
+                        unit: UnitTypeRef::Addr(self.schema.json_scalar),
+                    },
+                },
+            );
+        }
+
+        match &mut self.schema.types[type_addr.0 as usize].kind {
+            TypeKind::Object(object_data) => {
+                object_data.fields.extend(fields);
+            }
+            _ => panic!(),
+        }
+    }
+
+    fn harvest_struct_fields(
+        &mut self,
+        def_id: DefId,
         properties: &Properties,
         property_field_producer: PropertyFieldProducer,
+        struct_flags: &mut SerdeStructFlags,
         field_namespace: &mut GraphqlNamespace,
         output: &mut IndexMap<String, FieldData>,
     ) {
         let Some(table) = &properties.table else {
             return;
         };
+
+        if let DefKind::Type(type_def) = self.defs.def_kind(def_id) {
+            if type_def.open {
+                *struct_flags |= SerdeStructFlags::OPEN_PROPS;
+            }
+        }
 
         for (property_id, property) in table {
             let property_id = *property_id;

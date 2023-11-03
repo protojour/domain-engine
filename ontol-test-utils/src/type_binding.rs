@@ -4,7 +4,10 @@ use ontol_faker::new_constant_fake;
 use ontol_runtime::{
     interface::json_schema::build_standalone_schema,
     interface::serde::operator::SerdeOperatorAddr,
-    interface::serde::processor::ProcessorMode,
+    interface::serde::{
+        deserialize_raw,
+        processor::{ProcessorLevel, ProcessorMode},
+    },
     ontology::{Ontology, TypeInfo},
     select::{Select, StructSelect},
     sequence::Sequence,
@@ -87,7 +90,7 @@ impl<'on> TypeBinding<'on> {
             binding: self,
             value: Value::unit(),
         }
-        .data(data)
+        .with_json_data(data)
     }
 
     pub fn new_fake(&self, processor_mode: ProcessorMode) -> Value {
@@ -103,8 +106,8 @@ impl<'on> TypeBinding<'on> {
             binding: self,
             value: Value::unit(),
         }
-        .id(id)
-        .data(data)
+        .with_json_id(id)
+        .with_json_data(data)
     }
 
     pub fn def_id(&self) -> DefId {
@@ -195,7 +198,7 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
         self.value.to_attr(rel_params.into())
     }
 
-    fn data(mut self, json: serde_json::Value) -> Self {
+    fn with_json_data(mut self, json: serde_json::Value) -> Self {
         let value = serde_create(self.binding).to_value(json).unwrap();
         self.value.type_def_id = value.type_def_id;
         match (&mut self.value.data, value) {
@@ -216,7 +219,7 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
         self
     }
 
-    fn id(self, json: serde_json::Value) -> Self {
+    fn with_json_id(self, json: serde_json::Value) -> Self {
         let entity_info = self
             .binding
             .type_info
@@ -233,6 +236,21 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
             .unwrap();
 
         self.merge_attribute(PropertyId::subject(entity_info.id_relationship_id), id)
+    }
+
+    pub fn with_open_data(self, json: serde_json::Value) -> Self {
+        let value = deserialize_raw(
+            self.binding.ontology,
+            ProcessorLevel::new_root(),
+            &mut serde_json::Deserializer::from_str(&serde_json::to_string(&json).unwrap()),
+        )
+        .unwrap();
+        let property_id = self
+            .binding
+            .ontology
+            .ontol_domain_meta()
+            .open_relationship_property_id();
+        self.merge_attribute(property_id, value.into())
     }
 
     fn merge_attribute(mut self, property_id: PropertyId, attribute: Attribute) -> Self {

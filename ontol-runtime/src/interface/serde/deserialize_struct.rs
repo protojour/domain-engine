@@ -10,7 +10,7 @@ use tracing::debug;
 
 use crate::{
     format_utils::{DoubleQuote, LogicOp, Missing},
-    interface::serde::{deserialize_open::OpenVisitor, EDGE_PROPERTY},
+    interface::serde::{deserialize_raw::RawVisitor, EDGE_PROPERTY},
     value::{Attribute, Data, PropertyId, Value},
     value_generator::ValueGenerator,
     vm::proc::{NParams, Procedure},
@@ -169,7 +169,7 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
                 open_dict.insert(
                     key,
                     serde_value::ValueDeserializer::new(serde_value).deserialize_any(
-                        OpenVisitor::new(processor.ontology, processor.level)
+                        RawVisitor::new(processor.ontology, processor.level)
                             .map_err(RecursionLimitError::to_de_error)?,
                     )?,
                 );
@@ -229,7 +229,7 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
                 open_dict.insert(
                     key,
                     map.next_value_seed(
-                        OpenVisitor::new(processor.ontology, processor.level)
+                        RawVisitor::new(processor.ontology, processor.level)
                             .map_err(RecursionLimitError::to_de_error)?,
                     )?,
                 );

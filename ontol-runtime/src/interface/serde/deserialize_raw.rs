@@ -14,13 +14,21 @@ use crate::{
 
 use super::processor::{ProcessorLevel, RecursionLimitError};
 
+pub fn deserialize_raw<'de, D: Deserializer<'de>>(
+    ontology: &Ontology,
+    level: ProcessorLevel,
+    deserializer: D,
+) -> Result<Value, D::Error> {
+    RawVisitor { ontology, level }.deserialize(deserializer)
+}
+
 #[derive(Clone, Copy)]
-pub struct OpenVisitor<'o> {
+pub(crate) struct RawVisitor<'o> {
     ontology: &'o Ontology,
     level: ProcessorLevel,
 }
 
-impl<'o> OpenVisitor<'o> {
+impl<'o> RawVisitor<'o> {
     pub fn new(ontology: &'o Ontology, level: ProcessorLevel) -> Result<Self, RecursionLimitError> {
         Ok(Self {
             ontology,
@@ -33,7 +41,7 @@ impl<'o> OpenVisitor<'o> {
     }
 }
 
-impl<'o, 'de> DeserializeSeed<'de> for OpenVisitor<'o> {
+impl<'o, 'de> DeserializeSeed<'de> for RawVisitor<'o> {
     type Value = Value;
 
     fn deserialize<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
@@ -41,7 +49,7 @@ impl<'o, 'de> DeserializeSeed<'de> for OpenVisitor<'o> {
     }
 }
 
-impl<'o, 'de> Visitor<'de> for OpenVisitor<'o> {
+impl<'o, 'de> Visitor<'de> for RawVisitor<'o> {
     type Value = Value;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

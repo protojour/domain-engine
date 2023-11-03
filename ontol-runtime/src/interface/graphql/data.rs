@@ -236,6 +236,7 @@ pub enum FieldKind {
     Nodes,
     PageInfo,
     TotalCount,
+    OpenAttributes,
     /// A connection from a map statement
     MapConnection {
         key: [MapKey; 2],

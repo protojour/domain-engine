@@ -9,7 +9,11 @@ use ontol_runtime::{
         },
         schema::TypingPurpose,
     },
-    interface::serde::{operator::SerdeOperator, processor::ProcessorMode},
+    interface::serde::{
+        operator::SerdeOperator,
+        processor::{ProcessorLevel, ProcessorMode},
+        serialize_raw,
+    },
     sequence::{Sequence, SubSequence},
     value::{Attribute, Data, PropertyId, Value},
     DefId,
@@ -259,6 +263,25 @@ impl<'v> AttributeType<'v> {
                 schema_ctx,
                 executor,
             ),
+            (Data::Struct(attrs), FieldKind::OpenAttributes) => {
+                match attrs.get(
+                    &schema_ctx
+                        .ontology
+                        .ontol_domain_meta()
+                        .open_relationship_property_id(),
+                ) {
+                    Some(open_attr) => {
+                        let ontology = schema_ctx.ontology.as_ref();
+                        Ok(serialize_raw(
+                            &open_attr.value,
+                            ontology,
+                            ProcessorLevel::new_root_with_recursion_limit(32),
+                            JuniperValueSerializer,
+                        )?)
+                    }
+                    None => Ok(juniper::Value::Null),
+                }
+            }
             (Data::Sequence(seq), FieldKind::Nodes | FieldKind::Edges) => {
                 resolve_schema_type_field(
                     SequenceType { seq },

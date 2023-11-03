@@ -1039,20 +1039,20 @@ async fn test_graphql_open_data() {
     def(pub|open) foo {
         rel .'id'(rel .gen: auto)|id: { rel .is: text }
     }
-    map foos {
-        {}
-        foo: [..foo match {}]
-    }
     "
     .compile_schemas([ROOT]);
     let [foo] = test.bind(["foo"]);
-    let entity: Value = foo.entity_builder(json!("the-id"), json!({})).into();
+    let entity: Value = foo
+        .entity_builder(json!("the-id"), json!({}))
+        .with_open_data(json!({ "foo": "bar" }))
+        .into();
 
     expect_eq!(
         actual = r#"
             mutation {
                 createfoo(input: { open_prop: "hei" }) {
                     id
+                    _open_attrs
                 }
             }
         "#
@@ -1067,36 +1067,19 @@ async fn test_graphql_open_data() {
                     .returns(Ok(entity))
             )
             .await
-            .with_serde_processor_profile_flags(ProcessorProfileFlags::DESERIALIZE_OPEN_PROPS)
+            .with_serde_processor_profile_flags(
+                ProcessorProfileFlags::DESERIALIZE_OPEN_PROPS
+                    | ProcessorProfileFlags::SERIALIZE_OPEN_PROPS
+            )
         )
         .await,
         expected = Ok(graphql_value!({
             "createfoo": {
-                "id": "the-id"
+                "id": "the-id",
+                "_open_attrs": {
+                    "foo": "bar"
+                }
             }
         })),
     );
-
-    // expect_eq!(
-    //     actual = "{
-    //         foos {
-    //             edges {
-    //                 node {
-    //                     id
-    //                 }
-    //             }
-    //         }
-    //     }"
-    //     .exec(
-    //         [],
-    //         &schema,
-    //         &gql_ctx_mock_data_store(&test, ROOT, mock_data_store_query_entities_empty()).await,
-    //     )
-    //     .await,
-    //     expected = Ok(graphql_value!({
-    //         "foos": {
-    //             "edges": [],
-    //         },
-    //     })),
-    // );
 }
