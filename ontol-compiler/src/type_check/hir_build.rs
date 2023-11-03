@@ -527,7 +527,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         ctx.pattern_variables.insert(
                             edge_var,
                             PatternVariable {
-                                ctrl_group: None,
+                                seq_element_group: None,
                                 hir_arms: Default::default(),
                             },
                         );

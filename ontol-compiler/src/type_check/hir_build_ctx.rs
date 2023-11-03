@@ -89,7 +89,7 @@ impl<'m> HirBuildCtx<'m> {
 }
 
 pub struct PatternVariable {
-    pub ctrl_group: Option<CtrlFlowGroup>,
+    pub seq_element_group: Option<SeqElementGroup>,
     pub hir_arms: FnvHashMap<Arm, ExplicitVariableArm>,
 }
 
@@ -107,8 +107,9 @@ pub struct ExplicitVariableArm {
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
-pub struct CtrlFlowGroup {
+pub struct SeqElementGroup {
     pub label: ontol_hir::Label,
+    pub iterated: bool,
     pub bind_depth: CtrlFlowDepth,
 }
 

@@ -535,10 +535,12 @@ fn error_ambiguous_number_resolution() {
     .compile_fail();
 }
 
-// BUG: FIXME: TODO: This should display a compile error!
+// FIXME: The code path to producing these error messages are very suboptimal.
+// It's a fallback into the classic unifier which fails to understand the structure.
+// The point of the compiler complaining about this, is that the user is likely
+// forgetting to add spread/iteration to the variables.
 #[test]
-#[should_panic]
-fn test_map_sequence_bug() {
+fn error_non_iterated_variable() {
     "
     def(pub) foo {
         rel .'p0': [text]
@@ -549,12 +551,12 @@ fn test_map_sequence_bug() {
 
     map {
         foo {
-            'p0': [x]
+            'p0': [x] // ERROR unbound variable
         }
         bar {
-            'p1': [x]
+            'p1': [x] // ERROR unbound variable
         }
     }
     "
-    .compile();
+    .compile_fail();
 }

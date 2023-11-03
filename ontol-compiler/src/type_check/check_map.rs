@@ -23,7 +23,7 @@ use crate::{
 
 use super::{
     ena_inference::{KnownType, Strength},
-    hir_build_ctx::{CtrlFlowDepth, CtrlFlowGroup, HirBuildCtx, PatternVariable, ARMS},
+    hir_build_ctx::{CtrlFlowDepth, HirBuildCtx, PatternVariable, SeqElementGroup, ARMS},
     hir_type_inference::{HirArmTypeInference, HirVariableMapper},
     repr::repr_model::ReprKind,
     TypeCheck, TypeEquation, TypeError,
@@ -38,17 +38,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     ) -> Result<TypeRef<'m>, CheckMapError> {
         let mut ctx = HirBuildCtx::new(def.span, VarAllocator::from(*var_allocator.peek_next()));
 
-        let mut map_check = MapCheck {
+        let mut analyzer = PreAnalyzer {
             errors: self.errors,
         };
         for (pat_id, arm) in pat_ids.iter().zip(ARMS) {
             let _entered = arm.tracing_debug_span().entered();
 
             ctx.current_arm = arm;
-            map_check.analyze_arm(self.patterns.table.get(pat_id).unwrap(), None, &mut ctx)?;
+            analyzer.analyze_arm(self.patterns.table.get(pat_id).unwrap(), None, &mut ctx)?;
         }
 
-        self.build_arms(
+        self.build_typed_ontol_hir_arms(
             def,
             [(pat_ids[0], Arm::First), (pat_ids[1], Arm::Second)],
             &mut ctx,
@@ -59,7 +59,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         Ok(self.types.intern(Type::Tautology))
     }
 
-    fn build_arms(
+    fn build_typed_ontol_hir_arms(
         &mut self,
         def: &Def,
         input: [(PatId, Arm); 2],
@@ -239,7 +239,7 @@ enum MapOutputClass {
     FilterMatch,
 }
 
-pub struct MapCheck<'c> {
+struct PreAnalyzer<'c> {
     errors: &'c mut CompileErrors,
 }
 
@@ -248,11 +248,11 @@ struct ArmAnalysis {
     class: MapOutputClass,
 }
 
-impl<'c> MapCheck<'c> {
+impl<'c> PreAnalyzer<'c> {
     fn analyze_arm(
         &mut self,
         pat: &Pattern,
-        parent_aggr_group: Option<CtrlFlowGroup>,
+        parent_aggr_group: Option<SeqElementGroup>,
         ctx: &mut HirBuildCtx<'_>,
     ) -> Result<ArmAnalysis, CheckMapError> {
         let pat_id = pat.id;
@@ -282,6 +282,8 @@ impl<'c> MapCheck<'c> {
                 }
             }
             PatternKind::Seq { elements, .. } => {
+                let contains_iter_element = elements.iter().any(|element| element.iter);
+
                 if ctx.current_arm.is_first() {
                     group_set.add(parent_aggr_group);
 
@@ -297,8 +299,9 @@ impl<'c> MapCheck<'c> {
                             // TODO: Skip non-iter?
                             let result = self.analyze_arm(
                                 &element.pattern,
-                                Some(CtrlFlowGroup {
+                                Some(SeqElementGroup {
                                     label,
+                                    iterated: element.iter,
                                     bind_depth: ctx.current_ctrl_flow_depth(),
                                 }),
                                 ctx,
@@ -317,30 +320,33 @@ impl<'c> MapCheck<'c> {
                     for element in elements {
                         if element.iter {
                             iter_element_count += 1;
-                            ctx.enter_ctrl(|ctx| {
-                                let analysis =
-                                    self.analyze_arm(&element.pattern, None, ctx).unwrap();
-                                inner_aggr_group.join(analysis.group_set);
-
-                                if !matches!(analysis.class, MapOutputClass::Data) {
-                                    // A match directly in an iterated element does not require
-                                    // finding an exact aggregation group
-                                    iter_match_element_count += 1;
-
-                                    arm_class = MapOutputClass::FilterMatch;
-                                }
-                            });
+                        } else if contains_iter_element {
+                            continue;
                         }
+
+                        ctx.enter_ctrl(|ctx| {
+                            let analysis = self.analyze_arm(&element.pattern, None, ctx).unwrap();
+                            inner_aggr_group.join(analysis.group_set);
+
+                            if !matches!(analysis.class, MapOutputClass::Data) {
+                                // A match directly in an iterated element does not require
+                                // finding an exact aggregation group
+                                iter_match_element_count += 1;
+
+                                arm_class = MapOutputClass::FilterMatch;
+                            }
+                        });
                     }
 
                     ctx.enter_ctrl::<Result<(), CheckMapError>>(|ctx| {
-                        match inner_aggr_group.disambiguate(ctx, ctx.current_ctrl_flow_depth()) {
+                        match inner_aggr_group.disambiguate(ctx.current_ctrl_flow_depth(), ctx) {
                             Ok(label) => {
                                 ctx.label_map.insert(pat_id, label);
 
                                 group_set.add(ctx.ctrl_flow_forest.find_parent(label).map(
-                                    |label| CtrlFlowGroup {
+                                    |label| SeqElementGroup {
                                         label,
+                                        iterated: true,
                                         bind_depth: outer_bind_depth,
                                     },
                                 ));
@@ -403,20 +409,26 @@ impl<'c> MapCheck<'c> {
         &mut self,
         node: &RegexPatternCaptureNode,
         full_span: &SourceSpan,
-        parent_aggr_group: Option<CtrlFlowGroup>,
+        parent_seq_element_group: Option<SeqElementGroup>,
         ctx: &mut HirBuildCtx<'_>,
     ) -> Result<AggrGroupSet, CheckMapError> {
         let mut group_set = AggrGroupSet::new();
         match node {
             RegexPatternCaptureNode::Capture { var, name_span, .. } => {
-                self.register_variable(*var, name_span, parent_aggr_group, &mut group_set, ctx);
+                self.register_variable(
+                    *var,
+                    name_span,
+                    parent_seq_element_group,
+                    &mut group_set,
+                    ctx,
+                );
             }
             RegexPatternCaptureNode::Concat { nodes } => {
                 for node in nodes {
                     group_set.join(self.analyze_regex_capture_node(
                         node,
                         full_span,
-                        parent_aggr_group,
+                        parent_seq_element_group,
                         ctx,
                     )?);
                 }
@@ -426,7 +438,7 @@ impl<'c> MapCheck<'c> {
                     group_set.join(self.analyze_regex_capture_node(
                         variant,
                         full_span,
-                        parent_aggr_group,
+                        parent_seq_element_group,
                         ctx,
                     )?);
                 }
@@ -437,21 +449,22 @@ impl<'c> MapCheck<'c> {
                 ..
             } => {
                 if ctx.current_arm.is_first() {
-                    group_set.add(parent_aggr_group);
+                    group_set.add(parent_seq_element_group);
 
                     // Register aggregation body
                     let label = Label(ctx.var_allocator.alloc().0);
                     debug!("first arm regex repetition: pat_id={pat_id:?}");
                     ctx.ctrl_flow_forest
-                        .insert(label, parent_aggr_group.map(|parent| parent.label));
+                        .insert(label, parent_seq_element_group.map(|parent| parent.label));
                     ctx.label_map.insert(*pat_id, label);
 
                     ctx.enter_ctrl(|ctx| {
                         self.analyze_regex_capture_node(
                             inner_node,
                             full_span,
-                            Some(CtrlFlowGroup {
+                            Some(SeqElementGroup {
                                 label,
+                                iterated: true,
                                 bind_depth: ctx.current_ctrl_flow_depth(),
                             }),
                             ctx,
@@ -467,7 +480,7 @@ impl<'c> MapCheck<'c> {
                             .analyze_regex_capture_node(
                                 inner_node,
                                 full_span,
-                                parent_aggr_group,
+                                parent_seq_element_group,
                                 ctx,
                             )
                             .unwrap();
@@ -475,13 +488,14 @@ impl<'c> MapCheck<'c> {
                     });
 
                     ctx.enter_ctrl::<Result<(), CheckMapError>>(|ctx| {
-                        match inner_aggr_group.disambiguate(ctx, ctx.current_ctrl_flow_depth()) {
+                        match inner_aggr_group.disambiguate(ctx.current_ctrl_flow_depth(), ctx) {
                             Ok(label) => {
                                 ctx.label_map.insert(*pat_id, label);
 
                                 group_set.add(ctx.ctrl_flow_forest.find_parent(label).map(
-                                    |label| CtrlFlowGroup {
+                                    |label| SeqElementGroup {
                                         label,
+                                        iterated: true,
                                         bind_depth: outer_bind_depth,
                                     },
                                 ));
@@ -511,13 +525,15 @@ impl<'c> MapCheck<'c> {
         &mut self,
         var: Var,
         span: &SourceSpan,
-        parent_aggr_group: Option<CtrlFlowGroup>,
+        parent_seq_element_group: Option<SeqElementGroup>,
         group_set: &mut AggrGroupSet,
         ctx: &mut HirBuildCtx<'_>,
     ) {
         if let Some(explicit_variable) = ctx.pattern_variables.get(&var) {
             // Variable is used more than once
-            if ctx.current_arm.is_first() && explicit_variable.ctrl_group != parent_aggr_group {
+            if ctx.current_arm.is_first()
+                && explicit_variable.seq_element_group != parent_seq_element_group
+            {
                 self.error(
                     CompileError::TODO(smart_format!("Incompatible aggregation group")),
                     span,
@@ -526,17 +542,17 @@ impl<'c> MapCheck<'c> {
 
             debug!("Join existing bound variable");
 
-            group_set.add(explicit_variable.ctrl_group);
+            group_set.add(explicit_variable.seq_element_group);
         } else if ctx.current_arm.is_first() {
             ctx.pattern_variables.insert(
                 var,
                 PatternVariable {
-                    ctrl_group: parent_aggr_group,
+                    seq_element_group: parent_seq_element_group,
                     hir_arms: Default::default(),
                 },
             );
 
-            group_set.add(parent_aggr_group);
+            group_set.add(parent_seq_element_group);
         } else {
             match ctx.pattern_variables.entry(var) {
                 Entry::Occupied(_occ) => {
@@ -544,10 +560,10 @@ impl<'c> MapCheck<'c> {
                 }
                 Entry::Vacant(vac) => {
                     vac.insert(PatternVariable {
-                        ctrl_group: parent_aggr_group,
+                        seq_element_group: parent_seq_element_group,
                         hir_arms: Default::default(),
                     });
-                    group_set.add(parent_aggr_group);
+                    group_set.add(parent_seq_element_group);
                 }
             }
         }
@@ -571,6 +587,7 @@ pub enum CheckMapError {
 
 struct AggrGroupSet {
     set: FnvHashSet<Option<Label>>,
+    iterated: bool,
     tallest_depth: u16,
 }
 
@@ -578,18 +595,23 @@ impl AggrGroupSet {
     fn new() -> Self {
         Self {
             set: Default::default(),
+            iterated: false,
             tallest_depth: 0,
         }
     }
 
     fn join(&mut self, other: AggrGroupSet) {
         self.set.extend(other.set);
+        self.iterated |= other.iterated;
         self.tallest_depth = core::cmp::max(self.tallest_depth, other.tallest_depth)
     }
 
-    fn add(&mut self, aggr_group: Option<CtrlFlowGroup>) {
-        self.set.insert(aggr_group.map(|group| group.label));
-        if let Some(group) = aggr_group {
+    fn add(&mut self, seq_element_group: Option<SeqElementGroup>) {
+        self.set.insert(seq_element_group.map(|group| group.label));
+        if let Some(group) = seq_element_group {
+            if group.iterated {
+                self.iterated = true;
+            }
             self.tallest_depth = core::cmp::max(self.tallest_depth, group.bind_depth.0)
         }
     }
@@ -597,8 +619,8 @@ impl AggrGroupSet {
     // Find a unique leaf in the aggregation forest
     fn disambiguate(
         self,
-        ctx: &HirBuildCtx,
         max_depth: CtrlFlowDepth,
+        ctx: &HirBuildCtx,
     ) -> Result<Label, CheckMapError> {
         if self.tallest_depth > max_depth.0 {
             return Err(CheckMapError::DepthExceeded);

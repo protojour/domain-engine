@@ -47,6 +47,7 @@ pub enum CompileError {
     CannotMixIndexedRelationIdentsAndEdgeTypes,
     NoPropertiesExpected,
     ExpectedPatternAttribute,
+    PatternRequiresIteratedVariable,
     NamedPropertyExpected,
     UnknownProperty,
     DuplicateProperty,
@@ -138,6 +139,9 @@ impl std::fmt::Display for CompileError {
             }
             Self::NoPropertiesExpected => write!(f, "no properties expected"),
             Self::ExpectedPatternAttribute => write!(f, "expected attribute"),
+            Self::PatternRequiresIteratedVariable => {
+                write!(f, "pattern requires an iterated variable (`..x`)")
+            }
             Self::NamedPropertyExpected => write!(f, "expected named property"),
             Self::UnknownProperty => write!(f, "unknown property"),
             Self::DuplicateProperty => write!(f, "duplicate property"),

@@ -574,7 +574,7 @@ fn test_sequence_flat_map1() {
     });
 }
 
-// FIXME: This should work both ways in principe, even if the backward mapping is fallible:
+// FIXME: This should work both ways in principle, even if the backward mapping is fallible:
 #[test]
 fn test_sequence_composer_no_iteration() {
     "

@@ -231,8 +231,8 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                                     AssignResult::Assigned(_) => {
                                         // non-iterated
                                     }
-                                    AssignResult::Unassigned(_) => {
-                                        panic!();
+                                    AssignResult::Unassigned(expr) => {
+                                        panic!("{expr:?} was unassigned");
                                     }
                                 }
                             } else {
