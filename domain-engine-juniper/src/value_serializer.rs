@@ -245,7 +245,7 @@ impl ser::SerializeSeq for JuniperListSerializer {
 }
 
 pub struct JuniperObjectSerializer {
-    pending_key: Option<juniper::Value<GqlScalar>>,
+    pending_key: Option<String>,
     object: juniper::Object<GqlScalar>,
 }
 
@@ -254,8 +254,13 @@ impl ser::SerializeMap for JuniperObjectSerializer {
     type Error = SerializeError;
 
     fn serialize_key<T: ?Sized + serde::Serialize>(&mut self, key: &T) -> Result<(), Self::Error> {
-        assert!(self.pending_key.is_none());
-        self.pending_key = Some(key.serialize(JuniperValueSerializer)?);
+        let juniper::Value::Scalar(GqlScalar::String(key)) =
+            key.serialize(JuniperValueSerializer)?
+        else {
+            return Err(SerializeError(smart_format!("Key must be a string")));
+        };
+
+        self.pending_key = Some(key);
         Ok(())
     }
 
@@ -263,14 +268,11 @@ impl ser::SerializeMap for JuniperObjectSerializer {
         &mut self,
         value: &T,
     ) -> Result<(), Self::Error> {
-        let juniper::Value::Scalar(GqlScalar::String(key)) = self.pending_key.take().unwrap()
-        else {
-            return Err(SerializeError(smart_format!("Key must be a string")));
-        };
-
+        let key = self.pending_key.take().unwrap();
         let value = value.serialize(JuniperValueSerializer)?;
 
         self.object.add_field(key, value);
+
         Ok(())
     }
 
