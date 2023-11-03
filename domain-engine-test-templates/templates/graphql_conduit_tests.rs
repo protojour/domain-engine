@@ -7,7 +7,7 @@ use domain_engine_juniper::{
     juniper::{self, graphql_value, InputValue},
     Schema,
 };
-use domain_engine_test_utils::graphql::{Exec, TestCompileSchema};
+use domain_engine_test_utils::graphql_test_utils::{Exec, TestCompileSchema};
 use ontol_runtime::config::DataStoreConfig;
 use ontol_runtime::sequence::Cursor;
 use ontol_test_utils::{

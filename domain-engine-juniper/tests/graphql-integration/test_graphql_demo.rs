@@ -1,4 +1,4 @@
-use domain_engine_test_utils::graphql::TestCompileSchema;
+use domain_engine_test_utils::graphql_test_utils::TestCompileSchema;
 use ontol_test_utils::{examples::DEMO, SourceName};
 use test_log::test;
 

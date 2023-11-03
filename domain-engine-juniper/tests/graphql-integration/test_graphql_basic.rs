@@ -21,7 +21,7 @@ use test_log::test;
 use unimock::*;
 
 use domain_engine_test_utils::{
-    graphql::{
+    graphql_test_utils::{
         gql_ctx_mock_data_store, mock_data_store_query_entities_empty, Exec, GraphqlTestResultExt,
         TestCompileSchema, TestError,
     },

@@ -1,4 +1,6 @@
-use domain_engine_test_utils::graphql::{gql_ctx_mock_data_store, Exec, TestCompileSchema};
+use domain_engine_test_utils::graphql_test_utils::{
+    gql_ctx_mock_data_store, Exec, TestCompileSchema,
+};
 use ontol_test_utils::{assert_error_msg, SourceName};
 use test_log::test;
 
