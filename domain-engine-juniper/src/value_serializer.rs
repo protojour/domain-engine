@@ -10,6 +10,12 @@ pub struct JuniperValueSerializer;
 #[derive(Debug)]
 pub struct SerializeError(String);
 
+impl SerializeError {
+    fn not_implemented() -> Self {
+        Self("not implemented".into())
+    }
+}
+
 impl Display for SerializeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
@@ -121,7 +127,7 @@ impl ser::Serializer for JuniperValueSerializer {
     }
 
     fn serialize_bytes(self, _value: &[u8]) -> SerResult {
-        todo!()
+        Err(SerializeError::not_implemented())
     }
 
     fn serialize_unit(self) -> SerResult {
@@ -129,11 +135,11 @@ impl ser::Serializer for JuniperValueSerializer {
     }
 
     fn serialize_unit_struct(self, _name: &'static str) -> SerResult {
-        panic!("not used")
+        Ok(juniper::Value::Null)
     }
 
     fn serialize_unit_variant(self, _: &'static str, _: u32, _: &'static str) -> SerResult {
-        panic!("not used")
+        Err(SerializeError::not_implemented())
     }
 
     fn serialize_newtype_struct<T: ?Sized + ser::Serialize>(
@@ -141,7 +147,7 @@ impl ser::Serializer for JuniperValueSerializer {
         _: &'static str,
         _: &T,
     ) -> SerResult {
-        panic!("not used")
+        Err(SerializeError::not_implemented())
     }
 
     fn serialize_newtype_variant<T: ?Sized + ser::Serialize>(
@@ -151,7 +157,7 @@ impl ser::Serializer for JuniperValueSerializer {
         _: &'static str,
         _: &T,
     ) -> SerResult {
-        panic!("not used")
+        Err(SerializeError::not_implemented())
     }
 
     fn serialize_some<T: ?Sized + ser::Serialize>(self, some: &T) -> SerResult {
@@ -169,7 +175,7 @@ impl ser::Serializer for JuniperValueSerializer {
     }
 
     fn serialize_tuple(self, _: usize) -> Result<Self::SerializeTuple, Self::Error> {
-        panic!("not a scalar")
+        Err(SerializeError::not_implemented())
     }
 
     fn serialize_tuple_struct(
@@ -177,7 +183,7 @@ impl ser::Serializer for JuniperValueSerializer {
         _: &'static str,
         _: usize,
     ) -> Result<Self::SerializeTupleStruct, Self::Error> {
-        panic!("not a scalar")
+        Err(SerializeError::not_implemented())
     }
 
     fn serialize_tuple_variant(
@@ -187,7 +193,7 @@ impl ser::Serializer for JuniperValueSerializer {
         _: &'static str,
         _: usize,
     ) -> Result<Self::SerializeTupleVariant, Self::Error> {
-        panic!("not a scalar")
+        Err(SerializeError::not_implemented())
     }
 
     fn serialize_map(self, cap: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
@@ -202,7 +208,7 @@ impl ser::Serializer for JuniperValueSerializer {
         _: &'static str,
         _: usize,
     ) -> Result<Self::SerializeStruct, Self::Error> {
-        panic!("not a scalar")
+        Err(SerializeError::not_implemented())
     }
 
     #[inline]
@@ -213,7 +219,7 @@ impl ser::Serializer for JuniperValueSerializer {
         _: &'static str,
         _: usize,
     ) -> Result<Self::SerializeStructVariant, Self::Error> {
-        panic!("not a scalar")
+        Err(SerializeError::not_implemented())
     }
 }
 
