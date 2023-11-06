@@ -3,7 +3,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use codegen::task::{execute_codegen_tasks, CodegenTasks};
-use def::{DefKind, Defs, LookupRelationshipMeta, RelationshipMeta, TypeDef};
+use def::{DefKind, DefVisibility, Defs, LookupRelationshipMeta, RelationshipMeta, TypeDef};
 
 pub use error::*;
 use fnv::FnvHashMap;
@@ -271,7 +271,9 @@ impl<'m> Compiler<'m> {
                 domain.add_type(TypeInfo {
                     def_id: type_def_id,
                     public: match self.defs.def_kind(type_def_id) {
-                        DefKind::Type(TypeDef { public, .. }) => *public,
+                        DefKind::Type(TypeDef { visibility, .. }) => {
+                            matches!(visibility, DefVisibility::Public)
+                        }
                         _ => true,
                     },
                     name: Some(type_name.into()),

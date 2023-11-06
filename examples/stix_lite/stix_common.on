@@ -10,20 +10,20 @@
 ///   ...
 /// }
 /// ```
-def(pub) string {
+def string {
     rel .is: ontol.text
 }
 
-def(pub) spec_version {
+def spec_version {
     rel .is?: '2.0'
     rel .is?: '2.1'
 }
 
 // placeholder for ONTOL dictionary
-def(pub) dictionary {}
+def dictionary {}
 
 // FIXME: should maybe be defined in ONTOL_PKG?
-def(pub) url {
+def url {
     rel .is: ontol.text
 }
 
@@ -31,31 +31,31 @@ def(pub) url {
 /// Additional restrictions MAY be placed on the type as described where it is used. The integer size is limited to a 54-bit value not a 64-bit value as per the RFC.
 ///
 /// In the JSON MTI serialization, integers are represented by the JSON Number type [RFC7493].
-def(pub) integer {
+def integer {
     rel .is: i64
 }
 
 /// The timestamp type defines how dates and times are represented in STIX.
 ///
 /// The JSON MTI serialization uses the JSON String type [RFC8259] when representing timestamp.
-def(pub) timestamp {
+def timestamp {
     rel .is: datetime
 }
 
 /// The hex data type encodes an array of octets (8-bit bytes) as hexadecimal.
 /// The string MUST consist of an even number of hexadecimal characters, which are the digits '0' through '9' and the lower-case letters 'a' through 'f'.
 /// In order to allow pattern matching on custom objects, for all properties that use the hex type, the property name MUST end with '_hex'.
-def(pub) hex {
+def hex {
     rel .is: /^[0-9a-f]*$/
 }
 
 /// A language code conformant to [RFC5646](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#kix.1js008hntuzu).
-def(pub) lang-rfc5646 {
+def lang-rfc5646 {
     rel .is: string
 }
 
 /// The `confidence` property identifies the confidence that the creator has in the correctness of their data. The confidence value **MUST** be a number in the range of 0-100.
-def(pub) confidence {
+def confidence {
     rel .is: integer
     rel .min: 0
     rel .max: 100
@@ -80,7 +80,7 @@ def(pub) confidence {
 ///     "x_foo_hash": "aaaabbbbccccddddeeeeffff0123457890"
 /// }
 /// ```
-def(pub) hashes {
+def hashes {
     // FIXME: Dictionary support:
     // rel ./(a-zA-Z0-9-_){3,250}/: string
 }
@@ -88,7 +88,7 @@ def(pub) hashes {
 /// External references are used to describe pointers to information represented outside of STIX.
 ///
 /// For example, a Malware object could use an external reference to indicate an ID for that malware in an external database or a report could use references to represent source material.
-def(pub) external-reference {
+def external-reference {
     /// The name of the source that the external-reference is defined within (system, registry, organization, etc.).
     rel .'source_name': string
 
@@ -110,7 +110,7 @@ def(pub) external-reference {
 }
 
 /// The `kill-chain-phase` represents a phase in a kill chain, which describes the various phases an attacker may undertake in order to achieve their objectives.
-def(pub) kill-chain-phase {
+def kill-chain-phase {
     /// The name of the kill chain.
     /// The value of this property **SHOULD** be all lowercase and **SHOULD** use hyphens instead of spaces or underscores as word separators.
     rel .'kill_chain_name': string
@@ -125,7 +125,7 @@ def(pub) kill-chain-phase {
 /// The JSON MTI serialization represents this as a base64-­encoded string as specified in
 /// [RFC4648](https://docs.google.com/document/d/1fWHWyo9OBOUVDKEs0HsMKIWqR8HTl3P8aDyM5Mz3iSM/edit#bookmark=id.w5obc8apb1tn)​.
 /// Other serializations SHOULD use a native binary type, if available.
-def(pub) binary {
+def binary {
     // FIXME: ONTOL support for binary?
     rel .is: string
 }

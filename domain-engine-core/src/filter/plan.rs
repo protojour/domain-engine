@@ -301,11 +301,11 @@ mod tests {
     #[test]
     fn basic_tree() {
         "
-        def(pub) foo {
+        def foo {
             rel .id: { rel .is: text }
             rel .'x': text
         }
-        def(pub) bar {
+        def bar {
             rel .id: { rel .is: text }
             rel .'y': text
             rel [.] 'foos'::'bars' [foo]
@@ -359,11 +359,11 @@ mod tests {
     #[test]
     fn basic_merge() {
         "
-        def(pub) foo {
+        def foo {
             rel .id: { rel .is: text }
             rel .'x': text
         }
-        def(pub) bar {
+        def bar {
             rel .id: { rel .is: text }
             rel .'y': text
         }

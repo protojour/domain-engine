@@ -18,7 +18,7 @@ use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
-    def::{Def, DefKind, FmtFinalState, RelParams, Relationship, TypeDef},
+    def::{Def, DefKind, DefVisibility, FmtFinalState, RelParams, Relationship, TypeDef},
     error::CompileError,
     namespace::Space,
     package::{PackageReference, ONTOL_PKG},
@@ -283,7 +283,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         } else if let Some((ctx_block, _)) = ctx_block {
             let rel_def_id = self.define_anonymous_type(
                 TypeDef {
-                    public: false,
+                    visibility: DefVisibility::Private,
                     open: false,
                     ident: None,
                     rel_type_for: Some(RelationshipId(relationship_id)),
@@ -400,7 +400,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
             let target_def_id = self.define_anonymous_type(
                 TypeDef {
-                    public: false,
+                    visibility: DefVisibility::Private,
                     open: false,
                     ident: None,
                     rel_type_for: None,
@@ -498,7 +498,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 if let Some(root_defs) = root_defs {
                     let def_id = self.define_anonymous_type(
                         TypeDef {
-                            public: false,
+                            visibility: DefVisibility::Private,
                             open: false,
                             ident: None,
                             rel_type_for: None,
@@ -635,7 +635,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             None => {
                 let def_id = self.define_anonymous_type(
                     TypeDef {
-                        public: true,
+                        visibility: DefVisibility::Public,
                         open: false,
                         ident: None,
                         rel_type_for: None,
@@ -910,7 +910,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                 match def_id {
                     Some(def_id) => match self.compiler.defs.def_kind(*def_id) {
-                        DefKind::Type(TypeDef { public: false, .. }) => {
+                        DefKind::Type(TypeDef { visibility, .. })
+                            if matches!(visibility, DefVisibility::Private) =>
+                        {
                             Err((CompileError::PrivateDefinition, span.clone()))
                         }
                         _ => Ok(*def_id),
@@ -930,7 +932,11 @@ impl<'s, 'm> Lowering<'s, 'm> {
             self.set_def_kind(
                 def_id,
                 DefKind::Type(TypeDef {
-                    public: def_stmt.public.is_some(),
+                    visibility: if def_stmt.private.is_some() {
+                        DefVisibility::Private
+                    } else {
+                        DefVisibility::Public
+                    },
                     open: def_stmt.open.is_some(),
                     ident: Some(ident),
                     rel_type_for: None,

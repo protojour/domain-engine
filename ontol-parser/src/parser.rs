@@ -70,7 +70,7 @@ fn def_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstPar
         .then(
             open('(')
                 .ignore_then(
-                    spanned(sym_set(&["pub", "open"], "modifier"))
+                    spanned(sym_set(&["private", "open"], "modifier"))
                         .separated_by(sigil('|'))
                         .at_least(1),
                 )
@@ -82,13 +82,13 @@ fn def_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstPar
             stmt_parser.repeated().delimited_by(open('{'), close('}')),
         ))
         .map(|((((docs, kw), modifiers), ident), ctx_block)| {
-            let mut public = None;
+            let mut private = None;
             let mut open = None;
 
             if let Some(modifiers) = modifiers {
                 for (sym, span) in modifiers {
                     match sym.as_str() {
-                        "pub" => public = Some(span),
+                        "private" => private = Some(span),
                         "open" => open = Some(span),
                         _ => unreachable!(),
                     }
@@ -97,7 +97,7 @@ fn def_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstPar
 
             DefStatement {
                 docs,
-                public,
+                private,
                 open,
                 kw,
                 ident,

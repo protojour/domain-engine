@@ -38,7 +38,7 @@ pub struct UseStatement {
 pub struct DefStatement {
     pub docs: Vec<String>,
     pub kw: Span,
-    pub public: Option<Span>,
+    pub private: Option<Span>,
     pub open: Option<Span>,
     pub ident: Spanned<String>,
     pub block: Spanned<Vec<Spanned<Statement>>>,

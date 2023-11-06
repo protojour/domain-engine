@@ -41,13 +41,13 @@ fn test_graphql_schema_for_entityless_domain_should_not_be_generated() {
 #[test(tokio::test)]
 async fn test_graphql_int_scalars() {
     let (test, [schema]) = "
-    def(pub) foo_id { fmt '' => text => . }
+    def foo_id { fmt '' => text => . }
     def smallint {
         rel .is: integer
         rel .min: 0
         rel .max: 255
     }
-    def(pub) foo {
+    def foo {
         rel foo_id identifies: .
         rel .'small': smallint
         rel .'big': i64
@@ -145,7 +145,7 @@ async fn test_graphql_int_scalars() {
 #[test(tokio::test)]
 async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
     let (test, [schema]) = "
-    def(pub) foo {
+    def foo {
         rel .'id'(rel .gen: auto)|id: { rel .is: text }
     }
     map foos {
@@ -182,7 +182,7 @@ async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
 #[test(tokio::test)]
 async fn test_graphql_basic_pagination() {
     let (test, [schema]) = "
-    def(pub) foo {
+    def foo {
         rel .'id'(rel .gen: auto)|id: { rel .is: text }
     }
     map foos {
@@ -313,7 +313,7 @@ async fn test_graphql_basic_pagination() {
 #[test(tokio::test)]
 async fn test_graphql_nodes() {
     let (test, [schema]) = "
-    def(pub) foo {
+    def foo {
         rel .'id'(rel .gen: auto)|id: { rel .is: text }
     }
     map foos {
@@ -360,7 +360,7 @@ async fn test_graphql_nodes() {
 fn test_graphql_value_type_as_field() {
     "
     def foo { rel .is: text }
-    def(pub) bar {
+    def bar {
         rel .'id'(rel .gen: auto)|id: { rel .is: text }
         rel .'foo': foo
     }
@@ -372,7 +372,7 @@ fn test_graphql_value_type_as_field() {
 fn test_graphql_value_type_in_array() {
     "
     def foo { rel .is: text }
-    def(pub) bar {
+    def bar {
         rel .'id'(rel .gen: auto)|id: { rel .is: text }
         rel .'foo': [foo]
     }
@@ -383,11 +383,11 @@ fn test_graphql_value_type_in_array() {
 #[test(tokio::test)]
 async fn test_inner_struct() {
     let (test, [schema]) = "
-    def(pub) foo_id { fmt '' => text => . }
+    def foo_id { fmt '' => text => . }
     def inner {
         rel .'prop': text
     }
-    def(pub) foo {
+    def foo {
         rel foo_id identifies: .
         rel .'inner': inner
     }
@@ -467,7 +467,7 @@ async fn test_docs_introspection() {
     }
 
     /// this is a type
-    def(pub) PublicType {
+    def PublicType {
         rel Key identifies: .
         /// this is a field
         rel .'relation': text
@@ -1014,7 +1014,7 @@ fn test_graphql_municipalities_geojson_union() {
 #[test(tokio::test)]
 async fn test_graphql_open_data() {
     let (test, [schema]) = "
-    def(pub|open) foo {
+    def(open) foo {
         rel .'id'(rel .gen: auto)|id: { rel .is: text }
     }
     "
@@ -1061,7 +1061,7 @@ async fn test_graphql_open_data() {
 #[test(tokio::test)]
 async fn test_open_data_disabled() {
     let (test, [schema]) = "
-    def(pub|open) foo {
+    def(open) foo {
         rel .'id'(rel .gen: auto)|id: { rel .is: text }
     }
     "

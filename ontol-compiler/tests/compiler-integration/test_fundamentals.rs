@@ -11,7 +11,7 @@ fn test_relations_are_distinct_for_different_domains() {
         (
             SourceName("other"),
             "
-            def(pub) foo {
+            def foo {
                 rel .'prop': text
             }
             ",
@@ -21,7 +21,7 @@ fn test_relations_are_distinct_for_different_domains() {
             "
             use 'other' as other
 
-            def(pub) foo {
+            def foo {
                 rel .'prop': text
             }
             ",
@@ -69,13 +69,13 @@ fn test_relations_are_distinct_for_different_domains() {
 #[test]
 fn ontol_domain_is_defined_in_the_namespace() {
     "
-    def(pub) i64 {
+    def i64 {
         rel .is: boolean
     }
-    def(pub) text {
+    def text {
         rel .is: ontol.i64
     }
-    def(pub) integer {
+    def integer {
         rel .is: text
     }
     "
@@ -87,5 +87,5 @@ fn ontol_domain_is_defined_in_the_namespace() {
 
 #[test]
 fn cannot_redefine_ontol() {
-    "def(pub) ontol {} // ERROR TODO: definition of external identifier".compile_fail();
+    "def ontol {} // ERROR TODO: definition of external identifier".compile_fail();
 }

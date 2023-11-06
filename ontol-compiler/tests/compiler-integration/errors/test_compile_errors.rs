@@ -13,7 +13,7 @@ fn error_comment_span() {
     // This tests that the eror span is correct
     r#"
     /// A comment - don't remove this
-    def(pub) union {} // ERROR variants of the union have prefixes that are prefixes of other variants
+    def union {} // ERROR variants of the union have prefixes that are prefixes of other variants
 
     def a { fmt '' => 'foo' => . }
     def b { fmt '' => 'foobar' => . }
@@ -387,12 +387,12 @@ fn error_rel_wildcard_span() {
 #[test]
 fn error_fail_import_private_type() {
     TestPackages::with_sources([
-        (SourceName("dep"), "def foo {}"),
+        (SourceName("dep"), "def(private) foo {}"),
         (
             SourceName::root(),
             "
             use 'dep' as dep
-            def(pub) bar {
+            def bar {
                 rel . 'foo': dep.foo // ERROR private definition
             }
             ",
@@ -498,17 +498,17 @@ fn error_test_lazy_seal_by_map() {
 #[test]
 fn error_test_error_object_property_in_foreign_domain() {
     TestPackages::with_sources([
-        (SourceName("foreign"), "def(pub) foo {}"),
+        (SourceName("foreign"), "def foo {}"),
         (
             SourceName::root(),
             "
             use 'foreign' as foreign
 
-            def(pub) bar {
+            def bar {
                 rel .'foo': foreign.foo // This is OK
             }
 
-            def(pub) baz {
+            def baz {
                 rel .'foo'::'baz'
                     foreign.foo // ERROR definition is sealed and cannot be modified
             }
@@ -542,10 +542,10 @@ fn error_ambiguous_number_resolution() {
 #[test]
 fn error_non_iterated_variable() {
     "
-    def(pub) foo {
+    def foo {
         rel .'p0': [text]
     }
-    def(pub) bar {
+    def bar {
         rel .'p1': [text]
     }
 

@@ -72,14 +72,20 @@ impl<'m> DefKind<'m> {
 
 #[derive(Debug)]
 pub struct TypeDef<'m> {
-    /// Whether the definition's identifier is exported
-    pub public: bool,
+    /// Whether the definition's export is ignored
+    pub visibility: DefVisibility,
     /// Whether the definition can have an "open relationship" to arbitrary data
     pub open: bool,
     pub ident: Option<&'m str>,
     pub rel_type_for: Option<RelationshipId>,
     /// for now: Every user-domain defined type is concrete.
     pub concrete: bool,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum DefVisibility {
+    Public,
+    Private,
 }
 
 #[derive(Clone, Copy, Debug)]

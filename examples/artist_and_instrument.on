@@ -1,22 +1,22 @@
-def(pub) artist {
+def artist {
     rel .'ID'(rel .gen: auto)|id: { fmt '' => 'artist/' => uuid => . }
     rel .'name': text
 }
 
-def(pub) record {
+def record {
     rel .'name': text
 }
 
-def(pub) instrument-id {
+def instrument-id {
     fmt '' => 'instrument/' => uuid => .
 }
 
-def(pub) instrument {
+def instrument {
     rel .'ID'(rel .gen: auto)|id: instrument-id
     rel .'name': text
 }
 
-def(pub) plays {
+def plays {
     rel .'how_much': text
 }
 

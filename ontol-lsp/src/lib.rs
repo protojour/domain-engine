@@ -318,8 +318,8 @@ impl LanguageServer for Backend {
                         Statement::Use(stmt) => {
                             format!("use '{}' as {}", stmt.reference.0, stmt.as_ident.0)
                         }
-                        Statement::Def(stmt) => match &stmt.public {
-                            Some(_) => format!("def(pub) {}", stmt.ident.0),
+                        Statement::Def(stmt) => match &stmt.private {
+                            Some(_) => format!("def(private) {}", stmt.ident.0),
                             None => format!("def {}", stmt.ident.0),
                         },
                         Statement::Rel(_) => {

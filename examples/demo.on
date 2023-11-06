@@ -2,7 +2,7 @@
 // database
 
 /// Item type enum
-def ItemType {
+def(private) ItemType {
     /// worthless junk
     rel .is?: 'worthless junk'
     /// ancient treasure
@@ -10,7 +10,7 @@ def ItemType {
     /// alien artifact
     rel .is?: 'alien artifact'
 }
-def archive_item {
+def(private) archive_item {
     rel .'id'|id: { fmt '' => 'archive_item/' => uuid => . }
     rel .'created': datetime
     rel .'updated': datetime
@@ -20,7 +20,7 @@ def archive_item {
     rel .'asset_score': i64
     rel .'type': ItemType
 }
-def archive_group {
+def(private) archive_group {
     rel .'id'|id: { fmt '' => 'archive_group/' => uuid => . }
     rel .'created': datetime
     rel .'updated': datetime
@@ -46,7 +46,7 @@ def ArchiveDates {
 }
 /// ## An Archived Object
 /// Comments support [Markdown](https://www.markdownguide.org/)
-def(pub) ArchiveObject {
+def ArchiveObject {
     /// ID of the object
     rel .'id'|id: { fmt '' => 'archive_item/' => uuid => . }
     /// Relevant dates for the object
@@ -62,7 +62,7 @@ def(pub) ArchiveObject {
 }
 /// ## An Archived Object Collection
 /// A collection of archived objects
-def(pub) ArchiveCollection {
+def ArchiveCollection {
     /// ID of the collection
     rel .'id'|id: { fmt '' => 'archive_group/' => uuid => . }
     /// Relevant dates for the collection

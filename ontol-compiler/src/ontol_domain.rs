@@ -5,7 +5,7 @@ use std::ops::Range;
 use ontol_runtime::{text_like_types::TextLikeType, vm::proc::BuiltinProc, DefId};
 
 use crate::{
-    def::{BuiltinRelationKind, DefKind, TypeDef},
+    def::{BuiltinRelationKind, DefKind, DefVisibility, TypeDef},
     mem::Intern,
     namespace::Space,
     package::ONTOL_PKG,
@@ -225,7 +225,7 @@ impl<'m> Compiler<'m> {
     ) -> (DefId, TypeRef<'m>) {
         let def_id = self.defs.add_def(
             DefKind::Type(TypeDef {
-                public: true,
+                visibility: DefVisibility::Public,
                 open: false,
                 ident: Some(ident),
                 rel_type_for: None,

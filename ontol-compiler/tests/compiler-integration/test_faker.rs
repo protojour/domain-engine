@@ -11,7 +11,7 @@ use test_log::test;
 #[test]
 fn test_fake_primitives() {
     "
-    def(pub) foo {
+    def foo {
         rel .'s': text
         rel .'i': i64
     }
@@ -31,7 +31,7 @@ fn test_fake_primitives() {
 #[test]
 fn test_fake_text_like_types() {
     "
-    def(pub) foo {
+    def foo {
         rel .'id': uuid
         rel .'created_at': datetime
     }
