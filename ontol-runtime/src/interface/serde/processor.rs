@@ -130,6 +130,9 @@ pub enum ProcessorMode {
     /// Used for unconditionally handling all fields.
     /// Should not be used for serialization or deserialization at the domain interface layer.
     Raw,
+    /// Used for only (de)serializing properties related to local "value trees", skipping entity graphs.
+    /// Should not be used for serialization or deserialization at the domain interface layer.
+    RawTreeOnly,
 }
 
 #[derive(Copy, Clone, Debug)]

@@ -276,6 +276,12 @@ impl SerdeProperty {
             }
         }
 
+        if matches!(mode, ProcessorMode::RawTreeOnly)
+            && self.flags.contains(SerdePropertyFlags::IN_ENTITY_GRAPH)
+        {
+            return None;
+        }
+
         Some(self)
     }
 }
@@ -283,9 +289,11 @@ impl SerdeProperty {
 bitflags::bitflags! {
     #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug, Serialize, Deserialize)]
     pub struct SerdePropertyFlags: u32 {
-        const OPTIONAL       = 0b00000001;
-        const READ_ONLY      = 0b00000010;
-        const ENTITY_ID      = 0b00000100;
+        const OPTIONAL        = 0b00000001;
+        const READ_ONLY       = 0b00000010;
+        const ENTITY_ID       = 0b00000100;
+        /// Property is part an the entity graph
+        const IN_ENTITY_GRAPH = 0b00001000;
     }
 }
 

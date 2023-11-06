@@ -919,6 +919,12 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 flags |= SerdePropertyFlags::ENTITY_ID;
             }
 
+            if let Some(target_properties) = self.relations.properties_by_def_id(type_def_id) {
+                if target_properties.identified_by.is_some() {
+                    flags |= SerdePropertyFlags::IN_ENTITY_GRAPH;
+                }
+            }
+
             insert_property(
                 &mut op.properties,
                 prop_key,
