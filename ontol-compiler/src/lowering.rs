@@ -910,11 +910,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                 match def_id {
                     Some(def_id) => match self.compiler.defs.def_kind(*def_id) {
-                        DefKind::Type(TypeDef { visibility, .. })
-                            if matches!(visibility, DefVisibility::Private) =>
-                        {
-                            Err((CompileError::PrivateDefinition, span.clone()))
-                        }
+                        DefKind::Type(TypeDef {
+                            visibility: DefVisibility::Private,
+                            ..
+                        }) => Err((CompileError::PrivateDefinition, span.clone())),
                         _ => Ok(*def_id),
                     },
                     None => Err((CompileError::TypeNotFound, span.clone())),
