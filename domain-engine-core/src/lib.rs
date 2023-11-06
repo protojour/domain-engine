@@ -3,11 +3,11 @@
 pub mod data_store;
 pub mod domain_error;
 pub mod entity_id_utils;
+pub mod filter;
 pub mod match_utils;
 pub mod system;
 
 mod domain_engine;
-mod filter;
 mod in_memory_store;
 mod resolve_path;
 mod select_data_flow;
