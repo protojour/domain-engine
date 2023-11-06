@@ -6,7 +6,8 @@ use ontol_runtime::{
     value::Data,
 };
 use ontol_test_utils::{
-    assert_error_msg, assert_json_io_matches, expect_eq, serde_helper::*, TestCompile,
+    assert_error_msg, assert_json_io_matches, examples::ARTIST_AND_INSTRUMENT, expect_eq,
+    serde_helper::*, TestCompile,
 };
 use serde::de::DeserializeSeed;
 use serde_json::json;
@@ -573,6 +574,35 @@ fn test_serialize_raw_tree_only() {
             json!({
                 "key": "a",
                 "foo_field": "1"
+            })
+        );
+    });
+}
+
+#[test]
+fn test_serialize_raw_tree_only_artist_and_instrument() {
+    ARTIST_AND_INSTRUMENT.1.compile_then(|test| {
+        let [artist] = test.bind(["artist"]);
+        let entity = serde_raw(&artist)
+            .to_value(json!({
+                "ID": "artist/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8",
+                "name": "Jimi",
+                "plays": [
+                    {
+                        "ID": "instrument/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8",
+                        "name": "guitar",
+                        "_edge": {
+                            "how_much": "a lot"
+                        }
+                    }
+                ]
+            }))
+            .unwrap();
+        assert_eq!(
+            serde_raw_tree_only(&artist).as_json(&entity),
+            json!({
+                "ID": "artist/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8",
+                "name": "Jimi",
             })
         );
     });
