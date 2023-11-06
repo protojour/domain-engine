@@ -2,7 +2,7 @@
   "name": "ontol",
   "displayName": "ONTOL",
   "description": "ONTOL language support for VS Code",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "publisher": "Protojour",
   "license": "MIT",
   "private": true,
@@ -63,12 +63,12 @@
     ]
   },
   "dependencies": {
-    "vscode-languageclient": "^8.1.0"
+    "vscode-languageclient": "^9.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.6.0",
     "@types/vscode": "^1.81.0",
-    "@vscode/vsce": "^2.21.0",
+    "@vscode/vsce": "^2.22.0",
     "esbuild": "^0.19.2",
     "typescript": "^5.2.2"
   }

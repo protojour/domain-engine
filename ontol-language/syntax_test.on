@@ -11,17 +11,17 @@ use "some_domain" as some
 // ^^^^^^^^^^^^^^^^^^^^^^^^^ comment.block.documentation.ontol
 /// It can span several lines, contain **Markdown**,
 /// and is connected to the statement below
-def(pub) test {
-// <- storage.modifier.pub.ontol
-//  ^^^^ keyword.declaration.def.ontol
-//       ^^^^
+def test {
+// <- keyword.declaration.def.ontol
     rel .'id'(rel .gen: auto)|id: {
 //      ^ variable.language.ontol
 //  ^^^ keyword.declaration.rel.ontol
 //       ^^^^ string.quoted.single.ontol
-//           ^ keyword.operator.sigil.ontol
-//            ^^ variable.function.ontol
-//              ^ keyword.operator.sigil.ontol
+//            ^^^ variable.function.ontol
+//                ^
+//                 ^^^
+//                    ^
+//                      ^^^^
         fmt '' => 'test--' => uuid => .
 //      ^^^ keyword.declaration.fmt.ontol
 //             ^^ keyword.operator.fatarrow.ontol
@@ -40,9 +40,7 @@ def(pub) test {
 //                            ^ keyword.operator.sigil.ontol
 }
 
-def(pub) test {
-// <- keyword.context.block.with.ontol
-//   ^^^^
+def(private) test {
     rel .'three_oh_three': 303
 //                         ^^^ constant.numeric.ontol
     rel .'p_value': 0.05
@@ -55,6 +53,9 @@ def(pub) test {
 //                ^^^^^^^^^^^^^^ string.regexp.ontol
 }
 
+def(open) all-yours {
+}
+
 map {
 // <- keyword.declaration.map.ontol
     test {
@@ -64,6 +65,11 @@ map {
         'something': [..thing]
 //                    ^^ keyword.operator.spread.ontol
     }
+}
+
+map thing {
+    {}
+    test: [..test match {}]
 }
 
 def artist {
@@ -79,6 +85,6 @@ rel plays 'how_much': string
 rel [artist] 'plays'(rel .is: plays)::'played_by' [instrument]
 
 def position-ring {
-    rel ...4: position
-    rel .4..: position
+    rel . ..4: position
+    rel . 4..: position
 }

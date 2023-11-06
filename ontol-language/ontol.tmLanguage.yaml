@@ -14,13 +14,12 @@ patterns:
     name: keyword.import.as.ontol
     match: \s(as)\s
 
-  - comment: pub export modifier
-    name: storage.modifier.pub.ontol
-    match: ^(pub)\s
-
   - comment: def declaration
-    name: keyword.declaration.def.ontol
-    match: \b(def)\s
+    match: ^(def)(\s?\((private|open)\))?
+    captures:
+      '1': {name: keyword.declaration.def.ontol}
+      '2': {}
+      '3': {name: variable.parameter.ontol}
 
   - comment: rel declaration
     name: keyword.declaration.rel.ontol
@@ -35,8 +34,15 @@ patterns:
     match: (=>)
 
   - comment: map declaration
-    name: keyword.declaration.map.ontol
-    match: ^(map)\s
+    match: ^(map)(\s(\w+))?
+    captures:
+      '1': {name: keyword.declaration.map.ontol}
+      '2': {}
+      '3': {name: variable.ontol}
+
+  - comment: map match matcher
+    name: variable.parameter.ontol
+    match: \s(match)\s
 
   - comment: built-in defs
     name: storage.type.ontol
@@ -46,9 +52,13 @@ patterns:
     name: constant.language.ontol
     match: \b(true|false|inf|nan|\(\)|\[\])\b
 
-  - comment: built-in rel defs and generators
+  - comment: built-in rel props
     name: variable.function.ontol
-    match: \b(is|id|gen|default|example|auto|create_time|update_time)\b
+    match: \b(is|id|gen|default|example)\b
+
+  - comment: built-in generators
+    name: entity.name.function.ontol
+    match: \b(auto|create_time|update_time)\b
 
   - comment: numeric literal
     name: constant.numeric.ontol
