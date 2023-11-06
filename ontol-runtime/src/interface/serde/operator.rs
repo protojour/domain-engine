@@ -292,7 +292,7 @@ bitflags::bitflags! {
         const OPTIONAL        = 0b00000001;
         const READ_ONLY       = 0b00000010;
         const ENTITY_ID       = 0b00000100;
-        /// Property is part an the entity graph
+        /// Property is part of the entity graph
         const IN_ENTITY_GRAPH = 0b00001000;
     }
 }
