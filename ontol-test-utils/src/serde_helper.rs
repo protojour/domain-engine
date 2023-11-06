@@ -167,3 +167,12 @@ pub fn serde_raw<'b, 'on>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 'on>
         profile: ProcessorProfile::default(),
     }
 }
+
+pub fn serde_raw_tree_only<'b, 'on>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 'on> {
+    SerdeHelper {
+        binding,
+        mode: ProcessorMode::RawTreeOnly,
+        level: ProcessorLevel::new_root(),
+        profile: ProcessorProfile::default(),
+    }
+}

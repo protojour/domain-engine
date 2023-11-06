@@ -920,7 +920,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             }
 
             if let Some(target_properties) = self.relations.properties_by_def_id(type_def_id) {
-                if target_properties.identified_by.is_some() {
+                if target_properties.identified_by.is_some() && !property.is_entity_id {
                     flags |= SerdePropertyFlags::IN_ENTITY_GRAPH;
                 }
             }

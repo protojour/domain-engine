@@ -542,3 +542,38 @@ fn test_serde_recursion_limit() {
         );
     });
 }
+
+#[test]
+fn test_serialize_raw_tree_only() {
+    "
+    def bar {
+        rel .'key'|id: { rel .is: text }
+        rel .'bar_field': text
+    }
+    def foo {
+        rel .'key'|id: { rel .is: text }
+        rel .'foo_field': text
+        rel .'bar'?: bar
+    }
+    "
+    .compile_then(|test| {
+        let [foo] = test.bind(["foo"]);
+        let entity = serde_raw(&foo)
+            .to_value(json!({
+                "key": "a",
+                "foo_field": "1",
+                "bar": {
+                    "key": "b",
+                    "bar_field": "2"
+                }
+            }))
+            .unwrap();
+        assert_eq!(
+            serde_raw_tree_only(&foo).as_json(&entity),
+            json!({
+                "key": "a",
+                "foo_field": "1"
+            })
+        );
+    });
+}
