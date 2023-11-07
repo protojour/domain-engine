@@ -34,22 +34,24 @@ def some_def {
 # def modifiers
 `def` modifiers are contextual keywords appearing within parentheses right after the keyword: `def(modifiers)`.
 
-## pub
+## private
 
-`def(pub)` makes the definition *public*. It will be accessible to other domains if the domain is imported in a `use` statement, or if the domain is exposed as an API.
+`def(private)` makes the definition *private*. It will not be accessible to other domains if the domain is imported in a `use` statement.
 
 ```ontol
-def(pub) public_def
+def(private) public_def
 ```
 
-`pub` is transitive.
-
 ```ontol
-def some_def {}
+def(private) some_def {}
 
-def(pub) public_def {
+def public_def {
     rel . 'some_def': some_def
 }
 ```
 
 Including `some_def` in `public_def` will make `some_def` public, but it cannot be referred to directly except through `public_def`.
+
+## open
+
+`def(open)` makes the definition's immediate tree-like relations _open_, so that any arbitrary data can be associated with it.
