@@ -39,7 +39,7 @@ pub(super) struct SchemaBuilder<'a, 's, 'c, 'm> {
     /// The schema being generated
     pub schema: &'s mut GraphqlSchema,
     /// Tool to ensure global type names are unique
-    pub namespace: &'s mut GraphqlNamespace<'a>,
+    pub type_namespace: &'s mut GraphqlNamespace<'a>,
     /// The partial ontology containing TypeInfo (does not yet have SerdeOperators)
     pub partial_ontology: &'a Ontology,
     /// Serde generator for generating new serialization operators
@@ -206,7 +206,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
         self.schema.json_scalar = self.next_type_addr();
         self.schema.types.push(TypeData {
-            typename: self.namespace.unique_literal("_ontol_json"),
+            typename: self.type_namespace.unique_literal("_ontol_json"),
             input_typename: None,
             partial_input_typename: None,
             kind: TypeKind::CustomScalar(ScalarData {
@@ -385,10 +385,44 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
         let id_unit_type_ref = self.get_def_type_ref(entity_data.id_def_id, QLevel::Node);
 
+        let mut mutation_namespace = GraphqlNamespace::default();
+
         {
             let mutation = object_data_mut(self.schema.mutation, self.schema);
+
+            let entity_array_operator_addr = self
+                .serde_generator
+                .gen_addr(gql_array_serde_key(entity_data.node_def_id))
+                .unwrap();
+
             mutation.fields.insert(
-                self.namespace.create(type_info),
+                mutation_namespace.typename(type_info),
+                FieldData {
+                    kind: FieldKind::EntityMutation {
+                        create_arg: argument::EntityCreateInputsArg {
+                            type_addr: entity_data.type_addr,
+                            def_id: entity_data.node_def_id,
+                            operator_addr: entity_array_operator_addr,
+                        },
+                        update_arg: argument::EntityUpdateInputsArg {
+                            type_addr: entity_data.type_addr,
+                            def_id: entity_data.node_def_id,
+                            operator_addr: entity_array_operator_addr,
+                        },
+                        delete_arg: argument::EntityDeleteInputsArg {
+                            def_id: entity_data.id_def_id,
+                            operator_addr: self
+                                .serde_generator
+                                .gen_addr(gql_array_serde_key(entity_data.id_def_id))
+                                .unwrap(),
+                        },
+                    },
+                    field_type: TypeRef::mandatory(node_ref).to_array(Optionality::Optional),
+                },
+            );
+
+            mutation.fields.insert(
+                mutation_namespace.create(type_info),
                 FieldData {
                     kind: FieldKind::CreateMutation {
                         input: argument::InputArg {
@@ -403,7 +437,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             );
 
             mutation.fields.insert(
-                self.namespace.update(type_info),
+                mutation_namespace.update(type_info),
                 FieldData {
                     kind: FieldKind::UpdateMutation {
                         input: argument::InputArg {
@@ -422,7 +456,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             );
 
             mutation.fields.insert(
-                self.namespace.delete(type_info),
+                mutation_namespace.delete(type_info),
                 FieldData {
                     kind: FieldKind::DeleteMutation {
                         id: argument::IdArg {

@@ -164,7 +164,7 @@ impl<'a> SelectAnalyzer<'a> {
                             select => select,
                         },
                     })),
-                    (TypeModifier::Array(..), _) => {
+                    (TypeModifier::Array { .. }, _) => {
                         panic!("Should be a MapConnection");
                     }
                 }

@@ -54,7 +54,7 @@ pub fn generate_graphql_schema<'c>(
         SchemaBuilder {
             lazy_tasks: vec![],
             schema: &mut schema,
-            namespace: &mut namespace,
+            type_namespace: &mut namespace,
             partial_ontology,
             serde_generator,
             relations,

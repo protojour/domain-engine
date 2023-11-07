@@ -270,12 +270,18 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             }
             SerdeOperator::DynamicSequence => panic!("No dynamic sequence expected here"),
             SerdeOperator::RelationSequence(seq_op) => {
+                let array_modifier = TypeModifier::Array {
+                    array: modifier.unit_optionality(),
+                    element: Optionality::Mandatory,
+                };
+
                 match self
                     .schema_ctx
                     .type_addr_by_def(seq_op.def.def_id, QueryLevel::Edge { rel_params })
                 {
-                    Some(type_addr) => self.registry.arg::<Option<Vec<InputType>>>(
+                    Some(type_addr) => self.modified_arg::<InputType>(
                         name,
+                        array_modifier,
                         &self
                             .schema_ctx
                             .get_schema_type(type_addr, TypingPurpose::InputOrReference),
@@ -285,7 +291,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         seq_op.ranges[0].addr,
                         rel_params,
                         property_flags,
-                        TypeModifier::Array(modifier.unit_optionality(), Optionality::Mandatory),
+                        array_modifier,
                     ),
                 }
             }
@@ -324,7 +330,9 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 let type_addr = self
                     .schema_ctx
                     .type_addr_by_def(def_id, query_level)
-                    .expect("No union found");
+                    .unwrap_or_else(|| {
+                        panic!("no union found: {def_id:?}. union_op={union_op:#?}")
+                    });
 
                 let info = self.schema_ctx.get_schema_type(type_addr, typing_purpose);
 
@@ -399,6 +407,15 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             FieldKind::DeleteMutation { id } => {
                 arguments.extend(self.get_domain_field_arg(id));
             }
+            FieldKind::EntityMutation {
+                create_arg,
+                update_arg,
+                delete_arg,
+            } => {
+                arguments.extend(self.get_domain_field_arg(create_arg));
+                arguments.extend(self.get_domain_field_arg(update_arg));
+                arguments.extend(self.get_domain_field_arg(delete_arg));
+            }
             FieldKind::Property(_)
             | FieldKind::EdgeProperty(_)
             | FieldKind::Id(_)
@@ -422,13 +439,12 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         field_arg: &dyn DomainFieldArg,
     ) -> Option<juniper::meta::Argument<'r, GqlScalar>> {
         let arg = match field_arg.kind() {
-            ArgKind::Addr(type_addr) => {
+            ArgKind::Addr(type_addr, modifier) => {
                 let schema_type = self
                     .schema_ctx
                     .get_schema_type(type_addr, field_arg.typing_purpose());
 
-                self.registry
-                    .arg::<InputType>(field_arg.name(), &schema_type)
+                self.modified_arg::<InputType>(field_arg.name(), modifier, &schema_type)
             }
             ArgKind::Operator(addr) => self.get_operator_argument(
                 field_arg.name(),
@@ -441,8 +457,11 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         };
 
         Some(match field_arg.default_arg() {
+            Some(default_arg) => arg.default_value(match default_arg {
+                DefaultArg::EmptyObject => juniper::InputValue::Object(vec![]),
+                DefaultArg::EmptyList => juniper::InputValue::List(vec![]),
+            }),
             None => arg,
-            Some(DefaultArg::EmptyObject) => arg.default_value(juniper::InputValue::Object(vec![])),
         })
     }
 
@@ -493,18 +512,20 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             TypeModifier::Unit(Optionality::Optional) => {
                 self.registry.get_type::<Option<T>>(type_info)
             }
-            TypeModifier::Array(Optionality::Mandatory, Optionality::Mandatory) => {
-                self.registry.get_type::<Vec<T>>(type_info)
-            }
-            TypeModifier::Array(Optionality::Mandatory, Optionality::Optional) => {
-                self.registry.get_type::<Vec<Option<T>>>(type_info)
-            }
-            TypeModifier::Array(Optionality::Optional, Optionality::Mandatory) => {
-                self.registry.get_type::<Option<Vec<T>>>(type_info)
-            }
-            TypeModifier::Array(Optionality::Optional, Optionality::Optional) => {
-                self.registry.get_type::<Option<Vec<Option<T>>>>(type_info)
-            }
+            TypeModifier::Array { array, element } => match (array, element) {
+                (Optionality::Mandatory, Optionality::Mandatory) => {
+                    self.registry.get_type::<Vec<T>>(type_info)
+                }
+                (Optionality::Mandatory, Optionality::Optional) => {
+                    self.registry.get_type::<Vec<Option<T>>>(type_info)
+                }
+                (Optionality::Optional, Optionality::Mandatory) => {
+                    self.registry.get_type::<Option<Vec<T>>>(type_info)
+                }
+                (Optionality::Optional, Optionality::Optional) => {
+                    self.registry.get_type::<Option<Vec<Option<T>>>>(type_info)
+                }
+            },
         }
     }
 
@@ -524,18 +545,20 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             TypeModifier::Unit(Optionality::Optional) => {
                 self.registry.arg::<Option<T>>(name, type_info)
             }
-            TypeModifier::Array(Optionality::Mandatory, Optionality::Mandatory) => {
-                self.registry.arg::<Vec<T>>(name, type_info)
-            }
-            TypeModifier::Array(Optionality::Mandatory, Optionality::Optional) => {
-                self.registry.arg::<Vec<Option<T>>>(name, type_info)
-            }
-            TypeModifier::Array(Optionality::Optional, Optionality::Mandatory) => {
-                self.registry.arg::<Option<Vec<T>>>(name, type_info)
-            }
-            TypeModifier::Array(Optionality::Optional, Optionality::Optional) => {
-                self.registry.arg::<Option<Vec<Option<T>>>>(name, type_info)
-            }
+            TypeModifier::Array { array, element } => match (array, element) {
+                (Optionality::Mandatory, Optionality::Mandatory) => {
+                    self.registry.arg::<Vec<T>>(name, type_info)
+                }
+                (Optionality::Mandatory, Optionality::Optional) => {
+                    self.registry.arg::<Vec<Option<T>>>(name, type_info)
+                }
+                (Optionality::Optional, Optionality::Mandatory) => {
+                    self.registry.arg::<Option<Vec<T>>>(name, type_info)
+                }
+                (Optionality::Optional, Optionality::Optional) => {
+                    self.registry.arg::<Option<Vec<Option<T>>>>(name, type_info)
+                }
+            },
         }
     }
 }

@@ -61,7 +61,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     let rel_type_info = self.partial_ontology.get_type_info(rel_def_id);
                     let rel_edge_ref = self.get_def_type_ref(rel_def_id, QLevel::Node);
 
-                    let typename = self.namespace.edge(Some(rel_type_info), type_info);
+                    let typename = self.type_namespace.edge(Some(rel_type_info), type_info);
 
                     self.lazy_tasks.push(LazyTask::HarvestFields {
                         type_addr: edge_addr,
@@ -74,7 +74,8 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         TypeData {
                             typename,
                             input_typename: Some(
-                                self.namespace.edge_input(Some(rel_type_info), type_info),
+                                self.type_namespace
+                                    .edge_input(Some(rel_type_info), type_info),
                             ),
                             partial_input_typename: None,
                             kind: TypeKind::Object(ObjectData {
@@ -91,8 +92,8 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     NewType::Addr(
                         edge_addr,
                         TypeData {
-                            typename: self.namespace.edge(None, type_info),
-                            input_typename: Some(self.namespace.edge_input(None, type_info)),
+                            typename: self.type_namespace.edge(None, type_info),
+                            input_typename: Some(self.type_namespace.edge_input(None, type_info)),
                             partial_input_typename: None,
                             kind: TypeKind::Object(ObjectData {
                                 fields,
@@ -116,7 +117,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 NewType::Addr(
                     connection_index,
                     TypeData {
-                        typename: self.namespace.connection(type_info),
+                        typename: self.type_namespace.connection(type_info),
                         input_typename: None,
                         partial_input_typename: None,
                         kind: TypeKind::Object(ObjectData {
@@ -219,9 +220,9 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 NewType::Addr(
                     type_addr,
                     TypeData {
-                        typename: self.namespace.typename(type_info),
-                        input_typename: Some(self.namespace.input(type_info)),
-                        partial_input_typename: Some(self.namespace.partial_input(type_info)),
+                        typename: self.type_namespace.typename(type_info),
+                        input_typename: Some(self.type_namespace.input(type_info)),
+                        partial_input_typename: Some(self.type_namespace.partial_input(type_info)),
                         kind: type_kind,
                     },
                 )
@@ -259,9 +260,11 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 NewType::Addr(
                     node_index,
                     TypeData {
-                        typename: self.namespace.typename(type_info),
-                        input_typename: Some(self.namespace.union_input(type_info)),
-                        partial_input_typename: Some(self.namespace.union_partial_input(type_info)),
+                        typename: self.type_namespace.typename(type_info),
+                        input_typename: Some(self.type_namespace.union_input(type_info)),
+                        partial_input_typename: Some(
+                            self.type_namespace.union_partial_input(type_info),
+                        ),
                         kind: if needs_scalar {
                             TypeKind::CustomScalar(ScalarData { operator_addr })
                         } else {
@@ -285,9 +288,9 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 NewType::Addr(
                     type_addr,
                     TypeData {
-                        typename: self.namespace.typename(type_info),
-                        input_typename: Some(self.namespace.input(type_info)),
-                        partial_input_typename: Some(self.namespace.partial_input(type_info)),
+                        typename: self.type_namespace.typename(type_info),
+                        input_typename: Some(self.type_namespace.input(type_info)),
+                        partial_input_typename: Some(self.type_namespace.partial_input(type_info)),
                         kind: TypeKind::CustomScalar(ScalarData { operator_addr }),
                     },
                 )

@@ -75,6 +75,7 @@ impl<'a> ArgsWrapper<'a> {
                 let unlocated_span = juniper::Span::unlocated();
                 let default_value: juniper::LookAheadValue<GqlScalar> =
                     match field_arg.default_arg() {
+                        Some(DefaultArg::EmptyList) => LookAheadValue::List(vec![]),
                         Some(DefaultArg::EmptyObject) => LookAheadValue::Object(vec![]),
                         None => {
                             return Err(juniper::FieldError::new(

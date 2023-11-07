@@ -33,7 +33,10 @@ impl Optionality {
 #[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub enum TypeModifier {
     Unit(Optionality),
-    Array(Optionality, Optionality),
+    Array {
+        array: Optionality,
+        element: Optionality,
+    },
 }
 
 impl TypeModifier {
@@ -44,7 +47,7 @@ impl TypeModifier {
     pub fn unit_optionality(&self) -> Optionality {
         match self {
             Self::Unit(unit) => *unit,
-            Self::Array(_, unit) => *unit,
+            Self::Array { element, .. } => *element,
         }
     }
 }
@@ -103,7 +106,10 @@ impl TypeRef {
 
     pub fn to_array(self, array_optionality: Optionality) -> Self {
         Self {
-            modifier: TypeModifier::Array(array_optionality, self.modifier.unit_optionality()),
+            modifier: TypeModifier::Array {
+                array: array_optionality,
+                element: self.modifier.unit_optionality(),
+            },
             unit: self.unit,
         }
     }
@@ -237,6 +243,11 @@ pub enum FieldKind {
     PageInfo,
     TotalCount,
     OpenData,
+    ConnectionProperty {
+        property_id: PropertyId,
+        first_arg: argument::FirstArg,
+        after_arg: argument::AfterArg,
+    },
     /// A connection from a map statement
     MapConnection {
         key: [MapKey; 2],
@@ -251,10 +262,10 @@ pub enum FieldKind {
         queries: FnvHashMap<PropertyId, Var>,
         input_arg: argument::MapInputArg,
     },
-    ConnectionProperty {
-        property_id: PropertyId,
-        first_arg: argument::FirstArg,
-        after_arg: argument::AfterArg,
+    EntityMutation {
+        create_arg: argument::EntityCreateInputsArg,
+        update_arg: argument::EntityUpdateInputsArg,
+        delete_arg: argument::EntityDeleteInputsArg,
     },
     CreateMutation {
         input: argument::InputArg,
