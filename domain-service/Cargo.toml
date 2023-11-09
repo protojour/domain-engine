@@ -20,3 +20,7 @@ axum = "0.6"
 anyhow = "1"
 tower-http = { version = "0.4", features = ["trace"] }
 tikv-jemallocator = "0.5"
+
+[dependencies.juniper_axum]
+git = "https://github.com/protojour/juniper"
+branch = "protojour-mods"

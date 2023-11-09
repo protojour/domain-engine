@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use axum::Extension;
 use domain_engine_juniper::{gql_scalar::GqlScalar, juniper};
+use juniper_axum::extract::JuniperRequest;
 
 pub struct GraphqlService {
     pub schema: domain_engine_juniper::Schema,
@@ -11,7 +12,7 @@ pub struct GraphqlService {
 
 pub async fn graphql_handler(
     Extension(service): Extension<Arc<GraphqlService>>,
-    GraphQLRequest(batch_request): GraphQLRequest,
+    JuniperRequest(batch_request): JuniperRequest<GqlScalar>,
 ) -> (
     axum::http::StatusCode,
     axum::Json<juniper::http::GraphQLBatchResponse<GqlScalar>>,
@@ -32,42 +33,6 @@ pub async fn graphql_handler(
 
 pub async fn graphiql_handler() -> axum::response::Html<&'static str> {
     axum::response::Html(GRAPHIQL)
-}
-
-pub struct GraphQLRequest(pub juniper::http::GraphQLBatchRequest<GqlScalar>);
-
-#[async_trait::async_trait]
-impl<S: Send + Sync> axum::extract::FromRequest<S, axum::body::Body> for GraphQLRequest {
-    type Rejection = (axum::http::StatusCode, String);
-
-    async fn from_request(
-        req: axum::http::Request<axum::body::Body>,
-        state: &S,
-    ) -> Result<Self, Self::Rejection> {
-        let content_type = req.headers().get("content-type").ok_or_else(|| {
-            (
-                axum::http::StatusCode::BAD_REQUEST,
-                "no content-type header".to_owned(),
-            )
-        })?;
-
-        match content_type.to_str() {
-            Ok("application/json" | "application/graphql") => {
-                let graphql_request =
-                    axum::Json::<juniper::http::GraphQLBatchRequest<GqlScalar>>::from_request(
-                        req, state,
-                    )
-                    .await
-                    .map_err(|err| (axum::http::StatusCode::BAD_REQUEST, err.to_string()))?;
-
-                Ok(GraphQLRequest(graphql_request.0))
-            }
-            _ => Err((
-                axum::http::StatusCode::BAD_REQUEST,
-                "invalid content-type".to_owned(),
-            )),
-        }
-    }
 }
 
 const GRAPHIQL: &str = r#"

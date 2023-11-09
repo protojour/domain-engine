@@ -7,12 +7,10 @@ use axum::Extension;
 use clap::Parser;
 use domain_engine_core::{data_store::DefaultDataStoreFactory, DomainEngine};
 use domain_engine_juniper::CreateSchemaError;
-use graphql::{graphiql_handler, GraphqlService};
+use graphql::{graphiql_handler, graphql_handler, GraphqlService};
 use ontol_runtime::{ontology::Ontology, PackageId};
 use tracing::info;
 use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt, util::SubscriberInitExt};
-
-use crate::graphql::graphql_handler;
 
 mod graphql;
 

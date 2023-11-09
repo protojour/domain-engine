@@ -671,6 +671,7 @@ dependencies = [
  "clap",
  "domain-engine-core",
  "domain-engine-juniper",
+ "juniper_axum",
  "ontol-runtime",
  "serde_json",
  "smartstring",
@@ -783,6 +784,7 @@ checksum = "da0290714b38af9b4a7b094b8a37086d1b4e61f2df9122c3cad2577669145335"
 dependencies = [
  "futures-channel",
  "futures-core",
+ "futures-executor",
  "futures-io",
  "futures-sink",
  "futures-task",
@@ -814,6 +816,17 @@ dependencies = [
  "derive_utils",
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "futures-executor"
+version = "0.3.29"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0f4fb8693db0cf099eadcca0efe2a5a22e4550f98ed16aba6c48700da29597bc"
+dependencies = [
+ "futures-core",
+ "futures-task",
+ "futures-util",
 ]
 
 [[package]]
@@ -1134,6 +1147,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "juniper_axum"
+version = "0.1.0"
+source = "git+https://github.com/protojour/juniper?branch=protojour-mods#b483786cd8dcea53110ec9d4c4697bbe2a3e873f"
+dependencies = [
+ "axum",
+ "bytes",
+ "juniper",
+ "juniper_graphql_ws",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "juniper_codegen"
 version = "0.16.0-dev"
 source = "git+https://github.com/protojour/juniper?branch=protojour-mods#b483786cd8dcea53110ec9d4c4697bbe2a3e873f"
@@ -1142,6 +1168,26 @@ dependencies = [
  "quote",
  "syn 2.0.38",
  "url",
+]
+
+[[package]]
+name = "juniper_graphql_ws"
+version = "0.4.0-dev"
+source = "git+https://github.com/protojour/juniper?branch=protojour-mods#b483786cd8dcea53110ec9d4c4697bbe2a3e873f"
+dependencies = [
+ "juniper",
+ "juniper_subscriptions",
+ "serde",
+ "tokio",
+]
+
+[[package]]
+name = "juniper_subscriptions"
+version = "0.17.0-dev"
+source = "git+https://github.com/protojour/juniper?branch=protojour-mods#b483786cd8dcea53110ec9d4c4697bbe2a3e873f"
+dependencies = [
+ "futures",
+ "juniper",
 ]
 
 [[package]]
