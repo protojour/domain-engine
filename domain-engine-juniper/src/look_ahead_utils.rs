@@ -205,7 +205,7 @@ impl<'a, 'de> de::Deserializer<'de> for LookAheadValueDeserializer<'a> {
                 let mut iterator = vec.iter().fuse();
                 let value = visitor
                     .visit_seq(SeqDeserializer::<_>::new(&mut iterator))
-                    .context(&self.span)?;
+                    .context(self.span)?;
                 match iterator.next() {
                     Some(item) => Err(Error::trailing_characters().with_span(item.span)),
                     None => Ok(value),
@@ -215,7 +215,7 @@ impl<'a, 'de> de::Deserializer<'de> for LookAheadValueDeserializer<'a> {
                 let mut iterator = vec.iter().fuse();
                 let value = visitor
                     .visit_map(ObjectDeserializer::<_>::new(&mut iterator))
-                    .context(&self.span)?;
+                    .context(self.span)?;
                 match iterator.next() {
                     Some((key, _)) => Err(Error::trailing_characters().with_span(key.span)),
                     None => Ok(value),
@@ -229,7 +229,7 @@ impl<'a, 'de> de::Deserializer<'de> for LookAheadValueDeserializer<'a> {
             LookAheadValue::Null => visitor.visit_none::<Error>().context(self.span),
             _ => {
                 let span = self.span;
-                visitor.visit_some(self).context(&span)
+                visitor.visit_some(self).context(span)
             }
         }
     }
@@ -267,7 +267,7 @@ where
                 self.count += 1;
                 seed.deserialize(LookAheadValueDeserializer {
                     value: &spanned_value.item,
-                    span: &spanned_value.span,
+                    span: spanned_value.span,
                 })
                 .map(Some)
             }
