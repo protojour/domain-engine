@@ -207,7 +207,7 @@ impl<'a> SelectAnalyzer<'a> {
                 let mut selection = None;
 
                 for field_look_ahead in look_ahead.children() {
-                    let field_name = field_look_ahead.field_name_unaliased();
+                    let field_name = field_look_ahead.field_original_name();
                     let field_data = object_data.fields.get(field_name).unwrap();
 
                     if let FieldKind::Node = &field_data.kind {
@@ -271,7 +271,7 @@ impl<'a> SelectAnalyzer<'a> {
         let mut include_total_len = false;
 
         for field_look_ahead in look_ahead.children() {
-            let field_name = field_look_ahead.field_name_unaliased();
+            let field_name = field_look_ahead.field_original_name();
             let field_data = connection_object_data.fields.get(field_name).unwrap();
 
             match &field_data.kind {
@@ -308,7 +308,7 @@ impl<'a> SelectAnalyzer<'a> {
                     FnvHashMap::default();
 
                 for field_look_ahead in look_ahead.children() {
-                    let field_name = field_look_ahead.field_name_unaliased();
+                    let field_name = field_look_ahead.field_original_name();
 
                     let applies_for = field_look_ahead.applies_for();
 
@@ -341,7 +341,7 @@ impl<'a> SelectAnalyzer<'a> {
 
                         let variant_map = union_map.entry(def_id).or_default();
                         let field_data =
-                            fields.get(field_look_ahead.field_name_unaliased()).unwrap();
+                            fields.get(field_look_ahead.field_original_name()).unwrap();
 
                         if let Some(selection) =
                             self.analyze_selection(field_look_ahead, field_data)?
@@ -376,7 +376,7 @@ impl<'a> SelectAnalyzer<'a> {
                 let mut properties: FnvHashMap<PropertyId, Select> = FnvHashMap::default();
 
                 for field_look_ahead in look_ahead.children() {
-                    let field_name = field_look_ahead.field_name_unaliased();
+                    let field_name = field_look_ahead.field_original_name();
                     let field_data = object_data.fields.get(field_name).unwrap();
 
                     if let Some(selection) = self.analyze_selection(field_look_ahead, field_data)? {

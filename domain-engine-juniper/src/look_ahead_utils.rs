@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use juniper::{graphql_value, parser::SourcePosition, LookAheadArgument, LookAheadValue, Spanning};
+use juniper::{graphql_value, LookAheadArgument, LookAheadValue};
 use ontol_runtime::{
     interface::{
         graphql::argument::{self, DefaultArg},
@@ -35,7 +35,8 @@ impl<'a> ArgsWrapper<'a> {
             None => Ok(None),
             Some(argument) => {
                 let value = Option::<T>::deserialize(LookAheadValueDeserializer {
-                    value: argument.spanned_value(),
+                    value: argument.value(),
+                    span: argument.span(),
                 })
                 .map_err(|error| {
                     juniper::FieldError::new(
@@ -67,11 +68,13 @@ impl<'a> ArgsWrapper<'a> {
 
         let result = match self.find_argument(arg_name) {
             Some(argument) => serde_processor.deserialize(LookAheadValueDeserializer {
-                value: argument.spanned_value(),
+                value: argument.value(),
+                span: argument.span(),
             }),
-            None => serde_processor.deserialize(LookAheadValueDeserializer {
-                value: &Spanning {
-                    item: match field_arg.default_arg() {
+            None => {
+                let unlocated_span = juniper::Span::unlocated();
+                let default_value: juniper::LookAheadValue<GqlScalar> =
+                    match field_arg.default_arg() {
                         Some(DefaultArg::EmptyObject) => LookAheadValue::Object(vec![]),
                         None => {
                             return Err(juniper::FieldError::new(
@@ -79,11 +82,13 @@ impl<'a> ArgsWrapper<'a> {
                                 graphql_value!(None),
                             ))
                         }
-                    },
-                    start: SourcePosition::new_origin(),
-                    end: SourcePosition::new_origin(),
-                },
-            }),
+                    };
+
+                serde_processor.deserialize(LookAheadValueDeserializer {
+                    value: &default_value,
+                    span: &unlocated_span,
+                })
+            }
         };
 
         result.map_err(|error| juniper::FieldError::new(error, graphql_value!(None)))
@@ -97,18 +102,42 @@ impl<'a> ArgsWrapper<'a> {
 #[derive(Debug)]
 struct Error {
     msg: smartstring::alias::String,
-    start: Option<juniper::parser::SourcePosition>,
+    start_pos: Option<juniper::parser::SourcePosition>,
+}
+
+impl Error {
+    fn new(msg: impl Into<smartstring::alias::String>) -> Self {
+        Self {
+            msg: msg.into(),
+            start_pos: None,
+        }
+    }
+
+    fn trailing_characters() -> Self {
+        Self::new("trailing characters")
+    }
+
+    fn with_span(mut self, span: &juniper::Span) -> Self {
+        self.set_span(span);
+        self
+    }
+
+    fn set_span(&mut self, span: &juniper::Span) {
+        if self.start_pos.is_none() && span.start != span.end {
+            self.start_pos = Some(span.start);
+        }
+    }
 }
 
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let msg = &self.msg;
-        if let Some(start) = &self.start {
+        if let Some(start_pos) = &self.start_pos {
             write!(
                 f,
                 "{msg} in input at line {} column {}",
-                start.line(),
-                start.column()
+                start_pos.line(),
+                start_pos.column()
             )
         } else {
             write!(f, "{msg}")
@@ -125,62 +154,60 @@ impl de::Error for Error {
     {
         Self {
             msg: smart_format!("{}", msg),
-            start: None,
+            start_pos: None,
         }
     }
 }
 
 trait ErrorContext {
-    fn context(self, pos: &SourcePosition) -> Self;
+    fn context(self, span: &juniper::Span) -> Self;
 }
 
 impl<T> ErrorContext for Result<T, Error> {
-    fn context(self, pos: &SourcePosition) -> Self {
+    fn context(self, span: &juniper::Span) -> Self {
         self.map_err(|mut error| {
-            if error.start.is_none() {
-                error.start = Some(*pos);
-            }
+            error.set_span(span);
             error
         })
     }
 }
 
+type BorrowedSpanning<'a, T> = juniper::Spanning<T, &'a juniper::Span>;
+
 struct LookAheadValueDeserializer<'a> {
-    value: &'a Spanning<LookAheadValue<'a, GqlScalar>>,
+    value: &'a LookAheadValue<'a, GqlScalar>,
+    span: &'a juniper::Span,
 }
 
 impl<'a, 'de> de::Deserializer<'de> for LookAheadValueDeserializer<'a> {
     type Error = Error;
 
     fn deserialize_any<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
-        match &self.value.item {
-            LookAheadValue::Null => visitor.visit_none::<Error>().context(&self.value.start),
+        match self.value {
+            LookAheadValue::Null => visitor.visit_none::<Error>().context(self.span),
             LookAheadValue::Scalar(GqlScalar::I32(value)) => {
-                visitor.visit_i32(*value).context(&self.value.start)
+                visitor.visit_i32(*value).context(self.span)
             }
             LookAheadValue::Scalar(GqlScalar::I64(value)) => {
-                visitor.visit_i64(*value).context(&self.value.start)
+                visitor.visit_i64(*value).context(self.span)
             }
             LookAheadValue::Scalar(GqlScalar::F64(value)) => {
-                visitor.visit_f64(*value).context(&self.value.start)
+                visitor.visit_f64(*value).context(self.span)
             }
             LookAheadValue::Scalar(GqlScalar::Boolean(value)) => {
-                visitor.visit_bool(*value).context(&self.value.start)
+                visitor.visit_bool(*value).context(self.span)
             }
             LookAheadValue::Scalar(GqlScalar::String(value)) => {
-                visitor.visit_str(value).context(&self.value.start)
+                visitor.visit_str(value).context(self.span)
             }
             LookAheadValue::Enum(value) => visitor.visit_str(value),
             LookAheadValue::List(vec) => {
                 let mut iterator = vec.iter().fuse();
                 let value = visitor
                     .visit_seq(SeqDeserializer::<_>::new(&mut iterator))
-                    .context(&self.value.start)?;
+                    .context(&self.span)?;
                 match iterator.next() {
-                    Some(item) => Err(Error {
-                        msg: "trailing characters".into(),
-                        start: Some(item.start),
-                    }),
+                    Some(item) => Err(Error::trailing_characters().with_span(item.span)),
                     None => Ok(value),
                 }
             }
@@ -188,12 +215,9 @@ impl<'a, 'de> de::Deserializer<'de> for LookAheadValueDeserializer<'a> {
                 let mut iterator = vec.iter().fuse();
                 let value = visitor
                     .visit_map(ObjectDeserializer::<_>::new(&mut iterator))
-                    .context(&self.value.start)?;
+                    .context(&self.span)?;
                 match iterator.next() {
-                    Some((key, _)) => Err(Error {
-                        msg: "trailing characters".into(),
-                        start: Some(key.start),
-                    }),
+                    Some((key, _)) => Err(Error::trailing_characters().with_span(key.span)),
                     None => Ok(value),
                 }
             }
@@ -201,11 +225,11 @@ impl<'a, 'de> de::Deserializer<'de> for LookAheadValueDeserializer<'a> {
     }
 
     fn deserialize_option<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
-        match &self.value.item {
-            LookAheadValue::Null => visitor.visit_none::<Error>().context(&self.value.start),
+        match self.value {
+            LookAheadValue::Null => visitor.visit_none::<Error>().context(self.span),
             _ => {
-                let pos = self.value.start;
-                visitor.visit_some(self).context(&pos)
+                let span = self.span;
+                visitor.visit_some(self).context(&span)
             }
         }
     }
@@ -230,7 +254,7 @@ impl<'i, I: Iterator> SeqDeserializer<'i, I> {
 
 impl<'a, 'i, 'de, I> de::SeqAccess<'de> for SeqDeserializer<'i, I>
 where
-    I: Iterator<Item = &'a Spanning<LookAheadValue<'a, GqlScalar>>>,
+    I: Iterator<Item = &'a BorrowedSpanning<'a, LookAheadValue<'a, GqlScalar>>>,
 {
     type Error = Error;
 
@@ -239,10 +263,13 @@ where
         V: de::DeserializeSeed<'de>,
     {
         match self.iter.next() {
-            Some(value) => {
+            Some(spanned_value) => {
                 self.count += 1;
-                seed.deserialize(LookAheadValueDeserializer { value })
-                    .map(Some)
+                seed.deserialize(LookAheadValueDeserializer {
+                    value: &spanned_value.item,
+                    span: &spanned_value.span,
+                })
+                .map(Some)
             }
             None => Ok(None),
         }
@@ -258,7 +285,7 @@ where
 
 struct ObjectDeserializer<'a, 'i, I> {
     iter: &'i mut std::iter::Fuse<I>,
-    state: MapState<&'a Spanning<LookAheadValue<'a, GqlScalar>>>,
+    state: MapState<&'a BorrowedSpanning<'a, LookAheadValue<'a, GqlScalar>>>,
     _count: usize,
 }
 
@@ -274,7 +301,12 @@ impl<'a, 'i, I: Iterator> ObjectDeserializer<'a, 'i, I> {
 
 impl<'a, 'i, 'de, I> de::MapAccess<'de> for ObjectDeserializer<'a, 'i, I>
 where
-    I: Iterator<Item = &'a (Spanning<&'a str>, Spanning<LookAheadValue<'a, GqlScalar>>)>,
+    I: Iterator<
+        Item = &'a (
+            BorrowedSpanning<'a, &'a str>,
+            BorrowedSpanning<'a, LookAheadValue<'a, GqlScalar>>,
+        ),
+    >,
 {
     type Error = Error;
 
@@ -283,9 +315,10 @@ where
         K: de::DeserializeSeed<'de>,
     {
         match (self.iter.next(), &self.state) {
-            (Some((key, value)), MapState::NextKey) => {
-                self.state = MapState::NextValue(value);
-                seed.deserialize(key.item.into_deserializer()).map(Some)
+            (Some((spanned_key, spanned_value)), MapState::NextKey) => {
+                self.state = MapState::NextValue(spanned_value);
+                seed.deserialize(spanned_key.item.into_deserializer())
+                    .map(Some)
             }
             (None, MapState::NextKey) => Ok(None),
             (_, MapState::NextValue(_)) => panic!("should call next_value"),
@@ -297,7 +330,10 @@ where
         V: de::DeserializeSeed<'de>,
     {
         match std::mem::take(&mut self.state) {
-            MapState::NextValue(value) => seed.deserialize(LookAheadValueDeserializer { value }),
+            MapState::NextValue(spanned_value) => seed.deserialize(LookAheadValueDeserializer {
+                value: &spanned_value.item,
+                span: spanned_value.span,
+            }),
             MapState::NextKey => panic!("should call next_key"),
         }
     }
