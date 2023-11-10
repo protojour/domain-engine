@@ -17,7 +17,7 @@ use crate::{
 };
 
 use super::{
-    processor::{ProcessorLevel, ProcessorMode},
+    processor::{ProcessorLevel, ProcessorMode, ProcessorProfile, ProcessorProfileFlags},
     SerdeDef,
 };
 
@@ -217,7 +217,15 @@ impl StructOperator {
         &self,
         mode: ProcessorMode,
         parent_property_id: Option<PropertyId>,
+        profile: &ProcessorProfile,
     ) -> usize {
+        if profile
+            .flags
+            .contains(ProcessorProfileFlags::ALL_PROPS_OPTIONAL)
+        {
+            return 0;
+        }
+
         self.filter_properties(mode, parent_property_id)
             .filter(|(_, property)| !property.is_optional())
             .count()
@@ -245,6 +253,14 @@ impl SerdeProperty {
     #[inline]
     pub fn is_optional(&self) -> bool {
         self.flags.contains(SerdePropertyFlags::OPTIONAL)
+    }
+
+    #[inline]
+    pub(crate) fn is_optional_in_profile(&self, profile: &ProcessorProfile) -> bool {
+        self.is_optional()
+            || profile
+                .flags
+                .contains(ProcessorProfileFlags::ALL_PROPS_OPTIONAL)
     }
 
     #[inline]

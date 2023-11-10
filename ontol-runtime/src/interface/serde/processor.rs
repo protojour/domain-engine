@@ -172,6 +172,8 @@ bitflags::bitflags! {
         const SERIALIZE_OPEN_DATA   = 0b00000001;
         /// Allow deserialize of open ("unknown") properties
         const DESERIALIZE_OPEN_DATA = 0b00000010;
+        /// Treat every property as optional
+        const ALL_PROPS_OPTIONAL    = 0b00000100;
     }
 }
 

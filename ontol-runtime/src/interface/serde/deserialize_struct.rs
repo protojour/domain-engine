@@ -77,8 +77,11 @@ impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
             self.processor,
             &self.struct_op.properties,
             self.struct_op.flags,
-            self.struct_op
-                .required_count(self.processor.mode, self.processor.ctx.parent_property_id),
+            self.struct_op.required_count(
+                self.processor.mode,
+                self.processor.ctx.parent_property_id,
+                self.processor.profile,
+            ),
             SpecialAddrs {
                 rel_params: self.ctx.rel_params_addr,
                 id: None,
@@ -151,7 +154,7 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
                     )
                     .map_err(RecursionLimitError::to_de_error)?;
 
-                if serde_property.is_optional() {
+                if serde_property.is_optional_in_profile(processor.profile) {
                     if let Some(attr) =
                         deserializer.deserialize_option(property_processor.to_option_processor())?
                     {
@@ -211,7 +214,7 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
                     )
                     .map_err(RecursionLimitError::to_de_error)?;
 
-                if serde_property.is_optional() {
+                if serde_property.is_optional_in_profile(processor.profile) {
                     if let Some(attr) =
                         map.next_value_seed(property_processor.to_option_processor())?
                     {
@@ -245,7 +248,9 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
         for (_, property) in properties {
             // Only _default values_ are handled in the deserializer:
             if let Some(ValueGenerator::DefaultProc(address)) = property.value_generator {
-                if !property.is_optional() && !attributes.contains_key(&property.property_id) {
+                if !property.is_optional_in_profile(processor.profile)
+                    && !attributes.contains_key(&property.property_id)
+                {
                     let procedure = Procedure {
                         address,
                         n_params: NParams(0),
