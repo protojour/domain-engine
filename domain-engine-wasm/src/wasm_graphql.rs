@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use domain_engine_core::{data_store::DefaultDataStoreFactory, DomainEngine};
+use domain_engine_core::{data_store::DefaultDataStoreFactory, system::SystemAPI, DomainEngine};
 use domain_engine_juniper::{create_graphql_schema, juniper, Schema};
 use ontol_runtime::{ontology::Ontology, PackageId};
 use serde::Serialize;
@@ -15,6 +15,14 @@ pub struct WasmGraphqlSchema {
     service_ctx: domain_engine_juniper::context::ServiceCtx,
 }
 
+pub struct WasmSystem;
+
+impl SystemAPI for WasmSystem {
+    fn current_time(&self) -> chrono::DateTime<chrono::Utc> {
+        chrono::Utc::now()
+    }
+}
+
 #[wasm_bindgen]
 impl WasmGraphqlSchema {
     pub(crate) async fn create(
@@ -24,6 +32,7 @@ impl WasmGraphqlSchema {
         // Since the domain engine currently gets created here,
         // its data store (if any) won't be shared with other interfaces.
         let domain_engine = DomainEngine::builder(ontology.clone())
+            .system(Box::new(WasmSystem))
             .build::<DefaultDataStoreFactory>()
             .await;
 

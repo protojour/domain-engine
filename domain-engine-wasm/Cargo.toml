@@ -10,6 +10,7 @@ crate-type = ["cdylib", "rlib"]
 doctest = false
 
 [dependencies]
+chrono.workspace = true
 domain-engine-core.path = "../domain-engine-core"
 ontol-runtime.path = "../ontol-runtime"
 ontol-compiler.path = "../ontol-compiler"
