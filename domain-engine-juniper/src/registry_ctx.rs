@@ -12,7 +12,10 @@ use ontol_runtime::{
     },
     interface::{
         graphql::argument::DefaultArg,
-        serde::operator::{FilteredVariants, SerdeOperator, SerdeOperatorAddr, SerdePropertyFlags},
+        serde::{
+            operator::{FilteredVariants, SerdeOperator, SerdeOperatorAddr, SerdePropertyFlags},
+            processor::ProcessorProfileFlags,
+        },
     },
     value::PropertyId,
     Role,
@@ -118,7 +121,9 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             SerdeOperator::Struct(struct_op) => {
                 let (mode, _) = typing_purpose.mode_and_level();
 
-                for (name, property) in struct_op.filter_properties(mode, None) {
+                for (name, property) in
+                    struct_op.filter_properties(mode, None, ProcessorProfileFlags::default())
+                {
                     if property.is_read_only()
                         && matches!(
                             typing_purpose,

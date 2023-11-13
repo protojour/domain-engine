@@ -310,7 +310,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         let mut map = serializer.serialize_map(Some(attributes.len() + option_len(&rel_params)))?;
 
         for (name, serde_prop) in
-            struct_op.filter_properties(self.mode, self.ctx.parent_property_id)
+            struct_op.filter_properties(self.mode, self.ctx.parent_property_id, self.profile.flags)
         {
             let unit_attr = UNIT_ATTR;
             let attribute = match attributes.get(&serde_prop.property_id) {

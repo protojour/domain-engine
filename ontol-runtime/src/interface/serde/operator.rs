@@ -207,26 +207,26 @@ impl StructOperator {
         &self,
         mode: ProcessorMode,
         parent_property_id: Option<PropertyId>,
+        profile_flags: ProcessorProfileFlags,
     ) -> impl Iterator<Item = (&String, &SerdeProperty)> {
-        self.properties
-            .iter()
-            .filter(move |(_, property)| property.filter(mode, parent_property_id).is_some())
+        self.properties.iter().filter(move |(_, property)| {
+            property
+                .filter(mode, parent_property_id, profile_flags)
+                .is_some()
+        })
     }
 
     pub fn required_count(
         &self,
         mode: ProcessorMode,
         parent_property_id: Option<PropertyId>,
-        profile: &ProcessorProfile,
+        profile_flags: ProcessorProfileFlags,
     ) -> usize {
-        if profile
-            .flags
-            .contains(ProcessorProfileFlags::ALL_PROPS_OPTIONAL)
-        {
+        if profile_flags.contains(ProcessorProfileFlags::ALL_PROPS_OPTIONAL) {
             return 0;
         }
 
-        self.filter_properties(mode, parent_property_id)
+        self.filter_properties(mode, parent_property_id, profile_flags)
             .filter(|(_, property)| !property.is_optional())
             .count()
     }
@@ -278,6 +278,7 @@ impl SerdeProperty {
         &self,
         mode: ProcessorMode,
         parent_property_id: Option<PropertyId>,
+        profile_flags: ProcessorProfileFlags,
     ) -> Option<&Self> {
         if !matches!(
             mode,
@@ -291,6 +292,7 @@ impl SerdeProperty {
             // Filter out if this property is the mirrored property of the parent property
             if self.property_id.relationship_id == parent_property_id.relationship_id
                 && self.property_id.role != parent_property_id.role
+                && !profile_flags.contains(ProcessorProfileFlags::ALLOW_STRUCTURALLY_CIRCULAR_PROPS)
             {
                 return None;
             }

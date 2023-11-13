@@ -80,7 +80,7 @@ impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
             self.struct_op.required_count(
                 self.processor.mode,
                 self.processor.ctx.parent_property_id,
-                self.processor.profile,
+                self.processor.profile.flags,
             ),
             SpecialAddrs {
                 rel_params: self.ctx.rel_params_addr,
@@ -285,7 +285,11 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
                 prop.0,
                 prop.1.flags,
                 prop.1
-                    .filter(processor.mode, processor.ctx.parent_property_id)
+                    .filter(
+                        processor.mode,
+                        processor.ctx.parent_property_id,
+                        processor.profile.flags
+                    )
                     .is_some(),
                 prop.1.is_optional()
             );
@@ -295,7 +299,11 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
             .iter()
             .filter(|(_, property)| {
                 property
-                    .filter(processor.mode, processor.ctx.parent_property_id)
+                    .filter(
+                        processor.mode,
+                        processor.ctx.parent_property_id,
+                        processor.profile.flags,
+                    )
                     .is_some()
                     && !property.is_optional()
                     && !attributes.contains_key(&property.property_id)
@@ -398,7 +406,11 @@ impl<'a, 'de> Visitor<'de> for PropertySet<'a> {
                 };
 
                 if serde_property
-                    .filter(self.processor_mode, self.parent_property_id)
+                    .filter(
+                        self.processor_mode,
+                        self.parent_property_id,
+                        self.processor_profile.flags,
+                    )
                     .is_some()
                 {
                     Ok(PropertyKey::Property(*serde_property))

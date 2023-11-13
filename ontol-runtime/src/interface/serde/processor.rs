@@ -169,11 +169,16 @@ bitflags::bitflags! {
     #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
     pub struct ProcessorProfileFlags: u32 {
         /// Allow serialize of open ("unknown") properties
-        const SERIALIZE_OPEN_DATA   = 0b00000001;
+        const SERIALIZE_OPEN_DATA               = 0b00000001;
         /// Allow deserialize of open ("unknown") properties
-        const DESERIALIZE_OPEN_DATA = 0b00000010;
+        const DESERIALIZE_OPEN_DATA             = 0b00000010;
         /// Treat every property as optional
-        const ALL_PROPS_OPTIONAL    = 0b00000100;
+        const ALL_PROPS_OPTIONAL                = 0b00000100;
+        /// Allow structurally circular properties
+        /// when a parent entity contains a child entity, this is using some defined defined relationship.
+        /// The child implicitly refers back to its parent.
+        /// If this flag is set, the child is allowed to re-state the same property.
+        const ALLOW_STRUCTURALLY_CIRCULAR_PROPS = 0b00001000;
     }
 }
 

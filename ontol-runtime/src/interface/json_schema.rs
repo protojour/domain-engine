@@ -18,7 +18,7 @@ use crate::{
     DefId, PackageId,
 };
 
-use super::serde::processor::ProcessorProfile;
+use super::serde::processor::ProcessorProfileFlags;
 use super::serde::{SerdeDef, SerdeModifier};
 
 pub fn build_openapi_schemas<'e>(
@@ -448,7 +448,7 @@ fn serialize_schema_inline<S: Serializer>(
             )?;
 
             let required_count =
-                struct_op.required_count(ctx.mode, None, &ProcessorProfile::default());
+                struct_op.required_count(ctx.mode, None, ProcessorProfileFlags::default());
             if required_count > 0 {
                 map.serialize_entry(
                     "required",
