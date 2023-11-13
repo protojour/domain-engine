@@ -62,6 +62,26 @@ impl WasmOntology {
             .collect()
     }
 
+    /// Returns a `Uint8Array` containing the bincode serialization of the ontology.
+    pub fn serialize_to_bincode(&self) -> Result<JsValue, WasmError> {
+        // allocate temporary first, since Uint8Array is not dynamically resizable
+        let mut bincode: Vec<u8> = Vec::new();
+        self.ontology
+            .try_serialize_to_bincode(&mut bincode)
+            .map_err(|error| WasmError::Generic(format!("Failed to serialize: {error}")))?;
+
+        let bincode_len: u32 = bincode
+            .len()
+            .try_into()
+            .map_err(|_| WasmError::Generic("Bincode buffer too large".to_string()))?;
+
+        let js_bincode = js_sys::Uint8Array::new_with_length(bincode_len);
+        // copy from WASM to JS
+        js_bincode.copy_from(bincode.as_slice());
+
+        Ok(js_bincode.into())
+    }
+
     pub fn ontology_graph_js(&self) -> JsValue {
         self.ontology_graph_js.clone()
     }

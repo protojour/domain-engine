@@ -114,7 +114,10 @@ async fn main() -> Result<(), OntoolError> {
             let output_path = args.output.unwrap_or_else(|| PathBuf::from("ontology"));
 
             let output_file = File::create(output_path).unwrap();
-            bincode::serialize_into(output_file, &compile_output.ontology).unwrap();
+            compile_output
+                .ontology
+                .try_serialize_to_bincode(output_file)
+                .unwrap();
 
             Ok(())
         }

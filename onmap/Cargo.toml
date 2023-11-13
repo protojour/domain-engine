@@ -7,7 +7,6 @@ edition = "2021"
 domain-engine-juniper.path = "../domain-engine-juniper"
 domain-engine-core.path = "../domain-engine-core"
 ontol-runtime.path = "../ontol-runtime"
-bincode.workspace = true
 chrono.workspace = true
 clap.workspace = true
 serde_json.workspace = true

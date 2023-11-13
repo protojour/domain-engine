@@ -87,7 +87,7 @@ async fn main() -> anyhow::Result<()> {
 
 fn load_ontology(path: PathBuf) -> anyhow::Result<Ontology> {
     let ontology_file = File::open(path).context("Ontology file not found")?;
-    bincode::deserialize_from(&ontology_file).context("Problem reading ontology")
+    Ontology::try_from_bincode(ontology_file).context("Problem reading ontology")
 }
 
 struct System;

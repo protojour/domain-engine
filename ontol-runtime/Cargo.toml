@@ -28,6 +28,7 @@ regex = "1"
 urlencoding = "2"
 bit-vec = { version = "0.6", features = ["serde"] }
 thin-vec = "0.2"
+bincode = "1"
 
 [dev-dependencies]
 tracing-subscriber.workspace = true

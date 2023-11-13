@@ -12,7 +12,7 @@ use ontol_runtime::{
 use serde::de::DeserializeSeed;
 use wasm_bindgen::prelude::*;
 
-use crate::{wasm_error::WasmError, wasm_util::js_serializer};
+use crate::{wasm_error::WasmError, wasm_graphql::WasmGraphqlSchema, wasm_util::js_serializer};
 
 #[wasm_bindgen]
 #[derive(Clone, Copy)]
@@ -46,6 +46,15 @@ impl WasmDomain {
         self.package_id.0
     }
 
+    pub fn unique_name(&self) -> String {
+        self.ontology
+            .find_domain(self.package_id)
+            .unwrap()
+            .unique_name
+            .as_str()
+            .to_owned()
+    }
+
     pub fn pub_types(&self) -> Vec<JsValue> {
         let domain = self.ontology.find_domain(self.package_id).unwrap();
         domain
@@ -71,6 +80,10 @@ impl WasmDomain {
         let schemas = build_openapi_schemas(self.ontology.as_ref(), self.package_id, domain);
         let schemas_yaml = serde_yaml::to_string(&schemas).unwrap();
         Ok(schemas_yaml)
+    }
+
+    pub async fn create_graphql_schema(&self) -> Result<WasmGraphqlSchema, WasmError> {
+        WasmGraphqlSchema::create(self.ontology.clone(), self.package_id).await
     }
 }
 

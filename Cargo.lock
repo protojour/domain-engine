@@ -648,6 +648,7 @@ dependencies = [
  "console_error_panic_hook",
  "domain-engine-core",
  "domain-engine-juniper",
+ "js-sys",
  "ontol-compiler",
  "ontol-faker",
  "ontol-runtime",
@@ -667,7 +668,6 @@ dependencies = [
  "anyhow",
  "async-trait",
  "axum",
- "bincode",
  "chrono",
  "clap",
  "domain-engine-core",
@@ -1433,7 +1433,6 @@ name = "onmap"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bincode",
  "chrono",
  "clap",
  "clap-stdin",
@@ -1554,6 +1553,7 @@ dependencies = [
 name = "ontol-runtime"
 version = "0.1.0"
 dependencies = [
+ "bincode",
  "bit-set",
  "bit-vec",
  "bitflags 2.4.1",
@@ -1581,7 +1581,6 @@ dependencies = [
 name = "ontol-test-utils"
 version = "0.1.0"
 dependencies = [
- "bincode",
  "fnv",
  "jsonschema",
  "ontol-compiler",
@@ -1599,7 +1598,6 @@ name = "ontool"
 version = "0.3.1"
 dependencies = [
  "ariadne",
- "bincode",
  "clap",
  "domain-engine-juniper",
  "ontol-compiler",

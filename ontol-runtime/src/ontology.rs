@@ -74,6 +74,17 @@ impl Ontology {
         }
     }
 
+    pub fn try_from_bincode(reader: impl std::io::Read) -> Result<Self, bincode::Error> {
+        bincode::deserialize_from(reader)
+    }
+
+    pub fn try_serialize_to_bincode(
+        &self,
+        writer: impl std::io::Write,
+    ) -> Result<(), bincode::Error> {
+        bincode::serialize_into(writer, self)
+    }
+
     pub fn new_vm(&self, proc: Procedure) -> OntolVm<'_> {
         OntolVm::new(self, proc)
     }

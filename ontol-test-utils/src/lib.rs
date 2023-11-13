@@ -253,9 +253,12 @@ impl TestPackages {
         match compiler.compile_package_topology(package_topology) {
             Ok(()) => {
                 let ontology: Ontology = {
-                    let binary_ontology: Vec<u8> =
-                        bincode::serialize(&compiler.into_ontology()).unwrap();
-                    bincode::deserialize(&binary_ontology).unwrap()
+                    let mut binary_ontology: Vec<u8> = Vec::new();
+                    compiler
+                        .into_ontology()
+                        .try_serialize_to_bincode(&mut binary_ontology)
+                        .unwrap();
+                    Ontology::try_from_bincode(binary_ontology.as_slice()).unwrap()
                 };
 
                 Ok(OntolTest {
