@@ -158,6 +158,7 @@ pub fn compile_ontol_domain(filename: String, source: String) -> Result<WasmOnto
 #[wasm_bindgen]
 pub struct WasmSources {
     sources: HashMap<String, String>,
+    package_config_table: HashMap<String, PackageConfig>,
     root: String,
 }
 
@@ -173,6 +174,7 @@ impl WasmSources {
     pub fn new() -> Self {
         Self {
             sources: HashMap::new(),
+            package_config_table: HashMap::new(),
             root: String::new(),
         }
     }
@@ -183,6 +185,20 @@ impl WasmSources {
 
     pub fn set_root(&mut self, filename: String) {
         self.root = filename;
+    }
+
+    pub fn configure_default_datastore(&mut self, filename: String) {
+        self.package_config_table
+            .entry(filename)
+            .or_default()
+            .data_store = Some(DataStoreConfig::Default);
+    }
+
+    pub fn configure_named_datastore(&mut self, filename: String, data_store_name: String) {
+        self.package_config_table
+            .entry(filename)
+            .or_default()
+            .data_store = Some(DataStoreConfig::ByName(data_store_name.into()));
     }
 
     pub fn keys(&self) -> Vec<JsValue> {
@@ -218,23 +234,21 @@ impl WasmSources {
                             PackageReference::Named(source_name) => source_name.as_str(),
                         };
 
-                        let mut is_root = false;
                         if source_name == self.root {
                             root_package = Some(request.package_id);
-                            is_root = true;
                         }
 
                         if let Some(source_text) = sources_by_name.get(source_name) {
+                            let package_config = self
+                                .package_config_table
+                                .get(source_name)
+                                .cloned()
+                                .unwrap_or_default();
+
                             package_graph_builder.provide_package(ParsedPackage::parse(
                                 request,
                                 source_text,
-                                PackageConfig {
-                                    // apparently there should only be one data store
-                                    data_store: match is_root {
-                                        false => None,
-                                        true => Some(DataStoreConfig::Default),
-                                    },
-                                },
+                                package_config,
                                 &mut sources,
                                 &mut source_code_registry,
                             ));
