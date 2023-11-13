@@ -50,9 +50,7 @@ impl juniper::GraphQLType<GqlScalar> for InputType {
                 )
                 .unwrap();
 
-                registry
-                    .build_input_object_type::<Self>(info, &arguments)
-                    .into_meta()
+                reg.build_input_object_meta_type(info, &arguments)
             }
             TypeKind::Object(ObjectData {
                 kind:
@@ -82,9 +80,7 @@ impl juniper::GraphQLType<GqlScalar> for InputType {
                     ));
                 }
 
-                registry
-                    .build_input_object_type::<Self>(info, &arguments)
-                    .into_meta()
+                reg.build_input_object_meta_type(info, &arguments)
             }
             TypeKind::Union(union_data) => {
                 let mut arguments = vec![];
@@ -95,9 +91,8 @@ impl juniper::GraphQLType<GqlScalar> for InputType {
                     ArgumentFilter::default(),
                 )
                 .unwrap();
-                registry
-                    .build_input_object_type::<Self>(info, &arguments)
-                    .into_meta()
+
+                reg.build_input_object_meta_type(info, &arguments)
             }
             TypeKind::CustomScalar(_) => registry.build_scalar_type::<Self>(info).into_meta(),
             TypeKind::Object(_) => panic!("Invalid Object input data"),

@@ -47,6 +47,34 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         }
     }
 
+    pub fn build_input_object_meta_type(
+        &mut self,
+        info: &SchemaType,
+        arguments: &[juniper::meta::Argument<'r, GqlScalar>],
+    ) -> juniper::meta::MetaType<'r, GqlScalar> {
+        if arguments.is_empty() {
+            // Hack for empty input types
+            let json_scalar = self.schema_ctx.get_schema_type(
+                self.schema_ctx.schema.json_scalar,
+                TypingPurpose::PartialInput,
+            );
+            let arguments = [self
+                .registry
+                .arg::<Option<InputType>>("_", &json_scalar)
+                .description(
+                "This argument is not a real argument; it acts as a marker for an input type without fields.",
+            )];
+
+            self.registry
+                .build_input_object_type::<InputType>(info, &arguments)
+                .into_meta()
+        } else {
+            self.registry
+                .build_input_object_type::<InputType>(info, arguments)
+                .into_meta()
+        }
+    }
+
     pub fn get_fields(&mut self, type_addr: TypeAddr) -> Vec<juniper::meta::Field<'r, GqlScalar>> {
         // This is part of a big recursive algorithm, so iterator mapping is avoided
         let mut fields = vec![];
@@ -326,36 +354,46 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         &mut self,
         field_kind: &FieldKind,
     ) -> Option<Vec<juniper::meta::Argument<'r, GqlScalar>>> {
+        let mut arguments = vec![];
+
         match field_kind {
             FieldKind::ConnectionProperty {
                 first_arg: first,
                 after_arg: after,
                 ..
-            } => Some(vec![
-                self.registry.arg::<Option<i32>>(first.name(), &()),
-                self.registry
-                    .arg::<Option<std::string::String>>(after.name(), &()),
-            ]),
+            } => {
+                arguments.extend([
+                    self.registry.arg::<Option<i32>>(first.name(), &()),
+                    self.registry
+                        .arg::<Option<std::string::String>>(after.name(), &()),
+                ]);
+            }
             FieldKind::MapConnection {
                 input_arg,
                 first_arg,
                 after_arg,
                 ..
-            } => Some(vec![
-                self.get_domain_field_arg(input_arg),
-                self.registry.arg::<Option<i32>>(first_arg.name(), &()),
-                self.registry
-                    .arg::<Option<std::string::String>>(after_arg.name(), &()),
-            ]),
-            FieldKind::MapFind { input_arg, .. } => {
-                Some(vec![self.get_domain_field_arg(input_arg)])
+            } => {
+                arguments.extend(self.get_domain_field_arg(input_arg));
+                arguments.extend([
+                    self.registry.arg::<Option<i32>>(first_arg.name(), &()),
+                    self.registry
+                        .arg::<Option<std::string::String>>(after_arg.name(), &()),
+                ]);
             }
-            FieldKind::CreateMutation { input } => Some(vec![self.get_domain_field_arg(input)]),
-            FieldKind::UpdateMutation { id, input } => Some(vec![
-                self.get_domain_field_arg(id),
-                self.get_domain_field_arg(input),
-            ]),
-            FieldKind::DeleteMutation { id } => Some(vec![self.get_domain_field_arg(id)]),
+            FieldKind::MapFind { input_arg, .. } => {
+                arguments.extend(self.get_domain_field_arg(input_arg));
+            }
+            FieldKind::CreateMutation { input } => {
+                arguments.extend(self.get_domain_field_arg(input));
+            }
+            FieldKind::UpdateMutation { id, input } => {
+                arguments.extend(self.get_domain_field_arg(id));
+                arguments.extend(self.get_domain_field_arg(input));
+            }
+            FieldKind::DeleteMutation { id } => {
+                arguments.extend(self.get_domain_field_arg(id));
+            }
             FieldKind::Property(_)
             | FieldKind::EdgeProperty(_)
             | FieldKind::Id(_)
@@ -364,14 +402,20 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             | FieldKind::PageInfo
             | FieldKind::Node
             | FieldKind::TotalCount
-            | FieldKind::OpenData => None,
+            | FieldKind::OpenData => {}
+        }
+
+        if arguments.is_empty() {
+            None
+        } else {
+            Some(arguments)
         }
     }
 
     fn get_domain_field_arg(
         &mut self,
         field_arg: &dyn DomainFieldArg,
-    ) -> juniper::meta::Argument<'r, GqlScalar> {
+    ) -> Option<juniper::meta::Argument<'r, GqlScalar>> {
         let arg = match field_arg.kind() {
             ArgKind::Addr(type_addr) => {
                 let schema_type = self
@@ -388,12 +432,13 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 SerdePropertyFlags::default(),
                 TypeModifier::Unit(Optionality::Mandatory),
             ),
+            ArgKind::Hidden => return None,
         };
 
-        match field_arg.default_arg() {
+        Some(match field_arg.default_arg() {
             None => arg,
             Some(DefaultArg::EmptyObject) => arg.default_value(juniper::InputValue::Object(vec![])),
-        }
+        })
     }
 
     #[inline]

@@ -11,6 +11,9 @@ use super::{
 pub enum ArgKind {
     Addr(TypeAddr),
     Operator(SerdeOperatorAddr),
+    /// The argument is "hidden" in GraphQL.
+    /// The reason can be that it's a struct without members.
+    Hidden,
 }
 
 pub trait FieldArg {
@@ -72,6 +75,7 @@ pub struct MapInputArg {
     /// If this string is defined, there will be a single argument with this name.
     pub scalar_input_name: Option<String>,
     pub default_arg: Option<DefaultArg>,
+    pub hidden: bool,
 }
 
 impl FieldArg for MapInputArg {
@@ -93,7 +97,11 @@ impl DomainFieldArg for MapInputArg {
     }
 
     fn kind(&self) -> ArgKind {
-        ArgKind::Operator(self.operator_addr)
+        if self.hidden {
+            ArgKind::Hidden
+        } else {
+            ArgKind::Operator(self.operator_addr)
+        }
     }
 
     fn default_arg(&self) -> Option<DefaultArg> {

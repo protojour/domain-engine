@@ -302,13 +302,17 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     operator_addr: input_operator_addr,
                     scalar_input_name: Some(scalar_input_name),
                     default_arg: None,
+                    hidden: false,
                 }
             }
             _ => {
                 let _unit_type_ref = self.get_def_type_ref(input_key.def_id, QLevel::Node);
+                let mut hidden = false;
 
                 let default_arg = match self.serde_generator.get_operator(input_operator_addr) {
                     SerdeOperator::Struct(struct_op) => {
+                        hidden = struct_op.properties.is_empty();
+
                         let all_optional =
                             struct_op.properties.values().all(|prop| prop.is_optional());
 
@@ -325,6 +329,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     operator_addr: input_operator_addr,
                     scalar_input_name: None,
                     default_arg,
+                    hidden,
                 }
             }
         };

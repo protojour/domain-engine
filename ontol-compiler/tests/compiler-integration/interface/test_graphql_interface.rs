@@ -143,6 +143,32 @@ fn test_graphql_serde_renaming() {
 }
 
 #[test]
+fn test_query_map_empty_input_becomes_hidden_arg() {
+    "
+    def entity {
+        rel .'id'|id: { rel .is: text }
+    }
+    def empty {}
+
+    map my_query {
+        {}
+        empty {}
+    }
+    "
+    .compile_then(|test| {
+        let (schema, _test) = schema_test(&test, ROOT_SRC_NAME);
+
+        let query = schema.type_data(schema.query).object_data();
+        let my_query = query.fields.get("my_query").unwrap();
+        let FieldKind::MapFind { input_arg, .. } = &my_query.kind else {
+            panic!("Incorrect field kind");
+        };
+
+        assert!(input_arg.hidden);
+    });
+}
+
+#[test]
 fn test_graphql_artist_and_instrument() {
     let test = ARTIST_AND_INSTRUMENT.1.compile();
     let (schema, test) = schema_test(&test, ROOT_SRC_NAME);
