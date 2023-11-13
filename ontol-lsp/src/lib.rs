@@ -388,7 +388,7 @@ impl LanguageServer for Backend {
 
     async fn execute_command(&self, params: ExecuteCommandParams) -> Result<Option<Value>> {
         if params.command.as_str() == "ontol-lsp.openFile" {
-            if let Some(val) = params.arguments.get(0) {
+            if let Some(val) = params.arguments.first() {
                 let args: OpenFileArgs = serde_json::from_value(val.clone()).unwrap_or_default();
                 let uri = Url::parse(&args.ref_uri).unwrap();
 

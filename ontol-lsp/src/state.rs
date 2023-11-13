@@ -374,7 +374,7 @@ impl State {
 
     /// Get Location given an external identifier
     fn get_location_for_ext_ident(&self, doc: &Document, path: &[String]) -> Option<Location> {
-        if let Some(root_alias) = path.get(0) {
+        if let Some(root_alias) = path.first() {
             if let Some(ident) = path.get(1) {
                 if let Some(root) = doc.aliases.get(root_alias) {
                     let uri = build_uri(&doc.path, root);
@@ -539,7 +539,7 @@ impl State {
 
     /// Get HoverDoc given an external identifier
     fn get_hoverdoc_for_ext_ident(&self, doc: &Document, path: &[String]) -> Option<HoverDoc> {
-        if let Some(root_alias) = path.get(0) {
+        if let Some(root_alias) = path.first() {
             if let Some(ident) = path.get(1) {
                 if let Some(root) = doc.aliases.get(root_alias) {
                     let uri = build_uri(&doc.path, root);
