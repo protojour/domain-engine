@@ -85,7 +85,7 @@ pub async fn gql_ctx_mock_data_store(
 ) -> ServiceCtx {
     DomainEngine::test_builder(ontol_test.ontology.clone())
         .mock_data_store(ontol_test.get_package_id(data_store_package.0), setup)
-        .build::<DefaultDataStoreFactory>()
+        .build(DefaultDataStoreFactory)
         .await
         .into()
 }

@@ -33,7 +33,7 @@ impl WasmGraphqlSchema {
         // its data store (if any) won't be shared with other interfaces.
         let domain_engine = DomainEngine::builder(ontology.clone())
             .system(Box::new(WasmSystem))
-            .build::<DefaultDataStoreFactory>()
+            .build(DefaultDataStoreFactory)
             .await;
 
         let schema = create_graphql_schema(package_id, ontology.clone())?;

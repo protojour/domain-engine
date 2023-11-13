@@ -28,7 +28,7 @@ fn artist_and_instrument() -> TestPackages {
 async fn test_conduit_db_id_generation() {
     let test = conduit_db().compile();
     let engine = DomainEngine::test_builder(test.ontology.clone())
-        .build::<crate::TestDataStoreFactory>()
+        .build(crate::TestDataStoreFactory::default())
         .await;
     let [user, article, comment, tag_entity] =
         test.bind(["User", "Article", "Comment", "TagEntity"]);
@@ -120,7 +120,7 @@ async fn test_conduit_db_id_generation() {
 async fn test_conduit_db_store_entity_tree() {
     let test = conduit_db().compile();
     let engine = DomainEngine::test_builder(test.ontology.clone())
-        .build::<crate::TestDataStoreFactory>()
+        .build(crate::TestDataStoreFactory::default())
         .await;
     let [user_type, article_type, comment_type] = test.bind(["User", "Article", "Comment"]);
 
@@ -269,7 +269,7 @@ async fn test_conduit_db_store_entity_tree() {
 async fn test_conduit_db_unresolved_foreign_key() {
     let test = conduit_db().compile();
     let engine = DomainEngine::test_builder(test.ontology.clone())
-        .build::<crate::TestDataStoreFactory>()
+        .build(crate::TestDataStoreFactory::default())
         .await;
     let [article] = test.bind(["Article"]);
 
@@ -298,7 +298,7 @@ async fn test_conduit_db_unresolved_foreign_key() {
 async fn test_artist_and_instrument_fmt_id_generation() {
     let test = artist_and_instrument().compile();
     let engine = DomainEngine::test_builder(test.ontology.clone())
-        .build::<crate::TestDataStoreFactory>()
+        .build(crate::TestDataStoreFactory::default())
         .await;
     let [artist] = test.bind(["artist"]);
     let artist_id = TypeBinding::from_def_id(
@@ -347,7 +347,7 @@ async fn test_artist_and_instrument_fmt_id_generation() {
 async fn test_artist_and_instrument_pagination() {
     let test = artist_and_instrument().compile();
     let engine = DomainEngine::test_builder(test.ontology.clone())
-        .build::<crate::TestDataStoreFactory>()
+        .build(crate::TestDataStoreFactory::default())
         .await;
     let [artist] = test.bind(["artist"]);
 
@@ -400,7 +400,7 @@ async fn test_artist_and_instrument_pagination() {
 async fn test_artist_and_instrument_filter_condition() {
     let test = artist_and_instrument().compile();
     let engine = DomainEngine::test_builder(test.ontology.clone())
-        .build::<crate::TestDataStoreFactory>()
+        .build(crate::TestDataStoreFactory::default())
         .await;
     let [artist] = test.bind(["artist"]);
 

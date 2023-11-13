@@ -28,7 +28,7 @@ async fn test_graphql_conduit_db() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
     let ctx: ServiceCtx = DomainEngine::test_builder(test.ontology.clone())
-        .build::<crate::TestDataStoreFactory>()
+        .build(crate::TestDataStoreFactory::default())
         .await
         .into();
 
@@ -90,7 +90,7 @@ async fn test_graphql_conduit_db_create_with_foreign_reference() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
     let ctx: ServiceCtx = DomainEngine::test_builder(test.ontology.clone())
-        .build::<crate::TestDataStoreFactory>()
+        .build(crate::TestDataStoreFactory::default())
         .await
         .into();
 
@@ -160,7 +160,7 @@ async fn test_graphql_conduit_db_query_article_with_tags() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
     let ctx: ServiceCtx = DomainEngine::test_builder(test.ontology.clone())
-        .build::<crate::TestDataStoreFactory>()
+        .build(crate::TestDataStoreFactory::default())
         .await
         .into();
 
@@ -237,7 +237,7 @@ impl BlogPostConduit {
         Self {
             domain_engine: Arc::new(
                 DomainEngine::test_builder(test.ontology.clone())
-                    .build::<crate::TestDataStoreFactory>()
+                    .build(crate::TestDataStoreFactory::default())
                     .await,
             ),
             db_schema,

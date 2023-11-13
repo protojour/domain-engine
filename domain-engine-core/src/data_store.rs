@@ -47,17 +47,20 @@ pub trait DataStoreAPI {
 #[async_trait::async_trait]
 pub trait DataStoreFactory {
     async fn new_api(
+        &self,
         config: &DataStoreConfig,
         ontology: &Ontology,
         package_id: PackageId,
     ) -> Box<dyn DataStoreAPI + Send + Sync>;
 }
 
+#[derive(Default)]
 pub struct DefaultDataStoreFactory;
 
 #[async_trait::async_trait]
 impl DataStoreFactory for DefaultDataStoreFactory {
     async fn new_api(
+        &self,
         _config: &DataStoreConfig,
         ontology: &Ontology,
         package_id: PackageId,

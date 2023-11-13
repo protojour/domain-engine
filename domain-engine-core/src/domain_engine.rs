@@ -264,7 +264,7 @@ impl Builder {
         self
     }
 
-    pub async fn build<F: DataStoreFactory>(self) -> DomainEngine {
+    pub async fn build<F: DataStoreFactory>(self, factory: F) -> DomainEngine {
         let data_store = match self.data_store {
             Some(data_store) => Some(data_store),
             None => {
@@ -273,8 +273,9 @@ impl Builder {
                 for (package_id, _) in self.ontology.domains() {
                     if let Some(config) = self.ontology.get_package_config(*package_id) {
                         if let Some(data_store_config) = &config.data_store {
-                            let api =
-                                F::new_api(data_store_config, &self.ontology, *package_id).await;
+                            let api = factory
+                                .new_api(data_store_config, &self.ontology, *package_id)
+                                .await;
                             data_store = Some(DataStore::new(*package_id, api));
                         }
                     }
