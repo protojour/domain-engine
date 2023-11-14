@@ -64,8 +64,11 @@ impl WasmOntology {
 
     /// Returns a `Uint8Array` containing the bincode serialization of the ontology.
     pub fn serialize_to_bincode(&self) -> Result<JsValue, WasmError> {
-        // allocate temporary first, since Uint8Array is not dynamically resizable
+        // Allocate temporary buffer first.
+        // Remember, Uint8Array's buffer must live in JS, a universe beyond WASM's own address space.
+        // The JS array must be initialized with length known up front.
         let mut bincode: Vec<u8> = Vec::new();
+
         self.ontology
             .try_serialize_to_bincode(&mut bincode)
             .map_err(|error| WasmError::Generic(format!("Failed to serialize: {error}")))?;
