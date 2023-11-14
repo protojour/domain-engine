@@ -416,7 +416,8 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 arguments.extend(self.get_domain_field_arg(update_arg));
                 arguments.extend(self.get_domain_field_arg(delete_arg));
             }
-            FieldKind::Property(_)
+            FieldKind::Deleted
+            | FieldKind::Property(_)
             | FieldKind::EdgeProperty(_)
             | FieldKind::Id(_)
             | FieldKind::Edges

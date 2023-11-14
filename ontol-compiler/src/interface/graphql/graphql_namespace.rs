@@ -54,6 +54,10 @@ impl<'o> GraphqlNamespace<'o> {
         self.concat(&[&Typename(type_info), &"Connection"])
     }
 
+    pub fn mutation_result(&mut self, type_info: &TypeInfo) -> String {
+        self.concat(&[&Typename(type_info), &"Mutation"])
+    }
+
     pub fn edge(&mut self, rel_type_info: Option<&TypeInfo>, type_info: &TypeInfo) -> String {
         if let Some(rel_type_info) = rel_type_info {
             self.concat(&[&Typename(rel_type_info), &Typename(type_info), &"Edge"])

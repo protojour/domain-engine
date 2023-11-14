@@ -392,6 +392,7 @@ impl<'a> SelectAnalyzer<'a> {
             ObjectKind::Edge(_)
             | ObjectKind::Connection(_)
             | ObjectKind::PageInfo
+            | ObjectKind::MutationResult
             | ObjectKind::Query
             | ObjectKind::Mutation => panic!("Bug in ONTOL interface schema"),
         }

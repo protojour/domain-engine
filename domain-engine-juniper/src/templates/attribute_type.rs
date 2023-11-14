@@ -221,6 +221,7 @@ impl<'v> AttributeType<'v> {
                     .unwrap(),
                 executor,
             ),
+            (Data::Unit, FieldKind::Node) => Ok(juniper::Value::Null),
             (Data::Struct(attrs), FieldKind::Property(property_data)) => {
                 trace!("lookup property {field_name} => {:?}", property_data);
                 Self::resolve_property(
@@ -324,6 +325,10 @@ impl<'v> AttributeType<'v> {
                     panic!("BUG: Tried to read edge property from {other:?}");
                 }
             },
+            (data, FieldKind::Deleted) => Ok(juniper::Value::Scalar(GqlScalar::Boolean(matches!(
+                data,
+                Data::Unit
+            )))),
             other => panic!("BUG: unhandled combination: {other:#?}"),
         }
     }

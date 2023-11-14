@@ -92,6 +92,7 @@ pub(super) enum QLevel {
     Connection {
         rel_params: Option<(DefId, SerdeOperatorAddr)>,
     },
+    MutationResult,
 }
 
 impl QLevel {
@@ -104,6 +105,7 @@ impl QLevel {
             Self::Connection { rel_params } => QueryLevel::Connection {
                 rel_params: rel_params.map(|(_, op_id)| op_id),
             },
+            Self::MutationResult => QueryLevel::MutationResult,
         }
     }
 }
@@ -385,6 +387,9 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
         let id_unit_type_ref = self.get_def_type_ref(entity_data.id_def_id, QLevel::Node);
 
+        let mutation_result_ref =
+            self.get_def_type_ref(entity_data.node_def_id, QLevel::MutationResult);
+
         let mut mutation_namespace = GraphqlNamespace::default();
 
         {
@@ -417,7 +422,8 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                                 .unwrap(),
                         },
                     },
-                    field_type: TypeRef::mandatory(node_ref).to_array(Optionality::Optional),
+                    field_type: TypeRef::mandatory(mutation_result_ref)
+                        .to_array(Optionality::Mandatory),
                 },
             );
 

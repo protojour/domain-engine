@@ -71,4 +71,5 @@ pub enum QueryLevel {
     Connection {
         rel_params: Option<SerdeOperatorAddr>,
     },
+    MutationResult,
 }

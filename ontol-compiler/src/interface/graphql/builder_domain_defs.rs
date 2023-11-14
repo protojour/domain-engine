@@ -109,13 +109,13 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             }
             QLevel::Connection { rel_params } => {
                 let type_info = self.partial_ontology.get_type_info(def_id);
-                let connection_index = self.alloc_def_type_addr(def_id, level);
+                let connection_addr = self.alloc_def_type_addr(def_id, level);
                 let edge_ref = self.get_def_type_ref(def_id, QLevel::Edge { rel_params });
                 let node_ref = self.get_def_type_ref(def_id, QLevel::Node);
                 let node_type_addr = node_ref.unwrap_addr();
 
                 NewType::Addr(
-                    connection_index,
+                    connection_addr,
                     TypeData {
                         typename: self.type_namespace.connection(type_info),
                         input_typename: None,
@@ -169,6 +169,49 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                             ]
                             .into(),
                             kind: ObjectKind::Connection(ConnectionData { node_type_addr }),
+                        }),
+                    },
+                )
+            }
+            QLevel::MutationResult => {
+                let addr = self.alloc_def_type_addr(def_id, level);
+                let type_info = self.partial_ontology.get_type_info(def_id);
+                let node_ref = self.get_def_type_ref(def_id, QLevel::Node);
+
+                NewType::Addr(
+                    addr,
+                    TypeData {
+                        typename: self.type_namespace.mutation_result(type_info),
+                        input_typename: None,
+                        partial_input_typename: None,
+                        kind: TypeKind::Object(ObjectData {
+                            fields: [
+                                (
+                                    smart_format!("node"),
+                                    FieldData {
+                                        kind: FieldKind::Node,
+                                        field_type: TypeRef::_optional(node_ref),
+                                    },
+                                ),
+                                (
+                                    smart_format!("deleted"),
+                                    FieldData {
+                                        kind: FieldKind::Node,
+                                        field_type: TypeRef {
+                                            unit: UnitTypeRef::NativeScalar(NativeScalarRef {
+                                                operator_addr: self
+                                                    .serde_generator
+                                                    .gen_addr(gql_serde_key(self.primitives.bool))
+                                                    .unwrap(),
+                                                kind: NativeScalarKind::Boolean,
+                                            }),
+                                            modifier: TypeModifier::Unit(Optionality::Mandatory),
+                                        },
+                                    },
+                                ),
+                            ]
+                            .into(),
+                            kind: ObjectKind::MutationResult,
                         }),
                     },
                 )

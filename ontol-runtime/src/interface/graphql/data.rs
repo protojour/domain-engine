@@ -150,6 +150,10 @@ impl TypeData {
                 kind: ObjectKind::Mutation,
                 ..
             }) => None,
+            TypeKind::Object(ObjectData {
+                kind: ObjectKind::MutationResult,
+                ..
+            }) => None,
             TypeKind::Union(uniondata) => ontology.get_docs(uniondata.union_def_id),
             TypeKind::CustomScalar(_) => None,
         }
@@ -182,6 +186,7 @@ pub enum ObjectKind {
     Edge(EdgeData),
     Connection(ConnectionData),
     PageInfo,
+    MutationResult,
     Query,
     Mutation,
 }
@@ -234,21 +239,33 @@ impl FieldData {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum FieldKind {
+    /// A normal property of a node
     Property(PropertyData),
+    /// The (incoming/"rel params") edge property of a node
     EdgeProperty(PropertyData),
+    /// The _id field of a node
     Id(IdPropertyData),
+    /// The node inside an edge or mutation result
     Node,
+    /// The edges of a connection
     Edges,
+    /// The nodes of a connection
     Nodes,
+    /// The page info of a connection
     PageInfo,
+    /// The total count of a connection
     TotalCount,
+    /// The open data of a node
     OpenData,
+    /// The deleted predicate of a mutation result
+    Deleted,
+    /// A connection property of an entity node
     ConnectionProperty {
         property_id: PropertyId,
         first_arg: argument::FirstArg,
         after_arg: argument::AfterArg,
     },
-    /// A connection from a map statement
+    /// A connection to a map statement
     MapConnection {
         key: [MapKey; 2],
         queries: FnvHashMap<PropertyId, Var>,
