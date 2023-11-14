@@ -19,6 +19,4 @@ lsp: ontool
 
 wasm:
     wasm-pack build --target web domain-engine-wasm
-    cp -r domain-engine-wasm/pkg ../ontol-domain-editor/domain-engine
     wasm-pack build --target web ontol-lsp --features wasm
-    cp -r ontol-lsp/pkg ../ontol-domain-editor/ontol-lsp
