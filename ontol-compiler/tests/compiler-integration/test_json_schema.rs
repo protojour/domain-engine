@@ -1,5 +1,7 @@
-use ontol_runtime::interface::serde::processor::ProcessorMode::*;
-use ontol_test_utils::{expect_eq, TestCompile};
+use ontol_runtime::interface::{
+    json_schema::build_openapi_schemas, serde::processor::ProcessorMode::*,
+};
+use ontol_test_utils::{examples::ARTIST_AND_INSTRUMENT, expect_eq, TestCompile};
 use serde_json::json;
 use test_log::test;
 
@@ -61,5 +63,18 @@ fn json_schema_from_simple_entity() {
                 "unevaluatedProperties": false,
             }),
         )
+    });
+}
+
+// https://gitlab.com/protojour/memoriam/domain-engine/-/issues/83
+#[test]
+fn test_artist_and_instrument_json_schema() {
+    ARTIST_AND_INSTRUMENT.1.compile_then(|test| {
+        serde_json::to_string(&build_openapi_schemas(
+            &test.ontology,
+            test.root_package,
+            test.ontology.find_domain(test.root_package).unwrap(),
+        ))
+        .unwrap();
     });
 }

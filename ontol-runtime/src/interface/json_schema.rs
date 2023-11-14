@@ -217,13 +217,12 @@ impl<'e> SchemaCtx<'e> {
         if serde_def.modifier.contains(SerdeModifier::ARRAY) {
             modifier.push_str("_array");
         }
-        self.ontology.find_domain(serde_def.def_id.0).map(|domain| {
-            smart_format!(
-                "{}{}",
-                domain.type_info(serde_def.def_id).name.as_ref().unwrap(),
-                modifier
-            )
-        })
+
+        let def_id = serde_def.def_id;
+        self.ontology
+            .find_domain(def_id.0)
+            .and_then(|domain| domain.type_info(def_id).name.as_ref())
+            .map(|type_name| smart_format!("{type_name}{modifier}"))
     }
 
     fn format_key(&self, serde_def: SerdeDef) -> String {
