@@ -6,7 +6,9 @@ use ontol_runtime::{
         graphql::argument::{self, DefaultArg},
         serde::processor::ProcessorProfile,
     },
+    sequence::Sequence,
     smart_format,
+    value::Data,
 };
 use serde::{
     de::{self, DeserializeSeed, IntoDeserializer},
@@ -17,6 +19,18 @@ use crate::{
     context::{SchemaCtx, ServiceCtx},
     gql_scalar::GqlScalar,
 };
+
+#[derive(Clone, Copy)]
+pub enum EntityMutationKind {
+    Create,
+    Update,
+    Delete,
+}
+
+pub struct EntityMutations {
+    pub kind: EntityMutationKind,
+    pub inputs: Sequence,
+}
 
 pub(crate) struct ArgsWrapper<'a> {
     arguments: &'a [LookAheadArgument<'a, GqlScalar>],
@@ -33,17 +47,15 @@ impl<'a> ArgsWrapper<'a> {
     ) -> Result<Option<T>, juniper::FieldError<GqlScalar>> {
         match self.find_argument(name) {
             None => Ok(None),
-            Some(argument) => {
-                let value = Option::<T>::deserialize(LookAheadValueDeserializer {
-                    value: argument.value(),
-                    span: argument.span(),
-                })
-                .map_err(|error| {
-                    juniper::FieldError::new(
-                        smart_format!("`{name}`: {error}"),
-                        graphql_value!(None),
-                    )
-                })?;
+            Some(look_ahead_arg) => {
+                let value =
+                    Option::<T>::deserialize(LookAheadValueDeserializer::from(look_ahead_arg))
+                        .map_err(|error| {
+                            juniper::FieldError::new(
+                                smart_format!("`{name}`: {error}"),
+                                graphql_value!(None),
+                            )
+                        })?;
 
                 Ok(value)
             }
@@ -67,10 +79,9 @@ impl<'a> ArgsWrapper<'a> {
             .with_profile(&processor_profile);
 
         let result = match self.find_argument(arg_name) {
-            Some(argument) => serde_processor.deserialize(LookAheadValueDeserializer {
-                value: argument.value(),
-                span: argument.span(),
-            }),
+            Some(look_ahead_arg) => {
+                serde_processor.deserialize(LookAheadValueDeserializer::from(look_ahead_arg))
+            }
             None => {
                 let unlocated_span = juniper::Span::unlocated();
                 let default_value: juniper::LookAheadValue<GqlScalar> =
@@ -93,6 +104,62 @@ impl<'a> ArgsWrapper<'a> {
         };
 
         result.map_err(|error| juniper::FieldError::new(error, graphql_value!(None)))
+    }
+
+    pub fn deserialize_entity_mutation_args(
+        &self,
+        create_arg: &argument::EntityCreateInputsArg,
+        update_arg: &argument::EntityUpdateInputsArg,
+        delete_arg: &argument::EntityDeleteInputsArg,
+        (schema_ctx, service_ctx): (&SchemaCtx, &ServiceCtx),
+    ) -> Result<Vec<EntityMutations>, juniper::FieldError<GqlScalar>> {
+        // A uniform array of the arguments that can be matched.
+        // The point here is that we want to match them in the order that the user has specified
+        // and return a vector that has the same order.
+        let arg_matchers: [(&dyn argument::DomainFieldArg, EntityMutationKind); 3] = [
+            (create_arg, EntityMutationKind::Create),
+            (update_arg, EntityMutationKind::Update),
+            (delete_arg, EntityMutationKind::Delete),
+        ];
+
+        let processor_profile =
+            ProcessorProfile::default().with_flags(service_ctx.serde_processor_profile_flags);
+
+        let mut output = vec![];
+
+        for look_ahead_arg in self.arguments {
+            let name = look_ahead_arg.name();
+
+            let Some((matched_arg, kind)) = arg_matchers
+                .iter()
+                .find(|(matching_arg, _)| matching_arg.name() == name)
+                .cloned()
+            else {
+                // The GraphQL engine should have complained before reaching this point
+                unreachable!();
+            };
+
+            let serde_processor = {
+                let (mode, level) = matched_arg.typing_purpose().mode_and_level();
+                schema_ctx
+                    .ontology
+                    .new_serde_processor(matched_arg.operator_addr(), mode)
+                    .with_level(level)
+                    .with_profile(&processor_profile)
+            };
+
+            let Data::Sequence(inputs) = serde_processor
+                .deserialize(LookAheadValueDeserializer::from(look_ahead_arg))?
+                .value
+                .data
+            else {
+                panic!("Expected sequence")
+            };
+
+            output.push(EntityMutations { kind, inputs });
+        }
+
+        Ok(output)
     }
 
     fn find_argument(&self, name: &str) -> Option<&'a LookAheadArgument<'a, GqlScalar>> {
@@ -178,6 +245,15 @@ type BorrowedSpanning<'a, T> = juniper::Spanning<T, &'a juniper::Span>;
 struct LookAheadValueDeserializer<'a> {
     value: &'a LookAheadValue<'a, GqlScalar>,
     span: &'a juniper::Span,
+}
+
+impl<'a> From<&'a juniper::LookAheadArgument<'a, GqlScalar>> for LookAheadValueDeserializer<'a> {
+    fn from(value: &'a juniper::LookAheadArgument<GqlScalar>) -> Self {
+        Self {
+            value: value.value(),
+            span: value.span(),
+        }
+    }
 }
 
 impl<'a, 'de> de::Deserializer<'de> for LookAheadValueDeserializer<'a> {

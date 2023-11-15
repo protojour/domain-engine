@@ -198,7 +198,7 @@ impl<'a> SelectAnalyzer<'a> {
                 select: self.analyze_connection(look_ahead, first, after, object_data)?,
             })),
             (
-                FieldKind::Edges,
+                FieldKind::Edges | FieldKind::EntityMutation { .. },
                 Ok(TypeData {
                     kind: TypeKind::Object(object_data),
                     ..
@@ -248,7 +248,7 @@ impl<'a> SelectAnalyzer<'a> {
                     select: Select::Leaf,
                 }))
             }
-            (FieldKind::OpenData, _) => Ok(None),
+            (FieldKind::OpenData | FieldKind::Deleted, _) => Ok(None),
             (kind, res) => panic!("unhandled: {kind:?} res is ok: {}", res.is_ok()),
         }
     }

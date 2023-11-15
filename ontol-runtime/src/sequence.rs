@@ -2,7 +2,7 @@ use thin_vec::ThinVec;
 
 use crate::value::Attribute;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct Sequence {
     /// The attributes of this sequence
     pub attrs: ThinVec<Attribute>,

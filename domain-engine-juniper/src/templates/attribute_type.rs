@@ -291,15 +291,16 @@ impl<'v> AttributeType<'v> {
                     None => Ok(juniper::Value::Null),
                 }
             }
-            (Data::Sequence(seq), FieldKind::Nodes | FieldKind::Edges) => {
-                resolve_schema_type_field(
-                    SequenceType { seq },
-                    schema_ctx
-                        .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
-                        .unwrap(),
-                    executor,
-                )
-            }
+            (
+                Data::Sequence(seq),
+                FieldKind::Nodes | FieldKind::Edges | FieldKind::EntityMutation { .. },
+            ) => resolve_schema_type_field(
+                SequenceType { seq },
+                schema_ctx
+                    .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
+                    .unwrap(),
+                executor,
+            ),
             (Data::Sequence(seq), FieldKind::PageInfo) => resolve_schema_type_field(
                 PageInfoType { seq },
                 schema_ctx

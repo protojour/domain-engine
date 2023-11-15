@@ -17,13 +17,16 @@ use ontol_runtime::{
     },
     ontology::Ontology,
     select::{Select, StructOrUnionSelect},
+    sequence::Sequence,
     value::ValueDebug,
     PackageId,
 };
+use templates::sequence_type::SequenceType;
 use thiserror::Error;
 use tracing::{debug, trace};
 
 use crate::{
+    look_ahead_utils::EntityMutationKind,
     select_analyzer::{AnalyzedQuery, SelectAnalyzer},
     templates::{attribute_type::AttributeType, resolve_schema_type_field},
 };
@@ -168,6 +171,52 @@ async fn mutation(
         .unwrap();
 
     match &field_data.kind {
+        FieldKind::EntityMutation {
+            create_arg,
+            update_arg,
+            delete_arg,
+            field_unit_type_addr,
+        } => {
+            let entity_mutations = args_wrapper
+                .deserialize_entity_mutation_args(create_arg, update_arg, delete_arg, ctx)?;
+            let struct_query = query_analyzer.analyze_struct_select(&look_ahead, field_data)?;
+            let query = match struct_query {
+                StructOrUnionSelect::Struct(struct_query) => Select::Struct(struct_query),
+                StructOrUnionSelect::Union(def_id, structs) => Select::StructUnion(def_id, structs),
+            };
+
+            let mut output_sequence = Sequence::default();
+
+            // FIXME: This could get a nice dose of transaction management
+            for entity_mutation in entity_mutations {
+                match entity_mutation.kind {
+                    EntityMutationKind::Create => {
+                        for input_attr in entity_mutation.inputs.attrs {
+                            let value = service_ctx
+                                .domain_engine
+                                // FIXME: Avoid query clone
+                                .store_new_entity(input_attr.value, query.clone())
+                                .await?;
+                            output_sequence.attrs.push(value.into());
+                        }
+                    }
+                    EntityMutationKind::Update => {
+                        todo!()
+                    }
+                    EntityMutationKind::Delete => {
+                        todo!()
+                    }
+                }
+            }
+
+            resolve_schema_type_field(
+                SequenceType {
+                    seq: &output_sequence,
+                },
+                schema_ctx.get_schema_type(*field_unit_type_addr, TypingPurpose::Selection),
+                executor,
+            )
+        }
         FieldKind::CreateMutation { input } => {
             let input_attribute =
                 args_wrapper.deserialize_domain_field_arg_as_attribute(input, ctx)?;

@@ -421,6 +421,10 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                                 .gen_addr(gql_array_serde_key(entity_data.id_def_id))
                                 .unwrap(),
                         },
+                        field_unit_type_addr: match mutation_result_ref {
+                            UnitTypeRef::Addr(addr) => addr,
+                            UnitTypeRef::NativeScalar(_) => unreachable!(),
+                        },
                     },
                     field_type: TypeRef::mandatory(mutation_result_ref)
                         .to_array(Optionality::Mandatory),

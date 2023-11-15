@@ -663,6 +663,88 @@ async fn test_graphql_artist_and_instrument_connections() {
 }
 
 #[test(tokio::test)]
+async fn test_unified_mutation_error_on_unrecognized_arg() {
+    let (test, [schema]) = ARTIST_AND_INSTRUMENT.1.compile_schemas([ROOT]);
+
+    expect_eq!(
+        actual = "mutation { artist(bogus: null) { deleted } }"
+            .exec([], &schema, &gql_ctx_mock_data_store(&test, ROOT, ()).await)
+            .await
+            .unwrap_first_graphql_error_msg(),
+        expected = "Unknown argument \"bogus\" on field \"artist\" of type \"Mutation\". At 0:18\n"
+    );
+}
+
+#[test(tokio::test)]
+async fn test_unified_mutation_create() {
+    let (test, [schema]) = ARTIST_AND_INSTRUMENT.1.compile_schemas([ROOT]);
+    let ziggy: Attribute = test.bind(["artist"])[0]
+        .entity_builder(
+            json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
+            json!({
+                "name": "Ziggy",
+            }),
+        )
+        .into();
+
+    expect_eq!(
+        actual = r#"
+            mutation {
+                artist(create: [
+                    {
+                        name: "Ziggy",
+                        plays: [
+                            {
+                                name: "Instrument",
+                                _edge: {
+                                    how_much: "A lot"
+                                }
+                            },
+                            {
+                                ID: "instrument/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8",
+                                _edge: {
+                                    how_much: "A little bit less"
+                                }
+                            }
+                        ]
+                    }
+                ]) {
+                    node {
+                        ID
+                        name
+                    }
+                    deleted
+                }
+            }
+        "#
+        .exec(
+            [],
+            &schema,
+            &gql_ctx_mock_data_store(
+                &test,
+                ROOT,
+                DataStoreAPIMock::store_new_entity
+                    .next_call(matching!(_, _, _))
+                    .returns(Ok(ziggy.value))
+            )
+            .await
+        )
+        .await,
+        expected = Ok(graphql_value!({
+            "artist": [
+                {
+                    "node": {
+                        "ID": "artist/88832e20-8c6e-46b4-af79-27b19b889a58",
+                        "name": "Ziggy"
+                    },
+                    "deleted": false
+                }
+            ],
+        })),
+    );
+}
+
+#[test(tokio::test)]
 async fn test_graphql_guitar_synth_union_selection() {
     let (test, [schema]) = GUITAR_SYNTH_UNION.1.compile_schemas([ROOT]);
     let [artist] = test.bind(["artist"]);

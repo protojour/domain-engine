@@ -97,7 +97,7 @@ impl TypeRef {
         }
     }
 
-    pub fn _optional(unit: UnitTypeRef) -> Self {
+    pub fn optional(unit: UnitTypeRef) -> Self {
         Self {
             modifier: TypeModifier::Unit(Optionality::Optional),
             unit,
@@ -283,6 +283,7 @@ pub enum FieldKind {
         create_arg: argument::EntityCreateInputsArg,
         update_arg: argument::EntityUpdateInputsArg,
         delete_arg: argument::EntityDeleteInputsArg,
+        field_unit_type_addr: TypeAddr,
     },
     CreateMutation {
         input: argument::InputArg,

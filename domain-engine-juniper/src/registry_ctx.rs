@@ -411,6 +411,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 create_arg,
                 update_arg,
                 delete_arg,
+                ..
             } => {
                 arguments.extend(self.get_domain_field_arg(create_arg));
                 arguments.extend(self.get_domain_field_arg(update_arg));

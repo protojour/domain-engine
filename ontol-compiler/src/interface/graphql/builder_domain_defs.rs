@@ -190,13 +190,13 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                                     smart_format!("node"),
                                     FieldData {
                                         kind: FieldKind::Node,
-                                        field_type: TypeRef::_optional(node_ref),
+                                        field_type: TypeRef::optional(node_ref),
                                     },
                                 ),
                                 (
                                     smart_format!("deleted"),
                                     FieldData {
-                                        kind: FieldKind::Node,
+                                        kind: FieldKind::Deleted,
                                         field_type: TypeRef {
                                             unit: UnitTypeRef::NativeScalar(NativeScalarRef {
                                                 operator_addr: self

@@ -124,10 +124,21 @@ impl Exec for &'static str {
 }
 
 pub trait GraphqlTestResultExt {
+    fn unwrap_first_graphql_error_msg(self) -> String;
     fn unwrap_first_exec_error_msg(self) -> String;
 }
 
 impl<T: Debug> GraphqlTestResultExt for Result<T, TestError> {
+    #[track_caller]
+    fn unwrap_first_graphql_error_msg(self) -> String {
+        match self.unwrap_err() {
+            TestError::GraphQL(error) => error.to_string(),
+            TestError::Execution(_) => {
+                panic!("Error was an Execution error");
+            }
+        }
+    }
+
     #[track_caller]
     fn unwrap_first_exec_error_msg(self) -> String {
         match self.unwrap_err() {
