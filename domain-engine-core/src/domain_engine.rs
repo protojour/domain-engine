@@ -280,7 +280,7 @@ impl Builder {
                                 .with_context(|| {
                                     format!("Failed to initialize data store {data_store_config:?}")
                                 })
-                                .map_err(|anyhow| DomainError::DataStore(anyhow))?;
+                                .map_err(DomainError::DataStore)?;
                             data_store = Some(DataStore::new(*package_id, api));
                         }
                     }
