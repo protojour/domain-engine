@@ -62,7 +62,7 @@ impl DomainEngine {
         self.system.as_ref()
     }
 
-    fn get_data_store(&self) -> DomainResult<&DataStore> {
+    pub fn get_data_store(&self) -> DomainResult<&DataStore> {
         self.data_store.as_ref().ok_or(DomainError::NoDataStore)
     }
 
