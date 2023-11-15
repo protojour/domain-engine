@@ -54,7 +54,8 @@ async fn main() -> anyhow::Result<()> {
         DomainEngine::builder(ontology.clone())
             .system(Box::new(System))
             .build(DefaultDataStoreFactory)
-            .await,
+            .await
+            .unwrap(),
     );
 
     let mut router: axum::Router = axum::Router::new();

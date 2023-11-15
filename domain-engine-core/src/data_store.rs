@@ -51,7 +51,7 @@ pub trait DataStoreFactory {
         config: &DataStoreConfig,
         ontology: &Ontology,
         package_id: PackageId,
-    ) -> Box<dyn DataStoreAPI + Send + Sync>;
+    ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>>;
 }
 
 #[derive(Default)]
@@ -64,7 +64,7 @@ impl DataStoreFactory for DefaultDataStoreFactory {
         _config: &DataStoreConfig,
         ontology: &Ontology,
         package_id: PackageId,
-    ) -> Box<dyn DataStoreAPI + Send + Sync> {
-        Box::new(InMemoryDb::new(ontology, package_id))
+    ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>> {
+        Ok(Box::new(InMemoryDb::new(ontology, package_id)))
     }
 }

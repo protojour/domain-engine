@@ -1,6 +1,6 @@
 use domain_engine_core::DomainEngine;
 use domain_engine_test_utils::{DomainEngineTestExt, TestFindQuery};
-use ontol_runtime::{config::DataStoreConfig, select::Select};
+use ontol_runtime::{config::DataStoreConfig, ontology::Ontology, select::Select};
 use ontol_test_utils::{
     assert_error_msg,
     examples::{conduit::CONDUIT_DB, Root, ARTIST_AND_INSTRUMENT},
@@ -11,6 +11,7 @@ use ontol_test_utils::{
     SourceName, TestCompile, TestPackages,
 };
 use serde_json::json;
+use std::sync::Arc;
 use test_log::test;
 use uuid::Uuid;
 
@@ -24,12 +25,17 @@ fn artist_and_instrument() -> TestPackages {
         .with_data_store(SourceName::root(), DataStoreConfig::Default)
 }
 
+async fn make_domain_engine(ontology: Arc<Ontology>) -> DomainEngine {
+    DomainEngine::test_builder(ontology)
+        .build(crate::TestDataStoreFactory::default())
+        .await
+        .unwrap()
+}
+
 #[test(tokio::test)]
 async fn test_conduit_db_id_generation() {
     let test = conduit_db().compile();
-    let engine = DomainEngine::test_builder(test.ontology.clone())
-        .build(crate::TestDataStoreFactory::default())
-        .await;
+    let engine = make_domain_engine(test.ontology.clone()).await;
     let [user, article, comment, tag_entity] =
         test.bind(["User", "Article", "Comment", "TagEntity"]);
 
@@ -119,9 +125,7 @@ async fn test_conduit_db_id_generation() {
 #[test(tokio::test)]
 async fn test_conduit_db_store_entity_tree() {
     let test = conduit_db().compile();
-    let engine = DomainEngine::test_builder(test.ontology.clone())
-        .build(crate::TestDataStoreFactory::default())
-        .await;
+    let engine = make_domain_engine(test.ontology.clone()).await;
     let [user_type, article_type, comment_type] = test.bind(["User", "Article", "Comment"]);
 
     let pre_existing_user_id: Uuid = engine
@@ -268,9 +272,7 @@ async fn test_conduit_db_store_entity_tree() {
 #[test(tokio::test)]
 async fn test_conduit_db_unresolved_foreign_key() {
     let test = conduit_db().compile();
-    let engine = DomainEngine::test_builder(test.ontology.clone())
-        .build(crate::TestDataStoreFactory::default())
-        .await;
+    let engine = make_domain_engine(test.ontology.clone()).await;
     let [article] = test.bind(["Article"]);
 
     assert_error_msg!(
@@ -297,9 +299,7 @@ async fn test_conduit_db_unresolved_foreign_key() {
 #[test(tokio::test)]
 async fn test_artist_and_instrument_fmt_id_generation() {
     let test = artist_and_instrument().compile();
-    let engine = DomainEngine::test_builder(test.ontology.clone())
-        .build(crate::TestDataStoreFactory::default())
-        .await;
+    let engine = make_domain_engine(test.ontology.clone()).await;
     let [artist] = test.bind(["artist"]);
     let artist_id = TypeBinding::from_def_id(
         artist
@@ -346,9 +346,7 @@ async fn test_artist_and_instrument_fmt_id_generation() {
 #[test(tokio::test)]
 async fn test_artist_and_instrument_pagination() {
     let test = artist_and_instrument().compile();
-    let engine = DomainEngine::test_builder(test.ontology.clone())
-        .build(crate::TestDataStoreFactory::default())
-        .await;
+    let engine = make_domain_engine(test.ontology.clone()).await;
     let [artist] = test.bind(["artist"]);
 
     let entities = vec![
@@ -399,9 +397,7 @@ async fn test_artist_and_instrument_pagination() {
 #[test(tokio::test)]
 async fn test_artist_and_instrument_filter_condition() {
     let test = artist_and_instrument().compile();
-    let engine = DomainEngine::test_builder(test.ontology.clone())
-        .build(crate::TestDataStoreFactory::default())
-        .await;
+    let engine = make_domain_engine(test.ontology.clone()).await;
     let [artist] = test.bind(["artist"]);
 
     let entities = vec![

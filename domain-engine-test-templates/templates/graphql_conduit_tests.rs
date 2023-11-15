@@ -8,8 +8,8 @@ use domain_engine_juniper::{
     Schema,
 };
 use domain_engine_test_utils::graphql_test_utils::{Exec, TestCompileSchema};
-use ontol_runtime::config::DataStoreConfig;
 use ontol_runtime::sequence::Cursor;
+use ontol_runtime::{config::DataStoreConfig, ontology::Ontology};
 use ontol_test_utils::{
     examples::conduit::{BLOG_POST_PUBLIC, CONDUIT_DB},
     expect_eq, SourceName, TestPackages,
@@ -23,14 +23,18 @@ fn conduit_db_only() -> TestPackages {
         .with_data_store(ROOT, DataStoreConfig::Default)
 }
 
+async fn make_domain_engine(ontology: Arc<Ontology>) -> DomainEngine {
+    DomainEngine::test_builder(ontology)
+        .build(crate::TestDataStoreFactory::default())
+        .await
+        .unwrap()
+}
+
 #[test(tokio::test)]
 async fn test_graphql_conduit_db() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
-    let ctx: ServiceCtx = DomainEngine::test_builder(test.ontology.clone())
-        .build(crate::TestDataStoreFactory::default())
-        .await
-        .into();
+    let ctx: ServiceCtx = make_domain_engine(test.ontology.clone()).await.into();
 
     expect_eq!(
         actual = r#"mutation {
@@ -89,10 +93,7 @@ async fn test_graphql_conduit_db() {
 async fn test_graphql_conduit_db_create_with_foreign_reference() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
-    let ctx: ServiceCtx = DomainEngine::test_builder(test.ontology.clone())
-        .build(crate::TestDataStoreFactory::default())
-        .await
-        .into();
+    let ctx: ServiceCtx = make_domain_engine(test.ontology.clone()).await.into();
 
     let response = r#"mutation {
         createUser(
@@ -159,10 +160,7 @@ async fn test_graphql_conduit_db_create_with_foreign_reference() {
 async fn test_graphql_conduit_db_query_article_with_tags() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
-    let ctx: ServiceCtx = DomainEngine::test_builder(test.ontology.clone())
-        .build(crate::TestDataStoreFactory::default())
-        .await
-        .into();
+    let ctx: ServiceCtx = make_domain_engine(test.ontology.clone()).await.into();
 
     let _response = r#"mutation {
         createArticle(
@@ -235,11 +233,7 @@ impl BlogPostConduit {
 
         let (test, [db_schema, blog_schema]) = test_packages.compile_schemas([CONDUIT_DB.0, ROOT]);
         Self {
-            domain_engine: Arc::new(
-                DomainEngine::test_builder(test.ontology.clone())
-                    .build(crate::TestDataStoreFactory::default())
-                    .await,
-            ),
+            domain_engine: Arc::new(make_domain_engine(test.ontology.clone()).await),
             db_schema,
             blog_schema,
         }

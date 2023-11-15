@@ -34,7 +34,8 @@ impl WasmGraphqlSchema {
         let domain_engine = DomainEngine::builder(ontology.clone())
             .system(Box::new(WasmSystem))
             .build(DefaultDataStoreFactory)
-            .await;
+            .await
+            .map_err(|e| WasmError::Generic(format!("{e}")))?;
 
         let schema = create_graphql_schema(package_id, ontology.clone())?;
 

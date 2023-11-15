@@ -87,6 +87,7 @@ pub async fn gql_ctx_mock_data_store(
         .mock_data_store(ontol_test.get_package_id(data_store_package.0), setup)
         .build(DefaultDataStoreFactory)
         .await
+        .unwrap()
         .into()
 }
 

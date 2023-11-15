@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use anyhow::Context;
 use ontol_runtime::{
     interface::serde::processor::ProcessorMode,
     ontology::{Ontology, ValueCardinality},
@@ -264,7 +265,7 @@ impl Builder {
         self
     }
 
-    pub async fn build<F: DataStoreFactory>(self, factory: F) -> DomainEngine {
+    pub async fn build<F: DataStoreFactory>(self, factory: F) -> DomainResult<DomainEngine> {
         let data_store = match self.data_store {
             Some(data_store) => Some(data_store),
             None => {
@@ -275,7 +276,11 @@ impl Builder {
                         if let Some(data_store_config) = &config.data_store {
                             let api = factory
                                 .new_api(data_store_config, &self.ontology, *package_id)
-                                .await;
+                                .await
+                                .with_context(|| {
+                                    format!("Failed to initialize data store {data_store_config:?}")
+                                })
+                                .map_err(|anyhow| DomainError::DataStore(anyhow))?;
                             data_store = Some(DataStore::new(*package_id, api));
                         }
                     }
@@ -287,12 +292,12 @@ impl Builder {
 
         let resolver_graph = ResolverGraph::new(&self.ontology);
 
-        DomainEngine {
+        Ok(DomainEngine {
             ontology: self.ontology,
             config: Arc::new(self.config),
             resolver_graph,
             data_store,
             system: self.system.expect("No system API provided!"),
-        }
+        })
     }
 }
