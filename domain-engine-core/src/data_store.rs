@@ -6,6 +6,7 @@ use ontol_runtime::{
     value::Value,
     PackageId,
 };
+use serde::{Deserialize, Serialize};
 use unimock::unimock;
 
 use crate::domain_error::DomainResult;
@@ -30,17 +31,26 @@ impl DataStore {
     }
 }
 
+/// A request to the data store
+#[derive(Serialize, Deserialize)]
+pub enum Request {
+    Query(EntitySelect),
+    StoreNewEntity(Value, Select),
+}
+
+/// A response from the data store.
+///
+/// Must match the corresponding Request.
+#[derive(Serialize, Deserialize)]
+pub enum Response {
+    Query(Sequence),
+    StoreNewEntity(Value),
+}
+
 #[unimock(api = DataStoreAPIMock)]
 #[async_trait::async_trait]
 pub trait DataStoreAPI {
-    async fn query(&self, select: EntitySelect, engine: &DomainEngine) -> DomainResult<Sequence>;
-
-    async fn store_new_entity(
-        &self,
-        entity: Value,
-        select: Select,
-        engine: &DomainEngine,
-    ) -> DomainResult<Value>;
+    async fn execute(&self, request: Request, engine: &DomainEngine) -> DomainResult<Response>;
 }
 
 /// Trait for creating data store APIs

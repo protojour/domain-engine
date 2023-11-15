@@ -9,7 +9,7 @@ use crate::{
     DefId,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Condition<Term> {
     pub clauses: Vec<Clause<Term>>,
 }
@@ -41,7 +41,7 @@ pub enum Clause<Term> {
     Or(Vec<Term>),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub enum CondTerm {
     Wildcard,
     Var(Var),

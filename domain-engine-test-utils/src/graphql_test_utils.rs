@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Display};
 
 use domain_engine_core::{
-    data_store::{DataStoreAPIMock, DefaultDataStoreFactory},
+    data_store::{DataStoreAPIMock, DefaultDataStoreFactory, Request, Response},
     DomainEngine,
 };
 use domain_engine_juniper::{
@@ -73,9 +73,9 @@ impl Display for TestError {
 }
 
 pub fn mock_data_store_query_entities_empty() -> impl unimock::Clause {
-    DataStoreAPIMock::query
-        .next_call(matching!(_, _))
-        .returns(Ok(Sequence::new([])))
+    DataStoreAPIMock::execute
+        .next_call(matching!(Request::Query(_), _))
+        .returns(Ok(Response::Query(Sequence::new([]))))
 }
 
 pub async fn gql_ctx_mock_data_store(

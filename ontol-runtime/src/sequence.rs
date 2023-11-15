@@ -1,8 +1,9 @@
+use serde::{Deserialize, Serialize};
 use thin_vec::ThinVec;
 
 use crate::value::Attribute;
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Serialize, Deserialize, Debug)]
 pub struct Sequence {
     /// The attributes of this sequence
     pub attrs: ThinVec<Attribute>,
@@ -35,7 +36,7 @@ impl Sequence {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct SubSequence {
     /// The cursor of the _last element_ in the sub sequence
     pub end_cursor: Option<Cursor>,
@@ -51,7 +52,7 @@ impl SubSequence {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub enum Cursor {
     Offset(usize),
     Custom(Box<[u8]>),

@@ -16,7 +16,7 @@ use crate::{
     DefId, PackageId, RelationshipId, Role,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Value {
     /// The data associated with this value
     pub data: Data,
@@ -119,7 +119,7 @@ impl Value {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Data {
     Unit,
     I64(i64),
@@ -267,7 +267,7 @@ impl PropertyId {
 /// FIXME: There is probably a flaw in the modelling of one-to-many attributes.
 /// One-to-many has many rel_params too (currently represented using Data::Seq for the value).
 /// So should Attribute be an enum instead of a struct?
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Attribute {
     pub value: Value,
     pub rel_params: Value,

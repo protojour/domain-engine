@@ -1,4 +1,5 @@
 use fnv::FnvHashMap;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     condition::{CondTerm, Condition},
@@ -7,7 +8,7 @@ use crate::{
     DefId,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Select {
     EntityId,
     Leaf,
@@ -16,7 +17,7 @@ pub enum Select {
     Entity(EntitySelect),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EntitySelect {
     pub source: StructOrUnionSelect,
     pub condition: Condition<CondTerm>,
@@ -25,7 +26,7 @@ pub struct EntitySelect {
     pub include_total_len: bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum StructOrUnionSelect {
     Struct(StructSelect),
     Union(DefId, Vec<StructSelect>),
@@ -40,7 +41,7 @@ impl StructOrUnionSelect {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StructSelect {
     pub def_id: DefId,
     pub properties: FnvHashMap<PropertyId, Select>,

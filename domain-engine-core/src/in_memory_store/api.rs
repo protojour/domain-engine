@@ -1,14 +1,8 @@
 use fnv::FnvHashMap;
-use ontol_runtime::{
-    ontology::Ontology,
-    select::{EntitySelect, Select},
-    sequence::Sequence,
-    value::Value,
-    DefId, PackageId, RelationshipId,
-};
+use ontol_runtime::{ontology::Ontology, DefId, PackageId, RelationshipId};
 use tokio::sync::RwLock;
 
-use crate::data_store::DataStoreAPI;
+use crate::data_store::{DataStoreAPI, Request, Response};
 use crate::domain_engine::DomainEngine;
 use crate::domain_error::DomainResult;
 
@@ -23,20 +17,18 @@ pub struct InMemoryDb {
 
 #[async_trait::async_trait]
 impl DataStoreAPI for InMemoryDb {
-    async fn query(&self, query: EntitySelect, engine: &DomainEngine) -> DomainResult<Sequence> {
-        Ok(self.store.read().await.query_entities(&query, engine)?)
-    }
-
-    async fn store_new_entity(
-        &self,
-        entity: Value,
-        query: Select,
-        engine: &DomainEngine,
-    ) -> DomainResult<Value> {
-        self.store
-            .write()
-            .await
-            .write_new_entity(entity, query, engine)
+    async fn execute(&self, request: Request, engine: &DomainEngine) -> DomainResult<Response> {
+        match request {
+            Request::Query(select) => Ok(Response::Query(
+                self.store.read().await.query_entities(&select, engine)?,
+            )),
+            Request::StoreNewEntity(value, select) => Ok(Response::StoreNewEntity(
+                self.store
+                    .write()
+                    .await
+                    .write_new_entity(value, select, engine)?,
+            )),
+        }
     }
 }
 

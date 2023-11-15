@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use ontol_runtime::{
     interface::serde::processor::ProcessorMode,
     ontology::{Ontology, ValueCardinality},
@@ -14,7 +14,7 @@ use ontol_runtime::{
 use tracing::debug;
 
 use crate::{
-    data_store::{DataStore, DataStoreFactory},
+    data_store::{self, DataStore, DataStoreFactory},
     domain_error::DomainResult,
     match_utils::find_entity_id_in_condition_for_var,
     resolve_path::{ProbeOptions, ResolverGraph},
@@ -118,7 +118,15 @@ impl DomainEngine {
             ontology.get_type_info(cur_def_id)
         );
 
-        let mut edge_seq = data_store.api().query(select, self).await?;
+        let data_store::Response::Query(mut edge_seq) = data_store
+            .api()
+            .execute(data_store::Request::Query(select), self)
+            .await?
+        else {
+            return Err(DomainError::DataStore(anyhow!(
+                "data store returned invalid response"
+            )));
+        };
 
         if resolve_path.is_empty() {
             return Ok(edge_seq);
@@ -159,10 +167,18 @@ impl DomainEngine {
 
         Generator::new(self, ProcessorMode::Create).generate_values(&mut entity);
 
-        self.get_data_store()?
+        let data_store::Response::StoreNewEntity(value) = self
+            .get_data_store()?
             .api()
-            .store_new_entity(entity, select, self)
-            .await
+            .execute(data_store::Request::StoreNewEntity(entity, select), self)
+            .await?
+        else {
+            return Err(DomainError::DataStore(anyhow!(
+                "data store returned invalid response"
+            )));
+        };
+
+        Ok(value)
     }
 
     async fn exec_map_query(
@@ -219,7 +235,15 @@ impl DomainEngine {
             _ => todo!("Basically apply the same operation as above, but refactor"),
         }
 
-        let edge_seq = data_store.api().query(entity_select, self).await?;
+        let data_store::Response::Query(edge_seq) = data_store
+            .api()
+            .execute(data_store::Request::Query(entity_select), self)
+            .await?
+        else {
+            return Err(DomainError::DataStore(anyhow!(
+                "data store returned invalid response"
+            )));
+        };
 
         match value_cardinality {
             ValueCardinality::One => match edge_seq.attrs.into_iter().next() {

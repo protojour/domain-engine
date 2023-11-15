@@ -20,14 +20,14 @@ uuid.workspace = true
 chrono.workspace = true
 bitflags.workspace = true
 bit-set.workspace = true
-num = "0.4"
+num = { version = "0.4", features = ["serde"] }
 serde-value = "0.7"
 derive-debug-extras = { version = "0.2", features = ["auto-debug-single-tuple-inline"] }
 time = { version = "0.3", features = ["serde-well-known"] }
 regex = "1"
 urlencoding = "2"
 bit-vec = { version = "0.6", features = ["serde"] }
-thin-vec = "0.2"
+thin-vec = { version = "0.2", features = ["serde"] }
 bincode = "1"
 
 [dev-dependencies]
