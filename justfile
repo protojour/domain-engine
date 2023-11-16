@@ -18,5 +18,5 @@ lsp: ontool
     cd ../..
 
 wasm:
-    wasm-pack build --target web domain-engine-wasm
-    wasm-pack build --target web ontol-lsp --features wasm
+    wasm-pack build --target web --weak-refs domain-engine-wasm
+    wasm-pack build --target web --weak-refs ontol-lsp --features wasm
