@@ -71,8 +71,8 @@ impl WasmDataStoreFactory {
     /// Set up the data store factory for to produce the "closure" data store.
     /// This data store will call the specified js closure with a bincode request
     /// and expect a bincode response (optionally as a promise).
-    pub fn set_closure(&mut self, this: JsValue, func: js_sys::Function) {
-        self.js_closure = Some((this, func));
+    pub fn set_closure(&mut self, js_this: JsValue, func: js_sys::Function) {
+        self.js_closure = Some((js_this, func));
     }
 }
 
@@ -90,10 +90,10 @@ impl DataStoreFactorySync for WasmDataStoreFactory {
                 // This task reads incoming requests in a loop and terminates
                 // when the channel closes, i.e. `self.request_tx` goes out of scope.
                 tokio::task::spawn_local(request_executor_task(
-                    request_rx,
                     self.js_closure
                         .clone()
                         .ok_or_else(|| anyhow!("No JS closure provided"))?,
+                    request_rx,
                 ));
 
                 Ok(Box::new(ChannelDataStore { request_tx }))
@@ -150,8 +150,8 @@ impl ChannelDataStore {
 }
 
 async fn request_executor_task(
-    mut request_rx: tokio::sync::mpsc::Receiver<ChannelRequest>,
     js_closure: (JsValue, js_sys::Function),
+    mut request_rx: tokio::sync::mpsc::Receiver<ChannelRequest>,
 ) {
     while let Some(ChannelRequest(request, response_tx)) = request_rx.recv().await {
         let result = invoke_request_closure(&js_closure, request).await;
@@ -160,14 +160,14 @@ async fn request_executor_task(
 }
 
 async fn invoke_request_closure(
-    (this, js_closure): &(JsValue, js_sys::Function),
+    (js_this, js_function): &(JsValue, js_sys::Function),
     request: DataStoreRequest,
 ) -> anyhow::Result<DataStoreResponse> {
     let js_request_array = js_sys::Uint8Array::from(bincode::serialize(&request)?.as_slice());
 
     let js_response = {
-        let value = js_closure
-            .call1(this, &js_request_array)
+        let value = js_function
+            .call1(js_this, &js_request_array)
             .map_err(|exception| anyhow!("JS exception: {exception:?}"))?;
 
         match value.dyn_into::<js_sys::Promise>() {
