@@ -644,6 +644,9 @@ dependencies = [
 name = "domain-engine-wasm"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "async-trait",
+ "bincode",
  "chrono",
  "console_error_panic_hook",
  "domain-engine-core",
@@ -656,6 +659,7 @@ dependencies = [
  "serde-wasm-bindgen",
  "serde_json",
  "serde_yaml",
+ "tokio",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",

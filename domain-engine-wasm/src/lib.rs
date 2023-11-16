@@ -3,7 +3,7 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use domain_engine_core::{data_store::DefaultDataStoreFactory, system::SystemAPI, DomainEngine};
+use domain_engine_core::system::SystemAPI;
 use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
@@ -18,12 +18,14 @@ use ontol_runtime::{
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 use wasm_domain::{WasmDomain, WasmMapper};
+use wasm_domain_engine::{WasmDataStoreFactory, WasmDomainEngine};
 use wasm_error::{JsCompileError, JsCompileErrors, WasmError, WasmResult};
 use wasm_gc::WasmWeak;
 use wasm_graphql::WasmGraphqlSchema;
 use wasm_util::js_serializer;
 
 pub mod wasm_domain;
+pub mod wasm_domain_engine;
 pub mod wasm_error;
 mod wasm_gc;
 pub mod wasm_graphql;
@@ -47,22 +49,17 @@ pub struct WasmOntology {
 
 #[wasm_bindgen]
 impl WasmOntology {
+    /// Create a domain engine based on the Ontology
+    pub async fn create_domain_engine(
+        &self,
+        data_store_factory: WasmDataStoreFactory,
+    ) -> WasmResult<WasmDomainEngine> {
+        WasmDomainEngine::build(self.ontology.clone(), data_store_factory)
+    }
+
     /// NOTE: deprecated
     pub async fn create_graphql_schema(&self) -> WasmResult<WasmGraphqlSchema> {
         WasmGraphqlSchema::from_ontology(WasmWeak::from_arc(&self.ontology), self.package_id).await
-    }
-
-    /// Turn the ontology into a domain engine
-    pub async fn create_domain_engine(&self) -> WasmResult<WasmDomainEngine> {
-        let domain_engine = DomainEngine::builder(self.ontology.clone())
-            .system(Box::new(WasmSystem))
-            .build(DefaultDataStoreFactory)
-            .await
-            .map_err(|e| WasmError::Generic(format!("{e}")))?;
-
-        Ok(WasmDomainEngine {
-            domain_engine: Arc::new(domain_engine),
-        })
     }
 
     pub fn domains(&self) -> Vec<JsValue> {
@@ -113,26 +110,6 @@ impl WasmOntology {
 
     pub fn ontology_graph_js(&self) -> JsValue {
         self.ontology_graph_js.clone()
-    }
-}
-
-/// Note: remember to free() the object from JS
-#[wasm_bindgen]
-pub struct WasmDomainEngine {
-    domain_engine: Arc<DomainEngine>,
-}
-
-#[wasm_bindgen]
-impl WasmDomainEngine {
-    pub async fn create_graphql_schema(
-        &self,
-        domain: &WasmDomain,
-    ) -> Result<WasmGraphqlSchema, WasmError> {
-        WasmGraphqlSchema::from_weak_domain_engine(
-            WasmWeak::from_arc(&self.domain_engine),
-            domain.package_id,
-        )
-        .await
     }
 }
 

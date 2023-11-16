@@ -64,12 +64,32 @@ pub trait DataStoreFactory {
     ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>>;
 }
 
+pub trait DataStoreFactorySync {
+    fn new_api_sync(
+        &self,
+        config: &DataStoreConfig,
+        ontology: &Ontology,
+        package_id: PackageId,
+    ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>>;
+}
+
 #[derive(Default)]
 pub struct DefaultDataStoreFactory;
 
 #[async_trait::async_trait]
 impl DataStoreFactory for DefaultDataStoreFactory {
     async fn new_api(
+        &self,
+        config: &DataStoreConfig,
+        ontology: &Ontology,
+        package_id: PackageId,
+    ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>> {
+        self.new_api_sync(config, ontology, package_id)
+    }
+}
+
+impl DataStoreFactorySync for DefaultDataStoreFactory {
+    fn new_api_sync(
         &self,
         _config: &DataStoreConfig,
         ontology: &Ontology,

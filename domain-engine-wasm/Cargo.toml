@@ -19,6 +19,10 @@ domain-engine-juniper.path = "../domain-engine-juniper"
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
+async-trait.workspace = true
+anyhow = "1"
+bincode = "1"
+tokio = { version = "1", default_features = false, features = ["sync", "rt"] }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 js-sys = { version = "0.3" }

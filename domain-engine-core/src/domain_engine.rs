@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Context};
 use ontol_runtime::{
+    config::DataStoreConfig,
     interface::serde::processor::ProcessorMode,
     ontology::{Ontology, ValueCardinality},
     select::{EntitySelect, Select, StructOrUnionSelect},
@@ -14,7 +15,7 @@ use ontol_runtime::{
 use tracing::debug;
 
 use crate::{
-    data_store::{self, DataStore, DataStoreFactory},
+    data_store::{self, DataStore, DataStoreFactory, DataStoreFactorySync},
     domain_error::DomainResult,
     match_utils::find_entity_id_in_condition_for_var,
     resolve_path::{ProbeOptions, ResolverGraph},
@@ -295,19 +296,13 @@ impl Builder {
             None => {
                 let mut data_store: Option<DataStore> = None;
 
-                for (package_id, _) in self.ontology.domains() {
-                    if let Some(config) = self.ontology.get_package_config(*package_id) {
-                        if let Some(data_store_config) = &config.data_store {
-                            let api = factory
-                                .new_api(data_store_config, &self.ontology, *package_id)
-                                .await
-                                .with_context(|| {
-                                    format!("Failed to initialize data store {data_store_config:?}")
-                                })
-                                .map_err(DomainError::DataStore)?;
-                            data_store = Some(DataStore::new(*package_id, api));
-                        }
-                    }
+                for (package_id, config) in data_store_backed_domains(&self.ontology) {
+                    let api = factory
+                        .new_api(config, &self.ontology, package_id)
+                        .await
+                        .with_context(|| format!("Failed to initialize data store {config:?}"))
+                        .map_err(DomainError::DataStore)?;
+                    data_store = Some(DataStore::new(package_id, api));
                 }
 
                 data_store
@@ -324,4 +319,44 @@ impl Builder {
             system: self.system.expect("No system API provided!"),
         })
     }
+
+    pub fn build_sync<F: DataStoreFactorySync>(self, factory: F) -> DomainResult<DomainEngine> {
+        let data_store = match self.data_store {
+            Some(data_store) => Some(data_store),
+            None => {
+                let mut data_store: Option<DataStore> = None;
+
+                for (package_id, config) in data_store_backed_domains(&self.ontology) {
+                    let api = factory
+                        .new_api_sync(config, &self.ontology, package_id)
+                        .with_context(|| format!("Failed to initialize data store {config:?}"))
+                        .map_err(DomainError::DataStore)?;
+                    data_store = Some(DataStore::new(package_id, api));
+                }
+
+                data_store
+            }
+        };
+
+        let resolver_graph = ResolverGraph::new(&self.ontology);
+
+        Ok(DomainEngine {
+            ontology: self.ontology,
+            config: Arc::new(self.config),
+            resolver_graph,
+            data_store,
+            system: self.system.expect("No system API provided!"),
+        })
+    }
+}
+
+fn data_store_backed_domains(
+    ontology: &Ontology,
+) -> impl Iterator<Item = (PackageId, &DataStoreConfig)> {
+    ontology.domains().filter_map(|(package_id, _domain)| {
+        ontology
+            .get_package_config(*package_id)
+            .and_then(|config| config.data_store.as_ref())
+            .map(|data_store_config| (*package_id, data_store_config))
+    })
 }

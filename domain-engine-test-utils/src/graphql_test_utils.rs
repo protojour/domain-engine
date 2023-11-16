@@ -78,15 +78,14 @@ pub fn mock_data_store_query_entities_empty() -> impl unimock::Clause {
         .returns(Ok(Response::Query(Sequence::new([]))))
 }
 
-pub async fn gql_ctx_mock_data_store(
+pub fn gql_ctx_mock_data_store(
     ontol_test: &OntolTest,
     data_store_package: SourceName,
     setup: impl unimock::Clause,
 ) -> ServiceCtx {
     DomainEngine::test_builder(ontol_test.ontology.clone())
         .mock_data_store(ontol_test.get_package_id(data_store_package.0), setup)
-        .build(DefaultDataStoreFactory)
-        .await
+        .build_sync(DefaultDataStoreFactory)
         .unwrap()
         .into()
 }
