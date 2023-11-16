@@ -1,29 +1,33 @@
 def cubic_meters {
-    rel _ is: i64
+    rel .is: i64
 }
 
 def meters {
-    rel _ is: i64
+    rel .is: i64
 }
 
 def meters_per_second {
-    rel _ is: i64
+    rel .is: i64
 }
 
 def seconds {
-    rel _ is: i64
+    rel .is: i64
+}
+
+def PI {
+    rel .is: 3.14159265358979323846264338327950288419716939937510
 }
 
 def water_tank {
-    rel _ 'height': meters
-    rel _ 'radius': meters
-    rel _ 'contents': cubic_meters
+    rel .'height': meters
+    rel .'radius': meters
+    rel .'contents': cubic_meters
 }
 
 def velocity_of_emptying {
-    rel _ 'velocity': meters_per_second
-    rel _ 'duration': seconds
-    rel _ 'capacity': cubic_meters
+    rel .'velocity': meters_per_second
+    rel .'duration': seconds
+    rel .'capacity': cubic_meters
 }
 
 map {
