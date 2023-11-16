@@ -3,6 +3,7 @@
 
 use std::{collections::HashMap, sync::Arc};
 
+use domain_engine_core::{data_store::DefaultDataStoreFactory, system::SystemAPI, DomainEngine};
 use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
@@ -17,15 +18,26 @@ use ontol_runtime::{
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 use wasm_domain::{WasmDomain, WasmMapper};
-use wasm_error::{JsCompileError, JsCompileErrors, WasmError};
+use wasm_error::{JsCompileError, JsCompileErrors, WasmError, WasmResult};
+use wasm_gc::WasmWeak;
 use wasm_graphql::WasmGraphqlSchema;
 use wasm_util::js_serializer;
 
 pub mod wasm_domain;
 pub mod wasm_error;
+mod wasm_gc;
 pub mod wasm_graphql;
 mod wasm_util;
 
+pub struct WasmSystem;
+
+impl SystemAPI for WasmSystem {
+    fn current_time(&self) -> chrono::DateTime<chrono::Utc> {
+        chrono::Utc::now()
+    }
+}
+
+/// Note: remember to free() the object from JS
 #[wasm_bindgen]
 pub struct WasmOntology {
     ontology: Arc<Ontology>,
@@ -35,8 +47,22 @@ pub struct WasmOntology {
 
 #[wasm_bindgen]
 impl WasmOntology {
-    pub async fn create_graphql_schema(&self) -> Result<WasmGraphqlSchema, WasmError> {
-        WasmGraphqlSchema::create(self.ontology.clone(), self.package_id).await
+    /// NOTE: deprecated
+    pub async fn create_graphql_schema(&self) -> WasmResult<WasmGraphqlSchema> {
+        WasmGraphqlSchema::from_ontology(WasmWeak::from_arc(&self.ontology), self.package_id).await
+    }
+
+    /// Turn the ontology into a domain engine
+    pub async fn create_domain_engine(&self) -> WasmResult<WasmDomainEngine> {
+        let domain_engine = DomainEngine::builder(self.ontology.clone())
+            .system(Box::new(WasmSystem))
+            .build(DefaultDataStoreFactory)
+            .await
+            .map_err(|e| WasmError::Generic(format!("{e}")))?;
+
+        Ok(WasmDomainEngine {
+            domain_engine: Arc::new(domain_engine),
+        })
     }
 
     pub fn domains(&self) -> Vec<JsValue> {
@@ -44,7 +70,7 @@ impl WasmOntology {
             .domains()
             .map(|(package_id, _domain)| WasmDomain {
                 package_id: *package_id,
-                ontology: self.ontology.clone(),
+                weak_ontology: WasmWeak::from_arc(&self.ontology),
             })
             .map(JsValue::from)
             .collect()
@@ -56,7 +82,7 @@ impl WasmOntology {
             .map(|(key, map_info)| WasmMapper {
                 key,
                 map_info: map_info.clone(),
-                ontology: self.ontology.clone(),
+                weak_ontology: WasmWeak::from_arc(&self.ontology),
             })
             .map(JsValue::from)
             .collect()
@@ -87,6 +113,26 @@ impl WasmOntology {
 
     pub fn ontology_graph_js(&self) -> JsValue {
         self.ontology_graph_js.clone()
+    }
+}
+
+/// Note: remember to free() the object from JS
+#[wasm_bindgen]
+pub struct WasmDomainEngine {
+    domain_engine: Arc<DomainEngine>,
+}
+
+#[wasm_bindgen]
+impl WasmDomainEngine {
+    pub async fn create_graphql_schema(
+        &self,
+        domain: &WasmDomain,
+    ) -> Result<WasmGraphqlSchema, WasmError> {
+        WasmGraphqlSchema::from_weak_domain_engine(
+            WasmWeak::from_arc(&self.domain_engine),
+            domain.package_id,
+        )
+        .await
     }
 }
 
