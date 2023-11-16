@@ -87,15 +87,16 @@ impl DataStoreFactorySync for WasmDataStoreFactory {
             DataStoreConfig::ByName(name) if name == "closure" => {
                 let (request_tx, request_rx) = tokio::sync::mpsc::channel(8);
 
-                Ok(Box::new(ChannelDataStore {
-                    request_tx,
-                    worker_join_handle: tokio::task::spawn_local(request_executor_task(
-                        request_rx,
-                        self.js_closure
-                            .clone()
-                            .ok_or_else(|| anyhow!("No JS closure provided"))?,
-                    )),
-                }))
+                // This task reads incoming requests in a loop and terminates
+                // when the channel closes, i.e. `self.request_tx` goes out of scope.
+                tokio::task::spawn_local(request_executor_task(
+                    request_rx,
+                    self.js_closure
+                        .clone()
+                        .ok_or_else(|| anyhow!("No JS closure provided"))?,
+                ));
+
+                Ok(Box::new(ChannelDataStore { request_tx }))
             }
             _ => DefaultDataStoreFactory.new_api_sync(config, ontology, package_id),
         }
@@ -115,7 +116,6 @@ struct ChannelRequest(
 /// Therefore we communicate over channel to a worker task running on the thread-local tokio executor.
 struct ChannelDataStore {
     request_tx: tokio::sync::mpsc::Sender<ChannelRequest>,
-    worker_join_handle: tokio::task::JoinHandle<()>,
 }
 
 #[async_trait::async_trait]
@@ -146,12 +146,6 @@ impl ChannelDataStore {
         response_rx
             .await
             .map_err(|_| anyhow!("Failed to receive response over channel"))?
-    }
-}
-
-impl Drop for ChannelDataStore {
-    fn drop(&mut self) {
-        self.worker_join_handle.abort();
     }
 }
 
