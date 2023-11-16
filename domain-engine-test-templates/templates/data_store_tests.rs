@@ -216,6 +216,19 @@ async fn test_conduit_db_store_entity_tree() {
         })
     );
 
+    let comments = engine
+        .query_entities(comment_type.struct_select([]).into())
+        .await
+        .unwrap();
+
+    let comment_id = comments.attrs[0]
+        .value
+        .get_attribute(comment_type.find_property("id").unwrap())
+        .unwrap()
+        .value
+        .clone()
+        .cast_into::<i64>();
+
     expect_eq!(
         actual = serde_read(&user_type).as_json(
             &engine
@@ -254,7 +267,7 @@ async fn test_conduit_db_store_entity_tree() {
                     "updated_at": "1970-01-01T00:00:00+00:00",
                     "comments": [
                         {
-                            "id": 0,
+                            "id": comment_id,
                             "body": "First post!",
                             "author": {
                                 "user_id": pre_existing_user_id.to_string(),
