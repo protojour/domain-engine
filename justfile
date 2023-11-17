@@ -16,6 +16,3 @@ lsp: ontool
     npm run build && \
     npm run package
     cd ../..
-
-wasm:
-    wasm-pack build --target web --weak-refs ontol-lsp --features wasm

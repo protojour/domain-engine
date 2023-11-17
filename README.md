@@ -94,9 +94,6 @@ just ontool
 # compile and install ontol-lsp
 just lsp
 code --install-extension ontol-language/ontol-vscode/ontol.vsix
-
-# compile domain-engine-wasm
-just wasm
 ```
 
 ## Documentation
