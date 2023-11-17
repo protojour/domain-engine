@@ -8,15 +8,7 @@ crate-type = ["cdylib", "rlib"]
 doctest = false
 
 [features]
-wasm = [
-    "dep:console_error_panic_hook",
-    "dep:js-sys",
-    "dep:wasm-bindgen",
-    "dep:wasm-bindgen-futures",
-    "dep:wasm-streams",
-    "dep:web-sys",
-    "dep:async-compat"
-]
+wasm = []
 
 [dependencies]
 ontol-runtime.path = "../ontol-runtime"
@@ -33,10 +25,3 @@ regex = "1.9.1"
 substring = "1.4.5"
 tower-lsp = { version = "0.20.0" }
 futures-util = { version = "0.3.28", features = ["futures-io", "io"] }
-console_error_panic_hook = { version = "0.1.7", optional = true }
-js-sys = { version = "0.3.64", optional = true }
-wasm-bindgen = { version = "0.2.87", optional = true }
-wasm-bindgen-futures = { version = "0.4.37", features = ["futures-core-03-stream"], optional = true  }
-wasm-streams = { version = "0.4.0", optional = true  }
-web-sys = { version = "0.3.64", features = ["console", "ReadableStream", "WritableStream"], optional = true  }
-async-compat = { version = "0.2", optional = true }

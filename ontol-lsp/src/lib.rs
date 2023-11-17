@@ -15,8 +15,6 @@ use tower_lsp::{Client, LanguageServer};
 
 mod docs;
 mod state;
-#[cfg(feature = "wasm")]
-pub mod wasm;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const NAME: &str = env!("CARGO_PKG_NAME");
