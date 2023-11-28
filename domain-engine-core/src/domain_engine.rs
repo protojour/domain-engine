@@ -180,7 +180,7 @@ impl DomainEngine {
                     }
                 }
                 BatchWriteRequest::Update(..) => {}
-                BatchWriteRequest::Delete(_) => {}
+                BatchWriteRequest::Delete(..) => {}
             }
         }
 

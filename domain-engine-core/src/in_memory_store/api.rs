@@ -42,7 +42,7 @@ impl DataStoreAPI for InMemoryDb {
                         BatchWriteRequest::Update(_entities, _select) => {
                             todo!()
                         }
-                        BatchWriteRequest::Delete(_ids) => {
+                        BatchWriteRequest::Delete(_ids, _def_id) => {
                             todo!()
                         }
                     }

@@ -4,7 +4,7 @@ use ontol_runtime::{
     select::{EntitySelect, Select},
     sequence::Sequence,
     value::Value,
-    PackageId,
+    DefId, PackageId,
 };
 use serde::{Deserialize, Serialize};
 use unimock::unimock;
@@ -45,7 +45,7 @@ pub enum Request {
 pub enum BatchWriteRequest {
     Insert(Vec<Value>, Select),
     Update(Vec<Value>, Select),
-    Delete(Vec<Value>),
+    Delete(Vec<Value>, DefId),
 }
 
 /// A response from the data store.
