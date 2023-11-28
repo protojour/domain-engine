@@ -7,7 +7,7 @@ use domain_engine_juniper::{
 };
 use ontol_runtime::{
     interface::serde::processor::ProcessorProfileFlags,
-    sequence::{Cursor, Sequence, SubSequence},
+    sequence::{Sequence, SubSequence},
     value::Attribute,
 };
 use ontol_test_utils::{
@@ -220,7 +220,7 @@ async fn test_graphql_basic_pagination() {
 
     expect_eq!(
         actual = r#"{
-            foos(first: 42, after: "bz0x") {
+            foos(first: 42, after: "MQ==") {
                 pageInfo {
                     endCursor
                     hasNextPage
@@ -241,12 +241,15 @@ async fn test_graphql_basic_pagination() {
                         };
                         assert_eq!(entity_select.include_total_len, false);
                         assert_eq!(entity_select.limit, 42);
-                        assert_eq!(entity_select.after_cursor, Some(Cursor::Offset(1)));
+                        assert_eq!(
+                            entity_select.after_cursor,
+                            Some(vec!['1' as u8].into_boxed_slice())
+                        );
 
                         Ok(Response::Query(Sequence::new_sub(
                             [],
                             SubSequence {
-                                end_cursor: Some(Cursor::Offset(2)),
+                                end_cursor: Some(vec!['2' as u8].into_boxed_slice()),
                                 has_next: true,
                                 total_len: Some(42),
                             },
@@ -258,7 +261,7 @@ async fn test_graphql_basic_pagination() {
         expected = Ok(graphql_value!({
             "foos": {
                 "pageInfo": {
-                    "endCursor": "bz0y",
+                    "endCursor": "Mg==",
                     "hasNextPage": true
                 }
             },
@@ -294,7 +297,7 @@ async fn test_graphql_basic_pagination() {
                         Ok(Response::Query(Sequence::new_sub(
                             [],
                             SubSequence {
-                                end_cursor: Some(Cursor::Offset(1)),
+                                end_cursor: Some(vec!['1' as u8].into_boxed_slice()),
                                 has_next: true,
                                 total_len: Some(42),
                             },
@@ -307,7 +310,7 @@ async fn test_graphql_basic_pagination() {
             "foos": {
                 "totalCount": 42,
                 "pageInfo": {
-                    "endCursor": "bz0x",
+                    "endCursor": "MQ==",
                     "hasNextPage": true
                 }
             },

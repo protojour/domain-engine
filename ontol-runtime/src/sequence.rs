@@ -39,7 +39,7 @@ impl Sequence {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct SubSequence {
     /// The cursor of the _last element_ in the sub sequence
-    pub end_cursor: Option<Cursor>,
+    pub end_cursor: Option<Box<[u8]>>,
     /// Are there more items in the sequence _following_ the concrete subsequence?
     pub has_next: bool,
     /// Total number of elements in the sequence
@@ -50,10 +50,4 @@ impl SubSequence {
     pub fn total_len(&self) -> Option<usize> {
         self.total_len
     }
-}
-
-#[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub enum Cursor {
-    Offset(usize),
-    Custom(Box<[u8]>),
 }

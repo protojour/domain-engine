@@ -214,10 +214,10 @@ impl DomainEngine {
             )));
         };
 
-        Ok(entities
+        entities
             .into_iter()
             .next()
-            .ok_or_else(|| DomainError::DataStore(anyhow!("No entity inserted")))?)
+            .ok_or_else(|| DomainError::DataStore(anyhow!("No entity inserted")))
     }
 
     async fn exec_map_query(

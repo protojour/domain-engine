@@ -392,19 +392,6 @@ async fn test_artist_and_instrument_pagination() {
         ),
         expected = json!(["Larry Young"])
     );
-
-    expect_eq!(
-        actual = extract_names(
-            engine
-                .exec_named_map_json(
-                    by_name,
-                    json!({}),
-                    TestFindQuery::default().limit(1).after_offset(0)
-                )
-                .await
-        ),
-        expected = json!(["Woody Shaw"])
-    );
 }
 
 #[test(tokio::test)]

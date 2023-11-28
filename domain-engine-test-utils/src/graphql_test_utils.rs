@@ -7,6 +7,7 @@ use domain_engine_core::{
 use domain_engine_juniper::{
     context::ServiceCtx, create_graphql_schema, gql_scalar::GqlScalar, Schema,
 };
+use juniper::ScalarValue;
 use ontol_runtime::sequence::Sequence;
 use ontol_test_utils::{OntolTest, SourceName, TestCompile};
 use unimock::*;
@@ -149,5 +150,41 @@ impl<T: Debug> GraphqlTestResultExt for Result<T, TestError> {
                 panic!("Error was a GraphQL error");
             }
         }
+    }
+}
+
+pub struct GraphQLPageDebug {
+    pub has_next_page: bool,
+    pub end_cursor: Option<String>,
+    pub total_count: Option<i32>,
+}
+
+impl GraphQLPageDebug {
+    pub fn parse_connection(
+        response: &juniper::Value<GqlScalar>,
+        connection_name: &str,
+    ) -> Option<Self> {
+        let connection = response
+            .as_object_value()?
+            .get_field_value(connection_name)?
+            .as_object_value()?;
+        let total_count = connection.get_field_value("totalCount");
+        let page_info = connection.get_field_value("pageInfo")?.as_object_value()?;
+        let has_next_page = page_info
+            .get_field_value("hasNextPage")?
+            .as_scalar()?
+            .as_bool()?;
+        let end_cursor = page_info
+            .get_field_value("endCursor")?
+            .as_scalar()?
+            .as_string();
+
+        Some(Self {
+            total_count: total_count
+                .and_then(|count| count.as_scalar())
+                .and_then(|scalar| scalar.as_int()),
+            has_next_page,
+            end_cursor,
+        })
     }
 }

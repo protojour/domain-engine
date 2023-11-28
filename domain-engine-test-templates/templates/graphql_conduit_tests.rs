@@ -1,20 +1,21 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use domain_engine_core::DomainEngine;
 use domain_engine_juniper::{
     context::ServiceCtx,
-    cursor_util::serialize_cursor,
-    juniper::{self, graphql_value, InputValue},
+    gql_scalar::GqlScalar,
+    juniper::{self, graphql_value, InputValue, Value},
     Schema,
 };
-use domain_engine_test_utils::graphql_test_utils::{Exec, TestCompileSchema};
-use ontol_runtime::sequence::Cursor;
+use domain_engine_test_utils::graphql_test_utils::{Exec, GraphQLPageDebug, TestCompileSchema};
 use ontol_runtime::{config::DataStoreConfig, ontology::Ontology};
 use ontol_test_utils::{
     examples::conduit::{BLOG_POST_PUBLIC, CONDUIT_DB},
     expect_eq, SourceName, TestPackages,
 };
 use test_log::test;
+use tracing::info;
 
 const ROOT: SourceName = SourceName::root();
 
@@ -358,11 +359,12 @@ async fn test_graphql_blog_post_conduit_paginated() {
         test.create_db_article().await;
     }
 
-    let after = serialize_cursor(&Cursor::Offset(0));
-    assert_eq!(after, "bz0w".into());
+    let mut prev_end_cursor: Option<InputValue<GqlScalar>> = None;
 
-    expect_eq!(
-        actual = r#"
+    for index in 0..3 {
+        info!("Executing page {index}");
+
+        let response: Value<GqlScalar> = r#"
             query paginated_posts($after: String) {
                 posts(input: { written_by: "teh_user" }, first: 1, after: $after) {
                     nodes {
@@ -378,27 +380,24 @@ async fn test_graphql_blog_post_conduit_paginated() {
             }
         "#
         .exec(
-            [("after".to_owned(), InputValue::Scalar(after))],
+            if let Some(cursor) = &prev_end_cursor {
+                HashMap::from([("after".to_owned(), cursor.clone())])
+            } else {
+                HashMap::default()
+            },
             &test.blog_schema,
-            &test.ctx()
+            &test.ctx(),
         )
-        .await,
-        expected = Ok(graphql_value!({
-            "posts": {
-                "nodes": [
-                    {
-                        "contents": "THE BODY",
-                        "written_by": "teh_user",
-                    }
-                ],
-                "pageInfo": {
-                    "hasNextPage": true,
-                    "endCursor": "bz0x"
-                },
-                "totalCount": 3
-            }
-        })),
-    );
+        .await
+        .unwrap();
+
+        let debug = GraphQLPageDebug::parse_connection(&response, "posts").unwrap();
+        assert_eq!(debug.total_count, Some(3));
+        assert_eq!(debug.has_next_page, index < 2);
+        prev_end_cursor = debug
+            .end_cursor
+            .map(|cursor| InputValue::Scalar(GqlScalar::String(cursor.into())));
+    }
 }
 
 #[test(tokio::test)]

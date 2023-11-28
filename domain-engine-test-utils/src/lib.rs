@@ -5,7 +5,6 @@ use ontol_runtime::{
     condition::{CondTerm, Condition},
     interface::serde::processor::ProcessorMode,
     select::{EntitySelect, StructOrUnionSelect, StructSelect},
-    sequence::Cursor,
     value::{Data, Value},
     var::Var,
     PackageId,
@@ -88,20 +87,12 @@ async fn test_exec_named_map(
 
 pub struct TestFindQuery {
     limit: usize,
-    after_cursor: Option<Cursor>,
     include_total_len: bool,
 }
 
 impl TestFindQuery {
     pub fn limit(self, limit: usize) -> Self {
         Self { limit, ..self }
-    }
-
-    pub fn after_offset(self, after_offset: usize) -> Self {
-        Self {
-            after_cursor: Some(Cursor::Offset(after_offset)),
-            ..self
-        }
     }
 
     pub fn with_total_len(self) -> Self {
@@ -116,7 +107,6 @@ impl Default for TestFindQuery {
     fn default() -> Self {
         Self {
             limit: 20,
-            after_cursor: None,
             include_total_len: false,
         }
     }
@@ -136,7 +126,7 @@ impl domain_engine_core::FindEntitySelect for TestFindQuery {
             }),
             condition: Default::default(),
             limit: self.limit,
-            after_cursor: self.after_cursor.clone(),
+            after_cursor: None,
             include_total_len: self.include_total_len,
         }
     }

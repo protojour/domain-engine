@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     condition::{CondTerm, Condition},
-    sequence::Cursor,
     value::PropertyId,
     DefId,
 };
@@ -22,7 +21,7 @@ pub struct EntitySelect {
     pub source: StructOrUnionSelect,
     pub condition: Condition<CondTerm>,
     pub limit: usize,
-    pub after_cursor: Option<Cursor>,
+    pub after_cursor: Option<Box<[u8]>>,
     pub include_total_len: bool,
 }
 
@@ -48,7 +47,7 @@ pub struct StructSelect {
 }
 
 impl StructSelect {
-    pub fn into_entity_select(self, limit: usize, after_cursor: Option<Cursor>) -> EntitySelect {
+    pub fn into_entity_select(self, limit: usize, after_cursor: Option<Box<[u8]>>) -> EntitySelect {
         EntitySelect {
             source: StructOrUnionSelect::Struct(self),
             condition: Condition::default(),

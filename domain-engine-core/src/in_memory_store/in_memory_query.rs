@@ -1,11 +1,12 @@
 use std::collections::BTreeMap;
 
+use anyhow::anyhow;
 use itertools::Itertools;
 use ontol_runtime::{
     condition::{CondTerm, Condition},
     ontology::{DataRelationshipKind, PropertyCardinality, TypeInfo, ValueCardinality},
     select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
-    sequence::{Cursor, Sequence, SubSequence},
+    sequence::{Sequence, SubSequence},
     value::{Attribute, Data, PropertyId, Value},
     Role,
 };
@@ -18,6 +19,11 @@ use crate::{
 
 use super::in_memory_core::{DynamicKey, EntityKey, InMemoryStore};
 
+#[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
+struct Cursor {
+    offset: usize,
+}
+
 impl InMemoryStore {
     pub fn query_entities(
         &self,
@@ -29,7 +35,12 @@ impl InMemoryStore {
                 struct_select,
                 &select.condition,
                 select.limit,
-                select.after_cursor.as_ref(),
+                select
+                    .after_cursor
+                    .as_deref()
+                    .map(bincode::deserialize)
+                    .transpose()
+                    .map_err(|_| DomainError::DataStore(anyhow!("Invalid cursor format")))?,
                 select.include_total_len,
                 engine,
             ),
@@ -42,7 +53,7 @@ impl InMemoryStore {
         struct_select: &StructSelect,
         condition: &Condition<CondTerm>,
         limit: usize,
-        after_cursor: Option<&Cursor>,
+        after_cursor: Option<Cursor>,
         include_total_len: bool,
         engine: &DomainEngine,
     ) -> DomainResult<Sequence> {
@@ -80,10 +91,7 @@ impl InMemoryStore {
 
         let start_offset = match after_cursor {
             None => 0,
-            Some(Cursor::Offset(after_offset)) => *after_offset + 1,
-            Some(Cursor::Custom(_)) => {
-                return Err(DomainError::NotImplemented);
-            }
+            Some(Cursor { offset }) => offset + 1,
         };
 
         if start_offset > 0 {
@@ -100,9 +108,15 @@ impl InMemoryStore {
 
         entity_sequence.sub_seq = Some(Box::new(SubSequence {
             end_cursor: if limit > 0 {
-                Some(Cursor::Offset(start_offset + limit - 1))
+                Some(
+                    bincode::serialize(&Cursor {
+                        offset: start_offset + limit - 1,
+                    })
+                    .unwrap()
+                    .into(),
+                )
             } else {
-                after_cursor.cloned()
+                after_cursor.map(|after_cursor| bincode::serialize(&after_cursor).unwrap().into())
             },
             has_next: start_offset + limit < total_size,
             total_len: if include_total_len {
