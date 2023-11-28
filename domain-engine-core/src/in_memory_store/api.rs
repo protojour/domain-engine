@@ -2,7 +2,7 @@ use fnv::FnvHashMap;
 use ontol_runtime::{ontology::Ontology, DefId, PackageId, RelationshipId};
 use tokio::sync::RwLock;
 
-use crate::data_store::{DataStoreAPI, Request, Response};
+use crate::data_store::{BatchWriteRequest, BatchWriteResponse, DataStoreAPI, Request, Response};
 use crate::domain_engine::DomainEngine;
 use crate::domain_error::DomainResult;
 
@@ -22,12 +22,34 @@ impl DataStoreAPI for InMemoryDb {
             Request::Query(select) => Ok(Response::Query(
                 self.store.read().await.query_entities(&select, engine)?,
             )),
-            Request::StoreNewEntity(value, select) => Ok(Response::StoreNewEntity(
-                self.store
-                    .write()
-                    .await
-                    .write_new_entity(value, select, engine)?,
-            )),
+            Request::BatchWrite(write_requests) => {
+                let mut store = self.store.write().await;
+                let mut responses = vec![];
+
+                for write_request in write_requests {
+                    match write_request {
+                        BatchWriteRequest::Insert(entities, select) => {
+                            let mut values = vec![];
+
+                            for entity in entities {
+                                let value =
+                                    store.write_new_entity(entity, select.clone(), engine)?;
+                                values.push(value);
+                            }
+
+                            responses.push(BatchWriteResponse::Inserted(values));
+                        }
+                        BatchWriteRequest::Update(_entities, _select) => {
+                            todo!()
+                        }
+                        BatchWriteRequest::Delete(_ids) => {
+                            todo!()
+                        }
+                    }
+                }
+
+                Ok(Response::BatchWrite(responses))
+            }
         }
     }
 }

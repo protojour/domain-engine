@@ -15,7 +15,10 @@ use ontol_runtime::{
 use tracing::debug;
 
 use crate::{
-    data_store::{self, DataStore, DataStoreFactory, DataStoreFactorySync},
+    data_store::{
+        self, BatchWriteRequest, BatchWriteResponse, DataStore, DataStoreFactory,
+        DataStoreFactorySync,
+    },
     domain_error::DomainResult,
     match_utils::find_entity_id_in_condition_for_var,
     resolve_path::{ProbeOptions, ResolverGraph},
@@ -163,15 +166,28 @@ impl DomainEngine {
         Ok(edge_seq)
     }
 
-    pub async fn store_new_entity(&self, mut entity: Value, select: Select) -> DomainResult<Value> {
+    pub async fn execute_writes(
+        &self,
+        mut requests: Vec<data_store::BatchWriteRequest>,
+    ) -> DomainResult<Vec<data_store::BatchWriteResponse>> {
         // TODO: Domain translation by finding optimal mapping path
 
-        Generator::new(self, ProcessorMode::Create).generate_values(&mut entity);
+        for request in &mut requests {
+            match request {
+                BatchWriteRequest::Insert(mut_values, _) => {
+                    for mut_value in mut_values {
+                        Generator::new(self, ProcessorMode::Create).generate_values(mut_value);
+                    }
+                }
+                BatchWriteRequest::Update(..) => {}
+                BatchWriteRequest::Delete(_) => {}
+            }
+        }
 
-        let data_store::Response::StoreNewEntity(value) = self
+        let data_store::Response::BatchWrite(responses) = self
             .get_data_store()?
             .api()
-            .execute(data_store::Request::StoreNewEntity(entity, select), self)
+            .execute(data_store::Request::BatchWrite(requests), self)
             .await?
         else {
             return Err(DomainError::DataStore(anyhow!(
@@ -179,7 +195,29 @@ impl DomainEngine {
             )));
         };
 
-        Ok(value)
+        Ok(responses)
+    }
+
+    /// Shorthand for storing one entity
+    pub async fn store_new_entity(&self, entity: Value, select: Select) -> DomainResult<Value> {
+        let write_responses = self
+            .execute_writes(vec![BatchWriteRequest::Insert(vec![entity], select)])
+            .await?;
+
+        let BatchWriteResponse::Inserted(entities) = write_responses
+            .into_iter()
+            .next()
+            .ok_or_else(|| DomainError::DataStore(anyhow!("Nothing got inserted")))?
+        else {
+            return Err(DomainError::DataStore(anyhow!(
+                "Expected inserted entities"
+            )));
+        };
+
+        Ok(entities
+            .into_iter()
+            .next()
+            .ok_or_else(|| DomainError::DataStore(anyhow!("No entity inserted")))?)
     }
 
     async fn exec_map_query(

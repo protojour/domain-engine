@@ -3,7 +3,10 @@
 use std::sync::Arc;
 
 use context::{SchemaCtx, SchemaType, ServiceCtx};
-use domain_engine_core::DomainError;
+use domain_engine_core::{
+    data_store::{BatchWriteRequest, BatchWriteResponse},
+    DomainError,
+};
 use gql_scalar::GqlScalar;
 use juniper::LookAheadMethods;
 use look_ahead_utils::ArgsWrapper;
@@ -18,7 +21,7 @@ use ontol_runtime::{
     ontology::Ontology,
     select::{Select, StructOrUnionSelect},
     sequence::Sequence,
-    value::ValueDebug,
+    value::{Data, Value, ValueDebug},
     PackageId,
 };
 use templates::sequence_type::SequenceType;
@@ -180,31 +183,59 @@ async fn mutation(
             let entity_mutations = args_wrapper
                 .deserialize_entity_mutation_args(create_arg, update_arg, delete_arg, ctx)?;
             let struct_query = query_analyzer.analyze_struct_select(&look_ahead, field_data)?;
-            let query = match struct_query {
+            let select = match struct_query {
                 StructOrUnionSelect::Struct(struct_query) => Select::Struct(struct_query),
                 StructOrUnionSelect::Union(def_id, structs) => Select::StructUnion(def_id, structs),
             };
 
-            let mut output_sequence = Sequence::default();
+            let mut batch_write_requests = vec![];
 
-            // FIXME: This could get a nice dose of transaction management
             for entity_mutation in entity_mutations {
                 match entity_mutation.kind {
                     EntityMutationKind::Create => {
-                        for input_attr in entity_mutation.inputs.attrs {
-                            let value = service_ctx
-                                .domain_engine
-                                // FIXME: Avoid query clone
-                                .store_new_entity(input_attr.value, query.clone())
-                                .await?;
-                            output_sequence.attrs.push(value.into());
-                        }
+                        batch_write_requests.push(BatchWriteRequest::Insert(
+                            entity_mutation
+                                .inputs
+                                .attrs
+                                .into_iter()
+                                .map(|attr| attr.value)
+                                .collect(),
+                            select.clone(),
+                        ));
                     }
                     EntityMutationKind::Update => {
                         todo!()
                     }
                     EntityMutationKind::Delete => {
                         todo!()
+                    }
+                }
+            }
+
+            let batch_write_responses = service_ctx
+                .domain_engine
+                .execute_writes(batch_write_requests)
+                .await?;
+
+            let mut output_sequence = Sequence::default();
+
+            for batch_write_response in batch_write_responses {
+                match batch_write_response {
+                    BatchWriteResponse::Inserted(values) | BatchWriteResponse::Updated(values) => {
+                        output_sequence
+                            .attrs
+                            .extend(values.into_iter().map(Into::into));
+                    }
+                    BatchWriteResponse::Deleted(bools) => {
+                        let bool_type = schema_ctx.ontology.ontol_domain_meta().bool;
+
+                        output_sequence.attrs.extend(bools.into_iter().map(|bool| {
+                            Value {
+                                data: Data::I64(if bool { 1 } else { 0 }),
+                                type_def_id: bool_type,
+                            }
+                            .into()
+                        }))
                     }
                 }
             }

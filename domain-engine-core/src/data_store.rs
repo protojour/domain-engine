@@ -34,8 +34,18 @@ impl DataStore {
 /// A request to the data store
 #[derive(Serialize, Deserialize)]
 pub enum Request {
+    /// A single query
     Query(EntitySelect),
-    StoreNewEntity(Value, Select),
+    /// A sequence of batch writes.
+    /// The corresponding responses must retain the order of inputs.
+    BatchWrite(Vec<BatchWriteRequest>),
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum BatchWriteRequest {
+    Insert(Vec<Value>, Select),
+    Update(Vec<Value>, Select),
+    Delete(Vec<Value>),
 }
 
 /// A response from the data store.
@@ -44,7 +54,14 @@ pub enum Request {
 #[derive(Serialize, Deserialize)]
 pub enum Response {
     Query(Sequence),
-    StoreNewEntity(Value),
+    BatchWrite(Vec<BatchWriteResponse>),
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum BatchWriteResponse {
+    Inserted(Vec<Value>),
+    Updated(Vec<Value>),
+    Deleted(Vec<bool>),
 }
 
 #[unimock(api = DataStoreAPIMock)]
@@ -96,5 +113,17 @@ impl DataStoreFactorySync for DefaultDataStoreFactory {
         package_id: PackageId,
     ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>> {
         Ok(Box::new(InMemoryDb::new(ontology, package_id)))
+    }
+}
+
+impl From<Vec<BatchWriteResponse>> for Response {
+    fn from(value: Vec<BatchWriteResponse>) -> Self {
+        Self::BatchWrite(value)
+    }
+}
+
+impl Response {
+    pub fn one_inserted(value: Value) -> Self {
+        Self::BatchWrite(vec![BatchWriteResponse::Inserted(vec![value])])
     }
 }
