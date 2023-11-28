@@ -39,22 +39,26 @@ async fn test_graphql_conduit_db() {
 
     expect_eq!(
         actual = r#"mutation {
-            createUser(
-                input: {
+            User(
+                create: [{
                     username: "u1",
                     email: "a@b",
                     password_hash: "s3cr3t",
-                }
+                }]
             ) {
-                username
+                node {
+                    username
+                }
             }
         }"#
         .exec([], &schema, &ctx)
         .await,
         expected = Ok(graphql_value!({
-            "createUser": {
-                "username": "u1"
-            }
+            "User": [{
+                "node": {
+                    "username": "u1"
+                }
+            }]
         })),
     );
 
@@ -462,6 +466,94 @@ async fn test_graphql_blog_post_conduit_no_join_real() {
                     }
                 ]
             }
+        })),
+    );
+}
+
+#[test(tokio::test)]
+async fn test_graphql_conduit_db_user_deletion() {
+    let test_packages = conduit_db_only();
+    let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
+    let ctx: ServiceCtx = make_domain_engine(test.ontology.clone()).await.into();
+
+    let response = r#"mutation {
+        User(
+            create: [{
+                username: "to_be_deleted",
+                email: "a@b",
+                password_hash: "s3cr3t",
+            }]
+        ) {
+            node {
+                user_id
+            }
+        }
+    }"#
+    .exec([], &schema, &ctx)
+    .await
+    .unwrap();
+
+    let user_id = response
+        .as_object_value()
+        .and_then(|response| response.get_field_value("User"))
+        .and_then(juniper::Value::as_list_value)
+        .map(|list| &list[0])
+        .and_then(juniper::Value::as_object_value)
+        .and_then(|mutation| mutation.get_field_value("node"))
+        .and_then(juniper::Value::as_object_value)
+        .and_then(|node| node.get_field_value("user_id"))
+        .and_then(juniper::Value::as_scalar_value)
+        .unwrap()
+        .clone();
+
+    r#"mutation {
+        User(
+            create: [{
+                username: "retained_user",
+                email: "b@c",
+                password_hash: "123abc",
+            }]
+        ) {
+            node {
+                user_id
+            }
+        }
+    }"#
+    .exec([], &schema, &ctx)
+    .await
+    .unwrap();
+
+    // Do the action deletion: One real user and one bogus user ID
+    expect_eq!(
+        actual = {
+            let mutation = format!(
+                r#"mutation {{
+                    User(delete: ["{user_id}", "deadbeef-baad-baad-baad-c0ffeeeeeeee"]) {{
+                        deleted
+                    }}
+                }}"#
+            );
+            mutation.exec([], &schema, &ctx).await
+        },
+        expected = Ok(graphql_value!({
+            "User": [
+                { "deleted": true },
+                { "deleted": false }
+            ]
+        })),
+    );
+
+    // Verify that the user was actually deleted
+    expect_eq!(
+        actual = "{ users { nodes { username } } }"
+            .exec([], &schema, &ctx)
+            .await,
+        expected = Ok(graphql_value!({
+            "users": {
+                "nodes": [
+                    { "username": "retained_user" }
+                ]
+            },
         })),
     );
 }

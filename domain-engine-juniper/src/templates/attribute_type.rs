@@ -326,10 +326,12 @@ impl<'v> AttributeType<'v> {
                     panic!("BUG: Tried to read edge property from {other:?}");
                 }
             },
-            (data, FieldKind::Deleted) => Ok(juniper::Value::Scalar(GqlScalar::Boolean(matches!(
-                data,
-                Data::Unit
-            )))),
+            (data, FieldKind::Deleted) => {
+                Ok(juniper::Value::Scalar(GqlScalar::Boolean(match data {
+                    Data::I64(bool) => *bool != 0,
+                    _ => false,
+                })))
+            }
             other => panic!("BUG: unhandled combination: {other:#?}"),
         }
     }

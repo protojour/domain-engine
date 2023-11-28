@@ -19,7 +19,6 @@ use ontol_runtime::{
         DomainInterface,
     },
     ontology::Ontology,
-    select::{Select, StructOrUnionSelect},
     sequence::Sequence,
     value::{Data, Value, ValueDebug},
     PackageId,
@@ -164,7 +163,7 @@ async fn mutation(
 
     let look_ahead = executor.look_ahead();
     let args_wrapper = ArgsWrapper::new(look_ahead.arguments());
-    let query_analyzer = SelectAnalyzer::new(schema_ctx, service_ctx);
+    let select_analyzer = SelectAnalyzer::new(schema_ctx, service_ctx);
 
     let field_data = type_info
         .type_data()
@@ -182,32 +181,28 @@ async fn mutation(
         } => {
             let entity_mutations = args_wrapper
                 .deserialize_entity_mutation_args(create_arg, update_arg, delete_arg, ctx)?;
-            let struct_query = query_analyzer.analyze_struct_select(&look_ahead, field_data)?;
-            let select = match struct_query {
-                StructOrUnionSelect::Struct(struct_query) => Select::Struct(struct_query),
-                StructOrUnionSelect::Union(def_id, structs) => Select::StructUnion(def_id, structs),
-            };
-
+            let select = select_analyzer.analyze_select(&look_ahead, field_data)?;
             let mut batch_write_requests = vec![];
 
             for entity_mutation in entity_mutations {
+                let values = entity_mutation
+                    .inputs
+                    .attrs
+                    .into_iter()
+                    .map(|attr| attr.value)
+                    .collect();
+
                 match entity_mutation.kind {
                     EntityMutationKind::Create => {
-                        batch_write_requests.push(BatchWriteRequest::Insert(
-                            entity_mutation
-                                .inputs
-                                .attrs
-                                .into_iter()
-                                .map(|attr| attr.value)
-                                .collect(),
-                            select.clone(),
-                        ));
+                        batch_write_requests
+                            .push(BatchWriteRequest::Insert(values, select.clone()));
                     }
                     EntityMutationKind::Update => {
                         todo!()
                     }
                     EntityMutationKind::Delete => {
-                        todo!()
+                        batch_write_requests
+                            .push(BatchWriteRequest::Delete(values, create_arg.def_id));
                     }
                 }
             }
@@ -251,20 +246,16 @@ async fn mutation(
         FieldKind::CreateMutation { input } => {
             let input_attribute =
                 args_wrapper.deserialize_domain_field_arg_as_attribute(input, ctx)?;
-            let struct_query = query_analyzer.analyze_struct_select(&look_ahead, field_data)?;
-            let query = match struct_query {
-                StructOrUnionSelect::Struct(struct_query) => Select::Struct(struct_query),
-                StructOrUnionSelect::Union(def_id, structs) => Select::StructUnion(def_id, structs),
-            };
+            let select = select_analyzer.analyze_select(&look_ahead, field_data)?;
 
             trace!(
-                "CREATE {} -> {query:#?}",
+                "CREATE {} -> {select:#?}",
                 ValueDebug(&input_attribute.value)
             );
 
             let value = service_ctx
                 .domain_engine
-                .store_new_entity(input_attribute.value, query)
+                .store_new_entity(input_attribute.value, select)
                 .await?;
 
             resolve_schema_type_field(
@@ -282,10 +273,10 @@ async fn mutation(
             let input_attribute =
                 args_wrapper.deserialize_domain_field_arg_as_attribute(input, ctx)?;
 
-            let query = query_analyzer.analyze_struct_select(&look_ahead, field_data);
+            let select = select_analyzer.analyze_select(&look_ahead, field_data)?;
 
             trace!(
-                "UPDATE {} -> {} -> {query:#?}",
+                "UPDATE {} -> {} -> {select:#?}",
                 ValueDebug(&id_attribute.value),
                 ValueDebug(&input_attribute.value)
             );

@@ -102,7 +102,7 @@ pub trait Exec {
 }
 
 #[async_trait::async_trait]
-impl Exec for &'static str {
+impl Exec for &str {
     async fn exec(
         self,
         variables: impl Into<juniper::Variables<GqlScalar>> + Send,

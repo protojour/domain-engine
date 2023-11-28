@@ -1,5 +1,6 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
+use anyhow::anyhow;
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
@@ -46,6 +47,41 @@ pub(super) struct EntityKey {
 }
 
 impl InMemoryStore {
+    pub fn delete_entity(&mut self, ids: Vec<Value>, def_id: DefId) -> DomainResult<Vec<bool>> {
+        let mut result_vec = Vec::with_capacity(ids.len());
+        let mut deleted_set: HashSet<EntityKey> = HashSet::with_capacity(ids.len());
+
+        let collection = self
+            .collections
+            .get_mut(&def_id)
+            .ok_or_else(|| DomainError::DataStore(anyhow!("Collection not found")))?;
+
+        for id in ids {
+            let dynamic_key = Self::extract_dynamic_key(&id.data)?;
+
+            let status = if collection.remove(&dynamic_key).is_some() {
+                deleted_set.insert(EntityKey {
+                    type_def_id: def_id,
+                    dynamic_key,
+                });
+                true
+            } else {
+                false
+            };
+
+            result_vec.push(status);
+        }
+
+        // filter deleted entity from edge collections
+        for (_, edge_collection) in self.edge_collections.iter_mut() {
+            edge_collection
+                .edges
+                .retain(|edge| !deleted_set.contains(&edge.from) && !deleted_set.contains(&edge.to))
+        }
+
+        Ok(result_vec)
+    }
+
     pub fn extract_dynamic_key(id_data: &Data) -> DomainResult<DynamicKey> {
         match id_data {
             Data::Struct(struct_map) => {

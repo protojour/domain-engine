@@ -123,21 +123,14 @@ impl<'a> SelectAnalyzer<'a> {
         }
     }
 
-    pub fn analyze_struct_select(
+    pub fn analyze_select(
         &self,
         look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
         field_data: &FieldData,
-    ) -> Result<StructOrUnionSelect, FieldError<GqlScalar>> {
-        match self
-            .analyze_selection(look_ahead, field_data)?
+    ) -> Result<Select, FieldError<GqlScalar>> {
+        self.analyze_selection(look_ahead, field_data)?
             .map(|sel| sel.select)
-        {
-            Some(Select::Struct(struct_)) => Ok(StructOrUnionSelect::Struct(struct_)),
-            Some(Select::StructUnion(def_id, variants)) => {
-                Ok(StructOrUnionSelect::Union(def_id, variants))
-            }
-            select => panic!("BUG: not a struct select: {select:?}"),
-        }
+            .ok_or_else(|| panic!("BUG: not a select"))
     }
 
     fn analyze_selection(
