@@ -47,7 +47,7 @@ impl DomainEngine {
     }
 
     pub fn test_builder(ontology: Arc<Ontology>) -> Builder {
-        Self::builder(ontology).system(Box::new(TestSystem))
+        Self::builder(ontology).system(Box::<TestSystem>::default())
     }
 
     pub fn config(&self) -> &Config {
@@ -179,7 +179,11 @@ impl DomainEngine {
                         Generator::new(self, ProcessorMode::Create).generate_values(mut_value);
                     }
                 }
-                BatchWriteRequest::Update(..) => {}
+                BatchWriteRequest::Update(mut_values, _) => {
+                    for mut_value in mut_values {
+                        Generator::new(self, ProcessorMode::Update).generate_values(mut_value);
+                    }
+                }
                 BatchWriteRequest::Delete(..) => {}
             }
         }

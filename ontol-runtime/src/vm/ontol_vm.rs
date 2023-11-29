@@ -116,7 +116,7 @@ impl<'o> Processor for OntolProcessor<'o> {
 
     #[inline(always)]
     fn iter_next(&mut self, seq: Local, index: Local) -> VmResult<bool> {
-        let i = *self.int_local_mut(index) as usize;
+        let i = *self.int_local_mut(index)? as usize;
         let seq = self.sequence_local_mut(seq)?;
 
         if seq.attrs.len() <= i {
@@ -128,7 +128,7 @@ impl<'o> Processor for OntolProcessor<'o> {
             self.stack.push(attr.rel_params);
             self.stack.push(attr.value);
 
-            *self.int_local_mut(index) += 1;
+            *self.int_local_mut(index)? += 1;
 
             Ok(true)
         }
@@ -414,10 +414,10 @@ impl<'o> OntolProcessor<'o> {
     }
 
     #[inline(always)]
-    fn int_local_mut(&mut self, local: Local) -> &mut i64 {
+    fn int_local_mut(&mut self, local: Local) -> VmResult<&mut i64> {
         match &mut self.local_mut(local).data {
-            Data::I64(int) => int,
-            _ => panic!("Value at {local:?} is not an int"),
+            Data::I64(int) => Ok(int),
+            _ => Err(VmError::InvalidType(local)),
         }
     }
 

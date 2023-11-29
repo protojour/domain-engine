@@ -154,7 +154,7 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
                     )
                     .map_err(RecursionLimitError::to_de_error)?;
 
-                if serde_property.is_optional_in_profile(processor.profile) {
+                if serde_property.is_optional_for(processor.mode, &processor.profile.flags) {
                     if let Some(attr) =
                         deserializer.deserialize_option(property_processor.to_option_processor())?
                     {
@@ -214,7 +214,7 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
                     )
                     .map_err(RecursionLimitError::to_de_error)?;
 
-                if serde_property.is_optional_in_profile(processor.profile) {
+                if serde_property.is_optional_for(processor.mode, &processor.profile.flags) {
                     if let Some(attr) =
                         map.next_value_seed(property_processor.to_option_processor())?
                     {
@@ -248,7 +248,7 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
         for (_, property) in properties {
             // Only _default values_ are handled in the deserializer:
             if let Some(ValueGenerator::DefaultProc(address)) = property.value_generator {
-                if !property.is_optional_in_profile(processor.profile)
+                if !property.is_optional_for(processor.mode, &processor.profile.flags)
                     && !attributes.contains_key(&property.property_id)
                 {
                     let procedure = Procedure {
@@ -274,11 +274,12 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
         || (rel_params.is_unit() != special_addrs.rel_params.is_none())
     {
         debug!(
-            "Missing attributes(mode={:?}). Rel params match: {}, special_rel: {} parent_relationship: {:?}",
+            "Missing attributes(mode={:?}). Rel params match: {}, special_rel: {} parent_relationship: {:?} expected_required_count: {}",
             processor.mode,
             rel_params.is_unit(),
             special_addrs.rel_params.is_none(),
             processor.ctx.parent_property_id,
+            expected_required_count
         );
         for attr in &attributes {
             debug!("    attr {:?}", attr.0);

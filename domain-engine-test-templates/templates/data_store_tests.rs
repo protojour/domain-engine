@@ -263,8 +263,8 @@ async fn test_conduit_db_store_entity_tree() {
                     "title": "Foo",
                     "description": "An article",
                     "body": "The body",
-                    "created_at": "1970-01-01T00:00:00+00:00",
-                    "updated_at": "1970-01-01T00:00:00+00:00",
+                    "created_at": "1971-01-01T00:00:00+00:00",
+                    "updated_at": "1971-01-01T00:00:00+00:00",
                     "comments": [
                         {
                             "id": comment_id,
@@ -272,8 +272,8 @@ async fn test_conduit_db_store_entity_tree() {
                             "author": {
                                 "user_id": pre_existing_user_id.to_string(),
                             },
-                            "created_at": "1970-01-01T00:00:00+00:00",
-                            "updated_at": "1970-01-01T00:00:00+00:00",
+                            "created_at": "1971-01-01T00:00:00+00:00",
+                            "updated_at": "1971-01-01T00:00:00+00:00",
                         }
                     ]
                 }

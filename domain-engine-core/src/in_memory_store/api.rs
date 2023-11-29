@@ -39,8 +39,15 @@ impl DataStoreAPI for InMemoryDb {
 
                             responses.push(BatchWriteResponse::Inserted(values));
                         }
-                        BatchWriteRequest::Update(_entities, _select) => {
-                            todo!()
+                        BatchWriteRequest::Update(entities, select) => {
+                            let mut values = vec![];
+
+                            for entity in entities {
+                                let value = store.update_entity(entity, select.clone(), engine)?;
+                                values.push(value);
+                            }
+
+                            responses.push(BatchWriteResponse::Inserted(values));
                         }
                         BatchWriteRequest::Delete(ids, def_id) => {
                             responses.push(BatchWriteResponse::Deleted(

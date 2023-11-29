@@ -316,7 +316,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
             let attribute = match attributes.get(&serde_prop.property_id) {
                 Some(value) => value,
                 None => {
-                    if serde_prop.is_optional_in_profile(self.profile) {
+                    if serde_prop.is_optional_for(self.mode, &self.profile.flags) {
                         continue;
                     } else {
                         match self.ontology.get_serde_operator(serde_prop.value_addr) {

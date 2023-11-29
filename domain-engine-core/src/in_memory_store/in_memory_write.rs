@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use anyhow::anyhow;
 use ontol_runtime::{
     condition::Condition,
     interface::serde::{operator::SerdeOperatorAddr, processor::ProcessorMode},
@@ -29,7 +30,41 @@ impl InMemoryStore {
         engine: &DomainEngine,
     ) -> DomainResult<Value> {
         let entity_id = self.write_new_entity_inner(entity, engine)?;
+        self.post_write_select(entity_id, select, engine)
+    }
 
+    pub fn update_entity(
+        &mut self,
+        data: Value,
+        select: Select,
+        engine: &DomainEngine,
+    ) -> DomainResult<Value> {
+        let entity_id = find_inherent_entity_id(engine.ontology(), &data)?
+            .ok_or_else(|| DomainError::EntityNotFound)?;
+        let type_info = engine.ontology().get_type_info(data.type_def_id);
+        let dynamic_key = Self::extract_dynamic_key(&entity_id.data)?;
+
+        let collection = self.collections.get_mut(&type_info.def_id).unwrap();
+        let stored_entity = collection
+            .get_mut(&dynamic_key)
+            .ok_or_else(|| DomainError::EntityNotFound)?;
+
+        let Data::Struct(data_struct) = data.data else {
+            return Err(DomainError::BadInput(anyhow!("Expected a struct")));
+        };
+        for (property_id, value) in data_struct {
+            stored_entity.insert(property_id, value);
+        }
+
+        self.post_write_select(entity_id, select, engine)
+    }
+
+    fn post_write_select(
+        &mut self,
+        entity_id: Value,
+        select: Select,
+        engine: &DomainEngine,
+    ) -> DomainResult<Value> {
         match select {
             Select::EntityId => Ok(entity_id),
             Select::Struct(struct_select) => {

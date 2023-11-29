@@ -241,15 +241,12 @@ async fn test_graphql_basic_pagination() {
                         };
                         assert_eq!(entity_select.include_total_len, false);
                         assert_eq!(entity_select.limit, 42);
-                        assert_eq!(
-                            entity_select.after_cursor,
-                            Some(vec!['1' as u8].into_boxed_slice())
-                        );
+                        assert_eq!(entity_select.after_cursor.as_deref().unwrap(), &['1' as u8]);
 
                         Ok(Response::Query(Sequence::new_sub(
                             [],
                             SubSequence {
-                                end_cursor: Some(vec!['2' as u8].into_boxed_slice()),
+                                end_cursor: Some(Box::new(['2' as u8])),
                                 has_next: true,
                                 total_len: Some(42),
                             },

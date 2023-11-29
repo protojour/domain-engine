@@ -17,7 +17,7 @@ use crate::{
 };
 
 use super::{
-    processor::{ProcessorLevel, ProcessorMode, ProcessorProfile, ProcessorProfileFlags},
+    processor::{ProcessorLevel, ProcessorMode, ProcessorProfileFlags},
     SerdeDef,
 };
 
@@ -227,7 +227,7 @@ impl StructOperator {
         }
 
         self.filter_properties(mode, parent_property_id, profile_flags)
-            .filter(|(_, property)| !property.is_optional())
+            .filter(|(_, property)| !property.is_optional_for(mode, &profile_flags))
             .count()
     }
 }
@@ -256,11 +256,14 @@ impl SerdeProperty {
     }
 
     #[inline]
-    pub(crate) fn is_optional_in_profile(&self, profile: &ProcessorProfile) -> bool {
+    pub(crate) fn is_optional_for(
+        &self,
+        mode: ProcessorMode,
+        profile_flags: &ProcessorProfileFlags,
+    ) -> bool {
         self.is_optional()
-            || profile
-                .flags
-                .contains(ProcessorProfileFlags::ALL_PROPS_OPTIONAL)
+            || (matches!(mode, ProcessorMode::Update) && !self.is_entity_id())
+            || profile_flags.contains(ProcessorProfileFlags::ALL_PROPS_OPTIONAL)
     }
 
     #[inline]
@@ -280,12 +283,18 @@ impl SerdeProperty {
         parent_property_id: Option<PropertyId>,
         profile_flags: ProcessorProfileFlags,
     ) -> Option<&Self> {
-        if !matches!(
-            mode,
-            ProcessorMode::Read | ProcessorMode::Raw | ProcessorMode::RawTreeOnly
-        ) && self.is_read_only()
-        {
-            return None;
+        match mode {
+            ProcessorMode::Create => {
+                if self.is_read_only() {
+                    return None;
+                }
+            }
+            ProcessorMode::Update => {
+                if self.is_read_only() && !self.is_entity_id() {
+                    return None;
+                }
+            }
+            ProcessorMode::Read | ProcessorMode::Raw | ProcessorMode::RawTreeOnly => {}
         }
 
         if let Some(parent_property_id) = parent_property_id {

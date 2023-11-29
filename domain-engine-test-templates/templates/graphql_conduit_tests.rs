@@ -471,6 +471,91 @@ async fn test_graphql_blog_post_conduit_no_join_real() {
 }
 
 #[test(tokio::test)]
+async fn test_graphql_conduit_db_article_shallow_update() {
+    let test_packages = conduit_db_only();
+    let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
+    let ctx: ServiceCtx = make_domain_engine(test.ontology.clone()).await.into();
+
+    let response = r#"mutation {
+        Article(
+            create: [{
+                slug: "the-slug",
+                title: "The old title",
+                description: "An article",
+                body: "THE BODY",
+                author: {
+                    username: "u1",
+                    email: "a@b",
+                    password_hash: "s3cr3t",
+                }
+                tags: [{ tag: "foobar" }]
+            }]
+        ) {
+            node {
+                article_id
+                updated_at
+            }
+        }
+    }"#
+    .exec([], &schema, &ctx)
+    .await
+    .unwrap();
+
+    let article_id = response
+        .as_object_value()
+        .and_then(|response| response.get_field_value("Article"))
+        .and_then(juniper::Value::as_list_value)
+        .map(|list| &list[0])
+        .and_then(juniper::Value::as_object_value)
+        .and_then(|mutation| mutation.get_field_value("node"))
+        .and_then(juniper::Value::as_object_value)
+        .and_then(|node| node.get_field_value("article_id"))
+        .and_then(juniper::Value::as_scalar_value)
+        .unwrap()
+        .clone();
+
+    let update_mutation = format!(
+        r#"mutation {{
+            Article(
+                update: [{{
+                    article_id: "{article_id}"
+                    title: "THE NEW TITLE"
+                }}]
+            ) {{
+                node {{
+                    article_id
+                    slug
+                    title
+                    created_at
+                    updated_at
+                    author {{
+                        username
+                    }}
+                }}
+            }}
+        }}"#
+    );
+    expect_eq!(
+        actual = update_mutation.exec([], &schema, &ctx).await,
+        expected = Ok(graphql_value!({
+            "Article": [{
+                "node": {
+                    "article_id": article_id,
+                    "slug": "the-slug",
+                    "title": "THE NEW TITLE",
+                    // Note: The TestSystem counts one year between successive reads of the time :)
+                    "created_at": "1970-01-01T00:00:00+00:00",
+                    "updated_at": "1971-01-01T00:00:00+00:00",
+                    "author": {
+                        "username": "u1"
+                    }
+                }
+            }]
+        }))
+    );
+}
+
+#[test(tokio::test)]
 async fn test_graphql_conduit_db_user_deletion() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);

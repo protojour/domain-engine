@@ -22,6 +22,8 @@ pub enum DomainError {
     InvalidEntityDefId,
     #[error("Type cannot be used for id generation")]
     TypeCannotBeUsedForIdGeneration,
+    #[error("Bad input: {0}")]
+    BadInput(anyhow::Error),
     #[error("Unresolved foreign key: {0}")]
     UnresolvedForeignKey(String),
     #[error("Not implemented")]

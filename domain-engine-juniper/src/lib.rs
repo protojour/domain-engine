@@ -182,7 +182,7 @@ async fn mutation(
             let entity_mutations = args_wrapper
                 .deserialize_entity_mutation_args(create_arg, update_arg, delete_arg, ctx)?;
             let select = select_analyzer.analyze_select(&look_ahead, field_data)?;
-            let mut batch_write_requests = vec![];
+            let mut batch_write_requests = Vec::with_capacity(entity_mutations.len());
 
             for entity_mutation in entity_mutations {
                 let values = entity_mutation
@@ -192,19 +192,13 @@ async fn mutation(
                     .map(|attr| attr.value)
                     .collect();
 
-                match entity_mutation.kind {
-                    EntityMutationKind::Create => {
-                        batch_write_requests
-                            .push(BatchWriteRequest::Insert(values, select.clone()));
-                    }
-                    EntityMutationKind::Update => {
-                        todo!()
-                    }
+                batch_write_requests.push(match entity_mutation.kind {
+                    EntityMutationKind::Create => BatchWriteRequest::Insert(values, select.clone()),
+                    EntityMutationKind::Update => BatchWriteRequest::Update(values, select.clone()),
                     EntityMutationKind::Delete => {
-                        batch_write_requests
-                            .push(BatchWriteRequest::Delete(values, create_arg.def_id));
+                        BatchWriteRequest::Delete(values, create_arg.def_id)
                     }
-                }
+                });
             }
 
             let batch_write_responses = service_ctx
