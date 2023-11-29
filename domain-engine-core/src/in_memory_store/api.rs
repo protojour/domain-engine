@@ -29,29 +29,24 @@ impl DataStoreAPI for InMemoryDb {
                 for write_request in write_requests {
                     match write_request {
                         BatchWriteRequest::Insert(entities, select) => {
-                            let mut values = vec![];
-
-                            for entity in entities {
-                                let value =
-                                    store.write_new_entity(entity, select.clone(), engine)?;
-                                values.push(value);
-                            }
-
-                            responses.push(BatchWriteResponse::Inserted(values));
+                            responses.push(BatchWriteResponse::Inserted(
+                                entities
+                                    .into_iter()
+                                    .map(|entity| store.write_new_entity(entity, &select, engine))
+                                    .collect::<DomainResult<_>>()?,
+                            ));
                         }
                         BatchWriteRequest::Update(entities, select) => {
-                            let mut values = vec![];
-
-                            for entity in entities {
-                                let value = store.update_entity(entity, select.clone(), engine)?;
-                                values.push(value);
-                            }
-
-                            responses.push(BatchWriteResponse::Inserted(values));
+                            responses.push(BatchWriteResponse::Updated(
+                                entities
+                                    .into_iter()
+                                    .map(|entity| store.update_entity(entity, &select, engine))
+                                    .collect::<DomainResult<_>>()?,
+                            ));
                         }
                         BatchWriteRequest::Delete(ids, def_id) => {
                             responses.push(BatchWriteResponse::Deleted(
-                                store.delete_entity(ids, def_id)?,
+                                store.delete_entities(ids, def_id)?,
                             ));
                         }
                     }

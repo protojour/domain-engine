@@ -20,9 +20,13 @@ use crate::{
 use super::in_memory_core::{DynamicKey, EntityKey, InMemoryStore};
 
 #[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
-struct Cursor {
+pub struct Cursor {
     offset: usize,
 }
+
+pub struct Limit(pub usize);
+
+pub struct IncludeTotalLen(pub bool);
 
 impl InMemoryStore {
     pub fn query_entities(
@@ -34,27 +38,27 @@ impl InMemoryStore {
             StructOrUnionSelect::Struct(struct_select) => self.query_single_entity_collection(
                 struct_select,
                 &select.condition,
-                select.limit,
+                Limit(select.limit),
                 select
                     .after_cursor
                     .as_deref()
                     .map(bincode::deserialize)
                     .transpose()
                     .map_err(|_| DomainError::DataStore(anyhow!("Invalid cursor format")))?,
-                select.include_total_len,
+                IncludeTotalLen(select.include_total_len),
                 engine,
             ),
             StructOrUnionSelect::Union(..) => todo!(),
         }
     }
 
-    fn query_single_entity_collection(
+    pub fn query_single_entity_collection(
         &self,
         struct_select: &StructSelect,
         condition: &Condition<CondTerm>,
-        limit: usize,
+        Limit(limit): Limit,
         after_cursor: Option<Cursor>,
-        include_total_len: bool,
+        IncludeTotalLen(include_total_len): IncludeTotalLen,
         engine: &DomainEngine,
     ) -> DomainResult<Sequence> {
         debug!("query single entity collection: {struct_select:?}");

@@ -5,7 +5,7 @@ use ontol_runtime::{
     condition::Condition,
     interface::serde::{operator::SerdeOperatorAddr, processor::ProcessorMode},
     ontology::{DataRelationshipInfo, DataRelationshipKind, Ontology, ValueCardinality},
-    select::{EntitySelect, Select, StructOrUnionSelect},
+    select::Select,
     smart_format,
     value::{Attribute, Data, PropertyId, Value, ValueDebug},
     value_generator::ValueGenerator,
@@ -16,7 +16,10 @@ use tracing::debug;
 
 use crate::{
     entity_id_utils::{find_inherent_entity_id, try_generate_entity_id, GeneratedId},
-    in_memory_store::in_memory_core::{Edge, EntityKey},
+    in_memory_store::{
+        in_memory_core::{Edge, EntityKey},
+        in_memory_query::{Cursor, IncludeTotalLen, Limit},
+    },
     DomainEngine, DomainError, DomainResult,
 };
 
@@ -26,7 +29,7 @@ impl InMemoryStore {
     pub fn write_new_entity(
         &mut self,
         entity: Value,
-        select: Select,
+        select: &Select,
         engine: &DomainEngine,
     ) -> DomainResult<Value> {
         let entity_id = self.write_new_entity_inner(entity, engine)?;
@@ -36,7 +39,7 @@ impl InMemoryStore {
     pub fn update_entity(
         &mut self,
         data: Value,
-        select: Select,
+        select: &Select,
         engine: &DomainEngine,
     ) -> DomainResult<Value> {
         let entity_id = find_inherent_entity_id(engine.ontology(), &data)?
@@ -62,21 +65,19 @@ impl InMemoryStore {
     fn post_write_select(
         &mut self,
         entity_id: Value,
-        select: Select,
+        select: &Select,
         engine: &DomainEngine,
     ) -> DomainResult<Value> {
         match select {
             Select::EntityId => Ok(entity_id),
             Select::Struct(struct_select) => {
                 let target_dynamic_key = Self::extract_dynamic_key(&entity_id.data)?;
-                let entity_seq = self.query_entities(
-                    &EntitySelect {
-                        source: StructOrUnionSelect::Struct(struct_select),
-                        condition: Condition::default(),
-                        limit: usize::MAX,
-                        after_cursor: None,
-                        include_total_len: false,
-                    },
+                let entity_seq = self.query_single_entity_collection(
+                    struct_select,
+                    &Condition::default(),
+                    Limit(usize::MAX),
+                    Option::<Cursor>::None,
+                    IncludeTotalLen(false),
                     engine,
                 )?;
 

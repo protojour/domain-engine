@@ -47,7 +47,7 @@ pub(super) struct EntityKey {
 }
 
 impl InMemoryStore {
-    pub fn delete_entity(&mut self, ids: Vec<Value>, def_id: DefId) -> DomainResult<Vec<bool>> {
+    pub fn delete_entities(&mut self, ids: Vec<Value>, def_id: DefId) -> DomainResult<Vec<bool>> {
         let mut result_vec = Vec::with_capacity(ids.len());
         let mut deleted_set: HashSet<EntityKey> = HashSet::with_capacity(ids.len());
 
