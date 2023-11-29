@@ -4,7 +4,7 @@ use ontol_runtime::{
     value::Value,
     vm::{
         proc::{Procedure, Yield},
-        VmState,
+        VmResult, VmState,
     },
     MapKey,
 };
@@ -116,7 +116,7 @@ impl<'on> TestMapper<'on> {
         let from = from.as_key();
         let to = to.as_key();
 
-        let value = self.domain_map((from.clone(), to.clone()), input);
+        let value = self.domain_map((from.clone(), to.clone()), input).unwrap();
         let [output_binding] = self.test.bind([to.typename()]);
         let output_json = match &to {
             Key::Unit(_) => (*self.serde_helper_factory)(&output_binding).as_json(&value),
@@ -152,7 +152,7 @@ impl<'on> TestMapper<'on> {
         let param = (*self.serde_helper_factory)(&input_binding)
             .to_value(input)
             .unwrap();
-        let value = self.run_vm(procedure, param);
+        let value = self.run_vm(procedure, param).unwrap();
 
         // The resulting value must have the runtime def_id of the requested to_key.
         expect_eq!(actual = value.type_def_id, expected = key[1].def_id);
@@ -172,7 +172,7 @@ impl<'on> TestMapper<'on> {
         &self,
         (from, to): (impl AsKey, impl AsKey),
         input: serde_json::Value,
-    ) -> Value {
+    ) -> VmResult<Value> {
         let from = from.as_key();
         let to = to.as_key();
 
@@ -200,19 +200,19 @@ impl<'on> TestMapper<'on> {
             ),
         };
 
-        let value = self.run_vm(procedure, param);
+        let value = self.run_vm(procedure, param)?;
 
         // The resulting value must have the runtime def_id of the requested to_key.
         expect_eq!(actual = value.type_def_id, expected = to_key.def_id);
 
-        value
+        Ok(value)
     }
 
-    fn run_vm(&self, procedure: Procedure, mut param: Value) -> Value {
+    fn run_vm(&self, procedure: Procedure, mut param: Value) -> VmResult<Value> {
         let mut vm = self.test.ontology.new_vm(procedure);
         loop {
-            match vm.run([param]) {
-                VmState::Complete(value) => return value,
+            match vm.run([param])? {
+                VmState::Complete(value) => return Ok(value),
                 VmState::Yielded(Yield::Match(_var, cardinality, condition)) => {
                     param = self.yielder.yield_match(cardinality, condition);
                 }

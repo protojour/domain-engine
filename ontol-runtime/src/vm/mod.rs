@@ -1,3 +1,7 @@
+use thiserror::Error;
+
+use proc::Local;
+
 pub mod ontol_vm;
 pub mod proc;
 
@@ -16,3 +20,15 @@ impl<C, Y> VmState<C, Y> {
         }
     }
 }
+
+#[derive(Debug, Error)]
+pub enum VmError {
+    #[error("invalid type at {0:?}")]
+    InvalidType(Local),
+    #[error("attribute not present")]
+    AttributeNotPresent,
+    #[error("assert failed")]
+    AssertionFailed,
+}
+
+pub type VmResult<T> = Result<T, VmError>;

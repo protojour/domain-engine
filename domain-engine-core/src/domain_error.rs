@@ -1,4 +1,4 @@
-use ontol_runtime::DefId;
+use ontol_runtime::{vm::VmError, DefId};
 use smartstring::alias::String;
 use thiserror::Error;
 
@@ -28,6 +28,8 @@ pub enum DomainError {
     NotImplemented,
     #[error("Datastore error: {0}")]
     DataStore(anyhow::Error),
+    #[error("Ontol data error")]
+    OntolVm(#[from] VmError),
 }
 
 pub type DomainResult<T> = Result<T, DomainError>;

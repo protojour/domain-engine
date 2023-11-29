@@ -68,14 +68,14 @@ pub enum OpCode {
     Goto(AddressOffset),
     /// Call a procedure. Its arguments must be top of the value stack.
     Call(Procedure),
-    /// Call a builtin procedure
-    CallBuiltin(BuiltinProc, DefId),
     /// Clone a specific local, putting its clone on the top of the stack.
     Clone(Local),
     /// Take a local, replace with unit, and put on top of stack
     Bump(Local),
     /// Pop all at top of stack, until (not including) the given local
     PopUntil(Local),
+    /// Call a builtin procedure
+    CallBuiltin(BuiltinProc, DefId),
     /// Iterate all items in #0, #1 is the counter.
     /// Pushes two items on the stack
     Iter(Local, Local, AddressOffset),

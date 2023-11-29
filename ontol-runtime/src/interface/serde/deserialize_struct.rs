@@ -255,7 +255,12 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
                         address,
                         n_params: NParams(0),
                     };
-                    let value = processor.ontology.new_vm(procedure).run([]).unwrap();
+                    let value = processor
+                        .ontology
+                        .new_vm(procedure)
+                        .run([])
+                        .map_err(|vm_error| serde::de::Error::custom(format!("{vm_error}")))?
+                        .unwrap();
 
                     // BUG: No support for rel_params:
                     attributes.insert(property.property_id, value.into());

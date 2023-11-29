@@ -29,6 +29,7 @@ urlencoding = "2"
 bit-vec = { version = "0.6", features = ["serde"] }
 thin-vec = { version = "0.2", features = ["serde"] }
 bincode = "1"
+thiserror = "1"
 
 [dev-dependencies]
 tracing-subscriber.workspace = true

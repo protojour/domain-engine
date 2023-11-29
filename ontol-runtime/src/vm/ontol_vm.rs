@@ -13,14 +13,17 @@ use crate::{
     text_pattern::TextPattern,
     value::{Attribute, Data, PropertyId, Value, ValueDebug},
     var::Var,
-    vm::abstract_vm::{AbstractVm, Processor, VmDebug},
     vm::proc::{BuiltinProc, Local, Procedure},
+    vm::{
+        abstract_vm::{AbstractVm, Processor, VmDebug},
+        VmError,
+    },
     DefId,
 };
 
 use super::{
     proc::{GetAttrFlags, OpCodeCondTerm, Predicate, Yield},
-    VmState,
+    VmResult, VmState,
 };
 
 /// Virtual machine for executing ONTOL procedures
@@ -40,20 +43,23 @@ impl<'o> OntolVm<'o> {
         }
     }
 
-    pub fn run(&mut self, params: impl IntoIterator<Item = Value>) -> VmState<Value, Yield> {
+    pub fn run(
+        &mut self,
+        params: impl IntoIterator<Item = Value>,
+    ) -> VmResult<VmState<Value, Yield>> {
         self.processor.stack.extend(params);
 
         let result = if tracing::enabled!(Level::TRACE) {
-            self.abstract_vm.run(&mut self.processor, &mut Tracer)
+            self.abstract_vm.run(&mut self.processor, &mut Tracer)?
         } else {
-            self.abstract_vm.run(&mut self.processor, &mut ())
+            self.abstract_vm.run(&mut self.processor, &mut ())?
         };
 
         match result {
-            Some(y) => VmState::Yielded(y),
+            Some(y) => Ok(VmState::Yielded(y)),
             None => {
                 let mut stack = std::mem::take(&mut self.processor.stack);
-                VmState::Complete(stack.pop().unwrap())
+                Ok(VmState::Complete(stack.pop().unwrap()))
             }
         }
     }
@@ -76,12 +82,6 @@ impl<'o> Processor for OntolProcessor<'o> {
     #[inline(always)]
     fn stack_mut(&mut self) -> &mut Vec<Self::Value> {
         &mut self.stack
-    }
-
-    #[inline(always)]
-    fn call_builtin(&mut self, proc: BuiltinProc, result_type: DefId) {
-        let data = self.eval_builtin(proc);
-        self.stack.push(Value::new(data, result_type));
     }
 
     #[inline(always)]
@@ -108,12 +108,19 @@ impl<'o> Processor for OntolProcessor<'o> {
     }
 
     #[inline(always)]
-    fn iter_next(&mut self, seq: Local, index: Local) -> bool {
+    fn call_builtin(&mut self, proc: BuiltinProc, result_type: DefId) -> VmResult<()> {
+        let data = self.eval_builtin(proc);
+        self.stack.push(Value::new(data, result_type));
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn iter_next(&mut self, seq: Local, index: Local) -> VmResult<bool> {
         let i = *self.int_local_mut(index) as usize;
-        let seq = self.sequence_local_mut(seq);
+        let seq = self.sequence_local_mut(seq)?;
 
         if seq.attrs.len() <= i {
-            false
+            Ok(false)
         } else {
             let mut attr = Value::unit().to_unit_attr();
             std::mem::swap(&mut seq.attrs[i], &mut attr);
@@ -123,13 +130,18 @@ impl<'o> Processor for OntolProcessor<'o> {
 
             *self.int_local_mut(index) += 1;
 
-            true
+            Ok(true)
         }
     }
 
     #[inline(always)]
-    fn get_attr(&mut self, source: Local, key: PropertyId, flags: super::proc::GetAttrFlags) {
-        let _struct = self.struct_local_mut(source);
+    fn get_attr(
+        &mut self,
+        source: Local,
+        key: PropertyId,
+        flags: super::proc::GetAttrFlags,
+    ) -> VmResult<()> {
+        let _struct = self.struct_local_mut(source)?;
         let attr = if flags.contains(GetAttrFlags::TAKE) {
             _struct.remove(&key)
         } else {
@@ -146,40 +158,45 @@ impl<'o> Processor for OntolProcessor<'o> {
                 if flags.contains(GetAttrFlags::VAL) {
                     self.stack.push(attr.value);
                 }
+                Ok(())
             }
             None => {
                 if flags.contains(GetAttrFlags::TRY) {
                     self.push_false();
+                    Ok(())
                 } else {
-                    panic!("Attribute {key} not present");
+                    Err(VmError::AttributeNotPresent)
                 }
             }
         }
     }
 
     #[inline(always)]
-    fn put_attr1(&mut self, target: Local, key: PropertyId) {
+    fn put_attr1(&mut self, target: Local, key: PropertyId) -> VmResult<()> {
         let value = self.stack.pop().unwrap();
         if !matches!(value.data, Data::Unit) {
-            let map = self.struct_local_mut(target);
+            let map = self.struct_local_mut(target)?;
             map.insert(key, value.to_unit_attr());
         }
+        Ok(())
     }
 
     #[inline(always)]
-    fn put_attr2(&mut self, target: Local, key: PropertyId) {
+    fn put_attr2(&mut self, target: Local, key: PropertyId) -> VmResult<()> {
         let [rel_params, value]: [Value; 2] = self.pop_n();
         if !matches!(value.data, Data::Unit) {
-            let map = self.struct_local_mut(target);
+            let map = self.struct_local_mut(target)?;
             map.insert(key, Attribute { value, rel_params });
         }
+        Ok(())
     }
 
     #[inline(always)]
-    fn move_rest_attrs(&mut self, target: Local, source: Local) {
-        let source = std::mem::take(self.struct_local_mut(source));
-        let target = self.struct_local_mut(target);
+    fn move_rest_attrs(&mut self, target: Local, source: Local) -> VmResult<()> {
+        let source = std::mem::take(self.struct_local_mut(source)?);
+        let target = self.struct_local_mut(target)?;
         target.extend(source);
+        Ok(())
     }
 
     #[inline(always)]
@@ -199,56 +216,66 @@ impl<'o> Processor for OntolProcessor<'o> {
     }
 
     #[inline(always)]
-    fn append_attr2(&mut self, seq: Local) {
+    fn append_attr2(&mut self, seq: Local) -> VmResult<()> {
         let [rel_params, value]: [Value; 2] = self.pop_n();
-        let seq = self.sequence_local_mut(seq);
+        let seq = self.sequence_local_mut(seq)?;
         seq.attrs.push(Attribute { value, rel_params });
+        Ok(())
     }
 
     #[inline(always)]
-    fn append_string(&mut self, to: Local) {
+    fn append_string(&mut self, to: Local) -> VmResult<()> {
         let [appendee]: [String; 1] = self.pop_n();
-        let to = self.string_local_mut(to);
+        let to = self.string_local_mut(to)?;
         to.push_str(&appendee);
+        Ok(())
     }
 
     #[inline(always)]
-    fn cond_predicate(&mut self, predicate: &Predicate) -> bool {
+    fn cond_predicate(&mut self, predicate: &Predicate) -> VmResult<bool> {
         match predicate {
-            Predicate::IsUnit(local) => matches!(self.local(*local).data, Data::Unit),
+            Predicate::IsUnit(local) => Ok(matches!(self.local(*local).data, Data::Unit)),
             Predicate::MatchesDiscriminant(local, def_id) => {
                 let value = self.local(*local);
-                value.type_def_id == *def_id
+                Ok(value.type_def_id == *def_id)
             }
-            Predicate::YankTrue(local) => !matches!(self.yank(*local).data, Data::I64(0)),
-            Predicate::YankFalse(local) => matches!(self.yank(*local).data, Data::I64(0)),
+            Predicate::YankTrue(local) => Ok(!matches!(self.yank(*local).data, Data::I64(0))),
+            Predicate::YankFalse(local) => Ok(matches!(self.yank(*local).data, Data::I64(0))),
         }
     }
 
-    fn move_seq_vals_to_stack(&mut self, source: Local) {
-        let sequence = std::mem::take(&mut self.sequence_local_mut(source).attrs);
+    fn move_seq_vals_to_stack(&mut self, source: Local) -> VmResult<()> {
+        let sequence = std::mem::take(&mut self.sequence_local_mut(source)?.attrs);
         *self.local_mut(source) = Value::unit();
         self.stack
             .extend(sequence.into_iter().map(|attr| attr.value));
+        Ok(())
     }
 
-    fn set_sub_seq(&mut self, target: Local, source: Local) {
-        let sub_seq = self.sequence_local_mut(source).sub_seq.clone();
-        self.sequence_local_mut(target).sub_seq = sub_seq;
+    fn set_sub_seq(&mut self, target: Local, source: Local) -> VmResult<()> {
+        let sub_seq = self.sequence_local_mut(source)?.sub_seq.clone();
+        self.sequence_local_mut(target)?.sub_seq = sub_seq;
+        Ok(())
     }
 
     #[inline(always)]
-    fn type_pun(&mut self, local: Option<Local>, def_id: DefId) {
+    fn type_pun(&mut self, local: Option<Local>, def_id: DefId) -> VmResult<()> {
         if let Some(local) = local {
             self.local_mut(local).type_def_id = def_id;
         } else {
             self.stack.last_mut().unwrap().type_def_id = def_id;
         }
+        Ok(())
     }
 
-    fn regex_capture(&mut self, local: Local, text_pattern: &TextPattern, group_filter: &BitVec) {
+    fn regex_capture(
+        &mut self,
+        local: Local,
+        text_pattern: &TextPattern,
+        group_filter: &BitVec,
+    ) -> VmResult<()> {
         let Data::Text(haystack) = &self.local(local).data else {
-            panic!("Not a string");
+            return Err(VmError::InvalidType(local));
         };
 
         match text_pattern.regex.captures(haystack) {
@@ -265,6 +292,7 @@ impl<'o> Processor for OntolProcessor<'o> {
                 self.push_false();
             }
         }
+        Ok(())
     }
 
     fn regex_capture_iter(
@@ -272,9 +300,9 @@ impl<'o> Processor for OntolProcessor<'o> {
         local: Local,
         text_pattern: &TextPattern,
         group_filter: &BitVec,
-    ) {
+    ) -> VmResult<()> {
         let Data::Text(haystack) = &self.local(local).data else {
-            panic!("Not a string");
+            return Err(VmError::InvalidType(local));
         };
 
         let mut attrs: Vec<Attribute> = Vec::new();
@@ -294,17 +322,24 @@ impl<'o> Processor for OntolProcessor<'o> {
             Data::Sequence(Sequence::new(attrs)),
             text_def_id,
         ));
+        Ok(())
     }
 
     #[inline(always)]
-    fn assert_true(&mut self) {
+    fn assert_true(&mut self) -> VmResult<()> {
         let [val]: [Value; 1] = self.pop_n();
-        if !matches!(val.data, Data::I64(1)) {
-            panic!("Assertion failed");
+        if matches!(val.data, Data::I64(1)) {
+            Ok(())
+        } else {
+            Err(VmError::AssertionFailed)
         }
     }
 
-    fn push_cond_clause(&mut self, cond_local: Local, clause: &Clause<OpCodeCondTerm>) {
+    fn push_cond_clause(
+        &mut self,
+        cond_local: Local,
+        clause: &Clause<OpCodeCondTerm>,
+    ) -> VmResult<()> {
         let clause: Clause<CondTerm> = match clause {
             Clause::Root(var) => Clause::Root(*var),
             Clause::IsEntity(term, def_id) => {
@@ -323,16 +358,17 @@ impl<'o> Processor for OntolProcessor<'o> {
             panic!();
         };
         condition.clauses.push(clause);
+        Ok(())
     }
 
     fn yield_match_condition(
         &mut self,
         var: Var,
         value_cardinality: ValueCardinality,
-    ) -> Self::Yield {
+    ) -> VmResult<Self::Yield> {
         match self.stack.pop().unwrap().data {
-            Data::Condition(condition) => Yield::Match(var, value_cardinality, condition),
-            _ => panic!("Top of stack is not a condition"),
+            Data::Condition(condition) => Ok(Yield::Match(var, value_cardinality, condition)),
+            _ => Err(VmError::InvalidType(Local(self.stack.len() as u16))),
         }
     }
 }
@@ -386,26 +422,26 @@ impl<'o> OntolProcessor<'o> {
     }
 
     #[inline(always)]
-    fn string_local_mut(&mut self, local: Local) -> &mut String {
+    fn string_local_mut(&mut self, local: Local) -> VmResult<&mut String> {
         match &mut self.local_mut(local).data {
-            Data::Text(string) => string,
-            _ => panic!("Value at {local:?} is not a string"),
+            Data::Text(string) => Ok(string),
+            _ => Err(VmError::InvalidType(local)),
         }
     }
 
     #[inline(always)]
-    fn struct_local_mut(&mut self, local: Local) -> &mut BTreeMap<PropertyId, Attribute> {
+    fn struct_local_mut(&mut self, local: Local) -> VmResult<&mut BTreeMap<PropertyId, Attribute>> {
         match &mut self.local_mut(local).data {
-            Data::Struct(attrs) => attrs,
-            _ => panic!("Value at {local:?} is not a struct"),
+            Data::Struct(attrs) => Ok(attrs),
+            _ => Err(VmError::InvalidType(local)),
         }
     }
 
     #[inline(always)]
-    fn sequence_local_mut(&mut self, local: Local) -> &mut Sequence {
+    fn sequence_local_mut(&mut self, local: Local) -> VmResult<&mut Sequence> {
         match &mut self.local_mut(local).data {
-            Data::Sequence(seq) => seq,
-            _ => panic!("Value at {local:?} is not a sequence"),
+            Data::Sequence(seq) => Ok(seq),
+            _ => Err(VmError::InvalidType(local)),
         }
     }
 
@@ -534,6 +570,7 @@ mod tests {
                 ),
                 def_id(0),
             )])
+            .unwrap()
             .unwrap();
 
         let Data::Struct(attrs) = output.data else {
@@ -608,6 +645,7 @@ mod tests {
                 ),
                 def_id(0),
             )])
+            .unwrap()
             .unwrap();
 
         let Data::Struct(mut attrs) = output.data else {
@@ -658,6 +696,7 @@ mod tests {
                 ])),
                 def_id(0),
             )])
+            .unwrap()
             .unwrap();
 
         let Data::Sequence(seq) = output.data else {
@@ -729,6 +768,7 @@ mod tests {
                 ),
                 def_id(0),
             )])
+            .unwrap()
             .unwrap();
 
         assert_eq!(
@@ -776,6 +816,7 @@ mod tests {
                     &OntolVm::new(&ontology, proc)
                         .run([Value::new(Data::Struct([].into()), def_id(0))])
                         .unwrap()
+                        .unwrap()
                 )
             )
         );
@@ -790,6 +831,7 @@ mod tests {
                             Data::Struct([(prop, Value::unit().into())].into()),
                             def_id(0)
                         )])
+                        .unwrap()
                         .unwrap()
                 )
             )
@@ -811,6 +853,7 @@ mod tests {
                             ),
                             def_id(0)
                         )])
+                        .unwrap()
                         .unwrap()
                 )
             )

@@ -83,7 +83,7 @@ impl DomainEngine {
         let mut vm = self.ontology.new_vm(proc);
 
         loop {
-            match vm.run([input]) {
+            match vm.run([input])? {
                 VmState::Complete(value) => return Ok(value),
                 VmState::Yielded(Yield::Match(match_var, value_cardinality, condition)) => {
                     let mut entity_select = selects.find_select(match_var, &condition);
@@ -147,7 +147,7 @@ impl DomainEngine {
                 let param = attr.value.take();
 
                 attr.value = loop {
-                    match vm.run([param]) {
+                    match vm.run([param])? {
                         VmState::Complete(value) => {
                             break value;
                         }
