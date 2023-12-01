@@ -12,7 +12,7 @@ use ontol_runtime::{
                 ObjectKind, Optionality, PropertyData, ScalarData, TypeAddr, TypeData, TypeKind,
                 TypeModifier, TypeRef, UnitTypeRef,
             },
-            schema::{GraphqlSchema, QueryLevel, TypingPurpose},
+            schema::{GraphqlSchema, QueryLevel},
         },
         serde::SerdeModifier,
     },
@@ -375,22 +375,13 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
     pub fn add_entity_queries_and_mutations(&mut self, entity_data: EntityData) {
         let type_info = self.partial_ontology.get_type_info(entity_data.node_def_id);
 
-        let node_ref = UnitTypeRef::Addr(entity_data.type_addr);
-
-        let entity_operator_addr = self
-            .serde_generator
-            .gen_addr(gql_serde_key(entity_data.node_def_id))
-            .unwrap();
-
-        let id_type_info = self.partial_ontology.get_type_info(entity_data.id_def_id);
-        let id_operator_addr = id_type_info.operator_addr.expect("No id_operator_addr");
-
-        let id_unit_type_ref = self.get_def_type_ref(entity_data.id_def_id, QLevel::Node);
-
         let mutation_result_ref =
             self.get_def_type_ref(entity_data.node_def_id, QLevel::MutationResult);
 
         let mut mutation_namespace = GraphqlNamespace::default();
+
+        // This is here for a reason
+        let _id_unit_type_ref = self.get_def_type_ref(entity_data.id_def_id, QLevel::Node);
 
         {
             let mutation = object_data_mut(self.schema.mutation, self.schema);
@@ -428,56 +419,6 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     },
                     field_type: TypeRef::mandatory(mutation_result_ref)
                         .to_array(Optionality::Mandatory),
-                },
-            );
-
-            mutation.fields.insert(
-                mutation_namespace.create(type_info),
-                FieldData {
-                    kind: FieldKind::CreateMutation {
-                        input: argument::InputArg {
-                            type_addr: entity_data.type_addr,
-                            def_id: entity_data.node_def_id,
-                            operator_addr: entity_operator_addr,
-                            typing_purpose: TypingPurpose::Input,
-                        },
-                    },
-                    field_type: TypeRef::mandatory(node_ref),
-                },
-            );
-
-            mutation.fields.insert(
-                mutation_namespace.update(type_info),
-                FieldData {
-                    kind: FieldKind::UpdateMutation {
-                        input: argument::InputArg {
-                            type_addr: entity_data.type_addr,
-                            def_id: entity_data.node_def_id,
-                            operator_addr: entity_operator_addr,
-                            typing_purpose: TypingPurpose::PartialInput,
-                        },
-                        id: argument::IdArg {
-                            operator_addr: id_operator_addr,
-                            unit_type_ref: id_unit_type_ref,
-                        },
-                    },
-                    field_type: TypeRef::mandatory(node_ref),
-                },
-            );
-
-            mutation.fields.insert(
-                mutation_namespace.delete(type_info),
-                FieldData {
-                    kind: FieldKind::DeleteMutation {
-                        id: argument::IdArg {
-                            operator_addr: id_operator_addr,
-                            unit_type_ref: id_unit_type_ref,
-                        },
-                    },
-                    field_type: TypeRef::mandatory(UnitTypeRef::NativeScalar(NativeScalarRef {
-                        operator_addr: SerdeOperatorAddr(42),
-                        kind: NativeScalarKind::Boolean,
-                    })),
                 },
             );
         }

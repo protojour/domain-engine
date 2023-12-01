@@ -285,16 +285,6 @@ pub enum FieldKind {
         delete_arg: argument::EntityDeleteInputsArg,
         field_unit_type_addr: TypeAddr,
     },
-    CreateMutation {
-        input: argument::InputArg,
-    },
-    UpdateMutation {
-        id: argument::IdArg,
-        input: argument::InputArg,
-    },
-    DeleteMutation {
-        id: argument::IdArg,
-    },
 }
 
 #[derive(Serialize, Deserialize, Debug)]

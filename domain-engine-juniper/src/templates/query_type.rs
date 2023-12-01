@@ -21,6 +21,10 @@ impl juniper::GraphQLType<GqlScalar> for QueryType {
     where
         GqlScalar: 'r,
     {
+        // Hack to avoid some juniper errors.
+        // The Int type needs to exist unconditionally, even if our generated schema does not request it.
+        registry.get_type::<i32>(&());
+
         let mut reg = RegistryCtx::new(&info.schema_ctx, registry);
         let fields = reg.get_fields(info.type_addr);
 

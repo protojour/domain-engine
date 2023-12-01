@@ -237,52 +237,6 @@ async fn mutation(
                 executor,
             )
         }
-        FieldKind::CreateMutation { input } => {
-            let input_attribute =
-                args_wrapper.deserialize_domain_field_arg_as_attribute(input, ctx)?;
-            let select = select_analyzer.analyze_select(&look_ahead, field_data)?;
-
-            trace!(
-                "CREATE {} -> {select:#?}",
-                ValueDebug(&input_attribute.value)
-            );
-
-            let value = service_ctx
-                .domain_engine
-                .store_new_entity(input_attribute.value, select)
-                .await?;
-
-            resolve_schema_type_field(
-                AttributeType {
-                    attr: &value.into(),
-                },
-                schema_ctx
-                    .find_schema_type_by_unit(field_data.field_type.unit, TypingPurpose::Selection)
-                    .unwrap(),
-                executor,
-            )
-        }
-        FieldKind::UpdateMutation { id, input } => {
-            let id_attribute = args_wrapper.deserialize_domain_field_arg_as_attribute(id, ctx)?;
-            let input_attribute =
-                args_wrapper.deserialize_domain_field_arg_as_attribute(input, ctx)?;
-
-            let select = select_analyzer.analyze_select(&look_ahead, field_data)?;
-
-            trace!(
-                "UPDATE {} -> {} -> {select:#?}",
-                ValueDebug(&id_attribute.value),
-                ValueDebug(&input_attribute.value)
-            );
-            Ok(juniper::Value::Null)
-        }
-        FieldKind::DeleteMutation { id } => {
-            let id_value = args_wrapper.deserialize_domain_field_arg_as_attribute(id, ctx)?;
-
-            trace!("DELETE {id_value:?}");
-
-            Ok(juniper::Value::Null)
-        }
         _ => panic!(),
     }
 }

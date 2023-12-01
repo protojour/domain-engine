@@ -397,16 +397,6 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             FieldKind::MapFind { input_arg, .. } => {
                 arguments.extend(self.get_domain_field_arg(input_arg));
             }
-            FieldKind::CreateMutation { input } => {
-                arguments.extend(self.get_domain_field_arg(input));
-            }
-            FieldKind::UpdateMutation { id, input } => {
-                arguments.extend(self.get_domain_field_arg(id));
-                arguments.extend(self.get_domain_field_arg(input));
-            }
-            FieldKind::DeleteMutation { id } => {
-                arguments.extend(self.get_domain_field_arg(id));
-            }
             FieldKind::EntityMutation {
                 create_arg,
                 update_arg,

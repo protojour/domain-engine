@@ -118,14 +118,14 @@ async fn test_graphql_int_scalars() {
 
     expect_eq!(
         actual = "mutation {
-            createfoo(
-                input: {
-                    small: 42
-                    big: 1337
+            foo(create: [{
+                small: 42
+                big: 1337
+            }]) {
+                node {
+                    small
+                    big
                 }
-            ) {
-                small
-                big
             }
         }"
         .exec(
@@ -135,10 +135,12 @@ async fn test_graphql_int_scalars() {
         )
         .await,
         expected = Ok(graphql_value!({
-            "createfoo": {
-                "small": 42,
-                "big": juniper::Value::Scalar(GqlScalar::I64(112233445566778899))
-            }
+            "foo": [{
+                "node": {
+                    "small": 42,
+                    "big": juniper::Value::Scalar(GqlScalar::I64(112233445566778899))
+                }
+            }]
         })),
     );
 }
@@ -437,15 +439,15 @@ async fn test_inner_struct() {
 
     expect_eq!(
         actual = r#"mutation {
-            createfoo(
-                input: {
-                    inner: {
-                        prop: "yo"
-                    }
+            foo(create: [{
+                inner: {
+                    prop: "yo"
                 }
-            ) {
-                inner {
-                    prop
+            }]) {
+                node {
+                    inner {
+                        prop
+                    }
                 }
             }
         }"#
@@ -456,11 +458,13 @@ async fn test_inner_struct() {
         )
         .await,
         expected = Ok(graphql_value!({
-            "createfoo": {
-                "inner": {
-                    "prop": "yo"
+            "foo": [{
+                "node": {
+                    "inner": {
+                        "prop": "yo"
+                    }
                 }
-            }
+            }]
         })),
     );
 }
@@ -621,9 +625,9 @@ async fn test_graphql_artist_and_instrument_connections() {
     );
 
     expect_eq!(
-        actual = r#"
-            mutation {
-                createartist(input: {
+        actual = r#"mutation {
+            artist(create: [
+                {
                     name: "Ziggy",
                     plays: [
                         {
@@ -639,12 +643,14 @@ async fn test_graphql_artist_and_instrument_connections() {
                             }
                         }
                     ]
-                }) {
+                }
+            ]) {
+                node {
                     ID
                     name
                 }
             }
-        "#
+        }"#
         .exec(
             [],
             &schema,
@@ -658,10 +664,12 @@ async fn test_graphql_artist_and_instrument_connections() {
         )
         .await,
         expected = Ok(graphql_value!({
-            "createartist": {
-                "ID": "artist/88832e20-8c6e-46b4-af79-27b19b889a58",
-                "name": "Ziggy"
-            }
+            "artist": [{
+                "node": {
+                    "ID": "artist/88832e20-8c6e-46b4-af79-27b19b889a58",
+                    "name": "Ziggy"
+                }
+            }]
         })),
     );
 }
@@ -880,29 +888,29 @@ async fn test_graphql_guitar_synth_union_input_exec() {
         )));
 
     expect_eq!(
-        actual = r#"
-            mutation {
-                createartist(input: {
-                    name: "Ziggy",
-                    plays: [
-                        {
-                            instrument_id: "synth/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8"
-                        },
-                        {
-                            type: "guitar",
-                            string_count: 6
-                        },
-                        {
-                            type: "synth",
-                            polyphony: 12
-                        },
-                    ]
-                }) {
+        actual = r#"mutation {
+            artist(create: [{
+                name: "Ziggy",
+                plays: [
+                    {
+                        instrument_id: "synth/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8"
+                    },
+                    {
+                        type: "guitar",
+                        string_count: 6
+                    },
+                    {
+                        type: "synth",
+                        polyphony: 12
+                    },
+                ]
+            }]) {
+                node {
                     artist_id
                     name
                 }
             }
-        "#
+        }"#
         .exec(
             [],
             &schema,
@@ -910,10 +918,12 @@ async fn test_graphql_guitar_synth_union_input_exec() {
         )
         .await,
         expected = Ok(graphql_value!({
-            "createartist": {
-                "artist_id": "artist/88832e20-8c6e-46b4-af79-27b19b889a58",
-                "name": "Ziggy"
-            }
+            "artist": [{
+                "node": {
+                    "artist_id": "artist/88832e20-8c6e-46b4-af79-27b19b889a58",
+                    "name": "Ziggy"
+                }
+            }]
         })),
     );
 }
@@ -923,25 +933,25 @@ async fn test_graphql_guitar_synth_union_input_error_span() {
     let (test, [schema]) = GUITAR_SYNTH_UNION.1.compile_schemas([ROOT]);
 
     expect_eq!(
-        actual = r#"
-            mutation {
-                createartist(input: {
-                    name: "Ziggy",
-                    plays: [
-                        {
-                            instrument_id: "bogus_value_here"
-                        }
-                    ]
-                }) {
+        actual = r#"mutation {
+            artist(create: [{
+                name: "Ziggy",
+                plays: [
+                    {
+                        instrument_id: "bogus_value_here"
+                    }
+                ]
+            }]) {
+                node {
                     artist_id
                     name
                 }
             }
-        "#
+        }"#
         .exec([], &schema, &gql_ctx_mock_data_store(&test, ROOT, ()))
         .await
         .unwrap_first_exec_error_msg(),
-        expected = "invalid map value, expected `instrument` (one of id, id, `guitar`, `synth`) in input at line 5 column 24"
+        expected = "invalid map value, expected `instrument` (one of id, id, `guitar`, `synth`) in input at line 4 column 20"
     );
 }
 
@@ -1112,14 +1122,14 @@ async fn test_graphql_open_data() {
         )));
 
     expect_eq!(
-        actual = r#"
-            mutation {
-                createfoo(input: { open_prop: "hei" }) {
+        actual = r#"mutation {
+            foo(create: [{ open_prop: "hei" }]) {
+                node {
                     id
                     _open_data
                 }
             }
-        "#
+        }"#
         .exec(
             [],
             &schema,
@@ -1131,12 +1141,14 @@ async fn test_graphql_open_data() {
         )
         .await,
         expected = Ok(graphql_value!({
-            "createfoo": {
-                "id": "the-id",
-                "_open_data": {
-                    "foo": "bar"
+            "foo": [{
+                "node": {
+                    "id": "the-id",
+                    "_open_data": {
+                        "foo": "bar"
+                    }
                 }
-            }
+            }]
         })),
     );
 }
@@ -1152,17 +1164,15 @@ async fn test_open_data_disabled() {
     let [foo] = test.bind(["foo"]);
 
     expect_eq!(
-        actual = r#"
-            mutation {
-                createfoo(input: { open_prop: "hei" }) {
-                    id
-                }
+        actual = r#"mutation {
+            foo(create: [{ open_prop: "hei" }]) {
+                node { id }
             }
-        "#
+        }"#
         .exec([], &schema, &gql_ctx_mock_data_store(&test, ROOT, ()))
         .await
         .unwrap_first_exec_error_msg(),
-        expected = "unknown property `open_prop` in input at line 2 column 33"
+        expected = "unknown property `open_prop` in input at line 1 column 25"
     );
 
     let store_entity_mock = DataStoreAPIMock::execute
@@ -1172,14 +1182,14 @@ async fn test_open_data_disabled() {
         )));
 
     expect_eq!(
-        actual = r#"
-            mutation {
-                createfoo(input: {}) {
+        actual = r#"mutation {
+            foo(create: [{}]) {
+                node {
                     id
                     _open_data
                 }
             }
-        "#
+        }"#
         .exec(
             [],
             &schema,

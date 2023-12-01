@@ -213,16 +213,12 @@ impl<'a> SelectAnalyzer<'a> {
                     select: Select::Leaf,
                 })))
             }
-            (
-                FieldKind::Node
-                | FieldKind::Nodes
-                | FieldKind::CreateMutation { .. }
-                | FieldKind::UpdateMutation { .. },
-                Ok(type_data),
-            ) => Ok(Some(KeyedPropertySelection {
-                key: unit_property(),
-                select: self.analyze_data(look_ahead, &type_data.kind)?,
-            })),
+            (FieldKind::Node | FieldKind::Nodes, Ok(type_data)) => {
+                Ok(Some(KeyedPropertySelection {
+                    key: unit_property(),
+                    select: self.analyze_data(look_ahead, &type_data.kind)?,
+                }))
+            }
             (FieldKind::Property(property_data), Ok(type_data)) => {
                 Ok(Some(KeyedPropertySelection {
                     key: property_data.property_id,

@@ -4,7 +4,7 @@ use smartstring::alias::String;
 use crate::{interface::serde::operator::SerdeOperatorAddr, DefId};
 
 use super::{
-    data::{Optionality, TypeAddr, TypeModifier, UnitTypeRef},
+    data::{Optionality, TypeAddr, TypeModifier},
     schema::TypingPurpose,
 };
 
@@ -77,38 +77,6 @@ impl DomainFieldArg for MapInputArg {
         self.default_arg.clone()
     }
 }
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct IdArg {
-    pub operator_addr: SerdeOperatorAddr,
-    pub unit_type_ref: UnitTypeRef,
-}
-
-impl FieldArg for IdArg {
-    fn name(&self) -> &str {
-        "id"
-    }
-}
-
-impl DomainFieldArg for IdArg {
-    fn operator_addr(&self) -> SerdeOperatorAddr {
-        self.operator_addr
-    }
-
-    fn kind(&self) -> ArgKind {
-        match &self.unit_type_ref {
-            UnitTypeRef::Addr(type_addr) => {
-                ArgKind::Addr(*type_addr, TypeModifier::Unit(Optionality::Mandatory))
-            }
-            UnitTypeRef::NativeScalar(_) => ArgKind::Operator(self.operator_addr),
-        }
-    }
-
-    fn default_arg(&self) -> Option<DefaultArg> {
-        None
-    }
-}
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct InputArg {
     pub type_addr: TypeAddr,

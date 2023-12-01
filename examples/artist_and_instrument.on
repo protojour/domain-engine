@@ -34,6 +34,13 @@ map artists_by_name {
     ]
 }
 
+// map instruments_by_how_much_played {
+//     { 'how_much': x }
+//     plays('how_much': x): [
+//         ..artist match {}
+//     ]
+// }
+
 map instruments {
     {}
     instrument: [..instrument match {}]

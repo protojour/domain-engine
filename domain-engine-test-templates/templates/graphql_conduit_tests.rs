@@ -101,14 +101,12 @@ async fn test_graphql_conduit_db_create_with_foreign_reference() {
     let ctx: ServiceCtx = make_domain_engine(test.ontology.clone()).await.into();
 
     let response = r#"mutation {
-        createUser(
-            input: {
-                username: "u1",
-                email: "a@b",
-                password_hash: "s3cr3t",
-            }
-        ) {
-            user_id
+        User(create: [{
+            username: "u1",
+            email: "a@b",
+            password_hash: "s3cr3t",
+        }]) {
+            node { user_id }
         }
     }"#
     .exec([], &schema, &ctx)
@@ -117,7 +115,11 @@ async fn test_graphql_conduit_db_create_with_foreign_reference() {
 
     let user_id = response
         .as_object_value()
-        .and_then(|response| response.get_field_value("createUser"))
+        .and_then(|response| response.get_field_value("User"))
+        .and_then(juniper::Value::as_list_value)
+        .map(|list| &list[0])
+        .and_then(juniper::Value::as_object_value)
+        .and_then(|mutation| mutation.get_field_value("node"))
         .and_then(juniper::Value::as_object_value)
         .and_then(|create_user| create_user.get_field_value("user_id"))
         .and_then(juniper::Value::as_scalar_value)
@@ -126,21 +128,21 @@ async fn test_graphql_conduit_db_create_with_foreign_reference() {
 
     expect_eq!(
         actual = r#"mutation new_article($authorId: ID!) {
-            createArticle(
-                input: {
-                    slug: "the-slug",
-                    title: "The title",
-                    description: "An article",
-                    body: "THE BODY",
-                    author: {
-                        user_id: $authorId
-                    }
-                    tags: [{ tag: "foobar" }]
+            Article(create: [{
+                slug: "the-slug",
+                title: "The title",
+                description: "An article",
+                body: "THE BODY",
+                author: {
+                    user_id: $authorId
                 }
-            ) {
-                slug
-                author {
-                    username
+                tags: [{ tag: "foobar" }]
+            }]) {
+                node {
+                    slug
+                    author {
+                        username
+                    }
                 }
             }
         }"#
@@ -151,12 +153,14 @@ async fn test_graphql_conduit_db_create_with_foreign_reference() {
         )
         .await,
         expected = Ok(graphql_value!({
-            "createArticle": {
-                "slug": "the-slug",
-                "author": {
-                    "username": "u1"
+            "Article": [{
+                "node": {
+                    "slug": "the-slug",
+                    "author": {
+                        "username": "u1"
+                    }
                 }
-            }
+            }]
         })),
     );
 }
@@ -168,21 +172,19 @@ async fn test_graphql_conduit_db_query_article_with_tags() {
     let ctx: ServiceCtx = make_domain_engine(test.ontology.clone()).await.into();
 
     let _response = r#"mutation {
-        createArticle(
-            input: {
-                slug: "the-slug",
-                title: "The title",
-                description: "An article",
-                body: "THE BODY",
-                author: {
-                    username: "u1",
-                    email: "a@b",
-                    password_hash: "s3cr3t",
-                }
-                tags: [{ tag: "foobar" }]
+        Article(create: [{
+            slug: "the-slug",
+            title: "The title",
+            description: "An article",
+            body: "THE BODY",
+            author: {
+                username: "u1",
+                email: "a@b",
+                password_hash: "s3cr3t",
             }
-        ) {
-            slug
+            tags: [{ tag: "foobar" }]
+        }]) {
+            node { slug }
         }
     }"#
     .exec([], &schema, &ctx)
@@ -252,26 +254,26 @@ impl BlogPostConduit {
         // Insert using the data store domain directly:
         expect_eq!(
             actual = r#"mutation {
-                createArticle(
-                    input: {
-                        slug: "the-slug",
-                        title: "The title",
-                        description: "An article",
-                        body: "THE BODY",
-                        author: {
-                            username: "teh_user",
-                            email: "a@b",
-                            password_hash: "s3cr3t"
-                        }
+                Article(create: [{
+                    slug: "the-slug",
+                    title: "The title",
+                    description: "An article",
+                    body: "THE BODY",
+                    author: {
+                        username: "teh_user",
+                        email: "a@b",
+                        password_hash: "s3cr3t"
                     }
-                ) {
-                    slug
+                }]) {
+                    node { slug }
                 }
             }"#
             .exec([], &self.db_schema, &self.ctx())
             .await,
             expected = Ok(graphql_value!({
-                "createArticle": { "slug": "the-slug" }
+                "Article": [{
+                    "node": { "slug": "the-slug" }
+                }]
             })),
         );
     }
@@ -279,27 +281,27 @@ impl BlogPostConduit {
     async fn create_db_article_with_tag(&self) {
         expect_eq!(
             actual = r#"mutation {
-                createArticle(
-                    input: {
-                        slug: "the-slug",
-                        title: "The title",
-                        description: "An article",
-                        body: "THE BODY",
-                        author: {
-                            username: "teh_user",
-                            email: "a@b",
-                            password_hash: "s3cr3t"
-                        }
-                        tags: [{ tag: "foobar" }]
+                Article(create: [{
+                    slug: "the-slug",
+                    title: "The title",
+                    description: "An article",
+                    body: "THE BODY",
+                    author: {
+                        username: "teh_user",
+                        email: "a@b",
+                        password_hash: "s3cr3t"
                     }
-                ) {
-                    slug
+                    tags: [{ tag: "foobar" }]
+                }]) {
+                    node { slug }
                 }
             }"#
             .exec([], &self.db_schema, &self.ctx())
             .await,
             expected = Ok(graphql_value!({
-                "createArticle": { "slug": "the-slug" }
+                "Article": [{
+                    "node": {"slug": "the-slug"}
+                }]
             })),
         );
     }

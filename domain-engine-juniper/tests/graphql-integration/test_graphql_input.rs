@@ -18,19 +18,16 @@ async fn test_graphql_input_deserialization_error() {
 
     let ctx = gql_ctx_mock_data_store(&test, ROOT, ());
     assert_error_msg!(
-        r#"
-        mutation {
-            createfoo(
-                input: {
-                    prop: "invalid"
-                }
-            ) {
-                prop
+        r#"mutation {
+            foo(create: [{
+                prop: "invalid"
+            }]) {
+                node { prop }
             }
         }"#
         .exec([], &schema, &ctx)
         .await,
-        r#"Execution: invalid type: string "invalid", expected "const" in input at line 4 column 26 (field at line 2 column 12)"#
+        r#"Execution: invalid type: string "invalid", expected "const" in input at line 2 column 22 (field at line 1 column 12)"#
     );
 }
 
@@ -53,14 +50,11 @@ async fn test_graphql_input_constructor_sequence_as_json_scalar() {
     "
     .compile_schemas([SourceName::root()]);
 
-    r#"
-    mutation {
-        createfoo(
-            input: {
-                prop: [42, "text"]
-            }
-        ) {
-            prop
+    r#"mutation {
+        foo(create: [{
+            prop: [42, "text"]
+        }]) {
+            node { prop }
         }
     }"#
     .exec([], &schema, &gql_ctx_mock_data_store(&test, ROOT, ()))
