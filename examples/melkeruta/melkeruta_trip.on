@@ -1,0 +1,59 @@
+use 'melkeruta' as melk
+use 'geojson' as geo
+
+def Mode {
+    rel .is?: 'walk'
+    rel .is?: 'tram'
+}
+
+def Location {
+    rel .'name': text
+    rel .'coordinates': geo.Point
+    rel .'stop_place'?: melk.StopPlace
+}
+
+def TripSegment {
+    rel .'mode': Mode
+    rel .'from': Place
+    rel .'to': Place
+    rel .'route': geo.Point
+    rel .'line': melk.Line
+    rel .'distance': i64
+    rel .'duration': i64
+    rel .'start_time': datetime
+    rel .'stop_time': datetime
+}
+
+def TripAlternative {
+    /// total distance of the trip, in meters
+    rel .'distance': i64
+    /// total duration of the trip, in minutes
+    rel .'duration': i64
+    /// summed distance of walking segments, in meters
+    rel .'transfer_distance': i64
+    /// summed duration of walking segments, in minutes
+    rel .'transfer_time': i64
+    /// total wait time, in minutes
+    rel .'wait_time': i64
+    /// estimated start time for the `from` Location
+    rel .'start_time': datetime
+    /// estimated arrival time for the `to` Location
+    rel .'stop_time': datetime
+    /// ordered list of trip segments
+    rel .'segments': [TripSegment]
+}
+
+def Trip {
+    rel .'from': Location
+    rel .'to': Location
+    rel .'alternatives': [TripAlternative]
+}
+
+map trip {
+    {
+        'start_time'?: start_time
+        'arrive_by'?: end_time
+        'walking_speed'?: speed
+    }
+    trip: [..Trip]
+}
