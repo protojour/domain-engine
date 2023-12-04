@@ -5,7 +5,7 @@ use domain_engine_core::DomainEngine;
 use domain_engine_juniper::{
     context::ServiceCtx,
     gql_scalar::GqlScalar,
-    juniper::{self, graphql_value, InputValue, Value},
+    juniper::{self, graphql_value, InputValue, ScalarValue, Value},
     Schema,
 };
 use domain_engine_test_utils::graphql_test_utils::{Exec, GraphQLPageDebug, TestCompileSchema};
@@ -116,13 +116,13 @@ async fn test_graphql_conduit_db_create_with_foreign_reference() {
     let user_id = response
         .as_object_value()
         .and_then(|response| response.get_field_value("User"))
-        .and_then(juniper::Value::as_list_value)
+        .and_then(Value::as_list_value)
         .map(|list| &list[0])
-        .and_then(juniper::Value::as_object_value)
+        .and_then(Value::as_object_value)
         .and_then(|mutation| mutation.get_field_value("node"))
-        .and_then(juniper::Value::as_object_value)
+        .and_then(Value::as_object_value)
         .and_then(|create_user| create_user.get_field_value("user_id"))
-        .and_then(juniper::Value::as_scalar_value)
+        .and_then(Value::as_scalar_value)
         .unwrap()
         .clone();
 
@@ -250,32 +250,41 @@ impl BlogPostConduit {
         self.domain_engine.clone().into()
     }
 
-    async fn create_db_article(&self) {
+    async fn create_db_article(&self) -> String {
         // Insert using the data store domain directly:
-        expect_eq!(
-            actual = r#"mutation {
-                Article(create: [{
-                    slug: "the-slug",
-                    title: "The title",
-                    description: "An article",
-                    body: "THE BODY",
-                    author: {
-                        username: "teh_user",
-                        email: "a@b",
-                        password_hash: "s3cr3t"
-                    }
-                }]) {
-                    node { slug }
+        let response = r#"mutation {
+            Article(create: [{
+                slug: "the-slug",
+                title: "The title",
+                description: "An article",
+                body: "THE BODY",
+                author: {
+                    username: "teh_user",
+                    email: "a@b",
+                    password_hash: "s3cr3t"
                 }
-            }"#
-            .exec([], &self.db_schema, &self.ctx())
-            .await,
-            expected = Ok(graphql_value!({
-                "Article": [{
-                    "node": { "slug": "the-slug" }
-                }]
-            })),
-        );
+            }]) {
+                node { article_id }
+            }
+        }"#
+        .exec([], &self.db_schema, &self.ctx())
+        .await
+        .unwrap();
+
+        let article_id = response
+            .as_object_value()
+            .and_then(|response| response.get_field_value("Article"))
+            .and_then(Value::as_list_value)
+            .map(|list| &list[0])
+            .and_then(Value::as_object_value)
+            .and_then(|mutation| mutation.get_field_value("node"))
+            .and_then(Value::as_object_value)
+            .and_then(|node| node.get_field_value("article_id"))
+            .and_then(Value::as_scalar_value)
+            .unwrap()
+            .clone();
+
+        article_id.as_string().unwrap().into()
     }
 
     async fn create_db_article_with_tag(&self) {
@@ -506,13 +515,13 @@ async fn test_graphql_conduit_db_article_shallow_update() {
     let article_id = response
         .as_object_value()
         .and_then(|response| response.get_field_value("Article"))
-        .and_then(juniper::Value::as_list_value)
+        .and_then(Value::as_list_value)
         .map(|list| &list[0])
-        .and_then(juniper::Value::as_object_value)
+        .and_then(Value::as_object_value)
         .and_then(|mutation| mutation.get_field_value("node"))
-        .and_then(juniper::Value::as_object_value)
+        .and_then(Value::as_object_value)
         .and_then(|node| node.get_field_value("article_id"))
-        .and_then(juniper::Value::as_scalar_value)
+        .and_then(Value::as_scalar_value)
         .unwrap()
         .clone();
 
@@ -641,6 +650,27 @@ async fn test_graphql_conduit_db_user_deletion() {
                     { "username": "retained_user" }
                 ]
             },
+        })),
+    );
+}
+
+#[test(tokio::test)]
+async fn test_graphql_blog_post_conduit_delete() {
+    let test = BlogPostConduit::new().await;
+    let article_id = test.create_db_article().await;
+
+    expect_eq!(
+        actual = format!(
+            "mutation {{
+                BlogPost(delete: [\"{article_id}\"]) {{
+                    deleted
+                }}
+            }}"
+        )
+        .exec([], &test.blog_schema, &test.ctx())
+        .await,
+        expected = Ok(graphql_value!({
+            "BlogPost": [{ "deleted": true }]
         })),
     );
 }

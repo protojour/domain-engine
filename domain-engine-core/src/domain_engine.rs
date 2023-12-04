@@ -172,24 +172,44 @@ impl DomainEngine {
     ) -> DomainResult<Vec<data_store::BatchWriteResponse>> {
         // TODO: Domain translation by finding optimal mapping path
 
+        let data_store = self.get_data_store()?;
+
         for request in &mut requests {
             match request {
                 BatchWriteRequest::Insert(mut_values, _) => {
+                    // TODO: domain translate
                     for mut_value in mut_values {
                         Generator::new(self, ProcessorMode::Create).generate_values(mut_value);
                     }
                 }
                 BatchWriteRequest::Update(mut_values, _) => {
+                    // TODO: domain translate
                     for mut_value in mut_values {
                         Generator::new(self, ProcessorMode::Update).generate_values(mut_value);
                     }
                 }
-                BatchWriteRequest::Delete(..) => {}
+                BatchWriteRequest::Delete(_ids, def_id) => {
+                    if def_id.package_id() != data_store.package_id() {
+                        // TODO: Do ids need to be translated?
+                        let path = self
+                            .resolver_graph
+                            .probe_path(
+                                &self.ontology,
+                                *def_id,
+                                data_store.package_id(),
+                                ProbeOptions {
+                                    must_be_entity: true,
+                                    inverted: true,
+                                },
+                            )
+                            .ok_or(DomainError::NoResolvePathToDataStore)?;
+                        *def_id = path.iter().last().unwrap();
+                    }
+                }
             }
         }
 
-        let data_store::Response::BatchWrite(responses) = self
-            .get_data_store()?
+        let data_store::Response::BatchWrite(responses) = data_store
             .api()
             .execute(data_store::Request::BatchWrite(requests), self)
             .await?
