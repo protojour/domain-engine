@@ -1,26 +1,33 @@
 use 'geojson' as geo
 
-def StopPlace {
-    rel .'id'|id: { fmt '' => 'NSR:StopPlace:' => i64 }
-    rel .'name': text
-    rel .'position': geo.Point
-    rel .'accessible_by_wheelchair': boolean
-}
-
-def Line {
-    rel .'id'|id: { rel .is: text }
-    rel .'direction': text
-}
-
 def TramState {
     rel .is?: 'in operation'
     rel .is?: 'in maintenance'
 }
 
-def Accessibility {
+def Facility {
+    rel .is?: 'toilet'
+    rel .is?: 'ticket sales'
+}
+
+def AccessibilityTags {
     rel .is?: 'stairs'
+    rel .is?: 'lift'
+    rel .is?: 'raised curb'
     rel .is?: 'wheelchair ramp'
-    rel .is?: 'curb level'
+}
+
+def StopPlace {
+    rel .'id'|id: { fmt '' => 'NSR:StopPlace:' => i64 }
+    rel .'name': text
+    rel .'location': geo.Point
+    rel .'facilities': [Facility]
+    rel .'a11y_tags': [AccessibilityTags]
+}
+
+def Line {
+    rel .'id'|id: { rel .is: text }
+    rel .'direction': text
 }
 
 def TramCarriage {
@@ -30,7 +37,7 @@ def TramCarriage {
     rel .'last_service': datetime
     rel .'max_passengers': i64
     rel .'seats': i64
-    rel .'accessibility': Accessibility
+    rel .'a11y_tags': [AccessibilityTags]
 }
 
 def RoutePoint {

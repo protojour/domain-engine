@@ -1,5 +1,5 @@
-use 'melkeruta' as melk
 use 'geojson' as geo
+use 'melkeruta' as melk
 
 def Mode {
     rel .is?: 'walk'
@@ -7,20 +7,32 @@ def Mode {
 }
 
 def Location {
+    /// name of the location
     rel .'name': text
+    /// geographical coordinates
     rel .'coordinates': geo.Point
+    /// public transport stop, if applicable
     rel .'stop_place'?: melk.StopPlace
 }
 
 def TripSegment {
+    /// mode of transportation
     rel .'mode': Mode
-    rel .'from': Place
-    rel .'to': Place
-    rel .'route': geo.Point
-    rel .'line': melk.Line
+    /// start location
+    rel .'from': Location
+    /// end location
+    rel .'to': Location
+    /// geographical route
+    rel .'route': geo.LineString
+    /// public transport line used, if applicable
+    rel .'line'?: melk.Line
+    /// distance covered
     rel .'distance': i64
+    /// estimated duration
     rel .'duration': i64
+    /// estimated start time
     rel .'start_time': datetime
+    /// estimated end time
     rel .'stop_time': datetime
 }
 
@@ -44,16 +56,19 @@ def TripAlternative {
 }
 
 def Trip {
+    /// start location
     rel .'from': Location
+    /// end location
     rel .'to': Location
+    /// trip alternatives
     rel .'alternatives': [TripAlternative]
 }
 
-map trip {
+map trip_search {
     {
         'start_time'?: start_time
         'arrive_by'?: end_time
         'walking_speed'?: speed
     }
-    trip: [..Trip]
+    trip: Trip
 }
