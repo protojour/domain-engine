@@ -763,7 +763,6 @@ async fn test_unified_mutation_create() {
 }
 
 #[test(tokio::test)]
-#[should_panic = "ontol data error: attribute not present"]
 async fn test_create_through_mapped_domain() {
     let (test, [schema]) = TestPackages::with_sources([
         (
@@ -834,7 +833,7 @@ async fn test_create_through_mapped_domain() {
             "player": [
                 {
                     "node": {
-                        "id": "88832e20-8c6e-46b4-af79-27b19b889a58",
+                        "id": "player/88832e20-8c6e-46b4-af79-27b19b889a58",
                         "nick": "Ziggy"
                     },
                     "deleted": false

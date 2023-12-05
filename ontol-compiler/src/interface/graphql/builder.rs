@@ -432,29 +432,29 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 FieldData {
                     kind: FieldKind::EntityMutation {
                         def_id: type_info.def_id,
-                        create_arg: creation_resolve_path.is_some().then(|| {
+                        create_arg: creation_resolve_path.is_some().then_some(
                             argument::EntityCreateInputsArg {
                                 type_addr: entity_data.type_addr,
                                 def_id: entity_data.node_def_id,
                                 operator_addr: entity_array_operator_addr,
-                            }
-                        }),
-                        update_arg: data_resolve_path.is_some().then(|| {
+                            },
+                        ),
+                        update_arg: data_resolve_path.is_some().then_some(
                             argument::EntityUpdateInputsArg {
                                 type_addr: entity_data.type_addr,
                                 def_id: entity_data.node_def_id,
                                 operator_addr: entity_array_operator_addr,
-                            }
-                        }),
-                        delete_arg: data_resolve_path.is_some().then(|| {
+                            },
+                        ),
+                        delete_arg: data_resolve_path.is_some().then_some(
                             argument::EntityDeleteInputsArg {
                                 def_id: entity_data.id_def_id,
                                 operator_addr: self
                                     .serde_generator
                                     .gen_addr(gql_array_serde_key(entity_data.id_def_id))
                                     .unwrap(),
-                            }
-                        }),
+                            },
+                        ),
                         field_unit_type_addr: match mutation_result_ref {
                             UnitTypeRef::Addr(addr) => addr,
                             UnitTypeRef::NativeScalar(_) => unreachable!(),

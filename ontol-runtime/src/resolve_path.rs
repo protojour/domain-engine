@@ -40,15 +40,15 @@ pub struct ResolverGraph {
 }
 
 impl ResolverGraph {
-    pub fn new(ontology: &Ontology) -> Self {
-        Self::from_iter(
+    pub fn from_ontology(ontology: &Ontology) -> Self {
+        Self::new(
             ontology
                 .iter_map_meta()
                 .map(|(keys, meta)| (keys, meta.lossiness)),
         )
     }
 
-    pub fn from_iter(iterator: impl Iterator<Item = ([MapKey; 2], MapLossiness)>) -> Self {
+    pub fn new(iterator: impl Iterator<Item = ([MapKey; 2], MapLossiness)>) -> Self {
         let mut map_graph: FnvHashMap<MapKey, Vec<(MapLossiness, MapKey)>> = Default::default();
         let mut inverted_map_graph: FnvHashMap<MapKey, Vec<(MapLossiness, MapKey)>> =
             Default::default();

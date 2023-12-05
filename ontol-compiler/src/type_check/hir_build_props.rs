@@ -388,10 +388,19 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             },
         };
 
-        let optional = ontol_hir::Optional(matches!(
+        let mut optional = ontol_hir::Optional(matches!(
             match_property.cardinality.0,
             PropertyCardinality::Optional
         ));
+
+        if self
+            .relations
+            .value_generators
+            .get(&match_property.property_id.relationship_id)
+            .is_some()
+        {
+            optional = ontol_hir::Optional(true);
+        }
 
         let prop_variants: Vec<ontol_hir::PropVariant<'_, TypedHir>> =
             match match_property.cardinality.0 {

@@ -67,8 +67,8 @@ pub fn generate_graphql_schema<'c>(
             defs,
             primitives,
             seal_ctx,
-            resolver_graph: ResolverGraph::from_iter(
-                codegen_tasks.result_map_proc_table.keys().map(|key| {
+            resolver_graph: ResolverGraph::new(codegen_tasks.result_map_proc_table.keys().map(
+                |key| {
                     (
                         *key,
                         codegen_tasks
@@ -77,8 +77,8 @@ pub fn generate_graphql_schema<'c>(
                             .map(|meta| meta.lossiness)
                             .unwrap_or(MapLossiness::Lossy),
                     )
-                }),
-            ),
+                },
+            )),
         }
     };
 

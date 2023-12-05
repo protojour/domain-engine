@@ -5,7 +5,7 @@ use ontol_runtime::{
     config::data_store_backed_domains,
     interface::serde::processor::ProcessorMode,
     ontology::{Ontology, ValueCardinality},
-    resolve_path::{ProbeOptions, ResolverGraph},
+    resolve_path::{ProbeOptions, ResolvePath, ResolverGraph},
     select::{EntitySelect, Select, StructOrUnionSelect},
     sequence::Sequence,
     value::{Data, Value},
@@ -138,13 +138,9 @@ impl DomainEngine {
                 let mut vm = ontology.new_vm(procedure);
                 let param = attr.value.take();
 
-                attr.value = loop {
-                    match vm.run([param])? {
-                        VmState::Complete(value) => {
-                            break value;
-                        }
-                        VmState::Yielded(_yield) => return Err(DomainError::ImpureMapping),
-                    }
+                attr.value = match vm.run([param])? {
+                    VmState::Complete(value) => value,
+                    VmState::Yielded(_yield) => return Err(DomainError::ImpureMapping),
                 };
             }
         }
@@ -161,6 +157,10 @@ impl DomainEngine {
         let data_store = self.get_data_store()?;
         let ontology = self.ontology();
 
+        // resolve paths for post-data-store mapping
+        let mut ordered_resolve_paths: Vec<Option<ResolvePath>> =
+            Vec::with_capacity(requests.len());
+
         for request in &mut requests {
             match request {
                 BatchWriteRequest::Insert(mut_values, select) => {
@@ -174,8 +174,6 @@ impl DomainEngine {
                     }
 
                     for (from, to) in resolve_path.iter() {
-                        debug!("{from:?} -> {to:?}");
-
                         let procedure = ontology
                             .get_mapper_proc([from.into(), to.into()])
                             .expect("No mapping procedure for query output");
@@ -184,14 +182,10 @@ impl DomainEngine {
                             let mut vm = ontology.new_vm(procedure);
                             let param = value.take();
 
-                            *value = loop {
-                                match vm.run([param])? {
-                                    VmState::Complete(value) => {
-                                        break value;
-                                    }
-                                    VmState::Yielded(_yield) => {
-                                        return Err(DomainError::ImpureMapping);
-                                    }
+                            *value = match vm.run([param])? {
+                                VmState::Complete(value) => value,
+                                VmState::Yielded(_yield) => {
+                                    return Err(DomainError::ImpureMapping);
                                 }
                             };
                         }
@@ -200,12 +194,14 @@ impl DomainEngine {
                     for mut_value in mut_values.iter_mut() {
                         Generator::new(self, ProcessorMode::Create).generate_values(mut_value);
                     }
+                    ordered_resolve_paths.push(Some(resolve_path));
                 }
                 BatchWriteRequest::Update(mut_values, _) => {
                     // TODO: domain translate
                     for mut_value in mut_values {
                         Generator::new(self, ProcessorMode::Update).generate_values(mut_value);
                     }
+                    ordered_resolve_paths.push(None);
                 }
                 BatchWriteRequest::Delete(_ids, def_id) => {
                     if def_id.package_id() != data_store.package_id() {
@@ -225,11 +221,12 @@ impl DomainEngine {
                             .ok_or(DomainError::NoResolvePathToDataStore)?;
                         *def_id = path.iter().last().unwrap().1;
                     }
+                    ordered_resolve_paths.push(None);
                 }
             }
         }
 
-        let data_store::Response::BatchWrite(responses) = data_store
+        let data_store::Response::BatchWrite(mut responses) = data_store
             .api()
             .execute(data_store::Request::BatchWrite(requests), self)
             .await?
@@ -238,6 +235,34 @@ impl DomainEngine {
                 "data store returned invalid response"
             )));
         };
+
+        for (response, resolve_path) in responses.iter_mut().zip(ordered_resolve_paths) {
+            match response {
+                BatchWriteResponse::Inserted(mut_values)
+                | BatchWriteResponse::Updated(mut_values) => {
+                    if let Some(resolve_path) = resolve_path {
+                        for (from, to) in resolve_path.reverse() {
+                            let procedure = ontology
+                                .get_mapper_proc([from.into(), to.into()])
+                                .expect("No mapping procedure for query output");
+
+                            for value in mut_values.iter_mut() {
+                                let mut vm = ontology.new_vm(procedure);
+                                let param = value.take();
+
+                                *value = match vm.run([param])? {
+                                    VmState::Complete(value) => value,
+                                    VmState::Yielded(_yield) => {
+                                        return Err(DomainError::ImpureMapping);
+                                    }
+                                };
+                            }
+                        }
+                    }
+                }
+                BatchWriteResponse::Deleted(..) => {}
+            }
+        }
 
         Ok(responses)
     }
@@ -389,7 +414,7 @@ impl Builder {
             }
         };
 
-        let resolver_graph = ResolverGraph::new(&self.ontology);
+        let resolver_graph = ResolverGraph::from_ontology(&self.ontology);
 
         Ok(DomainEngine {
             ontology: self.ontology,
@@ -418,7 +443,7 @@ impl Builder {
             }
         };
 
-        let resolver_graph = ResolverGraph::new(&self.ontology);
+        let resolver_graph = ResolverGraph::from_ontology(&self.ontology);
 
         Ok(DomainEngine {
             ontology: self.ontology,
