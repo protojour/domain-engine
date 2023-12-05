@@ -771,7 +771,7 @@ async fn test_create_through_mapped_domain() {
             use 'artist' as a
 
             def player {
-                rel .'id'(rel .gen: auto)|id: { fmt '' => 'player/' => uuid => . }
+                rel .'id'(rel .gen: auto)|id: { rel .is: uuid }
                 rel .'nick': text
             }
 
@@ -833,7 +833,7 @@ async fn test_create_through_mapped_domain() {
             "player": [
                 {
                     "node": {
-                        "id": "player/88832e20-8c6e-46b4-af79-27b19b889a58",
+                        "id": "88832e20-8c6e-46b4-af79-27b19b889a58",
                         "nick": "Ziggy"
                     },
                     "deleted": false

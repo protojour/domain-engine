@@ -8,6 +8,7 @@ use crate::{
     map::MapKeyPair,
     relation::Constructor,
     text_patterns::TextPatternSegment,
+    type_check::repr::repr_model::ReprKind,
     typed_hir::{
         IntoTypedHirData, Meta, TypedArena, TypedHir, TypedHirData, TypedRootNode, UNIT_META,
     },
@@ -46,6 +47,30 @@ pub fn autogenerate_mapping<'m>(
                 span: NO_SPAN,
             })
         }
+        (Constructor::TextFmt(fmt), Constructor::Transparent) => {
+            let [fmt_node, transparent_node] =
+                autogenerate_fmt_to_transparent((first_def_id, fmt), second_def_id, compiler)?;
+
+            Some(ExplicitMapCodegenTask {
+                def_id: compiler
+                    .defs
+                    .add_def(DefKind::AutoMapping, package_id, NO_SPAN),
+                arms: [fmt_node, transparent_node],
+                span: NO_SPAN,
+            })
+        }
+        (Constructor::Transparent, Constructor::TextFmt(fmt)) => {
+            let [fmt_node, transparent_node] =
+                autogenerate_fmt_to_transparent((second_def_id, fmt), first_def_id, compiler)?;
+
+            Some(ExplicitMapCodegenTask {
+                def_id: compiler
+                    .defs
+                    .add_def(DefKind::AutoMapping, package_id, NO_SPAN),
+                arms: [transparent_node, fmt_node],
+                span: NO_SPAN,
+            })
+        }
         _ => None,
     }
 }
@@ -72,6 +97,45 @@ fn autogenerate_fmt_to_fmt<'m>(
         autogenerate_fmt_hir_struct(None, second.0, second_var, second.1, &mut var_map, compiler)?;
 
     Some([first_node, second_node])
+}
+
+fn autogenerate_fmt_to_transparent<'m>(
+    (fmt_def_id, segment): (DefId, &TextPatternSegment),
+    transparent_def_id: DefId,
+    compiler: &Compiler<'m>,
+) -> Option<[TypedRootNode<'m>; 2]> {
+    let mut var_allocator = VarAllocator::default();
+    let var = var_allocator.alloc();
+    let mut var_map = Default::default();
+    let fmt_node = autogenerate_fmt_hir_struct(
+        Some(&mut var_allocator),
+        fmt_def_id,
+        var,
+        segment,
+        &mut var_map,
+        compiler,
+    )?;
+
+    let transparent_repr_kind = compiler.seal_ctx.get_repr_kind(&transparent_def_id)?;
+
+    let transparent_var = match transparent_repr_kind {
+        ReprKind::Scalar(scalar_def_id, ..) => *var_map.get(scalar_def_id)?,
+        _ => *var_map.get(&transparent_def_id)?,
+    };
+
+    let transparent_node = {
+        let mut arena: TypedArena<'m> = Default::default();
+        let node = arena.add(TypedHirData(
+            ontol_hir::Kind::Var(transparent_var),
+            Meta {
+                ty: compiler.def_types.table.get(&transparent_def_id)?,
+                span: NO_SPAN,
+            },
+        ));
+        ontol_hir::RootNode::new(node, arena)
+    };
+
+    Some([fmt_node, transparent_node])
 }
 
 fn autogenerate_fmt_hir_struct<'m>(
