@@ -1,5 +1,6 @@
 use assert_matches::assert_matches;
 use ontol_runtime::{
+    config::DataStoreConfig,
     interface::graphql::{
         data::{FieldKind, NativeScalarKind, ObjectData, TypeData},
         schema::{GraphqlSchema, QueryLevel},
@@ -13,7 +14,7 @@ use ontol_test_utils::{
         graphql::{ObjectDataExt, TypeDataExt, UnitTypeRefExt},
         serde::SerdeOperatorExt,
     },
-    OntolTest, TestCompile, ROOT_SRC_NAME,
+    OntolTest, SourceName, TestCompile, TestPackages, ROOT_SRC_NAME,
 };
 use test_log::test;
 
@@ -197,6 +198,77 @@ fn test_graphql_artist_and_instrument() {
     );
 }
 
+#[test]
+fn test_no_datastore_yields_empty_mutation() {
+    let test = "
+    def foo {
+        rel .'id'|id: { rel .is: text }
+        rel .'x': text
+    }
+    "
+    .compile();
+    let (_schema, test) = schema_test(&test, ROOT_SRC_NAME);
+    assert!(test.mutation_object_data().fields.is_empty());
+}
+
+#[test]
+fn test_imperfect_mapping_mutation() {
+    let test = TestPackages::with_sources([
+        (
+            SourceName::root(),
+            "
+            use 'inner' as inner
+
+            def outer {
+                rel .'id'|id: { rel .is: text }
+                rel .'x': text
+            }
+
+            map {
+                inner.inner match {
+                    'id': id
+                    'a': x
+                }
+                outer {
+                    'id': id
+                    'x': x
+                }
+            }
+            ",
+        ),
+        (
+            SourceName("inner"),
+            "
+            def inner {
+                rel .'id'|id: { rel .is: text }
+                rel .'a': text
+                rel .'b': text
+            }
+            ",
+        ),
+    ])
+    .with_data_store(SourceName("inner"), DataStoreConfig::Default)
+    .compile();
+    let (_schema, test) = schema_test(&test, ROOT_SRC_NAME);
+    let mutation_object = test.mutation_object_data();
+    let outer_field = mutation_object.fields.get("outer").unwrap();
+    let FieldKind::EntityMutation {
+        create_arg,
+        update_arg,
+        delete_arg,
+        ..
+    } = &outer_field.kind
+    else {
+        panic!()
+    };
+
+    // The outer domain cannot create entities of the inner domain because
+    // of the imperfect mapping in that direction.
+    assert!(create_arg.is_none());
+    assert!(update_arg.is_some());
+    assert!(delete_arg.is_some());
+}
+
 struct SchemaTest<'o> {
     test: &'o OntolTest,
     schema: &'o GraphqlSchema,
@@ -205,6 +277,10 @@ struct SchemaTest<'o> {
 impl<'o> SchemaTest<'o> {
     fn query_object_data(&self) -> &ObjectData {
         self.schema.type_data(self.schema.query).object_data()
+    }
+
+    fn mutation_object_data(&self) -> &ObjectData {
+        self.schema.type_data(self.schema.mutation).object_data()
     }
 
     // fn mutation_object_data(&self) -> &ObjectData {

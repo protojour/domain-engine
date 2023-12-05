@@ -11,6 +11,7 @@ pub mod config;
 pub mod format_utils;
 pub mod interface;
 pub mod ontology;
+pub mod resolve_path;
 pub mod select;
 pub mod sequence;
 pub mod text_like_types;

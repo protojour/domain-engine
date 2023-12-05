@@ -1,12 +1,10 @@
-use fnv::{FnvHashMap, FnvHashSet};
-use ontol_runtime::{
-    ontology::Ontology,
+use crate::{
+    ontology::{MapLossiness, Ontology},
     select::{EntitySelect, StructOrUnionSelect},
     DefId, MapKey, PackageId,
 };
+use fnv::{FnvHashMap, FnvHashSet};
 use tracing::trace;
-
-use crate::data_store::DataStore;
 
 #[derive(Debug)]
 pub struct ResolvePath {
@@ -36,26 +34,39 @@ impl ResolvePath {
 pub struct ProbeOptions {
     pub must_be_entity: bool,
     pub inverted: bool,
+    pub filter_lossiness: Option<MapLossiness>,
 }
 
 pub struct ResolverGraph {
     /// Graph of what each DefId can map to
-    map_graph: FnvHashMap<MapKey, Vec<MapKey>>,
+    map_graph: FnvHashMap<MapKey, Vec<(MapLossiness, MapKey)>>,
     /// Graph of what each DefId can map from
-    inverted_map_graph: FnvHashMap<MapKey, Vec<MapKey>>,
+    inverted_map_graph: FnvHashMap<MapKey, Vec<(MapLossiness, MapKey)>>,
 }
 
 impl ResolverGraph {
     pub fn new(ontology: &Ontology) -> Self {
-        let mut map_graph: FnvHashMap<MapKey, Vec<MapKey>> = Default::default();
-        let mut inverted_map_graph: FnvHashMap<MapKey, Vec<MapKey>> = Default::default();
+        Self::from_iter(
+            ontology
+                .iter_map_meta()
+                .map(|(keys, meta)| (keys, meta.lossiness)),
+        )
+    }
 
-        for ([source_key, target_key], _) in ontology.iter_map_meta() {
-            map_graph.entry(source_key).or_default().push(target_key);
+    pub fn from_iter(iterator: impl Iterator<Item = ([MapKey; 2], MapLossiness)>) -> Self {
+        let mut map_graph: FnvHashMap<MapKey, Vec<(MapLossiness, MapKey)>> = Default::default();
+        let mut inverted_map_graph: FnvHashMap<MapKey, Vec<(MapLossiness, MapKey)>> =
+            Default::default();
+
+        for ([source_key, target_key], map_kind) in iterator {
+            map_graph
+                .entry(source_key)
+                .or_default()
+                .push((map_kind, target_key));
             inverted_map_graph
                 .entry(target_key)
                 .or_default()
-                .push(source_key);
+                .push((map_kind, source_key));
         }
 
         Self {
@@ -68,17 +79,18 @@ impl ResolverGraph {
         &self,
         ontology: &Ontology,
         select: &EntitySelect,
-        data_store: &DataStore,
+        target_package: PackageId,
     ) -> Option<(DefId, ResolvePath)> {
         match &select.source {
             StructOrUnionSelect::Struct(struct_query) => self
                 .probe_path(
                     ontology,
                     struct_query.def_id,
-                    data_store.package_id(),
+                    target_package,
                     ProbeOptions {
                         must_be_entity: true,
                         inverted: true,
+                        filter_lossiness: None,
                     },
                 )
                 .map(|path| (struct_query.def_id, path)),
@@ -118,7 +130,7 @@ impl ResolverGraph {
 
 struct Probe<'on, 'a> {
     ontology: &'on Ontology,
-    graph: &'on FnvHashMap<MapKey, Vec<MapKey>>,
+    graph: &'on FnvHashMap<MapKey, Vec<(MapLossiness, MapKey)>>,
     options: &'on ProbeOptions,
     path: &'a mut Vec<DefId>,
     visited: &'a mut FnvHashSet<DefId>,
@@ -150,9 +162,16 @@ impl<'on, 'a> Probe<'on, 'a> {
             None => return false,
         };
 
-        for edge in edges {
-            self.path.push(edge.def_id);
-            if self.probe_rec(edge.def_id) {
+        for (edge_map_kind, edge_key) in edges {
+            match (self.options.filter_lossiness, edge_map_kind) {
+                (None, _) => {}
+                (Some(MapLossiness::Lossy), MapLossiness::Lossy) => {}
+                (Some(MapLossiness::Perfect), MapLossiness::Perfect) => {}
+                _ => return false,
+            }
+
+            self.path.push(edge_key.def_id);
+            if self.probe_rec(edge_key.def_id) {
                 return true;
             } else {
                 self.path.pop();

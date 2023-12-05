@@ -9,7 +9,6 @@ pub mod system;
 
 mod domain_engine;
 mod in_memory_store;
-mod resolve_path;
 mod select_data_flow;
 mod value_generator;
 

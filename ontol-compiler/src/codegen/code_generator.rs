@@ -3,7 +3,7 @@ use fnv::FnvHashMap;
 use ontol_hir::{EvalCondTerm, HasDefault, PropPattern, PropVariant, StructFlags};
 use ontol_runtime::{
     condition::Clause,
-    ontology::ValueCardinality,
+    ontology::{MapLossiness, ValueCardinality},
     smart_format,
     value::PropertyId,
     var::Var,
@@ -30,7 +30,7 @@ use crate::{
 use super::{
     ir::Ir,
     proc_builder::{Block, ProcBuilder},
-    task::ProcTable,
+    task::{MapOutputMeta, ProcTable},
     type_mapper::TypeMapper,
 };
 
@@ -78,6 +78,17 @@ pub(super) fn map_codegen<'m>(
     let body = &func.body;
     let body_span = body.data().span();
 
+    let lossiness = match body.as_ref().kind() {
+        ontol_hir::Kind::Struct(_, flags, _) => {
+            if flags.contains(StructFlags::MATCH) {
+                MapLossiness::Lossy
+            } else {
+                MapLossiness::Perfect
+            }
+        }
+        _ => MapLossiness::Perfect,
+    };
+
     let data_flow = DataFlowAnalyzer::new(&compiler.defs).analyze(func.arg.0.var, body.as_ref());
 
     let return_ty = body.data().ty();
@@ -111,6 +122,10 @@ pub(super) fn map_codegen<'m>(
                     .propflow_table
                     .insert([from_info.key, to_info.key], data_flow);
             }
+
+            proc_table
+                .metadata_table
+                .insert([from_info.key, to_info.key], MapOutputMeta { lossiness });
 
             [from_info.key, to_info.key]
         }

@@ -8,8 +8,8 @@ use domain_engine_juniper::{
     context::ServiceCtx, create_graphql_schema, gql_scalar::GqlScalar, Schema,
 };
 use juniper::ScalarValue;
-use ontol_runtime::sequence::Sequence;
-use ontol_test_utils::{OntolTest, SourceName, TestCompile};
+use ontol_runtime::{config::DataStoreConfig, sequence::Sequence};
+use ontol_test_utils::{OntolTest, SourceName, TestCompile, TestPackages};
 use unimock::*;
 
 pub trait TestCompileSchema {
@@ -24,20 +24,42 @@ impl<T: TestCompile> TestCompileSchema for T {
         self,
         source_names: [SourceName; N],
     ) -> (OntolTest, [Schema; N]) {
-        let mut ontol_test = self.compile();
-        // Don't want JSON schema noise in GraphQL tests:
-        ontol_test.compile_json_schema = false;
-
-        let schemas: [Schema; N] = source_names.map(|source_name| {
-            create_graphql_schema(
-                ontol_test.get_package_id(source_name.0),
-                ontol_test.ontology.clone(),
-            )
-            .unwrap()
-        });
-
-        (ontol_test, schemas)
+        compile_schemas_inner(self.compile(), source_names)
     }
+}
+
+pub trait TestCompileSingletonSchema {
+    fn compile_single_schema_with_datastore(self) -> (OntolTest, Schema);
+}
+
+impl TestCompileSingletonSchema for &'static str {
+    fn compile_single_schema_with_datastore(self) -> (OntolTest, Schema) {
+        let (ontol_test, [schema]) = compile_schemas_inner(
+            TestPackages::with_root(self)
+                .with_data_store(SourceName::root(), DataStoreConfig::Default)
+                .compile(),
+            [SourceName::root()],
+        );
+        (ontol_test, schema)
+    }
+}
+
+fn compile_schemas_inner<const N: usize>(
+    mut ontol_test: OntolTest,
+    source_names: [SourceName; N],
+) -> (OntolTest, [Schema; N]) {
+    // Don't want JSON schema noise in GraphQL tests:
+    ontol_test.compile_json_schema = false;
+
+    let schemas: [Schema; N] = source_names.map(|source_name| {
+        create_graphql_schema(
+            ontol_test.get_package_id(source_name.0),
+            ontol_test.ontology.clone(),
+        )
+        .unwrap()
+    });
+
+    (ontol_test, schemas)
 }
 
 #[derive(Debug, Eq, PartialEq)]

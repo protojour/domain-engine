@@ -352,6 +352,13 @@ pub enum DataRelationshipKind {
 pub struct MapMeta {
     pub procedure: Procedure,
     pub propflow_range: Range<u32>,
+    pub lossiness: MapLossiness,
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
+pub enum MapLossiness {
+    Perfect,
+    Lossy,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Serialize, Deserialize)]

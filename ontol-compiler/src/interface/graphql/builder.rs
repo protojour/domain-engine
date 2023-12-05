@@ -16,10 +16,11 @@ use ontol_runtime::{
         },
         serde::SerdeModifier,
     },
-    ontology::{Ontology, PropertyFlow, PropertyFlowData},
+    ontology::{MapLossiness, Ontology, PropertyFlow, PropertyFlowData},
+    resolve_path::{ProbeOptions, ResolverGraph},
     value::PropertyId,
     var::Var,
-    DefId, MapKey,
+    DefId, MapKey, PackageId,
 };
 use smartstring::alias::String;
 
@@ -52,6 +53,8 @@ pub(super) struct SchemaBuilder<'a, 's, 'c, 'm> {
     pub primitives: &'c Primitives,
     /// The compiler's sealed type information
     pub seal_ctx: &'c SealCtx,
+    /// A resolver graph
+    pub resolver_graph: ResolverGraph,
 }
 
 pub(super) enum LazyTask {
@@ -372,7 +375,15 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             .insert(name.into(), field_data);
     }
 
-    pub fn add_entity_queries_and_mutations(&mut self, entity_data: EntityData) {
+    pub fn add_entity_queries_and_mutations(
+        &mut self,
+        entity_data: EntityData,
+        data_store_domain: Option<PackageId>,
+    ) {
+        let Some(data_store_domain) = data_store_domain else {
+            return;
+        };
+
         let type_info = self.partial_ontology.get_type_info(entity_data.node_def_id);
 
         let mutation_result_ref =
@@ -383,35 +394,67 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         // This is here for a reason
         let _id_unit_type_ref = self.get_def_type_ref(entity_data.id_def_id, QLevel::Node);
 
-        {
-            let mutation = object_data_mut(self.schema.mutation, self.schema);
+        let entity_array_operator_addr = self
+            .serde_generator
+            .gen_addr(gql_array_serde_key(entity_data.node_def_id))
+            .unwrap();
 
-            let entity_array_operator_addr = self
-                .serde_generator
-                .gen_addr(gql_array_serde_key(entity_data.node_def_id))
-                .unwrap();
+        let data_resolve_path = self.resolver_graph.probe_path(
+            self.partial_ontology,
+            type_info.def_id,
+            data_store_domain,
+            ProbeOptions {
+                must_be_entity: true,
+                inverted: false,
+                filter_lossiness: None,
+            },
+        );
+        // The creation resolve path must be Perfect for the creation to be available
+        let creation_resolve_path = self.resolver_graph.probe_path(
+            self.partial_ontology,
+            type_info.def_id,
+            data_store_domain,
+            ProbeOptions {
+                must_be_entity: true,
+                inverted: false,
+                filter_lossiness: Some(MapLossiness::Perfect),
+            },
+        );
 
-            mutation.fields.insert(
+        if data_resolve_path.is_none() && creation_resolve_path.is_none() {
+            return;
+        }
+
+        object_data_mut(self.schema.mutation, self.schema)
+            .fields
+            .insert(
                 mutation_namespace.typename(type_info),
                 FieldData {
                     kind: FieldKind::EntityMutation {
-                        create_arg: argument::EntityCreateInputsArg {
-                            type_addr: entity_data.type_addr,
-                            def_id: entity_data.node_def_id,
-                            operator_addr: entity_array_operator_addr,
-                        },
-                        update_arg: argument::EntityUpdateInputsArg {
-                            type_addr: entity_data.type_addr,
-                            def_id: entity_data.node_def_id,
-                            operator_addr: entity_array_operator_addr,
-                        },
-                        delete_arg: argument::EntityDeleteInputsArg {
-                            def_id: entity_data.id_def_id,
-                            operator_addr: self
-                                .serde_generator
-                                .gen_addr(gql_array_serde_key(entity_data.id_def_id))
-                                .unwrap(),
-                        },
+                        def_id: type_info.def_id,
+                        create_arg: creation_resolve_path.is_some().then(|| {
+                            argument::EntityCreateInputsArg {
+                                type_addr: entity_data.type_addr,
+                                def_id: entity_data.node_def_id,
+                                operator_addr: entity_array_operator_addr,
+                            }
+                        }),
+                        update_arg: data_resolve_path.is_some().then(|| {
+                            argument::EntityUpdateInputsArg {
+                                type_addr: entity_data.type_addr,
+                                def_id: entity_data.node_def_id,
+                                operator_addr: entity_array_operator_addr,
+                            }
+                        }),
+                        delete_arg: data_resolve_path.is_some().then(|| {
+                            argument::EntityDeleteInputsArg {
+                                def_id: entity_data.id_def_id,
+                                operator_addr: self
+                                    .serde_generator
+                                    .gen_addr(gql_array_serde_key(entity_data.id_def_id))
+                                    .unwrap(),
+                            }
+                        }),
                         field_unit_type_addr: match mutation_result_ref {
                             UnitTypeRef::Addr(addr) => addr,
                             UnitTypeRef::NativeScalar(_) => unreachable!(),
@@ -421,7 +464,6 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         .to_array(Optionality::Mandatory),
                 },
             );
-        }
     }
 }
 

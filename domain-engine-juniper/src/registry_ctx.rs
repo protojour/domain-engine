@@ -403,9 +403,15 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 delete_arg,
                 ..
             } => {
-                arguments.extend(self.get_domain_field_arg(create_arg));
-                arguments.extend(self.get_domain_field_arg(update_arg));
-                arguments.extend(self.get_domain_field_arg(delete_arg));
+                if let Some(create_arg) = create_arg {
+                    arguments.extend(self.get_domain_field_arg(create_arg));
+                }
+                if let Some(update_arg) = update_arg {
+                    arguments.extend(self.get_domain_field_arg(update_arg));
+                }
+                if let Some(delete_arg) = delete_arg {
+                    arguments.extend(self.get_domain_field_arg(delete_arg));
+                }
             }
             FieldKind::Deleted
             | FieldKind::Property(_)

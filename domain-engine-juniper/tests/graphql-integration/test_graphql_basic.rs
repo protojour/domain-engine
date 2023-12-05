@@ -6,6 +6,7 @@ use domain_engine_juniper::{
     Schema,
 };
 use ontol_runtime::{
+    config::DataStoreConfig,
     interface::serde::processor::ProcessorProfileFlags,
     sequence::{Sequence, SubSequence},
     value::Attribute,
@@ -23,7 +24,7 @@ use unimock::*;
 use domain_engine_test_utils::{
     graphql_test_utils::{
         gql_ctx_mock_data_store, mock_data_store_query_entities_empty, Exec, GraphqlTestResultExt,
-        TestCompileSchema, TestError,
+        TestCompileSchema, TestCompileSingletonSchema, TestError,
     },
     parser_document_utils::{
         find_input_object_type, find_object_field, find_object_type, FieldInfo,
@@ -40,7 +41,7 @@ fn test_graphql_schema_for_entityless_domain_should_not_be_generated() {
 
 #[test(tokio::test)]
 async fn test_graphql_int_scalars() {
-    let (test, [schema]) = "
+    let (test, schema) = "
     def foo_id { fmt '' => text => . }
     def smallint {
         rel .is: integer
@@ -58,7 +59,7 @@ async fn test_graphql_int_scalars() {
         foo: [..foo match {}]
     }
     "
-    .compile_schemas([ROOT]);
+    .compile_single_schema_with_datastore();
 
     {
         let parser_document = schema.as_parser_document();
@@ -147,7 +148,7 @@ async fn test_graphql_int_scalars() {
 
 #[test(tokio::test)]
 async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
-    let (test, [schema]) = "
+    let (test, schema) = "
     def foo {
         rel .'id'(rel .gen: auto)|id: { rel .is: text }
     }
@@ -156,7 +157,7 @@ async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
         foo: [..foo match {}]
     }
     "
-    .compile_schemas([ROOT]);
+    .compile_single_schema_with_datastore();
 
     expect_eq!(
         actual = "{
@@ -184,7 +185,7 @@ async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
 
 #[test(tokio::test)]
 async fn test_graphql_basic_pagination() {
-    let (test, [schema]) = "
+    let (test, schema) = "
     def foo {
         rel .'id'(rel .gen: auto)|id: { rel .is: text }
     }
@@ -193,7 +194,7 @@ async fn test_graphql_basic_pagination() {
         foo: [..foo match {}]
     }
     "
-    .compile_schemas([ROOT]);
+    .compile_single_schema_with_datastore();
 
     expect_eq!(
         actual = "{
@@ -319,7 +320,7 @@ async fn test_graphql_basic_pagination() {
 
 #[test(tokio::test)]
 async fn test_graphql_nodes() {
-    let (test, [schema]) = "
+    let (test, schema) = "
     def foo {
         rel .'id'(rel .gen: auto)|id: { rel .is: text }
     }
@@ -328,7 +329,7 @@ async fn test_graphql_nodes() {
         foo: [..foo match {}]
     }
     "
-    .compile_schemas([ROOT]);
+    .compile_single_schema_with_datastore();
 
     let [foo] = test.bind(["foo"]);
     let query_mock = DataStoreAPIMock::execute
@@ -389,7 +390,7 @@ fn test_graphql_value_type_in_array() {
 
 #[test(tokio::test)]
 async fn test_inner_struct() {
-    let (test, [schema]) = "
+    let (test, schema) = "
     def foo_id { fmt '' => text => . }
     def inner {
         rel .'prop': text
@@ -403,7 +404,7 @@ async fn test_inner_struct() {
         foo: [..foo match {}]
     }
     "
-    .compile_schemas([ROOT]);
+    .compile_single_schema_with_datastore();
 
     let [foo] = test.bind(["foo"]);
 
@@ -471,7 +472,7 @@ async fn test_inner_struct() {
 
 #[test(tokio::test)]
 async fn test_docs_introspection() {
-    let (test, [schema]) = "
+    let (test, schema) = "
     def Key {
         rel .is: text
     }
@@ -483,7 +484,7 @@ async fn test_docs_introspection() {
         rel .'relation': text
     }
     "
-    .compile_schemas([ROOT]);
+    .compile_single_schema_with_datastore();
 
     expect_eq!(
         actual = r#"{
@@ -515,7 +516,9 @@ async fn test_docs_introspection() {
 
 #[test(tokio::test)]
 async fn test_graphql_artist_and_instrument_connections() {
-    let (test, [schema]) = ARTIST_AND_INSTRUMENT.1.compile_schemas([ROOT]);
+    let (test, schema) = ARTIST_AND_INSTRUMENT
+        .1
+        .compile_single_schema_with_datastore();
     let [artist, instrument, plays] = test.bind(["artist", "instrument", "plays"]);
     let ziggy: Attribute = artist
         .entity_builder(
@@ -676,7 +679,9 @@ async fn test_graphql_artist_and_instrument_connections() {
 
 #[test(tokio::test)]
 async fn test_unified_mutation_error_on_unrecognized_arg() {
-    let (test, [schema]) = ARTIST_AND_INSTRUMENT.1.compile_schemas([ROOT]);
+    let (test, schema) = ARTIST_AND_INSTRUMENT
+        .1
+        .compile_single_schema_with_datastore();
 
     expect_eq!(
         actual = "mutation { artist(bogus: null) { deleted } }"
@@ -689,7 +694,9 @@ async fn test_unified_mutation_error_on_unrecognized_arg() {
 
 #[test(tokio::test)]
 async fn test_unified_mutation_create() {
-    let (test, [schema]) = ARTIST_AND_INSTRUMENT.1.compile_schemas([ROOT]);
+    let (test, schema) = ARTIST_AND_INSTRUMENT
+        .1
+        .compile_single_schema_with_datastore();
     let ziggy: Attribute = test.bind(["artist"])[0]
         .entity_builder(
             json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
@@ -757,7 +764,7 @@ async fn test_unified_mutation_create() {
 
 #[test(tokio::test)]
 async fn test_graphql_guitar_synth_union_selection() {
-    let (test, [schema]) = GUITAR_SYNTH_UNION.1.compile_schemas([ROOT]);
+    let (test, schema) = GUITAR_SYNTH_UNION.1.compile_single_schema_with_datastore();
     let [artist] = test.bind(["artist"]);
 
     let query_mock = DataStoreAPIMock::execute
@@ -838,7 +845,7 @@ async fn test_graphql_guitar_synth_union_selection() {
 
 #[test]
 fn test_graphql_guitar_synth_union_input_union_field_list() {
-    let (_test, [schema]) = GUITAR_SYNTH_UNION.1.compile_schemas([ROOT]);
+    let (_test, schema) = GUITAR_SYNTH_UNION.1.compile_single_schema_with_datastore();
     let parser_document = schema.as_parser_document();
 
     let instrument_edge_input =
@@ -871,7 +878,7 @@ fn test_graphql_guitar_synth_union_input_union_field_list() {
 
 #[test(tokio::test)]
 async fn test_graphql_guitar_synth_union_input_exec() {
-    let (test, [schema]) = GUITAR_SYNTH_UNION.1.compile_schemas([ROOT]);
+    let (test, schema) = GUITAR_SYNTH_UNION.1.compile_single_schema_with_datastore();
     let [artist] = test.bind(["artist"]);
     let store_entity_mock = DataStoreAPIMock::execute
         .next_call(matching!(Request::BatchWrite(..), _))
@@ -930,7 +937,7 @@ async fn test_graphql_guitar_synth_union_input_exec() {
 
 #[test(tokio::test)]
 async fn test_graphql_guitar_synth_union_input_error_span() {
-    let (test, [schema]) = GUITAR_SYNTH_UNION.1.compile_schemas([ROOT]);
+    let (test, schema) = GUITAR_SYNTH_UNION.1.compile_single_schema_with_datastore();
 
     expect_eq!(
         actual = r#"mutation {
@@ -1081,6 +1088,7 @@ async fn test_graphql_municipalities_named_query() {
 #[test]
 fn test_graphql_municipalities_geojson_union() {
     let (_test, [schema]) = TestPackages::with_sources([(ROOT, MUNICIPALITIES.1), GEOJSON, WGS])
+        .with_data_store(ROOT, DataStoreConfig::Default)
         .compile_schemas([ROOT]);
 
     let parser_document = schema.as_parser_document();
@@ -1106,12 +1114,12 @@ fn test_graphql_municipalities_geojson_union() {
 
 #[test(tokio::test)]
 async fn test_graphql_open_data() {
-    let (test, [schema]) = "
+    let (test, schema) = "
     def(open) foo {
         rel .'id'(rel .gen: auto)|id: { rel .is: text }
     }
     "
-    .compile_schemas([ROOT]);
+    .compile_single_schema_with_datastore();
     let [foo] = test.bind(["foo"]);
     let store_entity_mock = DataStoreAPIMock::execute
         .next_call(matching!(Request::BatchWrite(..), _))
@@ -1155,12 +1163,12 @@ async fn test_graphql_open_data() {
 
 #[test(tokio::test)]
 async fn test_open_data_disabled() {
-    let (test, [schema]) = "
+    let (test, schema) = "
     def(open) foo {
         rel .'id'(rel .gen: auto)|id: { rel .is: text }
     }
     "
-    .compile_schemas([ROOT]);
+    .compile_single_schema_with_datastore();
     let [foo] = test.bind(["foo"]);
 
     expect_eq!(

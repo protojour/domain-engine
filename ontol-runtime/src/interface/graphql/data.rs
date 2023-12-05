@@ -280,9 +280,10 @@ pub enum FieldKind {
         input_arg: argument::MapInputArg,
     },
     EntityMutation {
-        create_arg: argument::EntityCreateInputsArg,
-        update_arg: argument::EntityUpdateInputsArg,
-        delete_arg: argument::EntityDeleteInputsArg,
+        def_id: DefId,
+        create_arg: Option<argument::EntityCreateInputsArg>,
+        update_arg: Option<argument::EntityUpdateInputsArg>,
+        delete_arg: Option<argument::EntityDeleteInputsArg>,
         field_unit_type_addr: TypeAddr,
     },
 }

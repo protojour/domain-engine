@@ -174,13 +174,18 @@ async fn mutation(
 
     match &field_data.kind {
         FieldKind::EntityMutation {
+            def_id,
             create_arg,
             update_arg,
             delete_arg,
             field_unit_type_addr,
         } => {
-            let entity_mutations = args_wrapper
-                .deserialize_entity_mutation_args(create_arg, update_arg, delete_arg, ctx)?;
+            let entity_mutations = args_wrapper.deserialize_entity_mutation_args(
+                create_arg.as_ref(),
+                update_arg.as_ref(),
+                delete_arg.as_ref(),
+                ctx,
+            )?;
             let select = select_analyzer.analyze_select(&look_ahead, field_data)?;
             let mut batch_write_requests = Vec::with_capacity(entity_mutations.len());
 
@@ -195,9 +200,7 @@ async fn mutation(
                 batch_write_requests.push(match entity_mutation.kind {
                     EntityMutationKind::Create => BatchWriteRequest::Insert(values, select.clone()),
                     EntityMutationKind::Update => BatchWriteRequest::Update(values, select.clone()),
-                    EntityMutationKind::Delete => {
-                        BatchWriteRequest::Delete(values, create_arg.def_id)
-                    }
+                    EntityMutationKind::Delete => BatchWriteRequest::Delete(values, *def_id),
                 });
             }
 

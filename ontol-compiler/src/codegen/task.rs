@@ -4,7 +4,7 @@ use fnv::FnvHashMap;
 use indexmap::{map::Entry, IndexMap};
 use ontol_runtime::{
     format_utils::DebugViaDisplay,
-    ontology::PropertyFlow,
+    ontology::{MapLossiness, PropertyFlow},
     smart_format,
     vm::proc::{Address, Lib, Procedure},
     DefId, MapKey, PackageId,
@@ -34,6 +34,7 @@ pub struct CodegenTasks<'m> {
     pub result_map_proc_table: FnvHashMap<[MapKey; 2], Procedure>,
     pub result_named_forward_maps: HashMap<(PackageId, String), [MapKey; 2]>,
     pub result_propflow_table: FnvHashMap<[MapKey; 2], Vec<PropertyFlow>>,
+    pub result_metadata_table: FnvHashMap<[MapKey; 2], MapOutputMeta>,
 }
 
 impl<'m> Debug for CodegenTasks<'m> {
@@ -105,7 +106,12 @@ pub(super) struct ProcTable {
     pub const_procedures: FnvHashMap<DefId, ProcBuilder>,
     pub procedure_calls: Vec<ProcedureCall>,
     pub propflow_table: FnvHashMap<[MapKey; 2], Vec<PropertyFlow>>,
+    pub metadata_table: FnvHashMap<[MapKey; 2], MapOutputMeta>,
     pub named_forward_maps: HashMap<(PackageId, String), [MapKey; 2]>,
+}
+
+pub struct MapOutputMeta {
+    pub lossiness: MapLossiness,
 }
 
 impl ProcTable {
@@ -171,6 +177,7 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
     compiler.codegen_tasks.result_map_proc_table = map_proc_table;
     compiler.codegen_tasks.result_named_forward_maps = proc_table.named_forward_maps;
     compiler.codegen_tasks.result_propflow_table = proc_table.propflow_table;
+    compiler.codegen_tasks.result_metadata_table = proc_table.metadata_table;
 }
 
 fn generate_explicit_map<'m>(

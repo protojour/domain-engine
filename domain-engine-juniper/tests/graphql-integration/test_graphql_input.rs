@@ -1,5 +1,5 @@
 use domain_engine_test_utils::graphql_test_utils::{
-    gql_ctx_mock_data_store, Exec, TestCompileSchema,
+    gql_ctx_mock_data_store, Exec, TestCompileSingletonSchema,
 };
 use ontol_test_utils::{assert_error_msg, SourceName};
 use test_log::test;
@@ -8,13 +8,13 @@ const ROOT: SourceName = SourceName::root();
 
 #[test(tokio::test)]
 async fn test_graphql_input_deserialization_error() {
-    let (test, [schema]) = "
+    let (test, schema) = "
     def foo {
         rel .id: { fmt '' => text => . }
         rel .'prop': 'const'
     }
     "
-    .compile_schemas([SourceName::root()]);
+    .compile_single_schema_with_datastore();
 
     let ctx = gql_ctx_mock_data_store(&test, ROOT, ());
     assert_error_msg!(
@@ -37,7 +37,7 @@ async fn test_graphql_input_deserialization_error() {
 // This requires a juniper patch.
 #[should_panic = "No mock implementation found"]
 async fn test_graphql_input_constructor_sequence_as_json_scalar() {
-    let (test, [schema]) = "
+    let (test, schema) = "
     def tuple {
         rel .0: i64
         rel .1: text
@@ -48,7 +48,7 @@ async fn test_graphql_input_constructor_sequence_as_json_scalar() {
         rel .'prop': tuple
     }
     "
-    .compile_schemas([SourceName::root()]);
+    .compile_single_schema_with_datastore();
 
     r#"mutation {
         foo(create: [{

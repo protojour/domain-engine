@@ -21,8 +21,8 @@ use ontol_runtime::{
         DomainInterface,
     },
     ontology::{
-        DataRelationshipInfo, DataRelationshipKind, Domain, EntityInfo, MapMeta, OntolDomainMeta,
-        Ontology, TypeInfo,
+        DataRelationshipInfo, DataRelationshipKind, Domain, EntityInfo, MapLossiness, MapMeta,
+        OntolDomainMeta, Ontology, TypeInfo,
     },
     value::PropertyId,
     DefId, PackageId,
@@ -357,6 +357,7 @@ impl<'m> Compiler<'m> {
                     MapMeta {
                         procedure,
                         propflow_range,
+                        lossiness: MapLossiness::Perfect,
                     },
                 )
             })

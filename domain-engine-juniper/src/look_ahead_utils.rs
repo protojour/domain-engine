@@ -108,19 +108,27 @@ impl<'a> ArgsWrapper<'a> {
 
     pub fn deserialize_entity_mutation_args(
         &self,
-        create_arg: &argument::EntityCreateInputsArg,
-        update_arg: &argument::EntityUpdateInputsArg,
-        delete_arg: &argument::EntityDeleteInputsArg,
+        create_arg: Option<&argument::EntityCreateInputsArg>,
+        update_arg: Option<&argument::EntityUpdateInputsArg>,
+        delete_arg: Option<&argument::EntityDeleteInputsArg>,
         (schema_ctx, service_ctx): (&SchemaCtx, &ServiceCtx),
     ) -> Result<Vec<EntityMutations>, juniper::FieldError<GqlScalar>> {
-        // A uniform array of the arguments that can be matched.
+        // A uniform vector of the arguments that can be matched.
         // The point here is that we want to match them in the order that the user has specified
         // and return a vector that has the same order.
-        let arg_matchers: [(&dyn argument::DomainFieldArg, EntityMutationKind); 3] = [
-            (create_arg, EntityMutationKind::Create),
-            (update_arg, EntityMutationKind::Update),
-            (delete_arg, EntityMutationKind::Delete),
-        ];
+        let arg_matchers = {
+            let mut arg_matchers: Vec<(&dyn argument::DomainFieldArg, EntityMutationKind)> = vec![];
+            if let Some(create_arg) = create_arg {
+                arg_matchers.push((create_arg, EntityMutationKind::Create));
+            }
+            if let Some(update_arg) = update_arg {
+                arg_matchers.push((update_arg, EntityMutationKind::Update));
+            }
+            if let Some(delete_arg) = delete_arg {
+                arg_matchers.push((delete_arg, EntityMutationKind::Delete));
+            }
+            arg_matchers
+        };
 
         let processor_profile =
             ProcessorProfile::default().with_flags(service_ctx.serde_processor_profile_flags);

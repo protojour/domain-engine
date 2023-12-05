@@ -2,9 +2,10 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Context};
 use ontol_runtime::{
-    config::DataStoreConfig,
+    config::data_store_backed_domains,
     interface::serde::processor::ProcessorMode,
     ontology::{Ontology, ValueCardinality},
+    resolve_path::{ProbeOptions, ResolverGraph},
     select::{EntitySelect, Select, StructOrUnionSelect},
     sequence::Sequence,
     value::{Data, Value},
@@ -21,7 +22,6 @@ use crate::{
     },
     domain_error::DomainResult,
     match_utils::find_entity_id_in_condition_for_var,
-    resolve_path::{ProbeOptions, ResolverGraph},
     select_data_flow::translate_entity_select,
     system::{SystemAPI, TestSystem},
     value_generator::Generator,
@@ -106,7 +106,7 @@ impl DomainEngine {
 
         let (mut cur_def_id, resolve_path) = self
             .resolver_graph
-            .probe_path_for_entity_select(ontology, &select, data_store)
+            .probe_path_for_entity_select(ontology, &select, data_store.package_id())
             .ok_or(DomainError::NoResolvePathToDataStore)?;
 
         let original_def_id = cur_def_id;
@@ -200,6 +200,7 @@ impl DomainEngine {
                                 ProbeOptions {
                                     must_be_entity: true,
                                     inverted: true,
+                                    filter_lossiness: None,
                                 },
                             )
                             .ok_or(DomainError::NoResolvePathToDataStore)?;
@@ -274,6 +275,7 @@ impl DomainEngine {
                         ProbeOptions {
                             must_be_entity: true,
                             inverted: true,
+                            filter_lossiness: None,
                         },
                     )
                     .ok_or(DomainError::NoResolvePathToDataStore)?;
@@ -410,15 +412,4 @@ impl Builder {
             system: self.system.expect("No system API provided!"),
         })
     }
-}
-
-fn data_store_backed_domains(
-    ontology: &Ontology,
-) -> impl Iterator<Item = (PackageId, &DataStoreConfig)> {
-    ontology.domains().filter_map(|(package_id, _domain)| {
-        ontology
-            .get_package_config(*package_id)
-            .and_then(|config| config.data_store.as_ref())
-            .map(|data_store_config| (*package_id, data_store_config))
-    })
 }

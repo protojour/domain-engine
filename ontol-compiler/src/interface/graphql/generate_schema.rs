@@ -1,13 +1,15 @@
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
+    config::data_store_backed_domains,
     interface::graphql::{
         data::{
             EntityData, NodeData, ObjectData, ObjectKind, TypeAddr, TypeData, TypeKind, UnitTypeRef,
         },
         schema::GraphqlSchema,
     },
-    ontology::Ontology,
+    ontology::{MapLossiness, Ontology},
+    resolve_path::ResolverGraph,
     DefId, PackageId,
 };
 use tracing::trace;
@@ -32,6 +34,10 @@ pub fn generate_graphql_schema<'c>(
     serde_generator: &mut SerdeGenerator<'c, '_>,
 ) -> Option<GraphqlSchema> {
     let domain = partial_ontology.find_domain(package_id).unwrap();
+
+    let data_store_domain = data_store_backed_domains(partial_ontology)
+        .map(|(package_id, _)| package_id)
+        .last();
 
     if !domain
         .type_names
@@ -61,6 +67,18 @@ pub fn generate_graphql_schema<'c>(
             defs,
             primitives,
             seal_ctx,
+            resolver_graph: ResolverGraph::from_iter(
+                codegen_tasks.result_map_proc_table.keys().map(|key| {
+                    (
+                        *key,
+                        codegen_tasks
+                            .result_metadata_table
+                            .get(key)
+                            .map(|meta| meta.lossiness)
+                            .unwrap_or(MapLossiness::Lossy),
+                    )
+                }),
+            ),
         }
     };
 
@@ -78,7 +96,7 @@ pub fn generate_graphql_schema<'c>(
             let type_ref = builder.get_def_type_ref(type_info.def_id, QLevel::Node);
 
             if let Some(entity_data) = entity_check(builder.schema, type_ref) {
-                builder.add_entity_queries_and_mutations(entity_data);
+                builder.add_entity_queries_and_mutations(entity_data, data_store_domain);
             }
         }
     }
