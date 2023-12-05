@@ -763,6 +763,88 @@ async fn test_unified_mutation_create() {
 }
 
 #[test(tokio::test)]
+#[should_panic = "ontol data error: attribute not present"]
+async fn test_create_through_mapped_domain() {
+    let (test, [schema]) = TestPackages::with_sources([
+        (
+            ROOT,
+            "
+            use 'artist' as a
+
+            def player {
+                rel .'id'(rel .gen: auto)|id: { fmt '' => 'player/' => uuid => . }
+                rel .'nick': text
+            }
+
+            map {
+                player {
+                    'id': id
+                    'nick': n
+                }
+                a.artist {
+                    'ID': id
+                    'name': n
+                }
+            }
+        ",
+        ),
+        // BUG: Not using `artist_and_instrument` here right now because of https://gitlab.com/protojour/memoriam/domain-engine/-/issues/86
+        (
+            SourceName("artist"),
+            "
+            def artist {
+                rel .'ID'(rel .gen: auto)|id: { fmt '' => 'artist/' => uuid => . }
+                rel .'name': text
+            }
+            ",
+        ),
+    ])
+    .with_data_store(SourceName("artist"), DataStoreConfig::Default)
+    .compile_schemas([ROOT]);
+
+    let ziggy: Attribute = test.bind(["artist.artist"])[0]
+        .entity_builder(
+            json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
+            json!({ "name": "Ziggy" }),
+        )
+        .into();
+
+    expect_eq!(
+        actual = r#"
+            mutation {
+                player(create: [{ nick: "Ziggy" }]) {
+                    node { id nick }
+                    deleted
+                }
+            }
+        "#
+        .exec(
+            [],
+            &schema,
+            &gql_ctx_mock_data_store(
+                &test,
+                SourceName("artist"),
+                DataStoreAPIMock::execute
+                    .next_call(matching!(Request::BatchWrite(..), _))
+                    .returns(Ok(Response::one_inserted(ziggy.value)))
+            )
+        )
+        .await,
+        expected = Ok(graphql_value!({
+            "player": [
+                {
+                    "node": {
+                        "id": "88832e20-8c6e-46b4-af79-27b19b889a58",
+                        "nick": "Ziggy"
+                    },
+                    "deleted": false
+                }
+            ],
+        })),
+    );
+}
+
+#[test(tokio::test)]
 async fn test_graphql_guitar_synth_union_selection() {
     let (test, schema) = GUITAR_SYNTH_UNION.1.compile_single_schema_with_datastore();
     let [artist] = test.bind(["artist"]);

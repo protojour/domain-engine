@@ -22,7 +22,7 @@ use crate::{
     },
     domain_error::DomainResult,
     match_utils::find_entity_id_in_condition_for_var,
-    select_data_flow::translate_entity_select,
+    select_data_flow::{translate_entity_select, translate_select},
     system::{SystemAPI, TestSystem},
     value_generator::Generator,
     Config, DomainError, FindEntitySelect,
@@ -104,23 +104,15 @@ impl DomainEngine {
         let data_store = self.get_data_store()?;
         let ontology = self.ontology();
 
-        let (mut cur_def_id, resolve_path) = self
+        let resolve_path = self
             .resolver_graph
             .probe_path_for_entity_select(ontology, &select, data_store.package_id())
             .ok_or(DomainError::NoResolvePathToDataStore)?;
 
-        let original_def_id = cur_def_id;
-
         // Transform select
-        for next_def_id in resolve_path.iter() {
-            translate_entity_select(&mut select, cur_def_id.into(), next_def_id.into(), ontology);
-            cur_def_id = next_def_id;
+        for (from, to) in resolve_path.iter() {
+            translate_entity_select(&mut select, from.into(), to.into(), ontology);
         }
-
-        debug!(
-            "Resolve path: {resolve_path:?} to: {:?}",
-            ontology.get_type_info(cur_def_id)
-        );
 
         let data_store::Response::Query(mut edge_seq) = data_store
             .api()
@@ -137,9 +129,9 @@ impl DomainEngine {
         }
 
         // Transform result
-        for next_def_id in resolve_path.reverse(original_def_id) {
+        for (from, to) in resolve_path.reverse() {
             let procedure = ontology
-                .get_mapper_proc([cur_def_id.into(), (next_def_id).into()])
+                .get_mapper_proc([from.into(), to.into()])
                 .expect("No mapping procedure for query output");
 
             for attr in edge_seq.attrs.iter_mut() {
@@ -151,17 +143,11 @@ impl DomainEngine {
                         VmState::Complete(value) => {
                             break value;
                         }
-                        VmState::Yielded(_yield) => {
-                            todo!()
-                        }
+                        VmState::Yielded(_yield) => return Err(DomainError::ImpureMapping),
                     }
                 };
             }
-
-            cur_def_id = next_def_id;
         }
-
-        assert_eq!(cur_def_id, original_def_id);
 
         Ok(edge_seq)
     }
@@ -173,12 +159,45 @@ impl DomainEngine {
         // TODO: Domain translation by finding optimal mapping path
 
         let data_store = self.get_data_store()?;
+        let ontology = self.ontology();
 
         for request in &mut requests {
             match request {
-                BatchWriteRequest::Insert(mut_values, _) => {
-                    // TODO: domain translate
-                    for mut_value in mut_values {
+                BatchWriteRequest::Insert(mut_values, select) => {
+                    let resolve_path = self
+                        .resolver_graph
+                        .probe_path_for_select(ontology, select, data_store.package_id())
+                        .ok_or(DomainError::NoResolvePathToDataStore)?;
+
+                    for (from, to) in resolve_path.iter() {
+                        translate_select(select, from.into(), to.into(), ontology);
+                    }
+
+                    for (from, to) in resolve_path.iter() {
+                        debug!("{from:?} -> {to:?}");
+
+                        let procedure = ontology
+                            .get_mapper_proc([from.into(), to.into()])
+                            .expect("No mapping procedure for query output");
+
+                        for value in mut_values.iter_mut() {
+                            let mut vm = ontology.new_vm(procedure);
+                            let param = value.take();
+
+                            *value = loop {
+                                match vm.run([param])? {
+                                    VmState::Complete(value) => {
+                                        break value;
+                                    }
+                                    VmState::Yielded(_yield) => {
+                                        return Err(DomainError::ImpureMapping);
+                                    }
+                                }
+                            };
+                        }
+                    }
+
+                    for mut_value in mut_values.iter_mut() {
                         Generator::new(self, ProcessorMode::Create).generate_values(mut_value);
                     }
                 }
@@ -204,7 +223,7 @@ impl DomainEngine {
                                 },
                             )
                             .ok_or(DomainError::NoResolvePathToDataStore)?;
-                        *def_id = path.iter().last().unwrap();
+                        *def_id = path.iter().last().unwrap().1;
                     }
                 }
             }
@@ -280,21 +299,18 @@ impl DomainEngine {
                     )
                     .ok_or(DomainError::NoResolvePathToDataStore)?;
 
-                if let Some(dest) = resolve_path.iter().last() {
-                    assert_eq!(dest, inner_entity_def_id);
+                if let Some((_from, to)) = resolve_path.iter().last() {
+                    assert_eq!(to, inner_entity_def_id);
                 }
 
-                let mut cur_def_id = struct_select.def_id;
-
                 // Transform select
-                for next_def_id in resolve_path.iter() {
+                for (from, to) in resolve_path.iter() {
                     translate_entity_select(
                         &mut entity_select,
-                        cur_def_id.into(),
-                        next_def_id.into(),
+                        from.into(),
+                        to.into(),
                         &self.ontology,
                     );
-                    cur_def_id = next_def_id;
                 }
             }
             _ => todo!("Basically apply the same operation as above, but refactor"),

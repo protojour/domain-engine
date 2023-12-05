@@ -305,7 +305,7 @@ async fn test_conduit_db_unresolved_foreign_key() {
                 Select::EntityId
             )
             .await,
-        r#"Unresolved foreign key: "67e55044-10b1-426f-9247-bb680e5fe0c8""#
+        r#"unresolved foreign key: "67e55044-10b1-426f-9247-bb680e5fe0c8""#
     );
 }
 

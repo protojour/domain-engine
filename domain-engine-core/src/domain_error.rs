@@ -4,33 +4,35 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum DomainError {
-    #[error("Mapping procedure not found")]
+    #[error("mapping procedure not found")]
     MappingProcedureNotFound,
-    #[error("No data store")]
+    #[error("no data store")]
     NoDataStore,
-    #[error("No resolve path to data store")]
+    #[error("no resolve path to data store")]
     NoResolvePathToDataStore,
-    #[error("Entity not found")]
+    #[error("entity not found")]
     EntityNotFound,
-    #[error("Not an entity")]
+    #[error("not an entity")]
     NotAnEntity(DefId),
-    #[error("Entity must be a struct")]
+    #[error("entity must be a struct")]
     EntityMustBeStruct,
-    #[error("Inherent ID not found in structure")]
+    #[error("inherent ID not found in structure")]
     InherentIdNotFound,
     #[error("BUG: Invalid entity DefId")]
     InvalidEntityDefId,
-    #[error("Type cannot be used for id generation")]
+    #[error("type cannot be used for id generation")]
     TypeCannotBeUsedForIdGeneration,
-    #[error("Bad input: {0}")]
+    #[error("bad input: {0}")]
     BadInput(anyhow::Error),
-    #[error("Unresolved foreign key: {0}")]
+    #[error("unresolved foreign key: {0}")]
     UnresolvedForeignKey(String),
-    #[error("Not implemented")]
+    #[error("not implemented")]
     NotImplemented,
-    #[error("Datastore error: {0}")]
+    #[error("impure mapping where a pure mapping was expected")]
+    ImpureMapping,
+    #[error("datastore error: {0}")]
     DataStore(anyhow::Error),
-    #[error("Ontol data error")]
+    #[error("ontol data error: {0}")]
     OntolVm(#[from] VmError),
 }
 

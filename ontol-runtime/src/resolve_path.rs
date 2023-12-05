@@ -1,6 +1,6 @@
 use crate::{
     ontology::{MapLossiness, Ontology},
-    select::{EntitySelect, StructOrUnionSelect},
+    select::{EntitySelect, Select, StructOrUnionSelect},
     DefId, MapKey, PackageId,
 };
 use fnv::{FnvHashMap, FnvHashSet};
@@ -8,7 +8,7 @@ use tracing::trace;
 
 #[derive(Debug)]
 pub struct ResolvePath {
-    path: Vec<DefId>,
+    path: Vec<(DefId, DefId)>,
 }
 
 impl ResolvePath {
@@ -16,17 +16,12 @@ impl ResolvePath {
         self.path.is_empty()
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = DefId> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item = (DefId, DefId)> + '_ {
         self.path.iter().cloned()
     }
 
-    pub fn reverse(&self, original_def_id: DefId) -> impl Iterator<Item = DefId> + '_ {
-        self.path
-            .iter()
-            .cloned()
-            .rev()
-            .skip(1)
-            .chain(std::iter::once(original_def_id))
+    pub fn reverse(&self) -> impl Iterator<Item = (DefId, DefId)> + '_ {
+        self.path.iter().cloned().rev().map(|(from, to)| (to, from))
     }
 }
 
@@ -75,25 +70,72 @@ impl ResolverGraph {
         }
     }
 
+    pub fn probe_path_for_select(
+        &self,
+        ontology: &Ontology,
+        select: &Select,
+        target_package: PackageId,
+    ) -> Option<ResolvePath> {
+        match select {
+            Select::Entity(
+                EntitySelect {
+                    source: StructOrUnionSelect::Struct(struct_select),
+                    ..
+                },
+                ..,
+            ) => self.probe_path(
+                ontology,
+                struct_select.def_id,
+                target_package,
+                ProbeOptions {
+                    must_be_entity: true,
+                    inverted: true,
+                    filter_lossiness: None,
+                },
+            ),
+            Select::Struct(struct_select) => self.probe_path(
+                ontology,
+                struct_select.def_id,
+                target_package,
+                ProbeOptions {
+                    must_be_entity: true,
+                    inverted: true,
+                    filter_lossiness: None,
+                },
+            ),
+            Select::StructUnion(..) => {
+                todo!()
+            }
+            Select::Entity(
+                EntitySelect {
+                    source: StructOrUnionSelect::Union(..),
+                    ..
+                },
+                ..,
+            ) => {
+                todo!()
+            }
+            Select::Leaf | Select::EntityId => Some(ResolvePath { path: vec![] }),
+        }
+    }
+
     pub fn probe_path_for_entity_select(
         &self,
         ontology: &Ontology,
         select: &EntitySelect,
         target_package: PackageId,
-    ) -> Option<(DefId, ResolvePath)> {
+    ) -> Option<ResolvePath> {
         match &select.source {
-            StructOrUnionSelect::Struct(struct_query) => self
-                .probe_path(
-                    ontology,
-                    struct_query.def_id,
-                    target_package,
-                    ProbeOptions {
-                        must_be_entity: true,
-                        inverted: true,
-                        filter_lossiness: None,
-                    },
-                )
-                .map(|path| (struct_query.def_id, path)),
+            StructOrUnionSelect::Struct(struct_query) => self.probe_path(
+                ontology,
+                struct_query.def_id,
+                target_package,
+                ProbeOptions {
+                    must_be_entity: true,
+                    inverted: true,
+                    filter_lossiness: None,
+                },
+            ),
             StructOrUnionSelect::Union(..) => todo!("Resolve a union"),
         }
     }
@@ -132,7 +174,7 @@ struct Probe<'on, 'a> {
     ontology: &'on Ontology,
     graph: &'on FnvHashMap<MapKey, Vec<(MapLossiness, MapKey)>>,
     options: &'on ProbeOptions,
-    path: &'a mut Vec<DefId>,
+    path: &'a mut Vec<(DefId, DefId)>,
     visited: &'a mut FnvHashSet<DefId>,
     target_package: PackageId,
 }
@@ -170,7 +212,7 @@ impl<'on, 'a> Probe<'on, 'a> {
                 _ => return false,
             }
 
-            self.path.push(edge_key.def_id);
+            self.path.push((def_id, edge_key.def_id));
             if self.probe_rec(edge_key.def_id) {
                 return true;
             } else {
