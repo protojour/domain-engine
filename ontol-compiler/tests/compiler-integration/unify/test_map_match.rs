@@ -9,14 +9,14 @@ use unimock::{matching, MockFn};
 #[test]
 fn test_map_match_non_inherent_id() {
     r#"
-    def key { rel .is: text }
-    def ent { rel .id: key }
-    map {
-        key: key
-        ent match { // ERROR no properties expected
+    def key (rel .is: text)
+    def ent (rel .id: key)
+    map(
+        key: key,
+        ent match( // ERROR no properties expected
             id: key
-        }
-    }
+        )
+    )
     "#
     .compile_fail();
 }
@@ -24,15 +24,15 @@ fn test_map_match_non_inherent_id() {
 #[test]
 fn test_map_match_scalar_key() {
     r#"
-    def key { rel .is: text }
-    def foo {
+    def key (rel .is: text)
+    def foo (
         rel .'key'|id: key
         rel .'prop': text
-    }
-    map query {
-        key: key
-        foo match { 'key': key }
-    }
+    )
+    map query(
+        key: key,
+        foo match('key': key),
+    )
     "#
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -66,15 +66,15 @@ fn test_map_match_scalar_key() {
 #[test]
 fn test_map_match_parameterless_query() {
     r#"
-    def key { rel .is: text }
-    def foo {
+    def key (rel .is: text)
+    def foo (
         rel .'key'|id: key
         rel .'prop': text
-    }
-    map query {
-        {}
-        foo: [..foo match {}]
-    }
+    )
+    map query(
+        (),
+        foo: { ..foo match() }
+    )
     "#
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -109,22 +109,22 @@ fn test_map_match_parameterless_query() {
 #[test]
 fn test_map_match_anonymous_query_mandatory_properties() {
     r#"
-    def key { rel .is: text }
-    def foo {
+    def key (rel .is: text)
+    def foo (
         rel .'key'|id: key
         rel .'prop_a': text
         rel .'prop_b': text
-    }
-    map query {
-        {
-            'input_a': a
-            'input_b': b
-        }
-        foo: [..foo match {
-            'prop_a': a
-            'prop_b': b
-        }]
-    }
+    )
+    map query(
+        (
+            'input_a': a,
+            'input_b': b,
+        ),
+        foo: { ..foo match(
+            'prop_a': a,
+            'prop_b': b,
+        )},
+    )
     "#
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -165,22 +165,22 @@ fn test_map_match_anonymous_query_mandatory_properties() {
 #[test]
 fn test_map_match_anonymous_query_optional_property() {
     r#"
-    def key { rel .is: text }
-    def foo {
+    def key (rel .is: text)
+    def foo (
         rel .'key'|id: key
         rel .'prop_a': text
         rel .'prop_b': text
-    }
-    map query {
-        {
-            'input_a': a
-            'input_b'?: b
-        }
-        foo: [..foo match {
-            'prop_a': a
-            'prop_b'?: b
-        }]
-    }
+    )
+    map query(
+        (
+            'input_a': a,
+            'input_b'?: b,
+        ),
+        foo: {..foo match(
+            'prop_a': a,
+            'prop_b'?: b,
+        )}
+    )
     "#
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -219,24 +219,24 @@ fn test_map_match_anonymous_query_optional_property() {
 #[test]
 fn test_map_match_anonymous_with_translation() {
     r#"
-    def key { rel .is: text }
-    def foo {
+    def key (rel .is: text)
+    def foo (
         rel .'key'|id: key
         rel .'foo': text
-    }
-    def bar {
+    )
+    def bar (
         rel .'bar': text
-    }
-    map {
-        foo match { 'foo': x }
-        bar { 'bar': x }
-    }
-    map query {
-        { 'input': x }
-        bar: [..foo match {
+    )
+    map(
+        foo match('foo': x),
+        bar('bar': x),
+    )
+    map query(
+        ('input': x),
+        bar: {..foo match(
             'foo': x
-        }]
-    }
+        )}
+    )
     "#
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -270,28 +270,26 @@ fn test_map_match_anonymous_with_translation() {
 #[should_panic = "not yet implemented"]
 fn test_map_sequence_filter_in_set() {
     r#"
-    def key { rel .is: text }
-    def foo {
+    def key (rel .is: text)
+    def foo (
         rel .'key'|id: key
         rel .'foo': text
-    }
-    def bar {
+    )
+    def bar (
         rel .'bar': text
-    }
-    map {
-        foo match { 'foo': x }
-        bar { 'bar': x }
-    }
-    map query {
-        {
-            'input': [..x]
+    )
+    map(
+        foo match('foo': x),
+        bar('bar': x),
+    )
+    map query(
+        (
+            'input': {..x}
+        ),
+        bar: {
+            ..foo match('foo': x)
         }
-        bar: [
-            ..foo match {
-                'foo': x
-            }
-        ]
-    }
+    )
     "#
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);

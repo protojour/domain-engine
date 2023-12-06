@@ -5,22 +5,22 @@ use test_log::test;
 #[test]
 fn test_map_regex_duplex1() {
     r#"
-    def foo {
+    def foo (
         rel .'input': text
-    }
-    def bar {
+    )
+    def bar (
         rel .'first': text
         rel .'second': text
-    }
-    map {
-        foo {
+    )
+    map(
+        foo(
             'input': /(?<one>\w+) (?<two>\w+)!/
-        }
-        bar {
-            'first': one
-            'second': two
-        }
-    }
+        ),
+        bar(
+            'first': one,
+            'second': two,
+        ),
+    )
     "#
     .compile_then(|test| {
         test.mapper().assert_map_eq(
@@ -39,25 +39,25 @@ fn test_map_regex_duplex1() {
 #[test]
 fn test_map_regex_alternation1() {
     r#"
-    def foo {
+    def foo (
         rel .'input': text
-    }
-    def capture {
+    )
+    def capture (
         rel .'value': text
-    }
-    def bar {
+    )
+    def bar (
         rel .'first'?: text
         rel .'second'?: text
-    }
-    map {
-        foo match {
+    )
+    map(
+        foo match(
             'input': /(first=(?<first>\w+))|(second=(?<second>\w+))!/
-        }
-        bar {
-            'first'?: first
-            'second'?: second
-        }
-    }
+        ),
+        bar(
+            'first'?: first,
+            'second'?: second,
+        )
+    )
     "#
     .compile_then(|test| {
         test.mapper().assert_map_eq(
@@ -77,31 +77,29 @@ fn test_map_regex_alternation1() {
 #[test]
 fn test_map_regex_loop_pattern() {
     r#"
-    def in {
+    def in (
         rel .'input': text
-    }
-    def capture {
+    )
+    def capture (
         rel .'first': text
         rel .'second': text
-    }
-    def out {
-        rel .'captures': [capture]
-    }
-    map {
-        in match {
-            'input': [
-                ../(?<one>\w+) (?<two>\w+),?/
-            ]
-        }
-        out {
-            'captures': [
-                ..capture {
-                    'first': one
-                    'second': two
-                }
-            ]
-        }
-    }
+    )
+    def out (
+        rel .'captures': {capture}
+    )
+    map(
+        in match(
+            'input': { ../(?<one>\w+) (?<two>\w+),?/ }
+        ),
+        out(
+            'captures': {
+                ..capture(
+                    'first': one,
+                    'second': two,
+                )
+            }
+        )
+    )
     "#
     .compile_then(|test| {
         test.mapper().assert_map_eq(
@@ -123,27 +121,27 @@ fn test_map_regex_loop_pattern() {
 #[test]
 fn test_map_regex_loop_alternation() {
     r#"
-    def in {
+    def in (
         rel .'input': text
-    }
-    def capture {
+    )
+    def capture (
         rel .'value': text
-    }
-    def out {
-        rel .'foo': [capture]
-        rel .'bar': [capture]
-    }
-    map {
-        in match {
-            'input': [
+    )
+    def out (
+        rel .'foo': {capture}
+        rel .'bar': {capture}
+    )
+    map(
+        in match(
+            'input': {
                 ../FOO=(?<foo>\w+)|BAR=(?<bar>\w+)/
-            ]
-        }
-        out {
-            'foo': [..capture { 'value': foo }]
-            'bar': [..capture { 'value': bar }]
-        }
-    }
+            }
+        ),
+        out(
+            'foo': { ..capture('value': foo) },
+            'bar': { ..capture('value': bar) },
+        ),
+    )
     "#
     .compile_then(|test| {
         test.mapper().assert_map_eq(

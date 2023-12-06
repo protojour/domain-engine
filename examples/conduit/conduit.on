@@ -1,55 +1,55 @@
 use 'conduit_public' as public
 use 'conduit_db' as db
 
-map {
-    db.Article {
-        'slug': slug
-        'title': title
-        'description': desc
-        'body': body
-        'createdAt': ca
-        'updatedAt': ua
-        'favorited_by': [..db.User match {
+map(
+    db.Article(
+        'slug': slug,
+        'title': title,
+        'description': desc,
+        'body': body,
+        'createdAt': ca,
+        'updatedAt': ua,
+        'favorited_by': { ..db.User match(
             'username': fav_user
-        }]
-        'author': author
-    }
-    public.Article {
-        'slug': slug
-        'title': title
-        'description': desc
-        'body': body
-        'createdAt': ca
-        'updatedAt': ua
-        'favorited': exists memoriam.current_user match {
+        )},
+        'author': author,
+    ),
+    public.Article(
+        'slug': slug,
+        'title': title,
+        'description': desc,
+        'body': body,
+        'createdAt': ca,
+        'updatedAt': ua,
+        'favorited': exists memoriam.current_user match(
             'username': fav_user
-        }
-        'favoritesCount': length [..fav_user]
-        'author': author
-    }
-}
+        ),
+        'favoritesCount': length { ..fav_user },
+        'author': author,
+    )
+)
 
-map {
-    public.ArticleFilter {
-        'slug'?: slug
-        'tag'?: [filter_tag]
-        'author'?: [author]
-        'favorited'?: [favorited_by]
-        'offset': offset
-        'limit': limit
-    }
-    db.Article: [
-        ..db.Article match(offset, limit) {
-            'slug'?: slug
-            'tagged'?: [
-                ..db.TagEntity match { 'tag': filter_tag }
-            ]
-            'author'?: db.User match {
+map(
+    public.ArticleFilter(
+        'slug'?: slug,
+        'tag'?: {filter_tag},
+        'author'?: {author},
+        'favorited'?: {favorited_by},
+        'offset': offset,
+        'limit': limit,
+    ),
+    db.Article: {
+        ..db.Article match[offset, limit] (
+            'slug'?: slug,
+            'tagged'?: {
+                ..db.TagEntity match('tag': filter_tag),
+            },
+            'author'?: db.User match(
                 'username': author
+            ),
+            'favorited'?: {
+                ..db.User match('username': favorited),
             }
-            'favorited'?: [
-                ..db.User match { 'username': favorited }
-            ]
-        }
-    ]
-}
+        )
+    }
+)

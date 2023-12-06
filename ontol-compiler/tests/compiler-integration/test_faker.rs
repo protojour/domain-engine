@@ -11,10 +11,10 @@ use test_log::test;
 #[test]
 fn test_fake_primitives() {
     "
-    def foo {
+    def foo (
         rel .'s': text
         rel .'i': i64
-    }
+    )
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -31,10 +31,10 @@ fn test_fake_primitives() {
 #[test]
 fn test_fake_text_like_types() {
     "
-    def foo {
+    def foo (
         rel .'id': uuid
         rel .'created_at': datetime
-    }
+    )
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);

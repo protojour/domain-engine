@@ -9,10 +9,10 @@ const ROOT: SourceName = SourceName::root();
 #[test(tokio::test)]
 async fn test_graphql_input_deserialization_error() {
     let (test, schema) = "
-    def foo {
-        rel .id: { fmt '' => text => . }
+    def foo (
+        rel .id: (fmt '' => text => .)
         rel .'prop': 'const'
-    }
+    )
     "
     .compile_single_schema_with_datastore();
 
@@ -38,15 +38,15 @@ async fn test_graphql_input_deserialization_error() {
 #[should_panic = "No mock implementation found"]
 async fn test_graphql_input_constructor_sequence_as_json_scalar() {
     let (test, schema) = "
-    def tuple {
+    def tuple (
         rel .0: i64
         rel .1: text
-    }
+    )
 
-    def foo {
-        rel .id: { fmt '' => text => . }
+    def foo (
+        rel .id: (fmt '' => text => .)
         rel .'prop': tuple
-    }
+    )
     "
     .compile_single_schema_with_datastore();
 

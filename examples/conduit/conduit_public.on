@@ -1,22 +1,22 @@
 
-def username { rel .is: text }
-def article_slug { rel .is: text }
+def username (rel .is: text)
+def article_slug (rel .is: text)
 
-def User {
-    rel .'email'|id: { rel .is: text }
+def User (
+    rel .'email'|id: (rel .is: text)
     rel .'username': text
     rel .'bio': text
     rel .'image'?: text
-}
+)
 
-def Profile {
+def Profile (
     rel .'username'|id: username
     rel .'bio': text
     rel .'image'?: text
     rel .'following': boolean
-}
+)
 
-def Article {
+def Article (
     rel .'slug'|id: article_slug
     rel .'title': text
     rel .'description': text
@@ -26,64 +26,64 @@ def Article {
     rel .'favorited': boolean
     rel .'favoritesCount': i64
     rel .'author': Profile
-}
+)
 
-def Comment {
-    rel .'id'|id: { rel .is: i64 }
+def Comment (
+    rel .'id'|id: (rel .is: i64)
     rel .'createdAt': datetime
     rel .'updatedAt': datetime
     rel .'body': text
     rel .'author': Profile
-}
+)
 
-def SingleArticle {
+def SingleArticle (
     rel .'article': Article
-}
+)
 
-def MultipleArticles {
-    rel .'articles': [Article]
+def MultipleArticles (
+    rel .'articles': {Article}
     rel .'articlesCount': i64
-}
+)
 
-def SingleComment {
+def SingleComment (
     rel .'comment': Comment
-}
+)
 
-def MultipleComments {
-    rel .'comments': [Comment]
-}
+def MultipleComments (
+    rel .'comments': {Comment}
+)
 
-def Tags {
-    rel .'tags': [text]
-}
+def Tags (
+    rel .'tags': {text}
+)
 
-def ArticleFilter {
+def ArticleFilter (
     rel .'slug'?: article_slug
     // NB: These must be a sets, not lists:
-    rel .'tag'?: [text]
-    rel .'author'?: [username]
-    rel .'favorited'?: [username]
+    rel .'tag'?: {text}
+    rel .'author'?: {username}
+    rel .'favorited'?: {username}
     rel .'limit'?: i64
     rel .'offset'?: i64
-}
+)
 
 // endpoint '/api/articles/:slug'
-map article {
-    article_slug: slug
-    SingleArticle {
-        'article': ArticleFilter {
+map article(
+    article_slug: slug,
+    SingleArticle(
+        'article': ArticleFilter(
             'slug'?: slug
-        }
-    }
-}
+        )
+    )
+)
 
 // endpoint '/api/articles'
-map articles {
-    ArticleFilter: filter
-    MultipleArticles {
+map articles(
+    ArticleFilter: filter,
+    MultipleArticles(
         // The idea is that ArticleFilter can map to many db.Articles,
         // and each db.Article maps to one public.Article.
-        'articles': [..filter] // ERROR TODO: Incompatible aggregation group
+        'articles': {..filter}, // ERROR TODO: Incompatible aggregation group
         'articlesCount': 0 // e.g. `length filter`
-    }
-}
+    )
+)

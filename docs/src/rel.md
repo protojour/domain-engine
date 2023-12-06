@@ -15,15 +15,15 @@ Here `some_def` is the subject, `'relation_name':` names the relation itself, an
 A common pattern is to define relations locally, within the block of a def. In this case, the subject can be replaced by a `.`.
 
 ```ontol
-def some_def {
+def some_def (
     rel . 'relation_name': text
-}
+)
 ```
 
 This is the same as:
 
 ```ontol
-def some_def {}
+def some_def ()
 rel some_def 'relation_name': text
 ```
 
@@ -39,10 +39,10 @@ In a directed graph, the direction of the relation is indicated by the order. Th
 
 ## one-to-many def relation
 
-Cardinality is indicated by enclosing the subject and/or object in square brackets.
+Cardinality is indicated by enclosing the subject and/or object in curly braces.
 
 ```ontol
-rel def_a 'DefBs'::'DefA' [def_b]
+rel def_a 'DefBs'::'DefA' {def_b}
 ```
 
 Here, `def_a` has a property called `'DefBs'`, which is a relation to one or more `def_b`s. Each `def_b` has a property called `'DefA'`, which is a relation to one `def_a`.
@@ -50,7 +50,7 @@ Here, `def_a` has a property called `'DefBs'`, which is a relation to one or mor
 ## many-to-many def relation
 
 ```ontol
-rel [def_a] 'DefBs'::'DefAs' [def_b]
+rel {def_a} 'DefBs'::'DefAs' {def_b}
 ```
 
 Here, `def_a` has a property called `'DefBs'`, which is a relation to one or more `def_b`s. Each `def_b` has a property called `'DefAs'`, which is a one or more `def_a`s.

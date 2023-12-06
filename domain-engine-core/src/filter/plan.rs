@@ -301,15 +301,15 @@ mod tests {
     #[test]
     fn basic_tree() {
         "
-        def foo {
-            rel .id: { rel .is: text }
+        def foo(
+            rel .id: (rel .is: text)
             rel .'x': text
-        }
-        def bar {
-            rel .id: { rel .is: text }
+        )
+        def bar(
+            rel .id: (rel .is: text)
             rel .'y': text
-            rel [.] 'foos'::'bars' [foo]
-        }
+            rel {.} 'foos'::'bars' {foo}
+        )
         "
         .compile_then(|test| {
             let [foo, bar] = test.bind(["foo", "bar"]);
@@ -359,16 +359,16 @@ mod tests {
     #[test]
     fn basic_merge() {
         "
-        def foo {
-            rel .id: { rel .is: text }
+        def foo(
+            rel .id: (rel .is: text)
             rel .'x': text
-        }
-        def bar {
-            rel .id: { rel .is: text }
+        )
+        def bar(
+            rel .id: (rel .is: text)
             rel .'y': text
-        }
-        rel [foo] 'bars_x'::'foos' [bar]
-        rel [foo] 'bars_y': [bar]
+        )
+        rel {foo} 'bars_x'::'foos' {bar}
+        rel {foo} 'bars_y': {bar}
         "
         .compile_then(|test| {
             let [foo, bar] = test.bind(["foo", "bar"]);

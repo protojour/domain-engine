@@ -20,9 +20,9 @@ fn load_package() {
         (
             SourceName("pkg"),
             "
-            def foo {
+            def foo (
                 rel .'prop': i64
-            }
+            )
             ",
         ),
         (
@@ -30,9 +30,9 @@ fn load_package() {
             "
             use 'pkg' as other
 
-            def bar {
+            def bar (
                 rel .'foo': other.foo
-            }
+            )
             ",
         ),
     ])
@@ -55,31 +55,31 @@ fn dependency_dag() {
             use 'a' as a
             use 'b' as b
 
-            def foobar {
+            def foobar (
                 rel .'a': a.a
                 rel .'b': b.b
-            }
+            )
             ",
         ),
         (
             SourceName("a"),
             "
             use 'c' as domain_c
-            def a {
+            def a (
                 rel .'c': domain_c.c
-            }
+            )
             ",
         ),
         (
             SourceName("b"),
             "
             use 'c' as c
-            def b {
+            def b (
                 rel .'c': c.c
-            }
+            )
             ",
         ),
-        (SourceName("c"), "def c { rel .is: i64 }"),
+        (SourceName("c"), "def c (rel .is: i64)"),
     ])
     .compile_then(|test| {
         // four user domains, plus `ontol`:

@@ -1,27 +1,27 @@
 use 'conduit_db' as db
 
-def signup {
+def signup (
     rel .'username': text
     rel .'email': text
     rel .'password': text
-    rel .'following': [text]
-}
+    rel .'following': {text}
+)
 
-map {
-    signup match {
-        'username': username
-        'email': email
-        'password': password
-        'following': [..follow_username]
-    }
-    db.User {
-        'username': username
-        'email': email
-        'password_hash': password
-        'following': [
-            ..db.User match {
+map(
+    signup match(
+        'username': username,
+        'email': email,
+        'password': password,
+        'following': {..follow_username},
+    ),
+    db.User(
+        'username': username,
+        'email': email,
+        'password_hash': password,
+        'following': {
+            ..db.User match(
                 'username': follow_username
-            }
-        ]
-    }
-}
+            )
+        }
+    )
+)

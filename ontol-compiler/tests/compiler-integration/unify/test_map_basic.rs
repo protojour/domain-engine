@@ -7,16 +7,16 @@ use test_log::test;
 #[test]
 fn test_map_simple() {
     "
-    def foo {
+    def foo (
         rel foo 'f': text
-    }
-    def bar {
+    )
+    def bar (
         rel bar 'b': text
-    }
-    map {
-        foo { 'f': x }
-        bar { 'b': x }
-    }
+    )
+    map(
+        foo('f': x),
+        bar('b': x),
+    )
     "
     .compile_then(|test| {
         test.mapper().assert_map_eq(
@@ -35,13 +35,13 @@ fn test_map_simple() {
 #[test]
 fn test_map_value_to_primitive() {
     "
-    def string { rel.is: text }
-    def foo { rel .'a': string }
-    def bar { rel .'b': text }
-    map {
-        foo { 'a': x }
-        bar { 'b': x }
-    }
+    def string (rel.is: text)
+    def foo (rel .'a': string)
+    def bar (rel .'b': text)
+    map(
+        foo('a': x),
+        bar('b': x),
+    )
     "
     .compile_then(|test| {
         test.mapper().assert_map_eq(
@@ -60,12 +60,12 @@ fn test_map_value_to_primitive() {
 #[test]
 fn test_meters() {
     "
-    def meters { rel .is: i64 }
-    def millimeters { rel .is: i64 }
-    map {
-        meters: x / 1000
-        millimeters: x
-    }
+    def meters (rel .is: i64)
+    def millimeters (rel .is: i64)
+    map(
+        meters: x / 1000,
+        millimeters: x,
+    )
     "
     .compile_then(|test| {
         test.mapper()
@@ -78,12 +78,12 @@ fn test_meters() {
 #[test]
 fn test_temperature() {
     "
-    def celsius { rel .is: i64 }
-    def fahrenheit { rel .is: i64 }
-    map {
-        celsius: x
-        fahrenheit: x * 9 / 5 + 32
-    }
+    def celsius (rel .is: i64)
+    def fahrenheit (rel .is: i64)
+    map(
+        celsius: x,
+        fahrenheit: x * 9 / 5 + 32,
+    )
     "
     .compile_then(|test| {
         test.mapper()
@@ -96,49 +96,37 @@ fn test_temperature() {
 #[test]
 fn test_nested_optional_attribute() {
     "
-    def seconds {
-        rel .is: i64
-    }
-    def years {
-        rel .is: i64
-    }
+    def seconds (rel .is: i64)
+    def years (rel .is: i64)
 
-    map {
-        seconds: y * 60 * 60 * 24 * 365
+    map(
+        seconds: y * 60 * 60 * 24 * 365,
         years: y
-    }
+    )
 
-    def person {
-        rel .'age'?: years
-    }
-    def creature {
-        rel .'age'?: seconds
-    }
+    def person (rel .'age'?: years)
+    def creature (rel .'age'?: seconds)
 
-    unify {
-        person { 'age'?: a }
-        creature { 'age'?: a }
-    }
+    map(
+        person('age'?: a),
+        creature('age'?: a),
+    )
 
-    def person_container {
-        rel .'person'?: person
-    }
-    def creature_container {
-        rel .'creature'?: creature
-    }
+    def person_container (rel .'person'?: person)
+    def creature_container (rel .'creature'?: creature)
 
-    unify {
-        person_container {
-            'person'?: person {
+    map(
+        person_container(
+            'person'?: person(
                 'age'?: a
-            }
-        }
-        creature_container {
-            'creature'?: creature {
+            )
+        ),
+        creature_container(
+            'creature'?: creature(
                 'age'?: a
-            }
-        }
-    }
+            )
+        ),
+    )
     "
     .compile_then(|test| {
         test.mapper()
@@ -169,18 +157,12 @@ fn test_nested_optional_attribute() {
 #[test]
 fn test_map_value_to_struct_no_func() {
     "
-    def one {
-        rel .is: text
-    }
-    def two {
-        rel .'a': text
-    }
-    map {
-        one: x
-        two {
-            'a': x
-        }
-    }
+    def one (rel .is: text)
+    def two (rel .'a': text)
+    map(
+        one: x,
+        two('a': x)
+    )
     "
     .compile_then(|test| {
         test.mapper()
@@ -193,18 +175,12 @@ fn test_map_value_to_struct_no_func() {
 #[test]
 fn test_map_value_to_struct_func() {
     "
-    def one {
-        rel .is: i64
-    }
-    def two {
-        rel .'a': i64
-    }
-    map {
-        one: x
-        two {
-            'a': x * 2
-        }
-    }
+    def one (rel .is: i64)
+    def two (rel .'a': i64)
+    map(
+        one: x,
+        two('a': x * 2),
+    )
     "
     .compile_then(|test| {
         test.mapper()
@@ -217,14 +193,14 @@ fn test_map_value_to_struct_func() {
 #[test]
 fn test_map_into_default_field_using_default_value() {
     "
-    def empty {}
-    def target {
+    def empty ()
+    def target (
         rel .'field'(rel .default := 'Default!'): text
-    }
-    map {
-        empty {}
-        target {}
-    }
+    )
+    map(
+        empty(),
+        target()
+    )
     "
     .compile_then(|test| {
         test.mapper().assert_map_eq(
@@ -243,16 +219,16 @@ fn test_map_into_default_field_using_default_value() {
 #[test]
 fn test_map_into_default_field_using_provided_value() {
     "
-    def required {
+    def required (
         rel .'field': text
-    }
-    def target {
+    )
+    def target (
         rel .'field'(rel .default := 'Default!'): text
-    }
-    map {
-        required { 'field': val }
-        target { 'field': val }
-    }
+    )
+    map(
+        required('field': val),
+        target('field': val),
+    )
     "
     .compile_then(|test| {
         test.mapper().assert_map_eq(
@@ -271,14 +247,14 @@ fn test_map_into_default_field_using_provided_value() {
 #[test]
 fn test_map_into_default_field_using_map_provided() {
     "
-    def empty {}
-    def target {
+    def empty ()
+    def target (
         rel .'field'(rel .default := 'Default!'): text
-    }
-    map {
-        empty {}
-        target { 'field': 'Mapped!' }
-    }
+    )
+    map(
+        empty(),
+        target('field': 'Mapped!'),
+    )
     "
     .compile_then(|test| {
         test.mapper().assert_map_eq(
@@ -297,44 +273,39 @@ fn test_map_into_default_field_using_map_provided() {
 #[test]
 fn test_deep_structural_map() {
     "
-    def foo {
+    def foo (
         rel .'a': text
-    }
-    def foo_inner {
+    )
+    def foo_inner (
         rel .'b': text
         rel .'c': text
-    }
-    def foo {
+    )
+    def foo (
         rel .'inner': foo_inner
-    }
+    )
 
-    def bar_inner {}
-    def bar {
+    def bar_inner ()
+    def bar (
         rel .'a': text
         rel .'b': text
         rel .'inner': bar_inner
-    }
+    )
 
-    def bar_inner {
+    def bar_inner (
         rel .'c': text
-    }
+    )
 
-    map {
-        foo {
-            'a': a
-            'inner': foo_inner {
-                'b': b
-                'c': c
-            }
-        }
-        bar {
-            'a': a
-            'b': b
-            'inner': bar_inner {
-                'c': c
-            }
-        }
-    }
+    map(
+        foo(
+            'a': a,
+            'inner': foo_inner('b': b, 'c': c),
+        ),
+        bar(
+            'a': a,
+            'b': b,
+            'inner': bar_inner('c': c),
+        ),
+    )
     "
     .compile_then(|test| {
         test.mapper().assert_map_eq(
@@ -353,20 +324,20 @@ fn test_deep_structural_map() {
 #[test]
 fn test_map_matching_sequence() {
     "
-    def foo {
-        rel .'a': [i64]
-    }
-    def bar {
-        rel .'b': [i64]
-    }
-    map {
-        foo {
-            'a': [..x]
-        }
-        bar {
-            'b': [..x]
-        }
-    }
+    def foo (
+        rel .'a': {i64}
+    )
+    def bar (
+        rel .'b': {i64}
+    )
+    map(
+        foo(
+            'a': {..x}
+        ),
+        bar(
+            'b': {..x}
+        ),
+    )
     "
     .compile_then(|test| {
         test.mapper()
@@ -378,19 +349,19 @@ fn test_map_matching_sequence() {
 
 // map call inside sequence
 const MAP_IN_SEQUENCE: &str = "
-def foo { rel .'f': text }
-def bar { rel .'b': text }
-def foos { rel .'foos': [foo] }
-def bars { rel .'bars': [bar] }
+def foo (rel .'f': text)
+def bar (rel .'b': text)
+def foos (rel .'foos': {foo})
+def bars (rel .'bars': {bar})
 
-map {
-    foos { 'foos': [..x] }
-    bars { 'bars': [..x] }
-}
-map {
-    foo { 'f': x }
-    bar { 'b': x }
-}
+map(
+    foos('foos': {..x}),
+    bars('bars': {..x}),
+)
+map(
+    foo('f': x),
+    bar('b': x),
+)
 ";
 
 #[test]
@@ -441,31 +412,31 @@ fn test_map_in_sequence_item_many() {
 #[test]
 fn test_sequence_cross_parallel() {
     "
-    def foo { rel .'f': text }
-    def bar { rel .'b': text }
-    map {
-        foo { 'f': x }
-        bar { 'b': x }
-    }
+    def foo (rel .'f': text)
+    def bar (rel .'b': text)
+    map(
+        foo('f': x),
+        bar('b': x),
+    )
 
-    def foos {
-        rel .'f1': [foo]
-        rel .'f2': [foo]
-    }
-    def bars {
-        rel .'b1': [bar]
-        rel .'b2': [bar]
-    }
-    map {
-        foos {
-            'f1': [..a]
-            'f2': [..b]
-        }
-        bars {
-            'b2': [..b]
-            'b1': [..a]
-        }
-    }
+    def foos (
+        rel .'f1': {foo}
+        rel .'f2': {foo}
+    )
+    def bars (
+        rel .'b1': {bar}
+        rel .'b2': {bar}
+    )
+    map(
+        foos(
+            'f1': {..a},
+            'f2': {..b},
+        ),
+        bars(
+            'b2': {..b},
+            'b1': {..a},
+        ),
+    )
     "
     .compile_then(|test| {
         test.mapper().assert_map_eq(
@@ -479,51 +450,51 @@ fn test_sequence_cross_parallel() {
 #[test]
 fn test_sequence_inner_loop() {
     "
-    def foo { rel .'P': text }
-    def bar { rel .'Q': text }
-    map {
-        foo { 'P': x }
-        bar { 'Q': x }
-    }
+    def foo (rel .'P': text)
+    def bar (rel .'Q': text)
+    map(
+        foo('P': x),
+        bar('Q': x),
+    )
 
-    def f0 {
-        rel .'a': [foo]
-        rel .'b': [foo]
-    }
-    def f1 {
-        rel .'a': [f0]
-        rel .'b': [f0]
-    }
-    def b0 {
-        rel .'a': [bar]
-        rel .'b': [bar]
-    }
-    def b1 {
-        rel .'a': [b0]
-        rel .'b': [b0]
-    }
-    map {
-        f1 {
-            'a': [..f0 {
-                'a': [..v0]
-                'b': [..v1]
-            }]
-            'b': [..f0 {
-                'a': [..v2]
-                'b': [..v3]
-            }]
-        }
-        b1 {
-            'b': [..b0 {
-                'b': [..v3]
-                'a': [..v2]
-            }]
-            'a': [..b0 {
-                'b': [..v1]
-                'a': [..v0]
-            }]
-        }
-    }
+    def f0(
+        rel .'a': {foo}
+        rel .'b': {foo}
+    )
+    def f1(
+        rel .'a': {f0}
+        rel .'b': {f0}
+    )
+    def b0(
+        rel .'a': {bar}
+        rel .'b': {bar}
+    )
+    def b1(
+        rel .'a': {b0}
+        rel .'b': {b0}
+    )
+    map(
+        f1(
+            'a': {..f0(
+                'a': {..v0},
+                'b': {..v1},
+            )},
+            'b': {..f0(
+                'a': {..v2},
+                'b': {..v3},
+            )},
+        ),
+        b1(
+            'b': {..b0(
+                'b': {..v3},
+                'a': {..v2},
+            )},
+            'a': {..b0(
+                'b': {..v1},
+                'a': {..v0},
+            )},
+        ),
+    )
     "
     .compile_then(|test| {
         test.mapper().assert_map_eq(
@@ -537,33 +508,33 @@ fn test_sequence_inner_loop() {
 #[test]
 fn test_sequence_flat_map1() {
     "
-    def foo {
+    def foo (
         rel .'a': text
 
-        def foo_inner {
+        def foo_inner (
             rel .'b': text
-        }
-        rel .'inner': [foo_inner]
-    }
-    def bar {
+        )
+        rel .'inner': {foo_inner}
+    )
+    def bar (
         rel .'a': text
         rel .'b': text
-    }
+    )
 
-    map {
-        foo {
-            'a': a
-            'inner': [..foo_inner {
+    map(
+        foo(
+            'a': a,
+            'inner': {..foo_inner(
                 'b': b
-            }]
+            )}
+        ),
+        bar: {
+            ..bar(
+                'a': a,
+                'b': b,
+            )
         }
-        bar: [
-            ..bar {
-                'a': a
-                'b': b
-            }
-        ]
-    }
+    )
     "
     .compile_then(|test| {
         test.mapper().assert_map_eq(
@@ -578,23 +549,23 @@ fn test_sequence_flat_map1() {
 #[test]
 fn test_sequence_composer_no_iteration() {
     "
-    def foo {
+    def foo (
         rel .'a': i64
         rel .'b': i64
-    }
-    def bar {
-        rel .'ab': [i64]
-    }
+    )
+    def bar (
+        rel .'ab': {i64}
+    )
 
-    map {
-        foo match {
-            'a': a
-            'b': b
-        }
-        bar {
-            'ab': [a b]
-        }
-    }
+    map(
+        foo match(
+            'a': a,
+            'b': b,
+        ),
+        bar(
+            'ab': {a, b}
+        ),
+    )
     "
     .compile_then(|test| {
         test.mapper().assert_map_eq(
@@ -611,25 +582,25 @@ fn test_sequence_composer_no_iteration() {
 #[test]
 fn test_sequence_composer_with_iteration() {
     "
-    def foo {
+    def foo (
         rel .'a': i64
-        rel .'b': [i64]
+        rel .'b': {i64}
         rel .'c': i64
-    }
-    def bar {
-        rel .'abc': [i64]
-    }
+    )
+    def bar (
+        rel .'abc': {i64}
+    )
 
-    map {
-        foo match {
-            'a': a
-            'b': [..b]
-            'c': c
-        }
-        bar {
-            'abc': [a ..b c]
-        }
-    }
+    map(
+        foo match(
+            'a': a,
+            'b': {..b},
+            'c': c,
+        ),
+        bar(
+            'abc': {a, ..b, c}
+        ),
+    )
     "
     .compile_then(|test| {
         test.mapper().assert_map_eq(
@@ -653,29 +624,29 @@ fn test_map_complex_flow() {
     // But perhaps let's accept that this might be what the user wants.
     // For example, when two `:x`es flow into one property, we can choose the first one.
     "
-    def one {
+    def one (
         rel .'a': text
         rel .'b': text
-    }
-    def two {
+    )
+    def two (
         rel .'a': text
         rel .'b': text
         rel .'c': text
         rel .'d': text
-    }
+    )
 
-    map {
-        one {
-            'a': x
-            'b': y
-        }
-        two {
-            'a': x
-            'b': y
-            'c': x
-            'd': y
-        }
-    }
+    map(
+        one(
+            'a': x,
+            'b': y,
+        ),
+        two(
+            'a': x,
+            'b': y,
+            'c': x,
+            'd': y,
+        )
+    )
     "
     .compile_then(|test| {
         test.mapper().assert_map_eq(
@@ -694,33 +665,25 @@ fn test_map_delegation() {
             "
             use 'SI' as SI
 
-            def car {
-                rel .'length': SI.meters
-            }
-            def vehicle {
-                rel .'length': SI.millimeters
-            }
+            def car (rel .'length': SI.meters)
+            def vehicle (rel .'length': SI.millimeters)
 
-            map {
-                car { 'length': l }
-                vehicle { 'length': l }
-            }
+            map(
+                car('length': l),
+                vehicle('length': l),
+            )
             ",
         ),
         (
             SourceName("SI"),
             "
-            def meters {
-                rel .is: i64
-            }
-            def millimeters {
-                rel .is: i64
-            }
+            def meters (rel .is: i64)
+            def millimeters (rel .is: i64)
 
-            map {
-                meters: m
-                millimeters: m * 1000
-            }
+            map(
+                meters: m,
+                millimeters: m * 1000,
+            )
             ",
         ),
     ])
@@ -746,41 +709,37 @@ fn test_map_delegation_abstract_types() {
         (
             SourceName("SI"),
             "
-            def meters {
-                rel .is: number
-            }
-            def millimeters {
-                rel .is: number
-            }
+            def meters (rel .is: number}
+            def millimeters (rel .is: number)
 
-            map {
-                meters: m
-                millimeters: m * 1000
-            }
+            map(
+                meters: m,
+                millimeters: m * 1000,
+            )
             ",
         ),
         (
             SourceName("car"),
             "
             use 'SI' as SI
-            def car {
-                rel .'length': {
+            def car (
+                rel .'length': (
                     rel .is: f64
                     rel .is: SI.meters
-                }
-            }
+                )
+            )
             ",
         ),
         (
             SourceName("vehicle"),
             "
             use 'SI' as SI
-            def vehicle {
-                rel .'length': {
+            def vehicle (
+                rel .'length': (
                     rel .is: f64
                     rel .is: SI.millimeters
-                }
-            }
+                )
+            )
             ",
         ),
         (
@@ -789,10 +748,10 @@ fn test_map_delegation_abstract_types() {
             use 'car' as c
             use 'vehicle' as v
 
-            map {
-                c.car { 'length': len }
-                v.vehicle { 'length': len }
-            }
+            map(
+                c.car('length': len),
+                v.vehicle('length': len),
+            )
             ",
         ),
     ])
@@ -813,25 +772,25 @@ fn test_map_delegation_abstract_types() {
 #[test]
 fn test_map_dependent_scoping() {
     "
-    def one {
+    def one (
         rel .'total_weight': i64
         rel .'net_weight': i64
-    }
-    def two {
+    )
+    def two (
         rel .'net_weight': i64
         rel .'container_weight': i64
-    }
+    )
 
-    map {
-        one {
-            'total_weight': t
-            'net_weight': n
-        }
-        two {
-            'net_weight': n
-            'container_weight': t - n
-        }
-    }
+    map(
+        one(
+            'total_weight': t,
+            'net_weight': n,
+        ),
+        two(
+            'net_weight': n,
+            'container_weight': t - n,
+        )
+    )
     "
     .compile_then(|test| {
         test.mapper().assert_map_eq(
@@ -850,34 +809,34 @@ fn test_map_dependent_scoping() {
 #[test]
 fn test_seq_scope_escape1() {
     "
-    def foo {}
+    def foo ()
 
-    def bar {
+    def bar (
         rel .'foo': foo
-        rel .'p1': [text]
-    }
+        rel .'p1': {text}
+    )
 
-    def baz {
+    def baz (
         rel .'foo': foo
-        rel .'p1': [text]
-    }
+        rel .'p1': {text}
+    )
 
-    def qux {
+    def qux (
         rel .'baz': baz
-    }
+    )
 
-    map {
-        bar match {
-            'foo': foo {}
-            'p1': [..p1]
-        }
-        qux {
-            'baz': baz {
-                'foo': foo {}
-                'p1': [..p1]
-            }
-        }
-    }
+    map(
+        bar match(
+            'foo': foo(),
+            'p1': {..p1},
+        ),
+        qux(
+            'baz': baz(
+                'foo': foo(),
+                'p1': {..p1},
+            )
+        )
+    )
     "
     .compile_then(|test| {
         test.mapper().assert_map_eq(
@@ -891,40 +850,40 @@ fn test_seq_scope_escape1() {
 #[test]
 fn test_seq_scope_escape2() {
     "
-    def foo {
-        rel .'p0': [text]
-    }
+    def foo (
+        rel .'p0': {text}
+    )
 
-    def bar {
+    def bar (
         rel .'foo': foo
-        rel .'p1': [text]
-    }
+        rel .'p1': {text}
+    )
 
-    def baz {
+    def baz (
         rel .'foo': foo
-        rel .'p1': [text]
-    }
+        rel .'p1': {text}
+    )
 
-    def qux {
+    def qux (
         rel .'baz': baz
-    }
+    )
 
-    map {
-        bar match {
-            'foo': foo {
-                'p0': [..p0]
-            }
-            'p1': [..p1]
-        }
-        qux {
-            'baz': baz {
-                'foo': foo {
-                    'p0': [..p0]
-                }
-                'p1': [..p1]
-            }
-        }
-    }
+    map(
+        bar match(
+            'foo': foo(
+                'p0': {..p0},
+            ),
+            'p1': {..p1},
+        ),
+        qux(
+            'baz': baz(
+                'foo': foo(
+                    'p0': {..p0}
+                ),
+                'p1': {..p1}
+            ),
+        ),
+    )
     "
     .compile_then(|test| {
         test.mapper().assert_map_eq(
@@ -938,21 +897,13 @@ fn test_seq_scope_escape2() {
 #[test]
 fn test_map_open_data_on_root_struct() {
     "
-    def(open) foo {
-        rel .'p0': [text]
-    }
-    def(open) bar {
-        rel .'p1': [text]
-    }
+    def(open) foo (rel .'p0': {text})
+    def(open) bar (rel .'p1': {text})
 
-    map {
-        foo {
-            'p0': [..x]
-        }
-        bar {
-            'p1': [..x]
-        }
-    }
+    map(
+        foo('p0': {..x}),
+        bar('p1': {..x}),
+    )
     "
     .compile_then(|test| {
         let mapper = test

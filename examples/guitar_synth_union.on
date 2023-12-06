@@ -1,31 +1,31 @@
-def guitar_id {
+def guitar_id (
     fmt '' => 'guitar/' => uuid => .
-}
-def synth_id {
+)
+def synth_id (
     fmt '' => 'synth/' => uuid => .
-}
+)
 
-def guitar {
+def guitar (
     rel .'instrument-id'(rel .gen: auto)|id: guitar_id
     rel .'type': 'guitar'
     rel .'string_count': i64
-}
-def synth {
+)
+def synth (
     rel .'instrument-id'(rel .gen: auto)|id: synth_id
     rel .'type': 'synth'
     rel .'polyphony': i64
-}
-def instrument {
+)
+def instrument (
     rel .is?: guitar
     rel .is?: synth
-}
-def artist {
-    rel .'artist-id'(rel .gen: auto)|id: { fmt '' => text => . }
+)
+def artist (
+    rel .'artist-id'(rel .gen: auto)|id: ( fmt '' => text => . )
     rel .'name': text
-    rel [.] 'plays'::'played-by' [instrument]
-}
+    rel {.} 'plays'::'played-by' {instrument}
+)
 
-map artists {
-    {}
-    artist: [..artist match {}]
-}
+map artists(
+    (),
+    artist: {..artist match()}
+)

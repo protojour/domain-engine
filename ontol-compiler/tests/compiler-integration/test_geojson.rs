@@ -73,14 +73,14 @@ fn test_municipalities() {
             "
             use 'geojson' as geojson
 
-            def kommunenummer {
+            def kommunenummer(
                 fmt '' => /[0-9]{4}/ => .
-            }
+            )
 
-            def kommune {
+            def kommune(
                 rel .'kommunenummer': kommunenummer
                 rel .'geometry': geojson.Polygon
-            }
+            )
             ",
         ),
     ])

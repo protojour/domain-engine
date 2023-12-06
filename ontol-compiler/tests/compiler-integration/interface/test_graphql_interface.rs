@@ -21,15 +21,15 @@ use test_log::test;
 #[test]
 fn test_graphql_small_range_number_becomes_int() {
     "
-    def myint {
+    def myint (
         rel .is: integer
         rel .min: 0
         rel .max: 100
-    }
-    def foo {
-        rel .id: { fmt '' => text => . }
+    )
+    def foo (
+        rel .id: (fmt '' => text => .)
         rel .'prop': myint
-    }
+    )
     "
     .compile_then(|test| {
         let (_schema, test) = schema_test(&test, ROOT_SRC_NAME);
@@ -47,10 +47,10 @@ fn test_graphql_small_range_number_becomes_int() {
 #[test]
 fn test_graphql_i64_custom_scalar() {
     "
-    def foo {
-        rel .id: { fmt '' => text => . }
+    def foo (
+        rel .id: (fmt '' => text => .)
         rel .'prop': i64
-    }
+    )
     "
     .compile_then(|test| {
         let (schema, test) = schema_test(&test, ROOT_SRC_NAME);
@@ -70,10 +70,10 @@ fn test_graphql_i64_custom_scalar() {
 #[test]
 fn test_graphql_default_scalar() {
     "
-    def foo {
-        rel .id: { fmt '' => text => . }
+    def foo (
+        rel .id: (fmt '' => text => .)
         rel .'default'(rel .default := ''): text
-    }
+    )
     "
     .compile_then(|test| {
         let (_schema, test) = schema_test(&test, ROOT_SRC_NAME);
@@ -91,10 +91,10 @@ fn test_graphql_default_scalar() {
 #[test]
 fn test_graphql_scalar_array() {
     "
-    def foo {
-        rel .id: { fmt '' => text => . }
-        rel .'tags': [text]
-    }
+    def foo (
+        rel .id: (fmt '' => text => .)
+        rel .'tags': {text}
+    )
     "
     .compile_then(|test| {
         let (_schema, test) = schema_test(&test, ROOT_SRC_NAME);
@@ -115,11 +115,11 @@ fn test_graphql_scalar_array() {
 #[test]
 fn test_graphql_serde_renaming() {
     "
-    def foo {
-        rel .id: { fmt '' => text => . }
+    def foo (
+        rel .id: (fmt '' => text => .)
         rel .'must-rewrite': text
         rel .'must_rewrite': text
-    }
+    )
     "
     .compile_then(|test| {
         let (_schema, schema_test) = schema_test(&test, ROOT_SRC_NAME);
@@ -146,15 +146,15 @@ fn test_graphql_serde_renaming() {
 #[test]
 fn test_query_map_empty_input_becomes_hidden_arg() {
     "
-    def entity {
-        rel .'id'|id: { rel .is: text }
-    }
-    def empty {}
+    def entity (
+        rel .'id'|id: (rel .is: text)
+    )
+    def empty ()
 
-    map my_query {
-        {}
-        empty {}
-    }
+    map my_query(
+        (),
+        empty(),
+    )
     "
     .compile_then(|test| {
         let (schema, _test) = schema_test(&test, ROOT_SRC_NAME);
@@ -201,10 +201,10 @@ fn test_graphql_artist_and_instrument() {
 #[test]
 fn test_no_datastore_yields_empty_mutation() {
     let test = "
-    def foo {
-        rel .'id'|id: { rel .is: text }
+    def foo (
+        rel .'id'|id: (rel .is: text)
         rel .'x': text
-    }
+    )
     "
     .compile();
     let (_schema, test) = schema_test(&test, ROOT_SRC_NAME);
@@ -219,31 +219,31 @@ fn test_imperfect_mapping_mutation() {
             "
             use 'inner' as inner
 
-            def outer {
-                rel .'id'|id: { rel .is: text }
+            def outer (
+                rel .'id'|id: (rel .is: text)
                 rel .'x': text
-            }
+            )
 
-            map {
-                inner.inner match {
-                    'id': id
-                    'a': x
-                }
-                outer {
-                    'id': id
-                    'x': x
-                }
-            }
+            map(
+                inner.inner match(
+                    'id': id,
+                    'a': x,
+                ),
+                outer(
+                    'id': id,
+                    'x': x,
+                )
+            )
             ",
         ),
         (
             SourceName("inner"),
             "
-            def inner {
-                rel .'id'|id: { rel .is: text }
+            def inner (
+                rel .'id'|id: (rel .is: text)
                 rel .'a': text
                 rel .'b': text
-            }
+            )
             ",
         ),
     ])

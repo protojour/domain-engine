@@ -8,10 +8,10 @@ use test_log::test;
 #[test]
 fn json_schema_from_simple_entity() {
     "
-    def some_id { fmt '' => text => . }
+    def some_id (fmt '' => text => .)
 
     /// This is type entity
-    def entity {
+    def entity (
         rel some_id identifies: .
 
         /// This is property 'foo'
@@ -22,7 +22,7 @@ fn json_schema_from_simple_entity() {
 
         // This is just a regular comment
         rel .'baz': i64
-    }
+    )
     "
     .compile_then(|test| {
         let [entity] = test.bind(["entity"]);

@@ -1,43 +1,43 @@
 
-def Person {
-    rel _ 'name': string
-    rel _ 'is_friends_with': [Person]
-    rel _ 'works_for'?: Company
-}
-def Company {
-    rel _ 'name': string
-}
-def Query {
-    rel _ 'friend_works_for': string
-}
+def Person (
+    rel . 'name': string
+    rel . 'is_friends_with': {Person}
+    rel . 'works_for'?: Company
+)
+def Company (
+    rel . 'name': string
+)
+def Query (
+    rel . 'friend_works_for': string
+)
 
-def Graph {
-    rel _ 'person': string
-    rel _ 'foaf': [string]
-}
+def Graph (
+    rel . 'person': string
+    rel . 'foaf': {string}
+)
 
-unify {
-    Query { 'friend_works_for': works_for &&.. }
-    Person {
+map(
+    Query('friend_works_for': works_for &&..),
+    Person(
         'is_friends_with': [Person {
             'works_for': Company {
                 'name': company_name
             }
         }]
         &&..
-    }
+    )
     if works_for in [company_name]
-}
+)
 
-unify {
-    Person {
-        'name': name
-        'is_friends_with': [Person {
+map(
+    Person(
+        'name': name,
+        'is_friends_with': {Person(
             'name': foaf
-        }]
-    }
-    Graph {
-        'person': name
-        'foaf': [foaf]
-    }
-}
+        )}
+    ),
+    Graph(
+        'person': name,
+        'foaf': [foaf],
+    )
+)

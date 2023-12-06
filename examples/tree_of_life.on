@@ -1,4 +1,4 @@
-def life {
+def life (
     // Common traits, all are not required:
     // rel .has?: homeostasis
     // rel .has?: organisation
@@ -7,289 +7,289 @@ def life {
     // rel .has?: adaptation
     // rel .has?: response-to-stimuli
     // rel .has?: reproduction
-}
+)
 
 // Categories outside of main taxonomy:
 
 /// Single-celled organisms
-def unicellular {}
+def unicellular ()
 
 /// Multicellular organisms
-def multicellular {}
+def multicellular ()
 
 /// Non-cellular life
-def non-cellular { rel .is: life }
+def non-cellular ( rel .is: life )
 
 /// Artificial life
-def artificial { rel .is: life }
+def artificial ( rel .is: life )
 
 /// All members of group are (presumed) extinct
-def extinct {}
+def extinct ()
 
 // Main taxononic ranks, in order:
 
-def domain {}
-def kingdom {}
-def phylum {}
-def class {}
-def order {}
-def family {}
-def genus {}
-def species {}
+def domain ()
+def kingdom ()
+def phylum ()
+def class ()
+def order ()
+def family ()
+def genus ()
+def species ()
 
 // Domains/kingdoms:
 
 /// Bacteria
-def Bacteria {
+def Bacteria (
     rel .is: domain
     rel .is: kingdom
     rel .is: unicellular
-}
+)
 
 /// Archaea
-def Archaea {
+def Archaea (
     rel .is: domain
     rel .is: kingdom
     rel .is: unicellular
-}
+)
 
 /// Eukaryotes
-def Eukaryota {
+def Eukaryota (
     rel .is: domain
-}
+)
 
 /// Protozoans
-def Protozoa {
+def Protozoa (
     rel .is: kingdom
     rel .is: Eukaryota
     rel .is: unicellular
-}
+)
 
 /// Chromista
-def Chromista {
+def Chromista (
     rel .is: kingdom
     rel .is: Eukaryota
-}
+)
 
 /// Plants
-def Plantae {
+def Plantae (
     rel .is: kingdom
     rel .is: Eukaryota
-}
+)
 
 /// Fungi
-def Fungi {
+def Fungi (
     rel .is: kingdom
     rel .is: Eukaryota
-}
+)
 
 /// Animals
-def Animalia {
+def Animalia (
     rel .is: kingdom
     rel .is: Eukaryota
-}
+)
 
 // Animalia:
 
 /// Annelids; Segmented worms
-def Annelida {
+def Annelida (
     rel .is: Animalia
-}
+)
 
 /// Agmates
-def Agmata {
+def Agmata (
     rel .is: Animalia
     rel .is: extinct
-}
+)
 
 /// Archaecyathids
-def Archaeocyatha {
+def Archaeocyatha (
     rel .is: Animalia
     rel .is: extinct
-}
+)
 
 /// Arthropods
-def Arthropoda {
+def Arthropoda (
     rel .is: Animalia
-}
+)
 
 /// Brachiopods; Lampshells
-def Brachiopoda {
+def Brachiopoda (
     rel .is: Animalia
-}
+)
 
 /// Bryozoans; Moss animals
-def Bryozoa {
+def Bryozoa (
     rel .is: Animalia
-}
+)
 
 /// Arrow worms
-def Chaetognatha {
+def Chaetognatha (
     rel .is: Animalia
-}
+)
 
 /// Chordates
-def Chordata {
+def Chordata (
     rel .is: Animalia
-}
+)
 
 /// Cnidarians
-def Cnidaria {
+def Cnidaria (
     rel .is: Animalia
-}
+)
 
 /// Comb jellies
-def Ctenophora {
+def Ctenophora (
     rel .is: Animalia
-}
+)
 
 /// Cycliophora
-def Cycliophora {
+def Cycliophora (
     rel .is: Animalia
-}
+)
 
 /// Echinoderms
-def Echinodermata {
+def Echinodermata (
     rel .is: Animalia
-}
+)
 
 /// Goblet worms
-def Entoprocta {
+def Entoprocta (
     rel .is: Animalia
-}
+)
 
 /// Gastrotrich worms
-def Gastrotricha {
+def Gastrotricha (
     rel .is: Animalia
-}
+)
 
 /// Jaw worms
-def Gnathostomulida {
+def Gnathostomulida (
     rel .is: Animalia
-}
+)
 
 /// Hemichordates; Acorn worms
-def Hemichordata {
+def Hemichordata (
     rel .is: Animalia
-}
+)
 
 /// Mud dragons
-def Kinorhyncha {
+def Kinorhyncha (
     rel .is: Animalia
-}
+)
 
 /// Brush heads
-def Lorcifera {
+def Lorcifera (
     rel .is: Animalia
-}
+)
 
 /// Micrognathozoa
-def Micrognathozoa {
+def Micrognathozoa (
     rel .is: Animalia
-}
+)
 
 /// Mollusks
-def Mollusca {
+def Mollusca (
     rel .is: Animalia
-}
+)
 
 /// Round worms
-def Nematoda {
+def Nematoda (
     rel .is: Animalia
-}
+)
 
 /// Horsehair worms
-def Nematomorpha {
+def Nematomorpha (
     rel .is: Animalia
-}
+)
 
 /// Ribbonworms
-def Nemertea {
+def Nemertea (
     rel .is: Animalia
-}
+)
 
 /// Velvet worms
-def Onychophora {
+def Onychophora (
     rel .is: Animalia
-}
+)
 
 /// Petalonamae
-def Petalonamae {
+def Petalonamae (
     rel .is: Animalia
     rel .is: extinct
-}
+)
 
 /// Horseshoe worms
-def Phoronida {
+def Phoronida (
     rel .is: Animalia
-}
+)
 
 /// Trichoplaxes
-def Placozoa {
+def Placozoa (
     rel .is: Animalia
-}
+)
 
 /// Flatworms
-def Platyhelminthes {
+def Platyhelminthes (
     rel .is: Animalia
-}
+)
 
 /// Sponges
-def Porifera {
+def Porifera (
     rel .is: Animalia
-}
+)
 
 /// Penis worms
-def Priapulida {
+def Priapulida (
     rel .is: Animalia
-}
+)
 
 /// Proarticulates
-def Proarticulata {
+def Proarticulata (
     rel .is: Animalia
     rel .is: extinct
-}
+)
 
 /// Rhombozoans
-def Rhombozoa {
+def Rhombozoa (
     rel .is: Animalia
-}
+)
 
 /// Rotifers
-def Rotifera {
+def Rotifera (
     rel .is: Animalia
-}
+)
 
 /// Saccorhytida
-def Saccorhytida {
+def Saccorhytida (
     rel .is: Animalia
     rel .is: extinct
-}
+)
 
 /// Water bears
-def Tardigrada {
+def Tardigrada (
     rel .is: Animalia
-}
+)
 
 /// Trilobozoans
-def Trilobozoa {
+def Trilobozoa (
     rel .is: Animalia
     rel .is: extinct
-}
+)
 
 /// Vetulicolians
-def Vetulicolia {
+def Vetulicolia (
     rel .is: Animalia
     rel .is: extinct
-}
+)
 
 /// Xenacoelomorpha
-def Xenacoelomorpha {
+def Xenacoelomorpha (
     rel .is: Animalia
-}
+)
 
 /// Humans
-def Homo-sapiens {
+def Homo-sapiens (
     rel .is: Eukaryota
     rel .is: Animalia
     rel .is: Chordata
@@ -302,18 +302,18 @@ def Homo-sapiens {
     rel .is: species
 
     rel .'species': 'Homo sapiens'
-}
+)
 
-def name {
+def name (
     fmt '' => text => .
-}
+)
 
-def Person {
+def Person (
     rel .is: Homo-sapiens
     rel .'name'|id: name
-}
+)
 
-// def species {
+// def species (
 //     rel .'domain': text
 //     rel .'kingdom': text
 //     rel .'phylum': text
@@ -325,4 +325,4 @@ def Person {
 //     rel .'species': text
 //     rel .'known extant members': integer
 //     rel .'known extinct members': integer
-// }
+// )

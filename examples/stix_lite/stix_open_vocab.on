@@ -1,10 +1,10 @@
 /// A value from a STIX open or suggested vocabulary.
-def open-vocab {
+def open-vocab (
     rel .is: ontol.text
-}
+)
 
 /// An open vocabulary of User Account types.
-def account-type-ov {
+def account-type-ov (
     rel .is: open-vocab
 
     rel .example: 'facebook'
@@ -18,12 +18,12 @@ def account-type-ov {
     rel .example: 'unix'
     rel .example: 'windows-local'
     rel .example: 'windows-domain'
-}
+)
 
 /// Knowing a Threat Actor or Intrusion Set's motivation may allow an analyst or defender to better understand likely targets and behaviors.
 /// Motivation shapes the intensity and the persistence of an attack. Threat Actors and Intrusion Sets usually act in a manner that reflects their underlying emotion or situation, and this informs defenders of the manner of attack. For example, a spy motivated by nationalism (ideology) likely has the patience to achieve long-term goals and work quietly for years, whereas a cyber-vandal out for notoriety can create an intense and attention-grabbing attack but may quickly lose interest and move on. Understanding these differences allows defenders to implement controls tailored to each type of attack for greatest efficiency.
 /// This section including vocabulary items and their descriptions is based on the Threat Agent Motivations publication from Intel Corp in February 2015 [Casey 2015].
-def attack-motivation-ov {
+def attack-motivation-ov (
     rel .is: open-vocab
 
     /// A non-hostile actor whose benevolent or harmless intent inadvertently causes harm.
@@ -67,13 +67,13 @@ def attack-motivation-ov {
     /// Acting without identifiable reason or purpose and creating unpredictable events.
     /// Unpredictable is not a miscellaneous or default category. Unpredictable means a truly random and likely bizarre event, which seems to have no logical purpose to the victims.
     rel .example: 'unpredictable'
-}
+)
 
 /// Attack Resource Level is an open vocabulary that captures the general level of resources that a threat actor, intrusion set, or campaign might have access to. It ranges from individual, a person acting alone, to government, the resources of a national government.
 ///
 /// This section including vocabulary items and their descriptions is based on the Threat Agent Library publication from Intel Corp in September 2007 [Casey 2007].
 ///
-def attack-resource-level-ov {
+def attack-resource-level-ov (
     rel .is: open-vocab
 
     /// Resources limited to the average individual; Threat Actor acts independently.
@@ -99,10 +99,10 @@ def attack-resource-level-ov {
 
     /// Controls public assets and functions within a jurisdiction; very well resourced and persists long term.
     rel .example: 'government'
-}
+)
 
 /// The Course of Action Type property uses an open vocabulary to describe the underlying language or structure of the Course of Action that is being represented.
-def course-of-action-type-ov {
+def course-of-action-type-ov (
     rel .is: open-vocab
 
     /// Unstructured textual/prose description of a course of action that does not conform to any standard language 
@@ -116,10 +116,10 @@ def course-of-action-type-ov {
 
     /// Prose description of a course of action defined in structured PDF content 
     rel .example: 'textual:pdf'
-}
+)
 
 /// An enumeration of encryption algorithms for sharing defanged and/or confidential artifacts.
-def encryption-algorithm-enum {
+def encryption-algorithm-enum (
     /// Specifies the AES-256-GCM cipher, as defined in [NIST SP800-38D](https://docs.oasis-open.org/cti/stix/v2.1/csprd01/stix-v2.1-csprd01.html#kix.58njqtoqcj7e)
     rel .is?: 'AES-256-GCM'
 
@@ -130,13 +130,13 @@ def encryption-algorithm-enum {
     /// The specified mime-type tells you which format it is, e.g., Word Doc or GPG.
     /// This is intended for formats like Zip files and Word files which take a simple password, or GPG armored files that contain the key blob along with the file.
     rel .is?: 'mime-type-indicated'
-}
+)
 
 /// Grouping context
 ///
 /// While the majority of this vocabulary is undefined (producers may use custom vocabulary entries), it has been added specifically to capture the `suspicious-activity-event` value.
 /// That value indicates that the information contained in the Grouping relates to a suspicious event.
-def grouping-context-ov {
+def grouping-context-ov (
     rel .is: open-vocab
 
     /// A set of STIX content related to a particular suspicious activity event. 
@@ -147,15 +147,15 @@ def grouping-context-ov {
 
     /// A set of STIX content contextually related but without any precise characterization of the contextual relationship between the objects.
     rel .example: 'unspecified'
-}
+)
 
 /// This vocabulary describes the type of entity that the Identity represents: whether it describes an organization, group, individual, or class.
-def identity-class-ov {
+def identity-class-ov (
     rel .is: open-vocab
-}
+)
 
 /// This is a non-exhaustive, open vocabulary that covers common programming languages and is intended to characterize the languages that may have been used to implement a malware instance or family.
-def implementation-language-ov {
+def implementation-language-ov (
     rel .is: open-vocab
 
     /// Specifies the AppleScript programming language.
@@ -220,12 +220,12 @@ def implementation-language-ov {
 
     /// Specifies the x86 64-bit Assembly programming language.
     rel .example: 'x86-64'
-}
+)
 
 /// Indicator type is an open vocabulary used to categorize Indicators. It is intended to be high-level to promote consistent practices.
 /// Indicator types should not be used to capture information that can be better captured via related Malware or Attack Pattern objects.
 /// It is better to link an Indicator to a Malware object describing Poison Ivy rather than simply providing a type or label of "poison-ivy".
-def indicator-type-ov {
+def indicator-type-ov (
     rel .is: open-vocab
 
     /// Unexpected, or unusual activity that may not necessarily be malicious or indicate compromise. This type of activity may include reconnaissance-like behavior such as port scans or version identification, network behavior anomalies, and asset and/or user behavioral anomalies.
@@ -248,11 +248,11 @@ def indicator-type-ov {
 
     /// There is not enough information available to determine the type of indicator.
     rel .example: 'unknown'
-}
+)
 
 /// Industry sector is an open vocabulary that describes industrial and commercial sectors.
 /// It is intended to be holistic; it has been derived from several other lists and is not limited to "critical infrastructure" sectors.
-def industry-sector-ov {
+def industry-sector-ov (
     rel .is: open-vocab
 
     rel .example: 'agriculture'
@@ -282,10 +282,10 @@ def industry-sector-ov {
     rel .example: 'telecommunications'
     rel .example: 'transportation'
     rel .example: 'utilities'
-}
+)
 
 /// A non-exhaustive enumeration of infrastructure types.
-def infrastructure-type-ov {
+def infrastructure-type-ov (
     rel .is: open-vocab
 
     /// Specifies infrastructure used for conducting amplification attacks.
@@ -320,10 +320,10 @@ def infrastructure-type-ov {
 
     /// Specifies an infrastructure of some undefined type.
     rel .example: 'undefined'
-}
+)
 
 /// This is a non-exhaustive, open vocabulary that captures common types of generic malware anti-virus (AV) tool results.
-def malware-av-result-ov {
+def malware-av-result-ov (
     rel .is: open-vocab
 
     /// The AV tool reported the malware binary as malicious.
@@ -337,10 +337,10 @@ def malware-av-result-ov {
 
     /// The AV tool was unable to determine whether the malware binary is malicious.
     rel .example: 'unknown'
-}
+)
 
 /// This is an open vocabulary that covers common capabilities that may be exhibited by a malware instance or family.
-def malware-capabilities-ov {
+def malware-capabilities-ov (
     rel .is: open-vocab
 
     /// Indicates that the malware instance or family is able to access one or more remote machines.
@@ -454,11 +454,11 @@ def malware-capabilities-ov {
 
     /// Indicates that the malware instance or family is able to compromise the operational integrity of the system on which it is executing and/or one or more remote systems, e.g., by causing them to operate beyond their set of specified operational parameters. For example, malware that causes the CPU fan on the machine that it is executing to spin at a higher than normal speed.
     rel .example: 'violates-system-operational-integrity'
-}
+)
 
 /// Malware type is an open vocabulary that represents different types and functions of malware.
 /// Malware types are not mutually exclusive; for example, a malware instance can be both spyware and a screen capture tool.
-def malware-type-ov {
+def malware-type-ov (
     rel .is: open-vocab
 
     /// Any software that is funded by advertising. Adware may also gather sensitive user information from a system.
@@ -526,11 +526,11 @@ def malware-type-ov {
 
 	/// A self-replicating, self-contained program that usually executes itself without user intervention.
     rel .example: 'worm'
-}
+)
 
 /// This enumeration captures a degree of agreement with the information in a STIX Object.
 /// It is an ordered enumeration, with the earlier terms representing disagreement, the middle term neutral, and the later terms representing agreement.
-def opinion-enum {
+def opinion-enum (
     /// The creator strongly disagrees with the information and believes it is inaccurate or incorrect.
     /// This MAY be considered equivalent to a 1 in a numeric scale.
     rel .is?: 'strongly-disagree'
@@ -550,18 +550,18 @@ def opinion-enum {
     /// The creator strongly agrees with the information and believes that it is accurate and correct.
     /// This MAY be considered equivalent to a 5 in a numeric scale.
     rel .is?: 'strongly-agree'
-}
+)
 
-def pattern-type-ov {
+def pattern-type-ov (
     rel .is: open-vocab
 
     rel .example: 'stix'
     rel .example: 'snort'
     rel .example: 'yara'
-}
+)
 
 /// This is a non-exhaustive, open vocabulary that covers common processor architectures and is intended to characterize the architectures that a malware instance or family may be able to execute on.
-def processor-architecture-ov {
+def processor-architecture-ov (
     rel .is: open-vocab
 
     /// Specifies the Alpha architecture.
@@ -587,10 +587,10 @@ def processor-architecture-ov {
 
     /// Specifies the 64-bit x86 architecture.
     rel .example: 'x86-64'
-}
+)
 
 /// A list of world regions based on the United Nations geoscheme [UNSD M49].
-def region-ov {
+def region-ov (
     rel .is: open-vocab
 
     rel .example: 'africa'
@@ -621,14 +621,14 @@ def region-ov {
     rel .example: 'micronesia'
     rel .example: 'polynesia'
     rel .example: 'antarctica'
-}
+)
 
 /// Report type is an open vocabulary to describe the primary purpose or subject of a report.
 /// For example, a report that contains malware and indicators for that malware should have a report type of malware to capture that the malware is the primary purpose.
 /// Report types are not mutually exclusive: a Report can be both a malware report and a tool report.
 /// Just because a report contains objects of a type does not mean that the report should include that type.
 /// If the objects are there to simply provide evidence or context for other objects, it is not necessary to include them in the type.
-def report-type-ov {
+def report-type-ov (
     rel .is: open-vocab
 
     /// Report subject is a characterization of one or more attack patterns and related information.
@@ -663,12 +663,12 @@ def report-type-ov {
 
     /// Report subject is a characterization of one or more vulnerabilities and related information.
     rel .example: 'vulnerability'
-}
+)
 
 /// Threat actor type is an open vocabulary used to describe what type of threat actor the individual or group is.
 /// For example, some threat actors are competitors who try to steal information, while others are activists who act in support of a social or political cause.
 /// Actor types are not mutually exclusive: a threat actor can be both a disgruntled insider and a spy. [[Casey 2007]](https://docs.oasis-open.org/cti/stix/v2.1/csprd01/stix-v2.1-csprd01.html#kix.odol9vccfh3b))
-def threat-actor-type-ov {
+def threat-actor-type-ov (
     rel .is: open-vocab
 
     /// Highly motivated, potentially destructive supporter of a social or political cause (e.g., trade, labor, environment, etc.) that attempts to disrupt an organization's business model or damage their image.
@@ -735,14 +735,14 @@ def threat-actor-type-ov {
 
     /// There is not enough information available to determine the type of threat actor.
     rel .example: 'unknown'
-}
+)
 
 /// Threat actor role is an open vocabulary that is used to describe the different roles that a threat actor can play.
 /// For example, some threat actors author malware or operate botnets while other actors actually carry out attacks directly.
 ///
 /// Threat actor roles are not mutually exclusive.
 /// For example, an actor can be both a financial backer for attacks and also direct attacks.
-def threat-actor-role-ov {
+def threat-actor-role-ov (
     rel .is: open-vocab
 
     /// Threat actor executes attacks either on behalf of themselves or at the direction of someone else.
@@ -765,12 +765,12 @@ def threat-actor-role-ov {
 
     /// The threat actor who funds the malicious activities.
     rel .example: 'sponsor'
-}
+)
 
 /// Threat actor sophistication vocabulary captures the skill level of a threat actor.
 /// It ranges from "none", which describes a complete novice, to "strategic", which describes an attacker who is able to influence supply chains to introduce vulnerabilities.
 /// This vocabulary is separate from resource level because an innovative, highly-skilled threat actor may have access to very few resources while a minimal-level actor might have the resources of an organized crime ring.
-def threat-actor-sophistication-ov {
+def threat-actor-sophistication-ov (
     rel .is: open-vocab
 
     /// Can carry out random acts of disruption or destruction by running tools they do not understand.
@@ -854,10 +854,10 @@ def threat-actor-sophistication-ov {
     /// * can create and design attacks for any systems, software package, or device; and
     /// * are responsible for APT-level attacks.
     rel .example: 'strategic'
-}
+)
 
 /// Tool types describe the categories of tools that can be used to perform attacks.
-def tool-type-ov {
+def tool-type-ov (
     rel .is: open-vocab
 
     /// Tools used to perform denial of service attacks or DDoS attacks, such as Low Orbit Ion Cannon (LOIC) and DHCPig.
@@ -883,10 +883,10 @@ def tool-type-ov {
 
     /// There is not enough information available to determine the type of tool.
     rel .example: 'unknown'
-}
+)
 
 /// An enumeration of Windows registry data types.
-def windows-registry-datatype-enum {
+def windows-registry-datatype-enum (
     /// No defined value type.
     rel .is?: 'REG_NONE'
 
@@ -928,4 +928,4 @@ def windows-registry-datatype-enum {
 
     /// Specifies an invalid key.
     rel .is?: 'REG_INVALID_TYPE'
-}
+)

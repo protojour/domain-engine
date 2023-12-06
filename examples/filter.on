@@ -1,26 +1,26 @@
 
-def a {
-    rel _ 'a': [string]
-}
-def b {
-    rel _ 'b': [string]
-}
+def a (
+    rel _ 'a': {string}
+)
+def b (
+    rel _ 'b': {string}
+)
 
 map {
-    a {
-        'a': [x]
-    }
+    a(
+        'a': {x}
+    ),
     if x starts_with: 'q' and x ends_with: 'l'
-    type b {
-        'b': [x]
-    }
+    type b(
+        'b': {x}
+    )
 }
 
-map {
-    a {
-        'a': [_]
-    }
-    b {
-        'b': [_]
-    }
-}
+map(
+    a(
+        'a': {_}
+    ),
+    b(
+        'b': {_}
+    )
+)

@@ -38,212 +38,212 @@ use 'SI' as SI
 /// RFC 4122 defines how one can distinguish between a UUIDv4 and UUIDv5 value. 
 ///
 /// The JSON MTI serialization uses the JSON String type [RFC8259] when representing identifier.
-def sdo_identifier {}
+def sdo_identifier ()
 
-def attack-pattern-id {
+def attack-pattern-id (
     fmt '' => 'attack-pattern--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def campaign-id {
+def campaign-id (
     fmt '' => 'campaign--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def course-of-action-id {
+def course-of-action-id (
     fmt '' => 'course-of-action--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def grouping-id {
+def grouping-id (
     fmt '' => 'grouping--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def identity-id {
+def identity-id (
     fmt '' => 'identity--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def indicator-id {
+def indicator-id (
     fmt '' => 'indicator--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def infrastructure-id {
+def infrastructure-id (
     fmt '' => 'infrastructure--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def intrusion-set-id {
+def intrusion-set-id (
     fmt '' => 'intrusion-set--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def location-id {
+def location-id (
     fmt '' => 'location--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def malware-id {
+def malware-id (
     fmt '' => 'malware--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def malware-analysis-id {
+def malware-analysis-id (
     fmt '' => 'malware-analysis--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def note-id {
+def note-id (
     fmt '' => 'note--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def observed-data-id {
+def observed-data-id (
     fmt '' => 'observed-data--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def opinion-id {
+def opinion-id (
     fmt '' => 'opinion--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def report-id {
+def report-id (
     fmt '' => 'report--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def threat-actor-id {
+def threat-actor-id (
     fmt '' => 'threat-actor--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def tool-id {
+def tool-id (
     fmt '' => 'tool--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def vulnerability-id {
+def vulnerability-id (
     fmt '' => 'vulnerability--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
 /// The identifier of a `marking-defifition`
-def marking-definition-id {
+def marking-definition-id (
     fmt '' => 'marking-definition--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def artifact-id {
+def artifact-id (
     fmt '' => 'artifact--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def autonomous-system-id {
+def autonomous-system-id (
     fmt '' => 'autonomous-system--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def directory-id {
+def directory-id (
     fmt '' => 'directory-id--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def domain-name-id {
+def domain-name-id (
     fmt '' => 'domain-name--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def email-addr-id {
+def email-addr-id (
     fmt '' => 'email-addr--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def email-message-id {
+def email-message-id (
     fmt '' => 'email-message--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def file-id {
+def file-id (
     fmt '' => 'file--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def ipv4-addr-id {
+def ipv4-addr-id (
     fmt '' => 'ipv4-addr--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def ipv6-addr-id {
+def ipv6-addr-id (
     fmt '' => 'ipv6-addr--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def mac-addr-id {
+def mac-addr-id (
     fmt '' => 'mac-addr--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def mutex-id {
+def mutex-id (
     fmt '' => 'mutex--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def network-traffic-id {
+def network-traffic-id (
     fmt '' => 'network-traffic--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def process-id {
+def process-id (
     fmt '' => 'process--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def software-id {
+def software-id (
     fmt '' => 'software--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def url-id {
+def url-id (
     fmt '' => 'url--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def user-account-id {
+def user-account-id (
     fmt '' => 'user-account--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def windows-registry-key-id {
+def windows-registry-key-id (
     fmt '' => 'windows-registry-key--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def x509-certificate-id {
+def x509-certificate-id (
     fmt '' => 'x509-certificate-key--' => uuid => .
     rel sdo_identifier is?: .
-}
+)
 
-def relationship-id {
+def relationship-id (
     fmt '' => 'relationship--' => uuid => .
-}
+)
 
-def sdo_sco_identifier {
+def sdo_sco_identifier (
     rel .is: sdo_identifier
-}
+)
 
 /// Type providing the `created_by_ref` property
-def created_by_object {
+def created_by_object (
     /// The **created_by_ref** property specifies the **id** property of the `identity` object that describes the entity that created this object.
     ///
     /// If this attribute is omitted, the source of this information is undefined. This may be used by object creators who wish to remain anonymous.
     rel .'created_by_ref'?: identity-id
-}
+)
 
 // FIXME: This type has union-like properties:
-def granular-marking {
+def granular-marking (
     /// The **lang** property identifies the language of the text identified by this marking.
     /// The value of the lang property, if present, **MUST** be an [[RFC5646](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#kix.1js008hntuzu)] language code.
     ///
@@ -262,17 +262,17 @@ def granular-marking {
     /// The `marking-definition` referenced in the **marking_ref** property is applied to the content selected by the selectors in this list.
     ///
     /// The [[RFC5646](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#kix.1js008hntuzu)] language code specified by the lang property is applied to the content selected by the selectors in this list.
-    rel .'selectors': [common.string]
-}
+    rel .'selectors': {common.string}
+)
 
-def stix_markings_object {
+def stix_markings_object (
     /// The **object_marking_refs** property specifies a list of id properties of marking-definition objects that apply to this object.
     ///
     /// In some cases, though uncommon, marking definitions themselves may be marked with sharing or handling guidance.
     /// In this case, this property **MUST NOT** contain any references to the same Marking Definition object (i.e., it cannot contain any circular references).
     ///
     /// See section [7.2](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_95gfoglikdzh) for further definition of data markings.
-    rel .'object_marking_refs'?: [marking-definition-id]
+    rel .'object_marking_refs'?: {marking-definition-id}
 
     /// The **granular_markings** property specifies a list of granular markings applied to this object.
     ///
@@ -280,15 +280,15 @@ def stix_markings_object {
     /// In this case, this property **MUST NOT** contain any references to the same Marking Definition object (i.e., it cannot contain any circular references).
     ///
     /// See section [7.2](https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html#_95gfoglikdzh) for further definition of data markings.
-    rel .'granular_markings'?: [granular-marking]
-}
+    rel .'granular_markings'?: {granular-marking}
+)
 
 
 /// STIX defines a set of STIX Domain Objects (SDOs): Attack Pattern, Campaign, Course of Action, Grouping, Identity, Indicator, Infrastructure, Intrusion Set, Location, Malware, Malware Analysis, Note, Observed Data, Opinion, Report, Threat Actor, Tool, and Vulnerability.
 /// Each of these objects corresponds to a concept commonly used in CTI.
 ///
 /// STIX Domain Objects are defined in section 4.
-def stix_domain_object {
+def stix_domain_object (
     rel .is: meta.spec_version_object
     rel .is: meta.created_modified_object
     rel .is: meta.confidence_object
@@ -299,7 +299,7 @@ def stix_domain_object {
 
     rel .is: created_by_object
     rel .is: stix_markings_object
-}
+)
 
 /// STIX Relationship Objects (SROs) represent types of relationships used to describe CTI.
 /// The Generic Relationship SRO is used to describe many varied types of relationships, while the specific Sighting SRO contains additional properties to represent Sighting relationships.
@@ -307,7 +307,7 @@ def stix_domain_object {
 /// Property information, relationship information, and examples are provided for each SRO defined below.
 /// Property information includes common properties as well as properties that are specific to each SRO.
 /// Because SROs cannot be the source or target of other SROs, relationship information is included but only to describe embedded relationships (e.g., `created_by_ref`).
-def stix_relationship_object {
+def stix_relationship_object (
     rel .is: meta.spec_version_object
     rel .is: meta.created_modified_object
     rel .is: meta.confidence_object
@@ -318,17 +318,17 @@ def stix_relationship_object {
 
     rel .is: created_by_object
     rel .is: stix_markings_object
-}
+)
 
 /// STIX Cyber Observable Object (SCO)
-def stix_cyber_observable_object {
+def stix_cyber_observable_object (
     rel .is: meta.defanged_object
 
     rel .is: stix_markings_object
-}
+)
 
 /// Attack Patterns are a type of TTP that describe ways that adversaries attempt to compromise targets.
-def attack-pattern {
+def attack-pattern (
     rel .is: stix_domain_object
     rel .'type': 'attack-pattern'
     rel .'id'(rel .gen: auto)|id: attack-pattern-id
@@ -340,11 +340,11 @@ def attack-pattern {
     rel .'description'?: common.string
 
     /// Alternative names used to identify this Attack Pattern.
-    rel .'aliases'?: [common.string]
+    rel .'aliases'?: {common.string}
 
     /// The list of Kill Chain Phases for which this Attack Pattern is used.
-    rel .'kill_chain_phases'?: [common.kill-chain-phase]
-}
+    rel .'kill_chain_phases'?: {common.kill-chain-phase}
+)
 
 /// A Campaign is a grouping of adversarial behaviors that describes a set of malicious activities or attacks (sometimes called waves) that occur over a period of time against a specific set of targets.
 /// Campaigns usually have well defined objectives and may be part of an Intrusion Set.
@@ -355,7 +355,7 @@ def attack-pattern {
 /// Campaigns can be characterized by their objectives and the incidents they cause, people or resources they target, and the resources (infrastructure, intelligence, Malware, Tools, etc.) they use.
 /// 
 /// For example, a Campaign could be used to describe a crime syndicate's attack using a specific variant of malware and new C2 servers against the executives of ACME Bank during the summer of 2016 in order to gain secret information about an upcoming merger with another bank.
-def campaign {
+def campaign (
     rel .is: stix_domain_object
     rel .'type': 'campaign'
     rel .'id'(rel .gen: auto)|id: campaign-id
@@ -367,7 +367,7 @@ def campaign {
     rel .'description'?: common.string
 
     /// Alternative names used to identify this Campaign
-    rel .'aliases'?: [common.string]
+    rel .'aliases'?: {common.string}
 
     /// The time that this Campaign was first seen.
     /// 
@@ -385,7 +385,7 @@ def campaign {
 
     /// This property defines the Campaign’s primary goal, objective, desired outcome, or intended effect — what the Threat Actor or Intrusion Set hopes to accomplish with this Campaign.
     rel .'objective'?: common.string
-}
+)
 
 /// A Course of Action (CoA) is a recommendation from a producer of intelligence to a consumer on the actions that they might take in response to that intelligence.
 /// The CoA may be preventative to deter exploitation or corrective to counter its potential impact.
@@ -393,7 +393,7 @@ def campaign {
 /// For example, a CoA that describes how to remediate a vulnerability could describe how to apply the patch that removes that vulnerability.
 ///
 /// The CoA includes the encoded content of an action or a reference to an externally defined action identified by the action_type property. 
-def course-of-action {
+def course-of-action (
     rel .is: stix_domain_object
     rel .'type': 'course-of-action'
     rel .'id'(rel .gen: auto)|id: course-of-action-id
@@ -428,7 +428,7 @@ def course-of-action {
     /// ```
     ///
     /// This example means that any version of the Windows 10 operating system is able to process and use the course of action defined in the **action_bin** or **action_reference** properties.
-    rel .'os_execution_envs'?: [common.string]
+    rel .'os_execution_envs'?: {common.string}
 
     /// This property contains the base64 encoded "commands" that represent the action for this Course of Action.
     ///
@@ -439,7 +439,7 @@ def course-of-action {
     ///
     /// This property MUST NOT be present if action_bin is provided.
     rel .'action_reference'?: common.external-reference
-}
+)
 
 /// A Grouping object explicitly asserts that the referenced STIX Objects have a shared context, unlike a STIX Bundle (which explicitly conveys no context).
 /// A Grouping object should not be confused with an intelligence product, which should be conveyed via a STIX Report.
@@ -447,7 +447,7 @@ def course-of-action {
 /// A STIX Grouping object might represent a set of data that, in time, given sufficient analysis, would mature to convey an incident or threat report as a STIX Report object.
 /// For example, a Grouping could be used to characterize an ongoing investigation into a security event or incident.
 /// A Grouping object could also be used to assert that the referenced STIX Objects are related to an ongoing analysis process, such as when a threat analyst is collaborating with others in their trust community to examine a series of Campaigns and Indicators. The Grouping SDO contains a list of references to SDOs, SCOs, and SROs, along with an explicit statement of the context shared by the content, a textual description, and the name of the grouping.
-def grouping {
+def grouping (
     rel .is: stix_domain_object
     rel .'type': 'grouping'
     rel .'id'(rel .gen: auto)|id: grouping-id
@@ -463,13 +463,13 @@ def grouping {
     /// This is an open vocabulary and values SHOULD come from the `grouping-context-ov` vocabulary.
     rel .'context': ov.grouping-context-ov
 
-    rel .'object_refs': [sdo_identifier]
-}
+    rel .'object_refs': {sdo_identifier}
+)
 
 /// Identities can represent actual individuals, organizations, or groups (e.g., ACME, Inc.) as well as classes of individuals, organizations, systems or groups (e.g., the finance sector).
 ///
 /// The Identity SDO can capture basic identifying information, contact information, and the sectors that the Identity belongs to. Identity is used in STIX to represent, among other things, targets of attacks, information sources, object creators, and threat actor identities.
-def identity {
+def identity (
     rel .is: stix_domain_object
     rel .'type': 'identity'
     rel .'id'(rel .gen: auto)|id: identity-id
@@ -483,7 +483,7 @@ def identity {
 
     /// The list of roles that this Identity performs (e.g., CEO, Domain Administrators, Doctors, Hospital, or Retailer).
     /// No open vocabulary is yet defined for this property.
-    rel .'roles'?: [common.string]
+    rel .'roles'?: {common.string}
 
     /// The type of entity that this Identity describes, e.g., an individual or organization.
     /// This is an open vocabulary and the values SHOULD come from the `identity-class-ov` vocabulary.
@@ -491,14 +491,14 @@ def identity {
 
     /// The list of industry sectors that this Identity belongs to.
     /// This is an open vocabulary and values SHOULD come from the `industry-sector-ov` vocabulary. 
-    rel .'sectors'?: [ov.industry-sector-ov]
+    rel .'sectors'?: {ov.industry-sector-ov}
 
     /// The contact information (e-mail, phone number, etc.) for this Identity.
     /// No format for this information is currently defined by this specification.
     rel .'contact_information'?: common.string
-}
+)
 
-def indicator {
+def indicator (
     rel .is: stix_domain_object
     rel .'type': 'indicator'
     rel .'id'(rel .gen: auto)|id: indicator-id
@@ -516,7 +516,7 @@ def indicator {
     /// This property is an open vocabulary that specifies a set of categorizations for this indicator.
     ///
     /// This is an open vocabulary and values SHOULD come from the indicator-type-ov vocabulary.
-    rel .'indicator-types': [ov.indicator-type-ov]
+    rel .'indicator-types': {ov.indicator-type-ov}
 
     /// The detection pattern for this Indicator is a STIX Pattern as specified in section 9.
     rel .'pattern': common.string
@@ -540,12 +540,12 @@ def indicator {
     rel .'valid_until'?: common.timestamp
 
     /// The kill chain phase(s) to which this Indicator corresponds.
-    rel .'kill_chain_phases'?: [common.kill-chain-phase]
-}
+    rel .'kill_chain_phases'?: {common.kill-chain-phase}
+)
 
 /// The Infrastructure SDO represents a type of TTP and describes any systems, software services and any associated physical or virtual resources intended to support some purpose (e.g., C2 servers used as part of an attack, device or server that are part of defence, database servers targeted by an attack, etc.).
 /// While elements of an attack can be represented by other SDOs or SCOs, the Infrastructure SDO represents a named group of related data that constitutes the infrastructure.
-def infrastructure {
+def infrastructure (
     rel .is: stix_domain_object
     rel .'type': 'infrastructure'
     rel .'id'(rel .gen: auto)|id: infrastructure-id
@@ -558,13 +558,13 @@ def infrastructure {
 
     /// The type of infrastructure being described.
     /// This is an open vocabulary and values SHOULD come from the `infrastructure-type-ov` vocabulary.
-    rel .'infrastructure_types': [ov.infrastructure-type-ov]
+    rel .'infrastructure_types': {ov.infrastructure-type-ov}
 
     /// Alternative names used to identify this Infrastructure.
-    rel .'aliases'?: [common.string]
+    rel .'aliases'?: {common.string}
 
     /// The list of Kill Chain Phases for which this Infrastructure is used.
-    rel .'kill_chain_phases'?: [common.kill-chain-phase]
+    rel .'kill_chain_phases'?: {common.kill-chain-phase}
 
     /// The time that this Infrastructure was first seen performing malicious activities.
     rel .'first_seen'?: common.timestamp
@@ -573,7 +573,7 @@ def infrastructure {
     ///
     /// If this property and the first_seen property are both defined, then this property MUST be greater than or equal to the timestamp in the first_seen property.
     rel .'last_seen'?: common.timestamp
-}
+)
 
 /// An Intrusion Set is a grouped set of adversarial behaviors and resources with common properties that is believed to be orchestrated by a single organization.
 /// An Intrusion Set may capture multiple Campaigns or other activities that are all tied together by shared attributes indicating a common known or unknown Threat Actor.
@@ -584,7 +584,7 @@ def infrastructure {
 ///
 /// While sometimes an Intrusion Set is not active, or changes focus, it is usually difficult to know if it has truly disappeared or ended.
 /// Analysts may have varying level of fidelity on attributing an Intrusion Set back to Threat Actors and may be able to only attribute it back to a nation state or perhaps back to an organization within that nation state.
-def intrusion-set {
+def intrusion-set (
     rel .is: stix_domain_object
     rel .'type': 'intrusion-set'
     rel .'id'(rel .gen: auto)|id: intrusion-set-id
@@ -596,7 +596,7 @@ def intrusion-set {
     rel .'description'?: common.string
 
     /// Alternative names used to identify this Intrusion Set.
-    rel .'aliases'?: [common.string]
+    rel .'aliases'?: {common.string}
 
     /// The time that this Intrusion Set was first seen.
     ///
@@ -617,7 +617,7 @@ def intrusion-set {
     /// To do this, they may execute specific Campaigns that have detailed objectives like compromising point of sale systems at a large retailer.
     ///
     /// Another example: to gain information about latest merger and IPO information from ACME Bank.
-    rel .'goals'?: [common.string]
+    rel .'goals'?: {common.string}
 
     /// This defines the organizational level at which this Intrusion Set typically works, which in turn determines the resources available to this Intrusion Set for use in an attack.
     /// This is an open vocabulary and values SHOULD come from the `attack-resource-level-ov` vocabulary.
@@ -637,8 +637,8 @@ def intrusion-set {
     /// The position in the list has no significance.
     ///
     /// This is an open vocabulary and values SHOULD come from the attack-motivation-ov vocabulary.
-    rel .'secondary_motivations'?: [ov.attack-motivation-ov]
-}
+    rel .'secondary_motivations'?: {ov.attack-motivation-ov}
+)
 
 /// A Location represents a geographic location. The location may be described as any, some or all of the following: region (e.g., North America), civic address (e.g. New York, US), latitude and longitude.
 /// 
@@ -662,7 +662,7 @@ def intrusion-set {
 /// If precision is specified, then the datum for latitude and longitude MUST be WGS 84 [WGS84].
 /// Organizations specifying a designated location using latitude and longitude SHOULD specify the precision which is appropriate for the scope of the location being identified.
 /// The scope is defined by the boundary as outlined by the precision around the coordinates.
-def location {
+def location (
     rel .is: stix_domain_object
     rel .'type': 'location'
     rel .'id'(rel .gen: auto)|id: location-id
@@ -688,10 +688,10 @@ def location {
     /// If this property is not present, then the precision is unspecified.
     ///
     /// If this property is present, the latitude and longitude properties MUST be present. 
-    rel .'precision'?: {
+    rel .'precision'?: (
         rel .is: f64
         rel .is: SI.meter
-    }
+    )
 
     /// The region that this Location describes.
     /// This property SHOULD contain a value from `region-ov`.
@@ -714,7 +714,7 @@ def location {
 
     /// The postal code for this Location.
     rel .'postal_code'?: common.string
-}
+)
 
 /// Malware is a type of TTP that represents malicious code. It generally refers to a program that is inserted into a system, usually covertly.
 /// The intent is to compromise the confidentiality, integrity, or availability of the victim's data, applications, or operating system (OS) or otherwise annoy or disrupt the victim.
@@ -728,7 +728,7 @@ def location {
 /// We strongly encourage the use of STIX Indicators for the detection of actual malware, due to its use of the STIX Patterning language and the clear semantics that it provides.
 ///
 /// To minimize the risk of a consumer compromising their system in parsing malware samples, producers SHOULD consider sharing defanged content (archive and password-protected samples) instead of raw, base64-encoded malware samples.
-def malware {
+def malware (
     rel .is: stix_domain_object
     rel .'type': 'malware'
     rel .'id'(rel .gen: auto)|id: malware-id
@@ -743,16 +743,16 @@ def malware {
     /// This property is an open vocabulary that specifies a set of categorizations for the malware being described.
     ///
     /// This is an open vocabulary and values SHOULD come from the `malware-type-ov` vocabulary.
-    rel .'malware_types': [ov.malware-type-ov]
+    rel .'malware_types': {ov.malware-type-ov}
 
     /// Whether the object represents a malware family (if `true`) or a malware instance (if `false`).
     rel .'is_family': boolean
 
     /// Alternative names used to identify this malware or malware family.
-    rel .'aliases'?: [common.string]
+    rel .'aliases'?: {common.string}
 
     /// The list of Kill Chain Phases for which this malware can be used.
-    rel .'kill_chain_phases'?: [common.kill-chain-phase]
+    rel .'kill_chain_phases'?: {common.kill-chain-phase}
 
     /// The time that the malware instance or family was first seen.
     ///
@@ -772,32 +772,32 @@ def malware {
     ///
     /// Each string value for this property SHOULD be a CPE v2.3 entry from the official NVD CPE Dictionary [NVD].
     /// This property MAY include custom values including values taken from other standards such as SWID [SWID].
-    rel .'os_execution_envs'?: [common.string]
+    rel .'os_execution_envs'?: {common.string}
 
     /// The processor architectures (e.g., x86, ARM, etc.) that the malware instance or family is executable on.
     ///
     /// This is an open vocabulary and values SHOULD come from the `processor-architecture-ov` vocabulary.
-    rel .'architecture_execution_envs'?: [ov.processor-architecture-ov]
+    rel .'architecture_execution_envs'?: {ov.processor-architecture-ov}
 
     /// The programming language(s) used to implement the malware instance or family.
     ///
     /// This is an open vocabulary and values SHOULD come from the `implementation-language-ov` vocabulary.
-    rel .'implementation_languages'?: [ov.implementation-language-ov]
+    rel .'implementation_languages'?: {ov.implementation-language-ov}
 
     /// Specifies any capabilities identified for the malware instance or family.
     /// 
     /// This is an open vocabulary and values SHOULD come from the `malware-capabilities-ov` vocabulary.
-    rel .'capabilities'?: [ov.malware-capabilities-ov]
+    rel .'capabilities'?: {ov.malware-capabilities-ov}
 
     /// The sample_refs property specifies a list of identifiers of the SCO file or artifact objects associated with this malware instance(s) or family.
     ///
     /// If is_family is false, then all samples listed in sample_refs MUST refer to the same binary data.
-    rel .'sample_refs'?: [sdo_identifier]
-}
+    rel .'sample_refs'?: {sdo_identifier}
+)
 
 /// Malware Analysis captures the metadata and results of a particular static or dynamic analysis performed on a malware instance or family.
 /// One of av_result or analysis_sco_refs MUST be provided.
-def malware-analysis {
+def malware-analysis (
     rel .is: stix_domain_object
     rel .'type': 'malware-analysis'
     rel .'id'(rel .gen: auto)|id: malware-analysis-id
@@ -812,7 +812,7 @@ def malware-analysis {
     rel .'version'?: common.string
 
     rel .'host_vm_ref'?: software-id
-}
+)
 
 /// A Note is intended to convey informative text to provide further context and/or to provide additional analysis not contained in the STIX Objects, Marking Definition objects, or Language Content objects which the Note relates to.
 /// Notes can be created by anyone (not just the original object creator).
@@ -821,7 +821,7 @@ def malware-analysis {
 ///
 /// Because Notes are typically (though not always) created by human analysts and are comprised of human-oriented text, they contain an additional property to capture the analyst(s) that created the Note.
 /// This is distinct from the created_by_ref property, which is meant to capture the organization that created the object.
-def note {
+def note (
     rel .is: stix_domain_object
     rel .'type': 'note'
     rel .'id'(rel .gen: auto)|id: note-id
@@ -833,11 +833,11 @@ def note {
     rel .'content': common.string
 
     /// The name of the author(s) of this note (e.g., the analyst(s) that created it).
-    rel .'authors'?: [common.string]
+    rel .'authors'?: {common.string}
 
     /// The STIX Objects that the note is being applied to.
-    rel .'object_refs': [sdo_identifier]
-}
+    rel .'object_refs': {sdo_identifier}
+)
 
 /// Observed Data conveys information about cyber security related entities such as files, systems, and networks using the STIX Cyber-observable Objects (SCOs).
 /// For example, Observed Data can capture information about an IP address, a network connection, a file, or a registry key.
@@ -860,7 +860,7 @@ def note {
 /// For example, the Sighting Relationship object, can relate an Indicator, Malware, or other SDO to a specific Observed Data to represent the raw information that led to the creation of the Sighting (e.g., what was actually seen that suggested that a particular instance of malware was active).
 /// 
 /// To support backwards compatibility, related SCOs can still be specified using the objects properties, Either the objects property or the object_refs property MUST be provided, but both MUST NOT be present at the same time.
-def observed-data {
+def observed-data (
     rel .is: stix_domain_object
     rel .'type': 'observed-data'
     rel .'id'(rel .gen: auto)|id: observed-data-id
@@ -887,8 +887,8 @@ def observed-data {
     /// For example, a Network Traffic object and two IPv4 Address objects related via the src_ref and dst_ref properties can be contained in the same Observed Data because they are all related and used to characterize that single entity.
     ///
     /// This property MUST NOT be present if objects is provided.
-    rel .'object_refs'?: [sdo_identifier]
-}
+    rel .'object_refs'?: {sdo_identifier}
+)
 
 /// An Opinion is an assessment of the correctness of the information in a STIX Object produced by a different entity.
 /// The primary property is the opinion property, which captures the level of agreement or disagreement using a fixed scale.
@@ -900,7 +900,7 @@ def observed-data {
 ///
 /// Because Opinions are typically (though not always) created by human analysts and are comprised of human-oriented text, they contain an additional property to capture the analyst(s) that created the Opinion.
 /// This is distinct from the created_by_ref property, which is meant to capture the organization that created the object.
-def opinion {
+def opinion (
     rel .is: stix_domain_object
     rel .'type': 'opinion'
     rel .'id'(rel .gen: auto)|id: opinion-id
@@ -910,7 +910,7 @@ def opinion {
     rel .'explanation'?: common.string
 
     /// The name of the author(s) of this Opinion (e.g., the analyst(s) that created it).
-    rel .'authors'?: [common.string]
+    rel .'authors'?: {common.string}
 
     /// The opinion that the producer has about all of the STIX Object(s) listed in the `object_refs` property.
     ///
@@ -918,8 +918,8 @@ def opinion {
     rel .'opinion': ov.opinion-enum
 
     /// The STIX Objects that the Opinion is being applied to.
-    rel .'object_refs': [sdo_identifier]
-}
+    rel .'object_refs': {sdo_identifier}
+)
 
 /// Reports are collections of threat intelligence focused on one or more topics, such as a description of a threat actor, malware, or attack technique, including context and related details.
 /// They are used to group related threat intelligence together so that it can be published as a comprehensive cyber threat story.
@@ -928,7 +928,7 @@ def opinion {
 ///
 /// For example, a threat report produced by ACME Defense Corp. discussing the Glass Gazelle campaign should be represented using Report.
 /// The Report itself would contain the narrative of the report while the Campaign SDO and any related SDOs (e.g., Indicators for the Campaign, Malware it uses, and the associated Relationships) would be referenced in the report contents.
-def report {
+def report (
     rel .is: stix_domain_object
     rel .'type': 'report'
     rel .'id'(rel .gen: auto)|id: report-id
@@ -942,7 +942,7 @@ def report {
     /// This property is an open vocabulary that specifies the primary subject(s) of this report.
     ///
     /// This is an open vocabulary and values SHOULD come from the `report-type-ov` vocabulary.
-    rel .'report_types': [ov.report-type-ov]
+    rel .'report_types': {ov.report-type-ov}
 
     /// The date that this Report object was officially published by the creator of this report.
     ///
@@ -950,8 +950,8 @@ def report {
     rel .'published': common.timestamp
 
     /// Specifies the STIX Objects that are referred to by this Report.
-    rel .'object_refs': [sdo_identifier]
-}
+    rel .'object_refs': {sdo_identifier}
+)
 
 /// Threat Actors are actual individuals, groups, or organizations believed to be operating with malicious intent.
 /// A Threat Actor is not an Intrusion Set but may support or be affiliated with various Intrusion Sets, groups, or organizations over time.
@@ -959,7 +959,7 @@ def report {
 /// Threat Actors leverage their resources, and possibly the resources of an Intrusion Set, to conduct attacks and run Campaigns against targets.
 ///
 /// Threat Actors can be characterized by their motives, capabilities, goals, sophistication level, past activities, resources they have access to, and their role in the organization.
-def threat-actor {
+def threat-actor (
     rel .is: stix_domain_object
     rel .'type': 'threat-actor'
     rel .'id'(rel .gen: auto)|id: threat-actor-id
@@ -973,10 +973,10 @@ def threat-actor {
     /// This property specifies the type(s) of this threat actor.
     ///
     /// This is an open vocabulary and values SHOULD come from the `threat-actor-type-ov` vocabulary.
-    rel .'threat_actor_types': [ov.threat-actor-type-ov]
+    rel .'threat_actor_types': {ov.threat-actor-type-ov}
 
     /// A list of other names that this Threat Actor is believed to use.
-    rel .'aliases'?: [common.string]
+    rel .'aliases'?: {common.string}
 
     /// The time that this Threat Actor was first seen.
     ///
@@ -995,12 +995,12 @@ def threat-actor {
     /// A list of roles the Threat Actor plays.
     ///
     /// This is an open vocabulary and the values SHOULD come from the `threat-actor-role-ov` vocabulary.
-    rel .'roles'?: [ov.threat-actor-role-ov]
+    rel .'roles'?: {ov.threat-actor-role-ov}
 
     /// The high-level goals of this Threat Actor, namely, what are they trying to do.
     /// For example, they may be motivated by personal gain, but their goal is to steal credit card numbers.
     /// To do this, they may execute specific Campaigns that have detailed objectives like compromising point of sale systems at a large retailer. 
-    rel .'goals'?: [common.string]
+    rel .'goals'?: {common.string}
 
     /// The skill, specific knowledge, special training, or expertise a Threat Actor must have to perform the attack.
     /// This is an open vocabulary and values SHOULD come from the `threat-actor-sophistication-ov` vocabulary.
@@ -1025,7 +1025,7 @@ def threat-actor {
     /// However, it does not replace or necessarily magnify the primary motivation, but it might indicate additional context.
     /// The position in the list has no significance.
     /// This is an open vocabulary and values SHOULD come from the `attack-motivation-ov` vocabulary.
-    rel .'secondary_motivations'?: [ov.attack-motivation-ov]
+    rel .'secondary_motivations'?: {ov.attack-motivation-ov}
 
     /// The personal reasons, motivations, or purposes of the Threat Actor regardless of organizational goals.
     /// 
@@ -1037,8 +1037,8 @@ def threat-actor {
     /// The position in the list has no significance.
     /// 
     /// This is an open vocabulary and values SHOULD come from the `attack-motivation-ov` vocabulary.
-    rel .'personal_motivations'?: [ov.attack-motivation-ov]
-}
+    rel .'personal_motivations'?: {ov.attack-motivation-ov}
+)
 
 /// Tools are legitimate software that can be used by threat actors to perform attacks.
 /// Knowing how and when threat actors use such tools can be important for understanding how campaigns are executed.
@@ -1050,7 +1050,7 @@ def threat-actor {
 ///
 /// This SDO MUST NOT be used to characterize malware.
 /// Further, Tool MUST NOT be used to characterise tools used as part of a course of action in response to an attack.
-def tool {
+def tool (
     rel .is: stix_domain_object
     rel .'type': 'tool'
     rel .'id'(rel .gen: auto)|id: tool-id
@@ -1064,17 +1064,17 @@ def tool {
     /// The kind(s) of tool(s) being described.
     ///
     /// This is an open vocabulary and values SHOULD come from the `tool-type-ov` vocabulary.
-    rel .'tool_types'?: [ov.tool-type-ov]
+    rel .'tool_types'?: {ov.tool-type-ov}
 
     /// Alternative names used to identify this Tool.
-    rel .'aliases'?: [common.string]
+    rel .'aliases'?: {common.string}
 
     /// The list of kill chain phases for which this Tool can be used. 
-    rel .'kill_chain_phases'?: [common.kill-chain-phase]
+    rel .'kill_chain_phases'?: {common.kill-chain-phase}
 
     /// The version identifier associated with the Tool.
     rel .'tool_version'?: common.string
-}
+)
 
 /// A Vulnerability is "a mistake in software that can be directly used by a hacker to gain access to a system or network".
 /// For example, if a piece of malware exploits CVE-2015-12345, a Malware object could be linked to a Vulnerability object that references CVE-2015-12345.
@@ -1083,7 +1083,7 @@ def tool {
 /// The Vulnerability SDO is primarily used to link to external definitions of vulnerabilities or to describe 0-day vulnerabilities that do not yet have an external definition.
 /// Typically, other SDOs assert relationships to Vulnerability objects when a specific vulnerability is targeted and exploited as part of malicious cyber activity.
 /// As such, Vulnerability objects can be used as a linkage to the asset management and compliance process.
-def vulnerability {
+def vulnerability (
     rel .is: stix_domain_object
     rel .'type': 'vulnerability'
     rel .'id'(rel .gen: auto)|id: vulnerability-id
@@ -1091,19 +1091,19 @@ def vulnerability {
     /// A list of external references which refer to non-STIX information.
     /// This property MAY be used to provide one or more Vulnerability identifiers, such as a CVE ID [CVE].
     /// When specifying a CVE ID, the source_name property of the external reference MUST be set to cve and the external_id property MUST be the exact CVE identifier.
-    rel .'external_references'?: [common.external-reference]
+    rel .'external_references'?: {common.external-reference}
 
     /// A name used to identify the Vulnerability.
     rel .'name': common.string
 
     /// A description that provides more details and context about the Vulnerability, potentially including its purpose and its key characteristics.
     rel .'description'?: common.string
-}
+)
 
 /// The Artifact object permits capturing an array of bytes (8-bits), as a base64-encoded string, or linking to a file-like payload.
 ///
 /// One of `payload_bin` or `url` MUST be provided. It is incumbent on object creators to ensure that the URL is accessible for downstream consumers.
-def artifact {
+def artifact (
     rel .is: stix_cyber_observable_object
     rel .'type': 'artifact'
     rel .'id'(rel .gen: auto)|id: artifact-id
@@ -1137,10 +1137,10 @@ def artifact {
     ///
     /// This property MUST NOT be present when the encryption_algorithm property is absent.
     rel .'decryption-key'?: common.string
-}
+)
 
 /// The AS object represents the properties of an Autonomous System (AS).
-def autonomous-system {
+def autonomous-system (
     rel .is: stix_cyber_observable_object
     rel .'type': 'autonomous-system'
     rel .'id'(rel .gen: auto)|id: autonomous-system-id
@@ -1153,10 +1153,10 @@ def autonomous-system {
 
     /// Specifies the name of the Regional Internet Registry (RIR) that assigned the number to the AS.
     rel .'rir'?: common.string
-}
+)
 
 /// The Directory object represents the properties common to a file system directory. 
-def directory {
+def directory (
     rel .is: stix_cyber_observable_object
     rel .'type': 'directory'
     rel .'id'(rel .gen: auto)|id: directory-id
@@ -1182,14 +1182,14 @@ def directory {
     /// Specifies a list of references to other File and/or Directory objects contained within the directory.
     ///
     /// The objects referenced in this list MUST be of type `file` or `directory`.
-    rel .'contains_refs'?: [{
+    rel .'contains_refs'?: {(
         rel .is?: file-id
         rel .is?: directory-id
-    }]
-}
+    )}
+)
 
 /// The Domain Name object represents the properties of a network domain name.
-def domain-name {
+def domain-name (
     rel .is: stix_cyber_observable_object
     rel .'type': 'domain-name'
     rel .'id'(rel .gen: auto)|id: domain-name-id
@@ -1199,11 +1199,11 @@ def domain-name {
     rel .'value': common.string
 
     // Note: Deprecated
-    // rel .'resolves_to_refs'?: [sdo_identifier]
-}
+    // rel .'resolves_to_refs'?: {sdo_identifier}
+)
 
 /// The Email Address object represents a single email address.
-def email-addr {
+def email-addr (
     rel .is: stix_cyber_observable_object
     rel .'type': 'email-addr'
     rel .'id'(rel .gen: auto)|id: email-addr-id
@@ -1222,7 +1222,7 @@ def email-addr {
     ///
     /// The object referenced in this property MUST be of type user-account.
     rel .'belongs_to_ref'?: user-account-id
-}
+)
 
 
 // FIXME: This seems a little out of place, but must currently be in this domain because it references id types,
@@ -1234,7 +1234,7 @@ def email-addr {
 /// There is no property to capture the value of the “Content-Transfer-Encoding” header field, since the body MUST be decoded before being represented in the body property.
 ///
 /// One of body OR body_raw_ref MUST be included.
-def mime-part-type {
+def mime-part-type (
     /// Specifies the contents of the MIME part if the content_type is not provided or starts with text/ (e.g., in the case of plain text or HTML email).
     ///
     /// For inclusion in this property, the contents MUST be decoded to Unicode. Note that the charset provided in content_type is for informational usage and not for decoding of this property. 
@@ -1245,10 +1245,10 @@ def mime-part-type {
     /// The object referenced in this property MUST be of type artifact or file.
     /// For use cases where conveying the actual data contained in the MIME part is of primary importance, artifact SHOULD be used.
     /// Otherwise, for use cases where conveying metadata about the file-like properties of the MIME part is of primary importance, file SHOULD be used.
-    rel .'body_raw_ref'?: {
+    rel .'body_raw_ref'?: (
         rel .is?: file-id
         rel .is?: artifact-id
-    }
+    )
 
     /// Specifies the value of the “Content-Type” header field of the MIME part.
     ///
@@ -1260,7 +1260,7 @@ def mime-part-type {
 
     /// Specifies the value of the “Content-Disposition” header field of the MIME part.
     rel .'content_disposition'?: common.string
-}
+)
 
 /// The Email Message object represents an instance of an email message, corresponding to the internet message format described in [RFC5322] and related RFCs.
 ///
@@ -1268,7 +1268,7 @@ def mime-part-type {
 /// For example, this is some text MUST be used instead of `=?iso-8859-1?q?this=20is=20some=20text?=`.
 /// Any characters in the encoded value which cannot be decoded into Unicode SHOULD be replaced with the 'REPLACEMENT CHARACTER' (U+FFFD).
 /// If it is necessary to capture the header value as observed, this can be achieved by referencing an Artifact object through the raw_email_ref property.
-def email-message {
+def email-message (
     rel .is: stix_cyber_observable_object
     rel .'type': 'email-message'
     rel .'id'(rel .gen: auto)|id: email-message-id
@@ -1297,19 +1297,19 @@ def email-message {
     /// Specifies the mailboxes that are “To:” recipients of the email message.
     ///
     /// The objects referenced in this list MUST be of type email-address.
-    rel .'to_refs'?: [email-addr-id]
+    rel .'to_refs'?: {email-addr-id}
 
     /// Specifies the mailboxes that are “CC:” recipients of the email message.
     ///
     /// The objects referenced in this list MUST be of type email-address.
-    rel .'cc_refs'?: [email-addr-id]
+    rel .'cc_refs'?: {email-addr-id}
 
     /// Specifies the mailboxes that are “BCC:” recipients of the email message.
     ///
     /// As per [RFC5322], the absence of this property should not be interpreted as semantically equivalent to an absent BCC header on the message being characterized.
     ///
     /// The objects referenced in this list MUST be of type email-address.
-    rel .'bcc_refs'?: [email-addr-id]
+    rel .'bcc_refs'?: {email-addr-id}
 
     /// Specifies the Message-ID field of the email message.
     rel .'message_id'?: common.string
@@ -1320,7 +1320,7 @@ def email-message {
     /// Specifies one or more "Received" header fields that may be included in the email headers.
     ///
     /// List values MUST appear in the same order as present in the email message.
-    rel .'received_lines'?: [common.string]
+    rel .'received_lines'?: {common.string}
 
     /// Specifies any other header fields (except for `date`, `received_lines`, `content_type`, `from_ref`, `sender_ref`, `to_refs`, `cc_refs`, `bcc_refs`, and `subject`) found in the email message, as a dictionary.
     ///
@@ -1333,17 +1333,17 @@ def email-message {
     rel .'body'?: common.string
 
     /// Specifies a list of the MIME parts that make up the email body. This property MUST NOT be used if is_multipart is false.
-    rel .'body_multipart'?: [mime-part-type]
+    rel .'body_multipart'?: {mime-part-type}
 
     /// Specifies the raw binary contents of the email message, including both the headers and body, as a reference to an Artifact object.
     ///
     /// The object referenced in this property MUST be of type `artifact`.
     rel .'raw_email_ref'?: artifact-id
-}
+)
 
 /// The File object represents the properties of a file.
 /// A File object MUST contain at least one of hashes or name.
-def file {
+def file (
     rel .is: stix_cyber_observable_object
     rel .'type': 'file'
     rel .'id'(rel .gen: auto)|id: file-id
@@ -1405,16 +1405,16 @@ def file {
     /// Specifies a list of references to other Cyber-observable Objects contained within the file, such as another file that is appended to the end of the file, or an IP address that is contained somewhere in the file.
     ///
     /// This is intended for use cases other than those targeted by the Archive extension.
-    rel .'contains_refs'?: [sdo_identifier]
+    rel .'contains_refs'?: {sdo_identifier}
 
     /// Specifies the content of the file, represented as an Artifact object.
     ///
     /// The object referenced in this property MUST be of type artifact.
-    rel .'content_ref'?: [artifact-id]
-}
+    rel .'content_ref'?: {artifact-id}
+)
 
 /// The IPv4 Address object represents one or more IPv4 addresses expressed using CIDR notation.
-def ipv4-addr {
+def ipv4-addr(
     rel .is: stix_cyber_observable_object
     rel .'type': 'ipv4-addr'
     rel .'id'(rel .gen: auto)|id: ipv4-addr-id
@@ -1422,17 +1422,17 @@ def ipv4-addr {
     /// Specifies the values of one or more IPv4 addresses expressed using CIDR notation.
     ///
     /// If a given IPv4 Address object represents a single IPv4 address, the CIDR /32 suffix MAY be omitted.
-    rel .'value': {
+    rel .'value': (
         rel .is: common.string
         rel .example: '10.2.4.5/24'
-    }
+    )
 
     // FIXME: Deprecated field `resolves_to_refs` not modelled
     // FIXME: Deprecated field `belongs_to_refs` not modelled
-}
+)
 
 /// The IPv6 Address object represents one or more IPv6 addresses expressed using CIDR notation.
-def ipv6-addr {
+def ipv6-addr(
     rel .is: stix_cyber_observable_object
     rel .'type': 'ipv6-addr'
     rel .'id'(rel .gen: auto)|id: ipv6-addr-id
@@ -1444,10 +1444,10 @@ def ipv6-addr {
 
     // FIXME: Deprecated field `resolves_to_refs` not modelled
     // FIXME: Deprecated field `belongs_to_refs` not modelled
-}
+)
 
 /// The MAC Address object represents a single Media Access Control (MAC) address.
-def mac-addr {
+def mac-addr (
     rel .is: stix_cyber_observable_object
     rel .'type': 'mac-addr'
     rel .'id'(rel .gen: auto)|id: mac-addr-id
@@ -1455,21 +1455,21 @@ def mac-addr {
     /// Specifies the value of a single MAC address.
     ///
     /// The MAC address value MUST be represented as a single colon-delimited, lowercase MAC-48 address, which MUST include leading zeros for each octet.
-    rel .'value': {
+    rel .'value': (
         rel .is: common.string
         rel .example: '00:00:ab:cd:ef:01'
-    }
-}
+    )
+)
 
 /// The Mutex object represents the properties of a mutual exclusion (mutex) object.
-def mutex {
+def mutex (
     rel .is: stix_cyber_observable_object
     rel .'type': 'mutex'
     rel .'id'(rel .gen: auto)|id: mutex-id
 
     /// Specifies the name of the mutex object.
     rel .'name': common.string
-}
+)
 
 /// The Network Traffic object represents arbitrary network traffic that originates from a source and is addressed to a destination.
 /// The network traffic MAY or MAY NOT constitute a valid unicast, multicast, or broadcast network connection.
@@ -1477,7 +1477,7 @@ def mutex {
 /// 
 /// To allow for use cases where a source or destination address may be sensitive and not suitable for sharing, such as addresses that are internal to an organization’s network, the source and destination properties (src_ref and dst_ref, respectively) are defined as optional in the properties table below.
 /// However, a Network Traffic object MUST contain the protocols property and at least one of the src_ref or dst_ref properties and SHOULD contain the src_port and dst_port properties. 
-def network-traffic {
+def network-traffic (
     rel .is: stix_cyber_observable_object
     rel .'type': 'network-traffic'
     rel .'id'(rel .gen: auto)|id: network-traffic-id
@@ -1510,36 +1510,36 @@ def network-traffic {
     /// Specifies the source of the network traffic, as a reference to a Cyber-observable Object.
     ///
     /// The object referenced MUST be of type `ipv4-addr`, `ipv6-addr`, `mac-addr`, or `domain-name` (for cases where the IP address for a domain name is unknown).
-    rel .'src_ref'?: {
+    rel .'src_ref'?: (
         rel .is?: ipv4-addr-id
         rel .is?: ipv6-addr-id
         rel .is?: mac-addr-id
         rel .is?: domain-name-id
-    }
+    )
 
     /// Specifies the destination of the network traffic, as a reference to a Cyber-observable Object.
     ///
     /// The object referenced MUST be of type `ipv4-addr`, `ipv6-addr`, `mac-addr`, or `domain-name` (for cases where the IP address for a domain name is unknown).
-    rel .'dst_ref'?: {
+    rel .'dst_ref'?: (
         rel .is?: ipv4-addr-id
         rel .is?: ipv6-addr-id
         rel .is?: mac-addr-id
         rel .is?: domain-name-id
-    }
+    )
 
     /// Specifies the source port used in the network traffic, as an integer.
-    rel .'src_port'?: {
+    rel .'src_port'?: (
         rel .is: common.integer
         rel .min: 0
         rel .max: 65535
-    }
+    )
 
     /// Specifies the destination port used in the network traffic, as an integer.
-    rel .'dst_port'?: {
+    rel .'dst_port'?: (
         rel .is: common.integer
         rel .min: 0
         rel .max: 65535
-    }
+    )
 
     /// Specifies the protocols observed in the network traffic, along with their corresponding state.
     ///
@@ -1548,7 +1548,7 @@ def network-traffic {
     ///
     /// The protocol names SHOULD come from the service names defined in the Service Name column of the IANA Service Name and Port Number Registry [Port Numbers].
     /// In cases where there is variance in the name of a network protocol not included in the IANA Registry, content producers should exercise their best judgement, and it is recommended that lowercase names be used for consistency with the IANA registry.
-    rel .'protocols'?: [{
+    rel .'protocols'?: {(
         rel .is: common.string
         rel .example: 'ipv4'
         rel .example: 'tcp'
@@ -1556,31 +1556,31 @@ def network-traffic {
         rel .example: 'http'
         rel .example: 'https'
         rel .example: 'ssl'
-    }]
+    )}
 
     /// Specifies the number of bytes, as a positive integer, sent from the source to the destination.
-    rel .'src_byte_count'?: {
+    rel .'src_byte_count'?: (
         rel .is: common.integer
         rel .min: 0
-    }
+    )
 
     /// Specifies the number of bytes, as a positive integer, sent from the destination to the source.
-    rel .'dst_byte_count'?: {
+    rel .'dst_byte_count'?: (
         rel .is: common.integer
         rel .min: 0
-    }
+    )
 
     /// Specifies the number of packets, as a positive integer, sent from the source to the destination.
-    rel .'src_packets'?: {
+    rel .'src_packets'?: (
         rel .is: common.integer
         rel .min: 0
-    }
+    )
 
     /// Specifies the number of packets, as a positive integer, sent from the destination to the source.
-    rel .'dst_packets'?: {
+    rel .'dst_packets'?: (
         rel .is: common.integer
         rel .min: 0
-    }
+    )
 
     /// Specifies any IP Flow Information Export [IPFIX] data for the traffic, as a dictionary.
     /// Each key/value pair in the dictionary represents the name/value of a single IPFIX element.
@@ -1598,16 +1598,16 @@ def network-traffic {
 
     /// Links to other network-traffic objects encapsulated by this network-traffic object.
     /// The objects referenced in this property MUST be of type `network-traffic`.
-    rel .'encapsulates_refs'?: [network-traffic-id]
+    rel .'encapsulates_refs'?: {network-traffic-id}
 
     /// Links to another network-traffic object which encapsulates this object.
     /// The object referenced in this property MUST be of type `network-traffic`.
-    rel .'encapsulated_by_ref'?: [network-traffic-id]
-}
+    rel .'encapsulated_by_ref'?: {network-traffic-id}
+)
 
 /// The Process object represents common properties of an instance of a computer program as executed on an operating system.
 /// A Process object MUST contain at least one property (other than type) from this object (or one of its extensions).
-def process {
+def process (
     rel .is: stix_cyber_observable_object
     rel .'type': 'process'
     rel .'id'(rel .gen: auto)|id: process-id
@@ -1644,7 +1644,7 @@ def process {
     /// Specifies the list of network connections opened by the process, as a reference to one or more Network Traffic objects.
     ///
     /// The objects referenced in this list MUST be of type `network-traffic`.
-    rel .'opened_connection_refs'?: [network-traffic-id]
+    rel .'opened_connection_refs'?: {network-traffic-id}
 
     /// Specifies the user that created the process, as a reference to a User Account object.
     ///
@@ -1665,11 +1665,11 @@ def process {
     /// Specifies the other processes that were spawned by (i.e. children of) this process, as a reference to one or more other Process objects.
     ///
     /// The objects referenced in this list MUST be of type process.
-    rel .'child_refs'?: [process-id]
-}
+    rel .'child_refs'?: {process-id}
+)
 
 /// The Software object represents high-level properties associated with software, including software products.
-def software {
+def software (
     rel .is: stix_cyber_observable_object
     rel .'type': 'software'
     rel .'id'(rel .gen: auto)|id: software-id
@@ -1685,17 +1685,17 @@ def software {
 
     /// Specifies the languages supported by the software.
     /// The value of each list member MUST be an ISO 639-2 language code [ISO639-2].
-    rel .'languages'?: [common.string]
+    rel .'languages'?: {common.string}
 
     /// Specifies the name of the vendor of the software.
     rel .'vendor'?: common.string
 
     /// Specifies the version of the software.
     rel .'version'?: common.string
-}
+)
 
 /// The URL object represents the properties of a uniform resource locator (URL).
-def url {
+def url (
     rel .is: stix_cyber_observable_object
     rel .'type': 'url'
     rel .'id'(rel .gen: auto)|id: url-id
@@ -1703,11 +1703,11 @@ def url {
     /// Specifies the value of the URL.
     /// The value of this property MUST conform to [RFC3986], more specifically section 1.1.3 with reference to the definition for "Uniform Resource Locator".
     rel .'value': common.url
-}
+)
 
 /// The User Account object represents an instance of any type of user account, including but not limited to operating system, device, messaging service, and social media platform accounts.
 /// As all properties of this object are optional, at least one of the properties defined below MUST be included when using this object.
-def user-account {
+def user-account (
     rel .is: stix_cyber_observable_object
     rel .'type': 'user-account'
     rel .'id'(rel .gen: auto)|id: user-account-id
@@ -1770,10 +1770,10 @@ def user-account {
 
     /// Specifies when the account was last accessed.
     rel .'account_last_login'?: common.timestamp
-}
+)
 
 /// The Windows Registry Value type captures the properties of a Windows Registry Key Value. As all properties of this type are optional, at least one of the properties defined below MUST be included when using this type.
-def windows-registry-value-type {
+def windows-registry-value-type (
     /// Specifies the name of the registry value. For specifying the default value in a registry key, an empty string MUST be used.
     rel .'name'?: common.string
 
@@ -1784,10 +1784,10 @@ def windows-registry-value-type {
     ///
     /// The values of this property MUST come from the `windows-registry-datatype-enum` enumeration.
     rel .'data_type'?: ov.windows-registry-datatype-enum
-}
+)
 
 /// The Registry Key object represents the properties of a Windows registry key. As all properties of this object are optional, at least one of the properties defined below MUST be included when using this object.
-def windows-registry-key {
+def windows-registry-key (
     rel .is: stix_cyber_observable_object
     rel .'type': 'windows-registry-key'
     rel .'id'(rel .gen: auto)|id: windows-registry-key-id
@@ -1799,7 +1799,7 @@ def windows-registry-key {
     rel .'key'?: common.string
 
     /// Specifies the values found under the registry key.
-    rel .'values'?: [windows-registry-value-type]
+    rel .'values'?: {windows-registry-value-type}
 
     /// Specifies the last date/time that the registry key was modified.
     rel .'modified_time'?: common.timestamp
@@ -1810,9 +1810,9 @@ def windows-registry-key {
 
     /// Specifies the number of subkeys contained under the registry key.
     rel .'number_of_subkeys'?: common.integer
-}
+)
 
-def x509-v3-extensions-type {
+def x509-v3-extensions-type(
     /// Specifies a multi-valued extension which indicates whether a certificate is a CA certificate.
     /// The first (mandatory) name is CA followed by TRUE or FALSE. If CA is TRUE, then an optional pathlen name followed by a non-negative value can be included. Also equivalent to the object ID (OID) value of 2.5.29.19.
     rel .'basic_constraints'?: common.string
@@ -1864,11 +1864,11 @@ def x509-v3-extensions-type {
     /// The pairing indicates whether the issuing CA considers its issuerDomainPolicy equivalent to the subject CA's subjectDomainPolicy.
     /// Also equivalent to the object ID (OID) value of 2.5.29.33.
     rel. 'policy_mappings': common.string
-}
+)
 
 /// The X.509 Certificate object represents the properties of an X.509 certificate, as defined by ITU recommendation X.509 [X.509].
 /// An X.509 Certificate object MUST contain at least one property (other than type) from this object.
-def x509-certificate {
+def x509-certificate(
     rel .is: stix_cyber_observable_object
     rel .'type': 'x509-certificate'
     rel .'id'(rel .gen: auto)|id: x509-certificate-id
@@ -1913,9 +1913,9 @@ def x509-certificate {
 
     /// Specifies any standard X.509 v3 extensions that may be used in the certificate. 
     rel .'x509_v3_extensions'?: x509-v3-extensions-type
-}
+)
 
-def relationship {
+def relationship (
     rel .is: stix_relationship_object
     rel .'type': 'relationship'
     rel .'id'(rel .gen: auto)|id: relationship-id
@@ -1947,4 +1947,4 @@ def relationship {
     ///
     /// If stop_time is not specified, then the latest time at which the relationship between the objects exists is either not known, not disclosed, or has no defined stop time.
     rel .'stop_time'?: common.timestamp
-}
+)

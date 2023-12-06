@@ -8,17 +8,17 @@ use test_log::test;
 #[test]
 fn should_map_inherent_capturing_pattern_id() {
     "
-    def foo {
-        rel .'id'|id: { fmt '' => 'foo/' => uuid => . }
-    }
-    def bar {
-        rel .'id'|id: { fmt '' => 'bar/' => uuid => . }
-    }
+    def foo (
+        rel .'id'|id: (fmt '' => 'foo/' => uuid => .)
+    )
+    def bar (
+        rel .'id'|id: (fmt '' => 'bar/' => uuid => .)
+    )
 
-    map {
-        foo { 'id': id }
-        bar { 'id': id }
-    }
+    map(
+        foo('id': id),
+        bar('id': id),
+    )
     "
     .compile_then(|test| {
         test.mapper().assert_map_eq(
@@ -32,47 +32,45 @@ fn should_map_inherent_capturing_pattern_id() {
 #[test]
 fn test_extract_rel_params() {
     "
-    def a1_id { fmt '' => 'a1/' => uuid => . }
-    def a2_id { fmt '' => 'a2/' => uuid => . }
-    def b1_id { fmt '' => 'b1/' => uuid => . }
-    def b2_id { fmt '' => 'b2/' => uuid => . }
+    def a1_id(fmt '' => 'a1/' => uuid => .)
+    def a2_id(fmt '' => 'a2/' => uuid => .)
+    def b1_id(fmt '' => 'b1/' => uuid => .)
+    def b2_id(fmt '' => 'b2/' => uuid => .)
 
-    def a2 {
+    def a2(
         rel a2_id identifies: .
         rel .'foo': text
-    }
-    def b2 {
+    )
+    def b2(
         rel b2_id identifies: .
         rel .'foo': text
         rel .'bar': text
-    }
+    )
 
-    def a_edge {
+    def a_edge (
         rel .'bar': text
-    }
+    )
 
-    def a1 {
+    def a1(
         rel a1_id identifies: .
         rel .'foreign'(rel .is: a_edge): a2
-    }
-    def b1 {
+    )
+    def b1(
         rel b1_id identifies: .
         rel .'foreign': b2
-    }
+    )
 
-    map {
-        a1 {
-            'foreign'('bar': b): a2 {
-                'foo': f
-            }
-        }
-        b1 {
-            'foreign': b2 {
-                'foo': f
-                'bar': b
-            }
-        }
-    }
+    map(
+        a1(
+            'foreign'('bar': b): a2('foo': f)
+        ),
+        b1(
+            'foreign': b2(
+                'foo': f,
+                'bar': b,
+            )
+        )
+    )
     "
     .compile_then(|test| {
         test.mapper().assert_map_eq(
@@ -116,44 +114,44 @@ fn test_extract_rel_params() {
 #[test]
 fn test_rel_params_implicit_map() {
     "
-    def a_id { fmt '' => 'a/' => uuid => . }
-    def b_id { fmt '' => 'a/' => uuid => . }
-    def a_inner_id { fmt '' => 'a_inner/' => uuid => . }
-    def b_inner_id { fmt '' => 'b_inner/' => uuid => . }
+    def a_id (fmt '' => 'a/' => uuid => .)
+    def b_id (fmt '' => 'a/' => uuid => .)
+    def a_inner_id (fmt '' => 'a_inner/' => uuid => .)
+    def b_inner_id (fmt '' => 'b_inner/' => uuid => .)
 
-    def a_inner {
+    def a_inner (
         rel a_inner_id identifies: .
         rel .'a_prop': text
-    }
-    def b_inner {
+    )
+    def b_inner (
         rel b_inner_id identifies: .
         rel .'b_prop': text
-    }
+    )
 
-    def a_edge { rel .'aa': text }
-    def b_edge { rel .'bb': text }
+    def a_edge (rel .'aa': text)
+    def b_edge (rel .'bb': text)
 
-    def a {
+    def a (
         rel a_id identifies: .
         rel .'foreign'(rel .is: a_edge): a_inner
-    }
-    def b {
+    )
+    def b (
         rel b_id identifies: .
         rel .'foreign'(rel .is: b_edge): b_inner
-    }
+    )
 
-    map {
-        a_inner { 'a_prop': x }
-        b_inner { 'b_prop': x }
-    }
-    map {
-        a_edge { 'aa': x }
-        b_edge { 'bb': x }
-    }
-    map {
-        a { 'foreign': x }
-        b { 'foreign': x }
-    }
+    map(
+        a_inner('a_prop': x),
+        b_inner('b_prop': x),
+    )
+    map(
+        a_edge('aa': x),
+        b_edge('bb': x),
+    )
+    map(
+        a('foreign': x),
+        b('foreign': x),
+    )
     "
     .compile_then(|test| {
         test.mapper().assert_map_eq(
@@ -181,25 +179,25 @@ fn test_rel_params_implicit_map() {
 #[test]
 fn test_map_relation_sequence_default_fallback() {
     "
-    def foo_inner { rel .'foo_id'|id: { rel .is: text } }
-    def bar_inner { rel .'bar_id'|id: { rel .is: text } }
-    rel [foo_inner] 'bars'::'foos' [bar_inner]
+    def foo_inner (rel .'foo_id'|id: (rel .is: text))
+    def bar_inner (rel .'bar_id'|id: (rel .is: text))
+    rel {foo_inner} 'bars'::'foos' {bar_inner}
 
-    def bar {
-        rel .'id'|id: { rel .is: text }
-        rel .'foos': [text]
-    }
+    def bar (
+        rel .'id'|id: (rel .is: text)
+        rel .'foos': {text}
+    )
 
-    map {
-        bar_inner match {
-            'bar_id': id
-            'foos': [..foo_inner { 'foo_id': foo }]
-        }
-        bar {
-            'id': id
-            'foos': [..foo]
-        }
-    }
+    map(
+        bar_inner match(
+            'bar_id': id,
+            'foos': { ..foo_inner('foo_id': foo) },
+        ),
+        bar(
+            'id': id,
+            'foos': {..foo}
+        ),
+    )
     "
     .compile_then(|test| {
         // The point of this test is to show that a
@@ -219,47 +217,47 @@ fn test_map_relation_sequence_default_fallback() {
 }
 
 const WORK: &str = "
-def worker_id { fmt '' => 'worker/' => uuid => . }
-def tech_id { fmt '' => 'tech/' => uuid => . }
+def worker_id (fmt '' => 'worker/' => uuid => .)
+def tech_id (fmt '' => 'tech/' => uuid => .)
 
-def worker {}
-def technology {}
+def worker ()
+def technology ()
 
-def worker {
+def worker (
     rel .'ID': worker_id
     rel worker_id identifies: .
     rel .'name': text
 
-    rel .'technologies': [technology]
-}
+    rel .'technologies': {technology}
+)
 
-def technology {
+def technology (
     rel .'ID': tech_id
     rel tech_id identifies: .
     rel .'name': text
-}
+)
 ";
 
 const DEV: &str = "
-def lang_id { fmt '' => uuid => . }
-def dev_id { fmt '' => uuid => . }
+def lang_id (fmt '' => uuid => .)
+def dev_id (fmt '' => uuid => .)
 
-def language {}
-def developer {}
+def language ()
+def developer ()
 
-def language {
+def language (
     rel .'id': lang_id
     rel lang_id identifies: .
 
     rel .'name': text
-    rel .'developers': [developer]
-}
+    rel .'developers': {developer}
+)
 
-def developer {
+def developer (
     rel .'id': dev_id
     rel dev_id identifies: .
     rel .'name': text
-}
+)
 ";
 
 #[test]
@@ -273,24 +271,24 @@ fn test_map_invert() {
             use 'work' as work
             use 'dev' as dev
 
-            map {
-                work.worker {
-                    'ID': p_id
-                    'name': p_name
-                    'technologies': [..work.technology {
-                        'ID': tech_id
-                        'name': tech_name
-                    }]
-                }
-                dev.language {
-                    'id': tech_id
-                    'name': tech_name
-                    'developers': [..dev.developer { // ERROR TODO: Incompatible aggregation group
-                        'id': p_id
-                        'name': p_name
-                    }]
-                }
-            }
+            map(
+                work.worker(
+                    'ID': p_id,
+                    'name': p_name,
+                    'technologies': {..work.technology(
+                        'ID': tech_id,
+                        'name': tech_name,
+                    )}
+                ),
+                dev.language(
+                    'id': tech_id,
+                    'name': tech_name,
+                    'developers': {..dev.developer( // ERROR TODO: Incompatible aggregation group
+                        'id': p_id,
+                        'name': p_name,
+                    )}
+                )
+            )
             ",
         ),
     ])
@@ -309,30 +307,30 @@ fn artist_etc_routing() {
             use 'ai' as ai
 
             rel gsu route(
-                map {
-                    gsu.artist {
-                        'artist-id': id
-                        'name': n
-                        'plays': [..p] // ERROR cannot convert this `instrument` from `instrument`: These types are not equated.
-                    }
-                    ai.artist {
-                        'ID': id
-                        'name': n
-                        'plays': [..p] // ERROR unbound variable// ERROR cannot convert this `instrument` from `instrument`: These types are not equated.
-                    }
-                }
+                map(
+                    gsu.artist(
+                        'artist-id': id,
+                        'name': n,
+                        'plays': {..p}, // ERROR cannot convert this `instrument` from `instrument`: These types are not equated.
+                    ),
+                    ai.artist(
+                        'ID': id,
+                        'name': n,
+                        'plays': {..p}, // ERROR unbound variable// ERROR cannot convert this `instrument` from `instrument`: These types are not equated.
+                    )
+                )
 
-                map {
-                    gsu.synth {
-                        'instrument-id': id
-                        'type': t // ERROR unbound variable
-                        'polyphony': p // ERROR unbound variable
-                    }
-                    ai.instrument {
-                        'ID': id
-                        'name': n // ERROR unbound variable
-                    }
-                }
+                map(
+                    gsu.synth(
+                        'instrument-id': id,
+                        'type': t, // ERROR unbound variable
+                        'polyphony': p, // ERROR unbound variable
+                    ),
+                    ai.instrument(
+                        'ID': id,
+                        'name': n, // ERROR unbound variable
+                    )
+                )
             ): ai
             ",
         ),

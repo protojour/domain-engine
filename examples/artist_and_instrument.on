@@ -1,47 +1,47 @@
-def artist {
-    rel .'ID'(rel .gen: auto)|id: { fmt '' => 'artist/' => uuid => . }
+def artist (
+    rel .'ID'(rel .gen: auto)|id: ( fmt '' => 'artist/' => uuid => . )
     rel .'name': text
-}
+)
 
-def record {
+def record (
     rel .'name': text
-}
+)
 
-def instrument-id {
+def instrument-id (
     fmt '' => 'instrument/' => uuid => .
-}
+)
 
-def instrument {
+def instrument (
     rel .'ID'(rel .gen: auto)|id: instrument-id
     rel .'name': text
-}
+)
 
-def plays {
+def plays (
     rel .'how_much': text
-}
+)
 
-rel [artist] 'plays'(rel .is: plays)::'played_by' [instrument]
+rel {artist} 'plays'(rel .is: plays)::'played_by' {instrument}
 
-map artists {
-    {}
-    artist: [..artist match {}]
-}
+map artists (
+    (),
+    artist: {..artist match ()}
+)
 
-map artists_by_name {
-    { 'name': x }
-    artist: [
-        ..artist match { 'name': x }
-    ]
-}
+map artists_by_name (
+    ( 'name': x ),
+    artist: {
+        ..artist match ( 'name': x )
+    }
+)
 
-// map instruments_by_how_much_played {
-//     { 'how_much': x }
-//     plays('how_much': x): [
-//         ..artist match {}
-//     ]
-// }
+// map instruments_by_how_much_played (
+//     ( 'how_much': x )
+//     plays('how_much': x): {
+//         ..artist match ()
+//     }
+// )
 
-map instruments {
-    {}
-    instrument: [..instrument match {}]
-}
+map instruments (
+    (),
+    instrument: { ..instrument match () }
+)

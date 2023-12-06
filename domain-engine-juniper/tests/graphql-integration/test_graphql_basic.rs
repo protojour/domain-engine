@@ -42,22 +42,22 @@ fn test_graphql_schema_for_entityless_domain_should_not_be_generated() {
 #[test(tokio::test)]
 async fn test_graphql_int_scalars() {
     let (test, schema) = "
-    def foo_id { fmt '' => text => . }
-    def smallint {
+    def foo_id (fmt '' => text => .)
+    def smallint (
         rel .is: integer
         rel .min: 0
         rel .max: 255
-    }
-    def foo {
+    )
+    def foo (
         rel foo_id identifies: .
         rel .'small': smallint
         rel .'big': i64
-    }
+    )
 
-    map foos {
-        {}
-        foo: [..foo match {}]
-    }
+    map foos(
+        (),
+        foo: {..foo match()},
+    )
     "
     .compile_single_schema_with_datastore();
 
@@ -149,13 +149,13 @@ async fn test_graphql_int_scalars() {
 #[test(tokio::test)]
 async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
     let (test, schema) = "
-    def foo {
-        rel .'id'(rel .gen: auto)|id: { rel .is: text }
-    }
-    map foos {
-        {}
-        foo: [..foo match {}]
-    }
+    def foo (
+        rel .'id'(rel .gen: auto)|id: (rel .is: text)
+    )
+    map foos(
+        (),
+        foo: {..foo match()}
+    )
     "
     .compile_single_schema_with_datastore();
 
@@ -186,13 +186,13 @@ async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
 #[test(tokio::test)]
 async fn test_graphql_basic_pagination() {
     let (test, schema) = "
-    def foo {
-        rel .'id'(rel .gen: auto)|id: { rel .is: text }
-    }
-    map foos {
-        {}
-        foo: [..foo match {}]
-    }
+    def foo (
+        rel .'id'(rel .gen: auto)|id: (rel .is: text)
+    )
+    map foos(
+        (),
+        foo: { ..foo match() },
+    )
     "
     .compile_single_schema_with_datastore();
 
@@ -321,13 +321,13 @@ async fn test_graphql_basic_pagination() {
 #[test(tokio::test)]
 async fn test_graphql_nodes() {
     let (test, schema) = "
-    def foo {
-        rel .'id'(rel .gen: auto)|id: { rel .is: text }
-    }
-    map foos {
-        {}
-        foo: [..foo match {}]
-    }
+    def foo (
+        rel .'id'(rel .gen: auto)|id: (rel .is: text)
+    )
+    map foos(
+        (),
+        foo: { ..foo match() }
+    )
     "
     .compile_single_schema_with_datastore();
 
@@ -367,11 +367,11 @@ async fn test_graphql_nodes() {
 #[test]
 fn test_graphql_value_type_as_field() {
     "
-    def foo { rel .is: text }
-    def bar {
-        rel .'id'(rel .gen: auto)|id: { rel .is: text }
+    def foo (rel .is: text)
+    def bar (
+        rel .'id'(rel .gen: auto)|id: (rel .is: text)
         rel .'foo': foo
-    }
+    )
     "
     .compile_schemas([ROOT]);
 }
@@ -379,11 +379,11 @@ fn test_graphql_value_type_as_field() {
 #[test]
 fn test_graphql_value_type_in_array() {
     "
-    def foo { rel .is: text }
-    def bar {
-        rel .'id'(rel .gen: auto)|id: { rel .is: text }
-        rel .'foo': [foo]
-    }
+    def foo (rel .is: text)
+    def bar (
+        rel .'id'(rel .gen: auto)|id: (rel .is: text)
+        rel .'foo': {foo}
+    )
     "
     .compile_schemas([ROOT]);
 }
@@ -391,18 +391,18 @@ fn test_graphql_value_type_in_array() {
 #[test(tokio::test)]
 async fn test_inner_struct() {
     let (test, schema) = "
-    def foo_id { fmt '' => text => . }
-    def inner {
+    def foo_id (fmt '' => text => .)
+    def inner (
         rel .'prop': text
-    }
-    def foo {
+    )
+    def foo (
         rel foo_id identifies: .
         rel .'inner': inner
-    }
-    map foos {
-        {}
-        foo: [..foo match {}]
-    }
+    )
+    map foos(
+        (),
+        foo: { ..foo match() },
+    )
     "
     .compile_single_schema_with_datastore();
 
@@ -473,16 +473,16 @@ async fn test_inner_struct() {
 #[test(tokio::test)]
 async fn test_docs_introspection() {
     let (test, schema) = "
-    def Key {
+    def Key (
         rel .is: text
-    }
+    )
 
     /// this is a type
-    def PublicType {
+    def PublicType (
         rel Key identifies: .
         /// this is a field
         rel .'relation': text
-    }
+    )
     "
     .compile_single_schema_with_datastore();
 
@@ -770,31 +770,31 @@ async fn test_create_through_mapped_domain() {
             "
             use 'artist' as a
 
-            def player {
-                rel .'id'(rel .gen: auto)|id: { rel .is: uuid }
+            def player (
+                rel .'id'(rel .gen: auto)|id: (rel .is: uuid)
                 rel .'nick': text
-            }
+            )
 
-            map {
-                player {
-                    'id': id
-                    'nick': n
-                }
-                a.artist {
-                    'ID': id
-                    'name': n
-                }
-            }
+            map(
+                player(
+                    'id': id,
+                    'nick': n,
+                ),
+                a.artist(
+                    'ID': id,
+                    'name': n,
+                ),
+            )
         ",
         ),
         // BUG: Not using `artist_and_instrument` here right now because of https://gitlab.com/protojour/memoriam/domain-engine/-/issues/86
         (
             SourceName("artist"),
             "
-            def artist {
-                rel .'ID'(rel .gen: auto)|id: { fmt '' => 'artist/' => uuid => . }
+            def artist (
+                rel .'ID'(rel .gen: auto)|id: (fmt '' => 'artist/' => uuid => .)
                 rel .'name': text
-            }
+            )
             ",
         ),
     ])
@@ -1196,9 +1196,9 @@ fn test_graphql_municipalities_geojson_union() {
 #[test(tokio::test)]
 async fn test_graphql_open_data() {
     let (test, schema) = "
-    def(open) foo {
-        rel .'id'(rel .gen: auto)|id: { rel .is: text }
-    }
+    def(open) foo (
+        rel .'id'(rel .gen: auto)|id: (rel .is: text)
+    )
     "
     .compile_single_schema_with_datastore();
     let [foo] = test.bind(["foo"]);
@@ -1245,9 +1245,9 @@ async fn test_graphql_open_data() {
 #[test(tokio::test)]
 async fn test_open_data_disabled() {
     let (test, schema) = "
-    def(open) foo {
-        rel .'id'(rel .gen: auto)|id: { rel .is: text }
-    }
+    def(open) foo (
+        rel .'id'(rel .gen: auto)|id: (rel .is: text)
+    )
     "
     .compile_single_schema_with_datastore();
     let [foo] = test.bind(["foo"]);

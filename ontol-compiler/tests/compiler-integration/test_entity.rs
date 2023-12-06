@@ -12,12 +12,12 @@ use test_log::test;
 #[test]
 fn id_cannot_identify_two_things() {
     "
-    def foo {}
-    def bar {}
-    def id {
+    def foo ()
+    def bar ()
+    def id (
         rel .identifies: foo
         rel .identifies: bar // ERROR already identifies a type
-    }
+    )
     "
     .compile_fail();
 }
@@ -25,11 +25,11 @@ fn id_cannot_identify_two_things() {
 #[test]
 fn entity_without_inherent_id() {
     "
-    def some_id { fmt '' => text => . }
-    def entity {
+    def some_id (fmt '' => text => .)
+    def entity (
         rel .id: some_id
         rel .'foo': text
-    }
+    )
     "
     .compile_then(|test| {
         let [entity] = test.bind(["entity"]);
@@ -40,12 +40,12 @@ fn entity_without_inherent_id() {
 #[test]
 fn inherent_id_no_autogen() {
     "
-    def foo_id { rel .is: text }
-    def foo {
+    def foo_id (rel .is: text)
+    def foo (
         rel .id: foo_id
         rel .'key': foo_id
-        rel .'children': [foo]
-    }
+        rel .'children': {foo}
+    )
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -62,11 +62,11 @@ fn inherent_id_no_autogen() {
 #[test]
 fn inherent_id_autogen() {
     "
-    def foo_id { rel .is: text }
-    def foo {
+    def foo_id (rel .is: text)
+    def foo (
         rel .'key'(rel .gen: auto)|id: foo_id
-        rel .'children': [foo]
-    }
+        rel .'children': {foo}
+    )
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -83,10 +83,10 @@ fn inherent_id_autogen() {
 #[test]
 fn id_and_inherent_property_inline_type() {
     "
-    def foo {
-        rel .'key'|id: { rel . is: text }
-        rel .'children': [foo]
-    }
+    def foo (
+        rel .'key'|id: (rel . is: text)
+        rel .'children': {foo}
+    )
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -107,9 +107,9 @@ fn id_and_inherent_property_inline_type() {
 #[test]
 fn entity_id_inline_fmt() {
     "
-    def foo {
-        rel .'key'|id: { fmt '' => 'foo/' => uuid => . }
-    }
+    def foo (
+        rel .'key'|id: ( fmt '' => 'foo/' => uuid => . )
+    )
     "
     .compile();
 }
@@ -244,12 +244,12 @@ fn artist_and_instrument_id_as_relation_object() {
 #[test]
 fn test_entity_self_relationship_optional_object() {
     "
-    def node_id { fmt '' => text => . }
-    def node {
+    def node_id (fmt '' => text => .)
+    def node (
         rel node_id identifies: .
         rel .'name': text
-        rel .'children'::'parent'? [node]
-    }
+        rel .'children'::'parent'? {node}
+    )
     "
     .compile_then(|test| {
         let [node] = test.bind(["node"]);
@@ -282,11 +282,11 @@ fn test_entity_self_relationship_optional_object() {
 #[test]
 fn test_entity_self_relationship_mandatory_object() {
     "
-    def node_id { fmt '' => text => . }
-    def node {
+    def node_id (fmt '' => text => .)
+    def node (
         rel node_id identifies: .
-        rel .'children'::'parent' [.]
-    }
+        rel .'children'::'parent' {.}
+    )
     "
     .compile_then(|test| {
         let [node] = test.bind(["node"]);
@@ -366,17 +366,17 @@ fn entity_union_in_relation_with_ids() {
 #[test]
 fn entity_relationship_without_reverse() {
     "
-    def lang_id { fmt '' => text => . }
-    def prog_id { fmt '' => text => . }
-    def language {
+    def lang_id (fmt '' => text => .)
+    def prog_id (fmt '' => text => .)
+    def language (
         rel lang_id identifies: .
         rel .'lang-id': lang_id
-    }
-    def programmer {
+    )
+    def programmer (
         rel prog_id identifies: .
         rel .'name': text
         rel .'favorite-language': language
-    }
+    )
     "
     .compile_then(|test| {
         let [programmer] = test.bind(["programmer"]);
@@ -390,28 +390,28 @@ fn entity_relationship_without_reverse() {
 #[test]
 fn recursive_entity_union() {
     "
-    def animal_id { fmt '' => 'animal/' => text => . }
-    def plant_id { fmt '' => 'plant/' => text => . }
-    def owner_id { fmt '' => text => . }
+    def animal_id (fmt '' => 'animal/' => text => .)
+    def plant_id (fmt '' => 'plant/' => text => .)
+    def owner_id (fmt '' => text => .)
 
-    def lifeform {}
-    def animal {
+    def lifeform ()
+    def animal (
         rel animal_id identifies: .
         rel .'class': 'animal'
-        rel .'eats': [lifeform]
-    }
-    def plant {
+        rel .'eats': {lifeform}
+    )
+    def plant (
         rel plant_id identifies: .
         rel .'class': 'plant'
-    }
+    )
     rel lifeform is?: animal
     rel lifeform is?: plant
 
-    def owner {
+    def owner (
         rel owner_id identifies: .
         rel .'name': text
-        rel .'owns': [lifeform]
-    }
+        rel .'owns': {lifeform}
+    )
     "
     .compile_then(|test| {
         let [lifeform] = test.bind(["lifeform"]);

@@ -2,16 +2,16 @@
 // database
 
 /// Item type enum
-def(private) ItemType {
+def(private) ItemType (
     /// worthless junk
     rel .is?: 'worthless junk'
     /// ancient treasure
     rel .is?: 'ancient treasure'
     /// alien artifact
     rel .is?: 'alien artifact'
-}
-def(private) archive_item {
-    rel .'id'|id: { fmt '' => 'archive_item/' => uuid => . }
+)
+def(private) archive_item (
+    rel .'id'|id: (fmt '' => 'archive_item/' => uuid => .)
     rel .'created': datetime
     rel .'updated': datetime
     rel .'archived': datetime
@@ -19,9 +19,9 @@ def(private) archive_item {
     rel .'description': text
     rel .'asset_score': i64
     rel .'type': ItemType
-}
-def(private) archive_group {
-    rel .'id'|id: { fmt '' => 'archive_group/' => uuid => . }
+)
+def(private) archive_group (
+    rel .'id'|id: (fmt '' => 'archive_group/' => uuid => .)
     rel .'created': datetime
     rel .'updated': datetime
     rel .'archived': datetime
@@ -29,26 +29,26 @@ def(private) archive_group {
     rel .'description': text
     rel .'start_date': datetime
     rel .'end_date': datetime
-}
-rel [archive_group] 'archive_items'::'archive_groups' [archive_item]
+)
+rel {archive_group} 'archive_items'::'archive_groups' {archive_item}
 
 // -----------------------------------
 // public API
 
 /// Common dates for Archive entities
-def ArchiveDates {
+def ArchiveDates (
     /// The (estimated) date the archived object was created
     rel .'createdAt': datetime
     /// The date the archived object was last updated
     rel .'updatedAt': datetime
     /// The date the archived object was entered into the collection
     rel .'archivedAt': datetime
-}
+)
 /// ## An Archived Object
 /// Comments support [Markdown](https://www.markdownguide.org/)
-def ArchiveObject {
+def ArchiveObject (
     /// ID of the object
-    rel .'id'|id: { fmt '' => 'archive_item/' => uuid => . }
+    rel .'id'|id: (fmt '' => 'archive_item/' => uuid => .)
     /// Relevant dates for the object
     rel .'dates': ArchiveDates
     /// Name of the object
@@ -59,12 +59,12 @@ def ArchiveObject {
     rel .'assetScoreTimesTen': i64
     /// Classification of the object
     rel .'kind': ItemType
-}
+)
 /// ## An Archived Object Collection
 /// A collection of archived objects
-def ArchiveCollection {
+def ArchiveCollection (
     /// ID of the collection
-    rel .'id'|id: { fmt '' => 'archive_group/' => uuid => . }
+    rel .'id'|id: (fmt '' => 'archive_group/' => uuid => .)
     /// Relevant dates for the collection
     rel .'dates': ArchiveDates
     /// Name of the collection
@@ -77,66 +77,66 @@ def ArchiveCollection {
     /// Start date; latest (estimated)
     /// creation date of object in collection
     rel .'endDate': datetime
-}
+)
 /// Relation between ArchiveCollections and ArchiveObjects
-rel [ArchiveCollection] 'archiveObjects'::'archiveCollections' [ArchiveObject]
+rel {ArchiveCollection} 'archiveObjects'::'archiveCollections' {ArchiveObject}
 
-map {
+map(
     // variables for mapping values between
     // map arms are created as needed
-    archive_item {
-        'id': id
-        'created': cr
-        'updated':  up
-        'archived': ar
-        'name': n
-        'description': d
-        'asset_score': s
-        'type': t
-    }
+    archive_item(
+        'id': id,
+        'created': cr,
+        'updated':  up,
+        'archived': ar,
+        'name': n,
+        'description': d,
+        'asset_score': s,
+        'type': t,
+    ),
     // variables must all be used
     // and correspond between map arms
-    ArchiveObject {
+    ArchiveObject(
         // values can be remapped structurally
-        'id': id
-        'dates': ArchiveDates {
-            'createdAt': cr
-            'updatedAt': up
-            'archivedAt': ar
-        }
-        'name': n
-        'description': d
+        'id': id,
+        'dates': ArchiveDates(
+            'createdAt': cr,
+            'updatedAt': up,
+            'archivedAt': ar,
+        ),
+        'name': n,
+        'description': d,
         // ONTOL supports many transformations
         // the inverse transformation is applied automatically
-        'assetScoreTimesTen': s * 10
-        'kind': t
-    }
-}
+        'assetScoreTimesTen': s * 10,
+        'kind': t,
+    ),
+)
 
-map {
-    archive_group {
-        'id': id
-        'created': cr
-        'updated': up
-        'archived': ar
-        'name': n
-        'description': d
-        'start_date': sd
-        'end_date': ed
+map(
+    archive_group(
+        'id': id,
+        'created': cr,
+        'updated': up,
+        'archived': ar,
+        'name': n,
+        'description': d,
+        'start_date': sd,
+        'end_date': ed,
         // the previous map is reused here
-        'archive_items': [..ai]
-    }
-    ArchiveCollection {
-        'id': id
-        'dates': ArchiveDates {
-            'createdAt': cr
-            'updatedAt': up
-            'archivedAt': ar
-        }
-        'name': n
-        'description': d
-        'startDate': sd
-        'endDate': ed
-        'archiveObjects': [..ai]
-    }
-}
+        'archive_items': {..ai},
+    ),
+    ArchiveCollection(
+        'id': id,
+        'dates': ArchiveDates(
+            'createdAt': cr,
+            'updatedAt': up,
+            'archivedAt': ar,
+        ),
+        'name': n,
+        'description': d,
+        'startDate': sd,
+        'endDate': ed,
+        'archiveObjects': {..ai}
+    )
+)

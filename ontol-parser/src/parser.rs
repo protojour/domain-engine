@@ -65,7 +65,6 @@ fn domain_statement() -> impl AstParser<Spanned<Statement>> {
 
 fn def_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstParser<DefStatement> {
     doc_comments()
-        // .then(keyword(Token::Pub).or_not())
         .then(keyword(Token::Def))
         .then(
             open('(')
@@ -79,7 +78,7 @@ fn def_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstPar
         )
         .then(spanned(ident()))
         .then(spanned(
-            stmt_parser.repeated().delimited_by(open('{'), close('}')),
+            stmt_parser.repeated().delimited_by(open('('), close(')')),
         ))
         .map(|((((docs, kw), modifiers), ident), ctx_block)| {
             let mut private = None;
@@ -265,7 +264,7 @@ fn fmt_statement() -> impl AstParser<FmtStatement> {
 
 fn with_unit_or_seq<T>(inner: impl AstParser<T> + Clone) -> impl AstParser<(UnitOrSeq, T)> {
     inner.clone().map(|unit| (UnitOrSeq::Unit, unit)).or(inner
-        .delimited_by(open('['), close(']'))
+        .delimited_by(open('{'), close('}'))
         .map(|seq| (UnitOrSeq::Seq, seq)))
 }
 
@@ -275,8 +274,10 @@ fn map_statement() -> impl AstParser<MapStatement> {
         .then(spanned(ident()).or_not())
         .then(
             spanned(map_arm())
+                .then_ignore(sigil(','))
                 .then(spanned(map_arm()))
-                .delimited_by(open('{'), close('}')),
+                .then_ignore(sigil(',').or_not())
+                .delimited_by(open('('), close(')')),
         )
         .map(|(((docs, kw), ident), (first, second))| MapStatement {
             docs,
@@ -288,7 +289,7 @@ fn map_statement() -> impl AstParser<MapStatement> {
 }
 
 fn map_arm() -> impl AstParser<MapArm> {
-    let struct_arm = braced_struct_pattern(pattern()).map(MapArm::Struct);
+    let struct_arm = parenthesized_struct_pattern(pattern()).map(MapArm::Struct);
     let binding_arm = spanned(path())
         .then_ignore(colon())
         .then(
@@ -303,14 +304,14 @@ fn map_arm() -> impl AstParser<MapArm> {
 
 fn pattern() -> impl AstParser<ExprOrStructOrSeqPattern> {
     recursive(|pattern| {
-        spanned(braced_struct_pattern(pattern.clone()))
+        spanned(parenthesized_struct_pattern(pattern.clone()))
             .map(ExprOrStructOrSeqPattern::Struct)
             .or(seq_pattern(pattern).map(ExprOrStructOrSeqPattern::Seq))
             .or(expr_pattern().map(|(expr, span)| ExprOrStructOrSeqPattern::Expr((expr, span))))
     })
 }
 
-fn braced_struct_pattern(
+fn parenthesized_struct_pattern(
     pattern: impl AstParser<ExprOrStructOrSeqPattern> + Clone + 'static,
 ) -> impl AstParser<StructPattern> {
     spanned(path())
@@ -318,8 +319,9 @@ fn braced_struct_pattern(
         .then(struct_pattern_modifier().or_not())
         .then(
             spanned(struct_pattern_attr(pattern))
-                .repeated()
-                .delimited_by(open('{'), close('}')),
+                .separated_by(sigil(','))
+                .allow_trailing()
+                .delimited_by(open('('), close(')')),
         )
         .map(|((path, modifier), attributes)| StructPattern {
             path,
@@ -372,8 +374,9 @@ fn seq_pattern(
                 pattern,
             }),
     )
-    .repeated()
-    .delimited_by(open('['), close(']'))
+    .separated_by(sigil(','))
+    .allow_trailing()
+    .delimited_by(open('{'), close('}'))
 }
 
 fn expr_pattern() -> impl AstParser<Spanned<ExprPattern>> {
@@ -465,7 +468,7 @@ fn named_type() -> impl AstParser<Type> {
 fn anonymous_type(
     stmt_parser: impl AstParser<Spanned<Statement>> + 'static,
 ) -> impl AstParser<Type> {
-    spanned(stmt_parser.repeated().delimited_by(open('{'), close('}')))
+    spanned(stmt_parser.repeated().delimited_by(open('('), close(')')))
         .boxed()
         .map(Type::AnonymousStruct)
 }
@@ -654,13 +657,13 @@ mod tests {
     fn parse_def() {
         let source = "
         /// doc comment
-        def foo {}
+        def foo()
         /// doc comment
-        def bar {
+        def bar(
             rel a '': b
             rel .lol: c
             fmt a => . => .
-        }
+        )
         ";
 
         let stmts = parse(source).unwrap();
@@ -680,20 +683,20 @@ mod tests {
     #[test]
     fn parse_map() {
         let source = "
-        map {
-            foo: x
-            bar {
+        map(
+            foo: x,
+            bar(
                 'foo': x
-            }
-        }
+            )
+        )
 
         // comment
-        map {
-            foo: x + 1
-            bar {
-                'foo': (x / 3) + 4
-            }
-        }
+        map(
+            foo: x + 1,
+            bar(
+                'foo': (x / 3) + 4,
+            ),
+        )
         ";
 
         let stmts = parse(source).unwrap();
@@ -703,12 +706,12 @@ mod tests {
     #[test]
     fn parse_regex_in_map() {
         let source = r"
-        map {
-            foo: x
-            bar {
+        map(
+            foo: x,
+            bar(
                 'foo': /Hello (?<name>\w+)!/
-            }
-        }
+            )
+        )
         ";
 
         let stmts = parse(source).unwrap();

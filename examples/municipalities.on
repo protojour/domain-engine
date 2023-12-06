@@ -1,21 +1,21 @@
 use 'geojson' as geojson
 
-def code {
+def code (
     fmt '' => text => .
-}
+)
 
-def municipality {
+def municipality (
     rel .'code'|id: code
     rel .'geometry': geojson.Geometry
-}
+)
 
 /// Get a single municipality
-map municipality {
-    code: code
-    municipality match { 'code': code }
-}
+map municipality(
+    code: code,
+    municipality match('code': code)
+)
 
-map municipalities {
-    {}
-    municipality: [..municipality match {}]
-}
+map municipalities(
+    (),
+    municipality: {..municipality match()}
+)

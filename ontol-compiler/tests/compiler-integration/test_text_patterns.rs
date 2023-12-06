@@ -7,9 +7,9 @@ use test_log::test;
 #[test]
 fn constant_text_pattern() {
     "
-    def foo {
+    def foo (
         fmt '' => 'foo' => .
-    }
+    )
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -24,9 +24,9 @@ fn constant_text_pattern() {
 #[test]
 fn concatenated_constant_string_constructor_pattern() {
     "
-    def foobar {
+    def foobar (
         fmt '' => 'foo' => 'bar' => .
-    }
+    )
     "
     .compile_then(|test| {
         let [foobar] = test.bind(["foobar"]);
@@ -41,9 +41,9 @@ fn concatenated_constant_string_constructor_pattern() {
 #[test]
 fn uuid_in_string_constructor_pattern() {
     "
-    def foo {
+    def foo (
         fmt '' => 'foo/' => uuid => .
-    }
+    )
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -67,16 +67,16 @@ fn uuid_in_string_constructor_pattern() {
 #[test]
 fn test_text_pattern_constructor_union() {
     "
-    def foo {
+    def foo (
         fmt '' => 'foo/' => uuid => .
-    }
-    def bar {
+    )
+    def bar (
         fmt '' => 'bar/' => uuid => .
-    }
-    def foobar {
+    )
+    def foobar (
         rel .is?: foo
         rel .is?: bar
-    }
+    )
     "
     .compile_then(|test| {
         let [foobar] = test.bind(["foobar"]);
@@ -100,9 +100,9 @@ fn test_text_pattern_constructor_union() {
 #[test]
 fn test_regex_property() {
     "
-    def foo {
+    def foo (
         rel .'prop': /abc*/
-    }
+    )
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -119,9 +119,9 @@ fn test_regex_property() {
 #[test]
 fn test_simple_regex_pattern_constructor() {
     "
-    def re {
+    def re (
         fmt '' => /a/ => /bc*/ => .
-    }
+    )
     "
     .compile_then(|test| {
         let [re] = test.bind(["re"]);
@@ -165,9 +165,9 @@ fn test_text_patterns() {
 #[test]
 fn regex_named_group_as_relation() {
     "
-    def lol {
+    def lol (
         rel .is: /abc(?<named>.)/
-    }
+    )
     "
     .compile_then(|_test| {});
 }

@@ -1,8 +1,8 @@
-def user_id { rel .is: uuid }
-def slug { rel.is: text }
-def tag { rel.is: text }
+def user_id (rel .is: uuid)
+def slug (rel.is: text)
+def tag (rel.is: text)
 
-def User {
+def User (
     // TODO: This must be an Authly user id
     rel .'user_id'(rel .gen: auto)|id: user_id
     // TODO: This is.. an authly user name? Maybe?
@@ -17,11 +17,11 @@ def User {
     rel .'image'?: text
 
     // TODO(constraint): User cannot follow itself
-    rel .'following'::'followed_by'? [User]
-}
+    rel .'following'::'followed_by'? {User}
+)
 
-def Article {
-    rel .'article_id'(rel .gen: auto)|id: { rel .is: uuid }
+def Article (
+    rel .'article_id'(rel .gen: auto)|id: (rel .is: uuid)
     // TODO(constraint): slug is unique
     rel .'slug': slug
     rel .'title': text
@@ -29,31 +29,31 @@ def Article {
     rel .'body': text
     rel .'created_at'(rel .gen: create_time): datetime
     rel .'updated_at'(rel .gen: update_time): datetime
-}
+)
 
-def Comment {
-    rel .'id'(rel .gen: auto)|id: { rel .is: i64 }
+def Comment (
+    rel .'id'(rel .gen: auto)|id: (rel .is: i64)
     rel .'body': text
     rel .'created_at'(rel .gen: create_time): datetime
     rel .'updated_at'(rel .gen: update_time): datetime
-}
+)
 
-def TagEntity {
+def TagEntity (
     rel .'tag'|id: tag
-}
+)
 
-rel [Article] 'author'::'authored_articles'? User
-rel Article 'favorited_by'::'favorited'? [User]
-rel [TagEntity] 'tagged'::'tags' [Article]
-rel [Comment] 'comment_on'::'comments'? Article
-rel [Comment] 'author'::'authored_comments'? User
+rel {Article} 'author'::'authored_articles'? User
+rel Article 'favorited_by'::'favorited'? {User}
+rel {TagEntity} 'tagged'::'tags' {Article}
+rel {Comment} 'comment_on'::'comments'? Article
+rel {Comment} 'author'::'authored_comments'? User
 
-map users {
-    {}
-    User: [..User match {}]
-}
+map users(
+    (),
+    User: { ..User match() }
+)
 
-map articles {
-    {}
-    Article: [..Article match {}]
-}
+map articles(
+    (),
+    Article: { ..Article match() }
+)

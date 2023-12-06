@@ -15,7 +15,7 @@ use test_log::test;
 
 #[test]
 fn test_serde_empty_type() {
-    "def foo {}".compile_then(|test| {
+    "def foo ()".compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(serde_create(&foo), {});
     });
@@ -24,7 +24,7 @@ fn test_serde_empty_type() {
 #[test]
 fn test_serde_type_alias() {
     "
-    def foo { rel .is: text }
+    def foo ( rel .is: text )
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -35,9 +35,9 @@ fn test_serde_type_alias() {
 #[test]
 fn test_serde_booleans() {
     "
-    def f { rel .is: false }
-    def t { rel .is: true }
-    def b { rel .is: boolean }
+    def f ( rel .is: false )
+    def t ( rel .is: true )
+    def b ( rel .is: boolean )
     "
     .compile_then(|test| {
         let [f, t, b] = test.bind(["f", "t", "b"]);
@@ -61,7 +61,7 @@ fn test_serde_booleans() {
 #[test]
 fn test_serde_struct_type() {
     "
-    def foo { rel .'a': text }
+    def foo ( rel .'a': text )
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -72,9 +72,9 @@ fn test_serde_struct_type() {
 #[test]
 fn test_serde_struct_optional_field() {
     "
-    def foo {
+    def foo (
         rel .'a'?: text
-    }
+    )
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -87,8 +87,8 @@ fn test_serde_struct_optional_field() {
 #[test]
 fn test_serde_complex_type() {
     "
-    def foo {}
-    def bar {}
+    def foo ()
+    def bar ()
     rel foo 'a': text
     rel foo 'b': bar
     rel bar 'c': text
@@ -102,10 +102,10 @@ fn test_serde_complex_type() {
 #[test]
 fn test_serde_sequence() {
     "
-    def t {
+    def t (
         rel .0: text
         rel .1: i64
-    }
+    )
     "
     .compile_then(|test| {
         let [t] = test.bind(["t"]);
@@ -116,10 +116,10 @@ fn test_serde_sequence() {
 #[test]
 fn test_serde_value_union1() {
     "
-    def u {
+    def u (
         rel .is?: 'a'
         rel .is?: 'b'
-    }
+    )
     "
     .compile_then(|test| {
         let [u] = test.bind(["u"]);
@@ -130,14 +130,14 @@ fn test_serde_value_union1() {
 #[test]
 fn test_serde_string_or_unit() {
     "
-    def text-or-unit {
+    def text-or-unit (
         rel .is?: text
         rel .is?: ()
-    }
+    )
 
-    def foo {
+    def foo (
         rel .'a': text-or-unit
-    }
+    )
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -149,18 +149,18 @@ fn test_serde_string_or_unit() {
 #[test]
 fn test_serde_map_union() {
     "
-    def foo {
+    def foo (
         rel .'type': 'foo'
         rel .'c': i64
-    }
-    def bar {
+    )
+    def bar (
         rel .'type': 'bar'
         rel .'d': i64
-    }
-    def u {
+    )
+    def u (
         rel .is?: foo
         rel .is?: bar
-    }
+    )
     "
     .compile_then(|test| {
         let [u] = test.bind(["u"]);
@@ -171,11 +171,11 @@ fn test_serde_map_union() {
 #[test]
 fn test_serde_noop_intersection() {
     "
-    def bar {}
-    def foo {
+    def bar ()
+    def foo (
         rel .is: bar
         rel .'foobar': bar
-    }
+    )
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -186,9 +186,9 @@ fn test_serde_noop_intersection() {
 #[test]
 fn test_serde_many_cardinality() {
     "
-    def foo {
-        rel .'s': [text]
-    }
+    def foo (
+        rel .'s': {text}
+    )
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -200,12 +200,12 @@ fn test_serde_many_cardinality() {
 #[test]
 fn test_serde_infinite_sequence() {
     "
-    def foo {
+    def foo (
         rel .  ..2: i64
         rel . 2..4: text
         rel . 5..6: i64
         rel . 6.. : i64
-    }
+    )
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -221,7 +221,7 @@ fn test_serde_infinite_sequence() {
 #[test]
 fn test_serde_uuid() {
     "
-    def my_id { rel .is: uuid }
+    def my_id ( rel .is: uuid )
     "
     .compile_then(|test| {
         let [my_id] = test.bind(["my_id"]);
@@ -244,7 +244,7 @@ fn test_serde_uuid() {
 #[test]
 fn test_serde_datetime() {
     "
-    def my_dt { rel .is: datetime }
+    def my_dt ( rel .is: datetime )
     "
     .compile_then(|test| {
         let [my_dt] = test.bind(["my_dt"]);
@@ -270,9 +270,9 @@ fn test_serde_datetime() {
 #[test]
 fn test_integer_default() {
     "
-    def foo {
+    def foo (
         rel .'bar'(rel .default := 42): i64
-    }
+    )
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -284,11 +284,11 @@ fn test_integer_default() {
 #[test]
 fn test_i64_range_constrained() {
     "
-    def percentage {
+    def percentage (
         rel .is: i64
         rel .min: 0
         rel .max: 100
-    }
+    )
     "
     .compile_then(|test| {
         let [percentage] = test.bind(["percentage"]);
@@ -304,11 +304,11 @@ fn test_i64_range_constrained() {
 #[test]
 fn test_integer_range_constrained() {
     "
-    def foo {
+    def foo (
         rel .is: integer
         rel .min: -1
         rel .max: 1
-    }
+    )
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -324,11 +324,11 @@ fn test_integer_range_constrained() {
 #[test]
 fn test_f64_range_constrained() {
     "
-    def fraction {
+    def fraction (
         rel .is: f64
         rel .min: 0
         rel .max: 1
-    }
+    )
     "
     .compile_then(|test| {
         let [fraction] = test.bind(["fraction"]);
@@ -346,9 +346,9 @@ fn test_f64_range_constrained() {
 #[test]
 fn test_float_default() {
     "
-    def foo {
+    def foo (
         rel .'bar'(rel .default := 42): f64
-    }
+    )
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -360,9 +360,9 @@ fn test_float_default() {
 #[test]
 fn test_string_default() {
     "
-    def foo {
+    def foo (
         rel .'bar'(rel .default := 'baz'): text
-    }
+    )
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -374,12 +374,12 @@ fn test_string_default() {
 #[test]
 fn test_prop_union() {
     "
-    def vec3 {
+    def vec3(
         /// A vector component
-        rel .'x'|'y'|'z': {
+        rel .'x'|'y'|'z': (
             rel .is: i64
-        }
-    }
+        )
+    )
     "
     .compile_then(|test| {
         let [vec3] = test.bind(["vec3"]);
@@ -390,14 +390,14 @@ fn test_prop_union() {
 #[test]
 fn test_jsonml() {
     "
-    def tag {}
-    def tag_name {}
-    def attributes {}
+    def tag ()
+    def tag_name ()
+    def attributes ()
 
-    def element {
+    def element (
         rel .is?: tag
         rel .is?: text
-    }
+    )
 
     rel tag 0: tag_name
 
@@ -436,15 +436,15 @@ fn test_serde_with_raw_id_overridde_profile() {
     };
 
     "
-    def foo {
-        rel .'prefix_id'|id: {
+    def foo (
+        rel .'prefix_id'|id: (
             fmt '' => 'prefix/' => uuid => .
-        }
-    }
+        )
+    )
 
-    def bar {
-        rel .'int_id'|id: { rel .is: i64 }
-    }
+    def bar (
+        rel .'int_id'|id: ( rel .is: i64 )
+    )
     "
     .compile_then(|test| {
         let [foo, bar] = test.bind(["foo", "bar"]);
@@ -492,9 +492,9 @@ fn test_serde_with_raw_id_overridde_profile() {
 #[test]
 fn test_serde_open_properties() {
     "
-    def(open) foo {
+    def(open) foo (
         rel .'closed': text
-    }
+    )
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
@@ -515,9 +515,9 @@ fn test_serde_open_properties() {
 #[test]
 fn test_serde_recursion_limit() {
     "
-    def foo {
+    def foo (
         rel .'child': foo
-    }
+    )
     "
     .compile_then(|test| {
         const RECURSION_LIMIT: u16 = 32;
@@ -547,15 +547,15 @@ fn test_serde_recursion_limit() {
 #[test]
 fn test_serialize_raw_tree_only() {
     "
-    def bar {
-        rel .'key'|id: { rel .is: text }
+    def bar (
+        rel .'key'|id: ( rel .is: text )
         rel .'bar_field': text
-    }
-    def foo {
-        rel .'key'|id: { rel .is: text }
+    )
+    def foo (
+        rel .'key'|id: ( rel .is: text )
         rel .'foo_field': text
         rel .'bar'?: bar
-    }
+    )
     "
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
