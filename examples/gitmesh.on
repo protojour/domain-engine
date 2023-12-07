@@ -1,0 +1,34 @@
+
+def Repository (
+    rel .'id'(rel .gen: auto)|id: (rel .is: uuid)
+    rel .'handle': text
+
+    rel .'owner'::'repositories' RepositoryOwner
+    rel .'origin'?: .
+)
+
+def RepositoryOwner (
+    rel .is?: User
+    rel .is?: Organization
+)
+
+def User (
+    rel .'id'|id: (fmt '' => 'user/' => text => .)
+    rel .'email': text
+)
+
+def Organization (
+    rel .'id'|id: (fmt '' => 'org/' => text => .)
+    rel .'members'(rel .is: OrganizationMember): {User}
+)
+
+def OrganizationMember (
+    rel .'role': text
+)
+
+map repositories(
+    (),
+    Repository: {
+        ..Repository match(),
+    }
+)

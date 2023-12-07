@@ -57,6 +57,11 @@ pub const ARTIST_AND_INSTRUMENT: Example = (
 
 pub const DEMO: Example = (SourceName("demo"), include_str!("../../examples/demo.on"));
 
+pub const GITMESH: Example = (
+    SourceName("gitmesh"),
+    include_str!("../../examples/gitmesh.on"),
+);
+
 pub const GEOJSON: Example = (
     SourceName("geojson"),
     include_str!("../../examples/geojson.on"),

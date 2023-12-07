@@ -14,7 +14,7 @@ use ontol_runtime::{
 };
 
 use smartstring::alias::String;
-use tracing::debug;
+use tracing::{debug, debug_span};
 
 use crate::{
     def::{Def, DefKind, DefVisibility, FmtFinalState, RelParams, Relationship, TypeDef},
@@ -1032,6 +1032,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
             .extend(docs);
 
         let mut root_defs: RootDefs = [def_id].into();
+
+        let _entered = debug_span!("def", id = ?def_id).entered();
 
         {
             // The inherent relation block on the type uses the just defined

@@ -13,7 +13,7 @@ use ontol_runtime::{
 };
 use patricia_tree::PatriciaMap;
 use smartstring::alias::String;
-use tracing::debug;
+use tracing::{debug, debug_span};
 
 use crate::{
     def::{Def, DefKind, LookupRelationshipMeta},
@@ -30,6 +30,8 @@ use super::{repr::repr_model::ReprKind, TypeCheck};
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
     pub fn check_value_union(&mut self, value_union_def_id: DefId) -> Vec<SpannedCompileError> {
+        let _entered = debug_span!("union", id = ?value_union_def_id).entered();
+
         // An error set to avoid reporting the same error more than once
         let mut error_set = ErrorSet::default();
 
@@ -138,35 +140,37 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let string_literal = self.defs.get_string_representation(*def_id);
                 builder.add_text_literal(string_literal, *def_id);
             }
-            Type::Domain(domain_def_id) => match self.find_domain_type_match_data(*domain_def_id) {
-                Ok(DomainTypeMatchData::Struct(property_set)) => {
-                    self.add_property_set_to_discriminator(
-                        builder,
-                        variant_def,
-                        property_set,
-                        span,
-                        error_set,
-                    );
-                }
-                Ok(DomainTypeMatchData::Sequence(_)) => {
-                    if builder.sequence.is_some() {
-                        error_set.report(
+            Type::Domain(domain_def_id) | Type::Anonymous(domain_def_id) => {
+                match self.find_domain_type_match_data(*domain_def_id) {
+                    Ok(DomainTypeMatchData::Struct(property_set)) => {
+                        self.add_property_set_to_discriminator(
+                            builder,
                             variant_def,
-                            UnionCheckError::CannotDiscriminateType,
+                            property_set,
                             span,
+                            error_set,
                         );
-                    } else {
-                        builder.sequence = Some(variant_def);
+                    }
+                    Ok(DomainTypeMatchData::Sequence(_)) => {
+                        if builder.sequence.is_some() {
+                            error_set.report(
+                                variant_def,
+                                UnionCheckError::CannotDiscriminateType,
+                                span,
+                            );
+                        } else {
+                            builder.sequence = Some(variant_def);
+                        }
+                    }
+                    Ok(DomainTypeMatchData::ConstructorStringPattern(segment)) => {
+                        builder.add_text_pattern(segment, variant_def);
+                    }
+                    Err(error) => {
+                        error_set.report(variant_def, error, span);
                     }
                 }
-                Ok(DomainTypeMatchData::ConstructorStringPattern(segment)) => {
-                    builder.add_text_pattern(segment, variant_def);
-                }
-                Err(error) => {
-                    error_set.report(variant_def, error, span);
-                }
-            },
-            _ => {
+            }
+            _other => {
                 error_set.report(variant_def, UnionCheckError::CannotDiscriminateType, span);
             }
         }

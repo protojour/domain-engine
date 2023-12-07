@@ -1,4 +1,7 @@
-use ontol_test_utils::{examples::DEMO, TestCompile};
+use ontol_test_utils::{
+    examples::{DEMO, GITMESH},
+    TestCompile,
+};
 use serde_json::json;
 use test_log::test;
 
@@ -78,4 +81,9 @@ fn test_demo() {
             ],
         }),
     );
+}
+
+#[test]
+fn test_gitmesh() {
+    let _test = GITMESH.1.compile();
 }
