@@ -89,3 +89,12 @@ fn ontol_domain_is_defined_in_the_namespace() {
 fn cannot_redefine_ontol() {
     "def ontol () // ERROR TODO: definition of external identifier".compile_fail();
 }
+
+#[test]
+fn can_refer_to_future_definitions() {
+    "
+    def a (rel .'b': b)
+    def b (rel .'a': a)
+    "
+    .compile();
+}

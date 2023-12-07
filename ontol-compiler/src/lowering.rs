@@ -13,7 +13,6 @@ use ontol_runtime::{
     DefId, RelationshipId,
 };
 
-use smallvec::SmallVec;
 use smartstring::alias::String;
 use tracing::debug;
 
@@ -45,7 +44,24 @@ pub struct Lowered {
 type LoweringError = (CompileError, Span);
 
 type Res<T> = Result<T, LoweringError>;
-type RootDefs = SmallVec<[DefId; 1]>;
+type RootDefs = Vec<DefId>;
+
+struct Open(Option<Span>);
+struct Private(Option<Span>);
+
+/// Statement after scanning once
+enum PreDefinedStmt {
+    Def(PreDefinedDefStmt),
+    Rel(ast::RelStatement),
+    Fmt(ast::FmtStatement),
+    Map(ast::MapStatement),
+}
+
+struct PreDefinedDefStmt {
+    def_id: DefId,
+    docs: Vec<String>,
+    block: (Vec<(ast::Statement, Span)>, Span),
+}
 
 impl<'s, 'm> Lowering<'s, 'm> {
     pub fn new(compiler: &'s mut Compiler<'m>, src: &'s Src) -> Self {
@@ -64,29 +80,41 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    pub fn lower_statement(&mut self, stmt: (ast::Statement, Span)) -> Result<(), ()> {
-        match self.stmt_to_def(stmt, BlockContext::NoContext) {
-            Ok(root_defs) => {
-                self.root_defs.extend(root_defs);
-                Ok(())
-            }
-            Err(error) => {
-                self.report_error(error);
-                Err(())
+    pub fn lower_statements(mut self, statements: Vec<(ast::Statement, Span)>) -> Self {
+        let mut pre_defined_statements = vec![];
+
+        // first pass: Register all named definitions into the namespace
+        for (stmt, span) in statements {
+            match self.pre_define_statement((stmt, span)) {
+                Ok(Some(pre_defined)) => {
+                    pre_defined_statements.push(pre_defined);
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    self.report_error(error);
+                }
             }
         }
+
+        // second pass: Handle inner bodies, etc
+        for (stmt, span) in pre_defined_statements {
+            match self.pre_defined_stmt_to_def((stmt, span), BlockContext::NoContext) {
+                Ok(root_defs) => {
+                    self.root_defs.extend(root_defs);
+                }
+                Err(error) => {
+                    self.report_error(error);
+                }
+            }
+        }
+
+        self
     }
 
-    fn report_error(&mut self, (error, span): (CompileError, Span)) {
-        self.compiler
-            .push_error(error.spanned(&self.src.span(&span)));
-    }
-
-    fn stmt_to_def(
+    fn pre_define_statement(
         &mut self,
         (stmt, span): (ast::Statement, Span),
-        block_context: BlockContext,
-    ) -> Res<RootDefs> {
+    ) -> Res<Option<(PreDefinedStmt, Span)>> {
         match stmt {
             ast::Statement::Use(use_stmt) => {
                 let reference = PackageReference::Named(use_stmt.reference.0);
@@ -111,11 +139,72 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let as_ident = self.compiler.strings.intern(&use_stmt.as_ident.0);
                 type_namespace.insert(as_ident, *used_package_def_id);
 
-                Ok(Default::default())
+                Ok(None)
             }
             ast::Statement::Def(def_stmt) => {
-                let ident_span = def_stmt.ident.1.clone();
-                self.named_definition(def_stmt, ident_span)
+                let def_id = self.coin_type_definition(
+                    def_stmt.ident.0,
+                    &def_stmt.ident.1,
+                    Private(def_stmt.private),
+                    Open(def_stmt.open),
+                )?;
+
+                Ok(Some((
+                    PreDefinedStmt::Def(PreDefinedDefStmt {
+                        def_id,
+                        docs: def_stmt.docs,
+                        block: def_stmt.block,
+                    }),
+                    span,
+                )))
+            }
+            ast::Statement::Rel(rel_stmt) => Ok(Some((PreDefinedStmt::Rel(rel_stmt), span))),
+            ast::Statement::Fmt(fmt_stmt) => Ok(Some((PreDefinedStmt::Fmt(fmt_stmt), span))),
+            ast::Statement::Map(map_stmt) => Ok(Some((PreDefinedStmt::Map(map_stmt), span))),
+        }
+    }
+
+    fn report_error(&mut self, (error, span): (CompileError, Span)) {
+        self.compiler
+            .push_error(error.spanned(&self.src.span(&span)));
+    }
+
+    fn pre_defined_stmt_to_def(
+        &mut self,
+        (stmt, span): (PreDefinedStmt, Span),
+        block_context: BlockContext,
+    ) -> Res<RootDefs> {
+        match stmt {
+            PreDefinedStmt::Def(def_stmt) => {
+                self.provide_definition(def_stmt.def_id, def_stmt.docs, def_stmt.block)
+            }
+            PreDefinedStmt::Rel(rel_stmt) => {
+                self.ast_relationship_to_def(rel_stmt, span, block_context)
+            }
+            PreDefinedStmt::Fmt(fmt_stmt) => {
+                self.fmt_transitions_to_def(fmt_stmt, span, block_context)
+            }
+            PreDefinedStmt::Map(map_stmt) => self.map_stmt_to_def((map_stmt, span)),
+        }
+    }
+
+    fn stmt_to_def(
+        &mut self,
+        (stmt, span): (ast::Statement, Span),
+        block_context: BlockContext,
+    ) -> Res<RootDefs> {
+        match stmt {
+            ast::Statement::Use(_) => Ok(vec![]),
+            ast::Statement::Def(def_stmt) => {
+                let def_id = self.coin_type_definition(
+                    def_stmt.ident.0,
+                    &def_stmt.ident.1,
+                    Private(def_stmt.private),
+                    Open(def_stmt.open),
+                )?;
+                let mut root_defs: RootDefs = [def_id].into();
+                root_defs.extend(self.provide_definition(def_id, def_stmt.docs, def_stmt.block)?);
+                Ok(root_defs)
             }
             ast::Statement::Rel(rel_stmt) => {
                 self.ast_relationship_to_def(rel_stmt, span, block_context)
@@ -123,44 +212,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ast::Statement::Fmt(fmt_stmt) => {
                 self.fmt_transitions_to_def(fmt_stmt, span, block_context)
             }
-            ast::Statement::Map(ast::MapStatement {
-                docs: _,
-                kw: _,
-                ident,
-                first,
-                second,
-            }) => {
-                let mut var_table = MapVarTable::default();
-                let first = self.lower_map_arm(first, &mut var_table)?;
-                let second = self.lower_map_arm(second, &mut var_table)?;
-                let var_alloc = var_table.into_allocator();
-
-                let (def_id, ident) = match ident {
-                    Some((ident, span)) => {
-                        let (def_id, coinage) = self.named_def_id(Space::Map, &ident, &span)?;
-                        if matches!(coinage, Coinage::Used) {
-                            return Err((CompileError::DuplicateMapIdentifier, span.clone()));
-                        }
-                        let ident = self.compiler.strings.intern(&ident);
-                        (def_id, Some(ident))
-                    }
-                    None => (self.compiler.defs.alloc_def_id(self.src.package_id), None),
-                };
-
-                self.set_def_kind(
-                    def_id,
-                    DefKind::Mapping {
-                        ident,
-                        arms: [first, second],
-                        var_alloc,
-                    },
-                    &span,
-                );
-
-                self.map_defs.insert(def_id);
-
-                Ok([def_id].into())
-            }
+            ast::Statement::Map(map_stmt) => self.map_stmt_to_def((map_stmt, span)),
         }
     }
 
@@ -374,7 +426,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             transitions,
         } = fmt;
 
-        let mut root_defs = SmallVec::new();
+        let mut root_defs = Vec::new();
         let mut origin_def_id =
             self.resolve_type_reference(origin, &origin_span, Some(&mut root_defs))?;
         let mut iter = transitions.into_iter().peekable();
@@ -564,6 +616,50 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 Ok(def_id)
             }
         }
+    }
+
+    fn map_stmt_to_def(
+        &mut self,
+        (
+            ast::MapStatement {
+                ident,
+                first,
+                second,
+                ..
+            },
+            span,
+        ): (ast::MapStatement, Span),
+    ) -> Res<RootDefs> {
+        let mut var_table = MapVarTable::default();
+        let first = self.lower_map_arm(first, &mut var_table)?;
+        let second = self.lower_map_arm(second, &mut var_table)?;
+        let var_alloc = var_table.into_allocator();
+
+        let (def_id, ident) = match ident {
+            Some((ident, span)) => {
+                let (def_id, coinage) = self.named_def_id(Space::Map, &ident, &span)?;
+                if matches!(coinage, Coinage::Used) {
+                    return Err((CompileError::DuplicateMapIdentifier, span.clone()));
+                }
+                let ident = self.compiler.strings.intern(&ident);
+                (def_id, Some(ident))
+            }
+            None => (self.compiler.defs.alloc_def_id(self.src.package_id), None),
+        };
+
+        self.set_def_kind(
+            def_id,
+            DefKind::Mapping {
+                ident,
+                arms: [first, second],
+                var_alloc,
+            },
+            &span,
+        );
+
+        self.map_defs.insert(def_id);
+
+        Ok([def_id].into())
     }
 
     fn lower_map_arm(
@@ -922,44 +1018,27 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
-    fn named_definition(&mut self, def_stmt: ast::DefStatement, span: Span) -> Res<RootDefs> {
-        let (def_id, coinage) = self.named_def_id(Space::Type, &def_stmt.ident.0, &span)?;
-        if matches!(coinage, Coinage::New) {
-            let ident = self.compiler.strings.intern(&def_stmt.ident.0);
-            debug!("{def_id:?}: `{}`", def_stmt.ident.0);
-
-            self.set_def_kind(
-                def_id,
-                DefKind::Type(TypeDef {
-                    visibility: if def_stmt.private.is_some() {
-                        DefVisibility::Private
-                    } else {
-                        DefVisibility::Public
-                    },
-                    open: def_stmt.open.is_some(),
-                    ident: Some(ident),
-                    rel_type_for: None,
-                    concrete: true,
-                }),
-                &span,
-            );
-        }
-
-        let mut root_defs: RootDefs = [def_id].into();
-
+    fn provide_definition(
+        &mut self,
+        def_id: DefId,
+        docs: Vec<String>,
+        def_block: (Vec<(ast::Statement, Span)>, Span),
+    ) -> Res<RootDefs> {
         self.compiler
             .namespaces
             .docs
             .entry(def_id)
             .or_default()
-            .extend(def_stmt.docs);
+            .extend(docs);
+
+        let mut root_defs: RootDefs = [def_id].into();
 
         {
             // The inherent relation block on the type uses the just defined
             // type as its context
             let context_fn = move || def_id;
 
-            for spanned_stmt in def_stmt.block.0 {
+            for spanned_stmt in def_block.0 {
                 match self.stmt_to_def(spanned_stmt, BlockContext::Context(&context_fn)) {
                     Ok(mut defs) => {
                         root_defs.append(&mut defs);
@@ -972,6 +1051,38 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
 
         Ok(root_defs)
+    }
+
+    fn coin_type_definition(
+        &mut self,
+        ident: String,
+        ident_span: &Span,
+        private: Private,
+        open: Open,
+    ) -> Res<DefId> {
+        let (def_id, coinage) = self.named_def_id(Space::Type, &ident, ident_span)?;
+        if matches!(coinage, Coinage::New) {
+            let ident = self.compiler.strings.intern(&ident);
+            debug!("{def_id:?}: `{}`", ident);
+
+            self.set_def_kind(
+                def_id,
+                DefKind::Type(TypeDef {
+                    visibility: if private.0.is_some() {
+                        DefVisibility::Private
+                    } else {
+                        DefVisibility::Public
+                    },
+                    open: open.0.is_some(),
+                    ident: Some(ident),
+                    rel_type_for: None,
+                    concrete: true,
+                }),
+                ident_span,
+            );
+        }
+
+        Ok(def_id)
     }
 
     fn define_relation_if_undefined(&mut self, key: RelationKey, span: &Range<usize>) -> DefId {

@@ -188,15 +188,9 @@ impl<'m> Compiler<'m> {
         self.package_config_table
             .insert(package.package_id, package.config);
 
-        let lowered = {
-            let mut lowering = Lowering::new(self, &src);
-
-            for stmt in package.statements {
-                let _ignored = lowering.lower_statement(stmt);
-            }
-
-            lowering.finish()
-        };
+        let lowered = Lowering::new(self, &src)
+            .lower_statements(package.statements)
+            .finish();
 
         for def_id in lowered.root_defs {
             if lowered.map_defs.contains(&def_id) {

@@ -43,7 +43,7 @@ fn test_map_match_scalar_key() {
                         eq!(&ValueCardinality::One),
                         eq!(&Literal(indoc! { r#"
                         (root $b)
-                        (is-entity $b def@1:3)
+                        (is-entity $b def@1:2)
                         (attr $b S:1:4 (_ Text("input")))
                         "#
                         }))
@@ -85,7 +85,7 @@ fn test_map_match_parameterless_query() {
                         eq!(&ValueCardinality::Many),
                         eq!(&Literal(indoc! { "
                         (root $c)
-                        (is-entity $c def@1:3)
+                        (is-entity $c def@1:2)
                         "
                         }))
                     ))
@@ -135,7 +135,7 @@ fn test_map_match_anonymous_query_mandatory_properties() {
                         eq!(&ValueCardinality::Many),
                         eq!(&Literal(indoc! { r#"
                         (root $e)
-                        (is-entity $e def@1:3)
+                        (is-entity $e def@1:2)
                         (attr $e S:1:6 (_ Text("A")))
                         (attr $e S:1:7 (_ Text("B")))
                         "#
@@ -191,7 +191,7 @@ fn test_map_match_anonymous_query_optional_property() {
                         eq!(&ValueCardinality::Many),
                         eq!(&Literal(indoc! { r#"
                         (root $e)
-                        (is-entity $e def@1:3)
+                        (is-entity $e def@1:2)
                         (attr $e S:1:6 (_ Text("A")))
                         "#
                         }))
@@ -247,8 +247,8 @@ fn test_map_match_anonymous_with_translation() {
                         eq!(&ValueCardinality::Many),
                         eq!(&Literal(indoc! { r#"
                         (root $d)
-                        (is-entity $d def@1:3)
-                        (attr $d S:1:6 (_ Text("X")))
+                        (is-entity $d def@1:2)
+                        (attr $d S:1:7 (_ Text("X")))
                         "#
                         }))
                     ))
@@ -300,7 +300,7 @@ fn test_map_sequence_filter_in_set() {
                         eq!(&ValueCardinality::Many),
                         eq!(&Literal(indoc! { r#"
                         (root $d)
-                        (is-entity $d def@1:3)
+                        (is-entity $d def@1:2)
                         (attr $d S:1:6 (_ Text("X")))
                         "#
                         }))
