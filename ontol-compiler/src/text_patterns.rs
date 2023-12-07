@@ -10,7 +10,11 @@ use smartstring::alias::String;
 use std::fmt::Write;
 use tracing::debug;
 
-use crate::{regex_util, relation::Constructor, Compiler};
+use crate::{
+    regex_util::{self, set_of_all_strings},
+    relation::Constructor,
+    Compiler,
+};
 
 #[derive(Default, Debug)]
 pub struct TextPatterns {
@@ -98,7 +102,14 @@ impl TextPatternSegment {
     fn to_regex_hir(&self, capture_cursor: &mut CaptureCursor) -> Hir {
         match self {
             Self::EmptyString => regex_util::empty_string(),
-            Self::AllStrings => regex_util::set_of_all_strings(),
+            Self::AllStrings => {
+                let index = capture_cursor.increment();
+                Hir::capture(Capture {
+                    index,
+                    name: None,
+                    sub: Box::new(set_of_all_strings()),
+                })
+            }
             Self::Literal(string) => Hir::literal(string.as_bytes()),
             Self::Regex(hir) => hir.clone(),
             Self::Property { segment, .. } => {
@@ -133,7 +144,9 @@ impl TextPatternSegment {
         match self {
             Self::EmptyString => {}
             Self::AllStrings => {
-                // parts.push(TextPatternConstantPart::AllStrings);
+                parts.push(TextPatternConstantPart::AllStrings {
+                    capture_group: capture_cursor.increment() as usize,
+                });
             }
             Self::Literal(string) => {
                 parts.push(TextPatternConstantPart::Literal(string.clone()));

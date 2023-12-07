@@ -65,6 +65,24 @@ fn uuid_in_string_constructor_pattern() {
 }
 
 #[test]
+fn text_prefix() {
+    "
+    def prefix (
+        fmt '' => 'prefix/' => text => .
+    )
+    "
+    .compile_then(|test| {
+        let [prefix] = test.bind(["prefix"]);
+
+        assert_matches!(
+            serde_create(&prefix).to_data(json!("prefix/foobar")),
+            Ok(Data::Struct(attrs)) if attrs.len() == 1
+        );
+        assert_json_io_matches!(serde_create(&prefix), "prefix/foobar");
+    });
+}
+
+#[test]
 fn test_text_pattern_constructor_union() {
     "
     def foo (

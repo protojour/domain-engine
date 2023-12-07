@@ -11,8 +11,8 @@ use crate::{
     ontology::Ontology,
     smart_format,
     text_like_types::ParseError,
-    value::{Data, FormatDataAsText, PropertyId},
-    DefId,
+    value::{Attribute, Data, FormatDataAsText, PropertyId, Value},
+    DefId, RelationshipId,
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -44,7 +44,25 @@ impl TextPattern {
 
             for part in &self.constant_parts {
                 match part {
-                    TextPatternConstantPart::AllStrings => {}
+                    TextPatternConstantPart::AllStrings { capture_group } => {
+                        let text = captures
+                            .get(*capture_group)
+                            .expect("expected property match")
+                            .as_str();
+
+                        let text_def_id = ontology.ontol_domain_meta().text;
+
+                        attrs.insert(
+                            PropertyId::subject(crate::RelationshipId(text_def_id)),
+                            Attribute {
+                                value: Value {
+                                    data: Data::Text(text.into()),
+                                    type_def_id: text_def_id,
+                                },
+                                rel_params: Value::unit(),
+                            },
+                        );
+                    }
                     TextPatternConstantPart::Literal(_) => {}
                     TextPatternConstantPart::Property(property) => {
                         let capture_group = property.capture_group;
@@ -83,7 +101,7 @@ impl TextPattern {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum TextPatternConstantPart {
-    AllStrings,
+    AllStrings { capture_group: usize },
     Literal(String),
     Property(TextPatternProperty),
 }
@@ -105,6 +123,20 @@ impl<'d, 'o> Display for FormatPattern<'d, 'o> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for constant_part in &self.pattern.constant_parts {
             match (constant_part, self.data) {
+                (TextPatternConstantPart::AllStrings { .. }, Data::Struct(attrs)) => {
+                    let property_id =
+                        PropertyId::subject(RelationshipId(self.ontology.ontol_domain_meta().text));
+                    let Some(attribute) = attrs.get(&property_id) else {
+                        error!("Attribute {property_id} missing when formatting capturing text pattern");
+                        return Err(std::fmt::Error);
+                    };
+                    match &attribute.value.data {
+                        Data::Text(text) => {
+                            write!(f, "{text}")?;
+                        }
+                        _ => panic!(),
+                    }
+                }
                 (
                     TextPatternConstantPart::Property(TextPatternProperty {
                         property_id,
