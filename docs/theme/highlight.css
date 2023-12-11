@@ -55,13 +55,15 @@ pre code.hljs {
 .hljs-keyword,
 .hljs-selector-tag,
 .hljs-name,
-.hljs-attr {
+.hljs-attr,
+.hljs-operator {
   color: #f92672;
 }
 
 .hljs-symbol,
 .hljs-type,
 .hljs-attribute {
+  font-style: italic;
   color: #66d9ef;
 }
 
@@ -76,7 +78,6 @@ pre code.hljs {
 .hljs-selector-attr,
 .hljs-selector-pseudo,
 .hljs-addition,
-.hljs-variable,
 .hljs-template-variable {
   color: #e6db74;
 }
@@ -85,4 +86,10 @@ pre code.hljs {
 .hljs-deletion,
 .hljs-meta {
   color: #75715e;
+}
+
+.hljs-param,
+.hljs-self {
+  font-style: italic;
+  color: #fd971f;
 }
