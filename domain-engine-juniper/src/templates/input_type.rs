@@ -5,7 +5,7 @@ use ontol_runtime::{
     interface::graphql::data::{EdgeData, ObjectData, ObjectKind, TypeKind, TypeRef},
     smart_format,
 };
-use tracing::debug;
+use tracing::{debug, trace_span};
 
 use crate::{
     context::SchemaType,
@@ -34,6 +34,8 @@ impl juniper::GraphQLType<GqlScalar> for InputType {
     where
         GqlScalar: 'r,
     {
+        let _entered = trace_span!("input", name = ?info.typename()).entered();
+
         let mut reg = RegistryCtx::new(&info.schema_ctx, registry);
         match &info.type_data().kind {
             TypeKind::Object(ObjectData {

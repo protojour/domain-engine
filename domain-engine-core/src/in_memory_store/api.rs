@@ -19,10 +19,15 @@ pub struct InMemoryDb {
 impl DataStoreAPI for InMemoryDb {
     async fn execute(&self, request: Request, engine: &DomainEngine) -> DomainResult<Response> {
         match request {
-            Request::Query(select) => Ok(Response::Query(
-                self.store.read().await.query_entities(&select, engine)?,
-            )),
+            Request::Query(select) => {
+                // debug!("{select:#?}");
+                Ok(Response::Query(
+                    self.store.read().await.query_entities(&select, engine)?,
+                ))
+            }
             Request::BatchWrite(write_requests) => {
+                // debug!("{write_requests:#?}");
+
                 let mut store = self.store.write().await;
                 let mut responses = vec![];
 

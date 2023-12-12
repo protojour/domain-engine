@@ -207,17 +207,6 @@ fn artist_and_instrument_id_as_relation_object() {
 
     assert_error_msg!(
         serde_create(&artist).to_data(json!({
-            "name": "Santana",
-            "plays": [
-                {
-                    "ID": "junk",
-                }
-            ]
-        })),
-        r#"invalid type: string "junk", expected string matching /(?:\A(?:instrument/)((?:[0-9A-Fa-f]{32}|(?:[0-9A-Fa-f]{8}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{12})))\z)/ at line 1 column 40"#
-    );
-    assert_error_msg!(
-        serde_create(&artist).to_data(json!({
             "name": "Robert Fripp",
             "plays": [{ "ID": example_id }]
         })),
@@ -238,6 +227,24 @@ fn artist_and_instrument_id_as_relation_object() {
             "plays": [{ "name": "Synthaxe", "ID": example_id }]
         })),
         r#"unknown property `name` at line 1 column 98"#
+    );
+}
+
+#[test]
+fn artist_and_instrument_id_as_relation_object_invalid_id_format() {
+    let test = ARTIST_AND_INSTRUMENT.1.compile();
+    let [artist] = test.bind(["artist"]);
+
+    assert_error_msg!(
+        serde_create(&artist).to_data(json!({
+            "name": "Santana",
+            "plays": [
+                {
+                    "ID": "junk",
+                }
+            ]
+        })),
+        r#"invalid type: string "junk", expected string matching /(?:\A(?:instrument/)((?:[0-9A-Fa-f]{32}|(?:[0-9A-Fa-f]{8}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{12})))\z)/ at line 1 column 40"#
     );
 }
 

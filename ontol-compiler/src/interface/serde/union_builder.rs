@@ -2,15 +2,18 @@ use std::collections::BTreeMap;
 
 use ontol_runtime::{
     interface::discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
-    interface::serde::{
-        operator::{SerdeOperator, SerdeOperatorAddr, ValueUnionVariant},
-        SerdeDef, SerdeKey,
+    interface::{
+        discriminator::LeafDiscriminant,
+        serde::{
+            operator::{SerdeOperator, SerdeOperatorAddr, ValueUnionVariant},
+            SerdeDef, SerdeKey, SerdeModifier,
+        },
     },
-    smart_format, DefId,
+    smart_format,
 };
 use smartstring::alias::String;
 
-use super::serde_generator::SerdeGenerator;
+use super::serde_generator::{operator_to_leaf_discriminant, SerdeGenerator};
 
 pub struct UnionBuilder {
     // variants _sorted_ by purpose
@@ -34,7 +37,7 @@ impl UnionBuilder {
         mut map_operator_fn: impl FnMut(
             &mut SerdeGenerator,
             SerdeOperatorAddr,
-            DefId,
+            SerdeDef,
         ) -> SerdeOperatorAddr,
     ) -> Result<Vec<ValueUnionVariant>, String> {
         // sanity check
@@ -46,31 +49,27 @@ impl UnionBuilder {
             .flat_map(|(_, variants)| variants)
             .collect();
 
-        for candidate in &mut variant_candidates {
-            let result_type = candidate.discriminator.serde_def.def_id;
+        if variant_candidates.is_empty() {
+            panic!("Empty");
+        }
 
-            candidate.addr = map_operator_fn(generator, candidate.addr, result_type);
+        for candidate in &mut variant_candidates {
+            let result_def = candidate.discriminator.serde_def;
+
+            candidate.addr = map_operator_fn(generator, candidate.addr, result_def);
 
             match &mut candidate.discriminator.discriminant {
                 Discriminant::StructFallback => {
                     panic!("MapFallback should have been filtered already");
                 }
-                Discriminant::IsSingletonProperty(relationship_id, prop) => {
+                Discriminant::HasAttribute(_, _, leaf @ LeafDiscriminant::IsAny) => {
                     // TODO: We don't know that we have to do any disambiguation here
                     // (there might be only one singleton property)
-                    let operator = generator.gen_operator(SerdeKey::Def(SerdeDef::new(
-                        result_type,
+                    if let Some(operator) = generator.gen_operator(SerdeKey::Def(SerdeDef::new(
+                        result_def.def_id,
                         self.def.modifier.cross_def_flags(),
-                    )));
-
-                    if let Some(SerdeOperator::CapturingTextPattern(def_id)) = operator {
-                        // convert this
-                        candidate.discriminator.discriminant =
-                            Discriminant::HasAttributeMatchingTextPattern(
-                                *relationship_id,
-                                prop.clone(),
-                                *def_id,
-                            );
+                    ))) {
+                        *leaf = operator_to_leaf_discriminant(operator);
                     }
                 }
                 _ => {}
@@ -95,15 +94,32 @@ impl UnionBuilder {
         discriminator: &VariantDiscriminator,
         generator: &mut SerdeGenerator,
     ) -> Result<(), String> {
-        let addr = match generator.gen_addr(SerdeKey::Def(
-            self.def.with_def(discriminator.serde_def.def_id),
-        )) {
+        let mut discriminator = discriminator.clone();
+
+        let inner_def = match discriminator.purpose {
+            VariantPurpose::Identification { entity_id } => {
+                let mut inner_def = self.def.with_def(entity_id);
+                inner_def.modifier = SerdeModifier::PRIMARY_ID;
+                inner_def
+            }
+            VariantPurpose::Data => {
+                discriminator.serde_def.modifier |= SerdeModifier::INHERENT_PROPS;
+
+                let mut inner_def = self.def.with_def(discriminator.serde_def.def_id);
+                inner_def.modifier |= SerdeModifier::INHERENT_PROPS;
+                inner_def
+            }
+        };
+
+        let addr = match generator.gen_addr(SerdeKey::Def(inner_def)) {
             Some(addr) => addr,
-            None => return Ok(()),
+            None => {
+                panic!();
+            }
         };
 
         // Push with empty scope ('root scope')
-        self.push_discriminator(discriminator, addr, &[], generator)
+        self.push_discriminator(&discriminator, addr, &[], generator)
     }
 
     fn push_discriminator(

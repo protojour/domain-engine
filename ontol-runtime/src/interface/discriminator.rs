@@ -17,22 +17,25 @@ pub struct VariantDiscriminator {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub enum VariantPurpose {
-    Identification,
+    Identification { entity_id: DefId },
     Data,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub enum Discriminant {
+    MatchesLeaf(LeafDiscriminant),
+    HasAttribute(RelationshipId, String, LeafDiscriminant),
+    /// Matches any struct
+    StructFallback,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+pub enum LeafDiscriminant {
+    IsAny,
     IsUnit,
     IsInt,
     IsText,
     IsTextLiteral(String),
     IsSequence,
     MatchesCapturingTextPattern(DefId),
-    /// Matches any struct
-    StructFallback,
-    /// Matches a struct that has a single property, and only that property will be used for informationk
-    IsSingletonProperty(RelationshipId, String),
-    HasTextAttribute(RelationshipId, String, String),
-    HasAttributeMatchingTextPattern(RelationshipId, String, DefId),
 }

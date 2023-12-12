@@ -11,9 +11,12 @@ use ontol_runtime::{
         SerdeOperator, SerdeOperatorAddr, SerdeProperty, StructOperator, UnionOperator,
         ValueUnionVariant,
     },
-    interface::serde::{
-        operator::{SerdePropertyFlags, SerdeStructFlags},
-        SerdeDef, SerdeKey, SerdeModifier,
+    interface::{
+        discriminator::LeafDiscriminant,
+        serde::{
+            operator::{SerdePropertyFlags, SerdeStructFlags},
+            SerdeDef, SerdeKey, SerdeModifier,
+        },
     },
     ontology::{Cardinality, PropertyCardinality, ValueCardinality},
     smart_format,
@@ -21,7 +24,7 @@ use ontol_runtime::{
     DefId, Role,
 };
 use smartstring::alias::String;
-use tracing::{debug, error, trace};
+use tracing::{debug, error, trace, warn};
 
 use super::sequence_range_builder::SequenceRangeBuilder;
 
@@ -192,6 +195,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             SerdeKey::Def(def)
                 if def.modifier - SerdeModifier::cross_def_mask() == SerdeModifier::PRIMARY_ID =>
             {
+                trace!("Gen primary id: {def:?}");
+
                 let table = self
                     .relations
                     .properties_by_def_id
@@ -621,10 +626,22 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 .gen_addr(SerdeKey::Def(struct_def))
                 .expect("No property struct operator");
 
-            let id_property_name = match self.operators_by_addr.get(id_addr.0 as usize).unwrap() {
-                SerdeOperator::IdSingletonStruct(id_property_name, _) => id_property_name.clone(),
-                other => panic!("id operator was not an Id: {other:?}"),
-            };
+            let (id_property_name, id_leaf_discriminant) =
+                match self.operators_by_addr.get(id_addr.0 as usize).unwrap() {
+                    SerdeOperator::IdSingletonStruct(id_property_name, inner_addr) => (
+                        id_property_name.clone(),
+                        if false {
+                            operator_to_leaf_discriminant(self.get_operator(*inner_addr))
+                        } else {
+                            // The point of using IsAny is that as soon as the `ìd_property_name`
+                            // matches, the variant has been found. The _value_ matcher
+                            // is then decided, without further fallback.
+                            // I.e. handled properly by its deserializer.
+                            LeafDiscriminant::IsAny
+                        },
+                    ),
+                    other => panic!("id operator was not an Id: {other:?}"),
+                };
 
             Some(OperatorAllocation::Allocated(
                 new_addr,
@@ -634,11 +651,14 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     vec![
                         ValueUnionVariant {
                             discriminator: VariantDiscriminator {
-                                discriminant: Discriminant::IsSingletonProperty(
+                                discriminant: Discriminant::HasAttribute(
                                     identifies_relationship_id,
                                     id_property_name,
+                                    id_leaf_discriminant,
                                 ),
-                                purpose: VariantPurpose::Identification,
+                                purpose: VariantPurpose::Identification {
+                                    entity_id: def.def_id,
+                                },
                                 serde_def: SerdeDef::new(
                                     identifies_meta.relationship.subject.0,
                                     def.modifier.cross_def_flags(),
@@ -780,16 +800,20 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         typename: &str,
         properties: &Properties,
     ) -> SerdeOperator {
-        let union_disciminator = self
+        let union_discriminator = self
             .relations
             .union_discriminators
             .get(&def.def_id)
             .expect("no union discriminator available. Should fail earlier");
 
+        if union_discriminator.variants.is_empty() {
+            panic!("No input variants");
+        }
+
         let mut union_builder = UnionBuilder::new(def);
         let mut root_types: HashSet<DefId> = Default::default();
 
-        for root_discriminator in &union_disciminator.variants {
+        for root_discriminator in &union_discriminator.variants {
             union_builder
                 .add_root_discriminator(root_discriminator, self)
                 .expect("Could not add root discriminator to union builder");
@@ -806,15 +830,13 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             ));
 
             union_builder
-                .build(self, |this, addr, result_type| {
-                    if root_types.contains(&result_type) {
+                .build(self, |this, addr, result_def| {
+                    if result_def.modifier.contains(SerdeModifier::INHERENT_PROPS)
+                        && root_types.contains(&result_def.def_id)
+                    {
                         // Make the intersection:
                         this.gen_addr(SerdeKey::Intersection(Box::new(
-                            [
-                                inherent_properties_key.clone(),
-                                SerdeKey::Def(def.with_def(result_type)),
-                            ]
-                            .into(),
+                            [inherent_properties_key.clone(), SerdeKey::Def(result_def)].into(),
                         )))
                         .expect("No inner operator")
                     } else {
@@ -827,6 +849,13 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 .build(self, |_this, addr, _result_type| addr)
                 .unwrap()
         };
+
+        if variants.is_empty() {
+            panic!(
+                "empty variant set for {def:?}. Input variants were {:?}",
+                union_discriminator.variants
+            );
+        }
 
         SerdeOperator::Union(UnionOperator::new(typename.into(), def, variants))
     }
@@ -995,6 +1024,22 @@ fn make_property_name(input: &str, modifier: SerdeModifier) -> (String, IdentAda
         }
     } else {
         (input.into(), IdentAdaption::Verbatim)
+    }
+}
+
+pub(super) fn operator_to_leaf_discriminant(operator: &SerdeOperator) -> LeafDiscriminant {
+    match operator {
+        SerdeOperator::CapturingTextPattern(def_id) => {
+            LeafDiscriminant::MatchesCapturingTextPattern(*def_id)
+        }
+        SerdeOperator::I64(..) | SerdeOperator::I32(..) => LeafDiscriminant::IsInt,
+        SerdeOperator::DynamicSequence | SerdeOperator::RelationSequence(_) => {
+            LeafDiscriminant::IsSequence
+        }
+        other => {
+            warn!("Unable to match {other:?} yet");
+            LeafDiscriminant::IsAny
+        }
     }
 }
 

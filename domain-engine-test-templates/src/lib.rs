@@ -16,6 +16,13 @@ pub fn include_graphql_conduit_tests() {
     );
 }
 
+pub fn include_graphql_misc_tests() {
+    output_tests(
+        "graphql_misc_tests.rs",
+        include_str!("../templates/graphql_misc_tests.rs"),
+    );
+}
+
 fn output_tests(name: &str, source: &str) {
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let dest_path = Path::new(&out_dir).join(name);

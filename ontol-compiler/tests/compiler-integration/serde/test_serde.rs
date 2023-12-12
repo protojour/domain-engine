@@ -6,8 +6,11 @@ use ontol_runtime::{
     value::Data,
 };
 use ontol_test_utils::{
-    assert_error_msg, assert_json_io_matches, examples::ARTIST_AND_INSTRUMENT, expect_eq,
-    serde_helper::*, TestCompile,
+    assert_error_msg, assert_json_io_matches,
+    examples::{ARTIST_AND_INSTRUMENT, GITMESH},
+    expect_eq,
+    serde_helper::*,
+    TestCompile,
 };
 use serde::de::DeserializeSeed;
 use serde_json::json;
@@ -605,5 +608,16 @@ fn test_serialize_raw_tree_only_artist_and_instrument() {
                 "name": "Jimi",
             })
         );
+    });
+}
+
+#[test]
+fn test_serde_gitmesh_id_union() {
+    GITMESH.1.compile_then(|test| {
+        let [repository] = test.bind(["Repository"]);
+        assert_json_io_matches!(serde_create(&repository), {
+            "handle": "repo1",
+            "owner": { "id": "user/bob" },
+        });
     });
 }

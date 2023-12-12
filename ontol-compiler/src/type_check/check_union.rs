@@ -4,12 +4,15 @@ use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::{IndexMap, IndexSet};
 use ontol_runtime::{
     interface::{
-        discriminator::{Discriminant, UnionDiscriminator, VariantDiscriminator, VariantPurpose},
+        discriminator::{
+            Discriminant, LeafDiscriminant, UnionDiscriminator, VariantDiscriminator,
+            VariantPurpose,
+        },
         serde::{SerdeDef, SerdeModifier},
     },
     smart_format,
     value::PropertyId,
-    DefId,
+    DefId, RelationshipId,
 };
 use patricia_tree::PatriciaMap;
 use smartstring::alias::String;
@@ -29,7 +32,7 @@ use crate::{
 use super::{repr::repr_model::ReprKind, TypeCheck};
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
-    pub fn check_value_union(&mut self, value_union_def_id: DefId) -> Vec<SpannedCompileError> {
+    pub fn check_union(&mut self, value_union_def_id: DefId) -> Vec<SpannedCompileError> {
         let _entered = debug_span!("union", id = ?value_union_def_id).entered();
 
         // An error set to avoid reporting the same error more than once
@@ -51,11 +54,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let mut used_variants: FnvHashSet<DefId> = Default::default();
 
+        let mut entity_detector = EntityDetector::default();
+
         for (variant_def_id, span) in union_variants {
             let variant_def_id = *variant_def_id;
 
             self.add_variant_to_builder(
                 &mut inherent_builder,
+                VariantKey::Instance,
                 variant_def_id,
                 &mut error_set,
                 span,
@@ -65,17 +71,48 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 if let Some(id_relationship_id) = &properties.identified_by {
                     let identifies_meta = self.defs.relationship_meta(*id_relationship_id);
 
+                    let name = match identifies_meta.relation_def_kind.value {
+                        DefKind::TextLiteral(lit) => String::from(*lit),
+                        // FIXME: Choose the real name
+                        _ => String::from("id"),
+                    };
+
                     self.add_variant_to_builder(
                         &mut entity_id_builder,
+                        VariantKey::IdProperty {
+                            entity_id: variant_def_id,
+                            name,
+                            rel_id: *id_relationship_id,
+                        },
                         identifies_meta.relationship.subject.0,
                         &mut error_set,
                         span,
                     );
+                    entity_detector.entity_count += 1;
+                } else {
+                    entity_detector.non_entity_count += 1;
                 }
+            } else {
+                entity_detector.non_entity_count += 1;
             }
 
             used_variants.insert(variant_def_id);
         }
+
+        let mut errors = vec![];
+
+        let entities_only = match entity_detector.detect(union_variants.len()) {
+            Ok(entities_only) => Some(entities_only),
+            Err(error) => {
+                errors.push(SpannedCompileError {
+                    error,
+                    span: union_def.span,
+                    notes: vec![],
+                });
+
+                None
+            }
+        };
 
         self.limit_property_discriminators(
             value_union_def_id,
@@ -98,22 +135,46 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             &mut error_set,
         );
 
-        let union_discriminator = self.make_union_discriminator(inherent_builder, &error_set);
+        let mut union_discriminator =
+            self.make_union_discriminator(inherent_builder, DiscriminatorType::Data, &error_set);
+
+        if let Some(EntitiesOnly(true)) = entities_only {
+            for (_, errors) in error_set.errors.iter_mut() {
+                // If there are only entities, filter out CannotDiscriminateTypeByProperty errors,
+                // since this is allowed for entities.
+                errors.retain(|error, _| {
+                    !matches!(error, UnionCheckError::CannotDiscriminateTypeByProperty)
+                });
+            }
+
+            if union_discriminator.variants.is_empty() && !union_variants.is_empty() {
+                union_discriminator = self.make_union_discriminator(
+                    entity_id_builder,
+                    DiscriminatorType::Identification,
+                    &error_set,
+                );
+            }
+        }
+
         self.relations
             .union_discriminators
             .insert(value_union_def_id, union_discriminator);
 
-        error_set
-            .errors
-            .into_iter()
-            .flat_map(|(_, errors)| errors.into_iter())
-            .map(|(union_error, span)| self.make_compile_error(union_error).spanned(&span))
-            .collect()
+        errors.extend(
+            error_set
+                .errors
+                .into_iter()
+                .flat_map(|(_, errors)| errors.into_iter())
+                .map(|(union_error, span)| self.make_compile_error(union_error).spanned(&span)),
+        );
+
+        errors
     }
 
     fn add_variant_to_builder<'t, 'b>(
         &'t self,
         builder: &'b mut DiscriminatorBuilder<'t>,
+        key: VariantKey,
         variant_def: DefId,
         error_set: &mut ErrorSet,
         span: &SourceSpan,
@@ -130,15 +191,21 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         match variant_ty {
             Type::Primitive(PrimitiveKind::Unit, def_id) => builder.unit = Some(*def_id),
             Type::Primitive(PrimitiveKind::I64, _) => {
-                builder.number = Some(IntDiscriminator(variant_def));
+                builder.number = Some(VariantKeyed {
+                    key,
+                    value: IntDiscriminator(variant_def),
+                });
             }
             Type::Primitive(PrimitiveKind::Text, _) => {
                 builder.string = TextDiscriminator::Any(variant_def);
-                builder.any_string.push(variant_def);
+                builder.any_string.push(VariantKeyed {
+                    key,
+                    value: variant_def,
+                });
             }
             Type::TextConstant(def_id) => {
                 let string_literal = self.defs.get_string_representation(*def_id);
-                builder.add_text_literal(string_literal, *def_id);
+                builder.add_text_literal(key, string_literal, *def_id);
             }
             Type::Domain(domain_def_id) | Type::Anonymous(domain_def_id) => {
                 match self.find_domain_type_match_data(*domain_def_id) {
@@ -159,11 +226,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 span,
                             );
                         } else {
-                            builder.sequence = Some(variant_def);
+                            builder.sequence = Some(VariantKeyed {
+                                key,
+                                value: variant_def,
+                            });
                         }
                     }
                     Ok(DomainTypeMatchData::ConstructorStringPattern(segment)) => {
-                        builder.add_text_pattern(segment, variant_def);
+                        builder.add_text_pattern(key, segment, variant_def);
                     }
                     Err(error) => {
                         error_set.report(variant_def, error, span);
@@ -243,10 +313,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     map_discriminator_candidate.property_candidates.push(
                         PropertyDiscriminatorCandidate {
                             relation_def_id: meta.relationship.relation_def_id,
-                            discriminant: Discriminant::HasTextAttribute(
+                            discriminant: Discriminant::HasAttribute(
                                 property_id.relationship_id,
                                 property_name.into(),
-                                string_literal.into(),
+                                LeafDiscriminant::IsTextLiteral(string_literal.into()),
                             ),
                         },
                     );
@@ -256,8 +326,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
 
         if map_discriminator_candidate.property_candidates.is_empty() {
-            debug!("no prop candidates for variant");
-            error_set.report(variant_def, UnionCheckError::CannotDiscriminateType, span);
+            error_set.report(
+                variant_def,
+                UnionCheckError::CannotDiscriminateTypeByProperty,
+                span,
+            );
         } else {
             discriminator_builder
                 .map_discriminator_candidates
@@ -331,8 +404,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let mut prefix_index: PatriciaMap<FnvHashSet<DefId>> = Default::default();
         let mut guaranteed_ambiguous_count = 0;
 
-        for (variant_def_id, segment) in &builder.pattern_candidates {
-            let prefix = segment.constant_prefix();
+        for (variant_def_id, keyed_segment) in &builder.pattern_candidates {
+            let prefix = keyed_segment.value.constant_prefix();
 
             if let Some(prefix) = prefix {
                 if let Some(set) = prefix_index.get_mut(&prefix) {
@@ -352,7 +425,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         // Also check for ambiguity with string literals
         if let TextDiscriminator::Literals(literals) = &builder.string {
-            for (literal, variant_def_id) in literals {
+            for keyed in literals {
+                let (literal, variant_def_id) = &keyed.value;
                 if let Some(set) = prefix_index.get_mut(literal) {
                     set.insert(*variant_def_id);
                 } else {
@@ -394,31 +468,44 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn make_union_discriminator(
         &self,
         builder: DiscriminatorBuilder,
+        discriminator_type: DiscriminatorType,
         error_set: &ErrorSet,
     ) -> UnionDiscriminator {
         let mut union_discriminator = UnionDiscriminator { variants: vec![] };
 
         if let Some(def_id) = builder.unit {
             union_discriminator.variants.push(VariantDiscriminator {
-                discriminant: Discriminant::IsUnit,
-                purpose: VariantPurpose::Data,
+                discriminant: Discriminant::MatchesLeaf(LeafDiscriminant::IsUnit),
+                purpose: discriminator_type.into_purpose(&VariantKey::Instance),
                 serde_def: SerdeDef::new(def_id, SerdeModifier::NONE),
             })
         }
 
         if let Some(number) = builder.number {
             union_discriminator.variants.push(VariantDiscriminator {
-                discriminant: Discriminant::IsInt,
-                purpose: VariantPurpose::Data,
-                serde_def: SerdeDef::new(number.0, SerdeModifier::NONE),
+                discriminant: Discriminant::MatchesLeaf(LeafDiscriminant::IsInt),
+                // BUG: Should not be DefId::unit:
+                purpose: discriminator_type.into_purpose(&VariantKey::Instance),
+                serde_def: SerdeDef::new(number.value.0, SerdeModifier::NONE),
             })
         }
 
         // match patterns before strings
-        for (variant_def_id, _) in builder.pattern_candidates {
+        for (variant_def_id, keyed) in builder.pattern_candidates {
+            let leaf_discriminant = LeafDiscriminant::MatchesCapturingTextPattern(variant_def_id);
+
             union_discriminator.variants.push(VariantDiscriminator {
-                discriminant: Discriminant::MatchesCapturingTextPattern(variant_def_id),
-                purpose: VariantPurpose::Data,
+                purpose: discriminator_type.into_purpose(&keyed.key),
+                discriminant: match (discriminator_type, keyed.key) {
+                    (DiscriminatorType::Data, _) => Discriminant::MatchesLeaf(leaf_discriminant),
+                    (
+                        DiscriminatorType::Identification,
+                        VariantKey::IdProperty { name, rel_id, .. },
+                    ) => Discriminant::HasAttribute(rel_id, name, leaf_discriminant),
+                    (DiscriminatorType::Identification, _) => {
+                        Discriminant::MatchesLeaf(leaf_discriminant)
+                    }
+                },
                 serde_def: SerdeDef::new(variant_def_id, SerdeModifier::NONE),
             });
         }
@@ -427,27 +514,30 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             TextDiscriminator::None => {}
             TextDiscriminator::Any(def_id) => {
                 union_discriminator.variants.push(VariantDiscriminator {
-                    discriminant: Discriminant::IsText,
-                    purpose: VariantPurpose::Data,
+                    discriminant: Discriminant::MatchesLeaf(LeafDiscriminant::IsText),
+                    purpose: discriminator_type.into_purpose(&VariantKey::Instance),
                     serde_def: SerdeDef::new(def_id, SerdeModifier::NONE),
                 });
             }
             TextDiscriminator::Literals(literals) => {
-                for (literal, def_id) in literals {
+                for keyed in literals {
+                    let (literal, def_id) = keyed.value;
                     union_discriminator.variants.push(VariantDiscriminator {
-                        discriminant: Discriminant::IsTextLiteral(literal),
-                        purpose: VariantPurpose::Data,
+                        purpose: discriminator_type.into_purpose(&keyed.key),
+                        discriminant: Discriminant::MatchesLeaf(LeafDiscriminant::IsTextLiteral(
+                            literal,
+                        )),
                         serde_def: SerdeDef::new(def_id, SerdeModifier::NONE),
                     });
                 }
             }
         }
 
-        if let Some(sequence_def_id) = builder.sequence {
+        if let Some(variant_keyed) = builder.sequence {
             union_discriminator.variants.push(VariantDiscriminator {
-                discriminant: Discriminant::IsSequence,
-                purpose: VariantPurpose::Data,
-                serde_def: SerdeDef::new(sequence_def_id, SerdeModifier::NONE),
+                discriminant: Discriminant::MatchesLeaf(LeafDiscriminant::IsSequence),
+                purpose: discriminator_type.into_purpose(&variant_keyed.key),
+                serde_def: SerdeDef::new(variant_keyed.value, SerdeModifier::NONE),
             });
         }
 
@@ -455,7 +545,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             for candidate in map_discriminator.property_candidates {
                 union_discriminator.variants.push(VariantDiscriminator {
                     discriminant: candidate.discriminant,
-                    purpose: VariantPurpose::Data,
+                    purpose: discriminator_type.into_purpose(&VariantKey::Instance),
                     serde_def: SerdeDef::new(map_discriminator.result_type, SerdeModifier::NONE),
                 })
             }
@@ -477,7 +567,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     FormatType(ty, self.defs, self.primitives)
                 ))
             }
-            UnionCheckError::CannotDiscriminateType => CompileError::CannotDiscriminateType,
+            UnionCheckError::CannotDiscriminateType
+            | UnionCheckError::CannotDiscriminateTypeByProperty => {
+                CompileError::CannotDiscriminateType
+            }
             UnionCheckError::NoUniformDiscriminatorFound => {
                 CompileError::NoUniformDiscriminatorFound
             }
@@ -495,50 +588,109 @@ enum DomainTypeMatchData<'a> {
     ConstructorStringPattern(&'a TextPatternSegment),
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct DiscriminatorBuilder<'a> {
     unit: Option<DefId>,
-    number: Option<IntDiscriminator>,
-    any_string: Vec<DefId>,
+    number: Option<VariantKeyed<IntDiscriminator>>,
+    any_string: Vec<VariantKeyed<DefId>>,
     string: TextDiscriminator,
-    sequence: Option<DefId>,
-    pattern_candidates: IndexMap<DefId, &'a TextPatternSegment>,
+    sequence: Option<VariantKeyed<DefId>>,
+    pattern_candidates: IndexMap<DefId, VariantKeyed<&'a TextPatternSegment>>,
     map_discriminator_candidates: Vec<MapDiscriminatorCandidate>,
 }
 
 impl<'a> DiscriminatorBuilder<'a> {
-    fn add_text_literal(&mut self, lit: &str, def_id: DefId) {
+    fn add_text_literal(&mut self, key: VariantKey, lit: &str, def_id: DefId) {
         match &mut self.string {
             TextDiscriminator::None => {
-                self.string = TextDiscriminator::Literals([(lit.into(), def_id)].into());
+                self.string = TextDiscriminator::Literals(
+                    [VariantKeyed {
+                        key,
+                        value: (lit.into(), def_id),
+                    }]
+                    .into(),
+                );
             }
             TextDiscriminator::Any(_) => {}
             TextDiscriminator::Literals(set) => {
-                set.insert((lit.into(), def_id));
+                set.insert(VariantKeyed {
+                    key,
+                    value: (lit.into(), def_id),
+                });
             }
         }
     }
 
-    fn add_text_pattern(&mut self, segment: &'a TextPatternSegment, variant_def_id: DefId) {
-        self.pattern_candidates.insert(variant_def_id, segment);
+    fn add_text_pattern(
+        &mut self,
+        key: VariantKey,
+        segment: &'a TextPatternSegment,
+        variant_def_id: DefId,
+    ) {
+        self.pattern_candidates.insert(
+            variant_def_id,
+            VariantKeyed {
+                key,
+                value: segment,
+            },
+        );
     }
 }
 
+#[derive(Clone, Copy)]
+enum DiscriminatorType {
+    Data,
+    Identification,
+}
+
+impl DiscriminatorType {
+    fn into_purpose(self, key: &VariantKey) -> VariantPurpose {
+        match (self, key) {
+            (Self::Data, VariantKey::Instance) => VariantPurpose::Data,
+            (Self::Identification, VariantKey::IdProperty { entity_id, .. }) => {
+                VariantPurpose::Identification {
+                    entity_id: *entity_id,
+                }
+            }
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Hash, Debug)]
+enum VariantKey {
+    Instance,
+    IdProperty {
+        entity_id: DefId,
+        name: String,
+        rel_id: RelationshipId,
+    },
+}
+
+#[derive(PartialEq, Eq, Hash, Debug)]
+struct VariantKeyed<T> {
+    key: VariantKey,
+    value: T,
+}
+
+#[derive(Debug)]
 struct IntDiscriminator(DefId);
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 enum TextDiscriminator {
     #[default]
     None,
     Any(DefId),
-    Literals(IndexSet<(String, DefId)>),
+    Literals(IndexSet<VariantKeyed<(String, DefId)>>),
 }
 
+#[derive(Debug)]
 struct MapDiscriminatorCandidate {
     result_type: DefId,
     property_candidates: Vec<PropertyDiscriminatorCandidate>,
 }
 
+#[derive(Debug)]
 struct PropertyDiscriminatorCandidate {
     relation_def_id: DefId,
     discriminant: Discriminant,
@@ -563,7 +715,27 @@ impl ErrorSet {
 enum UnionCheckError {
     UnitTypePartOfUnion(DefId),
     CannotDiscriminateType,
+    CannotDiscriminateTypeByProperty,
     NoUniformDiscriminatorFound,
     SharedPrefixInPatternUnion,
     NonDisjointIdsInEntityUnion,
+}
+
+#[derive(Clone, Copy)]
+struct EntitiesOnly(bool);
+
+#[derive(Default)]
+struct EntityDetector {
+    entity_count: usize,
+    non_entity_count: usize,
+}
+
+impl EntityDetector {
+    fn detect(self, variants_len: usize) -> Result<EntitiesOnly, CompileError> {
+        if !(self.entity_count == variants_len || self.non_entity_count == variants_len) {
+            return Err(CompileError::CannotMixNonEntitiesInUnion);
+        }
+
+        Ok(EntitiesOnly(self.entity_count == variants_len))
+    }
 }

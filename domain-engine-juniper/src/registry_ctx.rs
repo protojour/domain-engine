@@ -11,6 +11,7 @@ use ontol_runtime::{
         schema::{QueryLevel, TypingPurpose},
     },
     interface::{
+        discriminator::VariantPurpose,
         graphql::argument::DefaultArg,
         serde::{
             operator::{FilteredVariants, SerdeOperator, SerdeOperatorAddr, SerdePropertyFlags},
@@ -20,7 +21,7 @@ use ontol_runtime::{
     value::PropertyId,
     Role,
 };
-use tracing::trace;
+use tracing::{debug, trace, trace_span};
 
 use crate::{
     context::{SchemaCtx, SchemaType},
@@ -169,6 +170,8 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         )?;
                     }
                     FilteredVariants::Union(variants) => {
+                        debug!("UNION ARGUMENTS for {:?}", union_op.unfiltered_variants());
+
                         // FIXME: Instead of just deduplicating the properties,
                         // the documentation for each of them should be combined in some way.
                         // When a union is used as an InputValue, the GraphQL functions purely
@@ -185,17 +188,23 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                                 },
                             )?;
                         }
+
                         for variant in variants {
-                            self.collect_operator_arguments(
-                                variant.addr,
-                                output,
-                                TypingPurpose::PartialInput,
-                                ArgumentFilter {
-                                    deduplicate: true,
-                                    skip_subject: true,
-                                    skip_object: false,
-                                },
-                            )?;
+                            match variant.discriminator.purpose {
+                                VariantPurpose::Data => {
+                                    self.collect_operator_arguments(
+                                        variant.addr,
+                                        output,
+                                        TypingPurpose::PartialInput,
+                                        ArgumentFilter {
+                                            deduplicate: true,
+                                            skip_subject: true,
+                                            skip_object: false,
+                                        },
+                                    )?;
+                                }
+                                VariantPurpose::Identification { .. } => {}
+                            }
                         }
                     }
                 }
@@ -229,7 +238,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         }
     }
 
-    pub fn get_operator_argument(
+    fn get_operator_argument(
         &mut self,
         name: &str,
         operator_addr: SerdeOperatorAddr,
@@ -239,7 +248,8 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
     ) -> juniper::meta::Argument<'r, GqlScalar> {
         let operator = self.schema_ctx.ontology.get_serde_operator(operator_addr);
 
-        trace!("register argument '{name}': {operator:?}");
+        let _entered = trace_span!("arg", name = ?name).entered();
+        trace!("register argument: {operator:?}");
 
         if property_flags.contains(SerdePropertyFlags::ENTITY_ID) {
             return self.modified_arg::<ID>(name, modifier, &());
@@ -315,6 +325,11 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 let def_id = union_op.union_def().def_id;
                 let type_info = self.schema_ctx.ontology.get_type_info(def_id);
 
+                // trace!(
+                //     "union unfiltered variants: {:?}",
+                //     union_op.unfiltered_variants()
+                // );
+
                 // If this is an entity, use Edge + ReferenceInput
                 // to get the option of just specifying an ID.
                 // TODO: Ensure this for create mutations only
@@ -327,18 +342,33 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                     (QueryLevel::Node, TypingPurpose::Input)
                 };
 
-                let type_addr = self
-                    .schema_ctx
-                    .type_addr_by_def(def_id, query_level)
-                    .unwrap_or_else(|| {
-                        panic!("no union found: {def_id:?}. union_op={union_op:#?}")
-                    });
+                let (mode, level) = typing_purpose.mode_and_level();
 
-                let info = self.schema_ctx.get_schema_type(type_addr, typing_purpose);
+                match union_op.variants(mode, level) {
+                    FilteredVariants::Single(single_addr) => self.get_operator_argument(
+                        name,
+                        single_addr,
+                        rel_params,
+                        property_flags,
+                        modifier,
+                    ),
+                    FilteredVariants::Union(_variants) => {
+                        let type_addr = self
+                            .schema_ctx
+                            .type_addr_by_def(def_id, query_level)
+                            .unwrap_or_else(|| {
+                                panic!("no union found: {def_id:?}. union_op={union_op:#?}")
+                            });
 
-                match modifier.unit_optionality() {
-                    Optionality::Mandatory => self.registry.arg::<InputType>(name, &info),
-                    Optionality::Optional => self.registry.arg::<Option<InputType>>(name, &info),
+                        let info = self.schema_ctx.get_schema_type(type_addr, typing_purpose);
+
+                        match modifier.unit_optionality() {
+                            Optionality::Mandatory => self.registry.arg::<InputType>(name, &info),
+                            Optionality::Optional => {
+                                self.registry.arg::<Option<InputType>>(name, &info)
+                            }
+                        }
+                    }
                 }
             }
             SerdeOperator::Struct(struct_op) => {

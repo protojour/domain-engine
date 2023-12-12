@@ -184,17 +184,26 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
             }
             (SerdeOperator::Union(union_op), _) => match union_op.variants(self.mode, self.level) {
                 FilteredVariants::Single(addr) => self.narrow(addr).deserialize(deserializer),
-                FilteredVariants::Union(variants) => deserializer.deserialize_any(
-                    UnionMatcher {
-                        typename: union_op.typename(),
-                        variants,
-                        ontology: self.ontology,
-                        ctx: self.ctx,
-                        mode: self.mode,
-                        level: self.level,
-                    }
-                    .into_visitor(self),
-                ),
+                FilteredVariants::Union(variants) => {
+                    assert!(
+                        !variants.is_empty(),
+                        "no variants ({:?}, {:?})",
+                        self.mode,
+                        self.level
+                    );
+
+                    deserializer.deserialize_any(
+                        UnionMatcher {
+                            typename: union_op.typename(),
+                            variants,
+                            ontology: self.ontology,
+                            ctx: self.ctx,
+                            mode: self.mode,
+                            level: self.level,
+                        }
+                        .into_visitor(self),
+                    )
+                }
             },
             (SerdeOperator::IdSingletonStruct(_name, _inner_addr), _) => {
                 //deserializer.deserialize_map()
@@ -349,6 +358,7 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
 
             match matcher.match_attribute(&property, &value) {
                 MapMatchResult::Match(map_match) => {
+                    trace!("matched attribute \"{property}\"");
                     buffered_attrs.push((property, value));
                     break map_match;
                 }

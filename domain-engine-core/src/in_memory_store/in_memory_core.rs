@@ -9,6 +9,7 @@ use ontol_runtime::{
 };
 use smallvec::SmallVec;
 use smartstring::alias::String;
+use tracing::warn;
 
 use crate::{DomainError, DomainResult};
 
@@ -86,6 +87,7 @@ impl InMemoryStore {
         match id_data {
             Data::Struct(struct_map) => {
                 if struct_map.len() != 1 {
+                    warn!("struct map was not 1: {struct_map:?}");
                     return Err(DomainError::InherentIdNotFound);
                 }
 
@@ -95,7 +97,10 @@ impl InMemoryStore {
             Data::Text(string) => Ok(DynamicKey::Text(string.clone())),
             Data::OctetSequence(octets) => Ok(DynamicKey::Octets(octets.clone())),
             Data::I64(int) => Ok(DynamicKey::Int(*int)),
-            _ => Err(DomainError::InherentIdNotFound),
+            other => {
+                warn!("inherent id from {other:?}");
+                Err(DomainError::InherentIdNotFound)
+            }
         }
     }
 

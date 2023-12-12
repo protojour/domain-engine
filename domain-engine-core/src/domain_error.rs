@@ -16,6 +16,8 @@ pub enum DomainError {
     NotAnEntity(DefId),
     #[error("entity must be a struct")]
     EntityMustBeStruct,
+    #[error("entity already exists")]
+    EntityAlreadyExists,
     #[error("inherent ID not found in structure")]
     InherentIdNotFound,
     #[error("BUG: Invalid entity DefId")]

@@ -1,11 +1,11 @@
 use std::{collections::BTreeMap, fmt::Display, ops::RangeInclusive};
 
 use serde::de::{value::StrDeserializer, DeserializeSeed};
-use tracing::error;
+use tracing::{error, trace};
 
 use crate::{
     format_utils::{Backticks, LogicOp, Missing},
-    interface::discriminator::Discriminant,
+    interface::discriminator::{Discriminant, LeafDiscriminant},
     ontology::Ontology,
     text_like_types::ParseError,
     text_pattern::{TextPattern, TextPatternConstantPart},
@@ -441,7 +441,7 @@ impl<'on> ValueMatcher for UnionMatcher<'on> {
     }
 
     fn match_unit(&self) -> Result<Value, ()> {
-        let def_id = self.match_discriminant(Discriminant::IsUnit)?;
+        let def_id = self.match_leaf_discriminant(LeafDiscriminant::IsUnit)?;
         Ok(Value::new(Data::Unit, def_id))
     }
 
@@ -450,7 +450,7 @@ impl<'on> ValueMatcher for UnionMatcher<'on> {
     }
 
     fn match_i64(&self, value: i64) -> Result<Value, ()> {
-        self.match_discriminant(Discriminant::IsInt)
+        self.match_leaf_discriminant(LeafDiscriminant::IsInt)
             .map(|def_id| Value {
                 data: Data::I64(value),
                 type_def_id: def_id,
@@ -459,8 +459,14 @@ impl<'on> ValueMatcher for UnionMatcher<'on> {
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
         for variant in self.variants {
-            match &variant.discriminator.discriminant {
-                Discriminant::IsText => {
+            let Discriminant::MatchesLeaf(scalar_discriminant) =
+                &variant.discriminator.discriminant
+            else {
+                continue;
+            };
+
+            match scalar_discriminant {
+                LeafDiscriminant::IsText => {
                     return try_deserialize_custom_string(
                         self.ontology,
                         variant.discriminator.serde_def.def_id,
@@ -468,7 +474,7 @@ impl<'on> ValueMatcher for UnionMatcher<'on> {
                     )
                     .map_err(|_| ())
                 }
-                Discriminant::IsTextLiteral(lit) if lit == str => {
+                LeafDiscriminant::IsTextLiteral(lit) if lit == str => {
                     return try_deserialize_custom_string(
                         self.ontology,
                         variant.discriminator.serde_def.def_id,
@@ -476,7 +482,7 @@ impl<'on> ValueMatcher for UnionMatcher<'on> {
                     )
                     .map_err(|_| ())
                 }
-                Discriminant::MatchesCapturingTextPattern(def_id) => {
+                LeafDiscriminant::MatchesCapturingTextPattern(def_id) => {
                     let result_type = variant.discriminator.serde_def.def_id;
                     let pattern = self.ontology.text_patterns.get(def_id).unwrap();
 
@@ -493,7 +499,12 @@ impl<'on> ValueMatcher for UnionMatcher<'on> {
 
     fn match_sequence(&self) -> Result<SequenceMatcher, ()> {
         for variant in self.variants {
-            if variant.discriminator.discriminant == Discriminant::IsSequence {
+            let Discriminant::MatchesLeaf(leaf_discriminant) = &variant.discriminator.discriminant
+            else {
+                continue;
+            };
+
+            if leaf_discriminant == &LeafDiscriminant::IsSequence {
                 match self.ontology.get_serde_operator(variant.addr) {
                     SerdeOperator::RelationSequence(seq_op) => {
                         return Ok(SequenceMatcher::new(
@@ -521,10 +532,7 @@ impl<'on> ValueMatcher for UnionMatcher<'on> {
         if !self.variants.iter().any(|variant| {
             matches!(
                 &variant.discriminator.discriminant,
-                Discriminant::StructFallback
-                    | Discriminant::IsSingletonProperty(..)
-                    | Discriminant::HasTextAttribute(..)
-                    | Discriminant::HasAttributeMatchingTextPattern(..)
+                Discriminant::StructFallback | Discriminant::HasAttribute(..)
             )
         }) {
             // None of the discriminators are matching a map.
@@ -542,9 +550,14 @@ impl<'on> ValueMatcher for UnionMatcher<'on> {
 }
 
 impl<'on> UnionMatcher<'on> {
-    fn match_discriminant(&self, discriminant: Discriminant) -> Result<DefId, ()> {
+    fn match_leaf_discriminant(&self, discriminant: LeafDiscriminant) -> Result<DefId, ()> {
         for variant in self.variants {
-            if variant.discriminator.discriminant == discriminant {
+            let Discriminant::MatchesLeaf(leaf_discriminant) = &variant.discriminator.discriminant
+            else {
+                continue;
+            };
+
+            if leaf_discriminant == &discriminant {
                 return Ok(variant.discriminator.serde_def.def_id);
             }
         }
@@ -585,25 +598,38 @@ impl<'on> MapMatcher<'on> {
         property: &str,
         value: &serde_value::Value,
     ) -> MapMatchResult<'on> {
-        // debug!("match_attribute '{property}': {:#?}", self.variants);
+        trace!("match_attribute '{property}': {:#?}", self.variants);
 
         let match_fn = |discriminant: &Discriminant| -> bool {
-            match (discriminant, value) {
+            let Discriminant::HasAttribute(_, match_attr_name, scalar_discriminant) = discriminant
+            else {
+                return false;
+            };
+
+            if property != match_attr_name {
+                return false;
+            }
+
+            match (scalar_discriminant, value) {
+                (LeafDiscriminant::IsAny, _) => true,
+                (LeafDiscriminant::IsUnit, serde_value::Value::Unit) => true,
                 (
-                    Discriminant::HasTextAttribute(_, match_name, match_value),
-                    serde_value::Value::String(value),
-                ) => property == match_name && value == match_value,
-                (Discriminant::IsSingletonProperty(_, match_name), _) => property == match_name,
+                    LeafDiscriminant::IsInt,
+                    serde_value::Value::I8(_)
+                    | serde_value::Value::I16(_)
+                    | serde_value::Value::I32(_)
+                    | serde_value::Value::I64(_),
+                ) => true,
+                (LeafDiscriminant::IsSequence, serde_value::Value::Seq(_)) => true,
+                (LeafDiscriminant::IsTextLiteral(lit), serde_value::Value::String(value)) => {
+                    value == lit
+                }
                 (
-                    Discriminant::HasAttributeMatchingTextPattern(_, match_name, def_id),
+                    LeafDiscriminant::MatchesCapturingTextPattern(def_id),
                     serde_value::Value::String(value),
                 ) => {
-                    if property == match_name {
-                        let pattern = self.ontology.text_patterns.get(def_id).unwrap();
-                        pattern.regex.is_match(value)
-                    } else {
-                        false
-                    }
+                    let pattern = self.ontology.text_patterns.get(def_id).unwrap();
+                    pattern.regex.is_match(value)
                 }
                 _ => false,
             }

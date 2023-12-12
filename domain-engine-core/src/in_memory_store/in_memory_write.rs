@@ -32,6 +32,8 @@ impl InMemoryStore {
         select: &Select,
         engine: &DomainEngine,
     ) -> DomainResult<Value> {
+        debug!("write new entity: {}", ValueDebug(&entity));
+
         let entity_id = self.write_new_entity_inner(entity, engine)?;
         self.post_write_select(entity_id, select, engine)
     }
@@ -189,6 +191,11 @@ impl InMemoryStore {
         }
 
         let collection = self.collections.get_mut(&entity.type_def_id).unwrap();
+
+        if collection.contains_key(&entity_key) {
+            return Err(DomainError::EntityAlreadyExists);
+        }
+
         collection.insert(entity_key, raw_props);
 
         Ok(id)

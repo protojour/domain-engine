@@ -127,16 +127,19 @@ pub struct UnionOperator {
 }
 
 impl UnionOperator {
-    /// Note: variants must be sorted according to its purpose (VariantPurpose)
+    /// Note: variants must be sorted according to their purpose (VariantPurpose)
     pub fn new(typename: String, union_def: SerdeDef, variants: Vec<ValueUnionVariant>) -> Self {
-        variants
-            .iter()
-            .fold(VariantPurpose::Identification, |last_purpose, variant| {
+        variants.iter().fold(
+            VariantPurpose::Identification {
+                entity_id: DefId::unit(),
+            },
+            |last_purpose, variant| {
                 if variant.discriminator.purpose < last_purpose {
                     panic!("variants are not sorted: {variants:#?}");
                 }
                 variant.discriminator.purpose
-            });
+            },
+        );
 
         Self {
             typename,
@@ -155,9 +158,11 @@ impl UnionOperator {
 
     pub fn variants(&self, mode: ProcessorMode, level: ProcessorLevel) -> FilteredVariants<'_> {
         if matches!(mode, ProcessorMode::Raw) || level.is_root() {
-            let skip_id = self.variants.iter().enumerate().find(|(_, variant)| {
-                variant.discriminator.purpose > VariantPurpose::Identification
-            });
+            let skip_id = self
+                .variants
+                .iter()
+                .enumerate()
+                .find(|(_, variant)| variant.discriminator.purpose >= VariantPurpose::Data);
 
             if let Some((skip_index, _)) = skip_id {
                 Self::filtered_variants(&self.variants[skip_index..])
@@ -172,6 +177,8 @@ impl UnionOperator {
     fn filtered_variants(variants: &[ValueUnionVariant]) -> FilteredVariants<'_> {
         if variants.len() == 1 {
             FilteredVariants::Single(variants[0].addr)
+        } else if variants.len() == 0 {
+            panic!("All variants got filtered");
         } else {
             FilteredVariants::Union(variants)
         }
@@ -182,6 +189,7 @@ impl UnionOperator {
     }
 }
 
+#[derive(Debug)]
 pub enum FilteredVariants<'e> {
     Single(SerdeOperatorAddr),
     /// Should serialize one of the union members

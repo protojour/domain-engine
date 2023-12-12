@@ -65,7 +65,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         if let Some(ReprKind::Union(_) | ReprKind::StructUnion(_)) =
             self.seal_ctx.get_repr_kind(&def_id)
         {
-            for error in self.check_value_union(def_id) {
+            for error in self.check_union(def_id) {
                 self.errors.push(error);
             }
         }

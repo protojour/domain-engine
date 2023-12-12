@@ -57,6 +57,7 @@ pub enum CompileError {
     VariableMustBeSequenceEnclosed(String),
     CannotDiscriminateType,
     UnitTypePartOfUnion(String),
+    CannotMixNonEntitiesInUnion,
     NoUniformDiscriminatorFound,
     SharedPrefixInPatternUnion,
     AlreadyIdentifiesAType,
@@ -166,7 +167,10 @@ impl std::fmt::Display for CompileError {
             }
             Self::CannotDiscriminateType => write!(f, "cannot discriminate type"),
             Self::UnitTypePartOfUnion(name) => {
-                write!(f, "unit type `{name}` cannot be part of a union",)
+                write!(f, "unit type `{name}` cannot be part of a union")
+            }
+            Self::CannotMixNonEntitiesInUnion => {
+                write!(f, "impossible mix of entities and non-entities in union")
             }
             Self::NoUniformDiscriminatorFound => {
                 write!(f, "no uniform discriminator found for union variants")

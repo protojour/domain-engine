@@ -872,19 +872,15 @@ async fn test_graphql_guitar_synth_union_selection() {
     expect_eq!(
         actual = "{
             artists {
-                edges {
-                    node {
-                        plays {
-                            edges {
-                                node {
-                                    __typename
-                                    ... on guitar {
-                                        string_count
-                                    }
-                                    ... on synth {
-                                        polyphony
-                                    }
-                                }
+                nodes {
+                    plays {
+                        nodes {
+                            __typename
+                            ... on guitar {
+                                string_count
+                            }
+                            ... on synth {
+                                polyphony
                             }
                         }
                     }
@@ -899,24 +895,18 @@ async fn test_graphql_guitar_synth_union_selection() {
         .await,
         expected = Ok(graphql_value!({
             "artists": {
-                "edges": [{
-                    "node": {
-                        "plays": {
-                            "edges": [
-                                {
-                                    "node": {
-                                        "__typename": "synth",
-                                        "polyphony": 42
-                                    },
-                                },
-                                {
-                                    "node": {
-                                        "__typename": "guitar",
-                                        "string_count": 91
-                                    }
-                                }
-                            ]
-                        }
+                "nodes": [{
+                    "plays": {
+                        "nodes": [
+                            {
+                                "__typename": "synth",
+                                "polyphony": 42
+                            },
+                            {
+                                "__typename": "guitar",
+                                "string_count": 91
+                            }
+                        ]
                     }
                 }]
             },
