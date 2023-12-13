@@ -177,7 +177,7 @@ impl UnionOperator {
     fn filtered_variants(variants: &[ValueUnionVariant]) -> FilteredVariants<'_> {
         if variants.len() == 1 {
             FilteredVariants::Single(variants[0].addr)
-        } else if variants.len() == 0 {
+        } else if variants.is_empty() {
             panic!("All variants got filtered");
         } else {
             FilteredVariants::Union(variants)

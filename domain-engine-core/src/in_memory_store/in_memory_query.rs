@@ -16,8 +16,8 @@ use ontol_runtime::{
 use tracing::{debug, error};
 
 use crate::{
-    entity_id_utils::find_inherent_entity_id, filter::plan::compute_filter_plan,
-    in_memory_store::in_memory_filter::FilterVal, DomainEngine, DomainError, DomainResult,
+    filter::plan::compute_filter_plan, in_memory_store::in_memory_filter::FilterVal, DomainEngine,
+    DomainError, DomainResult,
 };
 
 use super::in_memory_core::{DynamicKey, EntityKey, InMemoryStore};
@@ -301,22 +301,29 @@ impl InMemoryStore {
                 panic!("variant not found");
             }
             Select::EntityId => todo!(),
-            Select::Entity(entity_select) => {
-                let entity_key = entity_key.dynamic_key.clone();
-                let entity_seq = self.query_entities(entity_select, engine)?;
-                for entity_attr in entity_seq.attrs {
-                    let id = find_inherent_entity_id(engine.ontology(), &entity_attr.value)?;
-                    if let Some(id) = id {
-                        let dynamic_key = Self::extract_dynamic_key(&id.data)?;
+            Select::Entity(entity_select) => match &entity_select.source {
+                StructOrUnionSelect::Struct(struct_select) => self.apply_struct_select(
+                    type_info,
+                    &entity_key.dynamic_key,
+                    properties.clone(),
+                    struct_select,
+                    engine,
+                ),
+                StructOrUnionSelect::Union(_, candidates) => {
+                    let struct_select = candidates
+                        .iter()
+                        .find(|struct_select| struct_select.def_id == entity_key.type_def_id)
+                        .expect("Union variant not found");
 
-                        if dynamic_key == entity_key {
-                            return Ok(entity_attr.value);
-                        }
-                    }
+                    self.apply_struct_select(
+                        type_info,
+                        &entity_key.dynamic_key,
+                        properties.clone(),
+                        struct_select,
+                        engine,
+                    )
                 }
-
-                panic!("Not found")
-            }
+            },
         }
     }
 
