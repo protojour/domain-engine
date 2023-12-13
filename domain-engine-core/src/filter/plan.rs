@@ -2,7 +2,7 @@ use fnv::FnvHashMap;
 use itertools::Itertools;
 use ontol_runtime::{
     condition::{Clause, CondTerm, Condition},
-    ontology::{DataRelationshipKind, Ontology, ValueCardinality},
+    ontology::{DataRelationshipKind, DataRelationshipTarget, Ontology, ValueCardinality},
     value::{Data, PropertyId, Value},
     var::{Var, VarSet},
     DefId,
@@ -164,7 +164,14 @@ fn sub_plans(
                     continue;
                 };
 
-                let val_plans = term_plans(val, data_relationship.target, clauses, builder)?;
+                let val_plans = match data_relationship.target {
+                    DataRelationshipTarget::Unambiguous(target_def_id) => {
+                        term_plans(val, target_def_id, clauses, builder)?
+                    }
+                    DataRelationshipTarget::Union { .. } => {
+                        todo!()
+                    }
+                };
 
                 match data_relationship.kind {
                     DataRelationshipKind::Tree => match data_relationship.cardinality.1 {

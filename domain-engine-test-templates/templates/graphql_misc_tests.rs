@@ -205,13 +205,15 @@ async fn test_gitmesh_misc() {
                     handle
                     owner {
                         ... on Organization {
+                            id
                             members {
-                                nodes {
-                                    id
+                                edges {
+                                    node { id }
+                                    role
                                 }
                             }
                         }
-                        ... on User { id }
+                        ... on User { id email }
                     }
                 }
             }
@@ -221,8 +223,31 @@ async fn test_gitmesh_misc() {
         expected = Ok(graphql_value!({
             "repositories": {
                 "nodes": [
-                    { "handle": "coolproj" },
-                    { "handle": "awesomeproj" },
+                    {
+                        "handle": "coolproj",
+                        "owner": {
+                            "id": "user/bob",
+                            "email": "bob@bob.com"
+                        },
+                    },
+                    {
+                        "handle": "awesomeproj",
+                        "owner": {
+                            "id": "org/lolsoft",
+                            "members": {
+                                "edges": [
+                                    {
+                                        "node": { "id": "user/bob" },
+                                        "role": "admin",
+                                    },
+                                    {
+                                        "node": { "id": "user/alice" },
+                                        "role": "contributor",
+                                    },
+                                ]
+                            }
+                        }
+                    },
                 ]
             }
         })),

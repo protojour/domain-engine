@@ -4,7 +4,10 @@ use anyhow::anyhow;
 use itertools::Itertools;
 use ontol_runtime::{
     condition::{CondTerm, Condition},
-    ontology::{DataRelationshipKind, PropertyCardinality, TypeInfo, ValueCardinality},
+    ontology::{
+        DataRelationshipKind, DataRelationshipTarget, PropertyCardinality, TypeInfo,
+        ValueCardinality,
+    },
     select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
     sequence::{Sequence, SubSequence},
     value::{Attribute, Data, PropertyId, Value},
@@ -180,7 +183,12 @@ impl InMemoryStore {
                             *property_id,
                             Value::new(
                                 Data::Sequence(Sequence::new(attrs)),
-                                data_relationship.target,
+                                match data_relationship.target {
+                                    DataRelationshipTarget::Unambiguous(def_id) => def_id,
+                                    DataRelationshipTarget::Union { union_def_id, .. } => {
+                                        union_def_id
+                                    }
+                                },
                             )
                             .into(),
                         );
@@ -205,32 +213,31 @@ impl InMemoryStore {
             .get(&relationship_id)
             .expect("No edge collection");
 
-        match property_id.role {
-            Role::Subject => edge_collection
-                .edges
-                .iter()
-                .filter(|edge| &edge.from.dynamic_key == parent_key)
-                .map(|edge| -> DomainResult<Attribute> {
-                    let entity = self.sub_query_entity(&edge.to, select, engine)?;
-                    Ok(Attribute {
-                        value: entity,
-                        rel_params: edge.params.clone(),
-                    })
-                })
-                .collect(),
-            Role::Object => edge_collection
-                .edges
-                .iter()
-                .filter(|edge| &edge.to.dynamic_key == parent_key)
-                .map(|edge| -> DomainResult<Attribute> {
-                    let entity = self.sub_query_entity(&edge.from, select, engine)?;
-                    Ok(Attribute {
-                        value: entity,
-                        rel_params: edge.params.clone(),
-                    })
-                })
-                .collect(),
+        let mut out = vec![];
+
+        for edge in &edge_collection.edges {
+            let entity = match property_id.role {
+                Role::Subject => {
+                    if &edge.from.dynamic_key != parent_key {
+                        continue;
+                    }
+                    self.sub_query_entity(&edge.to, select, engine)?
+                }
+                Role::Object => {
+                    if &edge.to.dynamic_key != parent_key {
+                        continue;
+                    }
+                    self.sub_query_entity(&edge.from, select, engine)?
+                }
+            };
+
+            out.push(Attribute {
+                value: entity,
+                rel_params: edge.params.clone(),
+            });
         }
+
+        Ok(out)
     }
 
     fn sub_query_entity(
@@ -271,32 +278,28 @@ impl InMemoryStore {
                     .unwrap();
                 Ok(id_attribute.value.clone())
             }
-            Select::Struct(struct_select) => {
-                let mut select_properties = struct_select.properties.clone();
-
-                // Need to "infer" mandatory entity properties, because JSON serializer expects that
-                for (property_id, data_relationship) in type_info.entity_relationships() {
-                    if matches!(
-                        data_relationship.cardinality.0,
-                        PropertyCardinality::Mandatory
-                    ) && !select_properties.contains_key(property_id)
-                    {
-                        select_properties.insert(*property_id, Select::Leaf);
+            Select::Struct(struct_select) => self.sub_query_entity_struct(
+                entity_key,
+                struct_select,
+                type_info,
+                properties,
+                engine,
+            ),
+            Select::StructUnion(_, variant_selects) => {
+                for variant_select in variant_selects {
+                    if variant_select.def_id == type_info.def_id {
+                        return self.sub_query_entity_struct(
+                            entity_key,
+                            variant_select,
+                            type_info,
+                            properties,
+                            engine,
+                        );
                     }
                 }
 
-                self.apply_struct_select(
-                    type_info,
-                    &entity_key.dynamic_key,
-                    properties.clone(),
-                    &StructSelect {
-                        def_id: entity_key.type_def_id,
-                        properties: select_properties,
-                    },
-                    engine,
-                )
+                panic!("variant not found");
             }
-            Select::StructUnion(_, _) => todo!(),
             Select::EntityId => todo!(),
             Select::Entity(entity_select) => {
                 let entity_key = entity_key.dynamic_key.clone();
@@ -315,5 +318,38 @@ impl InMemoryStore {
                 panic!("Not found")
             }
         }
+    }
+
+    fn sub_query_entity_struct(
+        &self,
+        entity_key: &EntityKey,
+        struct_select: &StructSelect,
+        type_info: &TypeInfo,
+        properties: &BTreeMap<PropertyId, Attribute>,
+        engine: &DomainEngine,
+    ) -> DomainResult<Value> {
+        let mut select_properties = struct_select.properties.clone();
+
+        // Need to "infer" mandatory entity properties, because JSON serializer expects that
+        for (property_id, data_relationship) in type_info.entity_relationships() {
+            if matches!(
+                data_relationship.cardinality.0,
+                PropertyCardinality::Mandatory
+            ) && !select_properties.contains_key(property_id)
+            {
+                select_properties.insert(*property_id, Select::Leaf);
+            }
+        }
+
+        self.apply_struct_select(
+            type_info,
+            &entity_key.dynamic_key,
+            properties.clone(),
+            &StructSelect {
+                def_id: entity_key.type_def_id,
+                properties: select_properties,
+            },
+            engine,
+        )
     }
 }

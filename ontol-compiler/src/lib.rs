@@ -21,8 +21,8 @@ use ontol_runtime::{
         DomainInterface,
     },
     ontology::{
-        DataRelationshipInfo, DataRelationshipKind, Domain, EntityInfo, MapLossiness, MapMeta,
-        OntolDomainMeta, Ontology, TypeInfo,
+        DataRelationshipInfo, DataRelationshipKind, DataRelationshipTarget, Domain, EntityInfo,
+        MapLossiness, MapMeta, OntolDomainMeta, Ontology, TypeInfo,
     },
     value::PropertyId,
     DefId, PackageId,
@@ -422,28 +422,40 @@ impl<'m> Compiler<'m> {
             };
 
             if let Some(repr_kind) = self.seal_ctx.get_repr_kind(&target_def_id) {
-                let data_relationship_kind = match repr_kind {
+                let (data_relationship_kind, target) = match repr_kind {
                     ReprKind::StructUnion(members) => {
+                        let target = DataRelationshipTarget::Union {
+                            union_def_id: target_def_id,
+                            variants: members.iter().map(|(def_id, _)| *def_id).collect(),
+                        };
+
                         if members.iter().all(|(member_def_id, _)| {
                             self.relations
                                 .properties_by_def_id(*member_def_id)
                                 .map(|properties| properties.identified_by.is_some())
                                 .unwrap_or(false)
                         }) {
-                            DataRelationshipKind::EntityGraph {
-                                rel_params: graph_rel_params,
-                            }
+                            (
+                                DataRelationshipKind::EntityGraph {
+                                    rel_params: graph_rel_params,
+                                },
+                                target,
+                            )
                         } else {
-                            DataRelationshipKind::Tree
+                            (DataRelationshipKind::Tree, target)
                         }
                     }
                     _ => {
+                        let target = DataRelationshipTarget::Unambiguous(target_def_id);
                         if target_properties.identified_by.is_some() {
-                            DataRelationshipKind::EntityGraph {
-                                rel_params: graph_rel_params,
-                            }
+                            (
+                                DataRelationshipKind::EntityGraph {
+                                    rel_params: graph_rel_params,
+                                },
+                                target,
+                            )
                         } else {
-                            DataRelationshipKind::Tree
+                            (DataRelationshipKind::Tree, target)
                         }
                     }
                 };
@@ -453,7 +465,7 @@ impl<'m> Compiler<'m> {
                     cardinality: property.cardinality,
                     subject_name: (*subject_name).into(),
                     object_name: meta.relationship.object_prop.map(|prop| prop.into()),
-                    target: target_def_id,
+                    target,
                 })
             } else {
                 None

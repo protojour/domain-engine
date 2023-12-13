@@ -4,7 +4,10 @@ use anyhow::anyhow;
 use ontol_runtime::{
     condition::Condition,
     interface::serde::{operator::SerdeOperatorAddr, processor::ProcessorMode},
-    ontology::{DataRelationshipInfo, DataRelationshipKind, Ontology, ValueCardinality},
+    ontology::{
+        DataRelationshipInfo, DataRelationshipKind, DataRelationshipTarget, EntityInfo, Ontology,
+        ValueCardinality,
+    },
     select::Select,
     smart_format,
     value::{Attribute, Data, PropertyId, Value, ValueDebug},
@@ -218,60 +221,63 @@ impl InMemoryStore {
         let value = attribute.value;
         let rel_params = attribute.rel_params;
 
-        let foreign_key = if value.type_def_id == data_relationship.target {
-            let def_id = value.type_def_id;
-            let foreign_id = self.write_new_entity_inner(value, engine)?;
-            let dynamic_key = Self::extract_dynamic_key(&foreign_id.data)?;
+        let foreign_key = match &data_relationship.target {
+            DataRelationshipTarget::Unambiguous(entity_def_id) => {
+                if &value.type_def_id == entity_def_id {
+                    let foreign_id = self.write_new_entity_inner(value, engine)?;
+                    let dynamic_key = Self::extract_dynamic_key(&foreign_id.data)?;
 
-            EntityKey {
-                type_def_id: def_id,
-                dynamic_key,
-            }
-        } else {
-            // This is for creating a relationship to an existing entity,
-            // using only a primary key.
-
-            let type_info = ontology.get_type_info(data_relationship.target);
-            let entity_info = type_info.entity_info.as_ref().unwrap();
-
-            let foreign_key = Self::extract_dynamic_key(&value.data)?;
-            let entity_data = self.look_up_entity(data_relationship.target, &foreign_key);
-
-            if entity_data.is_none() && entity_info.is_self_identifying {
-                // This type has UPSERT semantics.
-                // Synthesize the entity, write it and move on..
-
-                let entity_data = BTreeMap::from([(
-                    PropertyId::subject(entity_info.id_relationship_id),
-                    Attribute::from(value),
-                )]);
-                self.write_new_entity_inner(
-                    Value::new(Data::Struct(entity_data), data_relationship.target),
-                    engine,
-                )?;
-            } else if entity_data.is_none() {
-                let type_info = ontology.get_type_info(value.type_def_id);
-                let repr = if let Some(operator_addr) = type_info.operator_addr {
-                    // TODO: Easier way to report values in "human readable"/JSON format
-
-                    let processor =
-                        ontology.new_serde_processor(operator_addr, ProcessorMode::Read);
-
-                    let mut buf: Vec<u8> = vec![];
-                    processor
-                        .serialize_value(&value, None, &mut serde_json::Serializer::new(&mut buf))
-                        .unwrap();
-                    String::from(std::str::from_utf8(&buf).unwrap())
+                    EntityKey {
+                        type_def_id: *entity_def_id,
+                        dynamic_key,
+                    }
                 } else {
-                    smart_format!("N/A")
-                };
-
-                return Err(DomainError::UnresolvedForeignKey(repr));
+                    self.resolve_foreign_key_for_edge(
+                        *entity_def_id,
+                        ontology
+                            .get_type_info(*entity_def_id)
+                            .entity_info
+                            .as_ref()
+                            .unwrap(),
+                        value,
+                        engine,
+                    )?
+                }
             }
+            DataRelationshipTarget::Union {
+                union_def_id: _,
+                variants,
+            } => {
+                if variants.contains(&value.type_def_id) {
+                    // Explicit data struct of a given variant
+                    let entity_def_id = value.type_def_id;
+                    let foreign_id = self.write_new_entity_inner(value, engine)?;
+                    let dynamic_key = Self::extract_dynamic_key(&foreign_id.data)?;
 
-            EntityKey {
-                type_def_id: type_info.def_id,
-                dynamic_key: foreign_key,
+                    EntityKey {
+                        type_def_id: entity_def_id,
+                        dynamic_key,
+                    }
+                } else {
+                    let (variant_def_id, entity_info) = variants
+                        .iter()
+                        .find_map(|variant_def_id| {
+                            let entity_info = ontology
+                                .get_type_info(*variant_def_id)
+                                .entity_info
+                                .as_ref()
+                                .unwrap();
+
+                            if entity_info.id_value_def_id == value.type_def_id {
+                                Some((*variant_def_id, entity_info))
+                            } else {
+                                None
+                            }
+                        })
+                        .expect("Corresponding entity def id not found for the given ID");
+
+                    self.resolve_foreign_key_for_edge(variant_def_id, entity_info, value, engine)?
+                }
             }
         };
 
@@ -304,6 +310,55 @@ impl InMemoryStore {
         }
 
         Ok(())
+    }
+
+    /// This is for creating a relationship to an existing entity, using only a "foreign key".
+    fn resolve_foreign_key_for_edge(
+        &mut self,
+        foreign_entity_def_id: DefId,
+        entity_info: &EntityInfo,
+        id_value: Value,
+        engine: &DomainEngine,
+    ) -> DomainResult<EntityKey> {
+        let foreign_key = Self::extract_dynamic_key(&id_value.data)?;
+        let entity_data = self.look_up_entity(foreign_entity_def_id, &foreign_key);
+
+        if entity_data.is_none() && entity_info.is_self_identifying {
+            // This type has UPSERT semantics.
+            // Synthesize the entity, write it and move on..
+
+            let entity_data = BTreeMap::from([(
+                PropertyId::subject(entity_info.id_relationship_id),
+                Attribute::from(id_value),
+            )]);
+            self.write_new_entity_inner(
+                Value::new(Data::Struct(entity_data), foreign_entity_def_id),
+                engine,
+            )?;
+        } else if entity_data.is_none() {
+            let ontology = engine.ontology();
+            let type_info = ontology.get_type_info(id_value.type_def_id);
+            let repr = if let Some(operator_addr) = type_info.operator_addr {
+                // TODO: Easier way to report values in "human readable"/JSON format
+
+                let processor = ontology.new_serde_processor(operator_addr, ProcessorMode::Read);
+
+                let mut buf: Vec<u8> = vec![];
+                processor
+                    .serialize_value(&id_value, None, &mut serde_json::Serializer::new(&mut buf))
+                    .unwrap();
+                String::from(std::str::from_utf8(&buf).unwrap())
+            } else {
+                smart_format!("N/A")
+            };
+
+            return Err(DomainError::UnresolvedForeignKey(repr));
+        }
+
+        Ok(EntityKey {
+            type_def_id: foreign_entity_def_id,
+            dynamic_key: foreign_key,
+        })
     }
 
     fn generate_entity_id(

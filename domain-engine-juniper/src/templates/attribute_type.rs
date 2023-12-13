@@ -190,11 +190,6 @@ impl<'v> AttributeType<'v> {
                     kind: ObjectKind::Node(node_data),
                     ..
                 }) => {
-                    trace!(
-                        "checking variant {:?} against {:?}",
-                        node_data.def_id,
-                        self.attr.value
-                    );
                     if node_data.def_id == self.attr.value.type_def_id {
                         return (*variant_type_addr, variant_type_data);
                     }

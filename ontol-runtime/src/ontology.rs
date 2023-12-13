@@ -331,7 +331,16 @@ pub struct DataRelationshipInfo {
     pub cardinality: Cardinality,
     pub subject_name: String,
     pub object_name: Option<String>,
-    pub target: DefId,
+    pub target: DataRelationshipTarget,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum DataRelationshipTarget {
+    Unambiguous(DefId),
+    Union {
+        union_def_id: DefId,
+        variants: Vec<DefId>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
