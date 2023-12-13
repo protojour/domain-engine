@@ -187,6 +187,8 @@ impl InMemoryStore {
                         }
                     }
                 }
+            } else {
+                panic!("Unknown relationship for {property_id:?}");
             }
         }
 
@@ -210,7 +212,7 @@ impl InMemoryStore {
         data_relationship: &DataRelationshipInfo,
         engine: &DomainEngine,
     ) -> DomainResult<()> {
-        debug!("entity rel attribute: {attribute:?}");
+        debug!("entity rel attribute: {attribute:?}. Data relationship: {data_relationship:?}");
 
         let ontology = engine.ontology();
         let value = attribute.value;

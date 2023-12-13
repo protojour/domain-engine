@@ -190,6 +190,11 @@ impl<'v> AttributeType<'v> {
                     kind: ObjectKind::Node(node_data),
                     ..
                 }) => {
+                    trace!(
+                        "checking variant {:?} against {:?}",
+                        node_data.def_id,
+                        self.attr.value
+                    );
                     if node_data.def_id == self.attr.value.type_def_id {
                         return (*variant_type_addr, variant_type_data);
                     }
@@ -198,7 +203,7 @@ impl<'v> AttributeType<'v> {
             }
         }
 
-        panic!("union variant not found")
+        panic!("union variant not found: {:?}", union_data.variants);
     }
 
     fn resolve_object_field(

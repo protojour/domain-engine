@@ -12,7 +12,7 @@ use ontol_runtime::{
     value::Attribute,
 };
 use ontol_test_utils::{
-    examples::{ARTIST_AND_INSTRUMENT, GEOJSON, GUITAR_SYNTH_UNION, MUNICIPALITIES, WGS},
+    examples::{ARTIST_AND_INSTRUMENT, GEOJSON, GITMESH, GUITAR_SYNTH_UNION, MUNICIPALITIES, WGS},
     expect_eq,
     type_binding::ToSequence,
     SourceName, TestPackages,
@@ -1277,5 +1277,30 @@ async fn test_open_data_disabled() {
         .await
         .unwrap_first_exec_error_msg(),
         expected = "open data is not available in this GraphQL context"
+    );
+}
+
+#[test(tokio::test)]
+async fn test_gitmesh_id_error() {
+    let (test, schema) = GITMESH.1.compile_single_schema_with_datastore();
+
+    expect_eq!(
+        actual = r#"mutation {
+            Repository(
+                create: [
+                    {
+                        handle: "badproj"
+                        owner: {
+                            id: "BOGUS_PREFIX/bob"
+                        }
+                    }
+                ]
+            ) { node { id } }
+        }"#
+        .exec([], &schema, &gql_ctx_mock_data_store(&test, ROOT, ()))
+        .await
+        .unwrap_first_exec_error_msg(),
+        expected =
+            "invalid map value, expected `RepositoryOwner` (id or id) in input at line 5 column 31"
     );
 }

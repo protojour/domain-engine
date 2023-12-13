@@ -1,21 +1,14 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use domain_engine_core::DomainEngine;
-use domain_engine_juniper::{
-    context::ServiceCtx,
-    gql_scalar::GqlScalar,
-    juniper::{self, graphql_value, InputValue, ScalarValue, Value},
-    Schema,
-};
-use domain_engine_test_utils::graphql_test_utils::{Exec, GraphQLPageDebug, TestCompileSchema};
+use domain_engine_juniper::{context::ServiceCtx, juniper::graphql_value};
+use domain_engine_test_utils::graphql_test_utils::{Exec, TestCompileSchema};
 use ontol_runtime::{config::DataStoreConfig, ontology::Ontology};
 use ontol_test_utils::{
     examples::{GITMESH, GUITAR_SYNTH_UNION},
     expect_eq, SourceName, TestPackages,
 };
 use test_log::test;
-use tracing::info;
 
 const ROOT: SourceName = SourceName::root();
 
@@ -151,7 +144,7 @@ async fn test_gitmesh_misc() {
     .await
     .unwrap();
 
-    let err = r#"mutation {
+    r#"mutation {
         User(
             create: [{ id: "user/bob" email: "bob2@bob.com" }]
         ) { node { id } }
@@ -182,9 +175,7 @@ async fn test_gitmesh_misc() {
             create: [
                 {
                     handle: "coolproj"
-                    owner: {
-                        id: "user/bob"
-                    }
+                    owner: { id: "user/bob" }
                 }
             ]
         ) { node { id } }
@@ -192,4 +183,48 @@ async fn test_gitmesh_misc() {
     .exec([], &schema, &ctx)
     .await
     .unwrap();
+
+    r#"mutation {
+        Repository(
+            create: [
+                {
+                    handle: "awesomeproj"
+                    owner: { id: "org/lolsoft" }
+                }
+            ]
+        ) { node { id } }
+    }"#
+    .exec([], &schema, &ctx)
+    .await
+    .unwrap();
+
+    expect_eq!(
+        actual = r#"{
+            repositories {
+                nodes {
+                    handle
+                    owner {
+                        ... on Organization {
+                            members {
+                                nodes {
+                                    id
+                                }
+                            }
+                        }
+                        ... on User { id }
+                    }
+                }
+            }
+        }"#
+        .exec([], &schema, &ctx)
+        .await,
+        expected = Ok(graphql_value!({
+            "repositories": {
+                "nodes": [
+                    { "handle": "coolproj" },
+                    { "handle": "awesomeproj" },
+                ]
+            }
+        })),
+    );
 }

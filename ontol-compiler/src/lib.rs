@@ -416,24 +416,48 @@ impl<'m> Compiler<'m> {
         };
 
         if let Some(target_properties) = self.relations.properties_by_def_id(target_def_id) {
-            let kind = if target_properties.identified_by.is_some() {
-                DataRelationshipKind::EntityGraph {
-                    rel_params: match meta.relationship.rel_params {
-                        RelParams::Type(def_id) => Some(def_id),
-                        RelParams::Unit | RelParams::IndexRange(_) => None,
-                    },
-                }
-            } else {
-                DataRelationshipKind::Tree
+            let graph_rel_params = match meta.relationship.rel_params {
+                RelParams::Type(def_id) => Some(def_id),
+                RelParams::Unit | RelParams::IndexRange(_) => None,
             };
 
-            Some(DataRelationshipInfo {
-                kind,
-                cardinality: property.cardinality,
-                subject_name: (*subject_name).into(),
-                object_name: meta.relationship.object_prop.map(|prop| prop.into()),
-                target: target_def_id,
-            })
+            if let Some(repr_kind) = self.seal_ctx.get_repr_kind(&target_def_id) {
+                let data_relationship_kind = match repr_kind {
+                    ReprKind::StructUnion(members) => {
+                        if members.iter().all(|(member_def_id, _)| {
+                            self.relations
+                                .properties_by_def_id(*member_def_id)
+                                .map(|properties| properties.identified_by.is_some())
+                                .unwrap_or(false)
+                        }) {
+                            DataRelationshipKind::EntityGraph {
+                                rel_params: graph_rel_params,
+                            }
+                        } else {
+                            DataRelationshipKind::Tree
+                        }
+                    }
+                    _ => {
+                        if target_properties.identified_by.is_some() {
+                            DataRelationshipKind::EntityGraph {
+                                rel_params: graph_rel_params,
+                            }
+                        } else {
+                            DataRelationshipKind::Tree
+                        }
+                    }
+                };
+
+                Some(DataRelationshipInfo {
+                    kind: data_relationship_kind,
+                    cardinality: property.cardinality,
+                    subject_name: (*subject_name).into(),
+                    object_name: meta.relationship.object_prop.map(|prop| prop.into()),
+                    target: target_def_id,
+                })
+            } else {
+                None
+            }
         } else {
             None
         }
