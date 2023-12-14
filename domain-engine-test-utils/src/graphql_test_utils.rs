@@ -175,6 +175,34 @@ impl<T: Debug> GraphqlTestResultExt for Result<T, TestError> {
     }
 }
 
+pub trait ValueExt<S> {
+    fn field(&self, name: &str) -> &juniper::Value<S>;
+    fn opt_field(&self, name: &str) -> Option<&juniper::Value<S>>;
+    fn element(&self, index: usize) -> &juniper::Value<S>;
+    fn scalar(&self) -> &S;
+}
+
+impl<S> ValueExt<S> for juniper::Value<S> {
+    fn field(&self, name: &str) -> &juniper::Value<S> {
+        self.opt_field(name)
+            .unwrap_or_else(|| panic!("field `{name}` was not present"))
+    }
+
+    fn opt_field(&self, name: &str) -> Option<&juniper::Value<S>> {
+        self.as_object_value()
+            .expect("not an object")
+            .get_field_value(name)
+    }
+
+    fn element(&self, index: usize) -> &juniper::Value<S> {
+        &self.as_list_value().expect("not a list")[index]
+    }
+
+    fn scalar(&self) -> &S {
+        self.as_scalar_value().unwrap()
+    }
+}
+
 pub struct GraphQLPageDebug {
     pub has_next_page: bool,
     pub end_cursor: Option<String>,
@@ -186,20 +214,11 @@ impl GraphQLPageDebug {
         response: &juniper::Value<GqlScalar>,
         connection_name: &str,
     ) -> Option<Self> {
-        let connection = response
-            .as_object_value()?
-            .get_field_value(connection_name)?
-            .as_object_value()?;
-        let total_count = connection.get_field_value("totalCount");
-        let page_info = connection.get_field_value("pageInfo")?.as_object_value()?;
-        let has_next_page = page_info
-            .get_field_value("hasNextPage")?
-            .as_scalar()?
-            .as_bool()?;
-        let end_cursor = page_info
-            .get_field_value("endCursor")?
-            .as_scalar()?
-            .as_string();
+        let connection = response.field(connection_name);
+        let total_count = connection.opt_field("totalCount");
+        let page_info = connection.field("pageInfo");
+        let has_next_page = page_info.field("hasNextPage").as_scalar()?.as_bool()?;
+        let end_cursor = page_info.opt_field("endCursor")?.as_scalar()?.as_string();
 
         Some(Self {
             total_count: total_count

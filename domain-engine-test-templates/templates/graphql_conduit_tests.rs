@@ -5,10 +5,12 @@ use domain_engine_core::DomainEngine;
 use domain_engine_juniper::{
     context::ServiceCtx,
     gql_scalar::GqlScalar,
-    juniper::{self, graphql_value, InputValue, ScalarValue, Value},
+    juniper::{graphql_value, InputValue, ScalarValue, Value},
     Schema,
 };
-use domain_engine_test_utils::graphql_test_utils::{Exec, GraphQLPageDebug, TestCompileSchema};
+use domain_engine_test_utils::graphql_test_utils::{
+    Exec, GraphQLPageDebug, TestCompileSchema, ValueExt,
+};
 use ontol_runtime::{config::DataStoreConfig, ontology::Ontology};
 use ontol_test_utils::{
     examples::conduit::{BLOG_POST_PUBLIC, CONDUIT_DB},
@@ -114,16 +116,11 @@ async fn test_graphql_conduit_db_create_with_foreign_reference() {
     .unwrap();
 
     let user_id = response
-        .as_object_value()
-        .and_then(|response| response.get_field_value("User"))
-        .and_then(Value::as_list_value)
-        .map(|list| &list[0])
-        .and_then(Value::as_object_value)
-        .and_then(|mutation| mutation.get_field_value("node"))
-        .and_then(Value::as_object_value)
-        .and_then(|create_user| create_user.get_field_value("user_id"))
-        .and_then(Value::as_scalar_value)
-        .unwrap()
+        .field("User")
+        .element(0)
+        .field("node")
+        .field("user_id")
+        .scalar()
         .clone();
 
     expect_eq!(
@@ -272,16 +269,11 @@ impl BlogPostConduit {
         .unwrap();
 
         let article_id = response
-            .as_object_value()
-            .and_then(|response| response.get_field_value("Article"))
-            .and_then(Value::as_list_value)
-            .map(|list| &list[0])
-            .and_then(Value::as_object_value)
-            .and_then(|mutation| mutation.get_field_value("node"))
-            .and_then(Value::as_object_value)
-            .and_then(|node| node.get_field_value("article_id"))
-            .and_then(Value::as_scalar_value)
-            .unwrap()
+            .field("Article")
+            .element(0)
+            .field("node")
+            .field("article_id")
+            .scalar()
             .clone();
 
         article_id.as_string().unwrap().into()
@@ -513,16 +505,11 @@ async fn test_graphql_conduit_db_article_shallow_update() {
     .unwrap();
 
     let article_id = response
-        .as_object_value()
-        .and_then(|response| response.get_field_value("Article"))
-        .and_then(Value::as_list_value)
-        .map(|list| &list[0])
-        .and_then(Value::as_object_value)
-        .and_then(|mutation| mutation.get_field_value("node"))
-        .and_then(Value::as_object_value)
-        .and_then(|node| node.get_field_value("article_id"))
-        .and_then(Value::as_scalar_value)
-        .unwrap()
+        .field("Article")
+        .element(0)
+        .field("node")
+        .field("article_id")
+        .scalar()
         .clone();
 
     let update_mutation = format!(
@@ -590,16 +577,11 @@ async fn test_graphql_conduit_db_user_deletion() {
     .unwrap();
 
     let user_id = response
-        .as_object_value()
-        .and_then(|response| response.get_field_value("User"))
-        .and_then(juniper::Value::as_list_value)
-        .map(|list| &list[0])
-        .and_then(juniper::Value::as_object_value)
-        .and_then(|mutation| mutation.get_field_value("node"))
-        .and_then(juniper::Value::as_object_value)
-        .and_then(|node| node.get_field_value("user_id"))
-        .and_then(juniper::Value::as_scalar_value)
-        .unwrap()
+        .field("User")
+        .element(0)
+        .field("node")
+        .field("user_id")
+        .scalar()
         .clone();
 
     r#"mutation {

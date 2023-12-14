@@ -198,7 +198,11 @@ impl<'v> AttributeType<'v> {
             }
         }
 
-        panic!("union variant not found: {:?}", union_data.variants);
+        panic!(
+            "union variant not found for ({value:?}) {variants:?}",
+            value = self.attr.value,
+            variants = union_data.variants
+        );
     }
 
     fn resolve_object_field(

@@ -28,6 +28,8 @@ use crate::{
 
 use super::in_memory_core::{DynamicKey, InMemoryStore};
 
+struct Overwrite(bool);
+
 impl InMemoryStore {
     pub fn write_new_entity(
         &mut self,
@@ -52,16 +54,56 @@ impl InMemoryStore {
         let type_info = engine.ontology().get_type_info(data.type_def_id);
         let dynamic_key = Self::extract_dynamic_key(&entity_id.data)?;
 
-        let collection = self.collections.get_mut(&type_info.def_id).unwrap();
-        let stored_entity = collection
-            .get_mut(&dynamic_key)
-            .ok_or_else(|| DomainError::EntityNotFound)?;
+        if !self
+            .collections
+            .get(&type_info.def_id)
+            .unwrap()
+            .contains_key(&dynamic_key)
+        {
+            return Err(DomainError::EntityNotFound);
+        }
+
+        let mut raw_props_update: BTreeMap<PropertyId, Attribute> = Default::default();
 
         let Data::Struct(data_struct) = data.data else {
             return Err(DomainError::BadInput(anyhow!("Expected a struct")));
         };
-        for (property_id, value) in data_struct {
-            stored_entity.insert(property_id, value);
+        for (property_id, attribute) in data_struct {
+            if let Some(data_relationship) = type_info.data_relationships.get(&property_id) {
+                match data_relationship.kind {
+                    DataRelationshipKind::Tree => {
+                        raw_props_update.insert(property_id, attribute);
+                    }
+                    DataRelationshipKind::EntityGraph { .. } => {
+                        match data_relationship.cardinality.1 {
+                            ValueCardinality::One => {
+                                self.insert_entity_relationship(
+                                    type_info.def_id,
+                                    &dynamic_key,
+                                    (property_id, Overwrite(true)),
+                                    attribute,
+                                    data_relationship,
+                                    engine,
+                                )?;
+                            }
+                            ValueCardinality::Many => {
+                                return Err(DomainError::DataStore(anyhow!(
+                                    "Multi-relation update not yet implemented"
+                                )));
+                            }
+                        }
+                    }
+                }
+            } else {
+                panic!("Unknown relationship for {property_id:?}");
+            }
+        }
+
+        let collection = self.collections.get_mut(&type_info.def_id).unwrap();
+        let raw_props = collection.get_mut(&dynamic_key).unwrap();
+
+        for (property_id, attr) in raw_props_update {
+            raw_props.insert(property_id, attr);
         }
 
         self.post_write_select(entity_id, select, engine)
@@ -164,7 +206,7 @@ impl InMemoryStore {
                                 self.insert_entity_relationship(
                                     type_info.def_id,
                                     &entity_key,
-                                    property_id,
+                                    (property_id, Overwrite(false)),
                                     attribute,
                                     data_relationship,
                                     engine,
@@ -180,7 +222,7 @@ impl InMemoryStore {
                                     self.insert_entity_relationship(
                                         type_info.def_id,
                                         &entity_key,
-                                        property_id,
+                                        (property_id, Overwrite(false)),
                                         attribute,
                                         data_relationship,
                                         engine,
@@ -210,7 +252,7 @@ impl InMemoryStore {
         &mut self,
         entity_def_id: DefId,
         entity_key: &DynamicKey,
-        property_id: PropertyId,
+        (property_id, overwrite): (PropertyId, Overwrite),
         attribute: Attribute,
         data_relationship: &DataRelationshipInfo,
         engine: &DomainEngine,
@@ -286,24 +328,31 @@ impl InMemoryStore {
             .get_mut(&property_id.relationship_id)
             .expect("No edge collection");
 
+        let local_key = EntityKey {
+            type_def_id: entity_def_id,
+            dynamic_key: entity_key.clone(),
+        };
+
         match property_id.role {
             Role::Subject => {
+                if overwrite.0 {
+                    edge_collection.edges.retain(|edge| edge.from != local_key);
+                }
+
                 edge_collection.edges.push(Edge {
-                    from: EntityKey {
-                        type_def_id: entity_def_id,
-                        dynamic_key: entity_key.clone(),
-                    },
+                    from: local_key,
                     to: foreign_key,
                     params: rel_params,
                 });
             }
             Role::Object => {
+                if overwrite.0 {
+                    edge_collection.edges.retain(|edge| edge.to != local_key);
+                }
+
                 edge_collection.edges.push(Edge {
                     from: foreign_key,
-                    to: EntityKey {
-                        type_def_id: entity_def_id,
-                        dynamic_key: entity_key.clone(),
-                    },
+                    to: local_key,
                     params: rel_params,
                 });
             }
