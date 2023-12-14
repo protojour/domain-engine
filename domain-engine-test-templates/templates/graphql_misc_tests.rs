@@ -193,6 +193,52 @@ async fn test_gitmesh_misc() {
 
     expect_eq!(
         actual = r#"{
+            users {
+                nodes {
+                    email
+                    member_of {
+                        edges {
+                            node { id }
+                            role
+                        }
+                    }
+                }
+            }
+        }"#
+        .exec([], &schema, &ctx)
+        .await,
+        expected = Ok(graphql_value!({
+            "users": {
+                "nodes": [
+                    {
+                        "email": "bob@bob.com",
+                        "member_of" : {
+                            "edges": [
+                                {
+                                    "node": { "id": "org/lolsoft" },
+                                    "role": "admin",
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "email": "alice@alice.com",
+                        "member_of" : {
+                            "edges": [
+                                {
+                                    "node": { "id": "org/lolsoft" },
+                                    "role": "contributor",
+                                }
+                            ]
+                        }
+                    },
+                ]
+            }
+        })),
+    );
+
+    expect_eq!(
+        actual = r#"{
             repositories {
                 nodes {
                     handle
@@ -224,6 +270,8 @@ async fn test_gitmesh_misc() {
             }
         })),
     );
+
+    tracing::info!("Last query");
 
     // With all selections:
     expect_eq!(

@@ -3,7 +3,9 @@ def Repository (
     rel .'id'(rel .gen: auto)|id: (rel .is: uuid)
     rel .'handle': text
 
-    rel .'owner'::'repositories' RepositoryOwner
+    // FIXME: Both User and Organization should get a `repositiories` field resulting from this:
+    rel {.}'owner'::'repositories' RepositoryOwner
+
     rel .'origin'?: .
 )
 
@@ -19,11 +21,18 @@ def User (
 
 def Organization (
     rel .'id'|id: (fmt '' => 'org/' => text => .)
-    rel .'members'(rel .is: OrganizationMember): {User}
+    rel {.}'members'(rel .is: OrganizationMember)::'member_of' {User}
 )
 
 def OrganizationMember (
     rel .'role': text
+)
+
+map users(
+    (),
+    User: {
+        ..User match(),
+    }
 )
 
 map repositories(

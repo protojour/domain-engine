@@ -114,10 +114,14 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 let node_ref = self.get_def_type_ref(def_id, QLevel::Node);
                 let node_type_addr = node_ref.unwrap_addr();
 
+                let rel_type_info = rel_params.map(|(rel_params_def_id, _)| {
+                    self.partial_ontology.get_type_info(rel_params_def_id)
+                });
+
                 NewType::Addr(
                     connection_addr,
                     TypeData {
-                        typename: self.type_namespace.connection(type_info),
+                        typename: self.type_namespace.connection(rel_type_info, type_info),
                         input_typename: None,
                         partial_input_typename: None,
                         kind: TypeKind::Object(ObjectData {

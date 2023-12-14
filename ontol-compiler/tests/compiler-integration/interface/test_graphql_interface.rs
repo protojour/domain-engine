@@ -269,6 +269,80 @@ fn test_imperfect_mapping_mutation() {
     assert!(delete_arg.is_some());
 }
 
+#[test]
+fn incompatible_edge_types_are_distinct() {
+    "
+    def edge_type (
+        rel .'edge_field': text
+    )
+
+    def source (
+        rel .'id'|id: (rel .is: text)
+        rel .'targets'(rel .is: edge_type): {target}
+    )
+    def target (
+        rel .'id'|id: (rel .is: text)
+    )
+
+    map targets (
+        (),
+        target: {
+            ..target match()
+        }
+    )
+    "
+    .compile_then(|test| {
+        let (schema, test) = schema_test(&test, ROOT_SRC_NAME);
+
+        let query = schema.type_data(schema.query).object_data();
+
+        if true {
+            let targets_query = query.fields.get("targets").unwrap();
+            let targets_query_connection = schema.type_data(targets_query.field_type.unit.addr());
+
+            assert_eq!(targets_query_connection.typename, "targetConnection");
+
+            let targets_query_edge = schema.type_data(
+                targets_query_connection
+                    .object_data()
+                    .fields
+                    .get("edges")
+                    .unwrap()
+                    .field_type
+                    .unit
+                    .addr(),
+            );
+            assert_eq!(targets_query_edge.typename, "targetEdge");
+            assert!(!targets_query_edge
+                .fields()
+                .unwrap()
+                .contains_key("edge_field"));
+        }
+
+        {
+            let source = test.type_data("source", QueryLevel::Node).object_data();
+            let targets_field = source.fields.get("targets").unwrap();
+
+            let targets_connection = schema.type_data(targets_field.field_type.unit.addr());
+            assert_eq!(targets_connection.typename, "_anon1_10targetConnection");
+
+            let targets_edge = schema.type_data(
+                targets_connection
+                    .object_data()
+                    .fields
+                    .get("edges")
+                    .unwrap()
+                    .field_type
+                    .unit
+                    .addr(),
+            );
+
+            assert_eq!(targets_edge.typename, "_anon1_10targetEdge");
+            assert!(targets_edge.fields().unwrap().contains_key("edge_field"));
+        }
+    });
+}
+
 struct SchemaTest<'o> {
     test: &'o OntolTest,
     schema: &'o GraphqlSchema,
