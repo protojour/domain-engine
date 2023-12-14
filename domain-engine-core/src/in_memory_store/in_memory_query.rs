@@ -298,7 +298,10 @@ impl InMemoryStore {
                     }
                 }
 
-                panic!("variant not found");
+                Ok(Value {
+                    data: Data::Struct(properties.clone()),
+                    type_def_id: type_info.def_id,
+                })
             }
             Select::EntityId => todo!(),
             Select::Entity(entity_select) => match &entity_select.source {

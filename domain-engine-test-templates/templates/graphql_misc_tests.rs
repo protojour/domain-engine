@@ -177,16 +177,6 @@ async fn test_gitmesh_misc() {
                     handle: "coolproj"
                     owner: { id: "user/bob" }
                 }
-            ]
-        ) { node { id } }
-    }"#
-    .exec([], &schema, &ctx)
-    .await
-    .unwrap();
-
-    r#"mutation {
-        Repository(
-            create: [
                 {
                     handle: "awesomeproj"
                     owner: { id: "org/lolsoft" }
@@ -198,6 +188,41 @@ async fn test_gitmesh_misc() {
     .await
     .unwrap();
 
+    expect_eq!(
+        actual = r#"{
+            repositories {
+                nodes {
+                    handle
+                    owner {
+                        ... on User { id email }
+                    }
+                }
+            }
+        }"#
+        .exec([], &schema, &ctx)
+        .await,
+        // What happens is that the `awesomeproj` which has an Organzation owner that didn't get selected,
+        // just returns an empty object:
+        expected = Ok(graphql_value!({
+            "repositories": {
+                "nodes": [
+                    {
+                        "handle": "coolproj",
+                        "owner": {
+                            "id": "user/bob",
+                            "email": "bob@bob.com"
+                        },
+                    },
+                    {
+                        "handle": "awesomeproj",
+                        "owner": {}
+                    },
+                ]
+            }
+        })),
+    );
+
+    // With all selections:
     expect_eq!(
         actual = r#"{
             repositories {
