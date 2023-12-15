@@ -551,6 +551,35 @@ async fn test_graphql_conduit_db_article_shallow_update() {
             }]
         }))
     );
+
+    expect_eq!(
+        actual = "{
+            users {
+                nodes {
+                    authored_articles {
+                        nodes { title }
+                    }
+                }
+            }
+        }"
+        .exec([], &schema, &ctx)
+        .await,
+        expected = Ok(graphql_value!({
+            "users": {
+                "nodes": [
+                    {
+                        "authored_articles": {
+                            "nodes": [
+                                {
+                                    "title": "THE NEW TITLE"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        })),
+    );
 }
 
 #[test(tokio::test)]
