@@ -26,7 +26,7 @@ serde_yaml = "0.9"
 smartstring = { version = "1", features = ["serde"] }
 smallvec = "1"
 itertools = "0.11"
-uuid = "1"
+uuid = "1.6"
 tokio = { version = "1", features = ["macros", "rt"] }
 async-trait = "0.1"
 test-log = { version = "0.2", default-features = false, features = ["trace"] }

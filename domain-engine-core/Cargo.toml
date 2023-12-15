@@ -17,7 +17,7 @@ tracing.workspace = true
 indexmap.workspace = true
 fnv.workspace = true
 itertools.workspace = true
-uuid = { workspace = true, features = ["v4"] }
+uuid = { workspace = true, features = ["v4", "v7"] }
 tokio = { workspace = true, features = ["sync"] }
 async-trait.workspace = true
 chrono.workspace = true

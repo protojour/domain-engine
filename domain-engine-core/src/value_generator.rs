@@ -11,7 +11,7 @@ use ontol_runtime::{
     DefId, Role,
 };
 
-use crate::DomainEngine;
+use crate::{DomainEngine, UuidGenerator};
 
 pub struct Generator<'e> {
     engine: &'e DomainEngine,
@@ -84,12 +84,15 @@ impl<'e> Generator<'e> {
                     match self.engine.ontology().get_value_generator(relationship_id) {
                         Some(ValueGenerator::DefaultProc(_)) => {}
                         Some(ValueGenerator::UuidV4) => {
+                            let uuid = match self.engine.config().uuid_generator {
+                                UuidGenerator::V4 => uuid::Uuid::new_v4(),
+                                UuidGenerator::V7 => uuid::Uuid::now_v7(),
+                            };
+
                             struct_map.insert(
                                 property.property_id,
                                 Value::new(
-                                    Data::OctetSequence(
-                                        uuid::Uuid::new_v4().as_bytes().iter().cloned().collect(),
-                                    ),
+                                    Data::OctetSequence(uuid.as_bytes().iter().cloned().collect()),
                                     self.property_def_id(property),
                                 )
                                 .into(),

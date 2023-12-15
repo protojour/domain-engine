@@ -24,11 +24,22 @@ use ontol_runtime::{
 
 pub struct Config {
     pub default_limit: usize,
+    pub uuid_generator: UuidGenerator,
+}
+
+#[derive(Default)]
+pub enum UuidGenerator {
+    V4,
+    #[default]
+    V7,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Self { default_limit: 20 }
+        Self {
+            default_limit: 20,
+            uuid_generator: UuidGenerator::default(),
+        }
     }
 }
 
