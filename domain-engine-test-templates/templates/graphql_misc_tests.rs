@@ -42,6 +42,10 @@ async fn test_guitar_synth_union_mutation_and_query() {
                         {
                             type: "synth"
                             polyphony: 1
+                        },
+                        {
+                            type: "synth"
+                            polyphony: 6
                         }
                     ]
                 }]
@@ -77,6 +81,10 @@ async fn test_guitar_synth_union_mutation_and_query() {
                             {
                                 "__typename": "synth",
                                 "polyphony": 1
+                            },
+                            {
+                                "__typename": "synth",
+                                "polyphony": 6
                             },
                         ]
                     }
@@ -119,6 +127,10 @@ async fn test_guitar_synth_union_mutation_and_query() {
                             {
                                 "__typename": "synth",
                                 "polyphony": 1
+                            },
+                            {
+                                "__typename": "synth",
+                                "polyphony": 6
                             },
                         ]
                     }
