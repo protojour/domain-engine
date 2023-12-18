@@ -303,7 +303,7 @@ impl InMemoryStore {
                     type_def_id: type_info.def_id,
                 })
             }
-            Select::EntityId => return Err(DomainError::DataStore(anyhow!("entity id"))),
+            Select::EntityId => Err(DomainError::DataStore(anyhow!("entity id"))),
             Select::Entity(entity_select) => match &entity_select.source {
                 StructOrUnionSelect::Struct(struct_select) => self.apply_struct_select(
                     type_info,
