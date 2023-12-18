@@ -210,9 +210,17 @@ async fn test_gitmesh_misc() {
                     email
                     member_of {
                         edges {
-                            node { id }
+                            node {
+                                id
+                                repositories {
+                                    nodes { handle }
+                                }
+                            }
                             role
                         }
+                    }
+                    repositories {
+                        nodes { handle }
                     }
                 }
             }
@@ -227,9 +235,21 @@ async fn test_gitmesh_misc() {
                         "member_of" : {
                             "edges": [
                                 {
-                                    "node": { "id": "org/lolsoft" },
+                                    "node": {
+                                        "id": "org/lolsoft",
+                                        "repositories": {
+                                            "nodes": [
+                                                { "handle": "awesomeproj" }
+                                            ]
+                                        }
+                                    },
                                     "role": "admin",
                                 }
+                            ]
+                        },
+                        "repositories": {
+                            "nodes": [
+                                { "handle": "coolproj" }
                             ]
                         }
                     },
@@ -238,11 +258,19 @@ async fn test_gitmesh_misc() {
                         "member_of" : {
                             "edges": [
                                 {
-                                    "node": { "id": "org/lolsoft" },
+                                    "node": {
+                                        "id": "org/lolsoft",
+                                        "repositories": {
+                                            "nodes": [
+                                                { "handle": "awesomeproj" }
+                                            ]
+                                        }
+                                    },
                                     "role": "contributor",
                                 }
                             ]
-                        }
+                        },
+                        "repositories": { "nodes": [] }
                     },
                 ]
             }
@@ -334,41 +362,6 @@ async fn test_gitmesh_misc() {
                                     },
                                 ]
                             }
-                        }
-                    },
-                ]
-            }
-        })),
-    );
-
-    expect_eq!(
-        actual = r#"{
-            users {
-                nodes {
-                    id
-                    repositories {
-                        nodes { handle }
-                    }
-                }
-            }
-        }"#
-        .exec([], &schema, &ctx)
-        .await,
-        expected = Ok(graphql_value!({
-            "users": {
-                "nodes": [
-                    {
-                        "id": "user/bob",
-                        "repositories": {
-                            "nodes": [
-                                { "handle": "coolproj" }
-                            ]
-                        }
-                    },
-                    {
-                        "id": "user/alice",
-                        "repositories": {
-                            "nodes": []
                         }
                     },
                 ]
