@@ -550,7 +550,6 @@ dependencies = [
  "fnv",
  "indexmap",
  "itertools",
- "ontol-compiler",
  "ontol-runtime",
  "ontol-test-utils",
  "ordered-float 4.1.1",

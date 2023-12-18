@@ -9,8 +9,7 @@ edition = "2021"
 doctest = false
 
 [dependencies]
-ontol-runtime.path = "../ontol-runtime"
-ontol-compiler.path = "../ontol-compiler"
+ontol-runtime.path = "../../ontol-runtime"
 smartstring.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
@@ -31,7 +30,7 @@ anyhow = "1"
 bincode = "1"
 
 [dev-dependencies]
-ontol-test-utils.path = "../ontol-test-utils"
+ontol-test-utils.path = "../../ontol-test-utils"
 domain-engine-test-utils.path = "../domain-engine-test-utils"
 test-log.workspace = true
 tracing-subscriber.workspace = true

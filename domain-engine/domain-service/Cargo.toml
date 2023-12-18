@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 domain-engine-juniper.path = "../domain-engine-juniper"
 domain-engine-core.path = "../domain-engine-core"
-ontol-runtime.path = "../ontol-runtime"
+ontol-runtime.path = "../../ontol-runtime"
 clap.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true

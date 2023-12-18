@@ -1,10 +1,10 @@
 [workspace]
 members = [
-    "domain-engine-core",
-    "domain-engine-juniper",
-    "domain-engine-test-templates",
-    "domain-engine-test-utils",
-    "domain-service",
+    "domain-engine/domain-engine-core",
+    "domain-engine/domain-engine-juniper",
+    "domain-engine/domain-engine-test-templates",
+    "domain-engine/domain-engine-test-utils",
+    "domain-engine/domain-service",
     "ontol-faker",
     "ontol-hir",
     "ontol-runtime",

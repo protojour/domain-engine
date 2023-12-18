@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-domain-engine-juniper.path = "../domain-engine-juniper"
+domain-engine-juniper.path = "../domain-engine/domain-engine-juniper"
 ontol-compiler.path = "../ontol-compiler"
 ontol-parser.path = "../ontol-parser"
 ontol-runtime.path = "../ontol-runtime"

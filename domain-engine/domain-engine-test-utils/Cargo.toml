@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-ontol-test-utils.path = "../ontol-test-utils"
-ontol-runtime.path = "../ontol-runtime"
+ontol-test-utils.path = "../../ontol-test-utils"
+ontol-runtime.path = "../../ontol-runtime"
 domain-engine-core.path = "../domain-engine-core"
 domain-engine-juniper.path = "../domain-engine-juniper"
 serde.workspace = true

@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-domain-engine-juniper.path = "../domain-engine-juniper"
-domain-engine-core.path = "../domain-engine-core"
+domain-engine-juniper.path = "../domain-engine/domain-engine-juniper"
+domain-engine-core.path = "../domain-engine/domain-engine-core"
 ontol-runtime.path = "../ontol-runtime"
 chrono.workspace = true
 clap.workspace = true
