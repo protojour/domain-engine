@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 
 use anyhow::anyhow;
-use itertools::Itertools;
 use ontol_runtime::{
     condition::{CondTerm, Condition},
     ontology::{
@@ -82,20 +81,21 @@ impl InMemoryStore {
         let filter_plan = compute_filter_plan(condition, engine.ontology()).unwrap();
         debug!("eval filter plan: {filter_plan:#?}");
 
-        let mut raw_props_vec = collection
-            .iter()
-            .filter(|(key, props)| {
-                self.eval_filter_plan(
-                    &FilterVal::Struct {
-                        type_def_id: type_info.def_id,
-                        dynamic_key: Some(key),
-                        prop_tree: props,
-                    },
-                    &filter_plan,
-                )
-            })
-            .map(|(key, props)| (key.clone(), props.clone()))
-            .collect_vec();
+        let mut raw_props_vec = {
+            let mut vec = vec![];
+
+            for (key, props) in collection {
+                let filter_val = FilterVal::Struct {
+                    type_def_id: type_info.def_id,
+                    dynamic_key: Some(key),
+                    prop_tree: props,
+                };
+                if self.eval_filter_plan(&filter_val, &filter_plan)? {
+                    vec.push((key.clone(), props.clone()));
+                }
+            }
+            vec
+        };
 
         let total_size = raw_props_vec.len();
 

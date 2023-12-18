@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 
+use anyhow::anyhow;
 use bit_set::BitSet;
 use fnv::FnvHashMap;
 use ontol_runtime::{
@@ -8,7 +9,10 @@ use ontol_runtime::{
     DefId, Role,
 };
 
-use domain_engine_core::filter::plan::{PlanEntry, Scalar};
+use domain_engine_core::{
+    filter::plan::{PlanEntry, Scalar},
+    DomainError, DomainResult,
+};
 
 use super::core::{DynamicKey, EntityKey, InMemoryStore};
 
@@ -65,7 +69,10 @@ impl Proof {
     }
 }
 
-struct Disproven;
+enum ProofError {
+    Disproven,
+    Domain(DomainError),
+}
 
 #[derive(Default)]
 struct JoinTable {
@@ -80,9 +87,9 @@ struct JoinTableEntry {
 }
 
 impl InMemoryStore {
-    pub fn eval_filter_plan(&self, val: &FilterVal, plan: &[PlanEntry]) -> bool {
+    pub fn eval_filter_plan(&self, val: &FilterVal, plan: &[PlanEntry]) -> DomainResult<bool> {
         if plan.is_empty() {
-            return true;
+            return Ok(true);
         }
 
         let mut join_table = JoinTable::default();
@@ -90,15 +97,14 @@ impl InMemoryStore {
         for (plan_idx, plan_entry) in plan.iter().enumerate() {
             join_table.current_subplan = plan_idx;
 
-            if self
-                .eval_filter_plan_entry(val, plan_entry, &mut join_table)
-                .is_err()
-            {
-                return false;
+            match self.eval_filter_plan_entry(val, plan_entry, &mut join_table) {
+                Ok(_) => {}
+                Err(ProofError::Disproven) => return Ok(false),
+                Err(ProofError::Domain(err)) => return Err(err),
             }
         }
 
-        join_table.joins.is_empty()
+        Ok(join_table.joins.is_empty())
     }
 
     fn eval_filter_plan_entry(
@@ -106,11 +112,11 @@ impl InMemoryStore {
         val: &FilterVal,
         entry: &PlanEntry,
         join_table: &mut JoinTable,
-    ) -> Result<Proof, Disproven> {
+    ) -> Result<Proof, ProofError> {
         match (entry, val) {
             (PlanEntry::EntitiesOf(def_id, entries), FilterVal::Struct { type_def_id, .. }) => {
                 if def_id != type_def_id {
-                    return Err(Disproven);
+                    return Err(ProofError::Disproven);
                 }
 
                 if entries.is_empty() {
@@ -124,7 +130,7 @@ impl InMemoryStore {
                 Ok(Proof::Proven)
             }
             (PlanEntry::JoinRoot(var, sub_entries), _) => {
-                let join_table_entry = join_table.joins.remove(var).ok_or(Disproven)?;
+                let join_table_entry = join_table.joins.remove(var).ok_or(ProofError::Disproven)?;
 
                 let observed_count = join_table_entry.in_subplans.iter().count();
 
@@ -132,13 +138,13 @@ impl InMemoryStore {
 
                 for (typed_key, count) in join_table_entry.keys {
                     if count < observed_count {
-                        return Err(Disproven);
+                        return Err(ProofError::Disproven);
                     }
 
                     let filter_val = self
                         .look_up_entity(typed_key.type_def_id, &typed_key.dynamic_key)
                         .map(|prop_tree| FilterVal::from_entity(&typed_key, prop_tree))
-                        .ok_or(Disproven)?;
+                        .ok_or(ProofError::Disproven)?;
 
                     for entry in sub_entries {
                         proof.merge(self.eval_filter_plan_entry(&filter_val, entry, join_table)?);
@@ -148,13 +154,13 @@ impl InMemoryStore {
                 Ok(proof)
             }
             (PlanEntry::Attr(prop_id, entries), FilterVal::Struct { prop_tree: map, .. }) => {
-                let attr = map.get(prop_id).ok_or(Disproven)?;
+                let attr = map.get(prop_id).ok_or(ProofError::Disproven)?;
                 self.eval_attr_entries(attr, entries, join_table)
             }
             (PlanEntry::AllAttrs(prop_id, entries), FilterVal::Struct { prop_tree: map, .. }) => {
-                let attr = map.get(prop_id).ok_or(Disproven)?;
+                let attr = map.get(prop_id).ok_or(ProofError::Disproven)?;
                 let Data::Sequence(seq) = &attr.value.data else {
-                    return Err(Disproven);
+                    return Err(ProofError::Disproven);
                 };
 
                 let mut proof = Proof::Proven;
@@ -175,7 +181,7 @@ impl InMemoryStore {
                 let edge_collection = self
                     .edge_collections
                     .get(&prop_id.relationship_id)
-                    .ok_or(Disproven)?;
+                    .ok_or(ProofError::Disproven)?;
 
                 let (target_key, rel_params) = match prop_id.role {
                     Role::Subject => edge_collection.edges.iter().find_map(|edge| {
@@ -193,12 +199,12 @@ impl InMemoryStore {
                         }
                     }),
                 }
-                .ok_or(Disproven)?;
+                .ok_or(ProofError::Disproven)?;
 
                 let entity = self
                     .look_up_entity(target_key.type_def_id, &target_key.dynamic_key)
                     .map(|prop_tree| FilterVal::from_entity(target_key, prop_tree))
-                    .ok_or(Disproven)?;
+                    .ok_or(ProofError::Disproven)?;
 
                 let mut proof = Proof::Proven;
 
@@ -212,20 +218,24 @@ impl InMemoryStore {
 
                 Ok(proof)
             }
-            (PlanEntry::AllEdges(..), _) => todo!(),
+            (PlanEntry::AllEdges(..), _) => Err(ProofError::Domain(DomainError::DataStore(
+                anyhow!("AllEdges operator not implemented"),
+            ))),
             (PlanEntry::Eq(pred_scalar), FilterVal::Scalar(val_scalar)) => {
                 match (&val_scalar.data, pred_scalar) {
                     (Data::Text(data), Scalar::Text(pred)) => {
                         if data.as_str() == pred.as_ref() {
                             Ok(Proof::Proven)
                         } else {
-                            Err(Disproven)
+                            Err(ProofError::Disproven)
                         }
                     }
-                    _ => Err(Disproven),
+                    _ => Err(ProofError::Disproven),
                 }
             }
-            (PlanEntry::In(..), _) => todo!(),
+            (PlanEntry::In(..), _) => Err(ProofError::Domain(DomainError::DataStore(anyhow!(
+                "In operator not implemented"
+            )))),
             (
                 PlanEntry::Join(var),
                 FilterVal::Struct {
@@ -251,7 +261,7 @@ impl InMemoryStore {
 
                 Ok(Proof::Maybe)
             }
-            _ => Err(Disproven),
+            _ => Err(ProofError::Disproven),
         }
     }
 
@@ -260,7 +270,7 @@ impl InMemoryStore {
         attr: &Attribute,
         entries: &[PlanEntry],
         join_table: &mut JoinTable,
-    ) -> Result<Proof, Disproven> {
+    ) -> Result<Proof, ProofError> {
         if entries.is_empty() {
             return Ok(Proof::Proven);
         }
