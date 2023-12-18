@@ -4,6 +4,7 @@ use anyhow::anyhow;
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
+    ontology::{DataRelationshipInfo, TypeInfo},
     value::{Attribute, Data, PropertyId, Value},
     DefId, RelationshipId,
 };
@@ -112,4 +113,18 @@ impl InMemoryStore {
         let collection = self.collections.get(&def_id)?;
         collection.get(dynamic_key)
     }
+}
+
+pub(crate) fn find_data_relationship<'a>(
+    type_info: &'a TypeInfo,
+    property_id: &PropertyId,
+) -> DomainResult<&'a DataRelationshipInfo> {
+    type_info
+        .data_relationships
+        .get(property_id)
+        .ok_or_else(|| {
+            DomainError::DataStoreBadRequest(anyhow!(
+                "data relationship {property_id} does not exist"
+            ))
+        })
 }

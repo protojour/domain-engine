@@ -34,6 +34,8 @@ pub enum DomainError {
     ImpureMapping,
     #[error("datastore error: {0}")]
     DataStore(anyhow::Error),
+    #[error("datastore bad request: {0}")]
+    DataStoreBadRequest(anyhow::Error),
     #[error("ontol data error: {0}")]
     OntolVm(#[from] VmError),
 }

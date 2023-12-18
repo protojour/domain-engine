@@ -19,7 +19,7 @@ use domain_engine_core::{
     filter::plan::compute_filter_plan, DomainEngine, DomainError, DomainResult,
 };
 
-use crate::filter::FilterVal;
+use crate::{core::find_data_relationship, filter::FilterVal};
 
 use super::core::{DynamicKey, EntityKey, InMemoryStore};
 
@@ -52,7 +52,9 @@ impl InMemoryStore {
                 IncludeTotalLen(select.include_total_len),
                 engine,
             ),
-            StructOrUnionSelect::Union(..) => todo!(),
+            StructOrUnionSelect::Union(..) => Err(DomainError::DataStoreBadRequest(anyhow!(
+                "Query entity union at root level not supported"
+            ))),
         }
     }
 
@@ -162,41 +164,36 @@ impl InMemoryStore {
                 continue;
             }
 
-            if let Some(data_relationship) = type_info.data_relationships.get(property_id) {
-                if !matches!(
-                    data_relationship.kind,
-                    DataRelationshipKind::EntityGraph { .. }
-                ) {
-                    continue;
-                }
+            let data_relationship = find_data_relationship(type_info, property_id)?;
 
-                let attrs =
-                    self.sub_query_attributes(*property_id, subselect, entity_key, engine)?;
+            if !matches!(
+                data_relationship.kind,
+                DataRelationshipKind::EntityGraph { .. }
+            ) {
+                continue;
+            }
 
-                match data_relationship.cardinality.1 {
-                    ValueCardinality::One => {
-                        if let Some(attribute) = attrs.into_iter().next() {
-                            properties.insert(*property_id, attribute);
-                        }
-                    }
-                    ValueCardinality::Many => {
-                        properties.insert(
-                            *property_id,
-                            Value::new(
-                                Data::Sequence(Sequence::new(attrs)),
-                                match data_relationship.target {
-                                    DataRelationshipTarget::Unambiguous(def_id) => def_id,
-                                    DataRelationshipTarget::Union { union_def_id, .. } => {
-                                        union_def_id
-                                    }
-                                },
-                            )
-                            .into(),
-                        );
+            let attrs = self.sub_query_attributes(*property_id, subselect, entity_key, engine)?;
+
+            match data_relationship.cardinality.1 {
+                ValueCardinality::One => {
+                    if let Some(attribute) = attrs.into_iter().next() {
+                        properties.insert(*property_id, attribute);
                     }
                 }
-            } else {
-                panic!("{property_id} data relationship not found");
+                ValueCardinality::Many => {
+                    properties.insert(
+                        *property_id,
+                        Value::new(
+                            Data::Sequence(Sequence::new(attrs)),
+                            match data_relationship.target {
+                                DataRelationshipTarget::Unambiguous(def_id) => def_id,
+                                DataRelationshipTarget::Union { union_def_id, .. } => union_def_id,
+                            },
+                        )
+                        .into(),
+                    );
+                }
             }
         }
 
@@ -306,7 +303,7 @@ impl InMemoryStore {
                     type_def_id: type_info.def_id,
                 })
             }
-            Select::EntityId => todo!(),
+            Select::EntityId => return Err(DomainError::DataStore(anyhow!("entity id"))),
             Select::Entity(entity_select) => match &entity_select.source {
                 StructOrUnionSelect::Struct(struct_select) => self.apply_struct_select(
                     type_info,

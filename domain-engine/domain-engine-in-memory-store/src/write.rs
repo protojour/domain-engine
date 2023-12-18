@@ -23,7 +23,7 @@ use domain_engine_core::{
 };
 
 use crate::{
-    core::{Edge, EntityKey},
+    core::{find_data_relationship, Edge, EntityKey},
     query::{Cursor, IncludeTotalLen, Limit},
 };
 
@@ -70,33 +70,29 @@ impl InMemoryStore {
             return Err(DomainError::BadInput(anyhow!("Expected a struct")));
         };
         for (property_id, attribute) in data_struct {
-            if let Some(data_relationship) = type_info.data_relationships.get(&property_id) {
-                match data_relationship.kind {
-                    DataRelationshipKind::Tree => {
-                        raw_props_update.insert(property_id, attribute);
-                    }
-                    DataRelationshipKind::EntityGraph { .. } => {
-                        match data_relationship.cardinality.1 {
-                            ValueCardinality::One => {
-                                self.insert_entity_relationship(
-                                    type_info.def_id,
-                                    &dynamic_key,
-                                    (property_id, Overwrite(true)),
-                                    attribute,
-                                    data_relationship,
-                                    engine,
-                                )?;
-                            }
-                            ValueCardinality::Many => {
-                                return Err(DomainError::DataStore(anyhow!(
-                                    "Multi-relation update not yet implemented"
-                                )));
-                            }
-                        }
-                    }
+            let data_relationship = find_data_relationship(type_info, &property_id)?;
+
+            match data_relationship.kind {
+                DataRelationshipKind::Tree => {
+                    raw_props_update.insert(property_id, attribute);
                 }
-            } else {
-                panic!("Unknown relationship for {property_id:?}");
+                DataRelationshipKind::EntityGraph { .. } => match data_relationship.cardinality.1 {
+                    ValueCardinality::One => {
+                        self.insert_entity_relationship(
+                            type_info.def_id,
+                            &dynamic_key,
+                            (property_id, Overwrite(true)),
+                            attribute,
+                            data_relationship,
+                            engine,
+                        )?;
+                    }
+                    ValueCardinality::Many => {
+                        return Err(DomainError::DataStore(anyhow!(
+                            "Multi-relation update not yet implemented"
+                        )));
+                    }
+                },
             }
         }
 
@@ -140,9 +136,13 @@ impl InMemoryStore {
                     }
                 }
 
-                panic!("Not found")
+                Err(DomainError::DataStore(anyhow!(
+                    "Entity did not get written"
+                )))
             }
-            _ => todo!(),
+            _ => Err(DomainError::DataStoreBadRequest(anyhow!(
+                "post-write select kind not supported"
+            ))),
         }
     }
 
@@ -164,16 +164,18 @@ impl InMemoryStore {
         let (id, id_generated) = match find_inherent_entity_id(ontology, &entity)? {
             Some(id) => (id, false),
             None => {
-                if let Some(value_generator) = entity_info.id_value_generator {
-                    let id = self.generate_entity_id(
+                let value_generator = entity_info.id_value_generator.ok_or_else(|| {
+                    DomainError::DataStoreBadRequest(anyhow!("No id provided and no ID generator"))
+                })?;
+
+                (
+                    self.generate_entity_id(
                         ontology,
                         entity_info.id_operator_addr,
                         value_generator,
-                    )?;
-                    (id, true)
-                } else {
-                    panic!("No id provided and no ID generator");
-                }
+                    )?,
+                    true,
+                )
             }
         };
 
@@ -196,45 +198,42 @@ impl InMemoryStore {
         let entity_key = Self::extract_dynamic_key(&id.data)?;
 
         for (property_id, attribute) in struct_map {
-            if let Some(data_relationship) = type_info.data_relationships.get(&property_id) {
-                match data_relationship.kind {
-                    DataRelationshipKind::Tree => {
-                        raw_props.insert(property_id, attribute);
-                    }
-                    DataRelationshipKind::EntityGraph { .. } => {
-                        match data_relationship.cardinality.1 {
-                            ValueCardinality::One => {
-                                self.insert_entity_relationship(
-                                    type_info.def_id,
-                                    &entity_key,
-                                    (property_id, Overwrite(false)),
-                                    attribute,
-                                    data_relationship,
-                                    engine,
-                                )?;
-                            }
-                            ValueCardinality::Many => {
-                                let seq = match attribute.value.data {
-                                    Data::Sequence(seq) => seq,
-                                    _ => panic!("Expected sequence for ValueCardinality::Many"),
-                                };
+            let data_relationship = find_data_relationship(type_info, &property_id)?;
 
-                                for attribute in seq.attrs {
-                                    self.insert_entity_relationship(
-                                        type_info.def_id,
-                                        &entity_key,
-                                        (property_id, Overwrite(false)),
-                                        attribute,
-                                        data_relationship,
-                                        engine,
-                                    )?;
-                                }
-                            }
+            match data_relationship.kind {
+                DataRelationshipKind::Tree => {
+                    raw_props.insert(property_id, attribute);
+                }
+                DataRelationshipKind::EntityGraph { .. } => match data_relationship.cardinality.1 {
+                    ValueCardinality::One => {
+                        self.insert_entity_relationship(
+                            type_info.def_id,
+                            &entity_key,
+                            (property_id, Overwrite(false)),
+                            attribute,
+                            data_relationship,
+                            engine,
+                        )?;
+                    }
+                    ValueCardinality::Many => {
+                        let Data::Sequence(seq) = attribute.value.data else {
+                            return Err(DomainError::DataStoreBadRequest(anyhow!(
+                                "Expected sequence for ValueCardinality::Many"
+                            )));
+                        };
+
+                        for attribute in seq.attrs {
+                            self.insert_entity_relationship(
+                                type_info.def_id,
+                                &entity_key,
+                                (property_id, Overwrite(false)),
+                                attribute,
+                                data_relationship,
+                                engine,
+                            )?;
                         }
                     }
-                }
-            } else {
-                panic!("Unknown relationship for {property_id:?}");
+                },
             }
         }
 
