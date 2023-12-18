@@ -28,7 +28,7 @@ use crate::{
     def::{DefKind, Defs},
     interface::serde::serde_generator::SerdeGenerator,
     primitive::Primitives,
-    relation::Relations,
+    relation::{Relations, UnionMemberCache},
     type_check::{repr::repr_model::ReprKind, seal::SealCtx},
 };
 
@@ -55,6 +55,8 @@ pub(super) struct SchemaBuilder<'a, 's, 'c, 'm> {
     pub seal_ctx: &'c SealCtx,
     /// A resolver graph
     pub resolver_graph: ResolverGraph,
+    /// cache of which def is member of which unions
+    pub union_member_cache: &'c UnionMemberCache,
 }
 
 pub(super) enum LazyTask {

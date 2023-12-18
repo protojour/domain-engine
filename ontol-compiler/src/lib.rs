@@ -1,6 +1,9 @@
 #![forbid(unsafe_code)]
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{BTreeSet, HashMap},
+    sync::Arc,
+};
 
 use codegen::task::{execute_codegen_tasks, CodegenTasks};
 use def::{DefKind, DefVisibility, Defs, LookupRelationshipMeta, RelationshipMeta, TypeDef};
@@ -21,8 +24,8 @@ use ontol_runtime::{
         DomainInterface,
     },
     ontology::{
-        DataRelationshipInfo, DataRelationshipKind, DataRelationshipTarget, Domain, EntityInfo,
-        MapLossiness, MapMeta, OntolDomainMeta, Ontology, TypeInfo,
+        DataRelationshipInfo, DataRelationshipKind, DataRelationshipSource, DataRelationshipTarget,
+        Domain, EntityInfo, MapLossiness, MapMeta, OntolDomainMeta, Ontology, TypeInfo,
     },
     value::PropertyId,
     DefId, PackageId,
@@ -31,7 +34,7 @@ use ontology_graph::OntologyGraph;
 use package::{PackageTopology, Packages, ParsedPackage, ONTOL_PKG};
 use pattern::Patterns;
 use primitive::Primitives;
-use relation::{Properties, Property, Relations};
+use relation::{Properties, Property, Relations, UnionMemberCache};
 pub use source::*;
 use strings::Strings;
 use text_patterns::{compile_all_text_patterns, TextPatterns};
@@ -245,6 +248,27 @@ impl<'m> Compiler<'m> {
             })
             .collect();
 
+        let union_member_cache = {
+            let mut cache: FnvHashMap<DefId, BTreeSet<DefId>> = Default::default();
+
+            for package_id in package_ids.iter() {
+                let namespace = namespaces.get(package_id).unwrap();
+
+                for (_, union_def_id) in &namespace.types {
+                    let Some(ReprKind::StructUnion(variants)) =
+                        self.seal_ctx.get_repr_kind(union_def_id)
+                    else {
+                        continue;
+                    };
+
+                    for (variant, _) in variants.iter() {
+                        cache.entry(*variant).or_default().insert(*union_def_id);
+                    }
+                }
+            }
+            UnionMemberCache { cache }
+        };
+
         // For now, create serde operators for every domain
         for package_id in package_ids.iter().cloned() {
             let domain_name = unique_domain_names
@@ -260,7 +284,8 @@ impl<'m> Compiler<'m> {
             }
 
             for (type_name, type_def_id) in type_namespace {
-                let data_relationships = self.get_data_relationships(type_def_id);
+                let data_relationships =
+                    self.find_data_relationships(type_def_id, &union_member_cache);
 
                 domain.add_type(TypeInfo {
                     def_id: type_def_id,
@@ -294,7 +319,8 @@ impl<'m> Compiler<'m> {
                         type_def_id,
                         SerdeModifier::json_default(),
                     ))),
-                    data_relationships: self.get_data_relationships(type_def_id),
+                    data_relationships: self
+                        .find_data_relationships(type_def_id, &union_member_cache),
                 });
             }
 
@@ -315,6 +341,7 @@ impl<'m> Compiler<'m> {
                     &self.primitives,
                     map_namespaces.get(&package_id),
                     &self.codegen_tasks,
+                    &union_member_cache,
                     &mut serde_generator,
                 ) {
                     interfaces
@@ -380,9 +407,10 @@ impl<'m> Compiler<'m> {
             .build()
     }
 
-    fn get_data_relationships(
+    fn find_data_relationships(
         &self,
         type_def_id: DefId,
+        union_member_cache: &UnionMemberCache,
     ) -> IndexMap<PropertyId, DataRelationshipInfo> {
         let Some(properties) = self.relations.properties_by_def_id(type_def_id) else {
             return Default::default();
@@ -391,10 +419,33 @@ impl<'m> Compiler<'m> {
 
         if let Some(table) = &properties.table {
             for (property_id, property) in table {
-                if let Some(data_relationship) =
-                    self.get_data_relationship_info(*property_id, property)
-                {
+                if let Some(data_relationship) = self.generate_data_relationship_info(
+                    *property_id,
+                    property,
+                    DataRelationshipSource::Inherent,
+                ) {
                     data_relationships.insert(*property_id, data_relationship);
+                }
+            }
+        }
+
+        if let Some(union_memberships) = union_member_cache.cache.get(&type_def_id) {
+            for union_def_id in union_memberships {
+                let Some(properties) = self.relations.properties_by_def_id(*union_def_id) else {
+                    continue;
+                };
+                let Some(table) = &properties.table else {
+                    continue;
+                };
+
+                for (property_id, property) in table {
+                    if let Some(data_relationship) = self.generate_data_relationship_info(
+                        *property_id,
+                        property,
+                        DataRelationshipSource::ByUnionProxy,
+                    ) {
+                        data_relationships.insert(*property_id, data_relationship);
+                    }
                 }
             }
         }
@@ -402,10 +453,11 @@ impl<'m> Compiler<'m> {
         data_relationships
     }
 
-    fn get_data_relationship_info(
+    fn generate_data_relationship_info(
         &self,
         property_id: PropertyId,
         property: &Property,
+        source: DataRelationshipSource,
     ) -> Option<DataRelationshipInfo> {
         let meta = self.defs.relationship_meta(property_id.relationship_id);
 
@@ -465,6 +517,7 @@ impl<'m> Compiler<'m> {
                     cardinality: property.cardinality,
                     subject_name: (*subject_name).into(),
                     object_name: meta.relationship.object_prop.map(|prop| prop.into()),
+                    source,
                     target,
                 })
             } else {

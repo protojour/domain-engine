@@ -16,15 +16,17 @@ use ontol_runtime::{
         },
     },
     ontology::{PropertyCardinality, ValueCardinality},
-    smart_format, DefId, Role,
+    smart_format,
+    value::PropertyId,
+    DefId, Role,
 };
 use smartstring::alias::String;
-use tracing::trace;
+use tracing::{trace, trace_span};
 
 use crate::{
     def::{DefKind, LookupRelationshipMeta, RelParams},
     interface::serde::serde_generator::SerdeGenerator,
-    relation::Properties,
+    relation::Property,
     type_check::repr::repr_model::{ReprKind, ReprScalarKind},
 };
 
@@ -404,7 +406,8 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         def_id: DefId,
         property_field_producer: PropertyFieldProducer,
     ) {
-        trace!("Harvest fields for {def_id:?} / {type_addr:?}");
+        let _entered = trace_span!("harvest", def_id = ?def_id).entered();
+        // trace!("Harvest fields for {def_id:?} / {type_addr:?}");
 
         let mut struct_flags = SerdeStructFlags::empty();
         let mut field_namespace = GraphqlNamespace::default();
@@ -417,28 +420,65 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     continue;
                 };
 
-                self.harvest_struct_fields(
-                    def_id,
-                    properties,
-                    property_field_producer,
-                    &mut struct_flags,
-                    &mut field_namespace,
-                    &mut fields,
-                );
+                if let Some(table) = &properties.table {
+                    for (property_id, property) in table {
+                        self.harvest_struct_field(
+                            *property_id,
+                            property,
+                            property_field_producer,
+                            &mut field_namespace,
+                            &mut fields,
+                        );
+                    }
+                }
             }
         } else {
             let Some(properties) = self.relations.properties_by_def_id(def_id) else {
                 return;
             };
 
-            self.harvest_struct_fields(
-                def_id,
-                properties,
-                property_field_producer,
-                &mut struct_flags,
-                &mut field_namespace,
-                &mut fields,
-            );
+            if let DefKind::Type(type_def) = self.defs.def_kind(def_id) {
+                if type_def.open {
+                    struct_flags |= SerdeStructFlags::OPEN_DATA;
+                }
+            }
+
+            if let Some(table) = &properties.table {
+                for (property_id, property) in table {
+                    self.harvest_struct_field(
+                        *property_id,
+                        property,
+                        property_field_producer,
+                        &mut field_namespace,
+                        &mut fields,
+                    );
+                }
+            }
+        }
+
+        if let Some(union_memberships) = self.union_member_cache.cache.get(&def_id) {
+            for union_def_id in union_memberships {
+                let Some(properties) = self.relations.properties_by_def_id(*union_def_id) else {
+                    continue;
+                };
+                let Some(table) = &properties.table else {
+                    continue;
+                };
+
+                for (property_id, property) in table {
+                    let meta = self.defs.relationship_meta(property_id.relationship_id);
+
+                    if meta.relationship.object.0 == *union_def_id {
+                        self.harvest_struct_field(
+                            *property_id,
+                            property,
+                            property_field_producer,
+                            &mut field_namespace,
+                            &mut fields,
+                        );
+                    }
+                }
+            }
         }
 
         if struct_flags.contains(SerdeStructFlags::OPEN_DATA) {
@@ -462,170 +502,155 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         }
     }
 
-    fn harvest_struct_fields(
+    fn harvest_struct_field(
         &mut self,
-        def_id: DefId,
-        properties: &Properties,
+        property_id: PropertyId,
+        property: &Property,
         property_field_producer: PropertyFieldProducer,
-        struct_flags: &mut SerdeStructFlags,
         field_namespace: &mut GraphqlNamespace,
         output: &mut IndexMap<String, FieldData>,
     ) {
-        let Some(table) = &properties.table else {
-            return;
+        let meta = self.defs.relationship_meta(property_id.relationship_id);
+        let (_, (prop_cardinality, value_cardinality), _) = meta.relationship.by(property_id.role);
+        let (value_def_id, ..) = meta.relationship.by(property_id.role.opposite());
+        let prop_key = match property_id.role {
+            Role::Subject => {
+                let DefKind::TextLiteral(prop_key) = meta.relation_def_kind.value else {
+                    panic!("Subject property is not a string literal");
+                };
+                *prop_key
+            }
+            Role::Object => meta
+                .relationship
+                .object_prop
+                .expect("Object property has no name"),
         };
 
-        if let DefKind::Type(type_def) = self.defs.def_kind(def_id) {
-            if type_def.open {
-                *struct_flags |= SerdeStructFlags::OPEN_DATA;
+        trace!("    register struct field `{prop_key}`: {property_id}");
+
+        let value_properties = self.relations.properties_by_def_id(value_def_id);
+
+        let is_entity_value = {
+            let repr_kind = self.seal_ctx.get_repr_kind(&value_def_id);
+            match repr_kind {
+                Some(ReprKind::StructUnion(variants)) => {
+                    variants.iter().all(|(variant_def_id, _)| {
+                        let variant_properties =
+                            self.relations.properties_by_def_id(*variant_def_id);
+                        variant_properties
+                            .map(|properties| properties.identified_by.is_some())
+                            .unwrap_or(false)
+                    })
+                }
+                _ => value_properties
+                    .map(|properties| properties.identified_by.is_some())
+                    .unwrap_or(false),
             }
-        }
+        };
 
-        for (property_id, property) in table {
-            let property_id = *property_id;
-            let meta = self.defs.relationship_meta(property_id.relationship_id);
-            let (_, (prop_cardinality, value_cardinality), _) =
-                meta.relationship.by(property_id.role);
-            let (value_def_id, ..) = meta.relationship.by(property_id.role.opposite());
-            let prop_key = match property_id.role {
-                Role::Subject => {
-                    let DefKind::TextLiteral(prop_key) = meta.relation_def_kind.value else {
-                        panic!("Subject property is not a string literal");
-                    };
-                    *prop_key
-                }
-                Role::Object => meta
-                    .relationship
-                    .object_prop
-                    .expect("Object property has no name"),
-            };
+        let field_data = if matches!(value_cardinality, ValueCardinality::One) {
+            let modifier = TypeModifier::new_unit(Optionality::from_optional(matches!(
+                prop_cardinality,
+                PropertyCardinality::Optional
+            )));
 
-            trace!("    register struct field `{prop_key}`: {property_id}");
+            let value_operator_addr = self
+                .serde_generator
+                .gen_addr(gql_serde_key(value_def_id))
+                .unwrap();
 
-            let value_properties = self.relations.properties_by_def_id(value_def_id);
-
-            let is_entity_value = {
-                let repr_kind = self.seal_ctx.get_repr_kind(&value_def_id);
-                match repr_kind {
-                    Some(ReprKind::StructUnion(variants)) => {
-                        variants.iter().all(|(variant_def_id, _)| {
-                            let variant_properties =
-                                self.relations.properties_by_def_id(*variant_def_id);
-                            variant_properties
-                                .map(|properties| properties.identified_by.is_some())
-                                .unwrap_or(false)
-                        })
-                    }
-                    _ => value_properties
-                        .map(|properties| properties.identified_by.is_some())
-                        .unwrap_or(false),
-                }
-            };
-
-            let field_data = if matches!(value_cardinality, ValueCardinality::One) {
-                let modifier = TypeModifier::new_unit(Optionality::from_optional(matches!(
-                    prop_cardinality,
-                    PropertyCardinality::Optional
-                )));
-
-                let value_operator_addr = self
-                    .serde_generator
-                    .gen_addr(gql_serde_key(value_def_id))
-                    .unwrap();
-
-                let field_type = if property.is_entity_id {
-                    TypeRef {
-                        modifier,
-                        unit: UnitTypeRef::NativeScalar(NativeScalarRef {
-                            operator_addr: value_operator_addr,
-                            kind: NativeScalarKind::ID,
-                        }),
-                    }
-                } else {
-                    let qlevel = match meta.relationship.rel_params {
-                        RelParams::Unit => QLevel::Node,
-                        RelParams::Type(rel_def_id) => {
-                            let operator_addr = self
-                                .serde_generator
-                                .gen_addr(gql_serde_key(rel_def_id))
-                                .unwrap();
-
-                            QLevel::Edge {
-                                rel_params: Some((rel_def_id, operator_addr)),
-                            }
-                        }
-                        RelParams::IndexRange(_) => todo!(),
-                    };
-                    TypeRef {
-                        modifier,
-                        unit: self.get_def_type_ref(value_def_id, qlevel),
-                    }
-                };
-
-                FieldData {
-                    kind: property_field_producer.make_property(PropertyData {
-                        property_id,
-                        value_operator_addr,
+            let field_type = if property.is_entity_id {
+                TypeRef {
+                    modifier,
+                    unit: UnitTypeRef::NativeScalar(NativeScalarRef {
+                        operator_addr: value_operator_addr,
+                        kind: NativeScalarKind::ID,
                     }),
-                    field_type,
                 }
-            } else if is_entity_value {
-                let connection_ref = {
-                    let rel_params = match meta.relationship.rel_params {
-                        RelParams::Unit => None,
-                        RelParams::Type(rel_def_id) => Some((
-                            rel_def_id,
-                            self.serde_generator
-                                .gen_addr(gql_serde_key(rel_def_id))
-                                .unwrap(),
-                        )),
-                        RelParams::IndexRange(_) => todo!(),
-                    };
-
-                    trace!("    connection/edge rel params {rel_params:?}");
-
-                    self.get_def_type_ref(value_def_id, QLevel::Connection { rel_params })
-                };
-
-                trace!("Connection `{prop_key}` of prop {property_id:?}");
-
-                FieldData::mandatory(
-                    FieldKind::ConnectionProperty {
-                        property_id,
-                        first_arg: argument::FirstArg,
-                        after_arg: argument::AfterArg,
-                    },
-                    connection_ref,
-                )
-            } else if let RelParams::Type(_) = meta.relationship.rel_params {
-                todo!("Edge list with rel params");
             } else {
-                let mut unit = self.get_def_type_ref(value_def_id, QLevel::Node);
+                let qlevel = match meta.relationship.rel_params {
+                    RelParams::Unit => QLevel::Node,
+                    RelParams::Type(rel_def_id) => {
+                        let operator_addr = self
+                            .serde_generator
+                            .gen_addr(gql_serde_key(rel_def_id))
+                            .unwrap();
 
-                let value_operator_addr = self
-                    .serde_generator
-                    .gen_addr(gql_array_serde_key(value_def_id))
-                    .unwrap();
-
-                trace!("Array value operator addr: {value_operator_addr:?}");
-
-                if let UnitTypeRef::NativeScalar(native) = &mut unit {
-                    native.operator_addr = value_operator_addr;
-                }
-
-                FieldData {
-                    kind: property_field_producer.make_property(PropertyData {
-                        property_id,
-                        value_operator_addr,
-                    }),
-                    field_type: TypeRef::mandatory(unit).to_array(Optionality::from_optional(
-                        matches!(prop_cardinality, PropertyCardinality::Optional),
-                    )),
+                        QLevel::Edge {
+                            rel_params: Some((rel_def_id, operator_addr)),
+                        }
+                    }
+                    RelParams::IndexRange(_) => todo!(),
+                };
+                TypeRef {
+                    modifier,
+                    unit: self.get_def_type_ref(value_def_id, qlevel),
                 }
             };
 
-            output.insert(field_namespace.unique_literal(prop_key), field_data);
-        }
+            FieldData {
+                kind: property_field_producer.make_property(PropertyData {
+                    property_id,
+                    value_operator_addr,
+                }),
+                field_type,
+            }
+        } else if is_entity_value {
+            let connection_ref = {
+                let rel_params = match meta.relationship.rel_params {
+                    RelParams::Unit => None,
+                    RelParams::Type(rel_def_id) => Some((
+                        rel_def_id,
+                        self.serde_generator
+                            .gen_addr(gql_serde_key(rel_def_id))
+                            .unwrap(),
+                    )),
+                    RelParams::IndexRange(_) => todo!(),
+                };
+
+                trace!("    connection/edge rel params {rel_params:?}");
+
+                self.get_def_type_ref(value_def_id, QLevel::Connection { rel_params })
+            };
+
+            trace!("Connection `{prop_key}` of prop {property_id:?}");
+
+            FieldData::mandatory(
+                FieldKind::ConnectionProperty {
+                    property_id,
+                    first_arg: argument::FirstArg,
+                    after_arg: argument::AfterArg,
+                },
+                connection_ref,
+            )
+        } else if let RelParams::Type(_) = meta.relationship.rel_params {
+            todo!("Edge list with rel params");
+        } else {
+            let mut unit = self.get_def_type_ref(value_def_id, QLevel::Node);
+
+            let value_operator_addr = self
+                .serde_generator
+                .gen_addr(gql_array_serde_key(value_def_id))
+                .unwrap();
+
+            trace!("Array value operator addr: {value_operator_addr:?}");
+
+            if let UnitTypeRef::NativeScalar(native) = &mut unit {
+                native.operator_addr = value_operator_addr;
+            }
+
+            FieldData {
+                kind: property_field_producer.make_property(PropertyData {
+                    property_id,
+                    value_operator_addr,
+                }),
+                field_type: TypeRef::mandatory(unit).to_array(Optionality::from_optional(
+                    matches!(prop_cardinality, PropertyCardinality::Optional),
+                )),
+            }
+        };
+
+        output.insert(field_namespace.unique_literal(prop_key), field_data);
     }
 }
 

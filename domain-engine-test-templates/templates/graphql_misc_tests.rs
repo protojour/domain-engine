@@ -340,6 +340,41 @@ async fn test_gitmesh_misc() {
             }
         })),
     );
+
+    expect_eq!(
+        actual = r#"{
+            users {
+                nodes {
+                    id
+                    repositories {
+                        nodes { handle }
+                    }
+                }
+            }
+        }"#
+        .exec([], &schema, &ctx)
+        .await,
+        expected = Ok(graphql_value!({
+            "users": {
+                "nodes": [
+                    {
+                        "id": "user/bob",
+                        "repositories": {
+                            "nodes": [
+                                { "handle": "coolproj" }
+                            ]
+                        }
+                    },
+                    {
+                        "id": "user/alice",
+                        "repositories": {
+                            "nodes": []
+                        }
+                    },
+                ]
+            }
+        })),
+    );
 }
 
 #[test(tokio::test)]

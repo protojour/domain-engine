@@ -1,4 +1,5 @@
 use fnv::FnvHashMap;
+use ontol_runtime::ontology::DataRelationshipSource;
 use ontol_runtime::{ontology::Ontology, DefId, PackageId, RelationshipId};
 use tokio::sync::RwLock;
 
@@ -74,11 +75,16 @@ impl InMemoryDb {
             if type_info.entity_info.is_some() {
                 collections.insert(type_info.def_id, Default::default());
 
-                for (property_id, _entity_relationship) in type_info.entity_relationships() {
-                    let relationship_id = property_id.relationship_id;
-                    edge_collections
-                        .entry(relationship_id)
-                        .or_insert_with(|| EdgeCollection { edges: vec![] });
+                for (property_id, entity_relationship) in type_info.entity_relationships() {
+                    match entity_relationship.source {
+                        DataRelationshipSource::Inherent => {
+                            let relationship_id = property_id.relationship_id;
+                            edge_collections
+                                .entry(relationship_id)
+                                .or_insert_with(|| EdgeCollection { edges: vec![] });
+                        }
+                        DataRelationshipSource::ByUnionProxy => {}
+                    }
                 }
             }
         }

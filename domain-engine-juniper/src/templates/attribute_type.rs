@@ -215,7 +215,7 @@ impl<'v> AttributeType<'v> {
         let field_data = object_data.fields.get(field_name).unwrap();
         let field_type = field_data.field_type;
 
-        trace!("resolve object field `{field_name}`: {:?}", self.attr);
+        // trace!("resolve object field `{field_name}`: {:?}", self.attr);
 
         match (&self.attr.value.data, &field_data.kind) {
             (Data::Struct(_), FieldKind::Node) => resolve_schema_type_field(

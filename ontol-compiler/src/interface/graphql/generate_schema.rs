@@ -18,6 +18,7 @@ use crate::{
     codegen::task::CodegenTasks,
     interface::{graphql::builder::QLevel, serde::serde_generator::SerdeGenerator},
     primitive::Primitives,
+    relation::UnionMemberCache,
 };
 
 use super::{
@@ -31,6 +32,7 @@ pub fn generate_graphql_schema<'c>(
     primitives: &'c Primitives,
     map_namespace: Option<&'c IndexMap<&str, DefId>>,
     codegen_tasks: &'c CodegenTasks,
+    union_member_cache: &'c UnionMemberCache,
     serde_generator: &mut SerdeGenerator<'c, '_>,
 ) -> Option<GraphqlSchema> {
     let domain = partial_ontology.find_domain(package_id).unwrap();
@@ -53,6 +55,7 @@ pub fn generate_graphql_schema<'c>(
         root_domain: package_id,
         ontology: partial_ontology,
     });
+
     let mut builder = {
         let relations = serde_generator.relations;
         let defs = serde_generator.defs;
@@ -79,6 +82,7 @@ pub fn generate_graphql_schema<'c>(
                     )
                 },
             )),
+            union_member_cache,
         }
     };
 

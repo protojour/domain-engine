@@ -331,16 +331,8 @@ pub struct DataRelationshipInfo {
     pub cardinality: Cardinality,
     pub subject_name: String,
     pub object_name: Option<String>,
+    pub source: DataRelationshipSource,
     pub target: DataRelationshipTarget,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum DataRelationshipTarget {
-    Unambiguous(DefId),
-    Union {
-        union_def_id: DefId,
-        variants: Vec<DefId>,
-    },
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -354,6 +346,21 @@ pub enum DataRelationshipKind {
         /// EntityGraph data relationships are allowed to be parametric.
         /// i.e. the relation itself has parameters.
         rel_params: Option<DefId>,
+    },
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum DataRelationshipSource {
+    Inherent,
+    ByUnionProxy,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum DataRelationshipTarget {
+    Unambiguous(DefId),
+    Union {
+        union_def_id: DefId,
+        variants: Vec<DefId>,
     },
 }
 

@@ -141,3 +141,8 @@ pub struct TypeParam {
     pub definition_site: PackageId,
     pub span: SourceSpan,
 }
+
+/// Cache of which DefId is a member of which unions
+pub struct UnionMemberCache {
+    pub(crate) cache: FnvHashMap<DefId, BTreeSet<DefId>>,
+}

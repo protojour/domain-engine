@@ -194,6 +194,8 @@ impl InMemoryStore {
                         );
                     }
                 }
+            } else {
+                panic!("{property_id} data relationship not found");
             }
         }
 
