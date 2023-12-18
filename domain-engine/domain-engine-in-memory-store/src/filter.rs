@@ -8,9 +8,9 @@ use ontol_runtime::{
     DefId, Role,
 };
 
-use crate::filter::plan::{PlanEntry, Scalar};
+use domain_engine_core::filter::plan::{PlanEntry, Scalar};
 
-use super::in_memory_core::{DynamicKey, EntityKey, InMemoryStore};
+use super::core::{DynamicKey, EntityKey, InMemoryStore};
 
 pub(super) enum FilterVal<'d> {
     Struct {

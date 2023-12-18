@@ -17,16 +17,17 @@ use ontol_runtime::{
 use smartstring::alias::String;
 use tracing::debug;
 
-use crate::{
+use domain_engine_core::{
     entity_id_utils::{find_inherent_entity_id, try_generate_entity_id, GeneratedId},
-    in_memory_store::{
-        in_memory_core::{Edge, EntityKey},
-        in_memory_query::{Cursor, IncludeTotalLen, Limit},
-    },
     DomainEngine, DomainError, DomainResult,
 };
 
-use super::in_memory_core::{DynamicKey, InMemoryStore};
+use crate::{
+    core::{Edge, EntityKey},
+    query::{Cursor, IncludeTotalLen, Limit},
+};
+
+use super::core::{DynamicKey, InMemoryStore};
 
 struct Overwrite(bool);
 

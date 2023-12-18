@@ -11,7 +11,7 @@ use smallvec::SmallVec;
 use smartstring::alias::String;
 use tracing::warn;
 
-use crate::{DomainError, DomainResult};
+use domain_engine_core::{DomainError, DomainResult};
 
 #[derive(Debug)]
 pub(super) struct InMemoryStore {

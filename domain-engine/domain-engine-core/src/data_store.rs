@@ -9,8 +9,8 @@ use ontol_runtime::{
 use serde::{Deserialize, Serialize};
 use unimock::unimock;
 
+use crate::domain_engine::DomainEngine;
 use crate::domain_error::DomainResult;
-use crate::{domain_engine::DomainEngine, in_memory_store::api::InMemoryDb};
 
 pub struct DataStore {
     package_id: PackageId,
@@ -88,32 +88,6 @@ pub trait DataStoreFactorySync {
         ontology: &Ontology,
         package_id: PackageId,
     ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>>;
-}
-
-#[derive(Default)]
-pub struct DefaultDataStoreFactory;
-
-#[async_trait::async_trait]
-impl DataStoreFactory for DefaultDataStoreFactory {
-    async fn new_api(
-        &self,
-        config: &DataStoreConfig,
-        ontology: &Ontology,
-        package_id: PackageId,
-    ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>> {
-        self.new_api_sync(config, ontology, package_id)
-    }
-}
-
-impl DataStoreFactorySync for DefaultDataStoreFactory {
-    fn new_api_sync(
-        &self,
-        _config: &DataStoreConfig,
-        ontology: &Ontology,
-        package_id: PackageId,
-    ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>> {
-        Ok(Box::new(InMemoryDb::new(ontology, package_id)))
-    }
 }
 
 impl From<Vec<BatchWriteResponse>> for Response {

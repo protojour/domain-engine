@@ -542,10 +542,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "bincode",
  "bit-set",
  "chrono",
- "domain-engine-test-templates",
  "domain-engine-test-utils",
  "fnv",
  "indexmap",
@@ -560,10 +558,37 @@ dependencies = [
  "smartstring",
  "test-log",
  "thiserror",
- "tokio",
  "tracing",
  "tracing-subscriber",
  "unimock",
+ "uuid",
+]
+
+[[package]]
+name = "domain-engine-in-memory-store"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bincode",
+ "bit-set",
+ "domain-engine-core",
+ "domain-engine-test-templates",
+ "domain-engine-test-utils",
+ "fnv",
+ "indexmap",
+ "itertools",
+ "ontol-runtime",
+ "ontol-test-utils",
+ "pretty_assertions",
+ "serde",
+ "serde_json",
+ "smallvec",
+ "smartstring",
+ "test-log",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
  "uuid",
 ]
 
@@ -574,6 +599,7 @@ dependencies = [
  "async-trait",
  "base64",
  "domain-engine-core",
+ "domain-engine-in-memory-store",
  "domain-engine-test-templates",
  "domain-engine-test-utils",
  "fnv",
@@ -605,6 +631,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "domain-engine-core",
+ "domain-engine-in-memory-store",
  "domain-engine-juniper",
  "fnv",
  "graphql-parser",
@@ -627,6 +654,7 @@ dependencies = [
  "chrono",
  "clap",
  "domain-engine-core",
+ "domain-engine-in-memory-store",
  "domain-engine-juniper",
  "juniper_axum",
  "ontol-runtime",

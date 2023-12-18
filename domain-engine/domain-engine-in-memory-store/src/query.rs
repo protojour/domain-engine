@@ -15,12 +15,13 @@ use ontol_runtime::{
 };
 use tracing::{debug, error};
 
-use crate::{
-    filter::plan::compute_filter_plan, in_memory_store::in_memory_filter::FilterVal, DomainEngine,
-    DomainError, DomainResult,
+use domain_engine_core::{
+    filter::plan::compute_filter_plan, DomainEngine, DomainError, DomainResult,
 };
 
-use super::in_memory_core::{DynamicKey, EntityKey, InMemoryStore};
+use crate::filter::FilterVal;
+
+use super::core::{DynamicKey, EntityKey, InMemoryStore};
 
 #[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct Cursor {

@@ -1,13 +1,21 @@
+use domain_engine_core::data_store::{DataStoreFactory, DataStoreFactorySync};
 use fnv::FnvHashMap;
+use ontol_runtime::config::DataStoreConfig;
 use ontol_runtime::ontology::DataRelationshipSource;
 use ontol_runtime::{ontology::Ontology, DefId, PackageId, RelationshipId};
 use tokio::sync::RwLock;
 
-use crate::data_store::{BatchWriteRequest, BatchWriteResponse, DataStoreAPI, Request, Response};
-use crate::domain_engine::DomainEngine;
-use crate::domain_error::DomainResult;
+use domain_engine_core::{
+    data_store::{BatchWriteRequest, BatchWriteResponse, DataStoreAPI, Request, Response},
+    DomainEngine, DomainResult,
+};
 
-use super::in_memory_core::{DynamicKey, EdgeCollection, EntityTable, InMemoryStore};
+use crate::core::{DynamicKey, EdgeCollection, EntityTable, InMemoryStore};
+
+mod core;
+mod filter;
+mod query;
+mod write;
 
 #[derive(Debug)]
 pub struct InMemoryDb {
@@ -97,5 +105,31 @@ impl InMemoryDb {
                 int_id_counter: 0,
             }),
         }
+    }
+}
+
+#[derive(Default)]
+pub struct InMemoryDataStoreFactory;
+
+#[async_trait::async_trait]
+impl DataStoreFactory for InMemoryDataStoreFactory {
+    async fn new_api(
+        &self,
+        config: &DataStoreConfig,
+        ontology: &Ontology,
+        package_id: PackageId,
+    ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>> {
+        self.new_api_sync(config, ontology, package_id)
+    }
+}
+
+impl DataStoreFactorySync for InMemoryDataStoreFactory {
+    fn new_api_sync(
+        &self,
+        _config: &DataStoreConfig,
+        ontology: &Ontology,
+        package_id: PackageId,
+    ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>> {
+        Ok(Box::new(InMemoryDb::new(ontology, package_id)))
     }
 }

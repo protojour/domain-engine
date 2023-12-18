@@ -1,9 +1,10 @@
 use std::fmt::{Debug, Display};
 
 use domain_engine_core::{
-    data_store::{DataStoreAPIMock, DefaultDataStoreFactory, Request, Response},
+    data_store::{DataStoreAPIMock, Request, Response},
     DomainEngine,
 };
+use domain_engine_in_memory_store::InMemoryDataStoreFactory;
 use domain_engine_juniper::{
     context::ServiceCtx, create_graphql_schema, gql_scalar::GqlScalar, Schema,
 };
@@ -108,7 +109,7 @@ pub fn gql_ctx_mock_data_store(
 ) -> ServiceCtx {
     DomainEngine::test_builder(ontol_test.ontology.clone())
         .mock_data_store(ontol_test.get_package_id(data_store_package.0), setup)
-        .build_sync(DefaultDataStoreFactory)
+        .build_sync(InMemoryDataStoreFactory)
         .unwrap()
         .into()
 }

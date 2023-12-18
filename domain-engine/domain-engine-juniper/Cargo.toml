@@ -29,6 +29,7 @@ features = ["schema-language", "protojour-disable-argument-type-check"]
 
 [dev-dependencies]
 ontol-test-utils.path = "../../ontol-test-utils"
+domain-engine-in-memory-store.path = "../domain-engine-in-memory-store"
 domain-engine-test-utils.path = "../domain-engine-test-utils"
 tracing-subscriber.workspace = true
 test-log.workspace = true

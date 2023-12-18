@@ -1,5 +1,5 @@
 [package]
-name = "domain-engine-core"
+name = "domain-engine-in-memory-store"
 version = "0.1.0"
 edition = "2021"
 
@@ -10,22 +10,20 @@ doctest = false
 
 [dependencies]
 ontol-runtime.path = "../../ontol-runtime"
-smartstring.workspace = true
-thiserror.workspace = true
-tracing.workspace = true
-indexmap.workspace = true
-fnv.workspace = true
-itertools.workspace = true
-uuid = { workspace = true, features = ["v4", "v7"] }
+domain-engine-core.path = "../domain-engine-core"
 async-trait.workspace = true
-chrono.workspace = true
+tokio = { workspace = true, features = ["sync"] }
+fnv.workspace = true
 smallvec.workspace = true
+indexmap.workspace = true
+tracing.workspace = true
+smartstring.workspace = true
 bit-set.workspace = true
-serde = "1"
-serde_json = "1"
-unimock = "0.5"
-ordered-float = "4"
+itertools.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 anyhow = "1"
+bincode = "1"
 
 [dev-dependencies]
 ontol-test-utils.path = "../../ontol-test-utils"
@@ -33,3 +31,7 @@ domain-engine-test-utils.path = "../domain-engine-test-utils"
 test-log.workspace = true
 tracing-subscriber.workspace = true
 pretty_assertions = "1"
+uuid = "1"
+
+[build-dependencies]
+domain-engine-test-templates.path = "../domain-engine-test-templates"

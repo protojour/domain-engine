@@ -8,7 +8,6 @@ pub mod match_utils;
 pub mod system;
 
 mod domain_engine;
-mod in_memory_store;
 mod select_data_flow;
 mod value_generator;
 
