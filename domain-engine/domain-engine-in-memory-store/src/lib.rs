@@ -1,6 +1,8 @@
 use domain_engine_core::data_store::{DataStoreFactory, DataStoreFactorySync};
+use domain_engine_core::object_generator::ObjectGenerator;
 use fnv::FnvHashMap;
 use ontol_runtime::config::DataStoreConfig;
+use ontol_runtime::interface::serde::processor::ProcessorMode;
 use ontol_runtime::ontology::DataRelationshipSource;
 use ontol_runtime::{ontology::Ontology, DefId, PackageId, RelationshipId};
 use tokio::sync::RwLock;
@@ -42,7 +44,12 @@ impl DataStoreAPI for InMemoryDb {
 
                 for write_request in write_requests {
                     match write_request {
-                        BatchWriteRequest::Insert(entities, select) => {
+                        BatchWriteRequest::Insert(mut entities, select) => {
+                            for value in entities.iter_mut() {
+                                ObjectGenerator::new(engine, ProcessorMode::Create)
+                                    .generate_objects(value);
+                            }
+
                             responses.push(BatchWriteResponse::Inserted(
                                 entities
                                     .into_iter()
@@ -50,7 +57,12 @@ impl DataStoreAPI for InMemoryDb {
                                     .collect::<DomainResult<_>>()?,
                             ));
                         }
-                        BatchWriteRequest::Update(entities, select) => {
+                        BatchWriteRequest::Update(mut entities, select) => {
+                            for value in entities.iter_mut() {
+                                ObjectGenerator::new(engine, ProcessorMode::Update)
+                                    .generate_objects(value);
+                            }
+
                             responses.push(BatchWriteResponse::Updated(
                                 entities
                                     .into_iter()

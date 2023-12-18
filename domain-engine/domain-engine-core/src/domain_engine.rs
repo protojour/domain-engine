@@ -3,7 +3,6 @@ use std::sync::Arc;
 use anyhow::{anyhow, Context};
 use ontol_runtime::{
     config::data_store_backed_domains,
-    interface::serde::processor::ProcessorMode,
     ontology::{Ontology, ValueCardinality},
     resolve_path::{ProbeOptions, ResolvePath, ResolverGraph},
     select::{EntitySelect, Select, StructOrUnionSelect},
@@ -24,7 +23,6 @@ use crate::{
     match_utils::find_entity_id_in_condition_for_var,
     select_data_flow::{translate_entity_select, translate_select},
     system::{SystemAPI, TestSystem},
-    value_generator::Generator,
     Config, DomainError, FindEntitySelect,
 };
 
@@ -191,16 +189,10 @@ impl DomainEngine {
                         }
                     }
 
-                    for mut_value in mut_values.iter_mut() {
-                        Generator::new(self, ProcessorMode::Create).generate_values(mut_value);
-                    }
                     ordered_resolve_paths.push(Some(resolve_path));
                 }
-                BatchWriteRequest::Update(mut_values, _) => {
+                BatchWriteRequest::Update(_values, _) => {
                     // TODO: domain translate
-                    for mut_value in mut_values {
-                        Generator::new(self, ProcessorMode::Update).generate_values(mut_value);
-                    }
                     ordered_resolve_paths.push(None);
                 }
                 BatchWriteRequest::Delete(_ids, def_id) => {

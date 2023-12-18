@@ -13,7 +13,8 @@ use ontol_runtime::{
 
 use crate::{DomainEngine, UuidGenerator};
 
-pub struct Generator<'e> {
+/// Relationship and object generator based on auto-generator information from ONTOL.
+pub struct ObjectGenerator<'e> {
     engine: &'e DomainEngine,
     mode: ProcessorMode,
 
@@ -21,7 +22,7 @@ pub struct Generator<'e> {
     current_time: chrono::DateTime<chrono::Utc>,
 }
 
-impl<'e> Generator<'e> {
+impl<'e> ObjectGenerator<'e> {
     pub fn new(engine: &'e DomainEngine, mode: ProcessorMode) -> Self {
         Self {
             engine,
@@ -30,32 +31,32 @@ impl<'e> Generator<'e> {
         }
     }
 
-    pub fn generate_values(&self, value: &mut Value) {
+    pub fn generate_objects(&self, value: &mut Value) {
         let ontology = self.engine.ontology();
         match &mut value.data {
             Data::Struct(struct_map) => {
                 let type_info = ontology.get_type_info(value.type_def_id);
                 if let Some(addr) = type_info.operator_addr {
-                    self.generate_struct_values(struct_map, type_info, addr);
+                    self.generate_struct_relationships(struct_map, type_info, addr);
                 }
 
                 // recurse into sub-properties
                 for attribute in struct_map.values_mut() {
-                    self.generate_values(&mut attribute.rel_params);
-                    self.generate_values(&mut attribute.value);
+                    self.generate_objects(&mut attribute.rel_params);
+                    self.generate_objects(&mut attribute.value);
                 }
             }
             Data::Sequence(seq) => {
                 for attribute in &mut seq.attrs {
-                    self.generate_values(&mut attribute.rel_params);
-                    self.generate_values(&mut attribute.value);
+                    self.generate_objects(&mut attribute.rel_params);
+                    self.generate_objects(&mut attribute.value);
                 }
             }
             _ => {}
         }
     }
 
-    fn generate_struct_values(
+    fn generate_struct_relationships(
         &self,
         struct_map: &mut BTreeMap<PropertyId, Attribute>,
         type_info: &TypeInfo,
@@ -132,7 +133,7 @@ impl<'e> Generator<'e> {
             SerdeOperator::Union(union_op) => {
                 match union_op.variants(ProcessorMode::Create, ProcessorLevel::new_root()) {
                     FilteredVariants::Single(child_addr) => {
-                        self.generate_struct_values(struct_map, type_info, child_addr);
+                        self.generate_struct_relationships(struct_map, type_info, child_addr);
                     }
                     FilteredVariants::Union(_) => panic!("BUG"),
                 }

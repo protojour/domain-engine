@@ -5,11 +5,11 @@ pub mod domain_error;
 pub mod entity_id_utils;
 pub mod filter;
 pub mod match_utils;
+pub mod object_generator;
 pub mod system;
 
 mod domain_engine;
 mod select_data_flow;
-mod value_generator;
 
 use std::{collections::HashMap, hash::BuildHasher};
 
