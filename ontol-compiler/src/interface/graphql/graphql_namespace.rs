@@ -86,6 +86,22 @@ impl<'o> GraphqlNamespace<'o> {
         }
     }
 
+    pub fn patch_edges_input(
+        &mut self,
+        rel_type_info: Option<&TypeInfo>,
+        type_info: &TypeInfo,
+    ) -> String {
+        if let Some(rel_type_info) = rel_type_info {
+            self.concat(&[
+                &Typename(rel_type_info),
+                &Typename(type_info),
+                &"PatchEdgesInput",
+            ])
+        } else {
+            self.concat(&[&Typename(type_info), &"PatchEdgesInput"])
+        }
+    }
+
     fn concat(&mut self, elements: &[&dyn ProcessName]) -> String {
         let mut output: String = "".into();
 

@@ -124,7 +124,10 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     connection_addr,
                     TypeData {
                         typename: self.type_namespace.connection(rel_type_info, type_info),
-                        input_typename: None,
+                        input_typename: Some(
+                            self.type_namespace
+                                .patch_edges_input(rel_type_info, type_info),
+                        ),
                         partial_input_typename: None,
                         kind: TypeKind::Object(ObjectData {
                             fields: [

@@ -67,8 +67,8 @@ impl InMemoryStore {
 
         let mut raw_props_update: BTreeMap<PropertyId, Attribute> = Default::default();
 
-        let Value::Struct(data_struct, _) = data else {
-            return Err(DomainError::BadInput(anyhow!("Expected a struct")));
+        let Value::StructUpdate(data_struct, _) = data else {
+            return Err(DomainError::BadInput(anyhow!("Expected a struct update")));
         };
         for (property_id, attribute) in *data_struct {
             let data_relationship = find_data_relationship(type_info, &property_id)?;

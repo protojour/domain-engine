@@ -32,6 +32,10 @@ pub enum Value {
     /// A collection of attributes keyed by property.
     Struct(Box<FnvHashMap<PropertyId, Attribute>>, DefId),
 
+    /// A collection of attributes keyed by property, but contains
+    /// only partial information, and must contain the ID of the struct (entity) to update.
+    StructUpdate(Box<FnvHashMap<PropertyId, Attribute>>, DefId),
+
     /// A collection of arbitrary values keyed by strings.
     Dict(Box<HashMap<String, Value>>, DefId),
 
@@ -43,6 +47,18 @@ pub enum Value {
     /// Some sequences will be uniform (all elements have the same type).
     /// Other sequences will behave more like tuples.
     Sequence(Sequence, DefId),
+
+    /// A patching of some graph property of entities.
+    ///
+    /// The type of each attribute carry the patch semantics:
+    ///
+    /// * `(value: Struct, rel_params)`: Write a new entity
+    /// * `(value: StructUpdate, rel_params)`: Update the given entity with new rel_params
+    /// * `(valud: ID, rel_params: Value::Delete)`: Delete the given ID
+    Patch(Vec<Attribute>, DefId),
+
+    /// Special rel_params used for edge deletion
+    DeleteRelationship(DefId),
 
     Condition(Condition<CondTerm>, DefId),
 }
@@ -89,6 +105,9 @@ impl Value {
             Value::Struct(_, def_id) => *def_id,
             Value::Dict(_, def_id) => *def_id,
             Value::Sequence(_, def_id) => *def_id,
+            Value::Patch(_, def_id) => *def_id,
+            Value::StructUpdate(_, def_id) => *def_id,
+            Value::DeleteRelationship(def_id) => *def_id,
             Value::Condition(_, def_id) => *def_id,
         }
     }
@@ -107,6 +126,9 @@ impl Value {
             Value::Struct(_, def_id) => def_id,
             Value::Dict(_, def_id) => def_id,
             Value::Sequence(_, def_id) => def_id,
+            Value::Patch(_, def_id) => def_id,
+            Value::StructUpdate(_, def_id) => def_id,
+            Value::DeleteRelationship(def_id) => def_id,
             Value::Condition(_, def_id) => def_id,
         }
     }
@@ -322,7 +344,7 @@ impl<'v> Display for ValueDebug<'v> {
             Value::ChronoDateTime(dt, _) => write!(f, "datetime({dt})"),
             Value::ChronoDate(d, _) => write!(f, "date({d})"),
             Value::ChronoTime(t, _) => write!(f, "time({t})"),
-            Value::Struct(m, _) => {
+            Value::Struct(m, _) | Value::StructUpdate(m, _) => {
                 write!(f, "{{")?;
                 let mut iter = m.iter().peekable();
                 while let Some((prop, attr)) = iter.next() {
@@ -348,6 +370,21 @@ impl<'v> Display for ValueDebug<'v> {
                     }
                 }
                 write!(f, "]")
+            }
+            Value::Patch(patch, _) => {
+                write!(f, "patch{{")?;
+                let mut iter = patch.iter().peekable();
+                while let Some(attr) = iter.next() {
+                    write!(f, "{}", AttrDebug(attr),)?;
+
+                    if iter.peek().is_some() {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, "}}")
+            }
+            Value::DeleteRelationship(_) => {
+                write!(f, "DELETE_RELATIONSHIP")
             }
             Value::Condition(..) => write!(f, "condition"),
         }

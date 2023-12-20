@@ -25,7 +25,7 @@ pub fn find_inherent_entity_id(
         .ok_or(DomainError::NotAnEntity(def_id))?;
 
     let struct_map = match entity {
-        Value::Struct(struct_map, _) => struct_map,
+        Value::Struct(struct_map, _) | Value::StructUpdate(struct_map, _) => struct_map,
         _ => return Err(DomainError::EntityMustBeStruct),
     };
 

@@ -74,6 +74,7 @@ pub struct RelationSequenceOperator {
     // note: This is constant size array so that it can produce a dynamic slice
     pub ranges: [SequenceRange; 1],
     pub def: SerdeDef,
+    pub to_entity: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -270,7 +271,8 @@ impl SerdeProperty {
         profile_flags: &ProcessorProfileFlags,
     ) -> bool {
         self.is_optional()
-            || (matches!(mode, ProcessorMode::Update) && !self.is_entity_id())
+            || (matches!(mode, ProcessorMode::Update | ProcessorMode::GraphqlUpdate)
+                && !self.is_entity_id())
             || profile_flags.contains(ProcessorProfileFlags::ALL_PROPS_OPTIONAL)
     }
 
@@ -297,7 +299,7 @@ impl SerdeProperty {
                     return None;
                 }
             }
-            ProcessorMode::Update => {
+            ProcessorMode::Update | ProcessorMode::GraphqlUpdate => {
                 if self.is_read_only() && !self.is_entity_id() {
                     return None;
                 }

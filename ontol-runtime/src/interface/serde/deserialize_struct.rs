@@ -88,8 +88,16 @@ impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
                 id: None,
             },
         )?;
+
+        let boxed_attrs = Box::new(deserialized_map.attributes);
+
         Ok(Attribute {
-            value: Value::Struct(Box::new(deserialized_map.attributes), type_def_id),
+            value: match self.processor.mode {
+                ProcessorMode::Update | ProcessorMode::GraphqlUpdate => {
+                    Value::StructUpdate(boxed_attrs, type_def_id)
+                }
+                _ => Value::Struct(boxed_attrs, type_def_id),
+            },
             rel_params: deserialized_map.rel_params,
         })
     }

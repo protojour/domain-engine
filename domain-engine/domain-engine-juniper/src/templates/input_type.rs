@@ -2,7 +2,13 @@ use std::str::FromStr;
 
 use juniper::{ParseError, ScalarToken};
 use ontol_runtime::{
-    interface::graphql::data::{EdgeData, ObjectData, ObjectKind, TypeKind, TypeRef},
+    interface::graphql::{
+        data::{
+            ConnectionData, EdgeData, ObjectData, ObjectKind, Optionality, TypeKind, TypeModifier,
+            TypeRef,
+        },
+        schema::TypingPurpose,
+    },
     smart_format,
 };
 use tracing::{debug, trace_span};
@@ -81,6 +87,36 @@ impl juniper::GraphQLType<GqlScalar> for InputType {
                         ),
                     ));
                 }
+
+                reg.build_input_object_meta_type(info, &arguments)
+            }
+            TypeKind::Object(ObjectData {
+                kind: ObjectKind::Connection(ConnectionData { node_type_addr }),
+                ..
+            }) => {
+                let mut arguments = vec![];
+                arguments.push(
+                    reg.modified_arg::<InputType>(
+                        "create",
+                        TypeModifier::Array {
+                            array: Optionality::Optional,
+                            element: Optionality::Mandatory,
+                        },
+                        &reg.schema_ctx
+                            .get_schema_type(*node_type_addr, TypingPurpose::InputOrReference),
+                    ),
+                );
+                arguments.push(
+                    reg.modified_arg::<InputType>(
+                        "update",
+                        TypeModifier::Array {
+                            array: Optionality::Optional,
+                            element: Optionality::Mandatory,
+                        },
+                        &reg.schema_ctx
+                            .get_schema_type(*node_type_addr, TypingPurpose::PartialInput),
+                    ),
+                );
 
                 reg.build_input_object_meta_type(info, &arguments)
             }

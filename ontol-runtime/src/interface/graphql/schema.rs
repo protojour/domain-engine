@@ -56,7 +56,9 @@ impl TypingPurpose {
         match self {
             TypingPurpose::Selection => (ProcessorMode::Raw, ProcessorLevel::new_root()),
             TypingPurpose::Input => (ProcessorMode::Create, ProcessorLevel::new_root()),
-            TypingPurpose::PartialInput => (ProcessorMode::Update, ProcessorLevel::new_root()),
+            TypingPurpose::PartialInput => {
+                (ProcessorMode::GraphqlUpdate, ProcessorLevel::new_root())
+            }
             TypingPurpose::InputOrReference => (ProcessorMode::Create, ProcessorLevel::new_child()),
         }
     }

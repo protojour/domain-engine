@@ -33,7 +33,8 @@ impl<'e> ObjectGenerator<'e> {
     pub fn generate_objects(&self, value: &mut Value) {
         let ontology = self.engine.ontology();
         match value {
-            Value::Struct(struct_map, type_def_id) => {
+            Value::Struct(struct_map, type_def_id)
+            | Value::StructUpdate(struct_map, type_def_id) => {
                 let type_info = ontology.get_type_info(*type_def_id);
                 if let Some(addr) = type_info.operator_addr {
                     self.generate_struct_relationships(struct_map, type_info, addr);

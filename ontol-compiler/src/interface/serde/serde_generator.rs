@@ -34,7 +34,7 @@ use crate::{
     def::{DefKind, Defs, LookupRelationshipMeta, RelParams, TypeDef},
     interface::graphql::graphql_namespace::{adapt_graphql_identifier, GqlAdaptedIdent},
     primitive::{PrimitiveKind, Primitives},
-    relation::{Constructor, Properties, Relations},
+    relation::{Constructor, Properties, Relations, UnionMemberCache},
     text_patterns::{TextPatternSegment, TextPatterns},
     type_check::{
         repr::repr_model::{ReprKind, ReprScalarKind},
@@ -54,6 +54,7 @@ pub struct SerdeGenerator<'c, 'm> {
     pub seal_ctx: &'c SealCtx,
     pub patterns: &'c TextPatterns,
     pub codegen_tasks: &'c CodegenTasks<'m>,
+    pub union_member_cache: &'c UnionMemberCache,
 
     pub(super) operators_by_addr: Vec<SerdeOperator>,
     pub(super) operators_by_key: HashMap<SerdeKey, SerdeOperatorAddr>,
@@ -239,6 +240,13 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 let item_addr =
                     self.gen_addr(SerdeKey::Def(def.remove_modifier(SerdeModifier::ARRAY)))?;
 
+                // FIXME: What about unions?
+                let to_entity = self
+                    .relations
+                    .properties_by_def_id(def.def_id)
+                    .map(|properties| properties.identified_by.is_some())
+                    .unwrap_or(false);
+
                 Some(OperatorAllocation::Allocated(
                     self.alloc_addr_for_key(&key),
                     SerdeOperator::RelationSequence(RelationSequenceOperator {
@@ -247,6 +255,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             finite_repetition: None,
                         }],
                         def: *def,
+                        to_entity,
                     }),
                 ))
             }

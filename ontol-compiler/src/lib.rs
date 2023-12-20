@@ -235,18 +235,6 @@ impl<'m> Compiler<'m> {
         let mut namespaces = std::mem::take(&mut self.namespaces.namespaces);
         let mut package_config_table = std::mem::take(&mut self.package_config_table);
         let docs = std::mem::take(&mut self.namespaces.docs);
-        let mut serde_generator = self.serde_generator();
-
-        let mut builder = Ontology::builder();
-
-        let dynamic_sequence_operator_addr = serde_generator.make_dynamic_sequence_addr();
-
-        let map_namespaces: FnvHashMap<_, _> = namespaces
-            .iter_mut()
-            .map(|(package_id, namespace)| {
-                (*package_id, std::mem::take(namespace.space_mut(Space::Map)))
-            })
-            .collect();
 
         let union_member_cache = {
             let mut cache: FnvHashMap<DefId, BTreeSet<DefId>> = Default::default();
@@ -268,6 +256,18 @@ impl<'m> Compiler<'m> {
             }
             UnionMemberCache { cache }
         };
+
+        let mut serde_generator = self.serde_generator(&union_member_cache);
+        let mut builder = Ontology::builder();
+
+        let dynamic_sequence_operator_addr = serde_generator.make_dynamic_sequence_addr();
+
+        let map_namespaces: FnvHashMap<_, _> = namespaces
+            .iter_mut()
+            .map(|(package_id, namespace)| {
+                (*package_id, std::mem::take(namespace.space_mut(Space::Map)))
+            })
+            .collect();
 
         // For now, create serde operators for every domain
         for package_id in package_ids.iter().cloned() {

@@ -153,6 +153,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                                 }
                             }
                         }),
+                        typing_purpose,
                     ))
                 }
 
@@ -229,6 +230,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         None,
                         SerdePropertyFlags::ENTITY_ID,
                         TypeModifier::Unit(Optionality::Optional),
+                        typing_purpose,
                     ));
                 }
 
@@ -245,6 +247,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         rel_params: Option<SerdeOperatorAddr>,
         property_flags: SerdePropertyFlags,
         modifier: TypeModifier,
+        typing_purpose: TypingPurpose,
     ) -> juniper::meta::Argument<'r, GqlScalar> {
         let operator = self.schema_ctx.ontology.get_serde_operator(operator_addr);
 
@@ -280,29 +283,47 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             }
             SerdeOperator::DynamicSequence => panic!("No dynamic sequence expected here"),
             SerdeOperator::RelationSequence(seq_op) => {
-                let array_modifier = TypeModifier::Array {
-                    array: modifier.unit_optionality(),
-                    element: Optionality::Mandatory,
-                };
+                if seq_op.to_entity && matches!(typing_purpose, TypingPurpose::PartialInput) {
+                    let type_addr = self
+                        .schema_ctx
+                        .type_addr_by_def(seq_op.def.def_id, QueryLevel::Connection { rel_params })
+                        .unwrap_or_else(|| {
+                            panic!("no PatchEdges available for relation sequence \"{name}\"")
+                        });
 
-                match self
-                    .schema_ctx
-                    .type_addr_by_def(seq_op.def.def_id, QueryLevel::Edge { rel_params })
-                {
-                    Some(type_addr) => self.modified_arg::<InputType>(
+                    self.modified_arg::<InputType>(
                         name,
-                        array_modifier,
+                        TypeModifier::Unit(Optionality::Mandatory),
                         &self
                             .schema_ctx
                             .get_schema_type(type_addr, TypingPurpose::InputOrReference),
-                    ),
-                    None => self.get_operator_argument(
-                        name,
-                        seq_op.ranges[0].addr,
-                        rel_params,
-                        property_flags,
-                        array_modifier,
-                    ),
+                    )
+                } else {
+                    let array_modifier = TypeModifier::Array {
+                        array: modifier.unit_optionality(),
+                        element: Optionality::Mandatory,
+                    };
+
+                    match self
+                        .schema_ctx
+                        .type_addr_by_def(seq_op.def.def_id, QueryLevel::Edge { rel_params })
+                    {
+                        Some(type_addr) => self.modified_arg::<InputType>(
+                            name,
+                            array_modifier,
+                            &self
+                                .schema_ctx
+                                .get_schema_type(type_addr, TypingPurpose::InputOrReference),
+                        ),
+                        None => self.get_operator_argument(
+                            name,
+                            seq_op.ranges[0].addr,
+                            rel_params,
+                            property_flags,
+                            array_modifier,
+                            typing_purpose,
+                        ),
+                    }
                 }
             }
             SerdeOperator::ConstructorSequence(_) => {
@@ -320,6 +341,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 rel_params,
                 property_flags,
                 modifier,
+                typing_purpose,
             ),
             SerdeOperator::Union(union_op) => {
                 let def_id = union_op.union_def().def_id;
@@ -351,6 +373,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         rel_params,
                         property_flags,
                         modifier,
+                        typing_purpose,
                     ),
                     FilteredVariants::Union(_variants) => {
                         let type_addr = self
@@ -480,6 +503,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 None,
                 SerdePropertyFlags::default(),
                 TypeModifier::Unit(Optionality::Mandatory),
+                TypingPurpose::Selection,
             ),
             ArgKind::Hidden => return None,
         };
@@ -557,7 +581,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         }
     }
 
-    fn modified_arg<T>(
+    pub fn modified_arg<T>(
         &mut self,
         name: &str,
         modifier: TypeModifier,

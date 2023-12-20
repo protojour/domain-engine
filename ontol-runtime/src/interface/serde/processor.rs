@@ -127,6 +127,7 @@ pub enum ProcessorMode {
     Create,
     Read,
     Update,
+    GraphqlUpdate,
     /// Used for unconditionally handling all fields.
     /// Should not be used for serialization or deserialization at the domain interface layer.
     Raw,
