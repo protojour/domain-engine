@@ -7,7 +7,7 @@ use ontol_runtime::{
     resolve_path::{ProbeOptions, ResolvePath, ResolverGraph},
     select::{EntitySelect, Select, StructOrUnionSelect},
     sequence::Sequence,
-    value::{Data, Value},
+    value::Value,
     var::Var,
     vm::{proc::Yield, VmState},
     DefId, MapKey, PackageId,
@@ -348,10 +348,7 @@ impl DomainEngine {
                 Some(attribute) => Ok(attribute.value),
                 None => Ok(Value::unit()),
             },
-            ValueCardinality::Many => Ok(Value {
-                data: Data::Sequence(edge_seq),
-                type_def_id: DefId::unit(),
-            }),
+            ValueCardinality::Many => Ok(Value::Sequence(edge_seq, DefId::unit())),
         }
     }
 }

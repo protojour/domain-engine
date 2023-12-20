@@ -3,7 +3,7 @@ use itertools::Itertools;
 use ontol_runtime::{
     condition::{Clause, CondTerm, Condition},
     ontology::{DataRelationshipKind, DataRelationshipTarget, Ontology, ValueCardinality},
-    value::{Data, PropertyId, Value},
+    value::{PropertyId, Value},
     var::{Var, VarSet},
     DefId,
 };
@@ -261,10 +261,10 @@ fn term_plans(
 }
 
 fn value_to_scalar(value: &Value) -> PlanResult<Scalar> {
-    match &value.data {
-        Data::Text(text) => Ok(Scalar::Text(text.as_str().into())),
-        Data::I64(int) => Ok(Scalar::I64(*int)),
-        Data::F64(float) => Ok(Scalar::F64(
+    match value {
+        Value::Text(text, _) => Ok(Scalar::Text(text.as_str().into())),
+        Value::I64(int, _) => Ok(Scalar::I64(*int)),
+        Value::F64(float, _) => Ok(Scalar::F64(
             (*float).try_into().map_err(|_| PlanError::InvalidScalar)?,
         )),
         _ => Err(PlanError::InvalidScalar),
@@ -292,9 +292,9 @@ mod tests {
     impl From<Scalar> for Value {
         fn from(scalar: Scalar) -> Self {
             match scalar {
-                Scalar::Text(text) => Value::new(Data::Text(text.into()), DefId::unit()),
-                Scalar::I64(int) => Value::new(Data::I64(int), DefId::unit()),
-                Scalar::F64(float) => Value::new(Data::F64(*float), DefId::unit()),
+                Scalar::Text(text) => Value::Text(text.into(), DefId::unit()),
+                Scalar::I64(int) => Value::I64(int, DefId::unit()),
+                Scalar::F64(float) => Value::F64(*float, DefId::unit()),
             }
         }
     }

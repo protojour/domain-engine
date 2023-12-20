@@ -44,7 +44,7 @@ fn test_map_match_scalar_key() {
                         eq!(&Literal(indoc! { r#"
                         (root $b)
                         (is-entity $b def@1:2)
-                        (attr $b S:1:4 (_ Text("input")))
+                        (attr $b S:1:4 (_ 'input'))
                         "#
                         }))
                     ))
@@ -136,8 +136,8 @@ fn test_map_match_anonymous_query_mandatory_properties() {
                         eq!(&Literal(indoc! { r#"
                         (root $e)
                         (is-entity $e def@1:2)
-                        (attr $e S:1:6 (_ Text("A")))
-                        (attr $e S:1:7 (_ Text("B")))
+                        (attr $e S:1:6 (_ 'A'))
+                        (attr $e S:1:7 (_ 'B'))
                         "#
                         }))
                     ))
@@ -192,7 +192,7 @@ fn test_map_match_anonymous_query_optional_property() {
                         eq!(&Literal(indoc! { r#"
                         (root $e)
                         (is-entity $e def@1:2)
-                        (attr $e S:1:6 (_ Text("A")))
+                        (attr $e S:1:6 (_ 'A'))
                         "#
                         }))
                     ))
@@ -248,7 +248,7 @@ fn test_map_match_anonymous_with_translation() {
                         eq!(&Literal(indoc! { r#"
                         (root $d)
                         (is-entity $d def@1:2)
-                        (attr $d S:1:7 (_ Text("X")))
+                        (attr $d S:1:7 (_ 'X'))
                         "#
                         }))
                     ))
@@ -301,7 +301,7 @@ fn test_map_sequence_filter_in_set() {
                         eq!(&Literal(indoc! { r#"
                         (root $d)
                         (is-entity $d def@1:2)
-                        (attr $d S:1:6 (_ Text("X")))
+                        (attr $d S:1:6 (_ 'X'))
                         "#
                         }))
                     ))

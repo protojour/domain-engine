@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 
 use fake::{Fake, Faker};
 use ontol_runtime::{
@@ -12,7 +12,7 @@ use ontol_runtime::{
     sequence::Sequence,
     text_like_types::TextLikeType,
     text_pattern::TextPattern,
-    value::{Attribute, Data, Value},
+    value::{Attribute, Value},
     DefId,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -78,11 +78,11 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
         debug!("fake attribute {processor:?}");
         let value = match processor.value_operator {
             SerdeOperator::Unit => Value::unit(),
-            SerdeOperator::False(def_id) => Value::new(Data::I64(0), *def_id),
-            SerdeOperator::True(def_id) => Value::new(Data::I64(1), *def_id),
+            SerdeOperator::False(def_id) => Value::I64(0, *def_id),
+            SerdeOperator::True(def_id) => Value::I64(1, *def_id),
             SerdeOperator::Boolean(def_id) => {
                 let value: bool = Faker.fake_with_rng(self.rng);
-                Value::new(Data::I64(if value { 1 } else { 0 }), *def_id)
+                Value::I64(if value { 1 } else { 0 }, *def_id)
             }
             SerdeOperator::I64(def_id, range) => {
                 let int: i64 = if let Some(range) = range {
@@ -92,7 +92,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                     let int: i32 = self.rng.gen();
                     int.into()
                 };
-                Value::new(Data::I64(int), *def_id)
+                Value::I64(int, *def_id)
             }
             SerdeOperator::I32(def_id, range) => {
                 let int: i32 = if let Some(range) = range {
@@ -100,7 +100,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                 } else {
                     self.rng.gen()
                 };
-                Value::new(Data::I64(int as i64), *def_id)
+                Value::I64(int as i64, *def_id)
             }
             SerdeOperator::F64(def_id, range) => {
                 let float: f64 = if let Some(range) = range {
@@ -108,12 +108,12 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                 } else {
                     self.rng.gen()
                 };
-                Value::new(
-                    Data::F64(if float == 0.0 || float == -0.0 {
+                Value::F64(
+                    if float == 0.0 || float == -0.0 {
                         0.1
                     } else {
                         float
-                    }),
+                    },
                     *def_id,
                 )
             }
@@ -122,49 +122,44 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                     fake::faker::lorem::en::Sentence(3..6).fake_with_rng(self.rng);
                 // Remove the last dot
                 string.pop();
-                Value::new(Data::Text(string.into()), *def_id)
+                Value::Text(string.into(), *def_id)
             }
-            SerdeOperator::StringConstant(s, def_id) => Value::new(Data::Text(s.clone()), *def_id),
+            SerdeOperator::StringConstant(s, def_id) => Value::Text(s.clone(), *def_id),
             SerdeOperator::TextPattern(def_id) => {
                 if let Some(string_like_type) = self.ontology.get_text_like_type(*def_id) {
                     match string_like_type {
                         TextLikeType::Uuid => {
                             let uuid: Uuid = Faker.fake_with_rng(self.rng);
-                            Value::new(
-                                Data::OctetSequence(uuid.as_bytes().iter().cloned().collect()),
-                                *def_id,
-                            )
+                            Value::OctetSequence(uuid.as_bytes().iter().cloned().collect(), *def_id)
                         }
                         TextLikeType::DateTime => {
-                            Value::new(Data::ChronoDateTime(Faker.fake_with_rng(self.rng)), *def_id)
+                            Value::ChronoDateTime(Faker.fake_with_rng(self.rng), *def_id)
                         }
                     }
                 } else {
                     let text_pattern = self.ontology.get_text_pattern(*def_id).unwrap();
                     let text = rand_text_matching_pattern(text_pattern, &mut self.rng);
-                    Value::new(Data::Text(text.into()), *def_id)
+                    Value::Text(text.into(), *def_id)
                 }
             }
             SerdeOperator::CapturingTextPattern(def_id) => {
                 let text_pattern = self.ontology.get_text_pattern(*def_id).unwrap();
                 let text = rand_text_matching_pattern(text_pattern, &mut self.rng);
-                let data = text_pattern
-                    .try_capturing_match(&text, self.ontology)
-                    .unwrap();
-
-                Value::new(data, *def_id)
+                text_pattern
+                    .try_capturing_match(&text, *def_id, self.ontology)
+                    .unwrap()
             }
             SerdeOperator::DynamicSequence => {
-                return Ok(Value::new(Data::Sequence(Sequence::new([])), DefId::unit()).into());
+                return Ok(Value::Sequence(Sequence::new([]), DefId::unit()).into());
             }
             SerdeOperator::RelationSequence(seq_op) => {
                 return if processor.level().current_level() > SENSIBLE_RECURSION_LEVEL {
-                    Ok(Value::new(Data::Sequence(Sequence::new([])), seq_op.def.def_id).into())
+                    Ok(Value::Sequence(Sequence::new([]), seq_op.def.def_id).into())
                 } else {
                     let variant = &seq_op.ranges[0];
                     let attr = self.fake_attribute(processor.narrow(variant.addr))?;
 
-                    Ok(Value::new(Data::Sequence(Sequence::new([attr])), seq_op.def.def_id).into())
+                    Ok(Value::Sequence(Sequence::new([attr]), seq_op.def.def_id).into())
                 }
             }
             SerdeOperator::ConstructorSequence(seq_op) => {
@@ -180,7 +175,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                     }
                 }
 
-                Value::new(Data::Sequence(Sequence::new(attrs)), seq_op.def.def_id)
+                Value::Sequence(Sequence::new(attrs), seq_op.def.def_id)
             }
             SerdeOperator::Alias(alias_op) => {
                 return self.fake_attribute(processor.narrow(alias_op.inner_addr));
@@ -197,13 +192,13 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                 }
             }
             SerdeOperator::Struct(struct_op) => {
-                let mut attrs = BTreeMap::default();
+                let mut attrs = HashMap::default();
                 for (_, property) in &struct_op.properties {
                     let attr = self.fake_attribute(processor.new_child(property.value_addr)?)?;
                     attrs.insert(property.property_id, attr);
                 }
 
-                Value::new(Data::Struct(attrs), struct_op.def.def_id)
+                Value::Struct(Box::new(attrs), struct_op.def.def_id)
             }
             SerdeOperator::IdSingletonStruct(_name, inner_addr) => {
                 return self.fake_attribute(processor.narrow(*inner_addr))

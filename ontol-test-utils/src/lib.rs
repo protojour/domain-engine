@@ -62,7 +62,7 @@ macro_rules! assert_json_io_matches {
     };
     ($serde_helper:expr, $input:tt == $expected_output:tt) => {
         let input = serde_json::json!($input);
-        let value = match $serde_helper.to_value(input.clone()) {
+        let value = match $serde_helper.to_value_raw(input.clone()) {
             Ok(value) => value,
             Err(err) => panic!("deserialize failed: {err}"),
         };

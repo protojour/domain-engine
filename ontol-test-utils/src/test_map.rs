@@ -150,12 +150,12 @@ impl<'on> TestMapper<'on> {
             None => panic!("named map not found"),
         };
         let param = (*self.serde_helper_factory)(&input_binding)
-            .to_value(input)
+            .to_value_raw(input)
             .unwrap();
         let value = self.run_vm(procedure, param).unwrap();
 
         // The resulting value must have the runtime def_id of the requested to_key.
-        expect_eq!(actual = value.type_def_id, expected = key[1].def_id);
+        expect_eq!(actual = value.type_def_id(), expected = key[1].def_id);
 
         let output_json = if key[1].seq {
             (*self.serde_helper_factory)(&output_binding).dynamic_seq_as_json(&value)
@@ -178,7 +178,7 @@ impl<'on> TestMapper<'on> {
 
         let [input_binding, output_binding] = self.test.bind([from.typename(), to.typename()]);
         let param = (*self.serde_helper_factory)(&input_binding)
-            .to_value(input)
+            .to_value_raw(input)
             .unwrap();
 
         fn get_map_key(key: &Key, binding: &TypeBinding) -> MapKey {
@@ -203,7 +203,7 @@ impl<'on> TestMapper<'on> {
         let value = self.run_vm(procedure, param)?;
 
         // The resulting value must have the runtime def_id of the requested to_key.
-        expect_eq!(actual = value.type_def_id, expected = to_key.def_id);
+        expect_eq!(actual = value.type_def_id(), expected = to_key.def_id);
 
         Ok(value)
     }

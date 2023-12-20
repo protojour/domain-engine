@@ -11,7 +11,7 @@ use ontol_runtime::{
     ontology::{Ontology, TypeInfo},
     select::{Select, StructSelect},
     sequence::Sequence,
-    value::{Attribute, Data, PropertyId, Value},
+    value::{Attribute, PropertyId, Value},
     DefId, PackageId,
 };
 use serde::de::DeserializeSeed;
@@ -199,20 +199,14 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
     }
 
     fn with_json_data(mut self, json: serde_json::Value) -> Self {
-        let value = serde_create(self.binding).to_value(json).unwrap();
-        self.value.type_def_id = value.type_def_id;
-        match (&mut self.value.data, value) {
-            (Data::Unit, value) => {
+        let value = serde_create(self.binding).to_value_raw(json).unwrap();
+        *self.value.type_def_id_mut() = value.type_def_id();
+        match (&mut self.value, value) {
+            (Value::Unit(_), value) => {
                 self.value = value;
             }
-            (
-                Data::Struct(attrs_a),
-                Value {
-                    data: Data::Struct(attrs_b),
-                    ..
-                },
-            ) => {
-                attrs_a.extend(attrs_b);
+            (Value::Struct(attrs_a, _), Value::Struct(attrs_b, _)) => {
+                attrs_a.extend(*attrs_b);
             }
             (a, b) => panic!("Unable to merge {a:?} and {b:?}"),
         }
@@ -254,11 +248,13 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
     }
 
     fn merge_attribute(mut self, property_id: PropertyId, attribute: Attribute) -> Self {
-        match &mut self.value.data {
-            Data::Struct(attrs) => {
+        match &mut self.value {
+            Value::Struct(attrs, _) => {
                 attrs.insert(property_id, attribute);
             }
-            Data::Unit => self.value.data = Data::Struct([(property_id, attribute)].into()),
+            Value::Unit(def_id) => {
+                self.value = Value::new_struct([(property_id, attribute)], *def_id);
+            }
             other => {
                 panic!("Value data was not a map/unit, but {other:?}.")
             }
@@ -273,10 +269,6 @@ pub trait ToSequence {
 
 impl ToSequence for Vec<Attribute> {
     fn to_sequence_attribute(self, ty: &TypeBinding) -> Attribute {
-        Value {
-            data: Data::Sequence(Sequence::new(self)),
-            type_def_id: ty.type_info.def_id,
-        }
-        .to_attr(Value::unit())
+        Value::Sequence(Sequence::new(self), ty.type_info.def_id).to_attr(Value::unit())
     }
 }

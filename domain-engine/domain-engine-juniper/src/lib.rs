@@ -20,7 +20,7 @@ use ontol_runtime::{
     },
     ontology::Ontology,
     sequence::Sequence,
-    value::{Data, Value, ValueDebug},
+    value::{Value, ValueDebug},
     PackageId,
 };
 use templates::sequence_type::SequenceType;
@@ -221,13 +221,11 @@ async fn mutation(
                     BatchWriteResponse::Deleted(bools) => {
                         let bool_type = schema_ctx.ontology.ontol_domain_meta().bool;
 
-                        output_sequence.attrs.extend(bools.into_iter().map(|bool| {
-                            Value {
-                                data: Data::I64(if bool { 1 } else { 0 }),
-                                type_def_id: bool_type,
-                            }
-                            .into()
-                        }))
+                        output_sequence.attrs.extend(
+                            bools
+                                .into_iter()
+                                .map(|bool| Value::I64(if bool { 1 } else { 0 }, bool_type).into()),
+                        )
                     }
                 }
             }

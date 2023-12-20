@@ -8,7 +8,7 @@ use serde::{
 use crate::{
     ontology::Ontology,
     sequence::Sequence,
-    value::{Attribute, Data, Value},
+    value::{Attribute, Value},
     DefId,
 };
 
@@ -61,45 +61,33 @@ impl<'o, 'de> Visitor<'de> for RawVisitor<'o> {
     }
 
     fn visit_bool<E: Error>(self, v: bool) -> Result<Self::Value, E> {
-        Ok(Value {
-            data: Data::I64(if v { 1 } else { 0 }),
-            type_def_id: self.ontology.ontol_domain_meta.bool,
-        })
+        Ok(Value::I64(
+            if v { 1 } else { 0 },
+            self.ontology.ontol_domain_meta.bool,
+        ))
     }
 
     fn visit_u64<E: Error>(self, v: u64) -> Result<Self::Value, E> {
-        Ok(Value {
-            data: Data::I64(v.try_into().map_err(|_| E::custom("integer overflow"))?),
-            type_def_id: self.ontology.ontol_domain_meta.i64,
-        })
+        Ok(Value::I64(
+            v.try_into().map_err(|_| E::custom("integer overflow"))?,
+            self.ontology.ontol_domain_meta.i64,
+        ))
     }
 
     fn visit_i64<E: Error>(self, v: i64) -> Result<Self::Value, E> {
-        Ok(Value {
-            data: Data::I64(v),
-            type_def_id: self.ontology.ontol_domain_meta.i64,
-        })
+        Ok(Value::I64(v, self.ontology.ontol_domain_meta.i64))
     }
 
     fn visit_f64<E: Error>(self, v: f64) -> Result<Self::Value, E> {
-        Ok(Value {
-            data: Data::F64(v),
-            type_def_id: self.ontology.ontol_domain_meta.f64,
-        })
+        Ok(Value::F64(v, self.ontology.ontol_domain_meta.f64))
     }
 
     fn visit_f32<E: Error>(self, v: f32) -> Result<Self::Value, E> {
-        Ok(Value {
-            data: Data::F64(v as f64),
-            type_def_id: self.ontology.ontol_domain_meta.f64,
-        })
+        Ok(Value::F64(v as f64, self.ontology.ontol_domain_meta.f64))
     }
 
     fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
-        Ok(Value {
-            data: Data::Text(v.into()),
-            type_def_id: self.ontology.ontol_domain_meta.text,
-        })
+        Ok(Value::Text(v.into(), self.ontology.ontol_domain_meta.text))
     }
 
     fn visit_seq<A: SeqAccess<'de>>(self, mut seq_access: A) -> Result<Self::Value, A::Error> {
@@ -114,10 +102,7 @@ impl<'o, 'de> Visitor<'de> for RawVisitor<'o> {
             sequence.attrs.push(Attribute::from(value));
         }
 
-        Ok(Value {
-            data: Data::Sequence(sequence),
-            type_def_id: DefId::unit(),
-        })
+        Ok(Value::Sequence(sequence, DefId::unit()))
     }
 
     fn visit_map<A: MapAccess<'de>>(self, mut map_access: A) -> Result<Self::Value, A::Error> {
@@ -126,16 +111,13 @@ impl<'o, 'de> Visitor<'de> for RawVisitor<'o> {
         let child = self.child().map_err(RecursionLimitError::to_de_error)?;
 
         while let Some(key) = map_access.next_key_seed(child)? {
-            let Data::Text(key) = key.data else {
+            let Value::Text(key, _) = key else {
                 return Err(A::Error::custom("Dictionary keys must be text"));
             };
 
             dict.insert(key, map_access.next_value_seed(child)?);
         }
 
-        Ok(Value {
-            data: Data::Dict(Box::new(dict)),
-            type_def_id: DefId::unit(),
-        })
+        Ok(Value::Dict(Box::new(dict), DefId::unit()))
     }
 }

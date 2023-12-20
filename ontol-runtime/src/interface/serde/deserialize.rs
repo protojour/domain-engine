@@ -13,7 +13,7 @@ use crate::{
         operator::SerdeStructFlags,
     },
     sequence::Sequence,
-    value::{Attribute, Data, Value},
+    value::{Attribute, Value},
 };
 
 use super::{
@@ -178,7 +178,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                 let mut typed_attribute =
                     self.narrow(value_op.inner_addr).deserialize(deserializer)?;
 
-                typed_attribute.value.type_def_id = value_op.def.def_id;
+                *typed_attribute.value.type_def_id_mut() = value_op.def.def_id;
 
                 Ok(typed_attribute)
             }
@@ -300,11 +300,9 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
                 None => {
                     // note: if there are more elements to deserialize,
                     // serde will automatically generate a 'trailing characters' error after returning:
-                    return Ok(Value {
-                        data: Data::Sequence(Sequence::new(attrs)),
-                        type_def_id: sequence_matcher.type_def_id,
-                    }
-                    .into());
+                    return Ok(
+                        Value::Sequence(Sequence::new(attrs), sequence_matcher.type_def_id).into(),
+                    );
                 }
             };
 
@@ -314,11 +312,10 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
                 }
                 None => {
                     return if sequence_matcher.match_seq_end().is_ok() {
-                        Ok(Value {
-                            data: Data::Sequence(Sequence::new(attrs)),
-                            type_def_id: sequence_matcher.type_def_id,
-                        }
-                        .into())
+                        Ok(
+                            Value::Sequence(Sequence::new(attrs), sequence_matcher.type_def_id)
+                                .into(),
+                        )
                     } else {
                         Err(Error::invalid_length(attrs.len(), &self))
                     };

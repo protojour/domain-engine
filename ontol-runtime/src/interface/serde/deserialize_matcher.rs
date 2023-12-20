@@ -1,5 +1,6 @@
-use std::{collections::BTreeMap, fmt::Display, ops::RangeInclusive};
+use std::{fmt::Display, ops::RangeInclusive};
 
+use fnv::FnvHashMap;
 use serde::de::{value::StrDeserializer, DeserializeSeed};
 use tracing::{error, trace};
 
@@ -9,7 +10,7 @@ use crate::{
     ontology::Ontology,
     text_like_types::ParseError,
     text_pattern::{TextPattern, TextPatternConstantPart},
-    value::{Data, Value},
+    value::Value,
     DefId,
 };
 
@@ -77,7 +78,7 @@ impl ValueMatcher for UnitMatcher {
     }
 
     fn match_unit(&self) -> Result<Value, ()> {
-        Ok(Value::new(Data::Unit, DefId::unit()))
+        Ok(Value::Unit(DefId::unit()))
     }
 }
 
@@ -99,9 +100,9 @@ impl ValueMatcher for BooleanMatcher {
     fn match_boolean(&self, val: bool) -> Result<Value, ()> {
         let int = if val { 1 } else { 0 };
         match (self, val) {
-            (Self::False(def_id), false) => Ok(Value::new(Data::I64(int), *def_id)),
-            (Self::True(def_id), true) => Ok(Value::new(Data::I64(int), *def_id)),
-            (Self::Boolean(def_id), _) => Ok(Value::new(Data::I64(int), *def_id)),
+            (Self::False(def_id), false) => Ok(Value::I64(int, *def_id)),
+            (Self::True(def_id), true) => Ok(Value::I64(int, *def_id)),
+            (Self::Boolean(def_id), _) => Ok(Value::I64(int, *def_id)),
             _ => Err(()),
         }
     }
@@ -128,10 +129,7 @@ impl ValueMatcher for NumberMatcher<i64> {
             }
         }
 
-        Ok(Value {
-            data: Data::I64(value),
-            type_def_id: self.def_id,
-        })
+        Ok(Value::I64(value, self.def_id))
     }
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
@@ -157,10 +155,7 @@ impl ValueMatcher for NumberMatcher<i32> {
             }
         }
 
-        Ok(Value {
-            data: Data::I64(value as i64),
-            type_def_id: self.def_id,
-        })
+        Ok(Value::I64(value as i64, self.def_id))
     }
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
@@ -188,10 +183,7 @@ impl ValueMatcher for NumberMatcher<f64> {
             }
         }
 
-        Ok(Value {
-            data: Data::F64(value),
-            type_def_id: self.def_id,
-        })
+        Ok(Value::F64(value, self.def_id))
     }
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
@@ -212,7 +204,7 @@ impl<'on> ValueMatcher for StringMatcher<'on> {
     }
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
-        Ok(Value::new(Data::Text(str.into()), self.def_id))
+        Ok(Value::Text(str.into(), self.def_id))
     }
 }
 
@@ -229,7 +221,7 @@ impl<'on> ValueMatcher for ConstantStringMatcher<'on> {
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
         if str == self.literal {
-            Ok(Value::new(Data::Text(str.into()), self.def_id))
+            Ok(Value::Text(str.into(), self.def_id))
         } else {
             Err(())
         }
@@ -274,16 +266,13 @@ impl<'on> ValueMatcher for CapturingTextPatternMatcher<'on> {
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
         match self.scalar_format {
-            ScalarFormat::DomainTransparent => {
-                let data = self
-                    .pattern
-                    .try_capturing_match(str, self.ontology)
-                    .map_err(|_| ())?;
-                Ok(Value::new(data, self.def_id))
-            }
+            ScalarFormat::DomainTransparent => Ok(self
+                .pattern
+                .try_capturing_match(str, self.def_id, self.ontology)
+                .map_err(|_| ())?),
 
             ScalarFormat::RawText => {
-                let mut attrs = BTreeMap::new();
+                let mut attrs = FnvHashMap::default();
 
                 for part in &self.pattern.constant_parts {
                     if let TextPatternConstantPart::Property(property) = part {
@@ -308,7 +297,7 @@ impl<'on> ValueMatcher for CapturingTextPatternMatcher<'on> {
                     }
                 }
 
-                Ok(Value::new(Data::Struct(attrs), self.def_id))
+                Ok(Value::Struct(Box::new(attrs), self.def_id))
             }
         }
     }
@@ -442,7 +431,7 @@ impl<'on> ValueMatcher for UnionMatcher<'on> {
 
     fn match_unit(&self) -> Result<Value, ()> {
         let def_id = self.match_leaf_discriminant(LeafDiscriminant::IsUnit)?;
-        Ok(Value::new(Data::Unit, def_id))
+        Ok(Value::Unit(def_id))
     }
 
     fn match_u64(&self, value: u64) -> Result<Value, ()> {
@@ -451,10 +440,7 @@ impl<'on> ValueMatcher for UnionMatcher<'on> {
 
     fn match_i64(&self, value: i64) -> Result<Value, ()> {
         self.match_leaf_discriminant(LeafDiscriminant::IsInt)
-            .map(|def_id| Value {
-                data: Data::I64(value),
-                type_def_id: def_id,
-            })
+            .map(|def_id| Value::I64(value, def_id))
     }
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
@@ -486,8 +472,9 @@ impl<'on> ValueMatcher for UnionMatcher<'on> {
                     let result_type = variant.discriminator.serde_def.def_id;
                     let pattern = self.ontology.text_patterns.get(def_id).unwrap();
 
-                    if let Ok(data) = pattern.try_capturing_match(str, self.ontology) {
-                        return Ok(Value::new(data, result_type));
+                    if let Ok(value) = pattern.try_capturing_match(str, result_type, self.ontology)
+                    {
+                        return Ok(value);
                     }
                 }
                 _ => {}
@@ -712,7 +699,7 @@ fn try_deserialize_custom_string(
 ) -> Result<Value, ParseError> {
     match ontology.text_like_types.get(&def_id) {
         Some(custom_string_deserializer) => custom_string_deserializer.try_deserialize(def_id, str),
-        None => Ok(Value::new(Data::Text(str.into()), def_id)),
+        None => Ok(Value::Text(str.into(), def_id)),
     }
 }
 

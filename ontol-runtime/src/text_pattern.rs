@@ -1,6 +1,7 @@
-use std::{collections::BTreeMap, fmt::Display};
+use std::fmt::Display;
 
 use ::serde::{Deserialize, Serialize};
+use fnv::FnvHashMap;
 use regex::Regex;
 use serde::de::{value::StrDeserializer, DeserializeSeed};
 use smartstring::alias::String;
@@ -11,7 +12,7 @@ use crate::{
     ontology::Ontology,
     smart_format,
     text_like_types::ParseError,
-    value::{Attribute, Data, FormatDataAsText, PropertyId, Value},
+    value::{Attribute, FormatValueAsText, PropertyId, Value},
     DefId, RelationshipId,
 };
 
@@ -26,11 +27,12 @@ impl TextPattern {
     pub fn try_capturing_match(
         &self,
         input: &str,
+        type_def_id: DefId,
         ontology: &Ontology,
-    ) -> Result<Data, ParseError> {
+    ) -> Result<Value, ParseError> {
         if self.constant_parts.is_empty() {
             if let Some(match_) = self.regex.find(input) {
-                Ok(Data::Text(match_.as_str().into()))
+                Ok(Value::Text(match_.as_str().into(), type_def_id))
             } else {
                 Err(ParseError(smart_format!(
                     "regular expression did not match"
@@ -40,7 +42,7 @@ impl TextPattern {
             let captures = self.regex.captures(input).ok_or(ParseError(smart_format!(
                 "regular expression did not match"
             )))?;
-            let mut attrs = BTreeMap::new();
+            let mut attrs = FnvHashMap::default();
 
             for part in &self.constant_parts {
                 match part {
@@ -55,10 +57,7 @@ impl TextPattern {
                         attrs.insert(
                             PropertyId::subject(crate::RelationshipId(text_def_id)),
                             Attribute {
-                                value: Value {
-                                    data: Data::Text(text.into()),
-                                    type_def_id: text_def_id,
-                                },
+                                value: Value::Text(text.into(), text_def_id),
                                 rel_params: Value::unit(),
                             },
                         );
@@ -94,7 +93,7 @@ impl TextPattern {
                 }
             }
 
-            Ok(Data::Struct(attrs))
+            Ok(Value::Struct(Box::new(attrs), type_def_id))
         }
     }
 }
@@ -115,23 +114,23 @@ pub struct TextPatternProperty {
 
 pub struct FormatPattern<'d, 'o> {
     pub pattern: &'d TextPattern,
-    pub data: &'d Data,
+    pub value: &'d Value,
     pub ontology: &'o Ontology,
 }
 
 impl<'d, 'o> Display for FormatPattern<'d, 'o> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for constant_part in &self.pattern.constant_parts {
-            match (constant_part, self.data) {
-                (TextPatternConstantPart::AllStrings { .. }, Data::Struct(attrs)) => {
+            match (constant_part, self.value) {
+                (TextPatternConstantPart::AllStrings { .. }, Value::Struct(attrs, _)) => {
                     let property_id =
                         PropertyId::subject(RelationshipId(self.ontology.ontol_domain_meta().text));
                     let Some(attribute) = attrs.get(&property_id) else {
                         error!("Attribute {property_id} missing when formatting capturing text pattern");
                         return Err(std::fmt::Error);
                     };
-                    match &attribute.value.data {
-                        Data::Text(text) => {
+                    match &attribute.value {
+                        Value::Text(text, _) => {
                             write!(f, "{text}")?;
                         }
                         _ => panic!(),
@@ -143,7 +142,7 @@ impl<'d, 'o> Display for FormatPattern<'d, 'o> {
                         type_def_id,
                         ..
                     }),
-                    Data::Struct(attrs),
+                    Value::Struct(attrs, _),
                 ) => {
                     let Some(attribute) = attrs.get(property_id) else {
                         error!("Attribute {property_id} missing when formatting capturing text pattern");
@@ -152,8 +151,8 @@ impl<'d, 'o> Display for FormatPattern<'d, 'o> {
                     write!(
                         f,
                         "{}",
-                        FormatDataAsText {
-                            data: &attribute.value.data,
+                        FormatValueAsText {
+                            value: &attribute.value,
                             type_def_id: *type_def_id,
                             ontology: self.ontology
                         }

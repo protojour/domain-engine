@@ -1,5 +1,6 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
+use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use serde::{
     de::{DeserializeSeed, Error, MapAccess, Visitor},
@@ -11,7 +12,7 @@ use tracing::debug;
 use crate::{
     format_utils::{DoubleQuote, LogicOp, Missing},
     interface::serde::{deserialize_raw::RawVisitor, EDGE_PROPERTY},
-    value::{Attribute, Data, PropertyId, Value},
+    value::{Attribute, PropertyId, Value},
     value_generator::ValueGenerator,
     vm::proc::{NParams, Procedure},
     DefId,
@@ -47,7 +48,7 @@ pub struct SpecialAddrs<'s> {
 }
 
 pub struct DeserializedStruct {
-    pub attributes: BTreeMap<PropertyId, Attribute>,
+    pub attributes: FnvHashMap<PropertyId, Attribute>,
     pub id: Option<Value>,
     pub rel_params: Value,
 }
@@ -88,10 +89,7 @@ impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
             },
         )?;
         Ok(Attribute {
-            value: Value {
-                data: Data::Struct(deserialized_map.attributes),
-                type_def_id,
-            },
+            value: Value::Struct(Box::new(deserialized_map.attributes), type_def_id),
             rel_params: deserialized_map.rel_params,
         })
     }
@@ -106,7 +104,7 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
     expected_required_count: usize,
     special_addrs: SpecialAddrs,
 ) -> Result<DeserializedStruct, A::Error> {
-    let mut attributes = BTreeMap::new();
+    let mut attributes = FnvHashMap::default();
     let mut rel_params = Value::unit();
     let mut id = None;
 
@@ -317,7 +315,7 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
             .map(|(key, _)| DoubleQuote(key.clone()))
             .collect();
 
-        if special_addrs.rel_params.is_some() && rel_params.type_def_id == DefId::unit() {
+        if special_addrs.rel_params.is_some() && rel_params.type_def_id() == DefId::unit() {
             items.push(DoubleQuote(EDGE_PROPERTY.into()));
         }
 
@@ -336,11 +334,7 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
     if !open_dict.is_empty() {
         attributes.insert(
             processor.ontology.ontol_domain_meta.open_data_property_id(),
-            Value {
-                data: Data::Dict(Box::new(open_dict)),
-                type_def_id: DefId::unit(),
-            }
-            .into(),
+            Value::Dict(Box::new(open_dict), DefId::unit()).into(),
         );
     }
 

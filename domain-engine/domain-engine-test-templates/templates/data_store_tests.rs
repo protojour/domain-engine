@@ -70,8 +70,8 @@ async fn test_conduit_db_id_generation() {
         .unwrap();
 
     expect_eq!(
-        actual = format!("{:?}", explicit_user_id.data),
-        expected = "OctetSequence([103, 229, 80, 68, 16, 177, 66, 111, 146, 71, 187, 104, 14, 95, 224, 200])"
+        actual = format!("{:?}", explicit_user_id),
+        expected = "OctetSequence([103, 229, 80, 68, 16, 177, 66, 111, 146, 71, 187, 104, 14, 95, 224, 200], def@1:1)"
     );
 
     let article_id: Uuid = engine

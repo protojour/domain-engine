@@ -19,7 +19,7 @@ fn test_stix_lite() {
     let test = stix_bundle().compile();
     let [attack_pattern] = test.bind(["attack-pattern"]);
     assert_error_msg!(
-        serde_create(&attack_pattern).to_data(json!({
+        serde_create(&attack_pattern).to_value(json!({
             "type": "attack-pattern",
         })),
         r#"missing properties, expected all of "name", "spec_version", "created", "modified" at line 1 column 25"#

@@ -8,7 +8,7 @@ use ontol_runtime::{
     },
     sequence::Sequence,
     smart_format,
-    value::Data,
+    value::Value,
 };
 use serde::{
     de::{self, DeserializeSeed, IntoDeserializer},
@@ -156,10 +156,9 @@ impl<'a> ArgsWrapper<'a> {
                     .with_profile(&processor_profile)
             };
 
-            let Data::Sequence(inputs) = serde_processor
+            let Value::Sequence(inputs, _) = serde_processor
                 .deserialize(LookAheadValueDeserializer::from(look_ahead_arg))?
                 .value
-                .data
             else {
                 panic!("Expected sequence")
             };

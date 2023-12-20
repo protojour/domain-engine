@@ -11,7 +11,7 @@ use crate::{
     interface::serde::processor::{RecursionLimitError, ScalarFormat},
     smart_format,
     text_pattern::{FormatPattern, TextPatternConstantPart},
-    value::{Attribute, Data, FormatDataAsText, Value},
+    value::{Attribute, FormatValueAsText, Value},
     DefId,
 };
 
@@ -47,15 +47,15 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
             (SerdeOperator::False(_), _) => serializer.serialize_bool(false),
             (SerdeOperator::True(_), _) => serializer.serialize_bool(true),
             (SerdeOperator::Boolean(_), _) => serializer.serialize_bool(*cast_ref::<bool>(value)),
-            (SerdeOperator::I64(..), ScalarFormat::DomainTransparent) => match &value.data {
-                Data::I64(int) => serializer.serialize_i64(*int),
-                Data::F64(f) => serializer.serialize_i64((*f).round() as i64),
+            (SerdeOperator::I64(..), ScalarFormat::DomainTransparent) => match value {
+                Value::I64(int, _) => serializer.serialize_i64(*int),
+                Value::F64(f, _) => serializer.serialize_i64((*f).round() as i64),
                 other => panic!("BUG: Serialize expected number, got {other:?}"),
             },
             (SerdeOperator::I32(..), ScalarFormat::DomainTransparent) => {
-                let int_i64: i64 = match &value.data {
-                    Data::I64(int) => *int,
-                    Data::F64(f) => (*f).round() as i64,
+                let int_i64: i64 = match value {
+                    Value::I64(int, _) => *int,
+                    Value::F64(f, _) => (*f).round() as i64,
                     other => panic!("BUG: Serialize expected number, got {other:?}"),
                 };
 
@@ -63,9 +63,9 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                     S::Error::custom(smart_format!("overflow when converting to i32: {err:?}"))
                 })?)
             }
-            (SerdeOperator::F64(..), ScalarFormat::DomainTransparent) => match &value.data {
-                Data::I64(num) => serializer.serialize_f64(*num as f64),
-                Data::F64(f) => serializer.serialize_f64(*f),
+            (SerdeOperator::F64(..), ScalarFormat::DomainTransparent) => match value {
+                Value::I64(num, _) => serializer.serialize_f64(*num as f64),
+                Value::F64(f, _) => serializer.serialize_f64(*f),
                 other => panic!("BUG: Serialize expected number, got {other:?}"),
             },
             (
@@ -79,8 +79,8 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                 | SerdeOperator::StringConstant(_, def_id)
                 | SerdeOperator::TextPattern(def_id),
                 _,
-            ) => match &value.data {
-                Data::Text(s) => serializer.serialize_str(s),
+            ) => match value {
+                Value::Text(s, _) => serializer.serialize_str(s),
                 _ => self.serialize_as_text_formatted(value, *def_id, serializer),
             },
             (
@@ -90,8 +90,8 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
             (SerdeOperator::CapturingTextPattern(pattern_def_id), ScalarFormat::RawText) => {
                 self.serialize_pattern_as_raw_text(value, *pattern_def_id, serializer)
             }
-            (SerdeOperator::DynamicSequence, _) => match &value.data {
-                Data::Sequence(seq) => self.serialize_dynamic_sequence(&seq.attrs, serializer),
+            (SerdeOperator::DynamicSequence, _) => match value {
+                Value::Sequence(seq, _) => self.serialize_dynamic_sequence(&seq.attrs, serializer),
                 _ => panic!("Not a sequence"),
             },
             (SerdeOperator::RelationSequence(seq_op), _) => {
@@ -109,7 +109,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                     .serialize_value(value, rel_params, serializer),
                 FilteredVariants::Union(variants) => {
                     let variant = variants.iter().find(|discriminator| {
-                        value.type_def_id == discriminator.discriminator.serde_def.def_id
+                        value.type_def_id() == discriminator.discriminator.serde_def.def_id
                     });
 
                     if let Some(variant) = variant {
@@ -157,8 +157,8 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         write!(
             &mut buf,
             "{}",
-            FormatDataAsText {
-                data: &value.data,
+            FormatValueAsText {
+                value,
                 type_def_id: operator_def_id,
                 ontology: self.ontology
             }
@@ -181,7 +181,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
             "{}",
             FormatPattern {
                 pattern,
-                data: &value.data,
+                value,
                 ontology: self.ontology
             }
         )
@@ -196,8 +196,8 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         pattern_def_id: DefId,
         serializer: S,
     ) -> Res<S> {
-        match &value.data {
-            Data::Struct(attrs) => {
+        match value {
+            Value::Struct(attrs, _) => {
                 let pattern = &self.ontology.text_patterns.get(&pattern_def_id).unwrap();
                 let mut pattern_property = None;
 
@@ -277,7 +277,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         let mut seq = serializer.serialize_seq(Some(elements.len()))?;
 
         for attr in elements {
-            let def_id = attr.value.type_def_id;
+            let def_id = attr.value.type_def_id();
             match self.ontology.get_type_info(def_id).operator_addr {
                 Some(addr) => seq.serialize_element(&Proxy {
                     value: &attr.value,
@@ -300,10 +300,10 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         value: &Value,
         serializer: S,
     ) -> Res<S> {
-        let attributes = match &value.data {
-            Data::Struct(attributes) => attributes,
+        let attributes = match value {
+            Value::Struct(attributes, _) => attributes,
             // Support for empty structs that are Unit encoded:
-            Data::Unit => return serializer.serialize_map(Some(0))?.end(),
+            Value::Unit(_) => return serializer.serialize_map(Some(0))?.end(),
             other => panic!("BUG: Serialize expected map attributes, got {other:?}"),
         };
 
@@ -378,7 +378,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
             if let Some(open_data_attr) =
                 attributes.get(&self.ontology.ontol_domain_meta().open_data_property_id())
             {
-                let Data::Dict(dict) = &open_data_attr.value.data else {
+                let Value::Dict(dict, _) = &open_data_attr.value else {
                     panic!("Open data must be a dict");
                 };
 

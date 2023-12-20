@@ -4,10 +4,7 @@ use serde::{
 };
 use tracing::error;
 
-use crate::{
-    ontology::Ontology,
-    value::{Data, Value},
-};
+use crate::{ontology::Ontology, value::Value};
 
 use super::processor::{ProcessorLevel, RecursionLimitError};
 
@@ -24,10 +21,10 @@ pub fn serialize_raw<S: Serializer>(
     level: ProcessorLevel,
     serializer: S,
 ) -> Res<S> {
-    match &value.data {
-        Data::Unit => serializer.serialize_unit(),
-        Data::I64(int) => {
-            if value.type_def_id == ontology.ontol_domain_meta.bool {
+    match value {
+        Value::Unit(_) => serializer.serialize_unit(),
+        Value::I64(int, type_id) => {
+            if type_id == &ontology.ontol_domain_meta.bool {
                 if *int == 0 {
                     serializer.serialize_bool(false)
                 } else {
@@ -37,9 +34,9 @@ pub fn serialize_raw<S: Serializer>(
                 serializer.serialize_i64(*int)
             }
         }
-        Data::F64(float) => serializer.serialize_f64(*float),
-        Data::Text(text) => serializer.serialize_str(text),
-        Data::Dict(dict) => {
+        Value::F64(float, _) => serializer.serialize_f64(*float),
+        Value::Text(text, _) => serializer.serialize_str(text),
+        Value::Dict(dict, _) => {
             let mut map_access = serializer.serialize_map(None)?;
 
             for (key, value) in dict.iter() {
@@ -52,7 +49,7 @@ pub fn serialize_raw<S: Serializer>(
 
             map_access.end()
         }
-        Data::Sequence(seq) => {
+        Value::Sequence(seq, _) => {
             let mut seq_access = serializer.serialize_seq(Some(seq.attrs.len()))?;
 
             for attr in &seq.attrs {

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     format_utils::Literal,
-    value::{PropertyId, Value},
+    value::{PropertyId, Value, ValueDebug},
     var::Var,
     DefId,
 };
@@ -88,7 +88,7 @@ impl Display for CondTerm {
         match self {
             Self::Wildcard => write!(f, "_"),
             Self::Var(var) => write!(f, "{var}"),
-            Self::Value(value) => write!(f, "{:?}", value.data),
+            Self::Value(value) => write!(f, "{}", ValueDebug(value)),
         }
     }
 }

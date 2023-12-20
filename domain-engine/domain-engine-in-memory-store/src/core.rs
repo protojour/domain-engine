@@ -1,11 +1,11 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
 
 use anyhow::anyhow;
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
     ontology::{DataRelationshipInfo, TypeInfo},
-    value::{Attribute, Data, PropertyId, Value},
+    value::{Attribute, PropertyId, Value},
     DefId, RelationshipId,
 };
 use smallvec::SmallVec;
@@ -28,7 +28,7 @@ pub(super) enum DynamicKey {
     Int(i64),
 }
 
-pub type EntityTable<K> = IndexMap<K, BTreeMap<PropertyId, Attribute>>;
+pub type EntityTable<K> = IndexMap<K, FnvHashMap<PropertyId, Attribute>>;
 
 #[derive(Debug)]
 pub(super) struct EdgeCollection {
@@ -59,7 +59,7 @@ impl InMemoryStore {
             .ok_or_else(|| DomainError::DataStore(anyhow!("Collection not found")))?;
 
         for id in ids {
-            let dynamic_key = Self::extract_dynamic_key(&id.data)?;
+            let dynamic_key = Self::extract_dynamic_key(&id)?;
 
             let status = if collection.remove(&dynamic_key).is_some() {
                 deleted_set.insert(EntityKey {
@@ -84,20 +84,22 @@ impl InMemoryStore {
         Ok(result_vec)
     }
 
-    pub fn extract_dynamic_key(id_data: &Data) -> DomainResult<DynamicKey> {
-        match id_data {
-            Data::Struct(struct_map) => {
+    pub fn extract_dynamic_key(id_value: &Value) -> DomainResult<DynamicKey> {
+        match id_value {
+            Value::Struct(struct_map, _) => {
                 if struct_map.len() != 1 {
                     warn!("struct map was not 1: {struct_map:?}");
                     return Err(DomainError::InherentIdNotFound);
                 }
 
                 let attribute = struct_map.iter().next().unwrap();
-                Self::extract_dynamic_key(&attribute.1.value.data)
+                Self::extract_dynamic_key(&attribute.1.value)
             }
-            Data::Text(string) => Ok(DynamicKey::Text(string.clone())),
-            Data::OctetSequence(octets) => Ok(DynamicKey::Octets(octets.clone())),
-            Data::I64(int) => Ok(DynamicKey::Int(*int)),
+            Value::Text(string, _) => Ok(DynamicKey::Text(string.clone())),
+            Value::OctetSequence(octets, _) => {
+                Ok(DynamicKey::Octets(octets.iter().cloned().collect()))
+            }
+            Value::I64(int, _) => Ok(DynamicKey::Int(*int)),
             other => {
                 warn!("inherent id from {other:?}");
                 Err(DomainError::InherentIdNotFound)
@@ -109,7 +111,7 @@ impl InMemoryStore {
         &self,
         def_id: DefId,
         dynamic_key: &DynamicKey,
-    ) -> Option<&BTreeMap<PropertyId, Attribute>> {
+    ) -> Option<&FnvHashMap<PropertyId, Attribute>> {
         let collection = self.collections.get(&def_id)?;
         collection.get(dynamic_key)
     }

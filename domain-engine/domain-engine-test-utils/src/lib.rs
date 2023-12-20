@@ -5,7 +5,7 @@ use ontol_runtime::{
     condition::{CondTerm, Condition},
     interface::serde::processor::ProcessorMode,
     select::{EntitySelect, StructOrUnionSelect, StructSelect},
-    value::{Data, Value},
+    value::Value,
     var::Var,
     PackageId,
 };
@@ -44,8 +44,8 @@ impl DomainEngineTestExt for DomainEngine {
         let mut json_buf: Vec<u8> = vec![];
         let mut serializer = serde_json::Serializer::new(&mut json_buf);
 
-        let processor = match &value.data {
-            Data::Sequence(_) => ontology.new_serde_processor(
+        let processor = match &value {
+            Value::Sequence(..) => ontology.new_serde_processor(
                 ontology.dynamic_sequence_operator_addr(),
                 ProcessorMode::Raw,
             ),

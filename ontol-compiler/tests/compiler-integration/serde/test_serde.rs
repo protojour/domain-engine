@@ -3,7 +3,7 @@ use ontol_runtime::{
     interface::serde::processor::{
         ProcessorLevel, ProcessorMode, ProcessorProfile, ProcessorProfileFlags, ScalarFormat,
     },
-    value::Data,
+    value::Value,
 };
 use ontol_test_utils::{
     assert_error_msg, assert_json_io_matches,
@@ -51,11 +51,11 @@ fn test_serde_booleans() {
         assert_json_io_matches!(serde_create(&b), true);
 
         assert_error_msg!(
-            serde_create(&f).to_data(json!(true)),
+            serde_create(&f).to_value(json!(true)),
             "invalid type: boolean `true`, expected false at line 1 column 4"
         );
         assert_error_msg!(
-            serde_create(&t).to_data(json!(false)),
+            serde_create(&t).to_value(json!(false)),
             "invalid type: boolean `false`, expected true at line 1 column 5"
         );
     });
@@ -215,7 +215,7 @@ fn test_serde_infinite_sequence() {
         assert_json_io_matches!(serde_create(&foo), [42, 43, "a", "b", null, 44]);
         assert_json_io_matches!(serde_create(&foo), [42, 43, "a", "b", null, 44, 45, 46]);
         assert_error_msg!(
-            serde_create(&foo).to_data(json!([77])),
+            serde_create(&foo).to_value(json!([77])),
             "invalid length 1, expected sequence with minimum length 6 at line 1 column 4"
         );
     });
@@ -229,16 +229,16 @@ fn test_serde_uuid() {
     .compile_then(|test| {
         let [my_id] = test.bind(["my_id"]);
         assert_matches!(
-            serde_create(&my_id).to_data(json!("a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
-            Ok(Data::OctetSequence(_))
+            serde_create(&my_id).to_value(json!("a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
+            Ok(Value::OctetSequence(..))
         );
         assert_json_io_matches!(serde_create(&my_id), "a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8");
         assert_error_msg!(
-            serde_create(&my_id).to_data(json!(42)),
+            serde_create(&my_id).to_value(json!(42)),
             "invalid type: integer `42`, expected `uuid` at line 1 column 2"
         );
         assert_error_msg!(
-            serde_create(&my_id).to_data(json!("foobar")),
+            serde_create(&my_id).to_value(json!("foobar")),
             r#"invalid type: string "foobar", expected `uuid` at line 1 column 8"#
         );
     });
@@ -252,19 +252,19 @@ fn test_serde_datetime() {
     .compile_then(|test| {
         let [my_dt] = test.bind(["my_dt"]);
         assert_matches!(
-            serde_create(&my_dt).to_data(json!("1983-10-01T01:31:32.59+01:00")),
-            Ok(Data::ChronoDateTime(_))
+            serde_create(&my_dt).to_value(json!("1983-10-01T01:31:32.59+01:00")),
+            Ok(Value::ChronoDateTime(..))
         );
         assert_json_io_matches!(
             serde_create(&my_dt),
             "1983-10-01T01:31:32.59+01:00" == "1983-10-01T00:31:32.590+00:00"
         );
         assert_error_msg!(
-            serde_create(&my_dt).to_data(json!(42)),
+            serde_create(&my_dt).to_value(json!(42)),
             "invalid type: integer `42`, expected `datetime` at line 1 column 2"
         );
         assert_error_msg!(
-            serde_create(&my_dt).to_data(json!("foobar")),
+            serde_create(&my_dt).to_value(json!("foobar")),
             r#"invalid type: string "foobar", expected `datetime` at line 1 column 8"#
         );
     });
@@ -298,7 +298,7 @@ fn test_i64_range_constrained() {
         assert_json_io_matches!(serde_create(&percentage), 0 == 0);
         assert_json_io_matches!(serde_create(&percentage), 100 == 100);
         assert_error_msg!(
-            serde_create(&percentage).to_data_variant(json!(1000)),
+            serde_create(&percentage).to_value_variant(json!(1000)),
             r#"invalid type: integer `1000`, expected integer in range 0..=100 at line 1 column 4"#
         );
     });
@@ -318,7 +318,7 @@ fn test_integer_range_constrained() {
         assert_json_io_matches!(serde_create(&foo), 0 == 0);
         assert_json_io_matches!(serde_create(&foo), (-1) == (-1));
         assert_error_msg!(
-            serde_create(&foo).to_data_variant(json!(-2)),
+            serde_create(&foo).to_value_variant(json!(-2)),
             r#"invalid type: integer `-2`, expected integer in range -1..=1 at line 1 column 2"#
         );
     });
@@ -340,7 +340,7 @@ fn test_f64_range_constrained() {
         assert_json_io_matches!(serde_create(&fraction), 0.5 == 0.5);
         assert_json_io_matches!(serde_create(&fraction), 1.0 == 1.0);
         assert_error_msg!(
-            serde_create(&fraction).to_data_variant(json!(3.14)),
+            serde_create(&fraction).to_value_variant(json!(3.14)),
             r#"invalid type: floating point `3.14`, expected float in range 0..=1 at line 1 column 4"#
         );
     });
@@ -454,7 +454,7 @@ fn test_serde_with_raw_id_overridde_profile() {
 
         let foo_value = serde_create(&foo)
             .with_profile(processor_profile.clone())
-            .to_value(json!({
+            .to_value_raw(json!({
                 "IGNORE1": 1,
                 "__ID": "a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8",
                 "IGNORE2": 2
@@ -475,7 +475,7 @@ fn test_serde_with_raw_id_overridde_profile() {
 
         let bar_value = serde_create(&bar)
             .with_profile(processor_profile.clone())
-            .to_value(json!({ "__ID": "1337" }))
+            .to_value_raw(json!({ "__ID": "1337" }))
             .unwrap();
 
         expect_eq!(
@@ -563,7 +563,7 @@ fn test_serialize_raw_tree_only() {
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         let entity = serde_raw(&foo)
-            .to_value(json!({
+            .to_value_raw(json!({
                 "key": "a",
                 "foo_field": "1",
                 "bar": {
@@ -587,7 +587,7 @@ fn test_serialize_raw_tree_only_artist_and_instrument() {
     ARTIST_AND_INSTRUMENT.1.compile_then(|test| {
         let [artist] = test.bind(["artist"]);
         let entity = serde_raw(&artist)
-            .to_value(json!({
+            .to_value_raw(json!({
                 "ID": "artist/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8",
                 "name": "Jimi",
                 "plays": [

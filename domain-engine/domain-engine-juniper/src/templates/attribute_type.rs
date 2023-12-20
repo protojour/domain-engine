@@ -1,5 +1,6 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::sync::Arc;
 
+use fnv::FnvHashMap;
 use juniper::{graphql_value, FieldError};
 use ontol_runtime::{
     interface::graphql::{
@@ -15,7 +16,7 @@ use ontol_runtime::{
         serialize_raw,
     },
     sequence::{Sequence, SubSequence},
-    value::{Attribute, Data, PropertyId, Value},
+    value::{Attribute, PropertyId, Value},
     DefId,
 };
 use serde::Serialize;
@@ -190,7 +191,7 @@ impl<'v> AttributeType<'v> {
                     kind: ObjectKind::Node(node_data),
                     ..
                 }) => {
-                    if node_data.def_id == self.attr.value.type_def_id {
+                    if node_data.def_id == self.attr.value.type_def_id() {
                         return (*variant_type_addr, variant_type_data);
                     }
                 }
@@ -217,16 +218,16 @@ impl<'v> AttributeType<'v> {
 
         // trace!("resolve object field `{field_name}`: {:?}", self.attr);
 
-        match (&self.attr.value.data, &field_data.kind) {
-            (Data::Struct(_), FieldKind::Node) => resolve_schema_type_field(
+        match (&self.attr.value, &field_data.kind) {
+            (Value::Struct(..), FieldKind::Node) => resolve_schema_type_field(
                 self,
                 schema_ctx
                     .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
                     .unwrap(),
                 executor,
             ),
-            (Data::Unit, FieldKind::Node) => Ok(juniper::Value::Null),
-            (Data::Struct(attrs), FieldKind::Property(property_data)) => {
+            (Value::Unit(_), FieldKind::Node) => Ok(juniper::Value::Null),
+            (Value::Struct(attrs, _), FieldKind::Property(property_data)) => {
                 trace!("lookup property {field_name} => {:?}", property_data);
                 Self::resolve_property(
                     attrs,
@@ -236,7 +237,7 @@ impl<'v> AttributeType<'v> {
                     executor,
                 )
             }
-            (Data::Struct(attrs), FieldKind::ConnectionProperty { property_id, .. }) => {
+            (Value::Struct(attrs, _), FieldKind::ConnectionProperty { property_id, .. }) => {
                 let type_info = schema_ctx
                     .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
                     .unwrap();
@@ -249,7 +250,7 @@ impl<'v> AttributeType<'v> {
                     ),
                     None => {
                         let empty = Attribute {
-                            value: Value::new(Data::Sequence(Sequence::new([])), DefId::unit()),
+                            value: Value::Sequence(Sequence::new([]), DefId::unit()),
                             rel_params: Value::unit(),
                         };
 
@@ -261,14 +262,14 @@ impl<'v> AttributeType<'v> {
                     }
                 }
             }
-            (Data::Struct(attrs), FieldKind::Id(id_property_data)) => Self::resolve_property(
+            (Value::Struct(attrs, _), FieldKind::Id(id_property_data)) => Self::resolve_property(
                 attrs,
                 PropertyId::subject(id_property_data.relationship_id),
                 field_type,
                 schema_ctx,
                 executor,
             ),
-            (Data::Struct(attrs), FieldKind::OpenData) => {
+            (Value::Struct(attrs, _), FieldKind::OpenData) => {
                 if !executor
                     .context()
                     .serde_processor_profile_flags
@@ -296,7 +297,7 @@ impl<'v> AttributeType<'v> {
                 }
             }
             (
-                Data::Sequence(seq),
+                Value::Sequence(seq, _),
                 FieldKind::Nodes | FieldKind::Edges | FieldKind::EntityMutation { .. },
             ) => resolve_schema_type_field(
                 SequenceType { seq },
@@ -305,22 +306,22 @@ impl<'v> AttributeType<'v> {
                     .unwrap(),
                 executor,
             ),
-            (Data::Sequence(seq), FieldKind::PageInfo) => resolve_schema_type_field(
+            (Value::Sequence(seq, _), FieldKind::PageInfo) => resolve_schema_type_field(
                 PageInfoType { seq },
                 schema_ctx
                     .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
                     .unwrap(),
                 executor,
             ),
-            (Data::Sequence(seq), FieldKind::TotalCount) => Ok(seq
+            (Value::Sequence(seq, _), FieldKind::TotalCount) => Ok(seq
                 .sub_seq
                 .as_deref()
                 .and_then(SubSequence::total_len)
                 .serialize(JuniperValueSerializer)?),
-            (Data::Unit, FieldKind::Property(_)) => Ok(juniper::Value::Null),
-            (_, FieldKind::EdgeProperty(property_data)) => match &self.attr.rel_params.data {
-                Data::Struct(rel_attrs) => Self::resolve_property(
-                    rel_attrs,
+            (Value::Unit(_), FieldKind::Property(_)) => Ok(juniper::Value::Null),
+            (_, FieldKind::EdgeProperty(property_data)) => match &self.attr.rel_params {
+                Value::Struct(rel_attrs, _) => Self::resolve_property(
+                    rel_attrs.as_ref(),
                     property_data.property_id,
                     field_type,
                     schema_ctx,
@@ -330,9 +331,9 @@ impl<'v> AttributeType<'v> {
                     panic!("BUG: Tried to read edge property from {other:?}");
                 }
             },
-            (data, FieldKind::Deleted) => {
-                Ok(juniper::Value::Scalar(GqlScalar::Boolean(match data {
-                    Data::I64(bool) => *bool != 0,
+            (value, FieldKind::Deleted) => {
+                Ok(juniper::Value::Scalar(GqlScalar::Boolean(match value {
+                    Value::I64(bool, _) => *bool != 0,
                     _ => false,
                 })))
             }
@@ -341,7 +342,7 @@ impl<'v> AttributeType<'v> {
     }
 
     fn resolve_property(
-        map: &BTreeMap<PropertyId, Attribute>,
+        map: &FnvHashMap<PropertyId, Attribute>,
         property_id: PropertyId,
         type_ref: TypeRef,
         schema_ctx: &Arc<SchemaCtx>,

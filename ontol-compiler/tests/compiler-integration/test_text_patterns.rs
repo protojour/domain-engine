@@ -1,5 +1,5 @@
 use assert_matches::assert_matches;
-use ontol_runtime::value::Data;
+use ontol_runtime::value::Value;
 use ontol_test_utils::{assert_error_msg, assert_json_io_matches, serde_helper::*, TestCompile};
 use serde_json::json;
 use test_log::test;
@@ -15,7 +15,7 @@ fn constant_text_pattern() {
         let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(serde_create(&foo), "foo");
         assert_error_msg!(
-            serde_create(&foo).to_data(json!("fo")),
+            serde_create(&foo).to_value(json!("fo")),
             r#"invalid type: string "fo", expected string matching /(?:\A(?:foo)\z)/ at line 1 column 4"#
         );
     });
@@ -32,7 +32,7 @@ fn concatenated_constant_string_constructor_pattern() {
         let [foobar] = test.bind(["foobar"]);
         assert_json_io_matches!(serde_create(&foobar), "foobar");
         assert_error_msg!(
-            serde_create(&foobar).to_data(json!("fooba")),
+            serde_create(&foobar).to_value(json!("fooba")),
             r#"invalid type: string "fooba", expected string matching /(?:\A(?:foobar)\z)/ at line 1 column 7"#
         );
     });
@@ -49,8 +49,8 @@ fn uuid_in_string_constructor_pattern() {
         let [foo] = test.bind(["foo"]);
 
         assert_matches!(
-            serde_create(&foo).to_data(json!("foo/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
-            Ok(Data::Struct(attrs)) if attrs.len() == 1
+            serde_create(&foo).to_value(json!("foo/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
+            Ok(Value::Struct(attrs, _)) if attrs.len() == 1
         );
         assert_json_io_matches!(serde_create(&foo), "foo/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8");
         // UUID gets normalized when serialized:
@@ -58,7 +58,7 @@ fn uuid_in_string_constructor_pattern() {
             "foo/a1a2a3a4b1b2c1c2d1d2d3d4d5d6d7d8" == "foo/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8"
         );
         assert_error_msg!(
-            serde_create(&foo).to_data(json!("foo")),
+            serde_create(&foo).to_value(json!("foo")),
             r#"invalid type: string "foo", expected string matching /(?:\A(?:foo/)((?:[0-9A-Fa-f]{32}|(?:[0-9A-Fa-f]{8}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{4}\-[0-9A-Fa-f]{12})))\z)/ at line 1 column 5"#
         );
     });
@@ -75,8 +75,8 @@ fn text_prefix() {
         let [prefix] = test.bind(["prefix"]);
 
         assert_matches!(
-            serde_create(&prefix).to_data(json!("prefix/foobar")),
-            Ok(Data::Struct(attrs)) if attrs.len() == 1
+            serde_create(&prefix).to_value(json!("prefix/foobar")),
+            Ok(Value::Struct(attrs, _)) if attrs.len() == 1
         );
         assert_json_io_matches!(serde_create(&prefix), "prefix/foobar");
     });
@@ -99,17 +99,17 @@ fn test_text_pattern_constructor_union() {
     .compile_then(|test| {
         let [foobar] = test.bind(["foobar"]);
         assert_matches!(
-            serde_create(&foobar).to_data_variant(json!("foo/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
-            Ok(Data::Struct(attrs)) if attrs.len() == 1
+            serde_create(&foobar).to_value_variant(json!("foo/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
+            Ok(Value::Struct(attrs, _)) if attrs.len() == 1
         );
         assert_json_io_matches!(serde_create(&foobar), "foo/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8");
         assert_json_io_matches!(serde_create(&foobar), "bar/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8");
         assert_error_msg!(
-            serde_create(&foobar).to_data(json!("foo/invalid-uuid")),
+            serde_create(&foobar).to_value(json!("foo/invalid-uuid")),
             r#"invalid type: string "foo/invalid-uuid", expected `foobar` (`text_pattern` or `text_pattern`) at line 1 column 18"#
         );
         assert_error_msg!(
-            serde_create(&foobar).to_data(json!("baz/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
+            serde_create(&foobar).to_value(json!("baz/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8")),
             r#"invalid type: string "baz/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8", expected `foobar` (`text_pattern` or `text_pattern`) at line 1 column 42"#
         );
     });
@@ -128,7 +128,7 @@ fn test_regex_property() {
         assert_json_io_matches!(serde_create(&foo), { "prop": "123abc" });
         assert_json_io_matches!(serde_create(&foo), { "prop": "123abcccc" });
         assert_error_msg!(
-            serde_create(&foo).to_data(json!({ "prop": "123" })),
+            serde_create(&foo).to_value(json!({ "prop": "123" })),
             r#"invalid type: string "123", expected string matching /(?:(?:ab)c*)/ at line 1 column 13"#
         );
     });
@@ -147,7 +147,7 @@ fn test_simple_regex_pattern_constructor() {
         assert_json_io_matches!(serde_create(&re), "abc" == "ab");
         assert_json_io_matches!(serde_create(&re), "abccccc" == "ab");
         assert_error_msg!(
-            serde_create(&re).to_data(json!("a")),
+            serde_create(&re).to_value(json!("a")),
             r#"invalid type: string "a", expected string matching /(?:\A(?:ab)c*\z)/ at line 1 column 3"#
         );
     });

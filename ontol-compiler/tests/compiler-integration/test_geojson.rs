@@ -37,27 +37,27 @@ fn test_geojson() {
             ]
         });
         assert_error_msg!(
-            serde_create(&geometry).to_data_variant(json!({ "type": "Point", "coordinates": [[1.0, 2.0]] })),
+            serde_create(&geometry).to_value_variant(json!({ "type": "Point", "coordinates": [[1.0, 2.0]] })),
             "invalid type: sequence, expected float at line 1 column 42"
         );
         assert_error_msg!(
-            serde_create(&geometry).to_data_variant(json!({ "type": "Polygon", "coordinates": [1.0, 2.0] })),
+            serde_create(&geometry).to_value_variant(json!({ "type": "Polygon", "coordinates": [1.0, 2.0] })),
             "invalid type: floating point `1`, expected sequence with length 2 at line 1 column 42"
         );
         assert_error_msg!(
-            serde_create(&geometry).to_data_variant(json!({ "type": "LineString", "coordinates": [[1.0, 2.0]] })),
+            serde_create(&geometry).to_value_variant(json!({ "type": "LineString", "coordinates": [[1.0, 2.0]] })),
             "invalid length 1, expected sequence with minimum length 2 at line 1 column 47"
         );
         assert_error_msg!(
-            serde_create(&geometry).to_data_variant(json!({ "type": "Polygon", "coordinates": [[1.0, 2.0]] })),
+            serde_create(&geometry).to_value_variant(json!({ "type": "Polygon", "coordinates": [[1.0, 2.0]] })),
             "invalid length 1, expected sequence with minimum length 4 at line 1 column 44"
         );
         assert_error_msg!(
-            serde_create(&geometry).to_data_variant(json!([])),
+            serde_create(&geometry).to_value_variant(json!([])),
             "invalid type: sequence, expected `Geometry` (one of `Point`, `MultiPoint`, `LineString`, `MultiLineString`, `Polygon`, `MultiPolygon`, `GeometryCollection`) at line 1 column 2"
         );
         assert_error_msg!(
-            serde_create(&geometry).to_data_variant(json!({ "type": "bogus" })),
+            serde_create(&geometry).to_value_variant(json!({ "type": "bogus" })),
             "invalid map value, expected `Geometry` (one of `Point`, `MultiPoint`, `LineString`, `MultiLineString`, `Polygon`, `MultiPolygon`, `GeometryCollection`) at line 1 column 16"
         );
     });

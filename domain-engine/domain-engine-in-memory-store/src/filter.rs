@@ -1,10 +1,10 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
 use anyhow::anyhow;
 use bit_set::BitSet;
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    value::{Attribute, Data, PropertyId, Value},
+    value::{Attribute, PropertyId, Value},
     var::Var,
     DefId, Role,
 };
@@ -20,7 +20,7 @@ pub(super) enum FilterVal<'d> {
     Struct {
         type_def_id: DefId,
         dynamic_key: Option<&'d DynamicKey>,
-        prop_tree: &'d BTreeMap<PropertyId, Attribute>,
+        prop_tree: &'d FnvHashMap<PropertyId, Attribute>,
     },
     Sequence(&'d [Attribute]),
     Scalar(&'d Value),
@@ -29,7 +29,7 @@ pub(super) enum FilterVal<'d> {
 impl<'d> FilterVal<'d> {
     fn from_entity(
         entity_key: &'d EntityKey,
-        prop_tree: &'d BTreeMap<PropertyId, Attribute>,
+        prop_tree: &'d FnvHashMap<PropertyId, Attribute>,
     ) -> Self {
         Self::Struct {
             type_def_id: entity_key.type_def_id,
@@ -39,13 +39,13 @@ impl<'d> FilterVal<'d> {
     }
 
     fn from_value(value: &'d Value) -> Self {
-        match &value.data {
-            Data::Struct(map) => Self::Struct {
-                type_def_id: value.type_def_id,
+        match value {
+            Value::Struct(map, type_def_id) => Self::Struct {
+                type_def_id: *type_def_id,
                 dynamic_key: None,
                 prop_tree: map,
             },
-            Data::Sequence(seq) => Self::Sequence(&seq.attrs),
+            Value::Sequence(seq, _) => Self::Sequence(&seq.attrs),
             _ => Self::Scalar(value),
         }
     }
@@ -159,7 +159,7 @@ impl InMemoryStore {
             }
             (PlanEntry::AllAttrs(prop_id, entries), FilterVal::Struct { prop_tree: map, .. }) => {
                 let attr = map.get(prop_id).ok_or(ProofError::Disproven)?;
-                let Data::Sequence(seq) = &attr.value.data else {
+                let Value::Sequence(seq, _) = &attr.value else {
                     return Err(ProofError::Disproven);
                 };
 
@@ -222,8 +222,8 @@ impl InMemoryStore {
                 anyhow!("AllEdges operator not implemented"),
             ))),
             (PlanEntry::Eq(pred_scalar), FilterVal::Scalar(val_scalar)) => {
-                match (&val_scalar.data, pred_scalar) {
-                    (Data::Text(data), Scalar::Text(pred)) => {
+                match (&val_scalar, pred_scalar) {
+                    (Value::Text(data, _), Scalar::Text(pred)) => {
                         if data.as_str() == pred.as_ref() {
                             Ok(Proof::Proven)
                         } else {

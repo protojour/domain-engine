@@ -1,12 +1,11 @@
-use std::collections::BTreeMap;
-
+use fnv::FnvHashMap;
 use ontol_runtime::{
     interface::serde::{
         operator::{FilteredVariants, SerdeOperator, SerdeOperatorAddr, SerdeProperty},
         processor::{ProcessorLevel, ProcessorMode},
     },
     ontology::TypeInfo,
-    value::{Attribute, Data, PropertyId, Value},
+    value::{Attribute, PropertyId, Value},
     value_generator::ValueGenerator,
     DefId, Role,
 };
@@ -33,9 +32,9 @@ impl<'e> ObjectGenerator<'e> {
 
     pub fn generate_objects(&self, value: &mut Value) {
         let ontology = self.engine.ontology();
-        match &mut value.data {
-            Data::Struct(struct_map) => {
-                let type_info = ontology.get_type_info(value.type_def_id);
+        match value {
+            Value::Struct(struct_map, type_def_id) => {
+                let type_info = ontology.get_type_info(*type_def_id);
                 if let Some(addr) = type_info.operator_addr {
                     self.generate_struct_relationships(struct_map, type_info, addr);
                 }
@@ -46,7 +45,7 @@ impl<'e> ObjectGenerator<'e> {
                     self.generate_objects(&mut attribute.value);
                 }
             }
-            Data::Sequence(seq) => {
+            Value::Sequence(seq, _) => {
                 for attribute in &mut seq.attrs {
                     self.generate_objects(&mut attribute.rel_params);
                     self.generate_objects(&mut attribute.value);
@@ -58,7 +57,7 @@ impl<'e> ObjectGenerator<'e> {
 
     fn generate_struct_relationships(
         &self,
-        struct_map: &mut BTreeMap<PropertyId, Attribute>,
+        struct_map: &mut FnvHashMap<PropertyId, Attribute>,
         type_info: &TypeInfo,
         addr: SerdeOperatorAddr,
     ) {
@@ -92,8 +91,8 @@ impl<'e> ObjectGenerator<'e> {
 
                             struct_map.insert(
                                 property.property_id,
-                                Value::new(
-                                    Data::OctetSequence(uuid.as_bytes().iter().cloned().collect()),
+                                Value::OctetSequence(
+                                    uuid.as_bytes().iter().cloned().collect(),
                                     self.property_def_id(property),
                                 )
                                 .into(),
@@ -106,8 +105,8 @@ impl<'e> ObjectGenerator<'e> {
                             if matches!(self.mode, ProcessorMode::Create) {
                                 struct_map.insert(
                                     property.property_id,
-                                    Value::new(
-                                        Data::ChronoDateTime(self.current_time),
+                                    Value::ChronoDateTime(
+                                        self.current_time,
                                         self.property_def_id(property),
                                     )
                                     .into(),
@@ -117,8 +116,8 @@ impl<'e> ObjectGenerator<'e> {
                         Some(ValueGenerator::UpdatedAtTime) => {
                             struct_map.insert(
                                 property.property_id,
-                                Value::new(
-                                    Data::ChronoDateTime(self.current_time),
+                                Value::ChronoDateTime(
+                                    self.current_time,
                                     self.property_def_id(property),
                                 )
                                 .into(),

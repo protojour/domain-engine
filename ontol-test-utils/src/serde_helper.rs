@@ -1,10 +1,9 @@
-use std::collections::BTreeMap;
-
+use fnv::FnvHashMap;
 use ontol_runtime::{
     interface::serde::processor::{
         ProcessorLevel, ProcessorMode, ProcessorProfile, ProcessorProfileFlags,
     },
-    value::{Attribute, Data, PropertyId, Value},
+    value::{Attribute, PropertyId, Value},
     DefId,
 };
 use serde::de::DeserializeSeed;
@@ -36,20 +35,22 @@ impl<'b, 'on> SerdeHelper<'b, 'on> {
         }
     }
 
-    pub fn to_data(&self, json: serde_json::Value) -> Result<Data, serde_json::Error> {
-        let value = self.to_value(json)?;
-        assert_eq!(value.type_def_id, self.binding.type_info.def_id);
-        Ok(value.data)
+    #[track_caller]
+    pub fn to_value(&self, json: serde_json::Value) -> Result<Value, serde_json::Error> {
+        let value = self.to_value_raw(json)?;
+        assert_eq!(value.type_def_id(), self.binding.type_info.def_id);
+        Ok(value)
     }
 
-    pub fn to_data_map(
+    #[track_caller]
+    pub fn to_value_map(
         &self,
         json: serde_json::Value,
-    ) -> Result<BTreeMap<PropertyId, Attribute>, serde_json::Error> {
-        let value = self.to_value(json)?;
-        assert_eq!(value.type_def_id, self.binding.type_info.def_id);
-        match value.data {
-            Data::Struct(attrs) => Ok(attrs),
+    ) -> Result<FnvHashMap<PropertyId, Attribute>, serde_json::Error> {
+        let value = self.to_value_raw(json)?;
+        assert_eq!(value.type_def_id(), self.binding.type_info.def_id);
+        match value {
+            Value::Struct(attrs, _) => Ok(*attrs),
             other => panic!("not a map: {other:?}"),
         }
     }
@@ -57,13 +58,14 @@ impl<'b, 'on> SerdeHelper<'b, 'on> {
     /// Deserialize data, but expect that the resulting type DefId
     /// is not the same as the nominal one for the TypeBinding.
     /// (i.e. it should deserialize to a _variant_ of the type)
-    pub fn to_data_variant(&self, json: serde_json::Value) -> Result<Data, serde_json::Error> {
-        let value = self.to_value(json)?;
-        assert_ne!(value.type_def_id, self.binding.type_info.def_id);
-        Ok(value.data)
+    #[track_caller]
+    pub fn to_value_variant(&self, json: serde_json::Value) -> Result<Value, serde_json::Error> {
+        let value = self.to_value_raw(json)?;
+        assert_ne!(value.type_def_id(), self.binding.type_info.def_id);
+        Ok(value)
     }
 
-    pub fn to_value(&self, json: serde_json::Value) -> Result<Value, serde_json::Error> {
+    pub fn to_value_raw(&self, json: serde_json::Value) -> Result<Value, serde_json::Error> {
         let json_string = serde_json::to_string(&json).unwrap();
 
         let attribute_result = self
@@ -80,7 +82,7 @@ impl<'b, 'on> SerdeHelper<'b, 'on> {
 
                 match (attribute_result, json_schema_result) {
                     (Ok(Attribute { value, rel_params }), Ok(())) => {
-                        assert_eq!(rel_params.type_def_id, DefId::unit());
+                        assert_eq!(rel_params.type_def_id(), DefId::unit());
 
                         Ok(value)
                     }
@@ -99,7 +101,7 @@ impl<'b, 'on> SerdeHelper<'b, 'on> {
                 }
             }
             _ => attribute_result.map(|Attribute { value, rel_params }| {
-                assert_eq!(rel_params.type_def_id, DefId::unit());
+                assert_eq!(rel_params.type_def_id(), DefId::unit());
 
                 value
             }),
@@ -108,10 +110,6 @@ impl<'b, 'on> SerdeHelper<'b, 'on> {
 
     pub fn as_json(&self, value: &Value) -> serde_json::Value {
         self.serialize_json(value, false)
-    }
-
-    pub fn data_as_json(&self, data: &Data) -> serde_json::Value {
-        self.as_json(&Value::new(data.clone(), self.binding.type_info.def_id))
     }
 
     pub fn dynamic_seq_as_json(&self, value: &Value) -> serde_json::Value {

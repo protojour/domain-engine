@@ -96,7 +96,7 @@ fn id_and_inherent_property_inline_type() {
         });
         // Since there is no `.rel gen: auto` for the id, it is required:
         assert_error_msg!(
-            serde_create(&foo).to_data(json!({
+            serde_create(&foo).to_value(json!({
                 "children": [{ "key": "inner" }]
             })),
             r#"missing properties, expected "key" at line 1 column 30"#
@@ -153,7 +153,7 @@ fn artist_and_instrument_error_artist() {
     let test = ARTIST_AND_INSTRUMENT.1.compile();
     let [artist] = test.bind(["artist"]);
     assert_error_msg!(
-        serde_create(&artist).to_data(json!({
+        serde_create(&artist).to_value(json!({
             "name": "Herbie Hancock",
             "plays": [{ "name": "piano" }]
         })),
@@ -181,7 +181,7 @@ fn artist_and_instrument_id_as_relation_object() {
     });
 
     let john = serde_create(&artist)
-        .to_value(json!({
+        .to_value_raw(json!({
                 "name": "John McLaughlin",
                 "plays": [
                     {
@@ -206,7 +206,7 @@ fn artist_and_instrument_id_as_relation_object() {
     );
 
     assert_error_msg!(
-        serde_create(&artist).to_data(json!({
+        serde_create(&artist).to_value(json!({
             "name": "Robert Fripp",
             "plays": [{ "ID": example_id }]
         })),
@@ -215,14 +215,14 @@ fn artist_and_instrument_id_as_relation_object() {
 
     // The following tests show that { "ID" } and the property map is a type union:
     assert_error_msg!(
-        serde_create(&artist).to_data(json!({
+        serde_create(&artist).to_value(json!({
             "name": "Tony Levin",
             "plays": [{ "ID": example_id, "name": "Chapman stick" }]
         })),
         r#"unknown property `name` at line 1 column 92"#
     );
     assert_error_msg!(
-        serde_create(&artist).to_data(json!({
+        serde_create(&artist).to_value(json!({
             "name": "Allan Holdsworth",
             "plays": [{ "name": "Synthaxe", "ID": example_id }]
         })),
@@ -236,7 +236,7 @@ fn artist_and_instrument_id_as_relation_object_invalid_id_format() {
     let [artist] = test.bind(["artist"]);
 
     assert_error_msg!(
-        serde_create(&artist).to_data(json!({
+        serde_create(&artist).to_value(json!({
             "name": "Santana",
             "plays": [
                 {
@@ -261,7 +261,7 @@ fn test_entity_self_relationship_optional_object() {
     .compile_then(|test| {
         let [node] = test.bind(["node"]);
         assert_error_msg!(
-            serde_create(&node).to_data(json!({})),
+            serde_create(&node).to_value(json!({})),
             r#"missing properties, expected "name" at line 1 column 2"#
         );
 
@@ -298,7 +298,7 @@ fn test_entity_self_relationship_mandatory_object() {
     .compile_then(|test| {
         let [node] = test.bind(["node"]);
         assert_error_msg!(
-            serde_create(&node).to_data(json!({})),
+            serde_create(&node).to_value(json!({})),
             r#"missing properties, expected "parent" at line 1 column 2"#
         );
     });
@@ -355,7 +355,7 @@ fn entity_union_in_relation_with_ids() {
         ]
     });
 
-    let artist_value = serde_create(&artist).to_value(json.clone()).unwrap();
+    let artist_value = serde_create(&artist).to_value_raw(json.clone()).unwrap();
 
     let plays_attributes = artist_value
         .get_attribute_value(plays)
@@ -366,8 +366,11 @@ fn entity_union_in_relation_with_ids() {
     let synth_id_attr = &plays_attributes[1];
 
     assert_ne!(guitar_id.type_info.def_id, synth_id.type_info.def_id);
-    assert_eq!(guitar_id_attr.value.type_def_id, guitar_id.type_info.def_id);
-    assert_eq!(synth_id_attr.value.type_def_id, synth_id.type_info.def_id);
+    assert_eq!(
+        guitar_id_attr.value.type_def_id(),
+        guitar_id.type_info.def_id
+    );
+    assert_eq!(synth_id_attr.value.type_def_id(), synth_id.type_info.def_id);
 }
 
 #[test]

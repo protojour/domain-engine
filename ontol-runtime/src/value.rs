@@ -1,12 +1,13 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     fmt::{Debug, Display},
     str::FromStr,
 };
 
 use ::serde::{Deserialize, Serialize};
-use smallvec::SmallVec;
+use fnv::FnvHashMap;
 use smartstring::alias::String;
+use thin_vec::ThinVec;
 
 use crate::{
     cast::Cast,
@@ -17,19 +18,41 @@ use crate::{
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Value {
-    /// The data associated with this value
-    pub data: Data,
+pub enum Value {
+    Unit(DefId),
+    I64(i64, DefId),
+    F64(f64, DefId),
+    Rational(Box<num::rational::BigRational>, DefId),
+    Text(String, DefId),
+    OctetSequence(ThinVec<u8>, DefId),
+    ChronoDateTime(chrono::DateTime<chrono::Utc>, DefId),
+    ChronoDate(chrono::NaiveDate, DefId),
+    ChronoTime(chrono::NaiveTime, DefId),
 
-    /// The runtime type associated with this value.
-    /// This is used to make quick type checks,
-    /// as well as figuring out how to serialize.
-    pub type_def_id: DefId,
+    /// A collection of attributes keyed by property.
+    Struct(Box<FnvHashMap<PropertyId, Attribute>>, DefId),
+
+    /// A collection of arbitrary values keyed by strings.
+    Dict(Box<HashMap<String, Value>>, DefId),
+
+    /// A sequence of attributes.
+    ///
+    /// The difference between a Sequence and a Map is that
+    /// sequences use numeric keys instead of PropertyId.
+    ///
+    /// Some sequences will be uniform (all elements have the same type).
+    /// Other sequences will behave more like tuples.
+    Sequence(Sequence, DefId),
+
+    Condition(Condition<CondTerm>, DefId),
 }
 
 impl Value {
-    pub const fn new(data: Data, type_def_id: DefId) -> Self {
-        Self { data, type_def_id }
+    pub fn new_struct(
+        props: impl IntoIterator<Item = (PropertyId, Attribute)>,
+        type_id: DefId,
+    ) -> Self {
+        Self::Struct(Box::new(FnvHashMap::from_iter(props)), type_id)
     }
 
     pub fn sequence_of(values: impl IntoIterator<Item = Value>) -> Self {
@@ -42,19 +65,49 @@ impl Value {
             .collect();
         let type_def_id = attrs
             .first()
-            .map(|attr| attr.value.type_def_id)
+            .map(|attr| attr.value.type_def_id())
             .unwrap_or(DefId::unit());
-        Self {
-            data: Data::Sequence(Sequence::new(attrs)),
-            type_def_id,
-        }
+        Self::Sequence(Sequence::new(attrs), type_def_id)
     }
 
     #[inline]
     pub const fn unit() -> Self {
-        Self {
-            data: Data::Unit,
-            type_def_id: DefId::unit(),
+        Self::Unit(DefId::unit())
+    }
+
+    pub fn type_def_id(&self) -> DefId {
+        match self {
+            Value::Unit(def_id) => *def_id,
+            Value::I64(_, def_id) => *def_id,
+            Value::F64(_, def_id) => *def_id,
+            Value::Rational(_, def_id) => *def_id,
+            Value::Text(_, def_id) => *def_id,
+            Value::OctetSequence(_, def_id) => *def_id,
+            Value::ChronoDateTime(_, def_id) => *def_id,
+            Value::ChronoDate(_, def_id) => *def_id,
+            Value::ChronoTime(_, def_id) => *def_id,
+            Value::Struct(_, def_id) => *def_id,
+            Value::Dict(_, def_id) => *def_id,
+            Value::Sequence(_, def_id) => *def_id,
+            Value::Condition(_, def_id) => *def_id,
+        }
+    }
+
+    pub fn type_def_id_mut(&mut self) -> &mut DefId {
+        match self {
+            Value::Unit(def_id) => def_id,
+            Value::I64(_, def_id) => def_id,
+            Value::F64(_, def_id) => def_id,
+            Value::Rational(_, def_id) => def_id,
+            Value::Text(_, def_id) => def_id,
+            Value::OctetSequence(_, def_id) => def_id,
+            Value::ChronoDateTime(_, def_id) => def_id,
+            Value::ChronoDate(_, def_id) => def_id,
+            Value::ChronoTime(_, def_id) => def_id,
+            Value::Struct(_, def_id) => def_id,
+            Value::Dict(_, def_id) => def_id,
+            Value::Sequence(_, def_id) => def_id,
+            Value::Condition(_, def_id) => def_id,
         }
     }
 
@@ -66,7 +119,7 @@ impl Value {
     }
 
     pub fn is_unit(&self) -> bool {
-        self.type_def_id == DefId::unit()
+        self.type_def_id() == DefId::unit()
     }
 
     pub fn filter_non_unit(&self) -> Option<&Self> {
@@ -78,8 +131,8 @@ impl Value {
     }
 
     pub fn get_attribute(&self, property_id: PropertyId) -> Option<&Attribute> {
-        match &self.data {
-            Data::Struct(map) => map.get(&property_id),
+        match self {
+            Self::Struct(map, _) => map.get(&property_id),
             _ => None,
         }
     }
@@ -119,74 +172,33 @@ impl Value {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum Data {
-    Unit,
-    I64(i64),
-    F64(f64),
-    Rational(Box<num::rational::BigRational>),
-    Text(String),
-    OctetSequence(SmallVec<[u8; 16]>),
-    ChronoDateTime(chrono::DateTime<chrono::Utc>),
-    ChronoDate(chrono::NaiveDate),
-    ChronoTime(chrono::NaiveTime),
-
-    /// A collection of attributes keyed by property.
-    // TODO: Change to some HashMap with cheap hash function, without
-    // extending size_of::<Data>().
-    Struct(BTreeMap<PropertyId, Attribute>),
-
-    /// A collection of arbitrary values keyed by strings.
-    Dict(Box<HashMap<String, Value>>),
-
-    /// A sequence of attributes.
-    ///
-    /// The difference between a Sequence and a Map is that
-    /// sequences use numeric keys instead of PropertyId.
-    ///
-    /// Some sequences will be uniform (all elements have the same type).
-    /// Other sequences will behave more like tuples.
-    Sequence(Sequence),
-
-    Condition(Condition<CondTerm>),
-}
-
-impl Data {
-    pub fn new_rational_i64(numer: i64, denom: i16) -> Self {
-        Self::Rational(Box::new(num::rational::BigRational::new(
-            numer.into(),
-            denom.into(),
-        )))
-    }
-}
-
-pub struct FormatDataAsText<'d, 'o> {
-    pub data: &'d Data,
+pub struct FormatValueAsText<'d, 'o> {
+    pub value: &'d Value,
     pub type_def_id: DefId,
     pub ontology: &'o Ontology,
 }
 
-impl<'d, 'o> Display for FormatDataAsText<'d, 'o> {
+impl<'d, 'o> Display for FormatValueAsText<'d, 'o> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(text_like_type) = self.ontology.get_text_like_type(self.type_def_id) {
-            text_like_type.format(self.data, f)
+            text_like_type.format(self.value, f)
         } else {
-            match self.data {
-                Data::Text(s) => write!(f, "{s}"),
-                Data::I64(int) => write!(f, "{int}"),
-                Data::F64(float) => write!(f, "{float}"),
-                Data::OctetSequence(vec) => write!(f, "b'{vec:x?}'"),
-                Data::ChronoDateTime(datetime) => {
+            match &self.value {
+                Value::Text(s, _) => write!(f, "{s}"),
+                Value::I64(int, _) => write!(f, "{int}"),
+                Value::F64(float, _) => write!(f, "{float}"),
+                Value::OctetSequence(vec, _) => write!(f, "b'{vec:x?}'"),
+                Value::ChronoDateTime(datetime, _) => {
                     // FIXME: A way to not do this via String
                     // Chrono 0.5 hopefully fixes this
                     write!(f, "{}", datetime.to_rfc3339())
                 }
-                Data::Struct(props) => {
+                Value::Struct(props, type_def_id) => {
                     // concatenate every prop (not sure this is a good idea, since the order is not defined)
                     for attr in props.values() {
-                        FormatDataAsText {
-                            data: &attr.value.data,
-                            type_def_id: attr.value.type_def_id,
+                        FormatValueAsText {
+                            value: &attr.value,
+                            type_def_id: *type_def_id,
                             ontology: self.ontology,
                         }
                         .fmt(f)?;
@@ -300,17 +312,17 @@ pub struct ValueDebug<'v>(pub &'v Value);
 impl<'v> Display for ValueDebug<'v> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let value = &self.0;
-        match &value.data {
-            Data::Unit => write!(f, "#u"),
-            Data::I64(i) => write!(f, "int({i})"),
-            Data::F64(n) => write!(f, "flt({n})"),
-            Data::Rational(r) => write!(f, "rat({r})"),
-            Data::Text(s) => write!(f, "'{s}'"),
-            Data::OctetSequence(vec) => write!(f, "b'{vec:x?}'"),
-            Data::ChronoDateTime(dt) => write!(f, "datetime({dt})"),
-            Data::ChronoDate(d) => write!(f, "date({d})"),
-            Data::ChronoTime(t) => write!(f, "time({t})"),
-            Data::Struct(m) => {
+        match &value {
+            Value::Unit(_) => write!(f, "#u"),
+            Value::I64(i, _) => write!(f, "int({i})"),
+            Value::F64(n, _) => write!(f, "flt({n})"),
+            Value::Rational(r, _) => write!(f, "rat({r})"),
+            Value::Text(s, _) => write!(f, "'{s}'"),
+            Value::OctetSequence(vec, _) => write!(f, "b'{vec:x?}'"),
+            Value::ChronoDateTime(dt, _) => write!(f, "datetime({dt})"),
+            Value::ChronoDate(d, _) => write!(f, "date({d})"),
+            Value::ChronoTime(t, _) => write!(f, "time({t})"),
+            Value::Struct(m, _) => {
                 write!(f, "{{")?;
                 let mut iter = m.iter().peekable();
                 while let Some((prop, attr)) = iter.next() {
@@ -322,10 +334,10 @@ impl<'v> Display for ValueDebug<'v> {
                 }
                 write!(f, "}}")
             }
-            Data::Dict(_) => {
+            Value::Dict(..) => {
                 write!(f, "dict")
             }
-            Data::Sequence(seq) => {
+            Value::Sequence(seq, _) => {
                 write!(f, "[")?;
                 let mut iter = seq.attrs.iter().peekable();
                 while let Some(attr) = iter.next() {
@@ -337,7 +349,7 @@ impl<'v> Display for ValueDebug<'v> {
                 }
                 write!(f, "]")
             }
-            Data::Condition(_) => write!(f, "condition"),
+            Value::Condition(..) => write!(f, "condition"),
         }
     }
 }
@@ -380,8 +392,7 @@ mod tests {
 
     #[test]
     fn value_size() {
-        assert_eq!(40, std::mem::size_of::<Value>());
-        assert_eq!(16, std::mem::size_of::<[u8; 16]>());
+        assert_eq!(32, std::mem::size_of::<Value>());
 
         assert_eq!(24, std::mem::size_of::<BTreeMap<RelationshipId, Value>>());
         assert_eq!(24, std::mem::size_of::<Vec<Value>>());
@@ -395,7 +406,7 @@ mod tests {
         let mut map = BTreeMap::new();
         map.insert(
             RelationshipId(DefId(PackageId(0), 666)),
-            Value::new(Data::I64(42), DefId(PackageId(0), 42)).to_unit_attr(),
+            Value::I64(42, DefId(PackageId(0), 42)).to_unit_attr(),
         );
     }
 }

@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use anyhow::anyhow;
+use fnv::FnvHashMap;
 use ontol_runtime::{
     condition::Condition,
     interface::serde::{operator::SerdeOperatorAddr, processor::ProcessorMode},
@@ -10,7 +11,7 @@ use ontol_runtime::{
     },
     select::Select,
     smart_format,
-    value::{Attribute, Data, PropertyId, Value, ValueDebug},
+    value::{Attribute, PropertyId, Value, ValueDebug},
     value_generator::ValueGenerator,
     DefId, Role,
 };
@@ -52,8 +53,8 @@ impl InMemoryStore {
     ) -> DomainResult<Value> {
         let entity_id = find_inherent_entity_id(engine.ontology(), &data)?
             .ok_or_else(|| DomainError::EntityNotFound)?;
-        let type_info = engine.ontology().get_type_info(data.type_def_id);
-        let dynamic_key = Self::extract_dynamic_key(&entity_id.data)?;
+        let type_info = engine.ontology().get_type_info(data.type_def_id());
+        let dynamic_key = Self::extract_dynamic_key(&entity_id)?;
 
         if !self
             .collections
@@ -66,10 +67,10 @@ impl InMemoryStore {
 
         let mut raw_props_update: BTreeMap<PropertyId, Attribute> = Default::default();
 
-        let Data::Struct(data_struct) = data.data else {
+        let Value::Struct(data_struct, _) = data else {
             return Err(DomainError::BadInput(anyhow!("Expected a struct")));
         };
-        for (property_id, attribute) in data_struct {
+        for (property_id, attribute) in *data_struct {
             let data_relationship = find_data_relationship(type_info, &property_id)?;
 
             match data_relationship.kind {
@@ -115,7 +116,7 @@ impl InMemoryStore {
         match select {
             Select::EntityId => Ok(entity_id),
             Select::Struct(struct_select) => {
-                let target_dynamic_key = Self::extract_dynamic_key(&entity_id.data)?;
+                let target_dynamic_key = Self::extract_dynamic_key(&entity_id)?;
                 let entity_seq = self.query_single_entity_collection(
                     struct_select,
                     &Condition::default(),
@@ -128,7 +129,7 @@ impl InMemoryStore {
                 for attr in entity_seq.attrs {
                     let id = find_inherent_entity_id(engine.ontology(), &attr.value)?;
                     if let Some(id) = id {
-                        let dynamic_key = Self::extract_dynamic_key(&id.data)?;
+                        let dynamic_key = Self::extract_dynamic_key(&id)?;
 
                         if dynamic_key == target_dynamic_key {
                             return Ok(attr.value);
@@ -155,11 +156,11 @@ impl InMemoryStore {
         debug!("write entity {}", ValueDebug(&entity));
 
         let ontology = engine.ontology();
-        let type_info = ontology.get_type_info(entity.type_def_id);
+        let type_info = ontology.get_type_info(entity.type_def_id());
         let entity_info = type_info
             .entity_info
             .as_ref()
-            .ok_or(DomainError::NotAnEntity(entity.type_def_id))?;
+            .ok_or(DomainError::NotAnEntity(entity.type_def_id()))?;
 
         let (id, id_generated) = match find_inherent_entity_id(ontology, &entity)? {
             Some(id) => (id, false),
@@ -181,9 +182,8 @@ impl InMemoryStore {
 
         debug!("write entity_id={}", ValueDebug(&id));
 
-        let mut struct_map = match entity.data {
-            Data::Struct(struct_map) => struct_map,
-            _ => return Err(DomainError::EntityMustBeStruct),
+        let Value::Struct(mut struct_map, type_def_id) = entity else {
+            return Err(DomainError::EntityMustBeStruct);
         };
 
         if id_generated {
@@ -193,11 +193,11 @@ impl InMemoryStore {
             );
         }
 
-        let mut raw_props: BTreeMap<PropertyId, Attribute> = Default::default();
+        let mut raw_props: FnvHashMap<PropertyId, Attribute> = Default::default();
 
-        let entity_key = Self::extract_dynamic_key(&id.data)?;
+        let entity_key = Self::extract_dynamic_key(&id)?;
 
-        for (property_id, attribute) in struct_map {
+        for (property_id, attribute) in *struct_map {
             let data_relationship = find_data_relationship(type_info, &property_id)?;
 
             match data_relationship.kind {
@@ -216,7 +216,7 @@ impl InMemoryStore {
                         )?;
                     }
                     ValueCardinality::Many => {
-                        let Data::Sequence(seq) = attribute.value.data else {
+                        let Value::Sequence(seq, _) = attribute.value else {
                             return Err(DomainError::DataStoreBadRequest(anyhow!(
                                 "Expected sequence for ValueCardinality::Many"
                             )));
@@ -237,7 +237,7 @@ impl InMemoryStore {
             }
         }
 
-        let collection = self.collections.get_mut(&entity.type_def_id).unwrap();
+        let collection = self.collections.get_mut(&type_def_id).unwrap();
 
         if collection.contains_key(&entity_key) {
             return Err(DomainError::EntityAlreadyExists);
@@ -265,9 +265,9 @@ impl InMemoryStore {
 
         let foreign_key = match &data_relationship.target {
             DataRelationshipTarget::Unambiguous(entity_def_id) => {
-                if &value.type_def_id == entity_def_id {
+                if &value.type_def_id() == entity_def_id {
                     let foreign_id = self.write_new_entity_inner(value, engine)?;
-                    let dynamic_key = Self::extract_dynamic_key(&foreign_id.data)?;
+                    let dynamic_key = Self::extract_dynamic_key(&foreign_id)?;
 
                     EntityKey {
                         type_def_id: *entity_def_id,
@@ -290,11 +290,11 @@ impl InMemoryStore {
                 union_def_id: _,
                 variants,
             } => {
-                if variants.contains(&value.type_def_id) {
+                if variants.contains(&value.type_def_id()) {
                     // Explicit data struct of a given variant
-                    let entity_def_id = value.type_def_id;
+                    let entity_def_id = value.type_def_id();
                     let foreign_id = self.write_new_entity_inner(value, engine)?;
-                    let dynamic_key = Self::extract_dynamic_key(&foreign_id.data)?;
+                    let dynamic_key = Self::extract_dynamic_key(&foreign_id)?;
 
                     EntityKey {
                         type_def_id: entity_def_id,
@@ -310,7 +310,7 @@ impl InMemoryStore {
                                 .as_ref()
                                 .unwrap();
 
-                            if entity_info.id_value_def_id == value.type_def_id {
+                            if entity_info.id_value_def_id == value.type_def_id() {
                                 Some((*variant_def_id, entity_info))
                             } else {
                                 None
@@ -369,24 +369,24 @@ impl InMemoryStore {
         id_value: Value,
         engine: &DomainEngine,
     ) -> DomainResult<EntityKey> {
-        let foreign_key = Self::extract_dynamic_key(&id_value.data)?;
+        let foreign_key = Self::extract_dynamic_key(&id_value)?;
         let entity_data = self.look_up_entity(foreign_entity_def_id, &foreign_key);
 
         if entity_data.is_none() && entity_info.is_self_identifying {
             // This type has UPSERT semantics.
             // Synthesize the entity, write it and move on..
 
-            let entity_data = BTreeMap::from([(
+            let entity_data = FnvHashMap::from_iter([(
                 PropertyId::subject(entity_info.id_relationship_id),
                 Attribute::from(id_value),
             )]);
             self.write_new_entity_inner(
-                Value::new(Data::Struct(entity_data), foreign_entity_def_id),
+                Value::Struct(Box::new(entity_data), foreign_entity_def_id),
                 engine,
             )?;
         } else if entity_data.is_none() {
             let ontology = engine.ontology();
-            let type_info = ontology.get_type_info(id_value.type_def_id);
+            let type_info = ontology.get_type_info(id_value.type_def_id());
             let repr = if let Some(operator_addr) = type_info.operator_addr {
                 // TODO: Easier way to report values in "human readable"/JSON format
 
@@ -421,7 +421,7 @@ impl InMemoryStore {
             GeneratedId::AutoIncrementI64(def_id) => {
                 let id_value = self.int_id_counter;
                 self.int_id_counter += 1;
-                Ok(Value::new(Data::I64(id_value), def_id))
+                Ok(Value::I64(id_value, def_id))
             }
         }
     }

@@ -1,6 +1,5 @@
-use std::collections::BTreeMap;
-
 use anyhow::anyhow;
+use fnv::FnvHashMap;
 use ontol_runtime::{
     condition::{CondTerm, Condition},
     ontology::{
@@ -9,7 +8,7 @@ use ontol_runtime::{
     },
     select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
     sequence::{Sequence, SubSequence},
-    value::{Attribute, Data, PropertyId, Value},
+    value::{Attribute, PropertyId, Value},
     Role,
 };
 use tracing::{debug, error};
@@ -155,7 +154,7 @@ impl InMemoryStore {
         &self,
         type_info: &TypeInfo,
         entity_key: &DynamicKey,
-        mut properties: BTreeMap<PropertyId, Attribute>,
+        mut properties: FnvHashMap<PropertyId, Attribute>,
         struct_select: &StructSelect,
         engine: &DomainEngine,
     ) -> DomainResult<Value> {
@@ -184,8 +183,8 @@ impl InMemoryStore {
                 ValueCardinality::Many => {
                     properties.insert(
                         *property_id,
-                        Value::new(
-                            Data::Sequence(Sequence::new(attrs)),
+                        Value::Sequence(
+                            Sequence::new(attrs),
                             match data_relationship.target {
                                 DataRelationshipTarget::Unambiguous(def_id) => def_id,
                                 DataRelationshipTarget::Union { union_def_id, .. } => union_def_id,
@@ -197,7 +196,7 @@ impl InMemoryStore {
             }
         }
 
-        Ok(Value::new(Data::Struct(properties), struct_select.def_id))
+        Ok(Value::Struct(Box::new(properties), struct_select.def_id))
     }
 
     fn sub_query_attributes(
@@ -298,10 +297,10 @@ impl InMemoryStore {
                     }
                 }
 
-                Ok(Value {
-                    data: Data::Struct(properties.clone()),
-                    type_def_id: type_info.def_id,
-                })
+                Ok(Value::Struct(
+                    Box::new(properties.clone()),
+                    type_info.def_id,
+                ))
             }
             Select::EntityId => Err(DomainError::DataStore(anyhow!("entity id"))),
             Select::Entity(entity_select) => match &entity_select.source {
@@ -335,7 +334,7 @@ impl InMemoryStore {
         entity_key: &EntityKey,
         struct_select: &StructSelect,
         type_info: &TypeInfo,
-        properties: &BTreeMap<PropertyId, Attribute>,
+        properties: &FnvHashMap<PropertyId, Attribute>,
         engine: &DomainEngine,
     ) -> DomainResult<Value> {
         let mut select_properties = struct_select.properties.clone();
