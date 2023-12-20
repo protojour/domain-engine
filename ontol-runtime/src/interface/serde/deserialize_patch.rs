@@ -7,7 +7,7 @@ use crate::{
 
 use super::{
     operator::SerdeOperatorAddr,
-    processor::{RecursionLimitError, SerdeProcessor, SubProcessorContext},
+    processor::{ProcessorMode, RecursionLimitError, SerdeProcessor, SubProcessorContext},
 };
 
 pub struct GraphqlPatchVisitor<'on, 'p> {
@@ -22,7 +22,7 @@ pub struct GraphqlPatchVisitor<'on, 'p> {
 enum Operation {
     Create,
     Update,
-    // Delete,
+    Delete,
 }
 
 impl<'on, 'p, 'de> Visitor<'de> for GraphqlPatchVisitor<'on, 'p> {
@@ -39,31 +39,53 @@ impl<'on, 'p, 'de> Visitor<'de> for GraphqlPatchVisitor<'on, 'p> {
         let mut patches = vec![];
 
         while let Some(operation) = map.next_key::<Operation>()? {
-            let sequence_attr = map.next_value_seed(
-                self.entity_sequence_processor.with_level(
-                    self.entity_sequence_processor
-                        .level
-                        .local_child()
-                        .map_err(RecursionLimitError::to_de_error)?,
-                ),
-            )?;
-            let Value::Sequence(mut seq, _def_id) = sequence_attr.value else {
-                return Err(<A::Error as serde::de::Error>::custom("Not a sequence"));
-            };
-
             match operation {
-                Operation::Create => {
-                    patches.extend(seq.attrs);
-                }
-                Operation::Update => {
-                    for attr in seq.attrs.iter_mut() {
-                        match &mut attr.value {
-                            Value::Struct(attrs, def_id) => {
+                Operation::Create | Operation::Update => {
+                    let sub_processor = self.entity_sequence_processor.with_level(
+                        self.entity_sequence_processor
+                            .level
+                            // prevent recursing into GraphqlPatchVisitor again:
+                            .local_child()
+                            .map_err(RecursionLimitError::to_de_error)?,
+                    );
+
+                    let Value::Sequence(mut seq, _def_id) =
+                        map.next_value_seed(sub_processor)?.value
+                    else {
+                        return Err(<A::Error as serde::de::Error>::custom("Not a sequence"));
+                    };
+
+                    if matches!(operation, Operation::Update) {
+                        // Transform into StructUpdate values:
+                        for attr in seq.attrs.iter_mut() {
+                            if let Value::Struct(attrs, def_id) = &mut attr.value {
                                 let attrs = std::mem::take(attrs);
                                 attr.value = Value::StructUpdate(attrs, *def_id);
                             }
-                            _ => {}
                         }
+                    }
+
+                    patches.extend(seq.attrs);
+                }
+                Operation::Delete => {
+                    let mut sub_processor = self.entity_sequence_processor.with_level(
+                        self.entity_sequence_processor
+                            .level
+                            // prevent recursing into GraphqlPatchVisitor again:
+                            .local_child()
+                            .map_err(RecursionLimitError::to_de_error)?,
+                    );
+                    // Go to id-only mode
+                    sub_processor.mode = ProcessorMode::Delete;
+
+                    let Value::Sequence(mut seq, _def_id) =
+                        map.next_value_seed(sub_processor)?.value
+                    else {
+                        return Err(<A::Error as serde::de::Error>::custom("Not a sequence"));
+                    };
+
+                    for attr in seq.attrs.iter_mut() {
+                        attr.rel_params = Value::DeleteRelationship(DefId::unit());
                     }
                     patches.extend(seq.attrs);
                 }

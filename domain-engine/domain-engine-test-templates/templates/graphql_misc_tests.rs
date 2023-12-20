@@ -561,4 +561,30 @@ async fn test_gitmesh_patch_members() {
     .exec([], &schema, &ctx)
     .await
     .unwrap();
+
+    // Delete a member
+    r#"mutation {
+        Organization(
+            update: [{
+                id: "org/lolsoft"
+                members: {
+                    delete: [{ id: "user/bob" }]
+                }
+            }]
+        ) { node { id } }
+    }"#
+    .exec([], &schema, &ctx)
+    .await
+    .unwrap();
+
+    expect_eq!(
+        actual = r#"{organizations { nodes { members { nodes { id }}}}}"#
+            .exec([], &schema, &ctx)
+            .await,
+        expected = Ok(graphql_value!({
+            "organizations": {
+                "nodes": [{ "members": { "nodes": [] } }]
+            }
+        })),
+    );
 }

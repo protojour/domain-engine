@@ -158,7 +158,20 @@ impl UnionOperator {
     }
 
     pub fn variants(&self, mode: ProcessorMode, level: ProcessorLevel) -> FilteredVariants<'_> {
-        if matches!(mode, ProcessorMode::Raw) || level.is_global_root() {
+        if matches!(mode, ProcessorMode::Delete) {
+            // Use only VariantPurpose::Identification
+            let skip_data = self
+                .variants
+                .iter()
+                .enumerate()
+                .find(|(_, variant)| variant.discriminator.purpose >= VariantPurpose::Data);
+
+            if let Some((skip_data, _)) = skip_data {
+                Self::filtered_variants(&self.variants[..skip_data])
+            } else {
+                Self::filtered_variants(&self.variants)
+            }
+        } else if matches!(mode, ProcessorMode::Raw) || level.is_global_root() {
             let skip_id = self
                 .variants
                 .iter()
@@ -304,7 +317,10 @@ impl SerdeProperty {
                     return None;
                 }
             }
-            ProcessorMode::Read | ProcessorMode::Raw | ProcessorMode::RawTreeOnly => {}
+            ProcessorMode::Read
+            | ProcessorMode::Raw
+            | ProcessorMode::RawTreeOnly
+            | ProcessorMode::Delete => {}
         }
 
         if let Some(parent_property_id) = parent_property_id {

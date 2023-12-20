@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use anyhow::anyhow;
 use fnv::FnvHashMap;
+use itertools::Itertools;
 use ontol_runtime::{
     condition::Condition,
     interface::serde::{operator::SerdeOperatorAddr, processor::ProcessorMode},
@@ -101,9 +102,14 @@ impl InMemoryStore {
                         Value::Patch(patch_attributes, _) => {
                             for attribute in patch_attributes {
                                 if matches!(attribute.rel_params, Value::DeleteRelationship(_)) {
-                                    return Err(DomainError::DataStore(anyhow!(
-                                        "Multi-relation delete not yet implemented"
-                                    )));
+                                    self.delete_entity_relationship(
+                                        type_info.def_id,
+                                        &dynamic_key,
+                                        property_id,
+                                        attribute.value,
+                                        data_relationship,
+                                        engine,
+                                    )?;
                                 } else {
                                     match &attribute.value {
                                         Value::Struct(..) => {
@@ -437,6 +443,83 @@ impl InMemoryStore {
         }
 
         Ok(())
+    }
+
+    fn delete_entity_relationship(
+        &mut self,
+        entity_def_id: DefId,
+        entity_key: &DynamicKey,
+        property_id: PropertyId,
+        foreign_id: Value,
+        data_relationship: &DataRelationshipInfo,
+        engine: &DomainEngine,
+    ) -> DomainResult<()> {
+        let ontology = engine.ontology();
+
+        let foreign_key = match &data_relationship.target {
+            DataRelationshipTarget::Unambiguous(entity_def_id) => self
+                .resolve_foreign_key_for_edge(
+                    *entity_def_id,
+                    ontology
+                        .get_type_info(*entity_def_id)
+                        .entity_info
+                        .as_ref()
+                        .unwrap(),
+                    foreign_id,
+                    engine,
+                )?,
+            DataRelationshipTarget::Union {
+                union_def_id: _,
+                variants,
+            } => {
+                let (variant_def_id, entity_info) = variants
+                    .iter()
+                    .find_map(|variant_def_id| {
+                        let entity_info = ontology
+                            .get_type_info(*variant_def_id)
+                            .entity_info
+                            .as_ref()
+                            .unwrap();
+
+                        if entity_info.id_value_def_id == foreign_id.type_def_id() {
+                            Some((*variant_def_id, entity_info))
+                        } else {
+                            None
+                        }
+                    })
+                    .expect("Corresponding entity def id not found for the given ID");
+
+                self.resolve_foreign_key_for_edge(variant_def_id, entity_info, foreign_id, engine)?
+            }
+        };
+
+        let edge_collection = self
+            .edge_collections
+            .get_mut(&property_id.relationship_id)
+            .expect("No edge collection");
+        let edges = &mut edge_collection.edges;
+
+        let local_key = EntityKey {
+            type_def_id: entity_def_id,
+            dynamic_key: entity_key.clone(),
+        };
+
+        let edge_index = match property_id.role {
+            Role::Subject => edges
+                .iter()
+                .find_position(|edge| edge.from == local_key && edge.to == foreign_key),
+            Role::Object => edges
+                .iter()
+                .find_position(|edge| edge.from == foreign_key && edge.to == local_key),
+        };
+
+        match edge_index {
+            Some((index, _)) => {
+                edges.remove(index);
+                Ok(())
+            }
+            None => Err(DomainError::EntityNotFound),
+        }
     }
 
     /// This is for creating a relationship to an existing entity, using only a "foreign key".

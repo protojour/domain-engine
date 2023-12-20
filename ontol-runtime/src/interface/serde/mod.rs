@@ -7,6 +7,7 @@ use crate::DefId;
 use self::operator::{SerdeOperatorAddr, StructOperator};
 
 mod deserialize;
+mod deserialize_id;
 mod deserialize_matcher;
 mod deserialize_option;
 mod deserialize_patch;

@@ -8,6 +8,7 @@ use tracing::trace;
 
 use crate::{
     interface::serde::{
+        deserialize_id::IdSingletonStructVisitor,
         deserialize_matcher::MapMatchResult,
         deserialize_struct::{deserialize_struct, SpecialAddrs, StructVisitor},
         operator::SerdeStructFlags,
@@ -218,10 +219,13 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                     )
                 }
             },
-            (SerdeOperator::IdSingletonStruct(_name, _inner_addr), _) => {
-                //deserializer.deserialize_map()
-                todo!()
-            }
+            (SerdeOperator::IdSingletonStruct(name, inner_addr), _) => deserializer
+                .deserialize_map(IdSingletonStructVisitor {
+                    processor: self,
+                    property_name: name,
+                    inner_addr: *inner_addr,
+                    ontology: self.ontology,
+                }),
             (SerdeOperator::Struct(struct_op), _) => deserializer.deserialize_map(StructVisitor {
                 processor: self,
                 buffered_attrs: Default::default(),
