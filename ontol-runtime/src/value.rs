@@ -183,7 +183,7 @@ impl<'d, 'o> Display for FormatDataAsText<'d, 'o> {
                 }
                 Data::Struct(props) => {
                     // concatenate every prop (not sure this is a good idea, since the order is not defined)
-                    for (_, attr) in props {
+                    for attr in props.values() {
                         FormatDataAsText {
                             data: &attr.value.data,
                             type_def_id: attr.value.type_def_id,
