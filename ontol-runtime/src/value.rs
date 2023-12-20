@@ -181,6 +181,19 @@ impl<'d, 'o> Display for FormatDataAsText<'d, 'o> {
                     // Chrono 0.5 hopefully fixes this
                     write!(f, "{}", datetime.to_rfc3339())
                 }
+                Data::Struct(props) => {
+                    // concatenate every prop (not sure this is a good idea, since the order is not defined)
+                    for (_, attr) in props {
+                        FormatDataAsText {
+                            data: &attr.value.data,
+                            type_def_id: attr.value.type_def_id,
+                            ontology: self.ontology,
+                        }
+                        .fmt(f)?;
+                    }
+
+                    Ok(())
+                }
                 data => panic!("not a text-like type: {data:?}"),
             }
         }
