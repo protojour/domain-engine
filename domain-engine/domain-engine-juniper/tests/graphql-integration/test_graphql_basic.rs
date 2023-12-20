@@ -942,7 +942,7 @@ fn test_graphql_guitar_synth_union_input_union_field_list() {
             // from "synth". Note the synth `type` is deduplicated.
             FieldInfo::from(("polyphony", "_ontol_i64")),
             // object properties ordered last
-            FieldInfo::from(("played_by", "[artistEdgeInput!]")),
+            FieldInfo::from(("played_by", "artistPatchEdgesInput!")),
         ]
     );
 }

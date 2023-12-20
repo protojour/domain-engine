@@ -22,8 +22,9 @@ use super::{
         MapMatchKind, NumberMatcher, SequenceMatcher, StringMatcher, TextPatternMatcher,
         UnionMatcher, UnitMatcher, ValueMatcher,
     },
+    deserialize_patch::GraphqlPatchVisitor,
     operator::{FilteredVariants, SerdeOperator},
-    processor::{ScalarFormat, SerdeProcessor},
+    processor::{ProcessorMode, ScalarFormat, SerdeProcessor},
 };
 
 pub(super) struct MatcherVisitor<'on, 'p, M> {
@@ -166,10 +167,22 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
             (SerdeOperator::DynamicSequence, _) => {
                 Err(Error::custom("Cannot deserialize dynamic sequence"))
             }
-            (SerdeOperator::RelationSequence(seq_op), _) => deserializer.deserialize_seq(
-                SequenceMatcher::new(&seq_op.ranges, seq_op.def.def_id, self.ctx)
-                    .into_visitor(self),
-            ),
+            (SerdeOperator::RelationSequence(seq_op), _) => match (self.mode, seq_op.to_entity) {
+                (ProcessorMode::GraphqlUpdate, true)
+                    if !self.level.is_global_root() && self.level.is_local_root() =>
+                {
+                    deserializer.deserialize_map(GraphqlPatchVisitor {
+                        entity_sequence_processor: self,
+                        inner_addr: seq_op.ranges[0].addr,
+                        type_def_id: seq_op.def.def_id,
+                        ctx: self.ctx,
+                    })
+                }
+                _ => deserializer.deserialize_seq(
+                    SequenceMatcher::new(&seq_op.ranges, seq_op.def.def_id, self.ctx)
+                        .into_visitor(self),
+                ),
+            },
             (SerdeOperator::ConstructorSequence(seq_op), _) => deserializer.deserialize_seq(
                 SequenceMatcher::new(&seq_op.ranges, seq_op.def.def_id, self.ctx)
                     .into_visitor(self),

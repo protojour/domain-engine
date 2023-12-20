@@ -86,7 +86,7 @@ impl InMemoryStore {
 
     pub fn extract_dynamic_key(id_value: &Value) -> DomainResult<DynamicKey> {
         match id_value {
-            Value::Struct(struct_map, _) => {
+            Value::Struct(struct_map, _) | Value::StructUpdate(struct_map, _) => {
                 if struct_map.len() != 1 {
                     warn!("struct map was not 1: {struct_map:?}");
                     return Err(DomainError::InherentIdNotFound);

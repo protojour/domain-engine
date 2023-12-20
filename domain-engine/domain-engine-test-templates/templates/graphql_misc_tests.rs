@@ -5,7 +5,9 @@ use domain_engine_juniper::{
     context::ServiceCtx,
     juniper::{graphql_value, InputValue},
 };
-use domain_engine_test_utils::graphql_test_utils::{Exec, TestCompileSchema, ValueExt};
+use domain_engine_test_utils::graphql_test_utils::{
+    Exec, GraphqlTestResultExt, TestCompileSchema, ValueExt,
+};
 use ontol_runtime::{config::DataStoreConfig, ontology::Ontology};
 use ontol_test_utils::{
     examples::{GITMESH, GUITAR_SYNTH_UNION},
@@ -449,4 +451,114 @@ async fn test_gitmesh_update_owner_relation() {
             ]
         }))
     );
+}
+
+#[test(tokio::test)]
+async fn test_gitmesh_patch_members() {
+    let (test, [schema]) = TestPackages::with_sources([(ROOT, GITMESH.1)])
+        .with_data_store(ROOT, DataStoreConfig::Default)
+        .compile_schemas([SourceName::root()]);
+    let ctx: ServiceCtx = make_domain_engine(test.ontology.clone()).await.into();
+
+    r#"mutation {
+        User(
+            create: [
+                { id: "user/bob" email: "bob@bob.com" }
+                { id: "user/alice" email: "alice@alice.com" }
+            ]
+        ) { node { id } }
+        Organization(
+            create: [{ id: "org/lolsoft" }]
+        ) { node { id } }
+    }"#
+    .exec([], &schema, &ctx)
+    .await
+    .unwrap();
+
+    r#"mutation {
+        Organization(
+            update: [{
+                id: "org/lolsoft"
+                members: {
+                    create: [{
+                        id: "user/bob"
+                        _edge: {
+                            role: "contributor"
+                        }
+                    }]
+                }
+            }]
+        ) { node { id } }
+    }"#
+    .exec([], &schema, &ctx)
+    .await
+    .unwrap();
+
+    expect_eq!(
+        actual = r#"{
+            organizations {
+                nodes {
+                    members {
+                        nodes { id }
+                    }
+                }
+            }
+        }"#
+        .exec([], &schema, &ctx)
+        .await,
+        expected = Ok(graphql_value!({
+            "organizations": {
+                "nodes": [
+                    {
+                        "members": {
+                            "nodes": [
+                                { "id": "user/bob" }
+                            ]
+                        }
+                    }
+                ]
+            }
+        })),
+    );
+
+    expect_eq!(
+        actual = r#"mutation {
+            Organization(
+                update: [{
+                    id: "org/lolsoft"
+                    members: {
+                        update: [{
+                            id: "user/alice"
+                            _edge: {
+                                role: "admin"
+                            }
+                        }]
+                    }
+                }]
+            ) { node { id } }
+        }"#
+        .exec([], &schema, &ctx)
+        .await
+        .unwrap_first_exec_error_msg(),
+        expected = "entity not found"
+    );
+
+    r#"mutation {
+        Organization(
+            update: [{
+                id: "org/lolsoft"
+                members: {
+                    update: [{
+                        id: "user/bob"
+                        _edge: {
+                            role: "admin"
+                        }
+                    }]
+                }
+            }]
+        ) { node { id } }
+    }"#
+    .exec([], &schema, &ctx)
+    .await
+    .unwrap();
 }

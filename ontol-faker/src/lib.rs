@@ -153,7 +153,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                 return Ok(Value::Sequence(Sequence::new([]), DefId::unit()).into());
             }
             SerdeOperator::RelationSequence(seq_op) => {
-                return if processor.level().current_level() > SENSIBLE_RECURSION_LEVEL {
+                return if processor.level().current_global_level() > SENSIBLE_RECURSION_LEVEL {
                     Ok(Value::Sequence(Sequence::new([]), seq_op.def.def_id).into())
                 } else {
                     let variant = &seq_op.ranges[0];

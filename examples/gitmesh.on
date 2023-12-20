@@ -32,6 +32,13 @@ map users(
     }
 )
 
+map organizations(
+    (),
+    Organization: {
+        ..Organization match(),
+    }
+)
+
 map repositories(
     (),
     Repository: {

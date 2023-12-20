@@ -158,7 +158,7 @@ impl UnionOperator {
     }
 
     pub fn variants(&self, mode: ProcessorMode, level: ProcessorLevel) -> FilteredVariants<'_> {
-        if matches!(mode, ProcessorMode::Raw) || level.is_root() {
+        if matches!(mode, ProcessorMode::Raw) || level.is_global_root() {
             let skip_id = self
                 .variants
                 .iter()

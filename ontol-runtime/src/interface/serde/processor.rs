@@ -138,8 +138,10 @@ pub enum ProcessorMode {
 
 #[derive(Copy, Clone, Debug)]
 pub struct ProcessorLevel {
-    level: u16,
+    global_level: u16,
     recursion_limit: u16,
+    /// Indicator for when the same operator is reused in a recursive manner
+    local_level: u8,
 }
 
 #[derive(Clone, Default)]
@@ -197,41 +199,60 @@ const DEFAULT_RECURSION_LIMIT: u16 = 64;
 impl ProcessorLevel {
     pub const fn new_root() -> Self {
         Self {
-            level: 0,
+            global_level: 0,
+            local_level: 0,
             recursion_limit: DEFAULT_RECURSION_LIMIT,
         }
     }
 
     pub const fn new_root_with_recursion_limit(limit: u16) -> Self {
         Self {
-            level: 0,
+            global_level: 0,
+            local_level: 0,
             recursion_limit: limit,
         }
     }
 
     pub const fn new_child() -> Self {
         Self {
-            level: 1,
+            global_level: 1,
+            local_level: 0,
             recursion_limit: DEFAULT_RECURSION_LIMIT,
         }
     }
 
     pub const fn child(self) -> Result<Self, RecursionLimitError> {
-        if self.level == self.recursion_limit {
+        if self.global_level == self.recursion_limit {
             return Err(RecursionLimitError);
         }
         Ok(Self {
-            level: self.level + 1,
+            global_level: self.global_level + 1,
+            local_level: 0,
             recursion_limit: self.recursion_limit,
         })
     }
 
-    pub const fn is_root(&self) -> bool {
-        self.level == 0
+    pub const fn local_child(self) -> Result<Self, RecursionLimitError> {
+        if self.global_level == self.recursion_limit {
+            return Err(RecursionLimitError);
+        }
+        Ok(Self {
+            global_level: self.global_level + 1,
+            local_level: self.local_level + 1,
+            recursion_limit: self.recursion_limit,
+        })
     }
 
-    pub const fn current_level(&self) -> u16 {
-        self.level
+    pub const fn is_global_root(&self) -> bool {
+        self.global_level == 0
+    }
+
+    pub const fn is_local_root(&self) -> bool {
+        self.local_level == 0
+    }
+
+    pub const fn current_global_level(&self) -> u16 {
+        self.global_level
     }
 }
 
