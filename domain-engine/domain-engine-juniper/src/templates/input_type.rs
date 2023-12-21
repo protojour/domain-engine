@@ -96,7 +96,7 @@ impl juniper::GraphQLType<GqlScalar> for InputType {
             }) => {
                 let arguments = vec![
                     reg.modified_arg::<InputType>(
-                        "create",
+                        "add",
                         TypeModifier::Array {
                             array: Optionality::Optional,
                             element: Optionality::Mandatory,
@@ -114,7 +114,7 @@ impl juniper::GraphQLType<GqlScalar> for InputType {
                             .get_schema_type(*node_type_addr, TypingPurpose::PartialInput),
                     ),
                     reg.modified_arg::<InputType>(
-                        "delete",
+                        "remove",
                         TypeModifier::Array {
                             array: Optionality::Optional,
                             element: Optionality::Mandatory,

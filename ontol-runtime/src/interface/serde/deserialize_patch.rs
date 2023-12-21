@@ -20,9 +20,9 @@ pub struct GraphqlPatchVisitor<'on, 'p> {
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum Operation {
-    Create,
+    Add,
     Update,
-    Delete,
+    Remove,
 }
 
 impl<'on, 'p, 'de> Visitor<'de> for GraphqlPatchVisitor<'on, 'p> {
@@ -40,7 +40,7 @@ impl<'on, 'p, 'de> Visitor<'de> for GraphqlPatchVisitor<'on, 'p> {
 
         while let Some(operation) = map.next_key::<Operation>()? {
             match operation {
-                Operation::Create | Operation::Update => {
+                Operation::Add | Operation::Update => {
                     let sub_processor = self.entity_sequence_processor.with_level(
                         self.entity_sequence_processor
                             .level
@@ -67,7 +67,7 @@ impl<'on, 'p, 'de> Visitor<'de> for GraphqlPatchVisitor<'on, 'p> {
 
                     patches.extend(seq.attrs);
                 }
-                Operation::Delete => {
+                Operation::Remove => {
                     let mut sub_processor = self.entity_sequence_processor.with_level(
                         self.entity_sequence_processor
                             .level

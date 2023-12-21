@@ -480,7 +480,7 @@ async fn test_gitmesh_patch_members() {
             update: [{
                 id: "org/lolsoft"
                 members: {
-                    create: [{
+                    add: [{
                         id: "user/bob"
                         _edge: {
                             role: "contributor"
@@ -568,7 +568,7 @@ async fn test_gitmesh_patch_members() {
             update: [{
                 id: "org/lolsoft"
                 members: {
-                    delete: [{ id: "user/bob" }]
+                    remove: [{ id: "user/bob" }]
                 }
             }]
         ) { node { id } }
@@ -632,7 +632,7 @@ async fn test_gitmesh_ownership_transfer() {
                 update: [{
                     id: $userId
                     repositories: {
-                        create: [{ id: $repoId }]
+                        add: [{ id: $repoId }]
                     }
                 }]
             ) {
