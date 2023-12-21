@@ -1,5 +1,6 @@
 use std::collections::{BTreeSet, HashSet};
 
+use fnv::FnvHashSet;
 use indexmap::IndexMap;
 use ontol_runtime::{
     interface::serde::{
@@ -46,28 +47,25 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             }
         }
 
-        if false {
-            if let Some(union_memberships) = self.union_member_cache.cache.get(&def.def_id) {
-                for union_def_id in union_memberships {
-                    let Some(properties) = self.relations.properties_by_def_id(*union_def_id)
-                    else {
-                        continue;
-                    };
-                    let Some(table) = &properties.table else {
-                        continue;
-                    };
+        if let Some(union_memberships) = self.union_member_cache.cache.get(&def.def_id) {
+            for union_def_id in union_memberships {
+                let Some(properties) = self.relations.properties_by_def_id(*union_def_id) else {
+                    continue;
+                };
+                let Some(table) = &properties.table else {
+                    continue;
+                };
 
-                    for (property_id, property) in table {
-                        let meta = self.defs.relationship_meta(property_id.relationship_id);
+                for (property_id, property) in table {
+                    let meta = self.defs.relationship_meta(property_id.relationship_id);
 
-                        if meta.relationship.object.0 == *union_def_id {
-                            self.add_struct_op_property(
-                                *property_id,
-                                property,
-                                def.modifier,
-                                &mut serde_properties,
-                            );
-                        }
+                    if meta.relationship.object.0 == *union_def_id {
+                        self.add_struct_op_property(
+                            *property_id,
+                            property,
+                            def.modifier,
+                            &mut serde_properties,
+                        );
                     }
                 }
             }
@@ -190,20 +188,30 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             })
             .clone();
 
+        // avoid duplicated properties, since some properties may already be "imported" from unions in which
+        // the types are members,
+        let mut property_deduplication: FnvHashSet<PropertyId> = Default::default();
+
+        for serde_property in intersected_map.properties.values() {
+            property_deduplication.insert(serde_property.property_id);
+        }
+
         for next_key in iterator {
             let next_id = self.gen_addr_lazy(next_key.clone()).unwrap();
 
             if let Ok(next_map_type) = self.find_unambiguous_struct_operator(next_id) {
-                for (key, value) in &next_map_type.properties {
-                    insert_property(
-                        &mut intersected_map.properties,
-                        key,
-                        *value,
-                        match next_key {
-                            SerdeKey::Def(def) => def.modifier,
-                            SerdeKey::Intersection(_) => panic!(),
-                        },
-                    );
+                for (key, serde_property) in &next_map_type.properties {
+                    if !property_deduplication.contains(&serde_property.property_id) {
+                        insert_property(
+                            &mut intersected_map.properties,
+                            key,
+                            *serde_property,
+                            match next_key {
+                                SerdeKey::Def(def) => def.modifier,
+                                SerdeKey::Intersection(_) => panic!(),
+                            },
+                        );
+                    }
                 }
             }
         }
