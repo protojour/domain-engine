@@ -514,11 +514,6 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             ReprKind::Union(members) | ReprKind::StructUnion(members) => {
                 if def.modifier.contains(SerdeModifier::UNION) {
                     Some(self.alloc_union_repr_operator(def, typename, properties))
-                    // let addr = self.alloc_addr(&def);
-                    // Some(OperatorAllocation::Allocated(
-                    //     addr,
-                    //     self.create_union_repr_operator(def, typename, properties),
-                    // ))
                 } else {
                     Some(self.alloc_struct_operator(def, typename, properties, {
                         let mut flags = SerdeStructFlags::empty();
@@ -528,24 +523,6 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         flags
                     }))
                 }
-
-                // let addr = self.alloc_addr(&def);
-                // Some(OperatorAllocation::Allocated(
-                //     addr,
-                //     if def.modifier.contains(SerdeModifier::UNION) {
-                //         self.create_union_operator(def, typename, properties)
-                //     } else {
-                //         // just the inherent properties are requested.
-                //         // Don't build a union
-                //         self.create_struct_operator(def, typename, properties, {
-                //             let mut flags = SerdeStructFlags::empty();
-                //             for (def_id, _) in members {
-                //                 flags |= self.struct_flags_from_def_id(*def_id);
-                //             }
-                //             flags
-                //         })
-                //     },
-                // ))
             }
             ReprKind::Seq | ReprKind::Intersection(_) => match &properties.constructor {
                 Constructor::Sequence(sequence) => {
@@ -683,15 +660,6 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         } else {
             let flags = self.struct_flags_from_def_id(def.def_id);
             Some(self.alloc_struct_operator(def, typename, properties, flags))
-
-            // prevent recursion
-            // let new_addr = self.alloc_addr(&def);
-            // let flags = self.struct_flags_from_def_id(def.def_id);
-            //
-            // Some(OperatorAllocation::Allocated(
-            //     new_addr,
-            //     self.create_struct_operator(def, typename, properties, flags),
-            // ))
         }
     }
 
@@ -746,7 +714,6 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 )))
             }
         } else if modifier.contains(SerdeModifier::INHERENT_PROPS) {
-            // let addr = self.alloc_addr(&def);
             let mut flags = SerdeStructFlags::empty();
             for (def_id, _) in members {
                 flags |= self.struct_flags_from_def_id(*def_id);
