@@ -5,19 +5,20 @@ use ontol_runtime::{
     interface::{
         discriminator::LeafDiscriminant,
         serde::{
-            operator::{SerdeOperator, SerdeOperatorAddr, ValueUnionVariant},
+            operator::{SerdeOperator, SerdeOperatorAddr, SerdeUnionVariant},
             SerdeDef, SerdeKey, SerdeModifier,
         },
     },
     smart_format,
 };
 use smartstring::alias::String;
+use tracing::info;
 
 use super::serde_generator::{operator_to_leaf_discriminant, SerdeGenerator};
 
 pub struct UnionBuilder {
     // variants _sorted_ by purpose
-    variant_candidates_by_purpose: BTreeMap<VariantPurpose, Vec<ValueUnionVariant>>,
+    variant_candidates_by_purpose: BTreeMap<VariantPurpose, Vec<SerdeUnionVariant>>,
     def: SerdeDef,
 }
 
@@ -39,7 +40,7 @@ impl UnionBuilder {
             SerdeOperatorAddr,
             SerdeDef,
         ) -> SerdeOperatorAddr,
-    ) -> Result<Vec<ValueUnionVariant>, String> {
+    ) -> Result<Vec<SerdeUnionVariant>, String> {
         // sanity check
         let mut ambiguous_discriminant_debug: BTreeMap<Discriminant, usize> = Default::default();
 
@@ -65,10 +66,9 @@ impl UnionBuilder {
                 Discriminant::HasAttribute(_, _, leaf @ LeafDiscriminant::IsAny) => {
                     // TODO: We don't know that we have to do any disambiguation here
                     // (there might be only one singleton property)
-                    if let Some(operator) = generator.gen_operator(SerdeKey::Def(SerdeDef::new(
-                        result_def.def_id,
-                        self.def.modifier.cross_def_flags(),
-                    ))) {
+                    if let Some(operator) = generator.gen_operator_lazy(SerdeKey::Def(
+                        SerdeDef::new(result_def.def_id, self.def.modifier.cross_def_flags()),
+                    )) {
                         *leaf = operator_to_leaf_discriminant(operator);
                     }
                 }
@@ -103,15 +103,19 @@ impl UnionBuilder {
                 inner_def
             }
             VariantPurpose::Data => {
+                let cross_def_flags = self.def.modifier.cross_def_flags();
+
                 discriminator.serde_def.modifier |= SerdeModifier::INHERENT_PROPS;
+                discriminator.serde_def.modifier |= cross_def_flags;
 
                 let mut inner_def = self.def.with_def(discriminator.serde_def.def_id);
                 inner_def.modifier |= SerdeModifier::INHERENT_PROPS;
+                inner_def.modifier |= cross_def_flags;
                 inner_def
             }
         };
 
-        let addr = match generator.gen_addr(SerdeKey::Def(inner_def)) {
+        let addr = match generator.gen_addr_lazy(SerdeKey::Def(inner_def)) {
             Some(addr) => addr,
             None => {
                 panic!();
@@ -133,6 +137,8 @@ impl UnionBuilder {
         match operator {
             SerdeOperator::Union(union_op) => {
                 for variant in union_op.unfiltered_variants() {
+                    info!("push UNION variant discriminator for {variant:?} {discriminator:?}");
+
                     let mut child_scope: Vec<&VariantDiscriminator> = vec![];
                     child_scope.extend(scope.iter());
                     child_scope.push(discriminator);
@@ -154,7 +160,7 @@ impl UnionBuilder {
                             self.variant_candidates_by_purpose
                                 .entry(scoping.purpose)
                                 .or_default()
-                                .push(ValueUnionVariant {
+                                .push(SerdeUnionVariant {
                                     discriminator: (*scoping).clone(),
                                     addr,
                                 });
@@ -168,7 +174,7 @@ impl UnionBuilder {
                         self.variant_candidates_by_purpose
                             .entry(discriminator.purpose)
                             .or_default()
-                            .push(ValueUnionVariant {
+                            .push(SerdeUnionVariant {
                                 discriminator: discriminator.clone(),
                                 addr,
                             });

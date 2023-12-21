@@ -301,7 +301,7 @@ impl<'m> Compiler<'m> {
                         &mut serde_generator,
                         &data_relationships,
                     ),
-                    operator_addr: serde_generator.gen_addr(SerdeKey::Def(SerdeDef::new(
+                    operator_addr: serde_generator.gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
                         type_def_id,
                         SerdeModifier::json_default(),
                     ))),
@@ -315,7 +315,7 @@ impl<'m> Compiler<'m> {
                     public: false,
                     name: None,
                     entity_info: None,
-                    operator_addr: serde_generator.gen_addr(SerdeKey::Def(SerdeDef::new(
+                    operator_addr: serde_generator.gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
                         type_def_id,
                         SerdeModifier::json_default(),
                     ))),
@@ -353,7 +353,7 @@ impl<'m> Compiler<'m> {
             interfaces
         };
 
-        let (serde_operators, serde_operators_per_def) = serde_generator.finish();
+        let (serde_operators, _) = serde_generator.finish();
 
         let mut property_flows = vec![];
 
@@ -397,7 +397,7 @@ impl<'m> Compiler<'m> {
             .const_procs(self.codegen_tasks.result_const_procs)
             .map_meta_table(map_meta_table)
             .named_forward_maps(self.codegen_tasks.result_named_forward_maps)
-            .serde_operators(serde_operators, serde_operators_per_def)
+            .serde_operators(serde_operators)
             .dynamic_sequence_operator_addr(dynamic_sequence_operator_addr)
             .property_flows(property_flows)
             .string_like_types(self.defs.string_like_types)
@@ -570,7 +570,7 @@ impl<'m> Compiler<'m> {
             id_value_def_id: identifies_meta.relationship.subject.0,
             id_value_generator,
             id_operator_addr: serde_generator
-                .gen_addr(SerdeKey::Def(SerdeDef::new(
+                .gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
                     identifies_meta.relationship.subject.0,
                     SerdeModifier::NONE,
                 )))

@@ -180,7 +180,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         unit: UnitTypeRef::NativeScalar(NativeScalarRef {
                             operator_addr: self
                                 .serde_generator
-                                .gen_addr(SerdeKey::Def(SerdeDef::new(
+                                .gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
                                     self.primitives.text,
                                     SerdeModifier::NONE,
                                 )))
@@ -199,7 +199,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         unit: UnitTypeRef::NativeScalar(NativeScalarRef {
                             operator_addr: self
                                 .serde_generator
-                                .gen_addr(SerdeKey::Def(SerdeDef::new(
+                                .gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
                                     self.primitives.bool,
                                     SerdeModifier::NONE,
                                 )))
@@ -277,7 +277,10 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             SerdeKey::Def(SerdeDef::new(input_key.def_id, serde_modifier))
         };
 
-        let input_operator_addr = self.serde_generator.gen_addr(input_serde_key).unwrap();
+        let input_operator_addr = self
+            .serde_generator
+            .gen_addr_greedy(input_serde_key)
+            .unwrap();
 
         let queries: FnvHashMap<PropertyId, Var> = prop_flow
             .iter()
@@ -398,7 +401,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
         let entity_array_operator_addr = self
             .serde_generator
-            .gen_addr(gql_array_serde_key(entity_data.node_def_id))
+            .gen_addr_lazy(gql_array_serde_key(entity_data.node_def_id))
             .unwrap();
 
         let data_resolve_path = self.resolver_graph.probe_path(
@@ -453,7 +456,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                                 def_id: entity_data.id_def_id,
                                 operator_addr: self
                                     .serde_generator
-                                    .gen_addr(gql_array_serde_key(entity_data.id_def_id))
+                                    .gen_addr_lazy(gql_array_serde_key(entity_data.id_def_id))
                                     .unwrap(),
                             },
                         ),

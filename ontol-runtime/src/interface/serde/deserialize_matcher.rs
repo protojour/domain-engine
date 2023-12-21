@@ -15,7 +15,7 @@ use crate::{
 };
 
 use super::{
-    operator::{FilteredVariants, SequenceRange, SerdeOperator, ValueUnionVariant},
+    operator::{FilteredVariants, SequenceRange, SerdeOperator, SerdeUnionVariant},
     processor::{ProcessorLevel, ProcessorMode, ScalarFormat, SubProcessorContext},
     SerdeOperatorAddr, StructOperator,
 };
@@ -403,7 +403,7 @@ impl<'on> SequenceMatcher<'on> {
 
 pub struct UnionMatcher<'on> {
     pub typename: &'on str,
-    pub variants: &'on [ValueUnionVariant],
+    pub variants: &'on [SerdeUnionVariant],
     pub ctx: SubProcessorContext,
     pub ontology: &'on Ontology,
     pub mode: ProcessorMode,
@@ -555,7 +555,7 @@ impl<'on> UnionMatcher<'on> {
 
 #[derive(Clone)]
 pub struct MapMatcher<'on> {
-    variants: &'on [ValueUnionVariant],
+    variants: &'on [SerdeUnionVariant],
     ontology: &'on Ontology,
     pub ctx: SubProcessorContext,
     mode: ProcessorMode,

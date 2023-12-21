@@ -11,7 +11,6 @@ use crate::{
         serde::{
             operator::{SerdeOperator, SerdeOperatorAddr},
             processor::{ProcessorLevel, ProcessorMode, SerdeProcessor, DOMAIN_PROFILE},
-            SerdeKey,
         },
         DomainInterface,
     },
@@ -43,7 +42,6 @@ pub struct Ontology {
     domain_interfaces: FnvHashMap<PackageId, Vec<DomainInterface>>,
     package_config_table: FnvHashMap<PackageId, PackageConfig>,
     docs: FnvHashMap<DefId, Vec<String>>,
-    serde_operators_per_def: HashMap<SerdeKey, SerdeOperatorAddr>,
     serde_operators: Vec<SerdeOperator>,
     dynamic_sequence_operator_addr: SerdeOperatorAddr,
     value_generators: FnvHashMap<RelationshipId, ValueGenerator>,
@@ -65,7 +63,6 @@ impl Ontology {
                 package_config_table: Default::default(),
                 docs: Default::default(),
                 lib: Lib::default(),
-                serde_operators_per_def: Default::default(),
                 serde_operators: Default::default(),
                 dynamic_sequence_operator_addr: SerdeOperatorAddr(u32::MAX),
                 value_generators: Default::default(),
@@ -453,13 +450,8 @@ impl OntologyBuilder {
         self
     }
 
-    pub fn serde_operators(
-        mut self,
-        operators: Vec<SerdeOperator>,
-        per_def: HashMap<SerdeKey, SerdeOperatorAddr>,
-    ) -> Self {
+    pub fn serde_operators(mut self, operators: Vec<SerdeOperator>) -> Self {
         self.ontology.serde_operators = operators;
-        self.ontology.serde_operators_per_def = per_def;
         self
     }
 

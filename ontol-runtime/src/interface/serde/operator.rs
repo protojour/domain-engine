@@ -124,12 +124,12 @@ pub struct AliasOperator {
 pub struct UnionOperator {
     typename: String,
     union_def: SerdeDef,
-    variants: Vec<ValueUnionVariant>,
+    variants: Vec<SerdeUnionVariant>,
 }
 
 impl UnionOperator {
     /// Note: variants must be sorted according to their purpose (VariantPurpose)
-    pub fn new(typename: String, union_def: SerdeDef, variants: Vec<ValueUnionVariant>) -> Self {
+    pub fn new(typename: String, union_def: SerdeDef, variants: Vec<SerdeUnionVariant>) -> Self {
         variants.iter().fold(
             VariantPurpose::Identification {
                 entity_id: DefId::unit(),
@@ -188,7 +188,7 @@ impl UnionOperator {
         }
     }
 
-    fn filtered_variants(variants: &[ValueUnionVariant]) -> FilteredVariants<'_> {
+    fn filtered_variants(variants: &[SerdeUnionVariant]) -> FilteredVariants<'_> {
         if variants.len() == 1 {
             FilteredVariants::Single(variants[0].addr)
         } else if variants.is_empty() {
@@ -198,7 +198,7 @@ impl UnionOperator {
         }
     }
 
-    pub fn unfiltered_variants(&self) -> &[ValueUnionVariant] {
+    pub fn unfiltered_variants(&self) -> &[SerdeUnionVariant] {
         &self.variants
     }
 }
@@ -207,11 +207,11 @@ impl UnionOperator {
 pub enum FilteredVariants<'e> {
     Single(SerdeOperatorAddr),
     /// Should serialize one of the union members
-    Union(&'e [ValueUnionVariant]),
+    Union(&'e [SerdeUnionVariant]),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ValueUnionVariant {
+pub struct SerdeUnionVariant {
     pub discriminator: VariantDiscriminator,
     pub addr: SerdeOperatorAddr,
 }
