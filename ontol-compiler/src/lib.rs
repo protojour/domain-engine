@@ -34,7 +34,7 @@ use ontology_graph::OntologyGraph;
 use package::{PackageTopology, Packages, ParsedPackage, ONTOL_PKG};
 use pattern::Patterns;
 use primitive::Primitives;
-use relation::{Properties, Property, Relations, UnionMemberCache};
+use relation::{Properties, Relations, UnionMemberCache};
 pub use source::*;
 use strings::Strings;
 use text_patterns::{compile_all_text_patterns, TextPatterns};
@@ -418,12 +418,10 @@ impl<'m> Compiler<'m> {
         let mut data_relationships = IndexMap::default();
 
         if let Some(table) = &properties.table {
-            for (property_id, property) in table {
-                if let Some(data_relationship) = self.generate_data_relationship_info(
-                    *property_id,
-                    property,
-                    DataRelationshipSource::Inherent,
-                ) {
+            for property_id in table.keys() {
+                if let Some(data_relationship) = self
+                    .generate_data_relationship_info(*property_id, DataRelationshipSource::Inherent)
+                {
                     data_relationships.insert(*property_id, data_relationship);
                 }
             }
@@ -438,10 +436,9 @@ impl<'m> Compiler<'m> {
                     continue;
                 };
 
-                for (property_id, property) in table {
+                for property_id in table.keys() {
                     if let Some(data_relationship) = self.generate_data_relationship_info(
                         *property_id,
-                        property,
                         DataRelationshipSource::ByUnionProxy,
                     ) {
                         data_relationships.insert(*property_id, data_relationship);
@@ -456,7 +453,6 @@ impl<'m> Compiler<'m> {
     fn generate_data_relationship_info(
         &self,
         property_id: PropertyId,
-        property: &Property,
         source: DataRelationshipSource,
     ) -> Option<DataRelationshipInfo> {
         let meta = self.defs.relationship_meta(property_id.relationship_id);
@@ -514,7 +510,8 @@ impl<'m> Compiler<'m> {
 
                 Some(DataRelationshipInfo {
                     kind: data_relationship_kind,
-                    cardinality: property.cardinality,
+                    subject_cardinality: meta.relationship.subject_cardinality,
+                    object_cardinality: meta.relationship.object_cardinality,
                     subject_name: (*subject_name).into(),
                     object_name: meta.relationship.object_prop.map(|prop| prop.into()),
                     source,

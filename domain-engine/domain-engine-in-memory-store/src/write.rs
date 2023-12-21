@@ -25,7 +25,7 @@ use domain_engine_core::{
 };
 
 use crate::{
-    core::{find_data_relationship, Edge, EntityKey},
+    core::{find_data_relationship, Edge, EdgeCollection, EntityKey},
     query::{Cursor, IncludeTotalLen, Limit},
 };
 
@@ -52,13 +52,15 @@ impl InMemoryStore {
 
     pub fn update_entity(
         &mut self,
-        data: Value,
+        value: Value,
         select: &Select,
         engine: &DomainEngine,
     ) -> DomainResult<Value> {
-        let entity_id = find_inherent_entity_id(engine.ontology(), &data)?
+        debug!("update entity: {:#?}", value);
+
+        let entity_id = find_inherent_entity_id(engine.ontology(), &value)?
             .ok_or_else(|| DomainError::EntityNotFound)?;
-        let type_info = engine.ontology().get_type_info(data.type_def_id());
+        let type_info = engine.ontology().get_type_info(value.type_def_id());
         let dynamic_key = Self::extract_dynamic_key(&entity_id)?;
 
         if !self
@@ -72,7 +74,7 @@ impl InMemoryStore {
 
         let mut raw_props_update: BTreeMap<PropertyId, Attribute> = Default::default();
 
-        let Value::StructUpdate(data_struct, _) = data else {
+        let Value::StructUpdate(data_struct, _) = value else {
             return Err(DomainError::BadInput(anyhow!("Expected a struct update")));
         };
         for (property_id, attribute) in *data_struct {
@@ -82,7 +84,10 @@ impl InMemoryStore {
                 DataRelationshipKind::Tree => {
                     raw_props_update.insert(property_id, attribute);
                 }
-                DataRelationshipKind::EntityGraph { .. } => match data_relationship.cardinality.1 {
+                DataRelationshipKind::EntityGraph { .. } => match data_relationship
+                    .cardinality_by_role(property_id.role)
+                    .1
+                {
                     ValueCardinality::One => {
                         self.insert_entity_relationship(
                             type_info.def_id,
@@ -111,33 +116,20 @@ impl InMemoryStore {
                                         engine,
                                     )?;
                                 } else {
-                                    match &attribute.value {
-                                        Value::Struct(..) => {
-                                            self.insert_entity_relationship(
-                                                type_info.def_id,
-                                                &dynamic_key,
-                                                (property_id, EdgeWriteMode::Insert),
-                                                attribute,
-                                                data_relationship,
-                                                engine,
-                                            )?;
-                                        }
-                                        Value::StructUpdate(..) => {
-                                            self.insert_entity_relationship(
-                                                type_info.def_id,
-                                                &dynamic_key,
-                                                (property_id, EdgeWriteMode::UpdateExisting),
-                                                attribute,
-                                                data_relationship,
-                                                engine,
-                                            )?;
-                                        }
-                                        _ => {
-                                            return Err(DomainError::DataStoreBadRequest(anyhow!(
-                                                "Expected Struct or StructUpdate"
-                                            )));
-                                        }
-                                    }
+                                    let edge_write_mode = match &attribute.value {
+                                        Value::Struct(..) => EdgeWriteMode::Insert,
+                                        Value::StructUpdate(..) => EdgeWriteMode::UpdateExisting,
+                                        _ => EdgeWriteMode::Overwrite,
+                                    };
+
+                                    self.insert_entity_relationship(
+                                        type_info.def_id,
+                                        &dynamic_key,
+                                        (property_id, edge_write_mode),
+                                        attribute,
+                                        data_relationship,
+                                        engine,
+                                    )?;
                                 }
                             }
                         }
@@ -258,25 +250,9 @@ impl InMemoryStore {
                 DataRelationshipKind::Tree => {
                     raw_props.insert(property_id, attribute);
                 }
-                DataRelationshipKind::EntityGraph { .. } => match data_relationship.cardinality.1 {
-                    ValueCardinality::One => {
-                        self.insert_entity_relationship(
-                            type_info.def_id,
-                            &entity_key,
-                            (property_id, EdgeWriteMode::Insert),
-                            attribute,
-                            data_relationship,
-                            engine,
-                        )?;
-                    }
-                    ValueCardinality::Many => {
-                        let Value::Sequence(seq, _) = attribute.value else {
-                            return Err(DomainError::DataStoreBadRequest(anyhow!(
-                                "Expected sequence for ValueCardinality::Many"
-                            )));
-                        };
-
-                        for attribute in seq.attrs {
+                DataRelationshipKind::EntityGraph { .. } => {
+                    match data_relationship.cardinality_by_role(property_id.role).1 {
+                        ValueCardinality::One => {
                             self.insert_entity_relationship(
                                 type_info.def_id,
                                 &entity_key,
@@ -286,8 +262,26 @@ impl InMemoryStore {
                                 engine,
                             )?;
                         }
+                        ValueCardinality::Many => {
+                            let Value::Sequence(seq, _) = attribute.value else {
+                                return Err(DomainError::DataStoreBadRequest(anyhow!(
+                                    "Expected sequence for ValueCardinality::Many"
+                                )));
+                            };
+
+                            for attribute in seq.attrs {
+                                self.insert_entity_relationship(
+                                    type_info.def_id,
+                                    &entity_key,
+                                    (property_id, EdgeWriteMode::Insert),
+                                    attribute,
+                                    data_relationship,
+                                    engine,
+                                )?;
+                            }
+                        }
                     }
-                },
+                }
             }
         }
 
@@ -387,27 +381,28 @@ impl InMemoryStore {
             dynamic_key: entity_key.clone(),
         };
 
-        let edges = &mut edge_collection.edges;
-
         match property_id.role {
             Role::Subject => match write_mode {
                 EdgeWriteMode::Insert => {
-                    edges.push(Edge {
+                    enforce_cardinality_pre_insert(edge_collection, &local_key, &foreign_key);
+                    edge_collection.edges.push(Edge {
                         from: local_key,
                         to: foreign_key,
                         params: rel_params,
                     });
                 }
                 EdgeWriteMode::Overwrite => {
-                    edges.retain(|edge| edge.from != local_key);
-                    edges.push(Edge {
+                    edge_collection.edges.retain(|edge| edge.from != local_key);
+                    enforce_cardinality_pre_insert(edge_collection, &local_key, &foreign_key);
+                    edge_collection.edges.push(Edge {
                         from: local_key,
                         to: foreign_key,
                         params: rel_params,
                     });
                 }
                 EdgeWriteMode::UpdateExisting => {
-                    let edge = edges
+                    let edge = edge_collection
+                        .edges
                         .iter_mut()
                         .find(|edge| edge.from == local_key && edge.to == foreign_key)
                         .ok_or(DomainError::EntityNotFound)?;
@@ -417,22 +412,25 @@ impl InMemoryStore {
             },
             Role::Object => match write_mode {
                 EdgeWriteMode::Insert => {
-                    edges.push(Edge {
+                    enforce_cardinality_pre_insert(edge_collection, &foreign_key, &local_key);
+                    edge_collection.edges.push(Edge {
                         from: foreign_key,
                         to: local_key,
                         params: rel_params,
                     });
                 }
                 EdgeWriteMode::Overwrite => {
-                    edges.retain(|edge| edge.to != local_key);
-                    edges.push(Edge {
+                    edge_collection.edges.retain(|edge| edge.to != local_key);
+                    enforce_cardinality_pre_insert(edge_collection, &foreign_key, &local_key);
+                    edge_collection.edges.push(Edge {
                         from: foreign_key,
                         to: local_key,
                         params: rel_params,
                     });
                 }
                 EdgeWriteMode::UpdateExisting => {
-                    let edge = edges
+                    let edge = edge_collection
+                        .edges
                         .iter_mut()
                         .find(|edge| edge.from == foreign_key && edge.to == local_key)
                         .ok_or(DomainError::EntityNotFound)?;
@@ -585,5 +583,21 @@ impl InMemoryStore {
                 Ok(Value::I64(id_value, def_id))
             }
         }
+    }
+}
+
+/// Ensure none of the keys are in the edge collection given there's some
+/// singleton cardinality that should be enforced.
+fn enforce_cardinality_pre_insert(
+    edge_collection: &mut EdgeCollection,
+    from_key: &EntityKey,
+    to_key: &EntityKey,
+) {
+    if matches!(edge_collection.subject_cardinality.1, ValueCardinality::One) {
+        edge_collection.edges.retain(|edge| &edge.from != from_key);
+    }
+
+    if matches!(edge_collection.object_cardinality.1, ValueCardinality::One) {
+        edge_collection.edges.retain(|edge| &edge.to != to_key);
     }
 }

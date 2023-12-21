@@ -588,3 +588,93 @@ async fn test_gitmesh_patch_members() {
         })),
     );
 }
+
+#[test(tokio::test)]
+async fn test_gitmesh_ownership_transfer() {
+    let (test, [schema]) = TestPackages::with_sources([(ROOT, GITMESH.1)])
+        .with_data_store(ROOT, DataStoreConfig::Default)
+        .compile_schemas([SourceName::root()]);
+    let ctx: ServiceCtx = make_domain_engine(test.ontology.clone()).await.into();
+
+    let response = r#"mutation {
+        User(
+            create: [{ id: "user/bob" email: "bob@bob.com" }]
+        ) { node { id } }
+        Organization(
+            create: [{ id: "org/lolsoft" }]
+        ) { node { id } }
+        Repository(
+            create: [
+                {
+                    handle: "l33tc0d3"
+                    owner: { id: "org/lolsoft" }
+                }
+            ]
+        ) { node { id } }
+    }"#
+    .exec([], &schema, &ctx)
+    .await
+    .unwrap();
+
+    let repo_id = response
+        .field("Repository")
+        .element(0)
+        .field("node")
+        .field("id")
+        .scalar()
+        .clone();
+
+    tracing::info!("Move repository over to user/bob");
+
+    expect_eq!(
+        actual = r#"mutation add_repo($userId: ID!, $repoId: ID!) {
+            User(
+                update: [{
+                    id: $userId
+                    repositories: {
+                        create: [{ id: $repoId }]
+                    }
+                }]
+            ) {
+                node {
+                    repositories {
+                        nodes { handle }
+                    }
+                }
+            }
+        }"#
+        .exec(
+            [
+                ("userId".to_owned(), InputValue::Scalar("user/bob".into())),
+                ("repoId".to_owned(), InputValue::Scalar(repo_id)),
+            ],
+            &schema,
+            &ctx,
+        )
+        .await,
+        expected = Ok(graphql_value!({
+            "User": [
+                {
+                    "node": {
+                        "repositories": {
+                            "nodes": [{ "handle": "l33tc0d3" }]
+                        }
+                    }
+                }
+            ]
+        }))
+    );
+
+    tracing::info!("The organization should no longer own the repository");
+
+    expect_eq!(
+        actual = r#"{organizations { nodes { repositories { nodes { id }}}}}"#
+            .exec([], &schema, &ctx)
+            .await,
+        expected = Ok(graphql_value!({
+            "organizations": {
+                "nodes": [{ "repositories": { "nodes": [] } }]
+            }
+        })),
+    );
+}

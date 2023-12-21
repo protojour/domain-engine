@@ -99,9 +99,13 @@ impl InMemoryDb {
                     match entity_relationship.source {
                         DataRelationshipSource::Inherent => {
                             let relationship_id = property_id.relationship_id;
-                            edge_collections
-                                .entry(relationship_id)
-                                .or_insert_with(|| EdgeCollection { edges: vec![] });
+                            edge_collections.entry(relationship_id).or_insert_with(|| {
+                                EdgeCollection {
+                                    edges: vec![],
+                                    subject_cardinality: entity_relationship.subject_cardinality,
+                                    object_cardinality: entity_relationship.object_cardinality,
+                                }
+                            });
                         }
                         DataRelationshipSource::ByUnionProxy => {}
                     }

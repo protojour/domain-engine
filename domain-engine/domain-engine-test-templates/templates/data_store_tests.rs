@@ -263,6 +263,8 @@ async fn test_conduit_db_store_entity_tree() {
                     "title": "Foo",
                     "description": "An article",
                     "body": "The body",
+                    "favorited_by": [],
+                    "tags": [],
                     "created_at": "1971-01-01T00:00:00+00:00",
                     "updated_at": "1971-01-01T00:00:00+00:00",
                     "comments": [

@@ -4,7 +4,7 @@ use anyhow::anyhow;
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
-    ontology::{DataRelationshipInfo, TypeInfo},
+    ontology::{Cardinality, DataRelationshipInfo, TypeInfo},
     value::{Attribute, PropertyId, Value},
     DefId, RelationshipId,
 };
@@ -33,6 +33,8 @@ pub type EntityTable<K> = IndexMap<K, FnvHashMap<PropertyId, Attribute>>;
 #[derive(Debug)]
 pub(super) struct EdgeCollection {
     pub edges: Vec<Edge>,
+    pub subject_cardinality: Cardinality,
+    pub object_cardinality: Cardinality,
 }
 
 #[derive(Debug)]

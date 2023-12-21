@@ -325,11 +325,21 @@ pub struct EntityInfo {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DataRelationshipInfo {
     pub kind: DataRelationshipKind,
-    pub cardinality: Cardinality,
+    pub subject_cardinality: Cardinality,
+    pub object_cardinality: Cardinality,
     pub subject_name: String,
     pub object_name: Option<String>,
     pub source: DataRelationshipSource,
     pub target: DataRelationshipTarget,
+}
+
+impl DataRelationshipInfo {
+    pub fn cardinality_by_role(&self, role: Role) -> Cardinality {
+        match role {
+            Role::Subject => self.subject_cardinality,
+            Role::Object => self.object_cardinality,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]

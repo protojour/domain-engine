@@ -174,7 +174,7 @@ impl InMemoryStore {
 
             let attrs = self.sub_query_attributes(*property_id, subselect, entity_key, engine)?;
 
-            match data_relationship.cardinality.1 {
+            match data_relationship.cardinality_by_role(property_id.role).1 {
                 ValueCardinality::One => {
                     if let Some(attribute) = attrs.into_iter().next() {
                         properties.insert(*property_id, attribute);
@@ -342,7 +342,7 @@ impl InMemoryStore {
         // Need to "infer" mandatory entity properties, because JSON serializer expects that
         for (property_id, data_relationship) in type_info.entity_relationships() {
             if matches!(
-                data_relationship.cardinality.0,
+                data_relationship.cardinality_by_role(property_id.role).0,
                 PropertyCardinality::Mandatory
             ) && !select_properties.contains_key(property_id)
             {

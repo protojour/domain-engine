@@ -173,8 +173,10 @@ fn sub_plans(
                     }
                 };
 
+                let cardinality = data_relationship.cardinality_by_role(property_id.role);
+
                 match data_relationship.kind {
-                    DataRelationshipKind::Tree => match data_relationship.cardinality.1 {
+                    DataRelationshipKind::Tree => match cardinality.1 {
                         ValueCardinality::One => {
                             plans.push(PlanEntry::Attr(*property_id, val_plans));
                         }
@@ -192,7 +194,7 @@ fn sub_plans(
                             val: val_plans,
                         };
 
-                        match data_relationship.cardinality.1 {
+                        match cardinality.1 {
                             ValueCardinality::One => {
                                 plans.push(PlanEntry::Edge(*property_id, attribute));
                             }
