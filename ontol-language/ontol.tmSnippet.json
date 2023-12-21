@@ -15,47 +15,23 @@
         ],
         "description": "Import domain alias"
     },
-	"type scalar": {
-        "prefix": "type scalar",
+    "def block": {
+        "prefix": "def block",
         "body": [
-            "type ${1:name}",
-			"$2"
-        ],
-        "description": "Type definition"
-    },
-	"pub type scalar": {
-        "prefix": "pub type scalar",
-        "body": [
-            "pub type ${name}"
-        ],
-        "description": "Type definition"
-    },
-    "type block": {
-        "prefix": "type block",
-        "body": [
-            "type ${1:name} {",
+            "def ${1:name} (",
             "\t$2",
-            "}"
+            ")"
         ],
         "description": "Type definition block"
     },
-    "pub type block": {
-        "prefix": "pub type block",
+    "def mod block": {
+        "prefix": "def block",
         "body": [
-            "pub type ${1:name} {",
-            "\t$2",
-            "}"
+            "def ($1) ${2:name} (",
+            "\t$3",
+            ")"
         ],
-        "description": "Public type definition block"
-    },
-    "with block": {
-        "prefix": "with block",
-        "body": [
-            "with ${1:name} {",
-            "\t$2",
-            "}"
-        ],
-        "description": "With block"
+        "description": "Modified type definition block"
     },
     "rel local": {
         "prefix": "rel .",
@@ -74,9 +50,9 @@
     "rel block": {
         "prefix": "rel . block",
         "body": [
-            "rel .'${1:name}'$2: ${3:object} {",
+            "rel .'${1:name}'$2: ${3:object} (",
             "\t$4",
-            "}"
+            ")"
         ],
         "description": "Relation block"
     },
@@ -97,16 +73,16 @@
 	"rel .-m": {
         "prefix": "rel .::m",
         "body": [
-            "rel .'${1:name_a}'::'${2:name_b}': [${3:object}]"
+            "rel .'${1:name_a}'::'${2:name_b}': {${3:object}}"
         ],
         "description": "Relation .-to-many"
     },
-	"rel [.]-m": {
-        "prefix": "rel [.]::m",
+	"rel (.)-m": {
+        "prefix": "rel {.}::m",
         "body": [
-            "rel [.]'${1:name_a}'::'${2:name_b}': [${3:object}]"
+            "rel {.}'${1:name_a}'::'${2:name_b}': {${3:object}}"
         ],
-        "description": "Relation [.]-to-many"
+        "description": "Relation (.)-to-many"
     },
 	"rel 1-1": {
         "prefix": "rel 1::1",
@@ -118,14 +94,14 @@
 	"rel 1-m": {
         "prefix": "rel 1::m",
         "body": [
-            "rel ${1:subject} '${2:name_a}'::'${3:name_b}': [${4:object}]"
+            "rel ${1:subject} '${2:name_a}'::'${3:name_b}': {${4:object}}"
         ],
         "description": "Relation one-to-many"
     },
 	"rel m-m": {
         "prefix": "rel m::m",
         "body": [
-            "rel [${1:subject}] '${2:name_a}'::'${3:name_b}': [${4:object}]"
+            "rel {${1:subject}} '${2:name_a}'::'${3:name_b}': {${4:object}}"
         ],
         "description": "Relation many-to-many"
     },
@@ -167,29 +143,43 @@
     "map": {
         "prefix": "map",
         "body": [
-            "map {",
-            "\t${1:a} {",
+            "map (",
+            "\t${1:a}: (",
             "\t\t$3",
-            "\t}",
-            "\t${2:b} {",
+            "\t)",
+            "\t${2:b}: (",
             "\t\t$4",
-            "\t}",
-            "}"
+            "\t)",
+            ")"
         ],
         "description": "Mapping block"
     },
-    "map oneway": {
-        "prefix": "map oneway",
+    "map named": {
+        "prefix": "map named",
         "body": [
-            "map => {",
-            "\t${1:a} {",
-            "\t\t$3",
-            "\t}",
-            "\t${2:b} {",
+            "map $1 (",
+            "\t${2:a}: (",
             "\t\t$4",
-            "\t}",
-            "}"
+            "\t)",
+            "\t${3:b}: (",
+            "\t\t$5",
+            "\t)",
+            "="
         ],
-        "description": "Mapping block one way"
+        "description": "Named mapping block"
+    },
+    "map named filter": {
+        "prefix": "map named filter",
+        "body": [
+            "map $1 (",
+            "\t(",
+            "\t\t$3",
+            "\t)",
+            "\t${2:b}: (",
+            "\t\t$4",
+            "\t)",
+            "="
+        ],
+        "description": "Named mapping filter block"
     }
 }
