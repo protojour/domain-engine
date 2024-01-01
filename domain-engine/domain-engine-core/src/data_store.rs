@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ontol_runtime::{
     config::DataStoreConfig,
     ontology::Ontology,
@@ -9,8 +11,13 @@ use ontol_runtime::{
 use serde::{Deserialize, Serialize};
 use unimock::unimock;
 
-use crate::domain_engine::DomainEngine;
-use crate::domain_error::DomainResult;
+use crate::{domain_error::DomainResult, system::ArcSystemApi};
+
+#[unimock(api = DataStoreAPIMock)]
+#[async_trait::async_trait]
+pub trait DataStoreAPI {
+    async fn execute(&self, request: Request) -> DomainResult<Response>;
+}
 
 pub struct DataStore {
     package_id: PackageId,
@@ -57,39 +64,6 @@ pub enum Response {
     BatchWrite(Vec<BatchWriteResponse>),
 }
 
-#[derive(Serialize, Deserialize)]
-pub enum BatchWriteResponse {
-    Inserted(Vec<Value>),
-    Updated(Vec<Value>),
-    Deleted(Vec<bool>),
-}
-
-#[unimock(api = DataStoreAPIMock)]
-#[async_trait::async_trait]
-pub trait DataStoreAPI {
-    async fn execute(&self, request: Request, engine: &DomainEngine) -> DomainResult<Response>;
-}
-
-/// Trait for creating data store APIs
-#[async_trait::async_trait]
-pub trait DataStoreFactory {
-    async fn new_api(
-        &self,
-        config: &DataStoreConfig,
-        ontology: &Ontology,
-        package_id: PackageId,
-    ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>>;
-}
-
-pub trait DataStoreFactorySync {
-    fn new_api_sync(
-        &self,
-        config: &DataStoreConfig,
-        ontology: &Ontology,
-        package_id: PackageId,
-    ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>>;
-}
-
 impl From<Vec<BatchWriteResponse>> for Response {
     fn from(value: Vec<BatchWriteResponse>) -> Self {
         Self::BatchWrite(value)
@@ -100,4 +74,33 @@ impl Response {
     pub fn one_inserted(value: Value) -> Self {
         Self::BatchWrite(vec![BatchWriteResponse::Inserted(vec![value])])
     }
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum BatchWriteResponse {
+    Inserted(Vec<Value>),
+    Updated(Vec<Value>),
+    Deleted(Vec<bool>),
+}
+
+/// Trait for creating data store APIs
+#[async_trait::async_trait]
+pub trait DataStoreFactory {
+    async fn new_api(
+        &self,
+        package_id: PackageId,
+        config: DataStoreConfig,
+        ontology: Arc<Ontology>,
+        system: ArcSystemApi,
+    ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>>;
+}
+
+pub trait DataStoreFactorySync {
+    fn new_api_sync(
+        &self,
+        package_id: PackageId,
+        config: DataStoreConfig,
+        ontology: Arc<Ontology>,
+        system: ArcSystemApi,
+    ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>>;
 }

@@ -22,23 +22,21 @@ use crate::{
     domain_error::DomainResult,
     match_utils::find_entity_id_in_condition_for_var,
     select_data_flow::{translate_entity_select, translate_select},
-    system::{SystemAPI, TestSystem},
-    Config, DomainError, FindEntitySelect,
+    system::{ArcSystemApi, SystemAPI, TestSystem},
+    DomainError, FindEntitySelect,
 };
 
 pub struct DomainEngine {
     ontology: Arc<Ontology>,
-    config: Arc<Config>,
     resolver_graph: ResolverGraph,
     data_store: Option<DataStore>,
-    system: Box<dyn SystemAPI + Send + Sync>,
+    system: ArcSystemApi,
 }
 
 impl DomainEngine {
     pub fn builder(ontology: Arc<Ontology>) -> Builder {
         Builder {
             ontology,
-            config: Config::default(),
             data_store: None,
             system: None,
         }
@@ -46,10 +44,6 @@ impl DomainEngine {
 
     pub fn test_builder(ontology: Arc<Ontology>) -> Builder {
         Self::builder(ontology).system(Box::<TestSystem>::default())
-    }
-
-    pub fn config(&self) -> &Config {
-        &self.config
     }
 
     pub fn ontology(&self) -> &Ontology {
@@ -114,7 +108,7 @@ impl DomainEngine {
 
         let data_store::Response::Query(mut edge_seq) = data_store
             .api()
-            .execute(data_store::Request::Query(select), self)
+            .execute(data_store::Request::Query(select))
             .await?
         else {
             return Err(DomainError::DataStore(anyhow!(
@@ -220,7 +214,7 @@ impl DomainEngine {
 
         let data_store::Response::BatchWrite(mut responses) = data_store
             .api()
-            .execute(data_store::Request::BatchWrite(requests), self)
+            .execute(data_store::Request::BatchWrite(requests))
             .await?
         else {
             return Err(DomainError::DataStore(anyhow!(
@@ -335,7 +329,7 @@ impl DomainEngine {
 
         let data_store::Response::Query(edge_seq) = data_store
             .api()
-            .execute(data_store::Request::Query(entity_select), self)
+            .execute(data_store::Request::Query(entity_select))
             .await?
         else {
             return Err(DomainError::DataStore(anyhow!(
@@ -355,24 +349,18 @@ impl DomainEngine {
 
 pub struct Builder {
     ontology: Arc<Ontology>,
-    config: Config,
     data_store: Option<DataStore>,
-    system: Option<Box<dyn SystemAPI + Send + Sync>>,
+    system: Option<ArcSystemApi>,
 }
 
 impl Builder {
-    pub fn config(mut self, config: Config) -> Self {
-        self.config = config;
-        self
-    }
-
     pub fn data_store(mut self, data_store: DataStore) -> Self {
         self.data_store = Some(data_store);
         self
     }
 
     pub fn system(mut self, system: Box<dyn SystemAPI + Send + Sync>) -> Self {
-        self.system = Some(system);
+        self.system = Some(system.into());
         self
     }
 
@@ -385,6 +373,8 @@ impl Builder {
     }
 
     pub async fn build<F: DataStoreFactory>(self, factory: F) -> DomainResult<DomainEngine> {
+        let system = self.system.expect("No system API provided!");
+
         let data_store = match self.data_store {
             Some(data_store) => Some(data_store),
             None => {
@@ -392,7 +382,12 @@ impl Builder {
 
                 for (package_id, config) in data_store_backed_domains(&self.ontology) {
                     let api = factory
-                        .new_api(config, &self.ontology, package_id)
+                        .new_api(
+                            package_id,
+                            config.clone(),
+                            self.ontology.clone(),
+                            system.clone(),
+                        )
                         .await
                         .with_context(|| format!("Failed to initialize data store {config:?}"))
                         .map_err(DomainError::DataStore)?;
@@ -407,14 +402,15 @@ impl Builder {
 
         Ok(DomainEngine {
             ontology: self.ontology,
-            config: Arc::new(self.config),
             resolver_graph,
             data_store,
-            system: self.system.expect("No system API provided!"),
+            system,
         })
     }
 
     pub fn build_sync<F: DataStoreFactorySync>(self, factory: F) -> DomainResult<DomainEngine> {
+        let system = self.system.expect("No system API provided!");
+
         let data_store = match self.data_store {
             Some(data_store) => Some(data_store),
             None => {
@@ -422,7 +418,12 @@ impl Builder {
 
                 for (package_id, config) in data_store_backed_domains(&self.ontology) {
                     let api = factory
-                        .new_api_sync(config, &self.ontology, package_id)
+                        .new_api_sync(
+                            package_id,
+                            config.clone(),
+                            self.ontology.clone(),
+                            system.clone(),
+                        )
                         .with_context(|| format!("Failed to initialize data store {config:?}"))
                         .map_err(DomainError::DataStore)?;
                     data_store = Some(DataStore::new(package_id, api));
@@ -436,10 +437,9 @@ impl Builder {
 
         Ok(DomainEngine {
             ontology: self.ontology,
-            config: Arc::new(self.config),
             resolver_graph,
             data_store,
-            system: self.system.expect("No system API provided!"),
+            system,
         })
     }
 }

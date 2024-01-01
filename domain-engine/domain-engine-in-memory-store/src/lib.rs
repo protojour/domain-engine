@@ -1,15 +1,18 @@
+use std::sync::Arc;
+
 use domain_engine_core::data_store::{DataStoreFactory, DataStoreFactorySync};
 use domain_engine_core::object_generator::ObjectGenerator;
+use domain_engine_core::system::ArcSystemApi;
 use fnv::FnvHashMap;
 use ontol_runtime::config::DataStoreConfig;
 use ontol_runtime::interface::serde::processor::ProcessorMode;
-use ontol_runtime::ontology::DataRelationshipSource;
-use ontol_runtime::{ontology::Ontology, DefId, PackageId, RelationshipId};
+use ontol_runtime::ontology::{DataRelationshipSource, Ontology};
+use ontol_runtime::{DefId, PackageId, RelationshipId};
 use tokio::sync::RwLock;
 
 use domain_engine_core::{
     data_store::{BatchWriteRequest, BatchWriteResponse, DataStoreAPI, Request, Response},
-    DomainEngine, DomainResult,
+    DomainResult,
 };
 
 use crate::core::{DynamicKey, EdgeCollection, EntityTable, InMemoryStore};
@@ -19,21 +22,21 @@ mod filter;
 mod query;
 mod write;
 
-#[derive(Debug)]
 pub struct InMemoryDb {
-    #[allow(unused)]
-    package_id: PackageId,
     store: RwLock<InMemoryStore>,
+    ontology: Arc<Ontology>,
+    system: ArcSystemApi,
 }
 
 #[async_trait::async_trait]
 impl DataStoreAPI for InMemoryDb {
-    async fn execute(&self, request: Request, engine: &DomainEngine) -> DomainResult<Response> {
+    async fn execute(&self, request: Request) -> DomainResult<Response> {
+        let ontology = self.ontology.as_ref();
         match request {
             Request::Query(select) => {
                 // debug!("{select:#?}");
                 Ok(Response::Query(
-                    self.store.read().await.query_entities(&select, engine)?,
+                    self.store.read().await.query_entities(&select, ontology)?,
                 ))
             }
             Request::BatchWrite(write_requests) => {
@@ -46,27 +49,35 @@ impl DataStoreAPI for InMemoryDb {
                     match write_request {
                         BatchWriteRequest::Insert(mut entities, select) => {
                             for value in entities.iter_mut() {
-                                ObjectGenerator::new(engine, ProcessorMode::Create)
-                                    .generate_objects(value);
+                                ObjectGenerator::new(
+                                    ProcessorMode::Create,
+                                    ontology,
+                                    self.system.as_ref(),
+                                )
+                                .generate_objects(value);
                             }
 
                             responses.push(BatchWriteResponse::Inserted(
                                 entities
                                     .into_iter()
-                                    .map(|entity| store.write_new_entity(entity, &select, engine))
+                                    .map(|entity| store.write_new_entity(entity, &select, ontology))
                                     .collect::<DomainResult<_>>()?,
                             ));
                         }
                         BatchWriteRequest::Update(mut entities, select) => {
                             for value in entities.iter_mut() {
-                                ObjectGenerator::new(engine, ProcessorMode::Update)
-                                    .generate_objects(value);
+                                ObjectGenerator::new(
+                                    ProcessorMode::Update,
+                                    ontology,
+                                    self.system.as_ref(),
+                                )
+                                .generate_objects(value);
                             }
 
                             responses.push(BatchWriteResponse::Updated(
                                 entities
                                     .into_iter()
-                                    .map(|entity| store.update_entity(entity, &select, engine))
+                                    .map(|entity| store.update_entity(entity, &select, ontology))
                                     .collect::<DomainResult<_>>()?,
                             ));
                         }
@@ -85,7 +96,7 @@ impl DataStoreAPI for InMemoryDb {
 }
 
 impl InMemoryDb {
-    pub fn new(ontology: &Ontology, package_id: PackageId) -> Self {
+    pub fn new(package_id: PackageId, ontology: Arc<Ontology>, system: ArcSystemApi) -> Self {
         let domain = ontology.find_domain(package_id).unwrap();
 
         let mut collections: FnvHashMap<DefId, EntityTable<DynamicKey>> = Default::default();
@@ -114,12 +125,13 @@ impl InMemoryDb {
         }
 
         Self {
-            package_id,
             store: RwLock::new(InMemoryStore {
                 collections,
                 edge_collections,
                 int_id_counter: 0,
             }),
+            ontology,
+            system,
         }
     }
 }
@@ -131,21 +143,23 @@ pub struct InMemoryDataStoreFactory;
 impl DataStoreFactory for InMemoryDataStoreFactory {
     async fn new_api(
         &self,
-        config: &DataStoreConfig,
-        ontology: &Ontology,
         package_id: PackageId,
+        config: DataStoreConfig,
+        ontology: Arc<Ontology>,
+        system: ArcSystemApi,
     ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>> {
-        self.new_api_sync(config, ontology, package_id)
+        self.new_api_sync(package_id, config, ontology, system)
     }
 }
 
 impl DataStoreFactorySync for InMemoryDataStoreFactory {
     fn new_api_sync(
         &self,
-        _config: &DataStoreConfig,
-        ontology: &Ontology,
         package_id: PackageId,
+        _config: DataStoreConfig,
+        ontology: Arc<Ontology>,
+        system: ArcSystemApi,
     ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>> {
-        Ok(Box::new(InMemoryDb::new(ontology, package_id)))
+        Ok(Box::new(InMemoryDb::new(package_id, ontology, system)))
     }
 }

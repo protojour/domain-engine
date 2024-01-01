@@ -98,7 +98,7 @@ impl Display for TestError {
 
 pub fn mock_data_store_query_entities_empty() -> impl unimock::Clause {
     DataStoreAPIMock::execute
-        .next_call(matching!(Request::Query(_), _))
+        .next_call(matching!(Request::Query(_)))
         .returns(Ok(Response::Query(Sequence::new([]))))
 }
 

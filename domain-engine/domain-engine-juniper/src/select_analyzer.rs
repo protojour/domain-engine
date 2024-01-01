@@ -253,7 +253,7 @@ impl<'a> SelectAnalyzer<'a> {
 
         let limit = args_wrapper
             .deserialize_optional::<usize>(first_arg.name())?
-            .unwrap_or(self.default_limit());
+            .unwrap_or(self.default_query_limit());
         let after_cursor = args_wrapper.deserialize_optional::<GraphQLCursor>(after_arg.name())?;
 
         let mut inner_select = Select::Leaf;
@@ -443,8 +443,11 @@ impl<'a> SelectAnalyzer<'a> {
         }
     }
 
-    fn default_limit(&self) -> usize {
-        self.service_ctx.domain_engine.config().default_limit
+    fn default_query_limit(&self) -> usize {
+        self.service_ctx
+            .domain_engine
+            .system()
+            .default_query_limit()
     }
 }
 

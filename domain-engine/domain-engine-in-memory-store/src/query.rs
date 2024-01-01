@@ -3,7 +3,7 @@ use fnv::FnvHashMap;
 use ontol_runtime::{
     condition::{CondTerm, Condition},
     ontology::{
-        DataRelationshipKind, DataRelationshipTarget, PropertyCardinality, TypeInfo,
+        DataRelationshipKind, DataRelationshipTarget, Ontology, PropertyCardinality, TypeInfo,
         ValueCardinality,
     },
     select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
@@ -13,9 +13,7 @@ use ontol_runtime::{
 };
 use tracing::{debug, error};
 
-use domain_engine_core::{
-    filter::plan::compute_filter_plan, DomainEngine, DomainError, DomainResult,
-};
+use domain_engine_core::{filter::plan::compute_filter_plan, DomainError, DomainResult};
 
 use crate::{core::find_data_relationship, filter::FilterVal};
 
@@ -34,7 +32,7 @@ impl InMemoryStore {
     pub fn query_entities(
         &self,
         select: &EntitySelect,
-        engine: &DomainEngine,
+        ontology: &Ontology,
     ) -> DomainResult<Sequence> {
         match &select.source {
             StructOrUnionSelect::Struct(struct_select) => self.query_single_entity_collection(
@@ -48,7 +46,7 @@ impl InMemoryStore {
                     .transpose()
                     .map_err(|_| DomainError::DataStore(anyhow!("Invalid cursor format")))?,
                 IncludeTotalLen(select.include_total_len),
-                engine,
+                ontology,
             ),
             StructOrUnionSelect::Union(..) => Err(DomainError::DataStoreBadRequest(anyhow!(
                 "Query entity union at root level not supported"
@@ -63,7 +61,7 @@ impl InMemoryStore {
         Limit(limit): Limit,
         after_cursor: Option<Cursor>,
         IncludeTotalLen(include_total_len): IncludeTotalLen,
-        engine: &DomainEngine,
+        ontology: &Ontology,
     ) -> DomainResult<Sequence> {
         debug!("query single entity collection: {struct_select:?}");
         let collection = self
@@ -71,13 +69,13 @@ impl InMemoryStore {
             .get(&struct_select.def_id)
             .ok_or(DomainError::InvalidEntityDefId)?;
 
-        let type_info = engine.ontology().get_type_info(struct_select.def_id);
+        let type_info = ontology.get_type_info(struct_select.def_id);
         let _entity_info = type_info
             .entity_info
             .as_ref()
             .ok_or(DomainError::NotAnEntity(struct_select.def_id))?;
 
-        let filter_plan = compute_filter_plan(condition, engine.ontology()).unwrap();
+        let filter_plan = compute_filter_plan(condition, ontology).unwrap();
         debug!("eval filter plan: {filter_plan:#?}");
 
         let mut raw_props_vec = {
@@ -141,7 +139,7 @@ impl InMemoryStore {
                 &entity_key,
                 properties,
                 struct_select,
-                engine,
+                ontology,
             )?;
 
             entity_sequence.attrs.push(value.into());
@@ -156,7 +154,7 @@ impl InMemoryStore {
         entity_key: &DynamicKey,
         mut properties: FnvHashMap<PropertyId, Attribute>,
         struct_select: &StructSelect,
-        engine: &DomainEngine,
+        ontology: &Ontology,
     ) -> DomainResult<Value> {
         for (property_id, subselect) in &struct_select.properties {
             if properties.contains_key(property_id) {
@@ -172,7 +170,7 @@ impl InMemoryStore {
                 continue;
             }
 
-            let attrs = self.sub_query_attributes(*property_id, subselect, entity_key, engine)?;
+            let attrs = self.sub_query_attributes(*property_id, subselect, entity_key, ontology)?;
 
             match data_relationship.cardinality_by_role(property_id.role).1 {
                 ValueCardinality::One => {
@@ -204,7 +202,7 @@ impl InMemoryStore {
         property_id: PropertyId,
         select: &Select,
         parent_key: &DynamicKey,
-        engine: &DomainEngine,
+        ontology: &Ontology,
     ) -> DomainResult<Vec<Attribute>> {
         let relationship_id = property_id.relationship_id;
         let edge_collection = self
@@ -220,13 +218,13 @@ impl InMemoryStore {
                     if &edge.from.dynamic_key != parent_key {
                         continue;
                     }
-                    self.sub_query_entity(&edge.to, select, engine)?
+                    self.sub_query_entity(&edge.to, select, ontology)?
                 }
                 Role::Object => {
                     if &edge.to.dynamic_key != parent_key {
                         continue;
                     }
-                    self.sub_query_entity(&edge.from, select, engine)?
+                    self.sub_query_entity(&edge.from, select, ontology)?
                 }
             };
 
@@ -243,7 +241,7 @@ impl InMemoryStore {
         &self,
         entity_key: &EntityKey,
         select: &Select,
-        engine: &DomainEngine,
+        ontology: &Ontology,
     ) -> DomainResult<Value> {
         if let Select::Struct(struct_select) = select {
             // sanity check
@@ -263,7 +261,7 @@ impl InMemoryStore {
             .get(&entity_key.dynamic_key)
             .ok_or(DomainError::InherentIdNotFound)?;
 
-        let type_info = engine.ontology().get_type_info(entity_key.type_def_id);
+        let type_info = ontology.get_type_info(entity_key.type_def_id);
         let entity_info = type_info
             .entity_info
             .as_ref()
@@ -282,7 +280,7 @@ impl InMemoryStore {
                 struct_select,
                 type_info,
                 properties,
-                engine,
+                ontology,
             ),
             Select::StructUnion(_, variant_selects) => {
                 for variant_select in variant_selects {
@@ -292,7 +290,7 @@ impl InMemoryStore {
                             variant_select,
                             type_info,
                             properties,
-                            engine,
+                            ontology,
                         );
                     }
                 }
@@ -309,7 +307,7 @@ impl InMemoryStore {
                     &entity_key.dynamic_key,
                     properties.clone(),
                     struct_select,
-                    engine,
+                    ontology,
                 ),
                 StructOrUnionSelect::Union(_, candidates) => {
                     let struct_select = candidates
@@ -322,7 +320,7 @@ impl InMemoryStore {
                         &entity_key.dynamic_key,
                         properties.clone(),
                         struct_select,
-                        engine,
+                        ontology,
                     )
                 }
             },
@@ -335,7 +333,7 @@ impl InMemoryStore {
         struct_select: &StructSelect,
         type_info: &TypeInfo,
         properties: &FnvHashMap<PropertyId, Attribute>,
-        engine: &DomainEngine,
+        ontology: &Ontology,
     ) -> DomainResult<Value> {
         let mut select_properties = struct_select.properties.clone();
 
@@ -358,7 +356,7 @@ impl InMemoryStore {
                 def_id: entity_key.type_def_id,
                 properties: select_properties,
             },
-            engine,
+            ontology,
         )
     }
 }

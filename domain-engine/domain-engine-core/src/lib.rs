@@ -21,27 +21,6 @@ use ontol_runtime::{
     var::Var,
 };
 
-pub struct Config {
-    pub default_limit: usize,
-    pub uuid_generator: UuidGenerator,
-}
-
-#[derive(Default)]
-pub enum UuidGenerator {
-    V4,
-    #[default]
-    V7,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            default_limit: 20,
-            uuid_generator: UuidGenerator::default(),
-        }
-    }
-}
-
 pub trait FindEntitySelect {
     fn find_select(&mut self, match_var: Var, condition: &Condition<CondTerm>) -> EntitySelect;
 }

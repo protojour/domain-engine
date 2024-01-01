@@ -4,17 +4,18 @@ use ontol_runtime::{
         operator::{FilteredVariants, SerdeOperator, SerdeOperatorAddr, SerdeProperty},
         processor::{ProcessorLevel, ProcessorMode},
     },
-    ontology::TypeInfo,
+    ontology::{Ontology, TypeInfo},
     value::{Attribute, PropertyId, Value},
     value_generator::ValueGenerator,
     DefId, Role,
 };
 
-use crate::{DomainEngine, UuidGenerator};
+use crate::system::SystemAPI;
 
 /// Relationship and object generator based on auto-generator information from ONTOL.
 pub struct ObjectGenerator<'e> {
-    engine: &'e DomainEngine,
+    ontology: &'e Ontology,
+    system: &'e dyn SystemAPI,
     mode: ProcessorMode,
 
     /// All generated times get the same value
@@ -22,20 +23,20 @@ pub struct ObjectGenerator<'e> {
 }
 
 impl<'e> ObjectGenerator<'e> {
-    pub fn new(engine: &'e DomainEngine, mode: ProcessorMode) -> Self {
+    pub fn new(mode: ProcessorMode, ontology: &'e Ontology, system: &'e dyn SystemAPI) -> Self {
         Self {
-            engine,
+            ontology,
+            system,
             mode,
-            current_time: engine.system().current_time(),
+            current_time: system.current_time(),
         }
     }
 
     pub fn generate_objects(&self, value: &mut Value) {
-        let ontology = self.engine.ontology();
         match value {
             Value::Struct(struct_map, type_def_id)
             | Value::StructUpdate(struct_map, type_def_id) => {
-                let type_info = ontology.get_type_info(*type_def_id);
+                let type_info = self.ontology.get_type_info(*type_def_id);
                 if let Some(addr) = type_info.operator_addr {
                     self.generate_struct_relationships(struct_map, type_info, addr);
                 }
@@ -62,7 +63,7 @@ impl<'e> ObjectGenerator<'e> {
         type_info: &TypeInfo,
         addr: SerdeOperatorAddr,
     ) {
-        let operator = self.engine.ontology().get_serde_operator(addr);
+        let operator = self.ontology.get_serde_operator(addr);
         let id_relationship = type_info
             .entity_info
             .as_ref()
@@ -82,12 +83,13 @@ impl<'e> ObjectGenerator<'e> {
                         continue;
                     }
 
-                    match self.engine.ontology().get_value_generator(relationship_id) {
+                    match self.ontology.get_value_generator(relationship_id) {
                         Some(ValueGenerator::DefaultProc(_)) => {}
                         Some(ValueGenerator::UuidV4) => {
-                            let uuid = match self.engine.config().uuid_generator {
-                                UuidGenerator::V4 => uuid::Uuid::new_v4(),
-                                UuidGenerator::V7 => uuid::Uuid::now_v7(),
+                            let uuid = match self.system.uuid_generator_version() {
+                                uuid::Version::Random => uuid::Uuid::new_v4(),
+                                uuid::Version::SortRand => uuid::Uuid::now_v7(),
+                                other => panic!("Bad UUID version: {other:?}"),
                             };
 
                             struct_map.insert(
@@ -143,10 +145,7 @@ impl<'e> ObjectGenerator<'e> {
     }
 
     fn property_def_id(&self, property: &SerdeProperty) -> DefId {
-        let operator = self
-            .engine
-            .ontology()
-            .get_serde_operator(property.value_addr);
+        let operator = self.ontology.get_serde_operator(property.value_addr);
         self.operator_def_id(operator)
     }
 
@@ -170,7 +169,7 @@ impl<'e> ObjectGenerator<'e> {
             SerdeOperator::Union(union_op) => union_op.union_def().def_id,
             SerdeOperator::Struct(struct_op) => struct_op.def.def_id,
             SerdeOperator::IdSingletonStruct(_, addr) => {
-                self.operator_def_id(self.engine.ontology().get_serde_operator(*addr))
+                self.operator_def_id(self.ontology.get_serde_operator(*addr))
             }
         }
     }

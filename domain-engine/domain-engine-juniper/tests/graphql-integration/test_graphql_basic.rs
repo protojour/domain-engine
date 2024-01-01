@@ -108,7 +108,7 @@ async fn test_graphql_int_scalars() {
     );
 
     let store_entity_mock = DataStoreAPIMock::execute
-        .next_call(matching!(Request::BatchWrite(_), _))
+        .next_call(matching!(Request::BatchWrite(_)))
         .returns(Ok(Response::one_inserted(
             foo.entity_builder(
                 json!("my_id"),
@@ -237,8 +237,8 @@ async fn test_graphql_basic_pagination() {
                 &test,
                 ROOT,
                 DataStoreAPIMock::execute
-                    .next_call(matching!(Request::Query(_), _))
-                    .answers(|(request, _)| {
+                    .next_call(matching!(Request::Query(_)))
+                    .answers(|request| {
                         let Request::Query(entity_select) = request else {
                             panic!();
                         };
@@ -285,8 +285,8 @@ async fn test_graphql_basic_pagination() {
                 &test,
                 ROOT,
                 DataStoreAPIMock::execute
-                    .next_call(matching!(Request::Query(_), _))
-                    .answers(|(request, _)| {
+                    .next_call(matching!(Request::Query(_)))
+                    .answers(|request| {
                         let Request::Query(entity_select) = request else {
                             panic!();
                         };
@@ -333,7 +333,7 @@ async fn test_graphql_nodes() {
 
     let [foo] = test.bind(["foo"]);
     let query_mock = DataStoreAPIMock::execute
-        .next_call(matching!(Request::Query(_), _))
+        .next_call(matching!(Request::Query(_)))
         .returns(Ok(Response::Query(Sequence::new([foo
             .entity_builder(json!("id"), json!({}))
             .into()]))));
@@ -432,7 +432,7 @@ async fn test_inner_struct() {
     );
 
     let store_entity_mock = DataStoreAPIMock::execute
-        .next_call(matching!(Request::BatchWrite(_), _))
+        .next_call(matching!(Request::BatchWrite(_)))
         .returns(Ok(Response::one_inserted(
             foo.entity_builder(json!("my_id"), json!({ "inner": { "prop": "yo" } }))
                 .into(),
@@ -568,7 +568,7 @@ async fn test_graphql_artist_and_instrument_connections() {
                 &test,
                 ROOT,
                 DataStoreAPIMock::execute
-                    .next_call(matching!(Request::Query(_), _))
+                    .next_call(matching!(Request::Query(_)))
                     .returns(Ok(Response::Query(Sequence::new([ziggy.clone()]))))
             )
         )
@@ -661,7 +661,7 @@ async fn test_graphql_artist_and_instrument_connections() {
                 &test,
                 ROOT,
                 DataStoreAPIMock::execute
-                    .next_call(matching!(Request::BatchWrite(..), _))
+                    .next_call(matching!(Request::BatchWrite(..)))
                     .returns(Ok(Response::one_inserted(ziggy.value)))
             )
         )
@@ -743,7 +743,7 @@ async fn test_unified_mutation_create() {
                 &test,
                 ROOT,
                 DataStoreAPIMock::execute
-                    .next_call(matching!(Request::BatchWrite(..), _))
+                    .next_call(matching!(Request::BatchWrite(..)))
                     .returns(Ok(Response::one_inserted(ziggy.value)))
             )
         )
@@ -824,7 +824,7 @@ async fn test_create_through_mapped_domain() {
                 &test,
                 SourceName("artist"),
                 DataStoreAPIMock::execute
-                    .next_call(matching!(Request::BatchWrite(..), _))
+                    .next_call(matching!(Request::BatchWrite(..)))
                     .returns(Ok(Response::one_inserted(ziggy.value)))
             )
         )
@@ -849,7 +849,7 @@ async fn test_graphql_guitar_synth_union_selection() {
     let [artist] = test.bind(["artist"]);
 
     let query_mock = DataStoreAPIMock::execute
-        .next_call(matching!(Request::Query(_), _))
+        .next_call(matching!(Request::Query(_)))
         .returns(Ok(Response::Query(Sequence::new([artist
             .entity_builder(
                 json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
@@ -952,7 +952,7 @@ async fn test_graphql_guitar_synth_union_input_exec() {
     let (test, schema) = GUITAR_SYNTH_UNION.1.compile_single_schema_with_datastore();
     let [artist] = test.bind(["artist"]);
     let store_entity_mock = DataStoreAPIMock::execute
-        .next_call(matching!(Request::BatchWrite(..), _))
+        .next_call(matching!(Request::BatchWrite(..)))
         .returns(Ok(Response::one_inserted(
             artist
                 .entity_builder(
@@ -1128,7 +1128,7 @@ async fn test_graphql_municipalities_named_query() {
     );
 
     let query_mock = DataStoreAPIMock::execute
-        .next_call(matching!(Request::Query(_), _))
+        .next_call(matching!(Request::Query(_)))
         .returns(Ok(Response::Query(Sequence::new([municipality
             .entity_builder(
                 json!("OSL"),
@@ -1193,7 +1193,7 @@ async fn test_graphql_open_data() {
     .compile_single_schema_with_datastore();
     let [foo] = test.bind(["foo"]);
     let store_entity_mock = DataStoreAPIMock::execute
-        .next_call(matching!(Request::BatchWrite(..), _))
+        .next_call(matching!(Request::BatchWrite(..)))
         .returns(Ok(Response::one_inserted(
             foo.entity_builder(json!("the-id"), json!({}))
                 .with_open_data(json!({ "foo": "bar" }))
@@ -1255,7 +1255,7 @@ async fn test_open_data_disabled() {
     );
 
     let store_entity_mock = DataStoreAPIMock::execute
-        .next_call(matching!(Request::BatchWrite(..), _))
+        .next_call(matching!(Request::BatchWrite(..)))
         .returns(Ok(Response::one_inserted(
             foo.entity_builder(json!("the-id"), json!({})).into(),
         )));
