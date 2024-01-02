@@ -9,7 +9,6 @@ use ontol_runtime::{
     value_generator::ValueGenerator,
     DefId,
 };
-use uuid::Uuid;
 
 use crate::{system::SystemAPI, DomainError, DomainResult};
 
@@ -57,7 +56,7 @@ pub fn try_generate_entity_id(
             match (ontology.get_text_like_type(*def_id), value_generator) {
                 (Some(TextLikeType::Uuid), ValueGenerator::Uuid) => {
                     Ok(GeneratedId::Generated(Value::OctetSequence(
-                        Uuid::new_v4().as_bytes().iter().cloned().collect(),
+                        system.generate_uuid().as_bytes().iter().cloned().collect(),
                         *def_id,
                     )))
                 }
