@@ -94,11 +94,7 @@ fn load_ontology(path: PathBuf) -> anyhow::Result<Ontology> {
 
 struct System;
 
-impl domain_engine_core::system::SystemAPI for System {
-    fn current_time(&self) -> chrono::DateTime<chrono::Utc> {
-        chrono::Utc::now()
-    }
-}
+impl domain_engine_core::system::SystemAPI for System {}
 
 fn domain_router(
     engine: Arc<DomainEngine>,

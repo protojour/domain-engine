@@ -7,7 +7,7 @@ use ontol_runtime::{
     condition::Condition,
     interface::serde::{operator::SerdeOperatorAddr, processor::ProcessorMode},
     ontology::{
-        DataRelationshipInfo, DataRelationshipKind, DataRelationshipTarget, EntityInfo, Ontology,
+        DataRelationshipInfo, DataRelationshipKind, DataRelationshipTarget, EntityInfo,
         ValueCardinality,
     },
     select::Select,
@@ -25,7 +25,7 @@ use domain_engine_core::{
 };
 
 use crate::{
-    core::{find_data_relationship, Edge, EdgeCollection, EntityKey},
+    core::{find_data_relationship, DbContext, Edge, EdgeCollection, EntityKey},
     query::{Cursor, IncludeTotalLen, Limit},
 };
 
@@ -42,25 +42,25 @@ impl InMemoryStore {
         &mut self,
         entity: Value,
         select: &Select,
-        ontology: &Ontology,
+        ctx: &DbContext,
     ) -> DomainResult<Value> {
         debug!("write new entity: {}", ValueDebug(&entity));
 
-        let entity_id = self.write_new_entity_inner(entity, ontology)?;
-        self.post_write_select(entity_id, select, ontology)
+        let entity_id = self.write_new_entity_inner(entity, ctx)?;
+        self.post_write_select(entity_id, select, ctx)
     }
 
     pub fn update_entity(
         &mut self,
         value: Value,
         select: &Select,
-        ontology: &Ontology,
+        ctx: &DbContext,
     ) -> DomainResult<Value> {
         debug!("update entity: {:#?}", value);
 
-        let entity_id = find_inherent_entity_id(ontology, &value)?
+        let entity_id = find_inherent_entity_id(&value, &ctx.ontology)?
             .ok_or_else(|| DomainError::EntityNotFound)?;
-        let type_info = ontology.get_type_info(value.type_def_id());
+        let type_info = ctx.ontology.get_type_info(value.type_def_id());
         let dynamic_key = Self::extract_dynamic_key(&entity_id)?;
 
         if !self
@@ -95,7 +95,7 @@ impl InMemoryStore {
                             (property_id, EdgeWriteMode::Overwrite),
                             attribute,
                             data_relationship,
-                            ontology,
+                            ctx,
                         )?;
                     }
                     ValueCardinality::Many => match attribute.value {
@@ -113,7 +113,7 @@ impl InMemoryStore {
                                         property_id,
                                         attribute.value,
                                         data_relationship,
-                                        ontology,
+                                        ctx,
                                     )?;
                                 } else {
                                     let edge_write_mode = match &attribute.value {
@@ -128,7 +128,7 @@ impl InMemoryStore {
                                         (property_id, edge_write_mode),
                                         attribute,
                                         data_relationship,
-                                        ontology,
+                                        ctx,
                                     )?;
                                 }
                             }
@@ -150,14 +150,14 @@ impl InMemoryStore {
             raw_props.insert(property_id, attr);
         }
 
-        self.post_write_select(entity_id, select, ontology)
+        self.post_write_select(entity_id, select, ctx)
     }
 
     fn post_write_select(
         &mut self,
         entity_id: Value,
         select: &Select,
-        ontology: &Ontology,
+        ctx: &DbContext,
     ) -> DomainResult<Value> {
         match select {
             Select::EntityId => Ok(entity_id),
@@ -169,11 +169,11 @@ impl InMemoryStore {
                     Limit(usize::MAX),
                     Option::<Cursor>::None,
                     IncludeTotalLen(false),
-                    ontology,
+                    ctx,
                 )?;
 
                 for attr in entity_seq.attrs {
-                    let id = find_inherent_entity_id(ontology, &attr.value)?;
+                    let id = find_inherent_entity_id(&attr.value, &ctx.ontology)?;
                     if let Some(id) = id {
                         let dynamic_key = Self::extract_dynamic_key(&id)?;
 
@@ -194,20 +194,16 @@ impl InMemoryStore {
     }
 
     /// Returns the entity ID
-    fn write_new_entity_inner(
-        &mut self,
-        entity: Value,
-        ontology: &Ontology,
-    ) -> DomainResult<Value> {
+    fn write_new_entity_inner(&mut self, entity: Value, ctx: &DbContext) -> DomainResult<Value> {
         debug!("write entity {}", ValueDebug(&entity));
 
-        let type_info = ontology.get_type_info(entity.type_def_id());
+        let type_info = ctx.ontology.get_type_info(entity.type_def_id());
         let entity_info = type_info
             .entity_info
             .as_ref()
             .ok_or(DomainError::NotAnEntity(entity.type_def_id()))?;
 
-        let (id, id_generated) = match find_inherent_entity_id(ontology, &entity)? {
+        let (id, id_generated) = match find_inherent_entity_id(&entity, &ctx.ontology)? {
             Some(id) => (id, false),
             None => {
                 let value_generator = entity_info.id_value_generator.ok_or_else(|| {
@@ -215,11 +211,7 @@ impl InMemoryStore {
                 })?;
 
                 (
-                    self.generate_entity_id(
-                        entity_info.id_operator_addr,
-                        value_generator,
-                        ontology,
-                    )?,
+                    self.generate_entity_id(entity_info.id_operator_addr, value_generator, ctx)?,
                     true,
                 )
             }
@@ -258,7 +250,7 @@ impl InMemoryStore {
                                 (property_id, EdgeWriteMode::Insert),
                                 attribute,
                                 data_relationship,
-                                ontology,
+                                ctx,
                             )?;
                         }
                         ValueCardinality::Many => {
@@ -275,7 +267,7 @@ impl InMemoryStore {
                                     (property_id, EdgeWriteMode::Insert),
                                     attribute,
                                     data_relationship,
-                                    ontology,
+                                    ctx,
                                 )?;
                             }
                         }
@@ -302,7 +294,7 @@ impl InMemoryStore {
         (property_id, write_mode): (PropertyId, EdgeWriteMode),
         attribute: Attribute,
         data_relationship: &DataRelationshipInfo,
-        ontology: &Ontology,
+        ctx: &DbContext,
     ) -> DomainResult<()> {
         debug!("entity rel attribute: {attribute:?}. Data relationship: {data_relationship:?}");
 
@@ -312,7 +304,7 @@ impl InMemoryStore {
         let foreign_key = match &data_relationship.target {
             DataRelationshipTarget::Unambiguous(entity_def_id) => {
                 if &value.type_def_id() == entity_def_id {
-                    let foreign_id = self.write_new_entity_inner(value, ontology)?;
+                    let foreign_id = self.write_new_entity_inner(value, ctx)?;
                     let dynamic_key = Self::extract_dynamic_key(&foreign_id)?;
 
                     EntityKey {
@@ -322,13 +314,13 @@ impl InMemoryStore {
                 } else {
                     self.resolve_foreign_key_for_edge(
                         *entity_def_id,
-                        ontology
+                        ctx.ontology
                             .get_type_info(*entity_def_id)
                             .entity_info
                             .as_ref()
                             .unwrap(),
                         value,
-                        ontology,
+                        ctx,
                     )?
                 }
             }
@@ -339,7 +331,7 @@ impl InMemoryStore {
                 if variants.contains(&value.type_def_id()) {
                     // Explicit data struct of a given variant
                     let entity_def_id = value.type_def_id();
-                    let foreign_id = self.write_new_entity_inner(value, ontology)?;
+                    let foreign_id = self.write_new_entity_inner(value, ctx)?;
                     let dynamic_key = Self::extract_dynamic_key(&foreign_id)?;
 
                     EntityKey {
@@ -350,7 +342,8 @@ impl InMemoryStore {
                     let (variant_def_id, entity_info) = variants
                         .iter()
                         .find_map(|variant_def_id| {
-                            let entity_info = ontology
+                            let entity_info = ctx
+                                .ontology
                                 .get_type_info(*variant_def_id)
                                 .entity_info
                                 .as_ref()
@@ -364,7 +357,7 @@ impl InMemoryStore {
                         })
                         .expect("Corresponding entity def id not found for the given ID");
 
-                    self.resolve_foreign_key_for_edge(variant_def_id, entity_info, value, ontology)?
+                    self.resolve_foreign_key_for_edge(variant_def_id, entity_info, value, ctx)?
                 }
             }
         };
@@ -448,19 +441,19 @@ impl InMemoryStore {
         property_id: PropertyId,
         foreign_id: Value,
         data_relationship: &DataRelationshipInfo,
-        ontology: &Ontology,
+        ctx: &DbContext,
     ) -> DomainResult<()> {
         let foreign_key = match &data_relationship.target {
             DataRelationshipTarget::Unambiguous(entity_def_id) => self
                 .resolve_foreign_key_for_edge(
                     *entity_def_id,
-                    ontology
+                    ctx.ontology
                         .get_type_info(*entity_def_id)
                         .entity_info
                         .as_ref()
                         .unwrap(),
                     foreign_id,
-                    ontology,
+                    ctx,
                 )?,
             DataRelationshipTarget::Union {
                 union_def_id: _,
@@ -469,7 +462,8 @@ impl InMemoryStore {
                 let (variant_def_id, entity_info) = variants
                     .iter()
                     .find_map(|variant_def_id| {
-                        let entity_info = ontology
+                        let entity_info = ctx
+                            .ontology
                             .get_type_info(*variant_def_id)
                             .entity_info
                             .as_ref()
@@ -483,12 +477,7 @@ impl InMemoryStore {
                     })
                     .expect("Corresponding entity def id not found for the given ID");
 
-                self.resolve_foreign_key_for_edge(
-                    variant_def_id,
-                    entity_info,
-                    foreign_id,
-                    ontology,
-                )?
+                self.resolve_foreign_key_for_edge(variant_def_id, entity_info, foreign_id, ctx)?
             }
         };
 
@@ -527,7 +516,7 @@ impl InMemoryStore {
         foreign_entity_def_id: DefId,
         entity_info: &EntityInfo,
         id_value: Value,
-        ontology: &Ontology,
+        ctx: &DbContext,
     ) -> DomainResult<EntityKey> {
         let foreign_key = Self::extract_dynamic_key(&id_value)?;
         let entity_data = self.look_up_entity(foreign_entity_def_id, &foreign_key);
@@ -542,14 +531,16 @@ impl InMemoryStore {
             )]);
             self.write_new_entity_inner(
                 Value::Struct(Box::new(entity_data), foreign_entity_def_id),
-                ontology,
+                ctx,
             )?;
         } else if entity_data.is_none() {
-            let type_info = ontology.get_type_info(id_value.type_def_id());
+            let type_info = ctx.ontology.get_type_info(id_value.type_def_id());
             let repr = if let Some(operator_addr) = type_info.operator_addr {
                 // TODO: Easier way to report values in "human readable"/JSON format
 
-                let processor = ontology.new_serde_processor(operator_addr, ProcessorMode::Read);
+                let processor = ctx
+                    .ontology
+                    .new_serde_processor(operator_addr, ProcessorMode::Read);
 
                 let mut buf: Vec<u8> = vec![];
                 processor
@@ -573,9 +564,14 @@ impl InMemoryStore {
         &mut self,
         id_operator_addr: SerdeOperatorAddr,
         value_generator: ValueGenerator,
-        ontology: &Ontology,
+        ctx: &DbContext,
     ) -> DomainResult<Value> {
-        match try_generate_entity_id(ontology, id_operator_addr, value_generator)? {
+        match try_generate_entity_id(
+            id_operator_addr,
+            value_generator,
+            &ctx.ontology,
+            ctx.system.as_ref(),
+        )? {
             GeneratedId::Generated(value) => Ok(value),
             GeneratedId::AutoIncrementI64(def_id) => {
                 let id_value = self.int_id_counter;

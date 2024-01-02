@@ -5,19 +5,21 @@ use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 /// Combination of system-specific functionality and configuration for the domain engine.
 pub trait SystemAPI: Sync {
     /// Get the system's current time.
-    fn current_time(&self) -> chrono::DateTime<chrono::Utc>;
+    fn current_time(&self) -> chrono::DateTime<chrono::Utc> {
+        chrono::Utc::now()
+    }
+
+    /// Generate a new [uuid::Uuid].
+    ///
+    /// The default implementation uses UUID V7 (SortRand),
+    /// because this is used in a database context.
+    fn generate_uuid(&self) -> uuid::Uuid {
+        uuid::Uuid::now_v7()
+    }
 
     /// Get the configured default limit of returned elements from a data store query.
     fn default_query_limit(&self) -> usize {
         20
-    }
-
-    /// Get the system's configured Uuid generator version.
-    ///
-    /// V7/SortRand is generally recommended for use in databases:
-    /// https://docs.rs/uuid/latest/uuid/#which-uuid-version-should-i-use
-    fn uuid_generator_version(&self) -> uuid::Version {
-        uuid::Version::SortRand
     }
 }
 

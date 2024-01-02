@@ -1,10 +1,10 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::Arc};
 
 use anyhow::anyhow;
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
-    ontology::{Cardinality, DataRelationshipInfo, TypeInfo},
+    ontology::{Cardinality, DataRelationshipInfo, Ontology, TypeInfo},
     value::{Attribute, PropertyId, Value},
     DefId, RelationshipId,
 };
@@ -12,13 +12,17 @@ use smallvec::SmallVec;
 use smartstring::alias::String;
 use tracing::warn;
 
-use domain_engine_core::{DomainError, DomainResult};
+use domain_engine_core::{system::ArcSystemApi, DomainError, DomainResult};
 
-#[derive(Debug)]
 pub(super) struct InMemoryStore {
     pub collections: FnvHashMap<DefId, EntityTable<DynamicKey>>,
     pub edge_collections: FnvHashMap<RelationshipId, EdgeCollection>,
     pub int_id_counter: i64,
+}
+
+pub(super) struct DbContext {
+    pub ontology: Arc<Ontology>,
+    pub system: ArcSystemApi,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]

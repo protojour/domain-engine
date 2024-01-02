@@ -85,17 +85,16 @@ impl<'e> ObjectGenerator<'e> {
 
                     match self.ontology.get_value_generator(relationship_id) {
                         Some(ValueGenerator::DefaultProc(_)) => {}
-                        Some(ValueGenerator::UuidV4) => {
-                            let uuid = match self.system.uuid_generator_version() {
-                                uuid::Version::Random => uuid::Uuid::new_v4(),
-                                uuid::Version::SortRand => uuid::Uuid::now_v7(),
-                                other => panic!("Bad UUID version: {other:?}"),
-                            };
-
+                        Some(ValueGenerator::Uuid) => {
                             struct_map.insert(
                                 property.property_id,
                                 Value::OctetSequence(
-                                    uuid.as_bytes().iter().cloned().collect(),
+                                    self.system
+                                        .generate_uuid()
+                                        .as_bytes()
+                                        .iter()
+                                        .cloned()
+                                        .collect(),
                                     self.property_def_id(property),
                                 )
                                 .into(),

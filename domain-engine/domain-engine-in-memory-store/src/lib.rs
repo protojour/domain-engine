@@ -1,3 +1,4 @@
+use core::DbContext;
 use std::sync::Arc;
 
 use domain_engine_core::data_store::{DataStoreFactory, DataStoreFactorySync};
@@ -24,79 +25,18 @@ mod write;
 
 pub struct InMemoryDb {
     store: RwLock<InMemoryStore>,
-    ontology: Arc<Ontology>,
-    system: ArcSystemApi,
+    context: DbContext,
 }
 
 #[async_trait::async_trait]
 impl DataStoreAPI for InMemoryDb {
     async fn execute(&self, request: Request) -> DomainResult<Response> {
-        let ontology = self.ontology.as_ref();
-        match request {
-            Request::Query(select) => {
-                // debug!("{select:#?}");
-                Ok(Response::Query(
-                    self.store.read().await.query_entities(&select, ontology)?,
-                ))
-            }
-            Request::BatchWrite(write_requests) => {
-                // debug!("{write_requests:#?}");
-
-                let mut store = self.store.write().await;
-                let mut responses = vec![];
-
-                for write_request in write_requests {
-                    match write_request {
-                        BatchWriteRequest::Insert(mut entities, select) => {
-                            for value in entities.iter_mut() {
-                                ObjectGenerator::new(
-                                    ProcessorMode::Create,
-                                    ontology,
-                                    self.system.as_ref(),
-                                )
-                                .generate_objects(value);
-                            }
-
-                            responses.push(BatchWriteResponse::Inserted(
-                                entities
-                                    .into_iter()
-                                    .map(|entity| store.write_new_entity(entity, &select, ontology))
-                                    .collect::<DomainResult<_>>()?,
-                            ));
-                        }
-                        BatchWriteRequest::Update(mut entities, select) => {
-                            for value in entities.iter_mut() {
-                                ObjectGenerator::new(
-                                    ProcessorMode::Update,
-                                    ontology,
-                                    self.system.as_ref(),
-                                )
-                                .generate_objects(value);
-                            }
-
-                            responses.push(BatchWriteResponse::Updated(
-                                entities
-                                    .into_iter()
-                                    .map(|entity| store.update_entity(entity, &select, ontology))
-                                    .collect::<DomainResult<_>>()?,
-                            ));
-                        }
-                        BatchWriteRequest::Delete(ids, def_id) => {
-                            responses.push(BatchWriteResponse::Deleted(
-                                store.delete_entities(ids, def_id)?,
-                            ));
-                        }
-                    }
-                }
-
-                Ok(Response::BatchWrite(responses))
-            }
-        }
+        self.exec_inner(request).await
     }
 }
 
 impl InMemoryDb {
-    pub fn new(package_id: PackageId, ontology: Arc<Ontology>, system: ArcSystemApi) -> Self {
+    fn new(package_id: PackageId, ontology: Arc<Ontology>, system: ArcSystemApi) -> Self {
         let domain = ontology.find_domain(package_id).unwrap();
 
         let mut collections: FnvHashMap<DefId, EntityTable<DynamicKey>> = Default::default();
@@ -130,8 +70,77 @@ impl InMemoryDb {
                 edge_collections,
                 int_id_counter: 0,
             }),
-            ontology,
-            system,
+            context: DbContext { ontology, system },
+        }
+    }
+
+    async fn exec_inner(&self, request: Request) -> DomainResult<Response> {
+        match request {
+            Request::Query(select) => {
+                // debug!("{select:#?}");
+                Ok(Response::Query(
+                    self.store
+                        .read()
+                        .await
+                        .query_entities(&select, &self.context)?,
+                ))
+            }
+            Request::BatchWrite(write_requests) => {
+                // debug!("{write_requests:#?}");
+
+                let mut store = self.store.write().await;
+                let mut responses = vec![];
+
+                for write_request in write_requests {
+                    match write_request {
+                        BatchWriteRequest::Insert(mut entities, select) => {
+                            for value in entities.iter_mut() {
+                                ObjectGenerator::new(
+                                    ProcessorMode::Create,
+                                    &self.context.ontology,
+                                    self.context.system.as_ref(),
+                                )
+                                .generate_objects(value);
+                            }
+
+                            responses.push(BatchWriteResponse::Inserted(
+                                entities
+                                    .into_iter()
+                                    .map(|entity| {
+                                        store.write_new_entity(entity, &select, &self.context)
+                                    })
+                                    .collect::<DomainResult<_>>()?,
+                            ));
+                        }
+                        BatchWriteRequest::Update(mut entities, select) => {
+                            for value in entities.iter_mut() {
+                                ObjectGenerator::new(
+                                    ProcessorMode::Update,
+                                    &self.context.ontology,
+                                    self.context.system.as_ref(),
+                                )
+                                .generate_objects(value);
+                            }
+
+                            responses.push(BatchWriteResponse::Updated(
+                                entities
+                                    .into_iter()
+                                    .map(|entity| {
+                                        store.update_entity(entity, &select, &self.context)
+                                    })
+                                    .collect::<DomainResult<_>>()?,
+                            ));
+                        }
+                        BatchWriteRequest::Delete(ids, def_id) => {
+                            responses.push(BatchWriteResponse::Deleted(
+                                store.delete_entities(ids, def_id)?,
+                            ));
+                        }
+                    }
+                }
+
+                Ok(Response::BatchWrite(responses))
+            }
         }
     }
 }

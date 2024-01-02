@@ -304,8 +304,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Some(Type::Primitive(PrimitiveKind::I64, _)) => {
                         Ok(ValueGenerator::Autoincrement)
                     }
-                    Some(Type::Primitive(PrimitiveKind::Text, _)) => Ok(ValueGenerator::UuidV4),
-                    Some(Type::TextLike(_, TextLikeType::Uuid)) => Ok(ValueGenerator::UuidV4),
+                    Some(Type::Primitive(PrimitiveKind::Text, _)) => Ok(ValueGenerator::Uuid),
+                    Some(Type::TextLike(_, TextLikeType::Uuid)) => Ok(ValueGenerator::Uuid),
                     _ => match properties.map(|p| &p.constructor) {
                         Some(Constructor::TextFmt(segment)) => {
                             self.auto_generator_for_text_pattern_segment(segment)
@@ -339,7 +339,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         segment: &TextPatternSegment,
     ) -> Result<ValueGenerator, ()> {
         match segment {
-            TextPatternSegment::AllStrings => Ok(ValueGenerator::UuidV4),
+            TextPatternSegment::AllStrings => Ok(ValueGenerator::Uuid),
             TextPatternSegment::Concat(segments) => {
                 let mut output_generator = None;
                 for concat_segment in segments {
