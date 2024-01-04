@@ -149,7 +149,7 @@ impl InMemoryDb {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Copy, Default)]
 pub struct InMemoryDataStoreFactory;
 
 #[async_trait::async_trait]
