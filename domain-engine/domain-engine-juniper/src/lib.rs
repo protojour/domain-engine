@@ -119,7 +119,7 @@ async fn query(
 
         service_ctx
             .domain_engine
-            .exec_map(map_key, input, &mut selects)
+            .exec_map(map_key, input, &mut selects, service_ctx.session.clone())
             .await?
     };
 
@@ -206,7 +206,7 @@ async fn mutation(
 
             let batch_write_responses = service_ctx
                 .domain_engine
-                .execute_writes(batch_write_requests)
+                .execute_writes(batch_write_requests, service_ctx.session.clone())
                 .await?;
 
             let mut output_sequence = Sequence::default();

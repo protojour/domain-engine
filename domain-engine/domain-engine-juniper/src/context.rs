@@ -22,8 +22,9 @@ use ontol_runtime::{
 /// it's responsible for resolving queries and mutations.
 #[derive(Clone)]
 pub struct ServiceCtx {
-    pub(crate) domain_engine: Arc<DomainEngine>,
-    pub(crate) serde_processor_profile_flags: ProcessorProfileFlags,
+    pub domain_engine: Arc<DomainEngine>,
+    pub serde_processor_profile_flags: ProcessorProfileFlags,
+    pub session: domain_engine_core::Session,
 }
 
 impl ServiceCtx {
@@ -40,6 +41,7 @@ impl From<DomainEngine> for ServiceCtx {
         Self {
             domain_engine: Arc::new(value),
             serde_processor_profile_flags: Default::default(),
+            session: Default::default(),
         }
     }
 }
@@ -49,6 +51,7 @@ impl From<Arc<DomainEngine>> for ServiceCtx {
         Self {
             domain_engine: value,
             serde_processor_profile_flags: Default::default(),
+            session: Default::default(),
         }
     }
 }

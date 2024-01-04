@@ -30,7 +30,11 @@ pub struct InMemoryDb {
 
 #[async_trait::async_trait]
 impl DataStoreAPI for InMemoryDb {
-    async fn execute(&self, request: Request) -> DomainResult<Response> {
+    async fn execute(
+        &self,
+        request: Request,
+        _session: domain_engine_core::Session,
+    ) -> DomainResult<Response> {
         self.exec_inner(request).await
     }
 }

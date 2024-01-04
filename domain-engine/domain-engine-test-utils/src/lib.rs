@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use domain_engine_core::DomainEngine;
+use domain_engine_core::{DomainEngine, Session};
 use ontol_runtime::{
     condition::{CondTerm, Condition},
     interface::serde::processor::ProcessorMode,
@@ -80,7 +80,7 @@ async fn test_exec_named_map(
         .expect("Deserialize input failed");
 
     engine
-        .exec_map([from, to], input.value, &mut find_query)
+        .exec_map([from, to], input.value, &mut find_query, Session::default())
         .await
         .expect("Exec map failed")
 }

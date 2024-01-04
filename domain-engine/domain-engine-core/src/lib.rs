@@ -11,7 +11,8 @@ pub mod system;
 mod domain_engine;
 mod select_data_flow;
 
-use std::{collections::HashMap, hash::BuildHasher};
+use std::any::Any;
+use std::{collections::HashMap, hash::BuildHasher, sync::Arc};
 
 pub use domain_engine::DomainEngine;
 pub use domain_error::{DomainError, DomainResult};
@@ -20,6 +21,16 @@ use ontol_runtime::{
     select::EntitySelect,
     var::Var,
 };
+
+/// A session that's passed through the DomainEngine APIs into the data store layer.
+#[derive(Clone)]
+pub struct Session(pub Arc<dyn Any + Send + Sync>);
+
+impl Default for Session {
+    fn default() -> Self {
+        Self(Arc::new(()))
+    }
+}
 
 pub trait FindEntitySelect {
     fn find_select(&mut self, match_var: Var, condition: &Condition<CondTerm>) -> EntitySelect;

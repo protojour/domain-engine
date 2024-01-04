@@ -1,4 +1,4 @@
-use domain_engine_core::DomainEngine;
+use domain_engine_core::{DomainEngine, Session};
 use domain_engine_test_utils::{DomainEngineTestExt, TestFindQuery};
 use ontol_runtime::{config::DataStoreConfig, ontology::Ontology, select::Select};
 use ontol_test_utils::{
@@ -49,6 +49,7 @@ async fn test_conduit_db_id_generation() {
                 }))
                 .unwrap(),
             Select::EntityId,
+            Session::default(),
         )
         .await
         .unwrap();
@@ -65,6 +66,7 @@ async fn test_conduit_db_id_generation() {
                 }))
                 .unwrap(),
             Select::EntityId,
+            Session::default(),
         )
         .await
         .unwrap();
@@ -88,6 +90,7 @@ async fn test_conduit_db_id_generation() {
                 }))
                 .unwrap(),
             Select::EntityId,
+            Session::default(),
         )
         .await
         .unwrap()
@@ -107,6 +110,7 @@ async fn test_conduit_db_id_generation() {
                 }))
                 .unwrap(),
             Select::EntityId,
+            Session::default(),
         )
         .await
         .unwrap();
@@ -117,6 +121,7 @@ async fn test_conduit_db_id_generation() {
                 .to_value(json!({ "tag": "foo" }))
                 .unwrap(),
             Select::EntityId,
+            Session::default(),
         )
         .await
         .unwrap();
@@ -138,6 +143,7 @@ async fn test_conduit_db_store_entity_tree() {
                 }))
                 .unwrap(),
             Select::EntityId,
+            Session::default(),
         )
         .await
         .unwrap()
@@ -173,13 +179,14 @@ async fn test_conduit_db_store_entity_tree() {
                 }))
                 .unwrap(),
             Select::EntityId,
+            Session::default(),
         )
         .await
         .unwrap()
         .cast_into();
 
     let users = engine
-        .query_entities(user_type.struct_select([]).into())
+        .query_entities(user_type.struct_select([]).into(), Session::default())
         .await
         .unwrap();
 
@@ -198,6 +205,7 @@ async fn test_conduit_db_store_entity_tree() {
                     user_type
                         .struct_select([("authored_articles", Select::Leaf)])
                         .into(),
+                    Session::default(),
                 )
                 .await
                 .unwrap()
@@ -217,7 +225,7 @@ async fn test_conduit_db_store_entity_tree() {
     );
 
     let comments = engine
-        .query_entities(comment_type.struct_select([]).into())
+        .query_entities(comment_type.struct_select([]).into(), Session::default())
         .await
         .unwrap();
 
@@ -244,6 +252,7 @@ async fn test_conduit_db_store_entity_tree() {
                                 .into()
                         )])
                         .into(),
+                    Session::default(),
                 )
                 .await
                 .unwrap()
@@ -304,7 +313,8 @@ async fn test_conduit_db_unresolved_foreign_key() {
                         }
                     }))
                     .unwrap(),
-                Select::EntityId
+                Select::EntityId,
+                Session::default(),
             )
             .await,
         r#"unresolved foreign key: "67e55044-10b1-426f-9247-bb680e5fe0c8""#
@@ -332,6 +342,7 @@ async fn test_artist_and_instrument_fmt_id_generation() {
                 .to_value(json!({"name": "Igor Stravinskij" }))
                 .unwrap(),
             Select::EntityId,
+            Session::default(),
         )
         .await
         .unwrap();
@@ -348,6 +359,7 @@ async fn test_artist_and_instrument_fmt_id_generation() {
                 }))
                 .unwrap(),
             Select::EntityId,
+            Session::default(),
         )
         .await
         .unwrap();
@@ -375,6 +387,7 @@ async fn test_artist_and_instrument_pagination() {
             .store_new_entity(
                 serde_create(&artist).to_value(json.clone()).unwrap(),
                 Select::EntityId,
+                Session::default(),
             )
             .await
             .unwrap();
@@ -413,6 +426,7 @@ async fn test_artist_and_instrument_filter_condition() {
             .store_new_entity(
                 serde_create(&artist).to_value(json.clone()).unwrap(),
                 Select::EntityId,
+                Session::default(),
             )
             .await
             .unwrap();

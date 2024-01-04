@@ -23,7 +23,7 @@ use crate::{
     match_utils::find_entity_id_in_condition_for_var,
     select_data_flow::{translate_entity_select, translate_select},
     system::{ArcSystemApi, SystemAPI, TestSystem},
-    DomainError, FindEntitySelect,
+    DomainError, FindEntitySelect, Session,
 };
 
 pub struct DomainEngine {
@@ -67,6 +67,7 @@ impl DomainEngine {
         key: [MapKey; 2],
         mut input: Value,
         selects: &mut (dyn FindEntitySelect + Send),
+        session: Session,
     ) -> DomainResult<Value> {
         let proc = self
             .ontology
@@ -85,14 +86,23 @@ impl DomainEngine {
                     entity_select.condition = condition;
 
                     input = self
-                        .exec_map_query(match_var, value_cardinality, entity_select)
+                        .exec_map_query(
+                            match_var,
+                            value_cardinality,
+                            entity_select,
+                            session.clone(),
+                        )
                         .await?;
                 }
             }
         }
     }
 
-    pub async fn query_entities(&self, mut select: EntitySelect) -> DomainResult<Sequence> {
+    pub async fn query_entities(
+        &self,
+        mut select: EntitySelect,
+        session: Session,
+    ) -> DomainResult<Sequence> {
         let data_store = self.get_data_store()?;
         let ontology = self.ontology();
 
@@ -108,7 +118,7 @@ impl DomainEngine {
 
         let data_store::Response::Query(mut edge_seq) = data_store
             .api()
-            .execute(data_store::Request::Query(select))
+            .execute(data_store::Request::Query(select), session)
             .await?
         else {
             return Err(DomainError::DataStore(anyhow!(
@@ -143,6 +153,7 @@ impl DomainEngine {
     pub async fn execute_writes(
         &self,
         mut requests: Vec<data_store::BatchWriteRequest>,
+        session: Session,
     ) -> DomainResult<Vec<data_store::BatchWriteResponse>> {
         // TODO: Domain translation by finding optimal mapping path
 
@@ -214,7 +225,7 @@ impl DomainEngine {
 
         let data_store::Response::BatchWrite(mut responses) = data_store
             .api()
-            .execute(data_store::Request::BatchWrite(requests))
+            .execute(data_store::Request::BatchWrite(requests), session)
             .await?
         else {
             return Err(DomainError::DataStore(anyhow!(
@@ -254,9 +265,17 @@ impl DomainEngine {
     }
 
     /// Shorthand for storing one entity
-    pub async fn store_new_entity(&self, entity: Value, select: Select) -> DomainResult<Value> {
+    pub async fn store_new_entity(
+        &self,
+        entity: Value,
+        select: Select,
+        session: Session,
+    ) -> DomainResult<Value> {
         let write_responses = self
-            .execute_writes(vec![BatchWriteRequest::Insert(vec![entity], select)])
+            .execute_writes(
+                vec![BatchWriteRequest::Insert(vec![entity], select)],
+                session,
+            )
             .await?;
 
         let BatchWriteResponse::Inserted(entities) = write_responses
@@ -280,6 +299,7 @@ impl DomainEngine {
         match_var: Var,
         value_cardinality: ValueCardinality,
         mut entity_select: EntitySelect,
+        session: Session,
     ) -> DomainResult<ontol_runtime::value::Value> {
         let data_store = self.get_data_store()?;
 
@@ -329,7 +349,7 @@ impl DomainEngine {
 
         let data_store::Response::Query(edge_seq) = data_store
             .api()
-            .execute(data_store::Request::Query(entity_select))
+            .execute(data_store::Request::Query(entity_select), session)
             .await?
         else {
             return Err(DomainError::DataStore(anyhow!(

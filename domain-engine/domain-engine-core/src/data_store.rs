@@ -11,12 +11,12 @@ use ontol_runtime::{
 use serde::{Deserialize, Serialize};
 use unimock::unimock;
 
-use crate::{domain_error::DomainResult, system::ArcSystemApi};
+use crate::{domain_error::DomainResult, system::ArcSystemApi, Session};
 
 #[unimock(api = DataStoreAPIMock)]
 #[async_trait::async_trait]
 pub trait DataStoreAPI {
-    async fn execute(&self, request: Request) -> DomainResult<Response>;
+    async fn execute(&self, request: Request, session: Session) -> DomainResult<Response>;
 }
 
 pub struct DataStore {

@@ -1,4 +1,7 @@
-use std::fmt::{Debug, Display};
+use std::{
+    fmt::{Debug, Display},
+    sync::Arc,
+};
 
 use domain_engine_core::{
     data_store::{DataStoreAPIMock, Request, Response},
@@ -98,7 +101,7 @@ impl Display for TestError {
 
 pub fn mock_data_store_query_entities_empty() -> impl unimock::Clause {
     DataStoreAPIMock::execute
-        .next_call(matching!(Request::Query(_)))
+        .next_call(matching!(Request::Query(_), _session))
         .returns(Ok(Response::Query(Sequence::new([]))))
 }
 
@@ -107,11 +110,16 @@ pub fn gql_ctx_mock_data_store(
     data_store_package: SourceName,
     setup: impl unimock::Clause,
 ) -> ServiceCtx {
-    DomainEngine::test_builder(ontol_test.ontology.clone())
+    let domain_engine = DomainEngine::test_builder(ontol_test.ontology.clone())
         .mock_data_store(ontol_test.get_package_id(data_store_package.0), setup)
         .build_sync(InMemoryDataStoreFactory)
-        .unwrap()
-        .into()
+        .unwrap();
+
+    ServiceCtx {
+        domain_engine: Arc::new(domain_engine),
+        serde_processor_profile_flags: Default::default(),
+        session: Default::default(),
+    }
 }
 
 #[async_trait::async_trait]

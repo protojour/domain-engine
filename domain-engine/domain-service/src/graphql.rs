@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
 use axum::Extension;
-use domain_engine_juniper::{gql_scalar::GqlScalar, juniper};
+use domain_engine_core::DomainEngine;
+use domain_engine_juniper::{context::ServiceCtx, gql_scalar::GqlScalar, juniper};
 use juniper_axum::extract::JuniperRequest;
 
 pub struct GraphqlService {
     pub schema: domain_engine_juniper::Schema,
-    pub service_ctx: domain_engine_juniper::context::ServiceCtx,
+    pub domain_engine: Arc<DomainEngine>,
     pub endpoint_url: String,
 }
 
@@ -18,7 +19,14 @@ pub async fn graphql_handler(
     axum::Json<juniper::http::GraphQLBatchResponse<GqlScalar>>,
 ) {
     let response = batch_request
-        .execute(&service.schema, &service.service_ctx)
+        .execute(
+            &service.schema,
+            &ServiceCtx {
+                domain_engine: service.domain_engine.clone(),
+                serde_processor_profile_flags: Default::default(),
+                session: Default::default(),
+            },
+        )
         .await;
 
     (

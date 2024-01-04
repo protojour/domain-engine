@@ -115,7 +115,7 @@ fn domain_router(
                 )
                 .layer(Extension(Arc::new(GraphqlService {
                     schema,
-                    service_ctx: engine.into(),
+                    domain_engine: engine,
                     endpoint_url: format!("{domain_path}/graphql"),
                 })));
         }
