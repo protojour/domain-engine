@@ -4,6 +4,8 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum DomainError {
+    #[error("unauthorized")]
+    Unauthorized,
     #[error("mapping procedure not found")]
     MappingProcedureNotFound,
     #[error("no data store")]
