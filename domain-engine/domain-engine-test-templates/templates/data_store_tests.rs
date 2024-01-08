@@ -27,7 +27,7 @@ fn artist_and_instrument() -> TestPackages {
 
 async fn make_domain_engine(ontology: Arc<Ontology>) -> DomainEngine {
     DomainEngine::test_builder(ontology)
-        .build(crate::TestDataStoreFactory::default())
+        .build(crate::TestDataStoreFactory::default(), Session::default())
         .await
         .unwrap()
 }

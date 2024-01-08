@@ -5,7 +5,7 @@ use std::{
 
 use domain_engine_core::{
     data_store::{DataStoreAPIMock, Request, Response},
-    DomainEngine,
+    DomainEngine, Session,
 };
 use domain_engine_in_memory_store::InMemoryDataStoreFactory;
 use domain_engine_juniper::{
@@ -112,7 +112,7 @@ pub fn gql_ctx_mock_data_store(
 ) -> ServiceCtx {
     let domain_engine = DomainEngine::test_builder(ontol_test.ontology.clone())
         .mock_data_store(ontol_test.get_package_id(data_store_package.0), setup)
-        .build_sync(InMemoryDataStoreFactory)
+        .build_sync(InMemoryDataStoreFactory, Session::default())
         .unwrap();
 
     ServiceCtx {

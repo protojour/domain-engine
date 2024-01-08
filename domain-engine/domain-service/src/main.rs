@@ -5,7 +5,7 @@ use std::{fs::File, path::PathBuf, sync::Arc};
 use anyhow::Context;
 use axum::Extension;
 use clap::Parser;
-use domain_engine_core::DomainEngine;
+use domain_engine_core::{DomainEngine, Session};
 use domain_engine_in_memory_store::InMemoryDataStoreFactory;
 use domain_engine_juniper::CreateSchemaError;
 use graphql::{graphiql_handler, graphql_handler, GraphqlService};
@@ -54,7 +54,7 @@ async fn main() -> anyhow::Result<()> {
     let engine = Arc::new(
         DomainEngine::builder(ontology.clone())
             .system(Box::new(System))
-            .build(InMemoryDataStoreFactory)
+            .build(InMemoryDataStoreFactory, Session::default())
             .await
             .unwrap(),
     );

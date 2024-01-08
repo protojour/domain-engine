@@ -392,7 +392,11 @@ impl Builder {
         self
     }
 
-    pub async fn build<F: DataStoreFactory>(self, factory: F) -> DomainResult<DomainEngine> {
+    pub async fn build<F: DataStoreFactory>(
+        self,
+        factory: F,
+        session: Session,
+    ) -> DomainResult<DomainEngine> {
         let system = self.system.expect("No system API provided!");
 
         let data_store = match self.data_store {
@@ -405,6 +409,7 @@ impl Builder {
                         .new_api(
                             package_id,
                             config.clone(),
+                            session.clone(),
                             self.ontology.clone(),
                             system.clone(),
                         )
@@ -428,7 +433,11 @@ impl Builder {
         })
     }
 
-    pub fn build_sync<F: DataStoreFactorySync>(self, factory: F) -> DomainResult<DomainEngine> {
+    pub fn build_sync<F: DataStoreFactorySync>(
+        self,
+        factory: F,
+        session: Session,
+    ) -> DomainResult<DomainEngine> {
         let system = self.system.expect("No system API provided!");
 
         let data_store = match self.data_store {
@@ -441,6 +450,7 @@ impl Builder {
                         .new_api_sync(
                             package_id,
                             config.clone(),
+                            session.clone(),
                             self.ontology.clone(),
                             system.clone(),
                         )

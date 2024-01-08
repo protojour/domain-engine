@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use domain_engine_core::DomainEngine;
+use domain_engine_core::{DomainEngine, Session};
 use domain_engine_juniper::{
     context::ServiceCtx,
     gql_scalar::GqlScalar,
@@ -28,7 +28,7 @@ fn conduit_db_only() -> TestPackages {
 
 async fn make_domain_engine(ontology: Arc<Ontology>) -> DomainEngine {
     DomainEngine::test_builder(ontology)
-        .build(crate::TestDataStoreFactory::default())
+        .build(crate::TestDataStoreFactory::default(), Session::default())
         .await
         .unwrap()
 }

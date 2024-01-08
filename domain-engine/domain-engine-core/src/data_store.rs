@@ -90,6 +90,7 @@ pub trait DataStoreFactory {
         &self,
         package_id: PackageId,
         config: DataStoreConfig,
+        session: Session,
         ontology: Arc<Ontology>,
         system: ArcSystemApi,
     ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>>;
@@ -100,6 +101,7 @@ pub trait DataStoreFactorySync {
         &self,
         package_id: PackageId,
         config: DataStoreConfig,
+        session: Session,
         ontology: Arc<Ontology>,
         system: ArcSystemApi,
     ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>>;

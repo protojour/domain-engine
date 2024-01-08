@@ -4,6 +4,7 @@ use std::sync::Arc;
 use domain_engine_core::data_store::{DataStoreFactory, DataStoreFactorySync};
 use domain_engine_core::object_generator::ObjectGenerator;
 use domain_engine_core::system::ArcSystemApi;
+use domain_engine_core::Session;
 use fnv::FnvHashMap;
 use ontol_runtime::config::DataStoreConfig;
 use ontol_runtime::interface::serde::processor::ProcessorMode;
@@ -158,10 +159,11 @@ impl DataStoreFactory for InMemoryDataStoreFactory {
         &self,
         package_id: PackageId,
         config: DataStoreConfig,
+        session: Session,
         ontology: Arc<Ontology>,
         system: ArcSystemApi,
     ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>> {
-        self.new_api_sync(package_id, config, ontology, system)
+        self.new_api_sync(package_id, config, session, ontology, system)
     }
 }
 
@@ -170,6 +172,7 @@ impl DataStoreFactorySync for InMemoryDataStoreFactory {
         &self,
         package_id: PackageId,
         _config: DataStoreConfig,
+        _session: Session,
         ontology: Arc<Ontology>,
         system: ArcSystemApi,
     ) -> anyhow::Result<Box<dyn DataStoreAPI + Send + Sync>> {
