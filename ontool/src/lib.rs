@@ -82,7 +82,7 @@ struct Generate {
 }
 
 #[derive(Debug, Error)]
-enum OntoolError {
+pub enum OntoolError {
     #[error("No input files")]
     NoInputFiles,
     #[error("Parse error")]
@@ -97,8 +97,7 @@ enum OntoolError {
     IO(#[from] std::io::Error),
 }
 
-#[tokio::main]
-async fn main() -> Result<(), OntoolError> {
+pub async fn run() -> Result<(), OntoolError> {
     tracing_subscriber::fmt()
         .with_writer(std::io::stderr)
         .with_target(false)

@@ -1596,6 +1596,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ontool-bin"
+version = "0.1.0"
+dependencies = [
+ "ontool",
+ "tokio",
+]
+
+[[package]]
 name = "ordered-float"
 version = "2.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

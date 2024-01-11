@@ -19,7 +19,3 @@ clap.workspace = true
 ariadne = { version = "0.3.0", features = ["auto-color"] }
 tower-lsp = "0.20.0"
 tokio = { workspace = true, features = ["full"] }
-
-[[bin]]
-name = "ontool"
-path = "src/main.rs"
