@@ -35,11 +35,11 @@ impl DomainEngineTestExt for DomainEngine {
         let value = test_exec_named_map(self, (package_id, name), input_json, find_query).await;
 
         let ontology = self.ontology();
-        let [_, to] = ontology
+        let key = ontology
             .get_named_forward_map_meta(package_id, name)
             .expect("Named map not found");
 
-        let output_type_info = ontology.get_type_info(to.def_id);
+        let output_type_info = ontology.get_type_info(key.output.def_id);
 
         let mut json_buf: Vec<u8> = vec![];
         let mut serializer = serde_json::Serializer::new(&mut json_buf);
@@ -68,11 +68,11 @@ async fn test_exec_named_map(
     mut find_query: TestFindQuery,
 ) -> Value {
     let ontology = engine.ontology();
-    let [from, to] = ontology
+    let key = ontology
         .get_named_forward_map_meta(package_id, name)
         .expect("Named map not found");
 
-    let input_type_info = ontology.get_type_info(from.def_id);
+    let input_type_info = ontology.get_type_info(key.input.def_id);
 
     let input = ontology
         .new_serde_processor(input_type_info.operator_addr.unwrap(), ProcessorMode::Raw)
@@ -80,7 +80,7 @@ async fn test_exec_named_map(
         .expect("Deserialize input failed");
 
     engine
-        .exec_map([from, to], input.value, &mut find_query, Session::default())
+        .exec_map(key, input.value, &mut find_query, Session::default())
         .await
         .expect("Exec map failed")
 }

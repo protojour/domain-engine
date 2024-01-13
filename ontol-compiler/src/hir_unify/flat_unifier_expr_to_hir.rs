@@ -256,7 +256,9 @@ impl<'t, 'u, 'a, 'm> ExprToHir<'t, 'u, 'a, 'm> {
                         self.mk_node(ontol_hir::Kind::Begin(body.into()), UNIT_META)
                     })
                 }
-                expr::PropVariant::Seq { .. } => Err(unifier_todo(smart_format!("seq prop"))),
+                expr::PropVariant::Seq { .. } => Err(super::UnifierError::Unimplemented(
+                    smart_format!("seq prop in condition: {}", prop.prop_id),
+                )),
             },
         }
     }

@@ -12,7 +12,7 @@ use crate::{
     },
     def::Def,
     error::CompileError,
-    map::MapKeyPair,
+    map::UndirectedMapKey,
     mem::Intern,
     pattern::{CompoundPatternModifier, PatId, Pattern, PatternKind, RegexPatternCaptureNode},
     type_check::hir_build_ctx::{Arm, VariableMapping},
@@ -146,7 +146,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             .insert(*var, VariableMapping::Mapping([actual.0, expected.0]));
 
                         self.codegen_tasks.add_map_task(
-                            MapKeyPair::new([first_def_id.into(), second_def_id.into()]),
+                            UndirectedMapKey::new([first_def_id.into(), second_def_id.into()]),
                             MapCodegenTask::Auto(def.id.package_id()),
                         );
                     }

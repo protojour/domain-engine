@@ -56,15 +56,38 @@ impl DefId {
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize, Deserialize)]
 pub struct MapKey {
-    pub def_id: DefId,
-    pub seq: bool,
+    pub input: MapDef,
+    pub output: MapDef,
+    pub flags: MapFlags,
 }
 
-impl From<DefId> for MapKey {
+bitflags::bitflags! {
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug, Serialize, Deserialize)]
+    pub struct MapFlags: u8 {
+        /// The mapping is a _pure_ but _partial_ version of an impure/lossy mapping that needs to access to a datastore.
+        const PURE_PARTIAL    = 0b00000001;
+    }
+}
+
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize, Deserialize)]
+pub struct MapDef {
+    pub def_id: DefId,
+    pub flags: MapDefFlags,
+}
+
+bitflags::bitflags! {
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug, Serialize, Deserialize)]
+    pub struct MapDefFlags: u8 {
+        /// The type is a sequence rather than a single value
+        const SEQUENCE        = 0b00000001;
+    }
+}
+
+impl From<DefId> for MapDef {
     fn from(value: DefId) -> Self {
         Self {
             def_id: value,
-            seq: false,
+            flags: MapDefFlags::empty(),
         }
     }
 }

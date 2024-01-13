@@ -6,7 +6,7 @@ use ontol_runtime::{
         proc::{Procedure, Yield},
         VmResult, VmState,
     },
-    MapKey,
+    MapDef, MapDefFlags, MapFlags, MapKey,
 };
 use unimock::{unimock, Unimock};
 
@@ -142,10 +142,10 @@ impl<'on> TestMapper<'on> {
             .get_named_forward_map_meta(package_id, name)
             .unwrap();
 
-        let input_binding = TypeBinding::from_def_id(key[0].def_id, &self.test.ontology);
-        let output_binding = TypeBinding::from_def_id(key[1].def_id, &self.test.ontology);
+        let input_binding = TypeBinding::from_def_id(key.input.def_id, &self.test.ontology);
+        let output_binding = TypeBinding::from_def_id(key.output.def_id, &self.test.ontology);
 
-        let procedure = match self.test.ontology.get_mapper_proc(key) {
+        let procedure = match self.test.ontology.get_mapper_proc(&key) {
             Some(procedure) => procedure,
             None => panic!("named map not found"),
         };
@@ -155,9 +155,9 @@ impl<'on> TestMapper<'on> {
         let value = self.run_vm(procedure, param).unwrap();
 
         // The resulting value must have the runtime def_id of the requested to_key.
-        expect_eq!(actual = value.type_def_id(), expected = key[1].def_id);
+        expect_eq!(actual = value.type_def_id(), expected = key.output.def_id);
 
-        let output_json = if key[1].seq {
+        let output_json = if key.output.flags.contains(MapDefFlags::SEQUENCE) {
             (*self.serde_helper_factory)(&output_binding).dynamic_seq_as_json(&value)
         } else {
             (*self.serde_helper_factory)(&output_binding).as_json(&value)
@@ -181,18 +181,25 @@ impl<'on> TestMapper<'on> {
             .to_value_raw(input)
             .unwrap();
 
-        fn get_map_key(key: &Key, binding: &TypeBinding) -> MapKey {
-            let seq = matches!(key, Key::Seq(_));
-            MapKey {
+        fn get_map_def(key: &Key, binding: &TypeBinding) -> MapDef {
+            let mut flags = MapDefFlags::empty();
+            if matches!(key, Key::Seq(_)) {
+                flags.insert(MapDefFlags::SEQUENCE);
+            }
+            MapDef {
                 def_id: binding.type_info.def_id,
-                seq,
+                flags,
             }
         }
 
-        let from_key = get_map_key(&from, &input_binding);
-        let to_key = get_map_key(&to, &output_binding);
+        let input_def = get_map_def(&from, &input_binding);
+        let output_def = get_map_def(&to, &output_binding);
 
-        let procedure = match self.test.ontology.get_mapper_proc([from_key, to_key]) {
+        let procedure = match self.test.ontology.get_mapper_proc(&MapKey {
+            input: input_def,
+            output: output_def,
+            flags: MapFlags::empty(),
+        }) {
             Some(procedure) => procedure,
             None => panic!(
                 "No mapping procedure found for ({:?}, {:?})",
@@ -203,7 +210,7 @@ impl<'on> TestMapper<'on> {
         let value = self.run_vm(procedure, param)?;
 
         // The resulting value must have the runtime def_id of the requested to_key.
-        expect_eq!(actual = value.type_def_id(), expected = to_key.def_id);
+        expect_eq!(actual = value.type_def_id(), expected = output_def.def_id);
 
         Ok(value)
     }

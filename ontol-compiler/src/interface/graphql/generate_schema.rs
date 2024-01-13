@@ -114,7 +114,7 @@ pub fn generate_graphql_schema<'c>(
             {
                 let prop_flow = codegen_tasks.result_propflow_table.get(map_key).unwrap();
 
-                builder.add_named_map_query(name, map_key, prop_flow);
+                builder.add_named_map_query(name, *map_key, prop_flow);
             }
         }
     }

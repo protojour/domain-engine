@@ -102,20 +102,20 @@ impl<'m> State<'m> {
             }
         }
 
-        for [source_key, target_key] in compiler.codegen_tasks.result_map_proc_table.keys() {
-            let source = source_key.def_id;
-            let target = target_key.def_id;
+        for key in compiler.codegen_tasks.result_map_proc_table.keys() {
+            let input = key.input.def_id;
+            let output = key.output.def_id;
 
-            if let Some(meta) = node_meta_table.get_mut(&source) {
+            if let Some(meta) = node_meta_table.get_mut(&input) {
                 meta.ref_count += 1;
             }
-            if let Some(meta) = node_meta_table.get_mut(&target) {
+            if let Some(meta) = node_meta_table.get_mut(&output) {
                 meta.ref_count += 1;
             }
 
             edge_meta_vec.push(EdgeMeta {
-                source,
-                target,
+                source: input,
+                target: output,
                 kind: EdgeKind::Map,
             })
         }

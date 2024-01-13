@@ -1,14 +1,14 @@
 use crate::{
     ontology::{MapLossiness, Ontology},
     select::{EntitySelect, Select, StructOrUnionSelect},
-    DefId, MapKey, PackageId,
+    DefId, MapDef, MapDefFlags, MapFlags, MapKey, PackageId,
 };
 use fnv::{FnvHashMap, FnvHashSet};
-use tracing::trace;
+use tracing::{debug, trace};
 
 #[derive(Debug)]
 pub struct ResolvePath {
-    path: Vec<(DefId, DefId)>,
+    path: Vec<MapKey>,
 }
 
 impl ResolvePath {
@@ -16,27 +16,53 @@ impl ResolvePath {
         self.path.is_empty()
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (DefId, DefId)> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item = MapKey> + '_ {
         self.path.iter().cloned()
     }
 
-    pub fn reverse(&self) -> impl Iterator<Item = (DefId, DefId)> + '_ {
-        self.path.iter().cloned().rev().map(|(from, to)| (to, from))
+    pub fn reverse(&self) -> impl Iterator<Item = MapKey> + '_ {
+        self.path.iter().cloned().rev().map(|key| MapKey {
+            input: key.output,
+            output: key.input,
+            flags: key.flags,
+        })
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct ProbeOptions {
     pub must_be_entity: bool,
-    pub inverted: bool,
-    pub filter_lossiness: Option<MapLossiness>,
+    pub direction: ProbeDirection,
+    pub filter: ProbeFilter,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum ProbeDirection {
+    ByInput,
+    ByOutput,
+}
+
+bitflags::bitflags! {
+    #[derive(Clone, Copy, Debug)]
+    pub struct ProbeFilter: u8 {
+        /// The mapping must be perfect, i.e. not lossy
+        const PERFECT         = 0b00000001;
+        const PURE            = 0b00000010;
+    }
+}
+
+#[derive(Debug)]
 pub struct ResolverGraph {
     /// Graph of what each DefId can map to
-    map_graph: FnvHashMap<MapKey, Vec<(MapLossiness, MapKey)>>,
+    graph_by_input: FnvHashMap<DefId, Vec<(MapDef, Flags)>>,
     /// Graph of what each DefId can map from
-    inverted_map_graph: FnvHashMap<MapKey, Vec<(MapLossiness, MapKey)>>,
+    graph_by_output: FnvHashMap<DefId, Vec<(MapDef, Flags)>>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Flags {
+    key_flags: MapFlags,
+    lossiness: MapLossiness,
 }
 
 impl ResolverGraph {
@@ -48,25 +74,37 @@ impl ResolverGraph {
         )
     }
 
-    pub fn new(iterator: impl Iterator<Item = ([MapKey; 2], MapLossiness)>) -> Self {
-        let mut map_graph: FnvHashMap<MapKey, Vec<(MapLossiness, MapKey)>> = Default::default();
-        let mut inverted_map_graph: FnvHashMap<MapKey, Vec<(MapLossiness, MapKey)>> =
-            Default::default();
+    pub fn new(iterator: impl Iterator<Item = (MapKey, MapLossiness)>) -> Self {
+        let mut graph_by_input: FnvHashMap<DefId, Vec<(MapDef, Flags)>> = Default::default();
+        let mut graph_by_output: FnvHashMap<DefId, Vec<(MapDef, Flags)>> = Default::default();
 
-        for ([source_key, target_key], map_kind) in iterator {
-            map_graph
-                .entry(source_key)
+        for (key, lossiness) in iterator {
+            let flags = Flags {
+                lossiness,
+                key_flags: key.flags,
+            };
+
+            debug!(
+                "Add map pair {:?} {:?}",
+                key.input.def_id, key.output.def_id
+            );
+
+            graph_by_input
+                .entry(key.input.def_id)
                 .or_default()
-                .push((map_kind, target_key));
-            inverted_map_graph
-                .entry(target_key)
+                .push((key.output, flags));
+
+            assert!(graph_by_input.contains_key(&key.input.def_id));
+
+            graph_by_output
+                .entry(key.output.def_id)
                 .or_default()
-                .push((map_kind, source_key));
+                .push((key.input, flags));
         }
 
         Self {
-            map_graph,
-            inverted_map_graph,
+            graph_by_input,
+            graph_by_output,
         }
     }
 
@@ -89,8 +127,8 @@ impl ResolverGraph {
                 target_package,
                 ProbeOptions {
                     must_be_entity: true,
-                    inverted: true,
-                    filter_lossiness: None,
+                    direction: ProbeDirection::ByOutput,
+                    filter: ProbeFilter::empty(),
                 },
             ),
             Select::Struct(struct_select) => self.probe_path(
@@ -99,8 +137,8 @@ impl ResolverGraph {
                 target_package,
                 ProbeOptions {
                     must_be_entity: true,
-                    inverted: true,
-                    filter_lossiness: None,
+                    direction: ProbeDirection::ByOutput,
+                    filter: ProbeFilter::empty(),
                 },
             ),
             Select::StructUnion(..) => {
@@ -132,8 +170,8 @@ impl ResolverGraph {
                 target_package,
                 ProbeOptions {
                     must_be_entity: true,
-                    inverted: true,
-                    filter_lossiness: None,
+                    direction: ProbeDirection::ByOutput,
+                    filter: ProbeFilter::PERFECT,
                 },
             ),
             StructOrUnionSelect::Union(..) => todo!("Resolve a union"),
@@ -151,10 +189,9 @@ impl ResolverGraph {
         let mut visited = Default::default();
         let mut probe = Probe {
             ontology,
-            graph: if options.inverted {
-                &self.inverted_map_graph
-            } else {
-                &self.map_graph
+            graph: match options.direction {
+                ProbeDirection::ByInput => &self.graph_by_input,
+                ProbeDirection::ByOutput => &self.graph_by_output,
             },
             options: &options,
             path: &mut path,
@@ -172,16 +209,20 @@ impl ResolverGraph {
 
 struct Probe<'on, 'a> {
     ontology: &'on Ontology,
-    graph: &'on FnvHashMap<MapKey, Vec<(MapLossiness, MapKey)>>,
+    graph: &'on FnvHashMap<DefId, Vec<(MapDef, Flags)>>,
     options: &'on ProbeOptions,
-    path: &'a mut Vec<(DefId, DefId)>,
+    path: &'a mut Vec<MapKey>,
     visited: &'a mut FnvHashSet<DefId>,
     target_package: PackageId,
 }
 
 impl<'on, 'a> Probe<'on, 'a> {
     fn probe_rec(&mut self, def_id: DefId) -> bool {
-        trace!("probe {def_id:?} path={:?}", self.path);
+        trace!(
+            "probe {def_id:?} path={:?} dir={:?}",
+            self.path,
+            self.options.direction
+        );
 
         if !self.visited.insert(def_id) {
             return false;
@@ -198,21 +239,41 @@ impl<'on, 'a> Probe<'on, 'a> {
             return true;
         }
 
-        let key = MapKey { def_id, seq: false };
-        let edges = match self.graph.get(&key) {
+        let edges = match self.graph.get(&def_id) {
             Some(edges) => edges,
             None => return false,
         };
 
-        for (edge_map_kind, edge_key) in edges {
-            match (self.options.filter_lossiness, edge_map_kind) {
-                (None, _) => {}
-                (Some(MapLossiness::Lossy), MapLossiness::Lossy) => {}
-                (Some(MapLossiness::Perfect), MapLossiness::Perfect) => {}
-                _ => return false,
+        for (edge_key, flags) in edges {
+            if self.options.filter.contains(ProbeFilter::PERFECT)
+                && !matches!(flags.lossiness, MapLossiness::Perfect)
+            {
+                continue;
             }
 
-            self.path.push((def_id, edge_key.def_id));
+            match self.options.direction {
+                ProbeDirection::ByInput => {
+                    self.path.push(MapKey {
+                        input: MapDef {
+                            def_id,
+                            flags: MapDefFlags::empty(),
+                        },
+                        output: *edge_key,
+                        flags: flags.key_flags,
+                    });
+                }
+                ProbeDirection::ByOutput => {
+                    self.path.push(MapKey {
+                        input: *edge_key,
+                        output: MapDef {
+                            def_id,
+                            flags: MapDefFlags::empty(),
+                        },
+                        flags: flags.key_flags,
+                    });
+                }
+            }
+
             if self.probe_rec(edge_key.def_id) {
                 return true;
             } else {

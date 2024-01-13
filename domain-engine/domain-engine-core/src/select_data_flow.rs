@@ -13,17 +13,17 @@ use tracing::{debug, trace};
 #[derive(Clone, Copy)]
 struct IsDep(bool);
 
-pub fn translate_select(select: &mut Select, from: MapKey, to: MapKey, ontology: &Ontology) {
+pub fn translate_select(select: &mut Select, key: &MapKey, ontology: &Ontology) {
     match select {
         Select::Entity(entity_select) => {
-            translate_entity_select(entity_select, from, to, ontology);
+            translate_entity_select(entity_select, key, ontology);
         }
         Select::Struct(struct_select) => {
-            translate_struct_select(struct_select, from, to, ontology);
+            translate_struct_select(struct_select, key, ontology);
         }
         Select::StructUnion(_def_id, selects) => {
             for select in selects {
-                translate_struct_select(select, from, to, ontology);
+                translate_struct_select(select, key, ontology);
             }
         }
         Select::EntityId => {}
@@ -31,37 +31,24 @@ pub fn translate_select(select: &mut Select, from: MapKey, to: MapKey, ontology:
     }
 }
 
-pub fn translate_entity_select(
-    select: &mut EntitySelect,
-    from: MapKey,
-    to: MapKey,
-    ontology: &Ontology,
-) {
+pub fn translate_entity_select(select: &mut EntitySelect, key: &MapKey, ontology: &Ontology) {
     match &mut select.source {
         StructOrUnionSelect::Struct(struct_select) => {
-            translate_struct_select(struct_select, from, to, ontology);
+            translate_struct_select(struct_select, key, ontology);
         }
         _ => todo!(),
     }
 }
 
-fn translate_struct_select(
-    struct_select: &mut StructSelect,
-    from: MapKey,
-    to: MapKey,
-    ontology: &Ontology,
-) {
+fn translate_struct_select(struct_select: &mut StructSelect, key: &MapKey, ontology: &Ontology) {
+    debug!("translate struct select for {key:?}");
+
     let map_meta = ontology
-        .get_map_meta([to, from])
+        .get_map_meta(key)
         .expect("No mapping procedure for select transformer");
     let prop_flow_slice = ontology.get_prop_flow_slice(map_meta);
 
     trace!("translate_entity_select flow props: {:#?}", prop_flow_slice);
-
-    let map_meta = ontology
-        .get_map_meta([to, from])
-        .expect("No mapping procedure for select transformer");
-    let prop_flow_slice = ontology.get_prop_flow_slice(map_meta);
 
     let processor = SelectFlowProcessor {
         ontology,
@@ -73,9 +60,9 @@ fn translate_struct_select(
         &mut struct_select.properties,
     );
 
-    debug!("Input select (after auto select): {struct_select:#?}");
+    struct_select.def_id = key.input.def_id;
 
-    struct_select.def_id = to.def_id;
+    debug!("Input select (after auto select): {struct_select:#?}");
 
     let select_props = std::mem::take(&mut struct_select.properties);
     for (property_id, select) in select_props {

@@ -267,7 +267,7 @@ pub enum FieldKind {
     },
     /// A connection to a map statement
     MapConnection {
-        key: [MapKey; 2],
+        map_key: MapKey,
         queries: FnvHashMap<PropertyId, Var>,
         input_arg: argument::MapInputArg,
         first_arg: argument::FirstArg,
@@ -275,7 +275,7 @@ pub enum FieldKind {
     },
     /// A find query from a map statement (zero or one return)
     MapFind {
-        key: [MapKey; 2],
+        map_key: MapKey,
         queries: FnvHashMap<PropertyId, Var>,
         input_arg: argument::MapInputArg,
     },

@@ -42,6 +42,7 @@ pub enum UnifierError {
     SequenceInputNotSupported,
     MultipleVariablesInExpression(SourceSpan),
     NonEntityQuery,
+    Unimplemented(String),
     TODO(String),
 }
 

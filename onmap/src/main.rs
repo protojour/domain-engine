@@ -8,7 +8,8 @@ use clap::{Parser, ValueEnum};
 use clap_stdin::FileOrStdin;
 use domain_engine_core::system::SystemAPI;
 use ontol_runtime::{
-    interface::serde::processor::ProcessorMode, ontology::Ontology, vm::VmState, MapKey, PackageId,
+    interface::serde::processor::ProcessorMode, ontology::Ontology, vm::VmState, MapDef,
+    MapDefFlags, MapFlags, MapKey, PackageId,
 };
 use serde::de::DeserializeSeed;
 
@@ -62,25 +63,29 @@ fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let ontology = Arc::new(load_ontology(args.ontology)?);
     let domain = ontology.find_domain(PackageId(1)).unwrap();
-    let from = MapKey {
+    let input = MapDef {
         def_id: *domain
             .type_names
             .get(args.from.as_str())
             .expect("--from def not found in domain"),
-        seq: false,
+        flags: MapDefFlags::empty(),
     };
-    let to = MapKey {
+    let output = MapDef {
         def_id: *domain
             .type_names
             .get(args.to.as_str())
             .expect("--to def not found in domain"),
-        seq: false,
+        flags: MapDefFlags::empty(),
     };
     let proc = ontology
-        .get_mapper_proc([from, to])
+        .get_mapper_proc(&MapKey {
+            input,
+            output,
+            flags: MapFlags::empty(),
+        })
         .ok_or_else(|| anyhow!(format!("No map from {} to {}", args.from, args.to)))?;
 
-    let from_type = ontology.get_type_info(from.def_id);
+    let from_type = ontology.get_type_info(input.def_id);
     let from_processor = ontology.new_serde_processor(
         from_type.operator_addr.expect("No deserializer found"),
         ProcessorMode::Read,
@@ -97,7 +102,7 @@ fn main() -> anyhow::Result<()> {
         VmState::Complete(value) => value,
         VmState::Yielded(_) => return Err(anyhow!("ONTOL-VM yielded!")),
     };
-    let to_type = ontology.get_type_info(to.def_id);
+    let to_type = ontology.get_type_info(output.def_id);
     let to_processor = ontology.new_serde_processor(
         to_type.operator_addr.expect("No deserializer found"),
         ProcessorMode::Create,

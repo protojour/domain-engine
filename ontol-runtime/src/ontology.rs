@@ -31,8 +31,8 @@ use crate::{
 #[derive(Serialize, Deserialize)]
 pub struct Ontology {
     pub(crate) const_proc_table: FnvHashMap<DefId, Procedure>,
-    pub(crate) map_meta_table: FnvHashMap<[MapKey; 2], MapMeta>,
-    pub(crate) named_forward_maps: HashMap<(PackageId, String), [MapKey; 2]>,
+    pub(crate) map_meta_table: FnvHashMap<MapKey, MapMeta>,
+    pub(crate) named_forward_maps: HashMap<(PackageId, String), MapKey>,
     pub(crate) text_like_types: FnvHashMap<DefId, TextLikeType>,
     pub(crate) text_patterns: FnvHashMap<DefId, TextPattern>,
     pub(crate) lib: Lib,
@@ -139,21 +139,17 @@ impl Ontology {
         self.const_proc_table.get(&const_id).cloned()
     }
 
-    pub fn iter_map_meta(&self) -> impl Iterator<Item = ([MapKey; 2], &MapMeta)> + '_ {
+    pub fn iter_map_meta(&self) -> impl Iterator<Item = (MapKey, &MapMeta)> + '_ {
         self.map_meta_table.iter().map(|(key, proc)| (*key, proc))
     }
 
-    pub fn get_map_meta(&self, keys: [MapKey; 2]) -> Option<&MapMeta> {
-        self.map_meta_table.get(&keys)
+    pub fn get_map_meta(&self, key: &MapKey) -> Option<&MapMeta> {
+        self.map_meta_table.get(key)
     }
 
     /// This primarily exists for testing only.
     /// TODO: Find some solution for avoiding having this in ontology
-    pub fn get_named_forward_map_meta(
-        &self,
-        package_id: PackageId,
-        name: &str,
-    ) -> Option<[MapKey; 2]> {
+    pub fn get_named_forward_map_meta(&self, package_id: PackageId, name: &str) -> Option<MapKey> {
         self.named_forward_maps
             .get(&(package_id, name.into()))
             .cloned()
@@ -164,9 +160,9 @@ impl Ontology {
         &self.property_flows[range.start as usize..range.end as usize]
     }
 
-    pub fn get_mapper_proc(&self, keys: [MapKey; 2]) -> Option<Procedure> {
+    pub fn get_mapper_proc(&self, key: &MapKey) -> Option<Procedure> {
         self.map_meta_table
-            .get(&keys)
+            .get(&key)
             .map(|map_info| map_info.procedure)
     }
 
@@ -447,14 +443,14 @@ impl OntologyBuilder {
         self
     }
 
-    pub fn map_meta_table(mut self, map_meta_table: FnvHashMap<[MapKey; 2], MapMeta>) -> Self {
+    pub fn map_meta_table(mut self, map_meta_table: FnvHashMap<MapKey, MapMeta>) -> Self {
         self.ontology.map_meta_table = map_meta_table;
         self
     }
 
     pub fn named_forward_maps(
         mut self,
-        named_forward_maps: HashMap<(PackageId, String), [MapKey; 2]>,
+        named_forward_maps: HashMap<(PackageId, String), MapKey>,
     ) -> Self {
         self.ontology.named_forward_maps = named_forward_maps;
         self

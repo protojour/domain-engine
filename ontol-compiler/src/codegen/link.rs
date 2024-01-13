@@ -2,7 +2,7 @@ use fnv::FnvHashMap;
 use ontol_runtime::{
     smart_format,
     vm::proc::{Address, Lib, OpCode, Procedure},
-    DefId, MapKey,
+    DefId, MapDef, MapKey,
 };
 use smartstring::alias::String;
 use tracing::debug;
@@ -14,11 +14,11 @@ use super::task::{ProcTable, ProcedureCall};
 pub struct LinkResult {
     pub lib: Lib,
     pub const_procs: FnvHashMap<DefId, Procedure>,
-    pub map_proc_table: FnvHashMap<[MapKey; 2], Procedure>,
+    pub map_proc_table: FnvHashMap<MapKey, Procedure>,
 }
 
 pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkResult {
-    let mut map_proc_table: FnvHashMap<[MapKey; 2], Procedure> = Default::default();
+    let mut map_proc_table: FnvHashMap<MapKey, Procedure> = Default::default();
     let mut const_proc_table: FnvHashMap<DefId, Procedure> = Default::default();
     let mut lib = Lib::default();
     // All the spans for each opcode
@@ -35,7 +35,7 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
     }
 
     for (key, proc_builder) in std::mem::take(&mut proc_table.map_procedures) {
-        debug!("{:?} -> {:?}", key[0], key[1]);
+        debug!("{:?} -> {:?}", key.input, key.output);
 
         let n_params = proc_builder.n_params;
         let opcodes = proc_builder.build();
@@ -59,8 +59,8 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
                         call_procedure.address = Address(0);
                         compiler.push_error(
                             CompileError::CannotConvertMissingMapping {
-                                input: format_map_key(compiler, key[0]),
-                                output: format_map_key(compiler, key[1]),
+                                input: format_map_def(compiler, key.input),
+                                output: format_map_def(compiler, key.output),
                             }
                             .spanned(&spans[index]),
                         );
@@ -89,8 +89,8 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
     }
 }
 
-fn format_map_key(compiler: &Compiler, map_key: MapKey) -> String {
-    let ty = compiler.def_types.table.get(&map_key.def_id).unwrap();
+fn format_map_def(compiler: &Compiler, map_def: MapDef) -> String {
+    let ty = compiler.def_types.table.get(&map_def.def_id).unwrap();
 
     smart_format!("{}", FormatType(ty, &compiler.defs, &compiler.primitives))
 }

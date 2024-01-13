@@ -14,8 +14,8 @@ use tracing::{debug, debug_span, warn};
 
 use crate::{
     codegen::code_generator::map_codegen, def::DefKind, hir_unify::unify_to_function,
-    map::MapKeyPair, typed_hir::TypedRootNode, types::Type, CompileError, CompileErrors, Compiler,
-    SourceSpan, SpannedCompileError,
+    map::UndirectedMapKey, typed_hir::TypedRootNode, types::Type, CompileError, CompileErrors,
+    Compiler, SourceSpan, SpannedCompileError,
 };
 
 use super::{
@@ -28,13 +28,13 @@ use super::{
 #[derive(Default)]
 pub struct CodegenTasks<'m> {
     const_tasks: Vec<ConstCodegenTask<'m>>,
-    pub map_tasks: IndexMap<MapKeyPair, MapCodegenTask<'m>>,
+    pub map_tasks: IndexMap<UndirectedMapKey, MapCodegenTask<'m>>,
     pub result_lib: Lib,
     pub result_const_procs: FnvHashMap<DefId, Procedure>,
-    pub result_map_proc_table: FnvHashMap<[MapKey; 2], Procedure>,
-    pub result_named_forward_maps: HashMap<(PackageId, String), [MapKey; 2]>,
-    pub result_propflow_table: FnvHashMap<[MapKey; 2], Vec<PropertyFlow>>,
-    pub result_metadata_table: FnvHashMap<[MapKey; 2], MapOutputMeta>,
+    pub result_map_proc_table: FnvHashMap<MapKey, Procedure>,
+    pub result_named_forward_maps: HashMap<(PackageId, String), MapKey>,
+    pub result_propflow_table: FnvHashMap<MapKey, Vec<PropertyFlow>>,
+    pub result_metadata_table: FnvHashMap<MapKey, MapOutputMeta>,
 }
 
 impl<'m> Debug for CodegenTasks<'m> {
@@ -46,7 +46,7 @@ impl<'m> Debug for CodegenTasks<'m> {
 }
 
 impl<'m> CodegenTasks<'m> {
-    pub fn add_map_task(&mut self, pair: MapKeyPair, task: MapCodegenTask<'m>) {
+    pub fn add_map_task(&mut self, pair: UndirectedMapKey, task: MapCodegenTask<'m>) {
         match self.map_tasks.entry(pair) {
             Entry::Occupied(mut occupied) => {
                 if let (MapCodegenTask::Auto(_), MapCodegenTask::Explicit(_)) =
@@ -102,12 +102,12 @@ impl<'m> Debug for ExplicitMapCodegenTask<'m> {
 
 #[derive(Default)]
 pub(super) struct ProcTable {
-    pub map_procedures: FnvHashMap<[MapKey; 2], ProcBuilder>,
+    pub map_procedures: FnvHashMap<MapKey, ProcBuilder>,
     pub const_procedures: FnvHashMap<DefId, ProcBuilder>,
     pub procedure_calls: Vec<ProcedureCall>,
-    pub propflow_table: FnvHashMap<[MapKey; 2], Vec<PropertyFlow>>,
-    pub metadata_table: FnvHashMap<[MapKey; 2], MapOutputMeta>,
-    pub named_forward_maps: HashMap<(PackageId, String), [MapKey; 2]>,
+    pub propflow_table: FnvHashMap<MapKey, Vec<PropertyFlow>>,
+    pub metadata_table: FnvHashMap<MapKey, MapOutputMeta>,
+    pub named_forward_maps: HashMap<(PackageId, String), MapKey>,
 }
 
 pub struct MapOutputMeta {
@@ -117,9 +117,9 @@ pub struct MapOutputMeta {
 impl ProcTable {
     /// Allocate a temporary procedure address for a map call.
     /// This will be resolved to final "physical" ID in the link phase.
-    pub(super) fn gen_mapping_addr(&mut self, from: MapKey, to: MapKey) -> Address {
+    pub(super) fn gen_mapping_addr(&mut self, key: MapKey) -> Address {
         let address = Address(self.procedure_calls.len() as u32);
-        self.procedure_calls.push(ProcedureCall::Map([from, to]));
+        self.procedure_calls.push(ProcedureCall::Map(key));
         address
     }
 
@@ -132,7 +132,7 @@ impl ProcTable {
 }
 
 pub(super) enum ProcedureCall {
-    Map([MapKey; 2]),
+    Map(MapKey),
     Const(DefId),
 }
 
@@ -220,7 +220,7 @@ fn generate_map_proc<'m>(
     expr: &TypedRootNode<'m>,
     proc_table: &mut ProcTable,
     compiler: &mut Compiler<'m>,
-) -> Option<[MapKey; 2]> {
+) -> Option<MapKey> {
     let func = match unify_to_function(scope, expr, compiler) {
         Ok(func) => func,
         Err(err) => {

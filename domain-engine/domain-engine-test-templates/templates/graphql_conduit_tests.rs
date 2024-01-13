@@ -666,6 +666,34 @@ async fn test_graphql_conduit_db_user_deletion() {
 }
 
 #[test(tokio::test)]
+async fn test_graphql_blog_post_conduit_update_body() {
+    let test = BlogPostConduit::new().await;
+    let article_id = test.create_db_article().await;
+
+    expect_eq!(
+        actual = format!(
+            "mutation {{
+                BlogPost(update: [
+                    {{
+                        post_id: \"{article_id}\"
+                        contents: \"The new body\"
+                    }}
+                ]) {{
+                    node {{ contents }}
+                }}
+            }}"
+        )
+        .exec([], &test.blog_schema, &test.ctx())
+        .await,
+        expected = Ok(graphql_value!({
+            "BlogPost": [{ "node": {
+                "contents": "The new body"
+            } }]
+        })),
+    );
+}
+
+#[test(tokio::test)]
 async fn test_graphql_blog_post_conduit_delete() {
     let test = BlogPostConduit::new().await;
     let article_id = test.create_db_article().await;

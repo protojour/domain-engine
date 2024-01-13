@@ -5,7 +5,7 @@ use ontol_runtime::{var::Var, DefId, PackageId};
 
 use crate::{
     def::DefKind,
-    map::MapKeyPair,
+    map::UndirectedMapKey,
     relation::Constructor,
     text_patterns::TextPatternSegment,
     type_check::repr::repr_model::ReprKind,
@@ -18,7 +18,7 @@ use crate::{
 use super::task::ExplicitMapCodegenTask;
 
 pub fn autogenerate_mapping<'m>(
-    key_pair: MapKeyPair,
+    key_pair: UndirectedMapKey,
     package_id: PackageId,
     compiler: &mut Compiler<'m>,
 ) -> Option<ExplicitMapCodegenTask<'m>> {

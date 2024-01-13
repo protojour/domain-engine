@@ -1,9 +1,9 @@
-use ontol_runtime::MapKey;
+use ontol_runtime::{MapDef, MapDefFlags};
 use tracing::warn;
 
 use crate::{
     def::Defs,
-    map::MapKeyPair,
+    map::UndirectedMapKey,
     relation::Relations,
     type_check::{repr::repr_model::ReprKind, seal::SealCtx},
     types::{Type, TypeRef},
@@ -11,8 +11,8 @@ use crate::{
 
 #[derive(Debug)]
 pub struct MapInfo {
-    pub key: MapKey,
-    pub punned: Option<MapKey>,
+    pub map_def: MapDef,
+    pub punned: Option<MapDef>,
     pub anonymous: bool,
 }
 
@@ -32,11 +32,11 @@ impl<'c, 'm> TypeMapper<'c, 'm> {
         }
     }
 
-    pub fn find_map_key_pair(&self, types: [TypeRef; 2]) -> Option<MapKeyPair> {
+    pub fn find_map_key_pair(&self, types: [TypeRef; 2]) -> Option<UndirectedMapKey> {
         let first = self.find_domain_mapping_info(types[0])?;
         let second = self.find_domain_mapping_info(types[1])?;
 
-        Some(MapKeyPair::new([first.key, second.key]))
+        Some(UndirectedMapKey::new([first.map_def, second.map_def]))
     }
 
     pub fn find_domain_mapping_info(&self, ty: TypeRef) -> Option<MapInfo> {
@@ -48,14 +48,14 @@ impl<'c, 'm> TypeMapper<'c, 'm> {
 
                 match repr {
                     ReprKind::Scalar(scalar_def_id, _, _) => Some(MapInfo {
-                        key: MapKey {
+                        map_def: MapDef {
                             def_id: *def_id,
-                            seq: false,
+                            flags: MapDefFlags::empty(),
                         },
                         punned: if scalar_def_id != def_id {
-                            Some(MapKey {
+                            Some(MapDef {
                                 def_id: *scalar_def_id,
-                                seq: false,
+                                flags: MapDefFlags::empty(),
                             })
                         } else {
                             None
@@ -67,13 +67,13 @@ impl<'c, 'm> TypeMapper<'c, 'm> {
                             let (member_def_id, _) = members.iter().next().unwrap();
 
                             Some(MapInfo {
-                                key: MapKey {
+                                map_def: MapDef {
                                     def_id: *def_id,
-                                    seq: false,
+                                    flags: MapDefFlags::empty(),
                                 },
-                                punned: Some(MapKey {
+                                punned: Some(MapDef {
                                     def_id: *member_def_id,
-                                    seq: false,
+                                    flags: MapDefFlags::empty(),
                                 }),
                                 anonymous,
                             })
@@ -82,9 +82,9 @@ impl<'c, 'm> TypeMapper<'c, 'm> {
                         }
                     }
                     _ => Some(MapInfo {
-                        key: MapKey {
+                        map_def: MapDef {
                             def_id: *def_id,
-                            seq: false,
+                            flags: MapDefFlags::empty(),
                         },
                         punned: None,
                         anonymous,
@@ -94,7 +94,10 @@ impl<'c, 'm> TypeMapper<'c, 'm> {
             Type::Seq(_, val_ty) => {
                 let def_id = val_ty.get_single_def_id()?;
                 Some(MapInfo {
-                    key: MapKey { def_id, seq: true },
+                    map_def: MapDef {
+                        def_id,
+                        flags: MapDefFlags::SEQUENCE,
+                    },
                     punned: None,
                     anonymous,
                 })

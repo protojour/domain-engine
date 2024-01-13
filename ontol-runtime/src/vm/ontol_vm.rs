@@ -433,7 +433,7 @@ impl<'o> OntolProcessor<'o> {
         local: Local,
     ) -> VmResult<&mut FnvHashMap<PropertyId, Attribute>> {
         match self.local_mut(local) {
-            Value::Struct(attrs, _) => Ok(attrs.as_mut()),
+            Value::Struct(attrs, _) | Value::StructUpdate(attrs, _) => Ok(attrs.as_mut()),
             _ => Err(VmError::InvalidType(local)),
         }
     }

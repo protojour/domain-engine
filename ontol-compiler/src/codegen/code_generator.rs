@@ -10,7 +10,7 @@ use ontol_runtime::{
     vm::proc::{
         BuiltinProc, GetAttrFlags, Local, NParams, OpCode, OpCodeCondTerm, Predicate, Procedure,
     },
-    DefId, MapKey,
+    DefId, MapFlags, MapKey,
 };
 use tracing::debug;
 
@@ -72,7 +72,7 @@ pub(super) fn map_codegen<'m>(
     func: &HirFunc<'m>,
     compiler: &Compiler<'m>,
     errors: &mut CompileErrors,
-) -> [MapKey; 2] {
+) -> MapKey {
     let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs, &compiler.seal_ctx);
 
     let body = &func.body;
@@ -112,22 +112,27 @@ pub(super) fn map_codegen<'m>(
         type_mapper.find_domain_mapping_info(func.arg.meta().ty),
         type_mapper.find_domain_mapping_info(return_ty),
     ) {
-        (Some(from_info), Some(to_info)) => {
-            proc_table
-                .map_procedures
-                .insert([from_info.key, to_info.key], builder);
+        (Some(input_info), Some(output_info)) => {
+            let input = input_info.map_def;
+            let output = output_info.map_def;
+
+            let map_key = MapKey {
+                input,
+                output,
+                flags: MapFlags::empty(),
+            };
+
+            proc_table.map_procedures.insert(map_key, builder);
 
             if let Some(data_flow) = data_flow {
-                proc_table
-                    .propflow_table
-                    .insert([from_info.key, to_info.key], data_flow);
+                proc_table.propflow_table.insert(map_key, data_flow);
             }
 
             proc_table
                 .metadata_table
-                .insert([from_info.key, to_info.key], MapOutputMeta { lossiness });
+                .insert(map_key, MapOutputMeta { lossiness });
 
-            [from_info.key, to_info.key]
+            map_key
         }
         (from_info, to_info) => {
             panic!("Problem finding def ids: ({from_info:?}, {to_info:?})");
@@ -238,18 +243,24 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     self.type_mapper.find_domain_mapping_info(param_ty),
                     self.type_mapper.find_domain_mapping_info(ty),
                 ) {
-                    (Some(from), Some(to)) => match (from.punned, to.punned) {
-                        (Some(from_pun), Some(to_pun)) if from.anonymous && to.anonymous => {
-                            if from_pun == to_pun {
+                    (Some(input), Some(output)) => match (input.punned, output.punned) {
+                        (Some(input_pun), Some(output_pun))
+                            if input.anonymous && output.anonymous =>
+                        {
+                            if input_pun == output_pun {
                                 block.op(
-                                    OpCode::TypePunTop(to.key.def_id),
+                                    OpCode::TypePunTop(output.map_def.def_id),
                                     Delta(0),
                                     span,
                                     self.builder,
                                 );
                             } else {
                                 let proc = Procedure {
-                                    address: self.proc_table.gen_mapping_addr(from_pun, to_pun),
+                                    address: self.proc_table.gen_mapping_addr(MapKey {
+                                        input: input_pun,
+                                        output: output_pun,
+                                        flags: MapFlags::empty(),
+                                    }),
                                     n_params: NParams(1),
                                 };
 
@@ -258,7 +269,11 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                         }
                         _ => {
                             let proc = Procedure {
-                                address: self.proc_table.gen_mapping_addr(from.key, to.key),
+                                address: self.proc_table.gen_mapping_addr(MapKey {
+                                    input: input.map_def,
+                                    output: output.map_def,
+                                    flags: MapFlags::empty(),
+                                }),
                                 n_params: NParams(1),
                             };
 

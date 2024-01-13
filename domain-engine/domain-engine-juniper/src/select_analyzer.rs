@@ -35,7 +35,7 @@ pub(crate) struct SelectAnalyzer<'a> {
 
 #[derive(Debug)]
 pub(crate) struct AnalyzedQuery {
-    pub map_key: [MapKey; 2],
+    pub map_key: MapKey,
     pub input: Value,
     pub selects: FnvHashMap<Var, EntitySelect>,
 }
@@ -55,13 +55,13 @@ impl<'a> SelectAnalyzer<'a> {
     ) -> Result<AnalyzedQuery, juniper::FieldError<GqlScalar>> {
         match &field_data.kind {
             FieldKind::MapConnection {
-                key,
+                map_key,
                 input_arg,
                 queries: map_queries,
                 ..
             }
             | FieldKind::MapFind {
-                key,
+                map_key,
                 input_arg,
                 queries: map_queries,
             } => {
@@ -83,7 +83,7 @@ impl<'a> SelectAnalyzer<'a> {
                 )?;
 
                 Ok(AnalyzedQuery {
-                    map_key: *key,
+                    map_key: *map_key,
                     input,
                     selects: output_selects,
                 })

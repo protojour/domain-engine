@@ -4,7 +4,7 @@ use anyhow::{anyhow, Context};
 use ontol_runtime::{
     config::data_store_backed_domains,
     ontology::{Ontology, ValueCardinality},
-    resolve_path::{ProbeOptions, ResolvePath, ResolverGraph},
+    resolve_path::{ProbeDirection, ProbeFilter, ProbeOptions, ResolvePath, ResolverGraph},
     select::{EntitySelect, Select, StructOrUnionSelect},
     sequence::Sequence,
     value::Value,
@@ -64,14 +64,14 @@ impl DomainEngine {
 
     pub async fn exec_map(
         &self,
-        key: [MapKey; 2],
+        key: MapKey,
         mut input: Value,
         selects: &mut (dyn FindEntitySelect + Send),
         session: Session,
     ) -> DomainResult<Value> {
         let proc = self
             .ontology
-            .get_mapper_proc(key)
+            .get_mapper_proc(&key)
             .ok_or(DomainError::MappingProcedureNotFound)?;
         let mut vm = self.ontology.new_vm(proc);
 
@@ -112,8 +112,8 @@ impl DomainEngine {
             .ok_or(DomainError::NoResolvePathToDataStore)?;
 
         // Transform select
-        for (from, to) in resolve_path.iter() {
-            translate_entity_select(&mut select, from.into(), to.into(), ontology);
+        for map_key in resolve_path.iter() {
+            translate_entity_select(&mut select, &map_key, ontology);
         }
 
         let data_store::Response::Query(mut edge_seq) = data_store
@@ -131,9 +131,9 @@ impl DomainEngine {
         }
 
         // Transform result
-        for (from, to) in resolve_path.reverse() {
+        for map_key in resolve_path.reverse() {
             let procedure = ontology
-                .get_mapper_proc([from.into(), to.into()])
+                .get_mapper_proc(&map_key)
                 .expect("No mapping procedure for query output");
 
             for attr in edge_seq.attrs.iter_mut() {
@@ -172,13 +172,13 @@ impl DomainEngine {
                         .probe_path_for_select(ontology, select, data_store.package_id())
                         .ok_or(DomainError::NoResolvePathToDataStore)?;
 
-                    for (from, to) in resolve_path.iter() {
-                        translate_select(select, from.into(), to.into(), ontology);
+                    for map_key in resolve_path.iter() {
+                        translate_select(select, &map_key, ontology);
                     }
 
-                    for (from, to) in resolve_path.iter() {
+                    for map_key in resolve_path.iter() {
                         let procedure = ontology
-                            .get_mapper_proc([from.into(), to.into()])
+                            .get_mapper_proc(&map_key)
                             .expect("No mapping procedure for query output");
 
                         for value in mut_values.iter_mut() {
@@ -196,7 +196,38 @@ impl DomainEngine {
 
                     ordered_resolve_paths.push(Some(resolve_path));
                 }
-                BatchWriteRequest::Update(_values, _) => {
+                BatchWriteRequest::Update(mut_values, select) => {
+                    let resolve_path = self
+                        .resolver_graph
+                        .probe_path_for_select(ontology, select, data_store.package_id())
+                        .ok_or(DomainError::NoResolvePathToDataStore)?;
+
+                    debug!("update resolve path: {resolve_path:?}");
+
+                    for map_key in resolve_path.iter() {
+                        translate_select(select, &map_key, ontology);
+                    }
+
+                    for map_key in resolve_path.iter() {
+                        let procedure = ontology
+                            .get_mapper_proc(&map_key)
+                            .expect("No mapping procedure for query output");
+
+                        for value in mut_values.iter_mut() {
+                            let mut vm = ontology.new_vm(procedure);
+                            let param = value.take();
+
+                            *value = match vm.run([param])? {
+                                VmState::Complete(value) => value,
+                                VmState::Yielded(_yield) => {
+                                    return Err(DomainError::ImpureMapping);
+                                }
+                            };
+                        }
+                    }
+
+                    ordered_resolve_paths.push(Some(resolve_path));
+
                     // TODO: domain translate
                     ordered_resolve_paths.push(None);
                 }
@@ -211,12 +242,12 @@ impl DomainEngine {
                                 data_store.package_id(),
                                 ProbeOptions {
                                     must_be_entity: true,
-                                    inverted: true,
-                                    filter_lossiness: None,
+                                    direction: ProbeDirection::ByOutput,
+                                    filter: ProbeFilter::empty(),
                                 },
                             )
                             .ok_or(DomainError::NoResolvePathToDataStore)?;
-                        *def_id = path.iter().last().unwrap().1;
+                        *def_id = path.iter().last().unwrap().input.def_id;
                     }
                     ordered_resolve_paths.push(None);
                 }
@@ -238,9 +269,9 @@ impl DomainEngine {
                 BatchWriteResponse::Inserted(mut_values)
                 | BatchWriteResponse::Updated(mut_values) => {
                     if let Some(resolve_path) = resolve_path {
-                        for (from, to) in resolve_path.reverse() {
+                        for map_key in resolve_path.reverse() {
                             let procedure = ontology
-                                .get_mapper_proc([from.into(), to.into()])
+                                .get_mapper_proc(&map_key)
                                 .expect("No mapping procedure for query output");
 
                             for value in mut_values.iter_mut() {
@@ -324,24 +355,19 @@ impl DomainEngine {
                         data_store.package_id(),
                         ProbeOptions {
                             must_be_entity: true,
-                            inverted: true,
-                            filter_lossiness: None,
+                            direction: ProbeDirection::ByOutput,
+                            filter: ProbeFilter::empty(),
                         },
                     )
                     .ok_or(DomainError::NoResolvePathToDataStore)?;
 
-                if let Some((_from, to)) = resolve_path.iter().last() {
-                    assert_eq!(to, inner_entity_def_id);
+                if let Some(map_key) = resolve_path.iter().last() {
+                    assert_eq!(map_key.input.def_id, inner_entity_def_id);
                 }
 
                 // Transform select
-                for (from, to) in resolve_path.iter() {
-                    translate_entity_select(
-                        &mut entity_select,
-                        from.into(),
-                        to.into(),
-                        &self.ontology,
-                    );
+                for map_key in resolve_path.iter() {
+                    translate_entity_select(&mut entity_select, &map_key, &self.ontology);
                 }
             }
             _ => todo!("Basically apply the same operation as above, but refactor"),
