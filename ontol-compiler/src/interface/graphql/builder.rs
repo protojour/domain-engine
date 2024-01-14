@@ -400,11 +400,11 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             .unwrap();
 
         let [data_resolve_path, create_resolve_path, update_resolve_path] = [
-            (ProbeFilter::empty(), ProbeDirection::ByOutput),
+            (ProbeFilter::Complete, ProbeDirection::ByOutput),
             // The CREATE resolve path must be PERFECT | PURE for create to be available
-            (ProbeFilter::empty(), ProbeDirection::ByInput),
+            (ProbeFilter::Complete, ProbeDirection::ByInput),
             // The UPDATE resolve path must be PURE (but not perfect) for update to be available
-            (ProbeFilter::empty(), ProbeDirection::ByInput),
+            (ProbeFilter::Pure, ProbeDirection::ByInput),
         ]
         .map(|(filter, direction)| {
             self.resolver_graph.probe_path(
@@ -447,17 +447,14 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                                 operator_addr: entity_array_operator_addr,
                             },
                         ),
-                        delete_arg: Some(
-                            data_resolve_path
-                                .is_some()
-                                .then_some(argument::EntityDeleteInputsArg {
-                                    def_id: entity_data.id_def_id,
-                                    operator_addr: self
-                                        .serde_generator
-                                        .gen_addr_lazy(gql_array_serde_key(entity_data.id_def_id))
-                                        .unwrap(),
-                                })
-                                .unwrap_or_else(|| panic!("lolge: {:?}", self.resolver_graph)),
+                        delete_arg: data_resolve_path.is_some().then_some(
+                            argument::EntityDeleteInputsArg {
+                                def_id: entity_data.id_def_id,
+                                operator_addr: self
+                                    .serde_generator
+                                    .gen_addr_lazy(gql_array_serde_key(entity_data.id_def_id))
+                                    .unwrap(),
+                            },
                         ),
                         field_unit_type_addr: match mutation_result_ref {
                             UnitTypeRef::Addr(addr) => addr,

@@ -180,8 +180,10 @@ pub(super) fn unify_root<'m>(
                     .with_meta(scope_meta.hir_meta),
                 ),
                 node: {
-                    let struct_node = unifier
-                        .mk_node(ontol_hir::Kind::Struct(binder, flags, body), meta.hir_meta);
+                    let struct_node = unifier.mk_node(
+                        ontol_hir::Kind::Struct(binder, unifier.filter_struct_flags(flags), body),
+                        meta.hir_meta,
+                    );
                     unifier.maybe_map_node(struct_node, opt_output_type)
                 },
             };

@@ -2,12 +2,13 @@ use std::{collections::HashMap, fmt::Debug};
 
 use fnv::FnvHashMap;
 use indexmap::{map::Entry, IndexMap};
+use ontol_hir::StructFlags;
 use ontol_runtime::{
     format_utils::DebugViaDisplay,
     ontology::{MapLossiness, PropertyFlow},
     smart_format,
     vm::proc::{Address, Lib, Procedure},
-    DefId, MapKey, PackageId,
+    DefId, MapFlags, MapKey, PackageId,
 };
 use smartstring::alias::String;
 use tracing::{debug, debug_span, warn};
@@ -189,13 +190,13 @@ fn generate_explicit_map<'m>(
     debug!("2nd (ty={:?}):\n{}", arms[1].data().ty(), arms[1]);
 
     let forward_key = {
-        let _entered = debug_span!("forward").entered();
-        generate_map_proc(&arms[0], &arms[1], proc_table, compiler)
+        let _entered = debug_span!("fwd").entered();
+        generate_map_procs(&arms[0], &arms[1], proc_table, compiler)
     };
 
     {
-        let _entered = debug_span!("backward").entered();
-        generate_map_proc(&arms[1], &arms[0], proc_table, compiler);
+        let _entered = debug_span!("backwd").entered();
+        generate_map_procs(&arms[1], &arms[0], proc_table, compiler);
     }
 
     match (compiler.map_ident(def_id), forward_key) {
@@ -215,13 +216,35 @@ fn generate_explicit_map<'m>(
     }
 }
 
-fn generate_map_proc<'m>(
+fn generate_map_procs<'m>(
     scope: &TypedRootNode<'m>,
     expr: &TypedRootNode<'m>,
     proc_table: &mut ProcTable,
     compiler: &mut Compiler<'m>,
 ) -> Option<MapKey> {
-    let func = match unify_to_function(scope, expr, compiler) {
+    let needs_pure_partial = match expr.as_ref().kind() {
+        ontol_hir::Kind::Struct(_, flags, _) => flags.contains(StructFlags::MATCH),
+        _ => false,
+    };
+
+    let key = generate_map_proc(scope, expr, MapFlags::empty(), proc_table, compiler);
+
+    if needs_pure_partial {
+        let _entered = debug_span!("pure").entered();
+        generate_map_proc(scope, expr, MapFlags::PURE_PARTIAL, proc_table, compiler);
+    }
+
+    key
+}
+
+fn generate_map_proc<'m>(
+    scope: &TypedRootNode<'m>,
+    expr: &TypedRootNode<'m>,
+    map_flags: MapFlags,
+    proc_table: &mut ProcTable,
+    compiler: &mut Compiler<'m>,
+) -> Option<MapKey> {
+    let func = match unify_to_function(scope, expr, map_flags, compiler) {
         Ok(func) => func,
         Err(err) => {
             warn!("unifier error: {err:?}");
@@ -242,10 +265,10 @@ fn generate_map_proc<'m>(
     debug!("body type: {:?}", func.body.data().ty());
 
     let mut errors = CompileErrors::default();
-    let keys = map_codegen(proc_table, &func, compiler, &mut errors);
+    let key = map_codegen(proc_table, &func, map_flags, compiler, &mut errors);
     compiler.errors.extend(errors);
 
-    Some(keys)
+    Some(key)
 }
 
 impl<'m> Compiler<'m> {

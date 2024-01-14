@@ -75,6 +75,8 @@ impl<'t, 'u, 'a, 'm> ExprToHir<'t, 'u, 'a, 'm> {
                     in_scope
                 );
 
+                let flags = self.unifier.filter_struct_flags(flags);
+
                 let body =
                     self.struct_body(&binder, flags, meta.hir_meta, props, in_scope, main_scope)?;
                 let struct_node =

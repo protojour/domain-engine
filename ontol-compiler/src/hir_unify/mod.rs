@@ -1,7 +1,10 @@
 use std::fmt::Debug;
 
 use ontol_hir::visitor::HirVisitor;
-use ontol_runtime::var::{Var, VarSet};
+use ontol_runtime::{
+    var::{Var, VarSet},
+    MapFlags,
+};
 use smartstring::alias::String;
 use tracing::{info, warn};
 
@@ -51,6 +54,7 @@ pub type UnifierResult<T> = Result<T, UnifierError>;
 pub fn unify_to_function<'m>(
     scope: &ontol_hir::RootNode<'m, TypedHir>,
     expr: &ontol_hir::RootNode<'m, TypedHir>,
+    map_flags: MapFlags,
     compiler: &mut Compiler<'m>,
 ) -> UnifierResult<HirFunc<'m>> {
     let mut var_tracker = VariableTracker::default();
@@ -60,7 +64,13 @@ pub fn unify_to_function<'m>(
     let (unified, mut var_allocator) = if !USE_FLAT_UNIFIER {
         unify_classic(scope, expr, var_tracker.var_allocator(), compiler)?
     } else {
-        match unify_flat(scope, expr, var_tracker.var_allocator(), compiler) {
+        match unify_flat(
+            scope,
+            expr,
+            map_flags,
+            var_tracker.var_allocator(),
+            compiler,
+        ) {
             Err(err) => {
                 if !CLASSIC_UNIFIER_FALLBACK || !matches!(&err, UnifierError::TODO(_)) {
                     return Err(err);
@@ -120,6 +130,7 @@ fn unify_classic<'m>(
 fn unify_flat<'m>(
     scope: &ontol_hir::RootNode<'m, TypedHir>,
     expr: &ontol_hir::RootNode<'m, TypedHir>,
+    map_flags: MapFlags,
     var_allocator: ontol_hir::VarAllocator,
     compiler: &mut Compiler<'m>,
 ) -> UnifierResult<(UnifiedRootNode<'m>, ontol_hir::VarAllocator)> {
@@ -135,7 +146,12 @@ fn unify_flat<'m>(
         (expr, expr_builder.var_allocator())
     };
 
-    let mut unifier = FlatUnifier::new(&mut compiler.types, &compiler.relations, var_allocator);
+    let mut unifier = FlatUnifier::new(
+        &mut compiler.types,
+        &compiler.relations,
+        var_allocator,
+        map_flags,
+    );
     let unified = unifier.unify(flat_scope, expr)?;
 
     Ok((
@@ -199,6 +215,8 @@ impl VariableTracker {
 pub mod test_api {
     use std::fmt::Write;
 
+    use ontol_runtime::MapFlags;
+
     use crate::{hir_unify::unify_to_function, mem::Mem, typed_hir::TypedHir, Compiler};
 
     use super::{flat_scope_builder::FlatScopeBuilder, VariableTracker};
@@ -213,8 +231,13 @@ pub mod test_api {
     pub fn test_unify(scope: &str, expr: &str) -> String {
         let mem = Mem::default();
         let mut compiler = Compiler::new(&mem, Default::default());
-        let func =
-            unify_to_function(&parse_typed(scope), &parse_typed(expr), &mut compiler).unwrap();
+        let func = unify_to_function(
+            &parse_typed(scope),
+            &parse_typed(expr),
+            MapFlags::empty(),
+            &mut compiler,
+        )
+        .unwrap();
         let mut output = String::new();
         write!(&mut output, "{func}").unwrap();
         output

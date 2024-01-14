@@ -373,12 +373,16 @@ impl<'m> Compiler<'m> {
                     0..0
                 };
 
+                let metadata = self.codegen_tasks.result_metadata_table.remove(&key);
+
                 (
                     key,
                     MapMeta {
                         procedure,
                         propflow_range,
-                        lossiness: MapLossiness::Perfect,
+                        lossiness: metadata
+                            .map(|metadata| metadata.lossiness)
+                            .unwrap_or(MapLossiness::Lossy),
                     },
                 )
             })

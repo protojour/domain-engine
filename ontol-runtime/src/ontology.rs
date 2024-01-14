@@ -376,7 +376,7 @@ pub struct MapMeta {
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub enum MapLossiness {
-    Perfect,
+    Complete,
     Lossy,
 }
 

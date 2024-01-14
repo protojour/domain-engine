@@ -4,7 +4,7 @@ use std::fmt::Display;
 
 use indexmap::IndexMap;
 use ontol_hir::{EvalCondTerm, StructFlags};
-use ontol_runtime::{condition::Clause, var::Var};
+use ontol_runtime::{condition::Clause, var::Var, MapFlags};
 use smartstring::alias::String;
 use tracing::{debug, warn};
 
@@ -85,6 +85,7 @@ pub struct FlatUnifier<'a, 'm> {
     pub(super) relations: &'a Relations,
     pub(super) var_allocator: ontol_hir::VarAllocator,
     pub(super) hir_arena: ontol_hir::arena::Arena<'m, TypedHir>,
+    pub(super) map_flags: MapFlags,
 
     condition_root: Option<Var>,
     match_struct_depth: usize,
@@ -95,22 +96,16 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
         types: &'a mut Types<'m>,
         relations: &'a Relations,
         var_allocator: ontol_hir::VarAllocator,
+        map_flags: MapFlags,
     ) -> Self {
         Self {
             types,
             relations,
             var_allocator,
             hir_arena: Default::default(),
+            map_flags,
             condition_root: None,
             match_struct_depth: 0,
-        }
-    }
-
-    pub(super) fn expr_mode(&self) -> ExprMode {
-        match (self.condition_root, self.match_struct_depth) {
-            (Some(root), 1) => ExprMode::Condition(root, ConditionRoot(true)),
-            (Some(root), _) => ExprMode::Condition(root, ConditionRoot(false)),
-            _ => ExprMode::Expr,
         }
     }
 
@@ -147,6 +142,26 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
         result?;
 
         flat_unifier_impl::unify_root(None, Default::default(), &mut table, self)
+    }
+
+    pub(super) fn expr_mode(&self) -> ExprMode {
+        if self.map_flags.contains(MapFlags::PURE_PARTIAL) {
+            return ExprMode::Expr;
+        }
+
+        match (self.condition_root, self.match_struct_depth) {
+            (Some(root), 1) => ExprMode::Condition(root, ConditionRoot(true)),
+            (Some(root), _) => ExprMode::Condition(root, ConditionRoot(false)),
+            _ => ExprMode::Expr,
+        }
+    }
+
+    pub(super) fn filter_struct_flags(&self, input_flags: StructFlags) -> StructFlags {
+        if self.map_flags.contains(MapFlags::PURE_PARTIAL) {
+            StructFlags::empty()
+        } else {
+            input_flags
+        }
     }
 
     #[inline]

@@ -70,6 +70,7 @@ pub(super) fn const_codegen<'m>(
 pub(super) fn map_codegen<'m>(
     proc_table: &mut ProcTable,
     func: &HirFunc<'m>,
+    map_flags: MapFlags,
     compiler: &Compiler<'m>,
     errors: &mut CompileErrors,
 ) -> MapKey {
@@ -83,10 +84,10 @@ pub(super) fn map_codegen<'m>(
             if flags.contains(StructFlags::MATCH) {
                 MapLossiness::Lossy
             } else {
-                MapLossiness::Perfect
+                MapLossiness::Complete
             }
         }
-        _ => MapLossiness::Perfect,
+        _ => MapLossiness::Complete,
     };
 
     let data_flow = DataFlowAnalyzer::new(&compiler.defs).analyze(func.arg.0.var, body.as_ref());
@@ -119,7 +120,7 @@ pub(super) fn map_codegen<'m>(
             let map_key = MapKey {
                 input,
                 output,
-                flags: MapFlags::empty(),
+                flags: map_flags,
             };
 
             proc_table.map_procedures.insert(map_key, builder);

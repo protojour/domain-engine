@@ -65,7 +65,8 @@ bitflags::bitflags! {
     #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug, Serialize, Deserialize)]
     pub struct MapFlags: u8 {
         /// The mapping is a _pure_ but _partial_ version of an impure/lossy mapping that needs to access to a datastore.
-        const PURE_PARTIAL    = 0b00000001;
+        /// Used to implement translation of UPDATEs.
+        const PURE_PARTIAL = 0b00000001;
     }
 }
 
