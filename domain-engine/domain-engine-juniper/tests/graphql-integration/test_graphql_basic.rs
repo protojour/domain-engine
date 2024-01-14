@@ -768,7 +768,7 @@ async fn test_create_through_mapped_domain() {
         (
             ROOT,
             "
-            use 'artist' as a
+            use 'artist_and_instrument' as ai
 
             def player (
                 rel .'id'(rel .gen: auto)|id: (rel .is: uuid)
@@ -780,28 +780,19 @@ async fn test_create_through_mapped_domain() {
                     'id': id,
                     'nick': n,
                 ),
-                a.artist(
+                ai.artist(
                     'ID': id,
                     'name': n,
                 ),
             )
         ",
         ),
-        // BUG: Not using `artist_and_instrument` here right now because of https://gitlab.com/protojour/memoriam/domain-engine/-/issues/86
-        (
-            SourceName("artist"),
-            "
-            def artist (
-                rel .'ID'(rel .gen: auto)|id: (fmt '' => 'artist/' => uuid => .)
-                rel .'name': text
-            )
-            ",
-        ),
+        ARTIST_AND_INSTRUMENT,
     ])
-    .with_data_store(SourceName("artist"), DataStoreConfig::Default)
+    .with_data_store(ARTIST_AND_INSTRUMENT.0, DataStoreConfig::Default)
     .compile_schemas([ROOT]);
 
-    let ziggy: Attribute = test.bind(["artist.artist"])[0]
+    let ziggy: Attribute = test.bind(["artist_and_instrument.artist"])[0]
         .entity_builder(
             json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
             json!({ "name": "Ziggy" }),
@@ -822,7 +813,7 @@ async fn test_create_through_mapped_domain() {
             &schema,
             &gql_ctx_mock_data_store(
                 &test,
-                SourceName("artist"),
+                ARTIST_AND_INSTRUMENT.0,
                 DataStoreAPIMock::execute
                     .next_call(matching!(Request::BatchWrite(..), _session))
                     .returns(Ok(Response::one_inserted(ziggy.value)))

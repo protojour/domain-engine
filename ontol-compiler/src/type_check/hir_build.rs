@@ -558,9 +558,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
 
-                self.error_node(CompileError::TODO(smart_format!("")), &prop_span, ctx)
+                self.error_node(
+                    CompileError::TODO(smart_format!("Seq problem")),
+                    &prop_span,
+                    ctx,
+                )
             }
-            _ => self.error_node(CompileError::TODO(smart_format!("")), &prop_span, ctx),
+            _ => self.error_node(
+                CompileError::TODO(smart_format!("Unexpected pattern kind")),
+                &prop_span,
+                ctx,
+            ),
         }
     }
 

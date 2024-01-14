@@ -443,18 +443,18 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         hir_props: &mut Vec<ontol_hir::Node>,
         ctx: &mut HirBuildCtx<'m>,
     ) {
-        for (name, match_property) in match_attributes {
-            if match_property.mentioned {
+        for (name, match_attr) in match_attributes {
+            if match_attr.mentioned {
                 continue;
             }
-            if matches!(match_property.property_id.role, Role::Object) {
+            if matches!(match_attr.property_id.role, Role::Object) {
                 continue;
             }
-            if matches!(match_property.cardinality.0, PropertyCardinality::Optional) {
+            if matches!(match_attr.cardinality.0, PropertyCardinality::Optional) {
                 continue;
             }
 
-            let relationship_id = match_property.property_id.relationship_id;
+            let relationship_id = match_attr.property_id.relationship_id;
 
             if let Some(const_def_id) = self
                 .relations
@@ -478,7 +478,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         ontol_hir::Kind::Prop(
                             ontol_hir::Optional(false),
                             struct_binder_var,
-                            match_property.property_id,
+                            match_attr.property_id,
                             [ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
                                 rel,
                                 val,
@@ -501,6 +501,29 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 // Value generators should be handled in data storage,
                 // so leave these fields out when not mentioned.
                 continue;
+            }
+
+            {
+                let meta = self.defs.relationship_meta(relationship_id);
+                let (target_def_id, cardinality, _span) =
+                    meta.relationship.by(match_attr.property_id.role.opposite());
+
+                // Here we check that if the missing property refers to variably sized edges
+                // to foreign entities, that property does not need to be mentioned for the map
+                // to be valid. This is because an entity can always "stand on its own"
+                // and be complete without looking at other entities.
+                // FIXME: Does this work with unions?
+                if let Some(target_properties) = self.relations.properties_by_def_id(target_def_id)
+                {
+                    if target_properties.identified_by.is_some()
+                        && matches!(
+                            cardinality,
+                            (PropertyCardinality::Optional, _) | (_, ValueCardinality::Many)
+                        )
+                    {
+                        continue;
+                    }
+                }
             }
 
             ctx.missing_properties
