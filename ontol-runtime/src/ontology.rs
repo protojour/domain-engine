@@ -162,7 +162,7 @@ impl Ontology {
 
     pub fn get_mapper_proc(&self, key: &MapKey) -> Option<Procedure> {
         self.map_meta_table
-            .get(&key)
+            .get(key)
             .map(|map_info| map_info.procedure)
     }
 

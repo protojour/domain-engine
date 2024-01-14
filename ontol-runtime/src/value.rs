@@ -20,6 +20,8 @@ use crate::{
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Value {
     Unit(DefId),
+    /// None represents that something doesn't exist
+    None(DefId),
     I64(i64, DefId),
     F64(f64, DefId),
     Rational(Box<num::rational::BigRational>, DefId),
@@ -94,6 +96,7 @@ impl Value {
     pub fn type_def_id(&self) -> DefId {
         match self {
             Value::Unit(def_id) => *def_id,
+            Value::None(def_id) => *def_id,
             Value::I64(_, def_id) => *def_id,
             Value::F64(_, def_id) => *def_id,
             Value::Rational(_, def_id) => *def_id,
@@ -115,6 +118,7 @@ impl Value {
     pub fn type_def_id_mut(&mut self) -> &mut DefId {
         match self {
             Value::Unit(def_id) => def_id,
+            Value::None(def_id) => def_id,
             Value::I64(_, def_id) => def_id,
             Value::F64(_, def_id) => def_id,
             Value::Rational(_, def_id) => def_id,
@@ -336,6 +340,7 @@ impl<'v> Display for ValueDebug<'v> {
         let value = &self.0;
         match &value {
             Value::Unit(_) => write!(f, "#u"),
+            Value::None(_) => write!(f, "#none"),
             Value::I64(i, _) => write!(f, "int({i})"),
             Value::F64(n, _) => write!(f, "flt({n})"),
             Value::Rational(r, _) => write!(f, "rat({r})"),
@@ -345,6 +350,10 @@ impl<'v> Display for ValueDebug<'v> {
             Value::ChronoDate(d, _) => write!(f, "date({d})"),
             Value::ChronoTime(t, _) => write!(f, "time({t})"),
             Value::Struct(m, _) | Value::StructUpdate(m, _) => {
+                if matches!(value, Value::StructUpdate(..)) {
+                    write!(f, "update")?;
+                }
+
                 write!(f, "{{")?;
                 let mut iter = m.iter().peekable();
                 while let Some((prop, attr)) = iter.next() {

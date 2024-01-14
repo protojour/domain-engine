@@ -253,13 +253,11 @@ impl<'on, 'a> Probe<'on, 'a> {
             let flags = match self.options.filter {
                 ProbeFilter::Complete => flag_candidates
                     .iter()
-                    .filter(|flags| !flags.map_flags.contains(MapFlags::PURE_PARTIAL))
-                    .next(),
+                    .find(|flags| !flags.map_flags.contains(MapFlags::PURE_PARTIAL)),
                 ProbeFilter::Pure => {
                     flag_candidates
                         .iter()
-                        .filter(|flags| flags.map_flags.contains(MapFlags::PURE_PARTIAL))
-                        .next()
+                        .find(|flags| flags.map_flags.contains(MapFlags::PURE_PARTIAL))
                         // Fall back to the default flag if there's no PURE PARTIAL flags
                         .or_else(|| flag_candidates.iter().next())
                 }

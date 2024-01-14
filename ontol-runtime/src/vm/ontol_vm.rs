@@ -118,20 +118,35 @@ impl<'o> Processor for OntolProcessor<'o> {
     #[inline(always)]
     fn iter_next(&mut self, seq: Local, index: Local) -> VmResult<bool> {
         let i = *self.int_local_mut(index)? as usize;
-        let seq = self.sequence_local_mut(seq)?;
 
-        if seq.attrs.len() <= i {
-            Ok(false)
-        } else {
-            let mut attr = Value::unit().to_unit_attr();
-            std::mem::swap(&mut seq.attrs[i], &mut attr);
+        match self.local_mut(seq) {
+            Value::Sequence(seq, _) => {
+                if seq.attrs.len() <= i {
+                    Ok(false)
+                } else {
+                    let mut attr = Value::unit().to_unit_attr();
+                    std::mem::swap(&mut seq.attrs[i], &mut attr);
 
-            self.stack.push(attr.rel_params);
-            self.stack.push(attr.value);
+                    self.stack.push(attr.rel_params);
+                    self.stack.push(attr.value);
 
-            *self.int_local_mut(index)? += 1;
+                    *self.int_local_mut(index)? += 1;
 
-            Ok(true)
+                    Ok(true)
+                }
+            }
+            Value::None(_) => {
+                // Yields one #none item, then stops
+                if i == 0 {
+                    self.push_none();
+                    self.push_none();
+                    *self.int_local_mut(index)? += 1;
+                    Ok(true)
+                } else {
+                    Ok(false)
+                }
+            }
+            _ => Err(VmError::InvalidType(seq)),
         }
     }
 
@@ -166,7 +181,13 @@ impl<'o> Processor for OntolProcessor<'o> {
                     self.push_false();
                     Ok(())
                 } else {
-                    Err(VmError::AttributeNotPresent)
+                    if flags.contains(GetAttrFlags::REL) {
+                        self.push_none();
+                    }
+                    if flags.contains(GetAttrFlags::VAL) {
+                        self.push_none();
+                    }
+                    Ok(())
                 }
             }
         }
@@ -476,6 +497,11 @@ impl<'o> OntolProcessor<'o> {
     #[inline(always)]
     fn push_false(&mut self) {
         self.stack.push(Value::I64(0, DefId::unit()));
+    }
+
+    #[inline(always)]
+    fn push_none(&mut self) {
+        self.stack.push(Value::None(DefId::unit()));
     }
 
     fn opcode_term_to_cond_term(&mut self, term: &OpCodeCondTerm) -> CondTerm {

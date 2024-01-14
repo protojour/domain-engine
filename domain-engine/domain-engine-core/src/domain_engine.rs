@@ -23,6 +23,7 @@ use crate::{
     match_utils::find_entity_id_in_condition_for_var,
     select_data_flow::{translate_entity_select, translate_select},
     system::{ArcSystemApi, SystemAPI, TestSystem},
+    update::sanitize_update,
     DomainError, FindEntitySelect, Session,
 };
 
@@ -241,6 +242,10 @@ impl DomainEngine {
                                 }
                             };
                         }
+                    }
+
+                    for value in mut_values.iter_mut() {
+                        sanitize_update(value);
                     }
 
                     let select_path = self
