@@ -41,7 +41,11 @@ pub fn translate_entity_select(select: &mut EntitySelect, key: &MapKey, ontology
 }
 
 fn translate_struct_select(struct_select: &mut StructSelect, key: &MapKey, ontology: &Ontology) {
-    debug!("translate struct select for {key:?}");
+    debug!(
+        "translate struct select {:?} for {:?}",
+        struct_select.def_id,
+        key.def_ids()
+    );
 
     let map_meta = ontology
         .get_map_meta(key)

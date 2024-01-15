@@ -4,6 +4,7 @@ use ::serde::{Deserialize, Serialize};
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use smartstring::alias::String;
+use tracing::debug;
 
 use crate::{
     config::PackageConfig,
@@ -161,9 +162,14 @@ impl Ontology {
     }
 
     pub fn get_mapper_proc(&self, key: &MapKey) -> Option<Procedure> {
-        self.map_meta_table
-            .get(key)
-            .map(|map_info| map_info.procedure)
+        self.map_meta_table.get(key).map(|map_info| {
+            debug!(
+                "get_mapper_proc ({:?}) => {:?}",
+                key.def_ids(),
+                map_info.procedure
+            );
+            map_info.procedure
+        })
     }
 
     pub fn new_serde_processor(

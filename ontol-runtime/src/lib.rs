@@ -61,6 +61,12 @@ pub struct MapKey {
     pub flags: MapFlags,
 }
 
+impl MapKey {
+    pub fn def_ids(&self) -> [DefId; 2] {
+        [self.input.def_id, self.output.def_id]
+    }
+}
+
 bitflags::bitflags! {
     #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug, Serialize, Deserialize)]
     pub struct MapFlags: u8 {

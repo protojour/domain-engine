@@ -835,6 +835,88 @@ async fn test_create_through_mapped_domain() {
 }
 
 #[test(tokio::test)]
+async fn test_create_through_three_domains() {
+    let (test, [schema]) = TestPackages::with_sources([
+        (
+            ROOT,
+            "
+            use 'player' as player
+
+            def actor (
+                rel .'ID'(rel .gen: auto)|id: (fmt '' => 'actor/' => uuid => .)
+                rel .'alias': text
+            )
+
+            map(
+                actor('ID': id, 'alias': c),
+                player.player('id': id, 'nick': c),
+            )
+        ",
+        ),
+        (
+            SourceName("player"),
+            "
+            use 'artist_and_instrument' as ai
+
+            def player (
+                rel .'id'(rel .gen: auto)|id: (rel .is: uuid)
+                rel .'nick': text
+            )
+
+            map(
+                player('id': id, 'nick': n),
+                ai.artist('ID': id, 'name': n),
+            )
+        ",
+        ),
+        ARTIST_AND_INSTRUMENT,
+    ])
+    .with_data_store(ARTIST_AND_INSTRUMENT.0, DataStoreConfig::Default)
+    .compile_schemas([ROOT]);
+
+    let ziggy: Attribute = test.bind(["artist_and_instrument.artist"])[0]
+        .entity_builder(
+            json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
+            json!({ "name": "Ziggy" }),
+        )
+        .into();
+
+    expect_eq!(
+        actual = r#"
+            mutation {
+                actor(create: [{ alias: "Ziggy" }]) {
+                    node { ID alias }
+                    deleted
+                }
+            }
+        "#
+        .exec(
+            [],
+            &schema,
+            &gql_ctx_mock_data_store(
+                &test,
+                ARTIST_AND_INSTRUMENT.0,
+                DataStoreAPIMock::execute
+                    .next_call(matching!(Request::BatchWrite(..), _session))
+                    .returns(Ok(Response::one_inserted(ziggy.value)))
+            )
+        )
+        .await,
+        expected = Ok(graphql_value!({
+            "actor": [
+                {
+                    "node": {
+                        "ID": "actor/88832e20-8c6e-46b4-af79-27b19b889a58",
+                        "alias": "Ziggy"
+                    },
+                    "deleted": false
+                }
+            ],
+        })),
+    );
+}
+
+#[test(tokio::test)]
 async fn test_graphql_guitar_synth_union_selection() {
     let (test, schema) = GUITAR_SYNTH_UNION.1.compile_single_schema_with_datastore();
     let [artist] = test.bind(["artist"]);

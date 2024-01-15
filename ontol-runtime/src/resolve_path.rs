@@ -4,7 +4,7 @@ use crate::{
     DefId, MapDef, MapDefFlags, MapFlags, MapKey, PackageId,
 };
 use fnv::{FnvHashMap, FnvHashSet};
-use tracing::{debug, trace};
+use tracing::trace;
 
 #[derive(Debug)]
 pub struct ResolvePath {
@@ -16,11 +16,11 @@ impl ResolvePath {
         self.path.is_empty()
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = MapKey> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item = MapKey> + DoubleEndedIterator + '_ {
         self.path.iter().cloned()
     }
 
-    pub fn reverse(&self) -> impl Iterator<Item = MapKey> + '_ {
+    pub fn reverse(&self) -> impl Iterator<Item = MapKey> + DoubleEndedIterator + '_ {
         self.path.iter().cloned().rev().map(|key| MapKey {
             input: key.output,
             output: key.input,
@@ -85,9 +85,11 @@ impl ResolverGraph {
                 map_flags: key.flags,
             };
 
-            debug!(
+            trace!(
                 "Add map pair {:?} {:?} {:?}",
-                key.input.def_id, key.output.def_id, key.flags
+                key.input.def_id,
+                key.output.def_id,
+                key.flags
             );
 
             graph_by_input

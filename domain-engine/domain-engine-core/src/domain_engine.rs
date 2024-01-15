@@ -303,7 +303,7 @@ impl DomainEngine {
                 BatchWriteResponse::Inserted(mut_values)
                 | BatchWriteResponse::Updated(mut_values) => {
                     if let Some(resolve_path) = resolve_path {
-                        for map_key in resolve_path.iter() {
+                        for map_key in resolve_path.iter().rev() {
                             trace!("post-mutation translation {map_key:?}");
 
                             let procedure = ontology
