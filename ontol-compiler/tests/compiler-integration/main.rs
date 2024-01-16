@@ -5,6 +5,7 @@ mod interface;
 mod serde;
 mod test_conduit;
 mod test_demo;
+mod test_dynamic_dicts;
 mod test_entity;
 mod test_faker;
 mod test_fundamentals;
