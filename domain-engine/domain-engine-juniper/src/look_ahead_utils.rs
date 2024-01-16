@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use juniper::{graphql_value, LookAheadArgument, LookAheadValue};
+use juniper::{graphql_value, LookAheadArgument, LookAheadSelection, LookAheadValue};
 use ontol_runtime::{
     interface::{
         graphql::argument::{self, DefaultArg},
@@ -33,12 +33,12 @@ pub struct EntityMutations {
 }
 
 pub(crate) struct ArgsWrapper<'a> {
-    arguments: &'a [LookAheadArgument<'a, GqlScalar>],
+    selection: LookAheadSelection<'a, GqlScalar>,
 }
 
 impl<'a> ArgsWrapper<'a> {
-    pub fn new(arguments: &'a [LookAheadArgument<'a, GqlScalar>]) -> Self {
-        Self { arguments }
+    pub fn new(selection: LookAheadSelection<'a, GqlScalar>) -> Self {
+        Self { selection }
     }
 
     pub fn deserialize_optional<'de, T: serde::Deserialize<'de>>(
@@ -86,8 +86,8 @@ impl<'a> ArgsWrapper<'a> {
                 let unlocated_span = juniper::Span::unlocated();
                 let default_value: juniper::LookAheadValue<GqlScalar> =
                     match field_arg.default_arg() {
-                        Some(DefaultArg::EmptyList) => LookAheadValue::List(vec![]),
-                        Some(DefaultArg::EmptyObject) => LookAheadValue::Object(vec![]),
+                        Some(DefaultArg::EmptyList) => LookAheadValue::List(Default::default()),
+                        Some(DefaultArg::EmptyObject) => LookAheadValue::Object(Default::default()),
                         None => {
                             return Err(juniper::FieldError::new(
                                 smart_format!("argument `{arg_name}` is missing"),
@@ -97,7 +97,7 @@ impl<'a> ArgsWrapper<'a> {
                     };
 
                 serde_processor.deserialize(LookAheadValueDeserializer {
-                    value: &default_value,
+                    value: default_value,
                     span: &unlocated_span,
                 })
             }
@@ -135,7 +135,7 @@ impl<'a> ArgsWrapper<'a> {
 
         let mut output = vec![];
 
-        for look_ahead_arg in self.arguments {
+        for look_ahead_arg in self.selection.arguments() {
             let name = look_ahead_arg.name();
 
             let Some((matched_arg, kind)) = arg_matchers
@@ -169,8 +169,8 @@ impl<'a> ArgsWrapper<'a> {
         Ok(output)
     }
 
-    fn find_argument(&self, name: &str) -> Option<&'a LookAheadArgument<'a, GqlScalar>> {
-        self.arguments.iter().find(|arg| arg.name() == name)
+    fn find_argument(&self, name: &str) -> Option<LookAheadArgument<'a, GqlScalar>> {
+        self.selection.arguments().find(|arg| arg.name() == name)
     }
 }
 
@@ -250,15 +250,15 @@ impl<T> ErrorContext for Result<T, Error> {
 type BorrowedSpanning<'a, T> = juniper::Spanning<T, &'a juniper::Span>;
 
 struct LookAheadValueDeserializer<'a> {
-    value: &'a LookAheadValue<'a, GqlScalar>,
+    value: LookAheadValue<'a, GqlScalar>,
     span: &'a juniper::Span,
 }
 
-impl<'a> From<&'a juniper::LookAheadArgument<'a, GqlScalar>> for LookAheadValueDeserializer<'a> {
-    fn from(value: &'a juniper::LookAheadArgument<GqlScalar>) -> Self {
+impl<'a> From<juniper::LookAheadArgument<'a, GqlScalar>> for LookAheadValueDeserializer<'a> {
+    fn from(value: juniper::LookAheadArgument<'a, GqlScalar>) -> Self {
         Self {
             value: value.value(),
-            span: value.span(),
+            span: value.value_span(),
         }
     }
 }
@@ -285,8 +285,8 @@ impl<'a, 'de> de::Deserializer<'de> for LookAheadValueDeserializer<'a> {
                 visitor.visit_str(value).context(self.span)
             }
             LookAheadValue::Enum(value) => visitor.visit_str(value),
-            LookAheadValue::List(vec) => {
-                let mut iterator = vec.iter().fuse();
+            LookAheadValue::List(list) => {
+                let mut iterator = list.iter().fuse();
                 let value = visitor
                     .visit_seq(SeqDeserializer::<_>::new(&mut iterator))
                     .context(self.span)?;
@@ -295,8 +295,8 @@ impl<'a, 'de> de::Deserializer<'de> for LookAheadValueDeserializer<'a> {
                     None => Ok(value),
                 }
             }
-            LookAheadValue::Object(vec) => {
-                let mut iterator = vec.iter().fuse();
+            LookAheadValue::Object(object) => {
+                let mut iterator = object.iter().fuse();
                 let value = visitor
                     .visit_map(ObjectDeserializer::<_>::new(&mut iterator))
                     .context(self.span)?;
@@ -338,7 +338,7 @@ impl<'i, I: Iterator> SeqDeserializer<'i, I> {
 
 impl<'a, 'i, 'de, I> de::SeqAccess<'de> for SeqDeserializer<'i, I>
 where
-    I: Iterator<Item = &'a BorrowedSpanning<'a, LookAheadValue<'a, GqlScalar>>>,
+    I: Iterator<Item = BorrowedSpanning<'a, LookAheadValue<'a, GqlScalar>>>,
 {
     type Error = Error;
 
@@ -350,7 +350,7 @@ where
             Some(spanned_value) => {
                 self.count += 1;
                 seed.deserialize(LookAheadValueDeserializer {
-                    value: &spanned_value.item,
+                    value: spanned_value.item,
                     span: spanned_value.span,
                 })
                 .map(Some)
@@ -369,7 +369,7 @@ where
 
 struct ObjectDeserializer<'a, 'i, I> {
     iter: &'i mut std::iter::Fuse<I>,
-    state: MapState<&'a BorrowedSpanning<'a, LookAheadValue<'a, GqlScalar>>>,
+    state: MapState<BorrowedSpanning<'a, LookAheadValue<'a, GqlScalar>>>,
     _count: usize,
 }
 
@@ -386,7 +386,7 @@ impl<'a, 'i, I: Iterator> ObjectDeserializer<'a, 'i, I> {
 impl<'a, 'i, 'de, I> de::MapAccess<'de> for ObjectDeserializer<'a, 'i, I>
 where
     I: Iterator<
-        Item = &'a (
+        Item = (
             BorrowedSpanning<'a, &'a str>,
             BorrowedSpanning<'a, LookAheadValue<'a, GqlScalar>>,
         ),
@@ -415,7 +415,7 @@ where
     {
         match std::mem::take(&mut self.state) {
             MapState::NextValue(spanned_value) => seed.deserialize(LookAheadValueDeserializer {
-                value: &spanned_value.item,
+                value: spanned_value.item,
                 span: spanned_value.span,
             }),
             MapState::NextKey => panic!("should call next_key"),

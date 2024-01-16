@@ -1,7 +1,7 @@
 use std::collections::hash_map::Entry;
 
 use fnv::FnvHashMap;
-use juniper::{FieldError, LookAheadMethods, LookAheadSelection};
+use juniper::{FieldError, LookAheadChildren};
 use ontol_runtime::{
     condition::Condition,
     interface::graphql::{
@@ -50,7 +50,7 @@ impl<'a> SelectAnalyzer<'a> {
 
     pub fn analyze_look_ahead(
         &self,
-        look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
+        look_ahead: juniper::executor::LookAheadSelection<GqlScalar>,
         field_data: &FieldData,
     ) -> Result<AnalyzedQuery, juniper::FieldError<GqlScalar>> {
         match &field_data.kind {
@@ -65,7 +65,7 @@ impl<'a> SelectAnalyzer<'a> {
                 input_arg,
                 queries: map_queries,
             } => {
-                let input = ArgsWrapper::new(look_ahead.arguments())
+                let input = ArgsWrapper::new(look_ahead)
                     .deserialize_domain_field_arg_as_attribute(
                         input_arg,
                         (self.schema_ctx, self.service_ctx),
@@ -94,7 +94,7 @@ impl<'a> SelectAnalyzer<'a> {
 
     fn analyze_map(
         &self,
-        look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
+        look_ahead: juniper::executor::LookAheadSelection<GqlScalar>,
         field_data: &FieldData,
         parent_property: PropertyId,
         input_queries: &FnvHashMap<PropertyId, Var>,
@@ -125,7 +125,7 @@ impl<'a> SelectAnalyzer<'a> {
 
     pub fn analyze_select(
         &self,
-        look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
+        look_ahead: juniper::executor::LookAheadSelection<GqlScalar>,
         field_data: &FieldData,
     ) -> Result<Select, FieldError<GqlScalar>> {
         self.analyze_selection(look_ahead, field_data)?
@@ -135,7 +135,7 @@ impl<'a> SelectAnalyzer<'a> {
 
     fn analyze_selection(
         &self,
-        look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
+        look_ahead: juniper::executor::LookAheadSelection<GqlScalar>,
         field_data: &FieldData,
     ) -> Result<Option<KeyedPropertySelection>, FieldError<GqlScalar>> {
         match (
@@ -146,7 +146,7 @@ impl<'a> SelectAnalyzer<'a> {
                 match (field_data.field_type.modifier, type_data) {
                     (TypeModifier::Unit(_), type_data) => Ok(Some(KeyedPropertySelection {
                         key: unit_property(),
-                        select: match self.analyze_data(look_ahead, &type_data.kind)? {
+                        select: match self.analyze_data(look_ahead.children(), &type_data.kind)? {
                             Select::Struct(struct_select) => Select::Entity(EntitySelect {
                                 source: StructOrUnionSelect::Struct(struct_select),
                                 condition: Condition::default(),
@@ -216,13 +216,13 @@ impl<'a> SelectAnalyzer<'a> {
             (FieldKind::Node | FieldKind::Nodes, Ok(type_data)) => {
                 Ok(Some(KeyedPropertySelection {
                     key: unit_property(),
-                    select: self.analyze_data(look_ahead, &type_data.kind)?,
+                    select: self.analyze_data(look_ahead.children(), &type_data.kind)?,
                 }))
             }
             (FieldKind::Property(property_data), Ok(type_data)) => {
                 Ok(Some(KeyedPropertySelection {
                     key: property_data.property_id,
-                    select: self.analyze_data(look_ahead, &type_data.kind)?,
+                    select: self.analyze_data(look_ahead.children(), &type_data.kind)?,
                 }))
             }
             (FieldKind::Property(property_data), Err(_scalar_ref)) => {
@@ -244,12 +244,12 @@ impl<'a> SelectAnalyzer<'a> {
 
     fn analyze_connection(
         &self,
-        look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
+        look_ahead: juniper::executor::LookAheadSelection<GqlScalar>,
         first_arg: &FirstArg,
         after_arg: &AfterArg,
         connection_object_data: &ObjectData,
     ) -> Result<Select, FieldError<GqlScalar>> {
-        let args_wrapper = ArgsWrapper::new(look_ahead.arguments());
+        let args_wrapper = ArgsWrapper::new(look_ahead);
 
         let limit = args_wrapper
             .deserialize_optional::<usize>(first_arg.name())?
@@ -287,16 +287,18 @@ impl<'a> SelectAnalyzer<'a> {
 
     pub fn analyze_data(
         &self,
-        look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
+        look_ahead_children: juniper::executor::LookAheadChildren<GqlScalar>,
         type_kind: &TypeKind,
     ) -> Result<Select, FieldError<GqlScalar>> {
         match type_kind {
-            TypeKind::Object(object_data) => self.analyze_object_data(look_ahead, object_data),
+            TypeKind::Object(object_data) => {
+                self.analyze_object_data(look_ahead_children, object_data)
+            }
             TypeKind::Union(union_data) => {
                 let mut union_map: FnvHashMap<DefId, FnvHashMap<PropertyId, Select>> =
                     FnvHashMap::default();
 
-                for field_look_ahead in look_ahead.children() {
+                for field_look_ahead in look_ahead_children {
                     let field_name = field_look_ahead.field_original_name();
 
                     let applies_for = field_look_ahead.applies_for();
@@ -349,7 +351,7 @@ impl<'a> SelectAnalyzer<'a> {
                 ))
             }
             TypeKind::CustomScalar(_) => {
-                assert!(look_ahead.children().is_empty());
+                assert!(look_ahead_children.is_empty());
                 Ok(Select::Leaf)
             }
         }
@@ -357,14 +359,14 @@ impl<'a> SelectAnalyzer<'a> {
 
     pub fn analyze_object_data(
         &self,
-        look_ahead: &juniper::executor::LookAheadSelection<GqlScalar>,
+        look_ahead_children: juniper::executor::LookAheadChildren<GqlScalar>,
         object_data: &ObjectData,
     ) -> Result<Select, FieldError<GqlScalar>> {
         match &object_data.kind {
             ObjectKind::Node(node_data) => {
                 let mut properties: FnvHashMap<PropertyId, Select> = FnvHashMap::default();
 
-                for field_look_ahead in look_ahead.children() {
+                for field_look_ahead in look_ahead_children {
                     let field_name = field_look_ahead.field_original_name();
                     let field_data = object_data.fields.get(field_name).unwrap();
 
@@ -437,9 +439,9 @@ impl<'a> SelectAnalyzer<'a> {
             | ObjectKind::Connection(ConnectionData { node_type_addr }) => {
                 let type_data = self.schema_ctx.type_data(*node_type_addr);
 
-                self.analyze_data(&LookAheadSelection::default(), &type_data.kind)
+                self.analyze_data(LookAheadChildren::default(), &type_data.kind)
             }
-            _ => self.analyze_object_data(&LookAheadSelection::default(), object_data),
+            _ => self.analyze_object_data(LookAheadChildren::default(), object_data),
         }
     }
 

@@ -62,7 +62,7 @@ async fn test_graphql_int_scalars() {
     .compile_single_schema_with_datastore();
 
     {
-        let parser_document = schema.as_parser_document();
+        let parser_document = schema.as_document();
         let foo_object = find_object_type(&parser_document, "foo").unwrap();
 
         expect_eq!(
@@ -990,7 +990,7 @@ async fn test_graphql_guitar_synth_union_selection() {
 #[test]
 fn test_graphql_guitar_synth_union_input_union_field_list() {
     let (_test, schema) = GUITAR_SYNTH_UNION.1.compile_single_schema_with_datastore();
-    let parser_document = schema.as_parser_document();
+    let parser_document = schema.as_document();
 
     let instrument_edge_input =
         find_input_object_type(&parser_document, "instrumentEdgeInput").unwrap();
@@ -1235,7 +1235,7 @@ fn test_graphql_municipalities_geojson_union() {
         .with_data_store(ROOT, DataStoreConfig::Default)
         .compile_schemas([ROOT]);
 
-    let parser_document = schema.as_parser_document();
+    let parser_document = schema.as_document();
 
     let geometry_union_input =
         find_input_object_type(&parser_document, "_geojson_GeometryUnionInput").unwrap();

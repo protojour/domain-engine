@@ -8,7 +8,6 @@ use domain_engine_core::{
     DomainError,
 };
 use gql_scalar::GqlScalar;
-use juniper::LookAheadMethods;
 use look_ahead_utils::ArgsWrapper;
 use ontol_runtime::{
     interface::{
@@ -89,7 +88,7 @@ pub fn create_graphql_schema(
         (),
     );
 
-    debug!("Created schema \n{}", juniper_schema.as_schema_language());
+    debug!("Created schema \n{}", juniper_schema.as_sdl());
 
     Ok(juniper_schema)
 }
@@ -115,7 +114,7 @@ async fn query(
             input,
             mut selects,
         } = SelectAnalyzer::new(schema_ctx, service_ctx)
-            .analyze_look_ahead(&executor.look_ahead(), query_field)?;
+            .analyze_look_ahead(executor.look_ahead(), query_field)?;
 
         service_ctx
             .domain_engine
@@ -162,7 +161,7 @@ async fn mutation(
     let ctx = (schema_ctx.as_ref(), service_ctx);
 
     let look_ahead = executor.look_ahead();
-    let args_wrapper = ArgsWrapper::new(look_ahead.arguments());
+    let args_wrapper = ArgsWrapper::new(look_ahead);
     let select_analyzer = SelectAnalyzer::new(schema_ctx, service_ctx);
 
     let field_data = type_info
@@ -186,7 +185,7 @@ async fn mutation(
                 delete_arg.as_ref(),
                 ctx,
             )?;
-            let select = select_analyzer.analyze_select(&look_ahead, field_data)?;
+            let select = select_analyzer.analyze_select(look_ahead, field_data)?;
             let mut batch_write_requests = Vec::with_capacity(entity_mutations.len());
 
             for entity_mutation in entity_mutations {
