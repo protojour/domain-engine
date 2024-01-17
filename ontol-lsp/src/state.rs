@@ -11,7 +11,7 @@ use ontol_compiler::{
 };
 use ontol_parser::{
     ast::{
-        DefStatement, ExprOrStructOrSeqPattern, MapArm, Path, Statement, StructPattern, Type,
+        DefStatement, ExprOrStructOrSetPattern, MapArm, Path, Statement, StructPattern, Type,
         TypeOrPattern, UseStatement,
     },
     lexer::lexer,
@@ -757,10 +757,10 @@ fn get_struct_pattern_path(s: &StructPattern, cursor: &usize) -> Option<Path> {
 }
 
 /// Try to find a Path in a Pattern
-fn get_pattern_path(pattern: &ExprOrStructOrSeqPattern, cursor: &usize) -> Option<Path> {
+fn get_pattern_path(pattern: &ExprOrStructOrSetPattern, cursor: &usize) -> Option<Path> {
     match pattern {
-        ExprOrStructOrSeqPattern::Struct((s, _)) => get_struct_pattern_path(s, cursor),
-        ExprOrStructOrSeqPattern::Seq(seq) => {
+        ExprOrStructOrSetPattern::Struct((s, _)) => get_struct_pattern_path(s, cursor),
+        ExprOrStructOrSetPattern::Set(seq) => {
             for (elem, range) in seq {
                 if in_range(range, cursor) {
                     return get_pattern_path(&elem.pattern.0, cursor);
@@ -768,6 +768,6 @@ fn get_pattern_path(pattern: &ExprOrStructOrSeqPattern, cursor: &usize) -> Optio
             }
             None
         }
-        ExprOrStructOrSeqPattern::Expr(_) => None,
+        ExprOrStructOrSetPattern::Expr(_) => None,
     }
 }

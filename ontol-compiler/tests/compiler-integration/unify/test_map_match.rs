@@ -42,9 +42,9 @@ fn test_map_match_scalar_key() {
                     .next_call(matching!(
                         eq!(&ValueCardinality::One),
                         eq!(&Literal(indoc! { r#"
-                        (root $b)
-                        (is-entity $b def@1:2)
-                        (attr $b S:1:4 (_ 'input'))
+                            (root $b)
+                            (is-entity $b def@1:2)
+                            (attr $b S:1:4 (_ 'input'))
                         "#
                         }))
                     ))
@@ -84,8 +84,8 @@ fn test_map_match_parameterless_query() {
                     .next_call(matching!(
                         eq!(&ValueCardinality::Many),
                         eq!(&Literal(indoc! { "
-                        (root $c)
-                        (is-entity $c def@1:2)
+                            (root $c)
+                            (is-entity $c def@1:2)
                         "
                         }))
                     ))
@@ -107,7 +107,7 @@ fn test_map_match_parameterless_query() {
 }
 
 #[test]
-fn test_map_match_anonymous_query_mandatory_properties() {
+fn test_map_match_query_mandatory_properties() {
     r#"
     def key (rel .is: text)
     def foo (
@@ -134,10 +134,10 @@ fn test_map_match_anonymous_query_mandatory_properties() {
                     .next_call(matching!(
                         eq!(&ValueCardinality::Many),
                         eq!(&Literal(indoc! { r#"
-                        (root $e)
-                        (is-entity $e def@1:2)
-                        (attr $e S:1:6 (_ 'A'))
-                        (attr $e S:1:7 (_ 'B'))
+                            (root $e)
+                            (is-entity $e def@1:2)
+                            (attr $e S:1:6 (_ 'A'))
+                            (attr $e S:1:7 (_ 'B'))
                         "#
                         }))
                     ))
@@ -147,23 +147,14 @@ fn test_map_match_anonymous_query_mandatory_properties() {
             )
             .assert_named_forward_map(
                 "query",
-                json!({
-                    "input_a": "A",
-                    "input_b": "B"
-                }),
-                json!([
-                    {
-                        "key": "key",
-                        "prop_a": "a!",
-                        "prop_b": "b!"
-                    }
-                ]),
+                json!({ "input_a": "A", "input_b": "B" }),
+                json!([{ "key": "key", "prop_a": "a!", "prop_b": "b!" }]),
             );
     });
 }
 
 #[test]
-fn test_map_match_anonymous_query_optional_property() {
+fn test_map_match_query_optional_property() {
     r#"
     def key (rel .is: text)
     def foo (
@@ -184,34 +175,49 @@ fn test_map_match_anonymous_query_optional_property() {
     "#
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
+        let return_value = Value::sequence_of([foo
+            .value_builder(json!({ "key": "key", "prop_a": "a!", "prop_b": "b!" }))
+            .into()]);
+
         test.mapper()
             .with_mock_yielder(
                 YielderMock::yield_match
                     .next_call(matching!(
                         eq!(&ValueCardinality::Many),
                         eq!(&Literal(indoc! { r#"
-                        (root $e)
-                        (is-entity $e def@1:2)
-                        (attr $e S:1:6 (_ 'A'))
+                            (root $e)
+                            (is-entity $e def@1:2)
+                            (attr $e S:1:6 (_ 'A'))
                         "#
                         }))
                     ))
-                    .returns(Value::sequence_of([foo
-                        .value_builder(json!({ "key": "key", "prop_a": "a!", "prop_b": "b!" }))
-                        .into()])),
+                    .returns(return_value.clone()),
             )
             .assert_named_forward_map(
                 "query",
-                json!({
-                    "input_a": "A",
-                }),
-                json!([
-                    {
-                        "key": "key",
-                        "prop_a": "a!",
-                        "prop_b": "b!"
-                    }
-                ]),
+                json!({ "input_a": "A", }),
+                json!([{ "key": "key", "prop_a": "a!", "prop_b": "b!" }]),
+            );
+
+        test.mapper()
+            .with_mock_yielder(
+                YielderMock::yield_match
+                    .next_call(matching!(
+                        eq!(&ValueCardinality::Many),
+                        eq!(&Literal(indoc! { r#"
+                            (root $e)
+                            (is-entity $e def@1:2)
+                            (attr $e S:1:6 (_ 'A'))
+                            (attr $e S:1:7 (_ 'B'))
+                        "#
+                        }))
+                    ))
+                    .returns(return_value),
+            )
+            .assert_named_forward_map(
+                "query",
+                json!({ "input_a": "A", "input_b": "B", }),
+                json!([{ "key": "key", "prop_a": "a!", "prop_b": "b!" }]),
             );
     });
 }
@@ -246,9 +252,9 @@ fn test_map_match_anonymous_with_translation() {
                     .next_call(matching!(
                         eq!(&ValueCardinality::Many),
                         eq!(&Literal(indoc! { r#"
-                        (root $d)
-                        (is-entity $d def@1:2)
-                        (attr $d S:1:7 (_ 'X'))
+                            (root $d)
+                            (is-entity $d def@1:2)
+                            (attr $d S:1:7 (_ 'X'))
                         "#
                         }))
                     ))
@@ -256,18 +262,12 @@ fn test_map_match_anonymous_with_translation() {
                         .value_builder(json!({ "key": "key", "foo": "x!" }))
                         .into()])),
             )
-            .assert_named_forward_map(
-                "query",
-                json!({ "input": "X", }),
-                json!([
-                    { "bar": "x!", }
-                ]),
-            );
+            .assert_named_forward_map("query", json!({ "input": "X", }), json!([{ "bar": "x!", }]));
     });
 }
 
 #[test]
-#[should_panic = "not yet implemented"]
+// #[should_panic = "not yet implemented"]
 fn test_map_sequence_filter_in_set() {
     r#"
     def key (rel .is: text)
@@ -283,11 +283,11 @@ fn test_map_sequence_filter_in_set() {
         bar('bar': x),
     )
     map query(
-        (
-            'input': {..x}
-        ),
+        ('input': {..x}),
         bar: {
-            ..foo match('foo': x)
+            ..foo match(
+                'foo': all in { ..x }
+            )
         }
     )
     "#
@@ -299,9 +299,9 @@ fn test_map_sequence_filter_in_set() {
                     .next_call(matching!(
                         eq!(&ValueCardinality::Many),
                         eq!(&Literal(indoc! { r#"
-                        (root $d)
-                        (is-entity $d def@1:2)
-                        (attr $d S:1:6 (_ 'X'))
+                            (root $d)
+                            (is-entity $d def@1:2)
+                            (attr $d S:1:6 (_ 'X'))
                         "#
                         }))
                     ))
@@ -309,12 +309,6 @@ fn test_map_sequence_filter_in_set() {
                         .value_builder(json!({ "key": "key", "foo": "x!" }))
                         .into()])),
             )
-            .assert_named_forward_map(
-                "query",
-                json!({ "input": "X", }),
-                json!([
-                    { "bar": "x!", }
-                ]),
-            );
+            .assert_named_forward_map("query", json!({ "input": "X", }), json!([{ "bar": "x!", }]));
     });
 }

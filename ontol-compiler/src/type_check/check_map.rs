@@ -24,7 +24,7 @@ use crate::{
 
 use super::{
     ena_inference::{KnownType, Strength},
-    hir_build_ctx::{CtrlFlowDepth, HirBuildCtx, PatternVariable, SeqElementGroup, ARMS},
+    hir_build_ctx::{CtrlFlowDepth, HirBuildCtx, PatternVariable, SetElementGroup, ARMS},
     hir_type_inference::{HirArmTypeInference, HirVariableMapper},
     TypeCheck, TypeEquation, TypeError,
 };
@@ -252,7 +252,7 @@ impl<'c> PreAnalyzer<'c> {
     fn analyze_arm(
         &mut self,
         pat: &Pattern,
-        parent_aggr_group: Option<SeqElementGroup>,
+        parent_aggr_group: Option<SetElementGroup>,
         ctx: &mut HirBuildCtx<'_>,
     ) -> Result<ArmAnalysis, CheckMapError> {
         let pat_id = pat.id;
@@ -281,7 +281,7 @@ impl<'c> PreAnalyzer<'c> {
                     arm_class = MapOutputClass::FindMatch;
                 }
             }
-            PatternKind::Seq { elements, .. } => {
+            PatternKind::Set { elements, .. } => {
                 let contains_iter_element = elements.iter().any(|element| element.iter);
 
                 if ctx.current_arm.is_first() {
@@ -289,7 +289,7 @@ impl<'c> PreAnalyzer<'c> {
 
                     // Register aggregation body
                     let label = Label(ctx.var_allocator.alloc().0);
-                    debug!("first arm seq: pat_id={pat_id:?}");
+                    debug!("first arm set: pat_id={pat_id:?}");
                     ctx.ctrl_flow_forest
                         .insert(label, parent_aggr_group.map(|parent| parent.label));
                     ctx.label_map.insert(pat_id, label);
@@ -299,7 +299,7 @@ impl<'c> PreAnalyzer<'c> {
                             // TODO: Skip non-iter?
                             let result = self.analyze_arm(
                                 &element.pattern,
-                                Some(SeqElementGroup {
+                                Some(SetElementGroup {
                                     label,
                                     iterated: element.iter,
                                     bind_depth: ctx.current_ctrl_flow_depth(),
@@ -344,7 +344,7 @@ impl<'c> PreAnalyzer<'c> {
                                 ctx.label_map.insert(pat_id, label);
 
                                 group_set.add(ctx.ctrl_flow_forest.find_parent(label).map(
-                                    |label| SeqElementGroup {
+                                    |label| SetElementGroup {
                                         label,
                                         iterated: true,
                                         bind_depth: outer_bind_depth,
@@ -371,7 +371,7 @@ impl<'c> PreAnalyzer<'c> {
                                     // So the logic here has to be improved.
 
                                     let label = Label(ctx.var_allocator.alloc().0);
-                                    debug!("first arm seq: pat_id={pat_id:?}");
+                                    debug!("first arm set: pat_id={pat_id:?}");
                                     ctx.ctrl_flow_forest.insert(
                                         label,
                                         parent_aggr_group.map(|parent| parent.label),
@@ -409,7 +409,7 @@ impl<'c> PreAnalyzer<'c> {
         &mut self,
         node: &RegexPatternCaptureNode,
         full_span: &SourceSpan,
-        parent_seq_element_group: Option<SeqElementGroup>,
+        parent_set_element_group: Option<SetElementGroup>,
         ctx: &mut HirBuildCtx<'_>,
     ) -> Result<AggrGroupSet, CheckMapError> {
         let mut group_set = AggrGroupSet::new();
@@ -418,7 +418,7 @@ impl<'c> PreAnalyzer<'c> {
                 self.register_variable(
                     *var,
                     name_span,
-                    parent_seq_element_group,
+                    parent_set_element_group,
                     &mut group_set,
                     ctx,
                 );
@@ -428,7 +428,7 @@ impl<'c> PreAnalyzer<'c> {
                     group_set.join(self.analyze_regex_capture_node(
                         node,
                         full_span,
-                        parent_seq_element_group,
+                        parent_set_element_group,
                         ctx,
                     )?);
                 }
@@ -438,7 +438,7 @@ impl<'c> PreAnalyzer<'c> {
                     group_set.join(self.analyze_regex_capture_node(
                         variant,
                         full_span,
-                        parent_seq_element_group,
+                        parent_set_element_group,
                         ctx,
                     )?);
                 }
@@ -449,20 +449,20 @@ impl<'c> PreAnalyzer<'c> {
                 ..
             } => {
                 if ctx.current_arm.is_first() {
-                    group_set.add(parent_seq_element_group);
+                    group_set.add(parent_set_element_group);
 
                     // Register aggregation body
                     let label = Label(ctx.var_allocator.alloc().0);
                     debug!("first arm regex repetition: pat_id={pat_id:?}");
                     ctx.ctrl_flow_forest
-                        .insert(label, parent_seq_element_group.map(|parent| parent.label));
+                        .insert(label, parent_set_element_group.map(|parent| parent.label));
                     ctx.label_map.insert(*pat_id, label);
 
                     ctx.enter_ctrl(|ctx| {
                         self.analyze_regex_capture_node(
                             inner_node,
                             full_span,
-                            Some(SeqElementGroup {
+                            Some(SetElementGroup {
                                 label,
                                 iterated: true,
                                 bind_depth: ctx.current_ctrl_flow_depth(),
@@ -480,7 +480,7 @@ impl<'c> PreAnalyzer<'c> {
                             .analyze_regex_capture_node(
                                 inner_node,
                                 full_span,
-                                parent_seq_element_group,
+                                parent_set_element_group,
                                 ctx,
                             )
                             .unwrap();
@@ -493,7 +493,7 @@ impl<'c> PreAnalyzer<'c> {
                                 ctx.label_map.insert(*pat_id, label);
 
                                 group_set.add(ctx.ctrl_flow_forest.find_parent(label).map(
-                                    |label| SeqElementGroup {
+                                    |label| SetElementGroup {
                                         label,
                                         iterated: true,
                                         bind_depth: outer_bind_depth,
@@ -525,14 +525,14 @@ impl<'c> PreAnalyzer<'c> {
         &mut self,
         var: Var,
         span: &SourceSpan,
-        parent_seq_element_group: Option<SeqElementGroup>,
+        parent_set_element_group: Option<SetElementGroup>,
         group_set: &mut AggrGroupSet,
         ctx: &mut HirBuildCtx<'_>,
     ) {
         if let Some(explicit_variable) = ctx.pattern_variables.get(&var) {
             // Variable is used more than once
             if ctx.current_arm.is_first()
-                && explicit_variable.seq_element_group != parent_seq_element_group
+                && explicit_variable.set_element_group != parent_set_element_group
             {
                 self.error(
                     CompileError::TODO(smart_format!("Incompatible aggregation group")),
@@ -542,17 +542,17 @@ impl<'c> PreAnalyzer<'c> {
 
             debug!("Join existing bound variable");
 
-            group_set.add(explicit_variable.seq_element_group);
+            group_set.add(explicit_variable.set_element_group);
         } else if ctx.current_arm.is_first() {
             ctx.pattern_variables.insert(
                 var,
                 PatternVariable {
-                    seq_element_group: parent_seq_element_group,
+                    set_element_group: parent_set_element_group,
                     hir_arms: Default::default(),
                 },
             );
 
-            group_set.add(parent_seq_element_group);
+            group_set.add(parent_set_element_group);
         } else {
             match ctx.pattern_variables.entry(var) {
                 Entry::Occupied(_occ) => {
@@ -560,10 +560,10 @@ impl<'c> PreAnalyzer<'c> {
                 }
                 Entry::Vacant(vac) => {
                     vac.insert(PatternVariable {
-                        seq_element_group: parent_seq_element_group,
+                        set_element_group: parent_set_element_group,
                         hir_arms: Default::default(),
                     });
-                    group_set.add(parent_seq_element_group);
+                    group_set.add(parent_set_element_group);
                 }
             }
         }
@@ -606,9 +606,9 @@ impl AggrGroupSet {
         self.tallest_depth = core::cmp::max(self.tallest_depth, other.tallest_depth)
     }
 
-    fn add(&mut self, seq_element_group: Option<SeqElementGroup>) {
-        self.set.insert(seq_element_group.map(|group| group.label));
-        if let Some(group) = seq_element_group {
+    fn add(&mut self, set_element_group: Option<SetElementGroup>) {
+        self.set.insert(set_element_group.map(|group| group.label));
+        if let Some(group) = set_element_group {
             if group.iterated {
                 self.iterated = true;
             }

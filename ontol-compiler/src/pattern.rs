@@ -35,10 +35,10 @@ pub enum PatternKind {
         is_unit_binding: bool,
         attributes: Box<[CompoundPatternAttr]>,
     },
-    /// Expression enclosed in sequence brackets: `[expr]`
-    Seq {
+    /// Expression enclosed in set-notation braces: `{expr..}`
+    Set {
         val_type_def: Option<DefId>,
-        elements: Vec<SeqPatternElement>,
+        elements: Vec<SetPatternElement>,
     },
     Variable(Var),
     ConstI64(i64),
@@ -60,7 +60,7 @@ pub struct CompoundPatternAttr {
 }
 
 #[derive(Debug)]
-pub struct SeqPatternElement {
+pub struct SetPatternElement {
     pub iter: bool,
     pub pattern: Pattern,
 }

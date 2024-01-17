@@ -79,7 +79,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                     self.infer_attr(pattern_attr, target_def_id, source_vars);
                 }
             }
-            PatternKind::Seq { .. } => todo!(),
+            PatternKind::Set { .. } => todo!(),
             PatternKind::Variable(_) => todo!(),
             PatternKind::ConstI64(_) => todo!(),
             PatternKind::ConstText(_) => todo!(),
@@ -138,7 +138,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                 }
             }
             PatternKind::Compound { .. } => todo!(),
-            PatternKind::Seq { .. } => todo!(),
+            PatternKind::Set { .. } => todo!(),
             PatternKind::ConstI64(_) => todo!(),
             PatternKind::Regex(_) => todo!(),
             PatternKind::ConstText(_) => todo!(),
@@ -234,7 +234,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                     }
                 }
             }
-            PatternKind::Seq { elements, .. } => {
+            PatternKind::Set { elements, .. } => {
                 for element in elements {
                     self.scan_source_variables(&element.pattern, output);
                 }
@@ -279,7 +279,7 @@ impl<'m> Compiler<'m> {
                     TypePath::Specified { def_id, .. } => InfStatus::Source(*def_id),
                     _ => InfStatus::Invalid,
                 },
-                PatternKind::Seq { elements, .. } => {
+                PatternKind::Set { elements, .. } => {
                     if elements.len() != 1 {
                         return InfStatus::Invalid;
                     }

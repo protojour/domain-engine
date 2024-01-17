@@ -101,7 +101,7 @@ pub enum MapArm {
     // `x: y` syntax
     Binding {
         path: Spanned<Path>,
-        pattern: ExprOrSeqPattern,
+        pattern: ExprOrSetPattern,
     },
     // `x {}` syntax
     Struct(StructPattern),
@@ -110,22 +110,16 @@ pub enum MapArm {
 /// A pattern is either `struct {}` or leaf expr.
 /// An expr cannot contain another struct pattern.
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub enum ExprOrStructOrSeqPattern {
+pub enum ExprOrStructOrSetPattern {
     Expr(Spanned<ExprPattern>),
     Struct(Spanned<StructPattern>),
-    Seq(Vec<Spanned<SeqPatternElement>>),
+    Set(Vec<Spanned<SetPatternElement>>),
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub enum ExprOrSeqPattern {
+pub enum ExprOrSetPattern {
     Expr(Spanned<ExprPattern>),
-    Seq(Vec<Spanned<SeqPatternElement>>),
-}
-
-#[derive(Clone, Copy, Eq, PartialEq, Debug)]
-pub enum UnitOrSeq {
-    Unit,
-    Seq,
+    Set(Vec<Spanned<SetPatternElement>>),
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -146,14 +140,14 @@ pub struct StructPatternAttr {
     pub relation: Spanned<Type>,
     pub relation_attrs: Option<Spanned<Vec<Spanned<StructPatternAttr>>>>,
     pub option: Option<Spanned<()>>,
-    pub object: Spanned<ExprOrStructOrSeqPattern>,
+    pub object: Spanned<ExprOrStructOrSetPattern>,
 }
 
-/// items within `[]`
+/// items within `{}`
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct SeqPatternElement {
+pub struct SetPatternElement {
     pub spread: Option<Span>,
-    pub pattern: Spanned<ExprOrStructOrSeqPattern>,
+    pub pattern: Spanned<ExprOrStructOrSetPattern>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -172,7 +166,7 @@ pub enum ExprPattern {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum TypeOrPattern {
     Type(Type),
-    Pattern(ExprOrStructOrSeqPattern),
+    Pattern(ExprOrStructOrSetPattern),
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]

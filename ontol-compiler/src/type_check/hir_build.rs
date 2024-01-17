@@ -239,7 +239,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             (
-                PatternKind::Seq {
+                PatternKind::Set {
                     val_type_def,
                     elements,
                 },
@@ -527,7 +527,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         ctx.pattern_variables.insert(
                             edge_var,
                             PatternVariable {
-                                seq_element_group: None,
+                                set_element_group: None,
                                 hir_arms: Default::default(),
                             },
                         );
@@ -549,7 +549,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ctx,
                 )
             }
-            PatternKind::Seq { elements, .. } => {
+            PatternKind::Set { elements, .. } => {
                 // FIXME: Unsure how correct this is:
                 for element in elements {
                     let node = self.build_implicit_rel_node(ty, &element.pattern, prop_span, ctx);

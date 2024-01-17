@@ -23,7 +23,7 @@ use crate::{
     package::{PackageReference, ONTOL_PKG},
     pattern::{
         CompoundPatternAttr, CompoundPatternModifier, PatId, Pattern, PatternKind,
-        SeqPatternElement, TypePath,
+        SetPatternElement, TypePath,
     },
     regex_util::RegexToPatternLowerer,
     Compiler, Src,
@@ -672,11 +672,11 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 self.lower_struct_pattern((ast, span.clone()), var_table)?
             }
             ast::MapArm::Binding { path, pattern } => match pattern {
-                ast::ExprOrSeqPattern::Expr(ast) => {
+                ast::ExprOrSetPattern::Expr(ast) => {
                     self.lower_map_expr_binding(path, ast, span.clone(), var_table)?
                 }
-                ast::ExprOrSeqPattern::Seq(ast_elements) => {
-                    self.lower_seq_pattern(Some(path), ast_elements, span, var_table)?
+                ast::ExprOrSetPattern::Set(ast_elements) => {
+                    self.lower_set_pattern(Some(path), ast_elements, span, var_table)?
                 }
             },
         };
@@ -817,26 +817,26 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
     fn lower_expr_or_struct_or_seq_pattern(
         &mut self,
-        (ast, span): (ast::ExprOrStructOrSeqPattern, Span),
+        (ast, span): (ast::ExprOrStructOrSetPattern, Span),
         var_table: &mut MapVarTable,
     ) -> Res<Pattern> {
         match ast {
-            ast::ExprOrStructOrSeqPattern::Expr((ast, _)) => {
+            ast::ExprOrStructOrSetPattern::Expr((ast, _)) => {
                 self.lower_expr_pattern((ast, span), var_table)
             }
-            ast::ExprOrStructOrSeqPattern::Struct((ast, span)) => {
+            ast::ExprOrStructOrSetPattern::Struct((ast, span)) => {
                 self.lower_struct_pattern((ast, span), var_table)
             }
-            ast::ExprOrStructOrSeqPattern::Seq(ast_elements) => {
-                self.lower_seq_pattern(None, ast_elements, span, var_table)
+            ast::ExprOrStructOrSetPattern::Set(ast_elements) => {
+                self.lower_set_pattern(None, ast_elements, span, var_table)
             }
         }
     }
 
-    fn lower_seq_pattern(
+    fn lower_set_pattern(
         &mut self,
         type_path: Option<(ast::Path, Span)>,
-        ast_elements: Vec<(ast::SeqPatternElement, Span)>,
+        ast_elements: Vec<(ast::SetPatternElement, Span)>,
         span: Span,
         var_table: &mut MapVarTable,
     ) -> Res<Pattern> {
@@ -857,14 +857,14 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 (ast_element.pattern.0, ast_element.pattern.1),
                 var_table,
             )?;
-            pattern_elements.push(SeqPatternElement {
+            pattern_elements.push(SetPatternElement {
                 iter: ast_element.spread.is_some(),
                 pattern,
             })
         }
 
         Ok(self.mk_pattern(
-            PatternKind::Seq {
+            PatternKind::Set {
                 val_type_def: seq_type,
                 elements: pattern_elements,
             },

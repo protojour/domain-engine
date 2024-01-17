@@ -323,7 +323,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 })
             }
             ValueCardinality::Many => match &value.kind {
-                PatternKind::Seq { elements, .. } => {
+                PatternKind::Set { elements, .. } => {
                     let mut hir_elements = Vec::with_capacity(elements.len());
                     for element in elements {
                         let val_node = self.build_node(
