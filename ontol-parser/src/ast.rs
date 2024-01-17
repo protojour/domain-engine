@@ -101,23 +101,24 @@ pub enum MapArm {
     // `x: y` syntax
     Binding {
         path: Spanned<Path>,
-        pattern: ExprOrSetPattern,
+        pattern: RootBindingPattern,
     },
     // `x {}` syntax
     Struct(StructPattern),
 }
 
-/// A pattern is either `struct {}` or leaf expr.
+/// A pattern is either `struct()` or leaf expr.
 /// An expr cannot contain another struct pattern.
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub enum ExprOrStructOrSetPattern {
+pub enum AnyPattern {
     Expr(Spanned<ExprPattern>),
     Struct(Spanned<StructPattern>),
     Set(Vec<Spanned<SetPatternElement>>),
+    SetAlgebra(Spanned<SetAlgebraPattern>),
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub enum ExprOrSetPattern {
+pub enum RootBindingPattern {
     Expr(Spanned<ExprPattern>),
     Set(Vec<Spanned<SetPatternElement>>),
 }
@@ -140,14 +141,36 @@ pub struct StructPatternAttr {
     pub relation: Spanned<Type>,
     pub relation_attrs: Option<Spanned<Vec<Spanned<StructPatternAttr>>>>,
     pub option: Option<Spanned<()>>,
-    pub object: Spanned<ExprOrStructOrSetPattern>,
+    pub object: Spanned<AnyPattern>,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct SetAlgebraPattern {
+    pub operator: Spanned<SetAlgebraicOperator>,
+    pub elements: Vec<Spanned<SetPatternElement>>,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub enum SetAlgebraicOperator {
+    /// element: IN set
+    In,
+    /// set: CONTAINS element
+    Contains,
+    /// set: ALL IN set
+    AllIn,
+    /// set: CONTAINS ALL set
+    ContainsAll,
+    /// set: INTERSECTS set
+    Intersects,
+    /// set: EQUALS set
+    Equals,
 }
 
 /// items within `{}`
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct SetPatternElement {
     pub spread: Option<Span>,
-    pub pattern: Spanned<ExprOrStructOrSetPattern>,
+    pub pattern: Spanned<AnyPattern>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -166,7 +189,7 @@ pub enum ExprPattern {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum TypeOrPattern {
     Type(Type),
-    Pattern(ExprOrStructOrSetPattern),
+    Pattern(AnyPattern),
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]

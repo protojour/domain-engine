@@ -286,7 +286,7 @@ fn test_map_sequence_filter_in_set() {
         ('input': {..x}),
         bar: {
             ..foo match(
-                'foo': all in { ..x }
+                'foo': in { ..x }
             )
         }
     )

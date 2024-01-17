@@ -5,9 +5,9 @@ use either::Either;
 use smartstring::alias::String;
 
 use crate::ast::{
-    Dot, ExprOrSetPattern, ExprOrStructOrSetPattern, ExprPattern, FmtStatement, MapArm, Path,
-    SetPatternElement, StructPattern, StructPatternAttr, StructPatternModifier, TypeOrPattern,
-    UseStatement,
+    AnyPattern, Dot, ExprPattern, FmtStatement, MapArm, Path, RootBindingPattern,
+    SetAlgebraPattern, SetAlgebraicOperator, SetPatternElement, StructPattern, StructPatternAttr,
+    StructPatternModifier, TypeOrPattern, UseStatement,
 };
 
 use super::{
@@ -120,7 +120,7 @@ fn rel_statement(
                 (unit_or_seq, (opt_ty.map_right(TypeOrPattern::Type), span))
             })
             .or(
-                sigil('=').ignore_then(spanned(pattern()).map(|(pat, span)| {
+                sigil('=').ignore_then(spanned(any_pattern()).map(|(pat, span)| {
                     (
                         UnitOrSet::Unit,
                         (Either::Right(TypeOrPattern::Pattern(pat)), span),
@@ -295,36 +295,37 @@ fn map_statement() -> impl AstParser<MapStatement> {
 }
 
 fn map_arm() -> impl AstParser<MapArm> {
-    let struct_arm = parenthesized_struct_pattern(pattern()).map(MapArm::Struct);
+    let struct_arm = parenthesized_struct_pattern(any_pattern()).map(MapArm::Struct);
     let binding_arm = spanned(path())
         .then_ignore(colon())
         .then(
             expr_pattern()
-                .map(ExprOrSetPattern::Expr)
-                .or(seq_pattern(pattern()).map(ExprOrSetPattern::Set)),
+                .map(RootBindingPattern::Expr)
+                .or(set_pattern(any_pattern()).map(RootBindingPattern::Set)),
         )
         .map(|(path, pattern)| MapArm::Binding { path, pattern });
 
     struct_arm.or(binding_arm)
 }
 
-fn pattern() -> impl AstParser<ExprOrStructOrSetPattern> {
-    recursive(|pattern| {
-        spanned(parenthesized_struct_pattern(pattern.clone()))
-            .map(ExprOrStructOrSetPattern::Struct)
-            .or(seq_pattern(pattern).map(ExprOrStructOrSetPattern::Set))
-            .or(expr_pattern().map(|(expr, span)| ExprOrStructOrSetPattern::Expr((expr, span))))
+fn any_pattern() -> impl AstParser<AnyPattern> {
+    recursive(|this| {
+        spanned(parenthesized_struct_pattern(this.clone()))
+            .map(AnyPattern::Struct)
+            .or(set_pattern(this.clone()).map(AnyPattern::Set))
+            .or(set_algebra_pattern(this).map(AnyPattern::SetAlgebra))
+            .or(expr_pattern().map(AnyPattern::Expr))
     })
 }
 
 fn parenthesized_struct_pattern(
-    pattern: impl AstParser<ExprOrStructOrSetPattern> + Clone + 'static,
+    any_pattern: impl AstParser<AnyPattern> + Clone + 'static,
 ) -> impl AstParser<StructPattern> {
     spanned(path())
         .or_not()
         .then(struct_pattern_modifier().or_not())
         .then(
-            spanned(struct_pattern_attr(pattern))
+            spanned(struct_pattern_attr(any_pattern))
                 .separated_by(sigil(','))
                 .allow_trailing()
                 .delimited_by(open('('), close(')')),
@@ -342,7 +343,7 @@ fn struct_pattern_modifier() -> impl AstParser<Spanned<StructPatternModifier>> {
 }
 
 fn struct_pattern_attr(
-    pattern: impl AstParser<ExprOrStructOrSetPattern> + Clone + 'static,
+    pattern: impl AstParser<AnyPattern> + Clone + 'static,
 ) -> impl AstParser<StructPatternAttr> {
     recursive(|struct_pattern_attr| {
         spanned(named_type())
@@ -368,13 +369,13 @@ fn struct_pattern_attr(
     })
 }
 
-fn seq_pattern(
-    pattern: impl AstParser<ExprOrStructOrSetPattern> + Clone + 'static,
+fn set_pattern(
+    any_pattern: impl AstParser<AnyPattern> + Clone + 'static,
 ) -> impl AstParser<Vec<Spanned<SetPatternElement>>> {
     spanned(
         spanned(dot_dot())
             .or_not()
-            .then(spanned(pattern))
+            .then(spanned(any_pattern))
             .map(|(spread, pattern)| SetPatternElement {
                 spread: spread.map(|(_, span)| span),
                 pattern,
@@ -434,6 +435,32 @@ fn expr_pattern() -> impl AstParser<Spanned<ExprPattern>> {
             })
     })
     .labelled("expression pattern")
+}
+
+fn set_algebra_pattern(
+    any_pattern: impl AstParser<AnyPattern> + Clone + 'static,
+) -> impl AstParser<Spanned<SetAlgebraPattern>> {
+    spanned(
+        set_algebraic_operator()
+            .then(set_pattern(any_pattern))
+            .map(|(operator, elements)| SetAlgebraPattern { operator, elements }),
+    )
+}
+
+fn set_algebraic_operator() -> impl AstParser<Spanned<SetAlgebraicOperator>> {
+    spanned(
+        kw_in()
+            .map(|_| SetAlgebraicOperator::In)
+            .or(kw_contains()
+                .then_ignore(kw_all())
+                .map(|_| SetAlgebraicOperator::ContainsAll))
+            .or(kw_contains().map(|_| SetAlgebraicOperator::Contains))
+            .or(kw_all()
+                .then_ignore(kw_in())
+                .map(|_| SetAlgebraicOperator::AllIn))
+            .or(kw_intersects().map(|_| SetAlgebraicOperator::Intersects))
+            .or(kw_equals().map(|_| SetAlgebraicOperator::Equals)),
+    )
 }
 
 fn spanned_named_type_or_dot() -> impl AstParser<Spanned<Either<Dot, Type>>> {
@@ -540,6 +567,26 @@ fn sym(str: &'static str, label: &'static str) -> impl AstParser<String> {
                 Err(Simple::custom(span, format!("expected `{str}`")))
             }
         })
+}
+
+fn kw_in() -> impl AstParser<()> {
+    sym("in", "`in`").ignored()
+}
+
+fn kw_contains() -> impl AstParser<()> {
+    sym("contains", "`contains`").ignored()
+}
+
+fn kw_all() -> impl AstParser<()> {
+    sym("all", "`all`").ignored()
+}
+
+fn kw_intersects() -> impl AstParser<()> {
+    sym("intersects", "`intersects`").ignored()
+}
+
+fn kw_equals() -> impl AstParser<()> {
+    sym("equals", "`equals`").ignored()
 }
 
 fn sym_set(set: &'static [&'static str], label: &'static str) -> impl AstParser<String> {

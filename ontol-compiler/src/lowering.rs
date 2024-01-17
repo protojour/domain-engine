@@ -252,10 +252,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
             )?,
             Either::Right(ast::TypeOrPattern::Pattern(ast_pattern)) => {
                 let mut var_table = MapVarTable::default();
-                let pattern = self.lower_expr_or_struct_or_seq_pattern(
-                    (ast_pattern, object_span.clone()),
-                    &mut var_table,
-                )?;
+                let pattern =
+                    self.lower_any_pattern((ast_pattern, object_span.clone()), &mut var_table)?;
                 let pat_id = self.compiler.patterns.alloc_pat_id();
                 self.compiler.patterns.table.insert(pat_id, pattern);
 
@@ -672,10 +670,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 self.lower_struct_pattern((ast, span.clone()), var_table)?
             }
             ast::MapArm::Binding { path, pattern } => match pattern {
-                ast::ExprOrSetPattern::Expr(ast) => {
+                ast::RootBindingPattern::Expr(ast) => {
                     self.lower_map_expr_binding(path, ast, span.clone(), var_table)?
                 }
-                ast::ExprOrSetPattern::Set(ast_elements) => {
+                ast::RootBindingPattern::Set(ast_elements) => {
                     self.lower_set_pattern(Some(path), ast_elements, span, var_table)?
                 }
             },
@@ -778,8 +776,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                 let def = self.resolve_type_reference(relation.0, &relation.1, None)?;
 
-                let object_pattern =
-                    self.lower_expr_or_struct_or_seq_pattern((object, object_span), var_table);
+                let object_pattern = self.lower_any_pattern((object, object_span), var_table);
                 let rel = match relation_attrs {
                     Some((attrs, span)) => {
                         // Inherit modifier from object pattern
@@ -815,21 +812,23 @@ impl<'s, 'm> Lowering<'s, 'm> {
             .collect()
     }
 
-    fn lower_expr_or_struct_or_seq_pattern(
+    fn lower_any_pattern(
         &mut self,
-        (ast, span): (ast::ExprOrStructOrSetPattern, Span),
+        (ast, span): (ast::AnyPattern, Span),
         var_table: &mut MapVarTable,
     ) -> Res<Pattern> {
         match ast {
-            ast::ExprOrStructOrSetPattern::Expr((ast, _)) => {
-                self.lower_expr_pattern((ast, span), var_table)
-            }
-            ast::ExprOrStructOrSetPattern::Struct((ast, span)) => {
+            ast::AnyPattern::Expr((ast, _)) => self.lower_expr_pattern((ast, span), var_table),
+            ast::AnyPattern::Struct((ast, span)) => {
                 self.lower_struct_pattern((ast, span), var_table)
             }
-            ast::ExprOrStructOrSetPattern::Set(ast_elements) => {
+            ast::AnyPattern::Set(ast_elements) => {
                 self.lower_set_pattern(None, ast_elements, span, var_table)
             }
+            ast::AnyPattern::SetAlgebra((_ast, span)) => Err((
+                CompileError::TODO(smart_format!("set algebra not supported yet")),
+                span.clone(),
+            )),
         }
     }
 
@@ -853,10 +852,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
         let mut pattern_elements = Vec::with_capacity(ast_elements.len());
         for (ast_element, _element_span) in ast_elements {
-            let pattern = self.lower_expr_or_struct_or_seq_pattern(
-                (ast_element.pattern.0, ast_element.pattern.1),
-                var_table,
-            )?;
+            let pattern =
+                self.lower_any_pattern((ast_element.pattern.0, ast_element.pattern.1), var_table)?;
             pattern_elements.push(SetPatternElement {
                 iter: ast_element.spread.is_some(),
                 pattern,
