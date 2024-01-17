@@ -201,6 +201,9 @@ pub enum Kind<'a, L: Lang> {
     ),
     /// A regex matcher/unpacker
     MatchRegex(Iter, Var, DefId, Vec<CaptureMatchArm<'a, L>>),
+    /// The "closure" part is that the _left_ operand is the owner of the node, i.e. given by context,
+    /// The _right_ operand is contained inside
+    PredicateClosure1(BoolBinaryOp, Node),
     PushCondClause(Var, Clause<EvalCondTerm>),
 }
 
@@ -255,6 +258,16 @@ pub enum EvalCondTerm {
     QuoteVar(Var),
     /// Evaluate var into a CondTerm::Value
     Eval(Node),
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum BoolBinaryOp {
+    ContainsElement,
+    ElementIn,
+    AllInSet,
+    SetContainsAll,
+    SetIntersects,
+    SetEquals,
 }
 
 #[derive(Debug)]

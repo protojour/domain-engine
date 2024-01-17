@@ -1,15 +1,18 @@
 use fnv::FnvHashMap;
+use indexmap::IndexMap;
 use ontol_runtime::{
     ontology::{PropertyCardinality, ValueCardinality},
     smart_format,
+    value::PropertyId,
     var::Var,
     DefId,
 };
+use tracing::info;
 
 use crate::{
     def::{Def, DefKind, Defs, LookupRelationshipMeta, RelParams, Relationship},
-    pattern::{CompoundPatternAttr, PatId, Pattern, PatternKind, Patterns, TypePath},
-    relation::Relations,
+    pattern::{PatId, Pattern, PatternKind, Patterns, TypePath},
+    relation::{Property, Relations},
     CompileError, CompileErrors, Compiler, SourceSpan, SpannedCompileError,
 };
 
@@ -21,9 +24,16 @@ pub struct MapArmTypeInferred {
     pub source: (PatId, DefId),
 }
 
+#[derive(Debug)]
 struct VarRelationship {
     val_def_id: DefId,
-    bind_option: bool,
+    flags: VarFlags,
+}
+
+#[derive(Default, Clone, Copy, PartialEq, Debug)]
+struct VarFlags {
+    is_option: bool,
+    is_set: bool,
 }
 
 pub struct MapArmDefInferencer<'c, 'm> {
@@ -45,7 +55,11 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
             .table_mut();
 
         let mut source_variables = Default::default();
-        self.scan_source_variables(self.get_pattern(info.source.0), &mut source_variables);
+        self.scan_source_variables(
+            self.get_pattern(info.source.0),
+            VarFlags::default(),
+            &mut source_variables,
+        );
 
         self.traverse_pattern(target_pattern, info.target.1, &source_variables);
         std::mem::take(&mut self.new_defs)
@@ -76,7 +90,16 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                 }
 
                 for pattern_attr in attributes.iter() {
-                    self.infer_attr(pattern_attr, target_def_id, source_vars);
+                    self.infer_attr_sub_pat(
+                        &pattern_attr.value,
+                        VarFlags {
+                            is_option: pattern_attr.bind_option,
+                            is_set: false,
+                        },
+                        pattern_attr.key.0,
+                        target_def_id,
+                        source_vars,
+                    );
                 }
             }
             PatternKind::Set { .. } => todo!(),
@@ -84,40 +107,47 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
             PatternKind::ConstI64(_) => todo!(),
             PatternKind::ConstText(_) => todo!(),
             PatternKind::Regex(_) => todo!(),
+            PatternKind::ContainsElement(_) => todo!(),
+            PatternKind::SetOperator { .. } => todo!(),
         }
     }
 
-    fn infer_attr(
+    fn infer_attr_sub_pat(
         &mut self,
-        pattern_attr: &CompoundPatternAttr,
+        pattern: &Pattern,
+        flags: VarFlags,
+        relation_def_id: DefId,
         parent_def_id: DefId,
         source_vars: &FnvHashMap<Var, Vec<VarRelationship>>,
     ) {
-        match &pattern_attr.value.kind {
+        match &pattern.kind {
             PatternKind::Call(_, _) => self.error(
                 CompileError::TODO(smart_format!("Not inferrable")),
-                &pattern_attr.value.span,
+                &pattern.span,
             ),
             PatternKind::Variable(var) => {
                 if let Some(var_relationship) =
-                    self.find_source_var_relationship(source_vars, *var, &pattern_attr.value.span)
+                    self.find_source_var_relationship(source_vars, *var, &pattern.span)
                 {
-                    if pattern_attr.bind_option != var_relationship.bind_option {
-                        self.error(
-                            CompileError::InferenceCardinalityMismatch,
-                            &pattern_attr.value.span,
-                        );
+                    if flags != var_relationship.flags {
+                        self.error(CompileError::InferenceCardinalityMismatch, &pattern.span);
                     }
 
+                    let value_cardinality = if flags.is_set {
+                        ValueCardinality::Many
+                    } else {
+                        ValueCardinality::One
+                    };
+
                     let relationship = Relationship {
-                        relation_def_id: pattern_attr.key.0,
-                        subject: (parent_def_id, pattern_attr.value.span),
-                        subject_cardinality: if pattern_attr.bind_option {
-                            (PropertyCardinality::Optional, ValueCardinality::One)
+                        relation_def_id,
+                        subject: (parent_def_id, pattern.span),
+                        subject_cardinality: if flags.is_option {
+                            (PropertyCardinality::Optional, value_cardinality)
                         } else {
-                            (PropertyCardinality::Mandatory, ValueCardinality::One)
+                            (PropertyCardinality::Mandatory, value_cardinality)
                         },
-                        object: (var_relationship.val_def_id, pattern_attr.value.span),
+                        object: (var_relationship.val_def_id, pattern.span),
                         object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
                         object_prop: None,
                         rel_params: RelParams::Unit,
@@ -130,18 +160,38 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                             id: relationship_id,
                             package: self.map_def_id.package_id(),
                             kind: DefKind::Relationship(relationship),
-                            span: pattern_attr.value.span,
+                            span: pattern.span,
                         },
                     );
 
                     self.new_defs.push(relationship_id);
                 }
             }
-            PatternKind::Compound { .. } => todo!(),
-            PatternKind::Set { .. } => todo!(),
+            PatternKind::Compound { .. } => {
+                self.error(
+                    CompileError::TODO(smart_format!("Recursive compounds not supported")),
+                    &pattern.span,
+                );
+            }
+            PatternKind::Set { elements, .. } => {
+                for element in elements {
+                    self.infer_attr_sub_pat(
+                        &element.pattern,
+                        VarFlags {
+                            is_set: true,
+                            ..flags
+                        },
+                        relation_def_id,
+                        parent_def_id,
+                        source_vars,
+                    );
+                }
+            }
             PatternKind::ConstI64(_) => todo!(),
             PatternKind::Regex(_) => todo!(),
             PatternKind::ConstText(_) => todo!(),
+            PatternKind::ContainsElement(_) => todo!(),
+            PatternKind::SetOperator { .. } => todo!(),
         }
     }
 
@@ -180,6 +230,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
     fn scan_source_variables(
         &self,
         pattern: &Pattern,
+        flags: VarFlags,
         output: &mut FnvHashMap<Var, Vec<VarRelationship>>,
     ) {
         match &pattern.kind {
@@ -200,48 +251,107 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                     return;
                 };
                 for attr in attributes.iter() {
-                    match &attr.value.kind {
-                        PatternKind::Compound { .. } => {
-                            if let Some(rel) = &attr.rel {
-                                self.scan_source_variables(rel, output);
-                            }
-                            self.scan_source_variables(&attr.value, output);
-                        }
-                        PatternKind::Variable(pat_var) => {
-                            let Some((prop_id, found_relationship_meta)) =
-                                table.iter().find_map(|(prop_id, _property)| {
-                                    let meta = self.defs.relationship_meta(prop_id.relationship_id);
-                                    if meta.relationship.relation_def_id == attr.key.0 {
-                                        Some((*prop_id, meta))
-                                    } else {
-                                        None
-                                    }
-                                })
-                            else {
-                                continue;
-                            };
-
-                            let (val_def_id, _cardinality, _) = found_relationship_meta
-                                .relationship
-                                .by(prop_id.role.opposite());
-
-                            output.entry(*pat_var).or_default().push(VarRelationship {
-                                val_def_id,
-                                bind_option: attr.bind_option,
-                            });
-                        }
-                        _ => {}
+                    if let Some(rel) = &attr.rel {
+                        self.scan_source_variables(rel, VarFlags::default(), output);
                     }
+
+                    self.scan_compound_attr_sub_pattern_source_variables(
+                        &attr.value,
+                        attr.key.0,
+                        VarFlags {
+                            is_option: attr.bind_option,
+                            is_set: false,
+                        },
+                        table,
+                        output,
+                    );
                 }
             }
             PatternKind::Set { elements, .. } => {
                 for element in elements {
-                    self.scan_source_variables(&element.pattern, output);
+                    self.scan_source_variables(
+                        &element.pattern,
+                        VarFlags {
+                            is_set: true,
+                            ..flags
+                        },
+                        output,
+                    );
                 }
             }
             PatternKind::ConstI64(_) => {}
             PatternKind::Regex(_) => {}
             PatternKind::ConstText(_) => {}
+            PatternKind::ContainsElement(pattern) => {
+                self.scan_source_variables(pattern, flags, output);
+            }
+            PatternKind::SetOperator { element, .. } => {
+                self.scan_source_variables(
+                    &element.pattern,
+                    VarFlags {
+                        is_set: true,
+                        ..flags
+                    },
+                    output,
+                );
+            }
+        }
+    }
+
+    fn scan_compound_attr_sub_pattern_source_variables(
+        &self,
+        pattern: &Pattern,
+        attr_relation_id: DefId,
+        flags: VarFlags,
+        parent_table: &IndexMap<PropertyId, Property>,
+        output: &mut FnvHashMap<Var, Vec<VarRelationship>>,
+    ) {
+        match &pattern.kind {
+            PatternKind::Compound { .. } => {
+                self.scan_source_variables(pattern, flags, output);
+            }
+            PatternKind::Variable(pat_var) => {
+                let Some((prop_id, found_relationship_meta)) =
+                    parent_table.iter().find_map(|(prop_id, _property)| {
+                        let meta = self.defs.relationship_meta(prop_id.relationship_id);
+                        if meta.relationship.relation_def_id == attr_relation_id {
+                            Some((*prop_id, meta))
+                        } else {
+                            None
+                        }
+                    })
+                else {
+                    return;
+                };
+
+                let (val_def_id, _cardinality, _) = found_relationship_meta
+                    .relationship
+                    .by(prop_id.role.opposite());
+
+                output
+                    .entry(*pat_var)
+                    .or_default()
+                    .push(VarRelationship { val_def_id, flags });
+            }
+            PatternKind::SetOperator { element, .. } => {
+                if element.iter {
+                    self.scan_compound_attr_sub_pattern_source_variables(
+                        &element.pattern,
+                        attr_relation_id,
+                        VarFlags {
+                            is_set: true,
+                            ..flags
+                        },
+                        parent_table,
+                        output,
+                    );
+                } else {
+                    info!("Skipping !iter set operator element");
+                }
+            }
+            other => {
+                info!("Skipping a pattern: {other:?}");
+            }
         }
     }
 

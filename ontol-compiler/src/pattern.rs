@@ -44,6 +44,11 @@ pub enum PatternKind {
     ConstI64(i64),
     ConstText(String),
     Regex(RegexPattern),
+    ContainsElement(Box<Pattern>),
+    SetOperator {
+        operator: SetBinaryOperator,
+        element: Box<SetPatternElement>,
+    },
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -63,6 +68,16 @@ pub struct CompoundPatternAttr {
 pub struct SetPatternElement {
     pub iter: bool,
     pub pattern: Pattern,
+}
+
+/// Binary operator that accepts a set on its right hand side
+#[derive(Debug)]
+pub enum SetBinaryOperator {
+    ElementIn,
+    AllIn,
+    ContainsAll,
+    Intersects,
+    SetEquals,
 }
 
 #[derive(Debug)]

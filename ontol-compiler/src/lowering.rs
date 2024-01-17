@@ -23,7 +23,7 @@ use crate::{
     package::{PackageReference, ONTOL_PKG},
     pattern::{
         CompoundPatternAttr, CompoundPatternModifier, PatId, Pattern, PatternKind,
-        SetPatternElement, TypePath,
+        SetBinaryOperator, SetPatternElement, TypePath,
     },
     regex_util::RegexToPatternLowerer,
     Compiler, Src,
@@ -825,10 +825,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ast::AnyPattern::Set(ast_elements) => {
                 self.lower_set_pattern(None, ast_elements, span, var_table)
             }
-            ast::AnyPattern::SetAlgebra((_ast, span)) => Err((
-                CompileError::TODO(smart_format!("set algebra not supported yet")),
-                span.clone(),
-            )),
+            ast::AnyPattern::SetAlgebra((ast, span)) => {
+                self.lower_set_algebra_pattern(ast, span, var_table)
+            }
         }
     }
 
@@ -864,6 +863,54 @@ impl<'s, 'm> Lowering<'s, 'm> {
             PatternKind::Set {
                 val_type_def: seq_type,
                 elements: pattern_elements,
+            },
+            &span,
+        ))
+    }
+
+    fn lower_set_algebra_pattern(
+        &mut self,
+        alg_pattern: ast::SetAlgebraPattern,
+        span: Span,
+        var_table: &mut MapVarTable,
+    ) -> Res<Pattern> {
+        if alg_pattern.elements.len() != 1 {
+            return Err((
+                CompileError::TODO(smart_format!("inner set must have one element")),
+                span.clone(),
+            ));
+        }
+
+        let (ast_pattern, _) = alg_pattern.elements.into_iter().next().unwrap();
+        let iter = ast_pattern.spread.is_some();
+
+        let pattern = self.lower_any_pattern(ast_pattern.pattern, var_table)?;
+
+        Ok(self.mk_pattern(
+            match alg_pattern.operator.0 {
+                ast::SetAlgebraicOperator::Contains => {
+                    PatternKind::ContainsElement(Box::new(pattern))
+                }
+                ast::SetAlgebraicOperator::In => PatternKind::SetOperator {
+                    operator: SetBinaryOperator::ElementIn,
+                    element: Box::new(SetPatternElement { iter, pattern }),
+                },
+                ast::SetAlgebraicOperator::AllIn => PatternKind::SetOperator {
+                    operator: SetBinaryOperator::AllIn,
+                    element: Box::new(SetPatternElement { iter, pattern }),
+                },
+                ast::SetAlgebraicOperator::ContainsAll => PatternKind::SetOperator {
+                    operator: SetBinaryOperator::ContainsAll,
+                    element: Box::new(SetPatternElement { iter, pattern }),
+                },
+                ast::SetAlgebraicOperator::Intersects => PatternKind::SetOperator {
+                    operator: SetBinaryOperator::Intersects,
+                    element: Box::new(SetPatternElement { iter, pattern }),
+                },
+                ast::SetAlgebraicOperator::Equals => PatternKind::SetOperator {
+                    operator: SetBinaryOperator::SetEquals,
+                    element: Box::new(SetPatternElement { iter, pattern }),
+                },
             },
             &span,
         ))

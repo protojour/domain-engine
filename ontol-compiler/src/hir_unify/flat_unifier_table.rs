@@ -419,13 +419,13 @@ fn selector_predicate(selector: ExprSelector, assignment: &Assignment) -> bool {
 
     match (selector, assignment.expr.kind()) {
         (Sel::Struct(struct_var, _), EKind::Prop(prop)) => prop.struct_var == struct_var,
-        (Sel::Struct(_, scope_var), EKind::SeqItem(label, _, iter, _)) => {
+        (Sel::Struct(_, scope_var), EKind::SetElement(label, _, iter, _)) => {
             scope_var.0 .0 == label.0 && !iter.0
         }
-        (Sel::SeqItem(selector_label), EKind::SeqItem(item_label, ..)) => {
+        (Sel::SeqItem(selector_label), EKind::SetElement(item_label, ..)) => {
             item_label == &selector_label
         }
-        (_, EKind::SeqItem(..)) => false,
+        (_, EKind::SetElement(..)) => false,
         (Sel::SeqItem(_), EKind::Prop(_)) => false,
         (Sel::Any, _) => true,
         _ => false,

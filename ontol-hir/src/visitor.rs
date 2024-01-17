@@ -177,6 +177,9 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                     self.visit_capture_match_arm(index, arm, arena);
                 }
             }
+            Kind::PredicateClosure1(_, node) => {
+                self.visit_node(0, arena.node_ref(*node));
+            }
             Kind::PushCondClause(var, _) => {
                 self.visit_var(*var);
             }

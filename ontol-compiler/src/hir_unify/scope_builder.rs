@@ -222,6 +222,9 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
                     ),
                 })
             }
+            ontol_hir::Kind::PredicateClosure1(..) => {
+                todo!("Invert predicate closure?")
+            }
             ontol_hir::Kind::Prop(..) => panic!("standalone prop"),
             ontol_hir::Kind::Sequence(..) => {
                 todo!()

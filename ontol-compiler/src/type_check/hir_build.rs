@@ -8,7 +8,8 @@ use crate::{
     error::CompileError,
     mem::Intern,
     pattern::{
-        CompoundPatternModifier, PatId, Pattern, PatternKind, RegexPatternCaptureNode, TypePath,
+        CompoundPatternModifier, PatId, Pattern, PatternKind, RegexPatternCaptureNode,
+        SetBinaryOperator, TypePath,
     },
     primitive::PrimitiveKind,
     type_check::{
@@ -478,6 +479,46 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
                 _ => self.error_node(CompileError::IncompatibleLiteral, &pattern.span, ctx),
             },
+            (PatternKind::SetOperator { operator, element }, Some(expected_ty)) => {
+                if !element.iter {
+                    return self.error_node(
+                        CompileError::TODO(smart_format!("must use spread")),
+                        &element.pattern.span,
+                        ctx,
+                    );
+                }
+
+                let element_node = self.build_node(
+                    &element.pattern,
+                    NodeInfo {
+                        expected_ty: Some(expected_ty),
+                        parent_struct_flags: node_info.parent_struct_flags,
+                    },
+                    ctx,
+                );
+
+                ctx.mk_node(
+                    ontol_hir::Kind::PredicateClosure1(
+                        match operator {
+                            SetBinaryOperator::ElementIn => ontol_hir::BoolBinaryOp::ElementIn,
+                            SetBinaryOperator::AllIn => ontol_hir::BoolBinaryOp::AllInSet,
+                            SetBinaryOperator::ContainsAll => {
+                                ontol_hir::BoolBinaryOp::SetContainsAll
+                            }
+                            SetBinaryOperator::Intersects => ontol_hir::BoolBinaryOp::SetIntersects,
+                            SetBinaryOperator::SetEquals => ontol_hir::BoolBinaryOp::SetEquals,
+                        },
+                        element_node,
+                    ),
+                    Meta {
+                        ty: match operator {
+                            SetBinaryOperator::ElementIn => expected_ty.0,
+                            _ => self.types.intern(Type::Seq(&UNIT_TYPE, expected_ty.0)),
+                        },
+                        span: pattern.span,
+                    },
+                )
+            }
             (kind, ty) => self.error_node(
                 CompileError::TODO(smart_format!(
                     "Not enough type information for {kind:?}, expected_ty = {ty:?}"

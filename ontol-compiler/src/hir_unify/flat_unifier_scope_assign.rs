@@ -62,10 +62,10 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
 
                 Ok(AssignResult::Assigned(0))
             }
-            expr::Kind::Seq(label, attr) if USE_FLAT_SEQ_HANDLING => {
+            expr::Kind::DeclSet(label, attr) if USE_FLAT_SEQ_HANDLING => {
                 let assign_result = self.assign_to_scope(
                     expr::Expr(
-                        expr::Kind::SeqItem(label, 0, ontol_hir::Iter(true), attr),
+                        expr::Kind::SetElement(label, 0, ontol_hir::Iter(true), attr),
                         meta.clone(),
                     ),
                     depth,
@@ -74,7 +74,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                 )?;
                 match assign_result {
                     AssignResult::Unassigned(expr::Expr(kind, meta)) => {
-                        let expr::Kind::SeqItem(_, _, _, attr) = kind else {
+                        let expr::Kind::SetElement(_, _, _, attr) = kind else {
                             panic!();
                         };
                         let seq_val_ty = match meta.hir_meta.ty {
@@ -128,7 +128,10 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                                 )
                             }
                             (rel, val) => Ok(AssignResult::Unassigned(expr::Expr(
-                                expr::Kind::Seq(label, Box::new(ontol_hir::Attribute { rel, val })),
+                                expr::Kind::DeclSet(
+                                    label,
+                                    Box::new(ontol_hir::Attribute { rel, val }),
+                                ),
                                 meta,
                             ))),
                         }
@@ -212,7 +215,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                                 free_vars.union_with(&attr.val.meta().free_vars);
 
                                 let element_expr = expr::Expr(
-                                    expr::Kind::SeqItem(label, index, iter, Box::new(attr)),
+                                    expr::Kind::SetElement(label, index, iter, Box::new(attr)),
                                     expr::Meta {
                                         free_vars,
                                         hir_meta: UNIT_META,
@@ -268,7 +271,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                     table,
                 ))
             }
-            expr::Kind::SeqItem(label, index, iter, attr) => {
+            expr::Kind::SetElement(label, index, iter, attr) => {
                 // Find the scope var that matches the label
                 let label_scope_var = ScopeVar(Var(label.0));
                 let (assignment_idx, final_label) =
@@ -282,7 +285,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                                     if flags.contains(StructFlags::MATCH) =>
                                 {
                                     Ok(AssignResult::Unassigned(expr::Expr(
-                                        expr::Kind::SeqItem(label, index, iter, attr),
+                                        expr::Kind::SetElement(label, index, iter, attr),
                                         meta,
                                     )))
                                 }
@@ -296,7 +299,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                                     Ok(Self::assign_to_assignment_slot(
                                         slot,
                                         expr::Expr(
-                                            expr::Kind::SeqItem(label, index, iter, attr),
+                                            expr::Kind::SetElement(label, index, iter, attr),
                                             meta,
                                         ),
                                         table,
@@ -313,7 +316,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                 let iter_scope_map = &mut table.scope_maps[assignment_idx];
 
                 iter_scope_map.assignments.push(Assignment::new(expr::Expr(
-                    expr::Kind::SeqItem(
+                    expr::Kind::SetElement(
                         final_label,
                         index,
                         iter,

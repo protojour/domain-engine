@@ -83,7 +83,7 @@ impl<'t, 'u, 'a, 'm> ExprToHir<'t, 'u, 'a, 'm> {
                     self.mk_node(ontol_hir::Kind::Struct(binder, flags, body), meta.hir_meta);
                 Ok(self.unifier.maybe_map_node(struct_node, opt_output_type))
             }
-            expr::Kind::SeqItem(label, _index, _iter, attr) => {
+            expr::Kind::SetElement(label, _index, _iter, attr) => {
                 let (scope_var, output_var) = match main_scope {
                     MainScope::Sequence(scope_var, output_var) => (scope_var, output_var),
                     MainScope::MultiSequence(table) => {
@@ -132,7 +132,7 @@ impl<'t, 'u, 'a, 'm> ExprToHir<'t, 'u, 'a, 'm> {
                 ))
             }
             expr::Kind::HirNode(node) => Ok(node),
-            other => Err(unifier_todo(smart_format!("leaf expr to node: {other:?}"))),
+            other => Err(unifier_todo(smart_format!("leaf expr to hir: {other:?}"))),
         }
     }
 
@@ -283,6 +283,11 @@ impl<'t, 'u, 'a, 'm> ExprToHir<'t, 'u, 'a, 'm> {
                 let body =
                     self.struct_body(&binder, flags, meta.hir_meta, props, in_scope, main_scope)?;
                 Ok((EvalCondTerm::QuoteVar(var), body))
+            }
+            expr::Kind::PredicateClosure1(op, expr) => {
+                debug!("predicate closure: op={op:?}, expr={expr:?}");
+                let node = self.expr_to_hir(*expr, in_scope, main_scope)?;
+                Ok((EvalCondTerm::Eval(node), ontol_hir::Nodes::default()))
             }
             _ => {
                 let node = self.expr_to_hir(expr::Expr(kind, meta), in_scope, main_scope)?;

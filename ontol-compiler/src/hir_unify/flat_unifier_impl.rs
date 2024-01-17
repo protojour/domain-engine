@@ -432,7 +432,7 @@ pub(super) fn unify_scope_structural<'m>(
 
                         for assignment in assignments {
                             match &assignment.expr.kind() {
-                                expr::Kind::SeqItem(_, index, iter, _) if iter.0 => {
+                                expr::Kind::SetElement(_, index, iter, _) if iter.0 => {
                                     iter_index = Some(*index);
                                     iter_assignments.push(assignment)
                                 }

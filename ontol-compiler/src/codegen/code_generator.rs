@@ -773,6 +773,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 );
                 block.pop_until(top, span, self.builder);
             }
+            ontol_hir::Kind::PredicateClosure1(..) => todo!(),
             ontol_hir::Kind::PushCondClause(cond_var, clause) => {
                 let Ok(cond_local) = self.var_local(*cond_var) else {
                     return;

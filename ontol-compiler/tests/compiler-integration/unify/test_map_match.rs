@@ -283,11 +283,9 @@ fn test_map_sequence_filter_in_set() {
         bar('bar': x),
     )
     map query(
-        ('input': {..x}),
+        ('input': { ..x }),
         bar: {
-            ..foo match(
-                'foo': in { ..x }
-            )
+            ..foo match('foo': in { ..x })
         }
     )
     "#

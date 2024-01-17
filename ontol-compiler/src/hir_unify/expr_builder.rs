@@ -1,7 +1,7 @@
 use ontol_hir::{PropVariant, SeqPropertyVariant};
 use ontol_runtime::var::VarSet;
 
-use super::expr;
+use super::{dep_tree::Expression, expr};
 use crate::{
     def::Defs,
     typed_hir::{IntoTypedHirData, TypedHirData, TypedNodeRef},
@@ -78,17 +78,17 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
             ),
             ontol_hir::Kind::Let(..) => panic!(),
             ontol_hir::Kind::Call(proc, args) => {
-                let args: Vec<_> = args
-                    .iter()
-                    .map(|arg| self.hir_to_expr(arena.node_ref(*arg)))
-                    .collect();
+                let mut expr_args = Vec::with_capacity(args.len());
+                for arg in args {
+                    expr_args.push(self.hir_to_expr(arena.node_ref(*arg)));
+                }
                 let mut free_vars = VarSet::default();
-                for param in &args {
+                for param in &expr_args {
                     free_vars.union_with(&param.1.free_vars);
                 }
 
                 expr::Expr(
-                    expr::Kind::Call(expr::Call(*proc, args)),
+                    expr::Kind::Call(expr::Call(*proc, expr_args)),
                     expr::Meta {
                         hir_meta,
                         free_vars,
@@ -113,7 +113,7 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                 free_vars.insert((*typed_label.hir()).into());
 
                 expr::Expr(
-                    expr::Kind::Seq(
+                    expr::Kind::DeclSet(
                         *typed_label.hir(),
                         Box::new(ontol_hir::Attribute { rel, val }),
                     ),
@@ -124,10 +124,11 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                 )
             }
             ontol_hir::Kind::Struct(binder, flags, nodes) => self.enter_binder(binder, |zelf| {
-                let props: Vec<_> = nodes
-                    .iter()
-                    .flat_map(|node| zelf.node_to_props(arena.node_ref(*node)))
-                    .collect();
+                let mut props = Vec::with_capacity(nodes.len());
+                for node in nodes {
+                    props.extend(zelf.node_to_props(arena.node_ref(*node)));
+                }
+
                 let mut free_vars = VarSet::default();
                 for prop in &props {
                     free_vars.union_with(&prop.free_vars);
@@ -183,6 +184,17 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                     },
                 )
             }
+            ontol_hir::Kind::PredicateClosure1(op, operand) => {
+                let operand = self.hir_to_expr(arena.node_ref(*operand));
+                let free_vars = operand.free_vars().clone();
+                expr::Expr(
+                    expr::Kind::PredicateClosure1(*op, Box::new(operand)),
+                    expr::Meta {
+                        hir_meta,
+                        free_vars,
+                    },
+                )
+            }
             ontol_hir::Kind::Prop(..) => panic!("standalone prop"),
             ontol_hir::Kind::Sequence(..) => {
                 todo!()
@@ -204,62 +216,68 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
     fn node_to_props(&mut self, node_ref: TypedNodeRef<'_, 'm>) -> Vec<expr::Prop<'m>> {
         let arena = node_ref.arena();
         match node_ref.kind() {
-            ontol_hir::Kind::Prop(optional, struct_var, prop_id, variants) => variants
-                .iter()
-                .map(|variant| match variant {
-                    PropVariant::Singleton(ontol_hir::Attribute { rel, val }) => {
-                        let mut union = UnionBuilder::default();
-                        let rel = union.plus(self.hir_to_expr(arena.node_ref(*rel)));
-                        let val = union.plus(self.hir_to_expr(arena.node_ref(*val)));
+            ontol_hir::Kind::Prop(optional, struct_var, prop_id, variants) => {
+                let mut output = Vec::with_capacity(variants.len());
+                for variant in variants {
+                    let prop = match variant {
+                        PropVariant::Singleton(ontol_hir::Attribute { rel, val }) => {
+                            let mut union = UnionBuilder::default();
+                            let rel = union.plus(self.hir_to_expr(arena.node_ref(*rel)));
+                            let val = union.plus(self.hir_to_expr(arena.node_ref(*val)));
 
-                        expr::Prop {
-                            optional: *optional,
-                            prop_id: *prop_id,
-                            free_vars: union.vars,
-                            seq: None,
-                            struct_var: *struct_var,
-                            variant: expr::PropVariant::Singleton(ontol_hir::Attribute {
-                                rel,
-                                val,
-                            }),
+                            expr::Prop {
+                                optional: *optional,
+                                prop_id: *prop_id,
+                                free_vars: union.vars,
+                                seq: None,
+                                struct_var: *struct_var,
+                                variant: expr::PropVariant::Singleton(ontol_hir::Attribute {
+                                    rel,
+                                    val,
+                                }),
+                            }
                         }
-                    }
-                    PropVariant::Seq(SeqPropertyVariant {
-                        label, elements, ..
-                    }) => {
-                        let mut union = UnionBuilder::default();
-                        let prop_elements = elements
-                            .iter()
-                            .map(|(iter, ontol_hir::Attribute { rel, val })| {
-                                let mut rel = self.hir_to_expr(arena.node_ref(*rel));
-                                let mut val = self.hir_to_expr(arena.node_ref(*val));
+                        PropVariant::Seq(SeqPropertyVariant {
+                            label, elements, ..
+                        }) => {
+                            let mut union = UnionBuilder::default();
+                            let prop_elements = elements
+                                .iter()
+                                .map(|(iter, ontol_hir::Attribute { rel, val })| {
+                                    let mut rel = self.hir_to_expr(arena.node_ref(*rel));
+                                    let mut val = self.hir_to_expr(arena.node_ref(*val));
 
-                                if !iter.0 {
-                                    // non-iter element variables may refer to outer scope
-                                    rel = union.plus(rel);
-                                    val = union.plus(val);
-                                }
+                                    if !iter.0 {
+                                        // non-iter element variables may refer to outer scope
+                                        rel = union.plus(rel);
+                                        val = union.plus(val);
+                                    }
 
-                                (*iter, ontol_hir::Attribute { rel, val })
-                            })
-                            .collect();
+                                    (*iter, ontol_hir::Attribute { rel, val })
+                                })
+                                .collect();
 
-                        union.vars.insert((*label.hir()).into());
+                            union.vars.insert((*label.hir()).into());
 
-                        expr::Prop {
-                            optional: *optional,
-                            prop_id: *prop_id,
-                            free_vars: union.vars,
-                            seq: Some(*label.hir()),
-                            struct_var: *struct_var,
-                            variant: expr::PropVariant::Seq {
-                                label: *label.hir(),
-                                elements: prop_elements,
-                            },
+                            expr::Prop {
+                                optional: *optional,
+                                prop_id: *prop_id,
+                                free_vars: union.vars,
+                                seq: Some(*label.hir()),
+                                struct_var: *struct_var,
+                                variant: expr::PropVariant::Seq {
+                                    label: *label.hir(),
+                                    elements: prop_elements,
+                                },
+                            }
                         }
-                    }
-                })
-                .collect(),
+                    };
+
+                    output.push(prop);
+                }
+
+                output
+            }
             _ => panic!("Expected property"),
         }
     }

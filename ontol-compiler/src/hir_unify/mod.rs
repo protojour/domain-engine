@@ -6,7 +6,7 @@ use ontol_runtime::{
     MapFlags,
 };
 use smartstring::alias::String;
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::{
     hir_unify::{expr_builder::ExprBuilder, scope_builder::ScopeBuilder, unifier::Unifier},
@@ -79,10 +79,7 @@ pub fn unify_to_function<'m>(
                 info!("Using classic unifier output because {err:?}");
                 unify_classic(scope, expr, var_tracker.var_allocator(), compiler)?
             }
-            Ok(value) => {
-                warn!("Using output from flat unifier, which is experimental");
-                value
-            }
+            Ok(value) => value,
         }
     };
 

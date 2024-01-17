@@ -1,4 +1,4 @@
-use ontol_hir::{Node, StructFlags};
+use ontol_hir::{BoolBinaryOp, Node, StructFlags};
 use ontol_runtime::{
     smart_format,
     value::PropertyId,
@@ -60,9 +60,9 @@ pub enum Kind<'m> {
     F64(f64),
     String(String),
     Const(DefId),
-    Seq(ontol_hir::Label, Box<ontol_hir::Attribute<Expr<'m>>>),
+    DeclSet(ontol_hir::Label, Box<ontol_hir::Attribute<Expr<'m>>>),
     DestructuredSeq(ontol_hir::Label, OutputVar),
-    SeqItem(
+    SetElement(
         ontol_hir::Label,
         usize,
         ontol_hir::Iter,
@@ -73,6 +73,7 @@ pub enum Kind<'m> {
         TypedHirData<'m, ontol_hir::Binder>,
         Vec<StringInterpolationComponent>,
     ),
+    PredicateClosure1(BoolBinaryOp, Box<Expr<'m>>),
     /// Temporarily wrap an ontol_hir::Node
     /// FIXME: This is a temporary hack for flat_unifier for dividing scoping into outside-loop and inside-loop
     HirNode(Node),
@@ -108,11 +109,11 @@ impl<'m> Kind<'m> {
             Self::F64(float) => format!("f64({float})"),
             Self::String(string) => format!("String({string})"),
             Self::Const(const_def_id) => format!("Const({const_def_id:?})"),
-            Self::Seq(label, _) => format!("Seq({label})"),
+            Self::DeclSet(label, _) => format!("Seq({label})"),
             Self::DestructuredSeq(label, output_var) => {
                 format!("DestructuredSeq({label}, {output_var:?})")
             }
-            Self::SeqItem(label, index, iter, attr) => format!(
+            Self::SetElement(label, index, iter, attr) => format!(
                 "{}SeqItem({label}, {index}, ({}, {}))",
                 if iter.0 { "Iter" } else { "" },
                 attr.rel.kind().debug_short(),
@@ -122,6 +123,7 @@ impl<'m> Kind<'m> {
             Self::StringInterpolation(binder, _) => {
                 format!("StringInterpolation({})", binder.hir().var)
             }
+            Self::PredicateClosure1(..) => format!("predicate-closure1"),
             Self::HirNode(_) => "Node".to_string(),
         }
     }
@@ -173,7 +175,7 @@ impl<'m> super::dep_tree::Expression for Expr<'m> {
     }
 
     fn is_seq(&self) -> bool {
-        matches!(&self.0, Kind::Seq(..))
+        matches!(&self.0, Kind::DeclSet(..))
     }
 }
 
@@ -225,11 +227,11 @@ impl FreeVarVisitor {
                     self.visit(arg);
                 }
             }
-            Kind::Seq(_, attr) => {
+            Kind::DeclSet(_, attr) => {
                 self.visit_attr(attr);
             }
             Kind::DestructuredSeq(..) => {}
-            Kind::SeqItem(_, _, _, attr) => self.visit_attr(attr),
+            Kind::SetElement(_, _, _, attr) => self.visit_attr(attr),
             Kind::Push(_, attr) => {
                 self.visit_attr(attr);
             }
@@ -242,6 +244,9 @@ impl FreeVarVisitor {
                         StringInterpolationComponent::Const(_) => {}
                     }
                 }
+            }
+            Kind::PredicateClosure1(_, expr) => {
+                self.visit(expr);
             }
             Kind::HirNode(_) => {}
         }

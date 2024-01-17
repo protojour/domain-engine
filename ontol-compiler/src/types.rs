@@ -187,7 +187,7 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
             Type::Seq(rel, val) => {
                 write!(
                     f,
-                    "[{}: {}]",
+                    "{{{}: {}}}",
                     FormatType(rel, defs, primitives),
                     FormatType(val, defs, primitives)
                 )

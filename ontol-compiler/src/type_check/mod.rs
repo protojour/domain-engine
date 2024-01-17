@@ -100,7 +100,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             TypeError::MustBeSequence(ty) => self.error(
                 CompileError::TypeMismatch {
                     actual: smart_format!("{}", FormatType(ty, self.defs, self.primitives)),
-                    expected: smart_format!("[{}]", FormatType(ty, self.defs, self.primitives)),
+                    expected: smart_format!("{{{}}}", FormatType(ty, self.defs, self.primitives)),
                 },
                 span,
             ),

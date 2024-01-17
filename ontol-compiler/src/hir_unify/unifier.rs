@@ -383,7 +383,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     ),
                 })
             }
-            (expr::Kind::Seq(_label, attr), scope::Kind::Gen(gen_scope)) => {
+            (expr::Kind::DeclSet(_label, attr), scope::Kind::Gen(gen_scope)) => {
                 let seq_ty = self
                     .types
                     .intern(Type::Seq(attr.rel.hir_meta().ty, attr.val.hir_meta().ty));
@@ -614,7 +614,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 // should be the innermost scope expansion.
                 let mut ordered_scope_vars: IndexSet<Var> = Default::default();
 
-                if let expr::Kind::Seq(label, _) = &expr_kind {
+                if let expr::Kind::DeclSet(label, _) = &expr_kind {
                     // label is the primary scope locator for a sequence
                     ordered_scope_vars.insert(Var(label.0));
                 }
@@ -674,7 +674,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     self.unify(scope::constant(), expr)
                 }
             }
-            (expr::Kind::Seq(_label, attr), _scope) => {
+            (expr::Kind::DeclSet(_label, attr), _scope) => {
                 if USE_FLAT_SEQ_HANDLING {
                     panic!("Should be solved in flat unifier");
                 }
@@ -695,8 +695,11 @@ impl<'a, 'm> Unifier<'a, 'm> {
             (expr::Kind::DestructuredSeq(..), _) => {
                 panic!("Should not be used here")
             }
-            (expr::Kind::SeqItem(..), _) => {
+            (expr::Kind::SetElement(..), _) => {
                 panic!("Only used in flat unifier")
+            }
+            (expr::Kind::PredicateClosure1(..), _) => {
+                panic!("Not handled in classic unifier")
             }
             (expr::Kind::HirNode(_), _) => {
                 unreachable!()

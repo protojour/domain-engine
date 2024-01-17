@@ -11,7 +11,7 @@ use ontol_runtime::{
     DefId, MapFlags, MapKey, PackageId,
 };
 use smartstring::alias::String;
-use tracing::{debug, debug_span, warn};
+use tracing::{debug, debug_span};
 
 use crate::{
     codegen::code_generator::map_codegen, def::DefKind, hir_unify::unify_to_function,
@@ -247,7 +247,7 @@ fn generate_map_proc<'m>(
     let func = match unify_to_function(scope, expr, map_flags, compiler) {
         Ok(func) => func,
         Err(err) => {
-            warn!("unifier error: {err:?}");
+            debug!("unifier error: {err:?}");
             return None;
         }
     };

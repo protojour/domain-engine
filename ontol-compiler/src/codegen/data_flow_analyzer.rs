@@ -255,7 +255,8 @@ where
             ontol_hir::Kind::Regex(..)
             | ontol_hir::Kind::PushCondClause(..)
             | ontol_hir::Kind::MoveRestAttrs(..)
-            | ontol_hir::Kind::CopySubSeq(..) => VarSet::default(),
+            | ontol_hir::Kind::CopySubSeq(..)
+            | ontol_hir::Kind::PredicateClosure1(..) => VarSet::default(),
         }
     }
 
