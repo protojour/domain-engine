@@ -98,3 +98,15 @@ fn can_refer_to_future_definitions() {
     "
     .compile();
 }
+
+#[test]
+// BUG: .default expected to work for booleans
+#[should_panic = "variable not found"]
+fn union_integers_no_question() {
+    "
+    def foo (
+        rel .'active'(rel .default := true): boolean
+    )
+    "
+    .compile_fail();
+}
