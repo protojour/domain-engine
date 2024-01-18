@@ -102,7 +102,7 @@ fn can_refer_to_future_definitions() {
 #[test]
 // BUG: .default expected to work for booleans
 #[should_panic = "variable not found"]
-fn union_integers_no_question() {
+fn default_for_boolean() {
     "
     def foo (
         rel .'active'(rel .default := true): boolean
