@@ -156,7 +156,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         ),
                     })
                 }
-                expr::PropVariant::Seq { label, elements } => {
+                expr::PropVariant::Set { label, elements } => {
                     if elements.is_empty() {
                         panic!("No elements in seq prop");
                     }
@@ -289,7 +289,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 })
             }
             (expr::Kind::Prop(prop), scope::Kind::Gen(gen_scope)) => {
-                let expr::PropVariant::Seq { elements, .. } = prop.variant else {
+                let expr::PropVariant::Set { elements, .. } = prop.variant else {
                     panic!(
                         "unexpected gen scope: prop={:?} scope_input_seq={:?}",
                         prop.prop_id, gen_scope.input_seq
@@ -476,7 +476,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         span: scope_hir_meta.span,
                     })),
                     node: self.mk_node(
-                        ontol_hir::Kind::SeqPush(
+                        ontol_hir::Kind::Insert(
                             seq_var,
                             ontol_hir::Attribute {
                                 rel: rel.node,

@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Display};
 
-use ontol_hir::{CaptureMatchArm, PropVariant, SeqPropertyVariant};
+use ontol_hir::{CaptureMatchArm, PropVariant, SetPropertyVariant};
 
 use crate::{
     types::{TypeRef, ERROR_TYPE, UNIT_TYPE},
@@ -181,9 +181,9 @@ pub fn arena_import<'m>(
             let arg = arena_import(target, source.arena().node_ref(*arg));
             target.add(TypedHirData(Map(arg), *meta))
         }
-        DeclSeq(label, attr) => {
+        DeclSet(label, attr) => {
             let attr = import_attr(target, source.arena(), *attr);
-            target.add(TypedHirData(DeclSeq(*label, attr), *meta))
+            target.add(TypedHirData(DeclSet(*label, attr), *meta))
         }
         Struct(binder, flags, body) => {
             let body = import_nodes(target, source.arena(), body);
@@ -196,13 +196,13 @@ pub fn arena_import<'m>(
                     PropVariant::Singleton(attr) => {
                         PropVariant::Singleton(import_attr(target, source.arena(), *attr))
                     }
-                    PropVariant::Seq(seq_variant) => {
+                    PropVariant::Set(seq_variant) => {
                         let elements = seq_variant
                             .elements
                             .iter()
                             .map(|(iter, attr)| (*iter, import_attr(target, source.arena(), *attr)))
                             .collect();
-                        PropVariant::Seq(SeqPropertyVariant {
+                        PropVariant::Set(SetPropertyVariant {
                             label: seq_variant.label,
                             has_default: seq_variant.has_default,
                             elements,
@@ -233,9 +233,9 @@ pub fn arena_import<'m>(
             let body = import_nodes(target, source.arena(), body);
             target.add(TypedHirData(ForEach(*var, (*rel, *val), body), *meta))
         }
-        SeqPush(var, attr) => {
+        Insert(var, attr) => {
             let attr = import_attr(target, source.arena(), *attr);
-            target.add(TypedHirData(SeqPush(*var, attr), *meta))
+            target.add(TypedHirData(Insert(*var, attr), *meta))
         }
         StringPush(var, node) => {
             let node = arena_import(target, source.arena().node_ref(*node));

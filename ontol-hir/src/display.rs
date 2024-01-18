@@ -117,8 +117,8 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
                 self.print_rparen(multi, f)?;
                 Ok(multi.or(sep))
             }
-            Kind::DeclSeq(label, attr) => {
-                write!(f, "{indent}(decl-seq ({})", L::as_hir(label))?;
+            Kind::DeclSet(label, attr) => {
+                write!(f, "{indent}(decl-set ({})", L::as_hir(label))?;
                 let multi = self.print_all(Sep::Space, self.kinds(&[attr.rel, attr.val]), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
@@ -170,8 +170,8 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
-            Kind::SeqPush(seq_var, attr) => {
-                write!(f, "{indent}(seq-push {seq_var}",)?;
+            Kind::Insert(seq_var, attr) => {
+                write!(f, "{indent}(insert {seq_var}",)?;
                 let multi = self.print_all(Sep::Space, self.kinds(&[attr.rel, attr.val]), f)?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
@@ -242,11 +242,11 @@ impl<'h, 'a, L: Lang> Print<PropVariant<'a, L>> for Printer<'h, 'a, L> {
             PropVariant::Singleton(attr) => {
                 self.print_all(Sep::None, self.kinds(&[attr.rel, attr.val]), f)?
             }
-            PropVariant::Seq(seq_variant) => {
+            PropVariant::Set(seq_variant) => {
                 if seq_variant.has_default.0 {
-                    write!(f, "seq-default")?;
+                    write!(f, "..default")?;
                 } else {
-                    write!(f, "seq")?;
+                    write!(f, "..")?;
                 }
                 write!(f, " ({})", L::as_hir(&seq_variant.label))?;
 
@@ -301,13 +301,13 @@ impl<'h, 'a, L: Lang> Print<(PropPattern<'a, L>, Nodes)> for Printer<'h, 'a, L> 
                 self.print(Sep::Space, val, f)?;
                 write!(f, ")")?;
             }
-            PropPattern::Seq(val, HasDefault(false)) => {
-                write!(f, "(seq")?;
+            PropPattern::Set(val, HasDefault(false)) => {
+                write!(f, "(..")?;
                 self.print(Sep::Space, val, f)?;
                 write!(f, ")")?;
             }
-            PropPattern::Seq(val, HasDefault(true)) => {
-                write!(f, "(seq-default")?;
+            PropPattern::Set(val, HasDefault(true)) => {
+                write!(f, "(..default")?;
                 self.print(Sep::Space, val, f)?;
                 write!(f, ")")?;
             }

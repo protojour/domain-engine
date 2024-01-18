@@ -22,7 +22,7 @@ pub enum Class {
     LParen,
     RParen,
     Symbol,
-    Seq,
+    Set,
     Dollar,
     Hash,
     At,
@@ -118,14 +118,14 @@ impl<'a, L: Lang> Parser<'a, L> {
             ("match-struct", next) => self.parse_struct_inner(next, StructFlags::MATCH),
             ("prop", next) => self.parse_prop(Optional(false), next),
             ("prop?", next) => self.parse_prop(Optional(true), next),
-            ("decl-seq", next) => {
+            ("decl-set", next) => {
                 let (_, next) = parse_lparen(next)?;
                 let (label, next) = parse_at_label(next)?;
                 let (_, next) = parse_rparen(next)?;
                 let (rel, next) = self.parse(next)?;
                 let (val, next) = self.parse(next)?;
                 Ok((
-                    self.make_node(Kind::DeclSeq(
+                    self.make_node(Kind::DeclSet(
                         self.make_label(label),
                         Attribute { rel, val },
                     )),
@@ -168,12 +168,12 @@ impl<'a, L: Lang> Parser<'a, L> {
                     next,
                 ))
             }
-            ("seq-push", next) => {
+            ("insert", next) => {
                 let (seq_var, next) = parse_dollar_var(next)?;
                 let (rel, next) = self.parse(next)?;
                 let (val, next) = self.parse(next)?;
                 Ok((
-                    self.make_node(Kind::SeqPush(seq_var, Attribute { rel, val })),
+                    self.make_node(Kind::Insert(seq_var, Attribute { rel, val })),
                     next,
                 ))
             }
@@ -261,19 +261,19 @@ impl<'a, L: Lang> Parser<'a, L> {
 
     fn parse_prop_variant<'s>(&mut self, next: &'s str) -> ParseResult<'s, PropVariant<'a, L>> {
         parse_paren_delimited(next, |next| match parse_symbol(next) {
-            Ok((sym @ ("seq" | "seq-default"), next)) => {
+            Ok((sym @ (".." | "..default"), next)) => {
                 let (label, next) = parse_paren_delimited(next, parse_at_label)?;
                 let (elements, next) = self.parse_many(next, Self::parse_seq_property_element)?;
                 Ok((
-                    PropVariant::Seq(SeqPropertyVariant {
+                    PropVariant::Set(SetPropertyVariant {
                         label: self.make_label(label),
-                        has_default: HasDefault(sym != "seq"),
+                        has_default: HasDefault(sym != ".."),
                         elements: elements.into(),
                     }),
                     next,
                 ))
             }
-            Ok((sym, _)) => return Err(Error::Expected(Class::Seq, Found(Token::Symbol(sym)))),
+            Ok((sym, _)) => return Err(Error::Expected(Class::Set, Found(Token::Symbol(sym)))),
             Err(_) => {
                 let (rel, next) = self.parse(next)?;
                 let (val, next) = self.parse(next)?;
@@ -312,7 +312,7 @@ impl<'a, L: Lang> Parser<'a, L> {
             let (seq_default, next) = match parse_symbol(next) {
                 Ok(("seq", next)) => (Some(HasDefault(false)), next),
                 Ok(("seq-default", next)) => (Some(HasDefault(true)), next),
-                Ok((sym, _)) => return Err(Error::Expected(Class::Seq, Found(Token::Symbol(sym)))),
+                Ok((sym, _)) => return Err(Error::Expected(Class::Set, Found(Token::Symbol(sym)))),
                 _ => (None, next),
             };
             let (pattern, next) = match self.parse_pattern_binding(next) {
@@ -322,7 +322,7 @@ impl<'a, L: Lang> Parser<'a, L> {
                             let (_, next) = parse_rparen(next)?;
                             (
                                 if seq_default.is_some() {
-                                    return Err(Error::Unexpected(Class::Seq));
+                                    return Err(Error::Unexpected(Class::Set));
                                 } else {
                                     PropPattern::Attr(first_binding, val_binding)
                                 },
@@ -331,7 +331,7 @@ impl<'a, L: Lang> Parser<'a, L> {
                         }
                         (Err(Error::Unexpected(Class::RParen)), Some(has_default)) => {
                             let (_, next) = parse_rparen(next)?;
-                            (PropPattern::Seq(first_binding, has_default), next)
+                            (PropPattern::Set(first_binding, has_default), next)
                         }
                         (Err(err), _) => return Err(err),
                     }

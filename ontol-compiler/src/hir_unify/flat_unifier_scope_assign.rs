@@ -178,7 +178,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
 
                 // Provide the sequence label to the assignment slot search
                 let seq_label = match &variant {
-                    expr::PropVariant::Seq {
+                    expr::PropVariant::Set {
                         label, elements, ..
                     } => {
                         if elements.iter().any(|(iter, _)| iter.0) {
@@ -195,7 +195,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
 
                 // Split off/assign individual property variants
                 let variant = match variant {
-                    expr::PropVariant::Seq {
+                    expr::PropVariant::Set {
                         mut label,
                         elements,
                     } => {
@@ -243,7 +243,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                             }
                         }
 
-                        expr::PropVariant::Seq {
+                        expr::PropVariant::Set {
                             label,
                             elements: vec![],
                         }
@@ -367,6 +367,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                         table,
                     )?;
                     if let AssignResult::Unassigned(expr::Expr(kind, _)) = assign_result {
+                        debug!("unassigned: {kind:?}");
                         let expr::Kind::Prop(prop) = kind else {
                             panic!();
                         };

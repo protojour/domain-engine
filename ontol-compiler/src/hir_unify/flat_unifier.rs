@@ -223,7 +223,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                         let push = {
                             let unit_node = self.mk_node(ontol_hir::Kind::Unit, UNIT_META);
                             self.mk_node(
-                                ontol_hir::Kind::SeqPush(
+                                ontol_hir::Kind::Insert(
                                     target_seq_var,
                                     ontol_hir::Attribute {
                                         rel: unit_node,

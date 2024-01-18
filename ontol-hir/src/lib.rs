@@ -172,7 +172,7 @@ pub enum Kind<'a, L: Lang> {
     /// A map call
     Map(Node),
     /// Standalone sequence in declarative mode.
-    DeclSeq(L::Data<'a, Label>, Attribute<Node>),
+    DeclSet(L::Data<'a, Label>, Attribute<Node>),
     /// A struct with associated binder. The value is the struct.
     Struct(L::Data<'a, Binder>, StructFlags, Nodes),
     /// A property definition associated with a struct var in scope
@@ -189,7 +189,7 @@ pub enum Kind<'a, L: Lang> {
     /// Iterate attributes in sequence var,
     ForEach(Var, (Binding<'a, L>, Binding<'a, L>), Nodes),
     /// Push an attribute to the end of a sequence
-    SeqPush(Var, Attribute<Node>),
+    Insert(Var, Attribute<Node>),
     /// Push the second string at the end of the first string
     StringPush(Var, Node),
     /// Declarative regex w/captures.
@@ -210,11 +210,11 @@ pub enum Kind<'a, L: Lang> {
 #[derive(Clone)]
 pub enum PropVariant<'a, L: Lang> {
     Singleton(Attribute<Node>),
-    Seq(SeqPropertyVariant<'a, L>),
+    Set(SetPropertyVariant<'a, L>),
 }
 
 #[derive(Clone)]
-pub struct SeqPropertyVariant<'a, L: Lang> {
+pub struct SetPropertyVariant<'a, L: Lang> {
     pub label: L::Data<'a, Label>,
     pub has_default: HasDefault,
     pub elements: SmallVec<[(Iter, Attribute<Node>); 1]>,
@@ -224,9 +224,9 @@ pub struct SeqPropertyVariant<'a, L: Lang> {
 pub enum PropPattern<'a, L: Lang> {
     /// ($rel $val)
     Attr(Binding<'a, L>, Binding<'a, L>),
-    /// (seq $val)
-    /// The sequence is captured in $val, relation is ignored
-    Seq(Binding<'a, L>, HasDefault),
+    /// (.. $val)
+    /// The set/sequence is captured in $val, relation is ignored
+    Set(Binding<'a, L>, HasDefault),
     /// The property is absent
     Absent,
 }

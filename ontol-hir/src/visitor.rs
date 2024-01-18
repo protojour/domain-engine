@@ -108,7 +108,7 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                     self.visit_node(index + 1, node_ref);
                 }
             }
-            Kind::DeclSeq(label, attr) => {
+            Kind::DeclSet(label, attr) => {
                 self.visit_label(*L::as_hir(label));
                 self.visit_node(0, arena.node_ref(attr.rel));
                 self.visit_node(1, arena.node_ref(attr.val));
@@ -151,7 +151,7 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                     self.visit_node(index, node_ref);
                 }
             }
-            Kind::SeqPush(seq_var, attr) => {
+            Kind::Insert(seq_var, attr) => {
                 self.visit_var(*seq_var);
                 self.visit_node(0, arena.node_ref(attr.rel));
                 self.visit_node(1, arena.node_ref(attr.val));
@@ -207,7 +207,7 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                 self.visit_node(0, arena.node_ref(attr.rel));
                 self.visit_node(1, arena.node_ref(attr.val));
             }
-            PropVariant::Seq(seq_variant) => {
+            PropVariant::Set(seq_variant) => {
                 self.visit_label(*L::as_hir(&seq_variant.label));
                 for (index, element) in seq_variant.elements.iter().enumerate() {
                     self.visit_seq_prop_element(index, element, arena);
@@ -237,7 +237,7 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                 self.visit_pattern_binding(0, rel);
                 self.visit_pattern_binding(1, val);
             }
-            PropPattern::Seq(val, _) => {
+            PropPattern::Set(val, _) => {
                 self.visit_pattern_binding(0, val);
             }
             PropPattern::Absent => {}

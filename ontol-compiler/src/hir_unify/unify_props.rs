@@ -81,7 +81,7 @@ pub(super) trait UnifyProps<'m>: Sized {
 
                 (
                     (
-                        ontol_hir::PropPattern::Seq(
+                        ontol_hir::PropPattern::Set(
                             ontol_hir::Binding::Binder(
                                 ontol_hir::Binder {
                                     var: Var(typed_label.hir().0),
@@ -210,7 +210,7 @@ impl<'m> UnifyProps<'m> for expr::Prop<'m> {
                         val: val.node,
                     })
                 }
-                expr::PropVariant::Seq { .. } => todo!(),
+                expr::PropVariant::Set { .. } => todo!(),
             };
 
             nodes.push(unifier.mk_node(

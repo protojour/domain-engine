@@ -91,7 +91,9 @@ impl<'m> Table<'m> {
                     let scope_constraints_len = scope_meta.constraints.0.len();
 
                     match scope_map.scope.kind() {
-                        flat_scope::Kind::PropVariant(..) | flat_scope::Kind::RegexCapture(..) => {}
+                        flat_scope::Kind::PropVariant(..)
+                        // | flat_scope::Kind::SeqPropVariant(..)
+                        | flat_scope::Kind::RegexCapture(..) => {}
                         _ => return false,
                     }
 
@@ -130,7 +132,9 @@ impl<'m> Table<'m> {
 
                 // only consider proper scope-introducing nodes
                 match scope_map.scope.kind() {
-                    flat_scope::Kind::PropVariant(..) | flat_scope::Kind::RegexCapture(..) => {}
+                    flat_scope::Kind::PropVariant(..)
+                    // | flat_scope::Kind::SeqPropVariant(..)
+                    | flat_scope::Kind::RegexCapture(..) => {}
                     _ => continue,
                 }
 

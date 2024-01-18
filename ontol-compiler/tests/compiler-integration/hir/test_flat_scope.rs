@@ -103,17 +103,17 @@ fn test_flat_regex() {
 }
 
 #[test]
-fn test_flat_seq() {
+fn test_flat_multi_prop() {
     let output = mk_flat_scope(
         "
         (struct ($b)
             (prop $b S:1:0
-                (seq (@f)
+                (.. (@f)
                     (iter
                         #u
                         (struct ($c)
                             (prop $c S:2:1
-                                (seq (@g)
+                                (.. (@g)
                                     (iter #u (map $a))
                                 )
                             )
@@ -145,7 +145,7 @@ fn test_flat_seq_mix() {
         "
         (struct ($c)
             (prop $c S:1:1
-                (seq (@d) (#u $a) (iter #u $b) (#u $c))
+                (.. (@d) (#u $a) (iter #u $b) (#u $c))
             )
         )",
     );

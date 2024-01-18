@@ -346,7 +346,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     let label = *ctx.label_map.get(&value.id).unwrap();
                     let seq_ty = self.types.intern(Type::Seq(rel_params_ty, value_ty));
 
-                    ontol_hir::PropVariant::Seq(ontol_hir::SeqPropertyVariant {
+                    ontol_hir::PropVariant::Set(ontol_hir::SetPropertyVariant {
                         label: TypedHirData(
                             label,
                             Meta {

@@ -98,7 +98,7 @@ impl<'t, 'u, 'a, 'm> ExprToHir<'t, 'u, 'a, 'm> {
                 let val = self.expr_to_hir(attr.val, in_scope, next_main_scope)?;
 
                 Ok(self.mk_node(
-                    ontol_hir::Kind::SeqPush(output_var.0, ontol_hir::Attribute { rel, val }),
+                    ontol_hir::Kind::Insert(output_var.0, ontol_hir::Attribute { rel, val }),
                     UNIT_META,
                 ))
             }
@@ -204,7 +204,7 @@ impl<'t, 'u, 'a, 'm> ExprToHir<'t, 'u, 'a, 'm> {
                         })]
                         .into()
                     }
-                    expr::PropVariant::Seq { label, elements } => {
+                    expr::PropVariant::Set { label, elements } => {
                         assert!(elements.is_empty());
                         let sequence_node = find_and_unify_sequence_prop(
                             prop.struct_var,
@@ -258,7 +258,7 @@ impl<'t, 'u, 'a, 'm> ExprToHir<'t, 'u, 'a, 'm> {
                         self.mk_node(ontol_hir::Kind::Begin(body.into()), UNIT_META)
                     })
                 }
-                expr::PropVariant::Seq { .. } => Err(super::UnifierError::Unimplemented(
+                expr::PropVariant::Set { .. } => Err(super::UnifierError::Unimplemented(
                     smart_format!("seq prop in condition: {}", prop.prop_id),
                 )),
             },

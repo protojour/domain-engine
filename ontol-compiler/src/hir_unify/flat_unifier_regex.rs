@@ -77,7 +77,7 @@ pub(super) fn unify_regex<'m>(
         // Analyze which sequences are under scrutiny and allocate output variables
         for assignment in std::mem::take(&mut scope_map.assignments) {
             if let expr::Expr(expr::Kind::Prop(prop), meta) = assignment.expr {
-                if let expr::PropVariant::Seq { label, .. } = &prop.variant {
+                if let expr::PropVariant::Set { label, .. } = &prop.variant {
                     let inferer = seq_type_inferers.entry(*label).or_insert_with(|| {
                         SeqTypeInfer::new(OutputVar(unifier.var_allocator.alloc()))
                     });

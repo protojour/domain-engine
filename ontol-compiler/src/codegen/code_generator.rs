@@ -346,7 +346,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                         PropVariant::Singleton(attr) => {
                             self.gen_attribute(*struct_var, *prop_id, *attr, arena, span, block)
                         }
-                        PropVariant::Seq(seq_variant) => {
+                        PropVariant::Set(seq_variant) => {
                             if let Some((_iter, attr)) = seq_variant.elements.iter().next() {
                                 self.gen_attribute(
                                     *struct_var,
@@ -440,7 +440,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     let arm = arms.into_iter().next().unwrap();
 
                     match &arm.0 {
-                        PropPattern::Seq(ontol_hir::Binding::Binder(binder), HasDefault(true)) => {
+                        PropPattern::Set(ontol_hir::Binding::Binder(binder), HasDefault(true)) => {
                             block.op(
                                 OpCode::GetAttr(
                                     struct_local,
@@ -602,7 +602,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 );
                 block.pop_until(counter, span, self.builder);
             }
-            ontol_hir::Kind::SeqPush(seq_var, attr) => {
+            ontol_hir::Kind::Insert(seq_var, attr) => {
                 let top = self.builder.top();
                 let Ok(seq_local) = self.var_local(*seq_var) else {
                     return;
@@ -818,7 +818,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
                 block.pop_until(top, span, self.builder);
             }
-            ontol_hir::Kind::DeclSeq(..) | ontol_hir::Kind::Regex(..) => {
+            ontol_hir::Kind::DeclSet(..) | ontol_hir::Kind::Regex(..) => {
                 unreachable!(
                     "{} is only declarative, not used in code generation",
                     node_ref
@@ -859,7 +859,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 arena,
                 block,
             ),
-            ontol_hir::PropPattern::Seq(binding, _has_default) => self.gen_in_scope(
+            ontol_hir::PropPattern::Set(binding, _has_default) => self.gen_in_scope(
                 &[
                     (rel_local, ontol_hir::Binding::Wildcard),
                     (val_local, *binding),

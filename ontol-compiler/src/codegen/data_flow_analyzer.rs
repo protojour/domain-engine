@@ -3,7 +3,7 @@
 use std::{collections::BTreeSet, fmt::Debug};
 
 use fnv::{FnvHashMap, FnvHashSet};
-use ontol_hir::{PropVariant, SeqPropertyVariant, StructFlags};
+use ontol_hir::{PropVariant, SetPropertyVariant, StructFlags};
 use ontol_runtime::{
     ontology::{PropertyFlow, PropertyFlowData},
     value::PropertyId,
@@ -118,7 +118,7 @@ where
                 var_set
             }
             ontol_hir::Kind::Map(node) => self.analyze_node(arena.node_ref(*node), parent_prop),
-            ontol_hir::Kind::DeclSeq(_, _) => {
+            ontol_hir::Kind::DeclSet(_, _) => {
                 unreachable!()
             }
             ontol_hir::Kind::Struct(binder, flags, body) => {
@@ -148,7 +148,7 @@ where
                             var_set.union_with(&self.analyze_node(arena.node_ref(*rel), *prop_id));
                             var_set.union_with(&self.analyze_node(arena.node_ref(*val), *prop_id));
                         }
-                        PropVariant::Seq(SeqPropertyVariant { elements, .. }) => {
+                        PropVariant::Set(SetPropertyVariant { elements, .. }) => {
                             for (_iter, ontol_hir::Attribute { rel, val }) in elements {
                                 var_set
                                     .union_with(&self.analyze_node(arena.node_ref(*rel), *prop_id));
@@ -182,7 +182,7 @@ where
                                 value_def_id = binder.ty().get_single_def_id();
                             }
                         }
-                        ontol_hir::PropPattern::Seq(binding, _has_default) => {
+                        ontol_hir::PropPattern::Set(binding, _has_default) => {
                             if let ontol_hir::Binding::Binder(binder) = binding {
                                 self.add_dep(binder.hir().var, *struct_var);
                                 value_def_id = match binder.ty() {
@@ -227,7 +227,7 @@ where
                 }
                 var_set
             }
-            ontol_hir::Kind::SeqPush(var, ontol_hir::Attribute { rel, val }) => {
+            ontol_hir::Kind::Insert(var, ontol_hir::Attribute { rel, val }) => {
                 let mut var_set = self.analyze_node(arena.node_ref(*rel), parent_prop);
                 var_set.union_with(&self.analyze_node(arena.node_ref(*val), parent_prop));
 

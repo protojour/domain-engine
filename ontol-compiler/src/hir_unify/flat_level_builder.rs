@@ -124,7 +124,7 @@ impl<'m> LevelBuilder<'m> {
             );
 
             merged_match_arms.match_arms.push((
-                ontol_hir::PropPattern::Seq(label_binding, has_default),
+                ontol_hir::PropPattern::Set(label_binding, has_default),
                 body.into(),
             ));
         }

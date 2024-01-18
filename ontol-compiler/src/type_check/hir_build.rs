@@ -337,7 +337,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let seq_ty = self.types.intern(Type::Seq(rel_ty, val_ty));
 
                 ctx.mk_node(
-                    ontol_hir::Kind::DeclSeq(
+                    ontol_hir::Kind::DeclSet(
                         label.with_ty(seq_ty),
                         ontol_hir::Attribute { rel, val },
                     ),

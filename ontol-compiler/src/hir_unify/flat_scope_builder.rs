@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use ontol_hir::{visitor::HirVisitor, SeqPropertyVariant};
+use ontol_hir::{visitor::HirVisitor, SetPropertyVariant};
 use ontol_runtime::var::{Var, VarSet};
 
 use crate::typed_hir::{arena_import_root, TypedArena, TypedHir};
@@ -186,7 +186,7 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
                                 next_node_set,
                             );
                         }
-                        ontol_hir::PropVariant::Seq(SeqPropertyVariant {
+                        ontol_hir::PropVariant::Set(SetPropertyVariant {
                             label,
                             has_default,
                             elements,
@@ -328,7 +328,7 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
                     }
                 }
             }
-            ontol_hir::Kind::DeclSeq(..) => return Err(UnifierError::SequenceInputNotSupported),
+            ontol_hir::Kind::DeclSet(..) => return Err(UnifierError::SequenceInputNotSupported),
             _ => todo!("{}", self.hir_arena.node_ref(node)),
         }
 

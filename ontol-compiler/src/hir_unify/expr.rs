@@ -150,7 +150,7 @@ pub struct Prop<'m> {
 #[derive(Debug)]
 pub enum PropVariant<'m> {
     Singleton(ontol_hir::Attribute<Expr<'m>>),
-    Seq {
+    Set {
         label: ontol_hir::Label,
         elements: Vec<(ontol_hir::Iter, ontol_hir::Attribute<Expr<'m>>)>,
     },
@@ -257,7 +257,7 @@ impl FreeVarVisitor {
             PropVariant::Singleton(attr) => {
                 self.visit_attr(attr);
             }
-            PropVariant::Seq { elements, .. } => {
+            PropVariant::Set { elements, .. } => {
                 for (_iter, attr) in elements {
                     self.visit_attr(attr);
                 }

@@ -1,4 +1,4 @@
-use ontol_hir::{PropVariant, SeqPropertyVariant};
+use ontol_hir::{PropVariant, SetPropertyVariant};
 use ontol_runtime::var::VarSet;
 
 use super::{dep_tree::Expression, expr};
@@ -103,7 +103,7 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                 };
                 expr::Expr(expr::Kind::Map(Box::new(arg)), expr_meta)
             }
-            ontol_hir::Kind::DeclSeq(typed_label, attr) => {
+            ontol_hir::Kind::DeclSet(typed_label, attr) => {
                 let rel = self.hir_to_expr(arena.node_ref(attr.rel));
                 let val = self.hir_to_expr(arena.node_ref(attr.val));
 
@@ -204,7 +204,7 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
             | ontol_hir::Kind::MatchRegex(..)
             | ontol_hir::Kind::ForEach(..)
             | ontol_hir::Kind::StringPush(..)
-            | ontol_hir::Kind::SeqPush(..)
+            | ontol_hir::Kind::Insert(..)
             | ontol_hir::Kind::PushCondClause(..)
             | ontol_hir::Kind::MoveRestAttrs(..)
             | ontol_hir::Kind::CopySubSeq(..) => {
@@ -237,7 +237,7 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                                 }),
                             }
                         }
-                        PropVariant::Seq(SeqPropertyVariant {
+                        PropVariant::Set(SetPropertyVariant {
                             label, elements, ..
                         }) => {
                             let mut union = UnionBuilder::default();
@@ -265,7 +265,7 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                                 free_vars: union.vars,
                                 seq: Some(*label.hir()),
                                 struct_var: *struct_var,
-                                variant: expr::PropVariant::Seq {
+                                variant: expr::PropVariant::Set {
                                     label: *label.hir(),
                                     elements: prop_elements,
                                 },

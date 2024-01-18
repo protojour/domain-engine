@@ -55,7 +55,7 @@ struct SeqTypeLocator<'i, 'm> {
 impl<'i, 'h, 'm: 'h> ontol_hir::visitor::HirVisitor<'h, 'm, TypedHir> for SeqTypeLocator<'i, 'm> {
     fn visit_node(&mut self, _: usize, node_ref: TypedNodeRef<'h, 'm>) {
         let arena = node_ref.arena();
-        if let ontol_hir::Kind::SeqPush(seq_var, attr) = node_ref.kind() {
+        if let ontol_hir::Kind::Insert(seq_var, attr) = node_ref.kind() {
             if seq_var == &self.output_seq_var.0 {
                 self.types
                     .push((arena[attr.rel].ty(), arena[attr.val].ty()));

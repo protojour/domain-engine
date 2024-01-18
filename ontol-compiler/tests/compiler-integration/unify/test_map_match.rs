@@ -267,7 +267,6 @@ fn test_map_match_anonymous_with_translation() {
 }
 
 #[test]
-// #[should_panic = "not yet implemented"]
 fn test_map_sequence_filter_in_set() {
     r#"
     def key (rel .is: text)
@@ -285,28 +284,9 @@ fn test_map_sequence_filter_in_set() {
     map query(
         ('input': { ..x }),
         bar: {
-            ..foo match('foo': in { ..x })
+            ..foo match('foo': in { ..x }) // ERROR unbound variable
         }
     )
     "#
-    .compile_then(|test| {
-        let [foo] = test.bind(["foo"]);
-        test.mapper()
-            .with_mock_yielder(
-                YielderMock::yield_match
-                    .next_call(matching!(
-                        eq!(&ValueCardinality::Many),
-                        eq!(&Literal(indoc! { r#"
-                            (root $d)
-                            (is-entity $d def@1:2)
-                            (attr $d S:1:6 (_ 'X'))
-                        "#
-                        }))
-                    ))
-                    .returns(Value::sequence_of([foo
-                        .value_builder(json!({ "key": "key", "foo": "x!" }))
-                        .into()])),
-            )
-            .assert_named_forward_map("query", json!({ "input": "X", }), json!([{ "bar": "x!", }]));
-    });
+    .compile_fail();
 }

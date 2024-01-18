@@ -107,12 +107,12 @@ fn test_mixed() {
 }
 
 #[test]
-fn test_decl_seq() {
+fn test_decl_set() {
     let src = indoc! {"
         (struct ($a)
             (prop $a S:0:0
                 (#u
-                    (decl-seq (@c) #u $b)
+                    (decl-set (@c) #u $b)
                 )
             )
         )"
@@ -121,11 +121,11 @@ fn test_decl_seq() {
 }
 
 #[test]
-fn test_seq_prop() {
+fn test_multi_prop() {
     let src = indoc! {"
         (struct ($a)
             (prop $a S:0:0
-                (seq (@c)
+                (.. (@c)
                     (iter #u $b)
                 )
             )

@@ -10,7 +10,7 @@ fn test_unify_matchcond_empty() {
         (struct ($b))
         ",
         "
-        (decl-seq (@a) #u
+        (decl-set (@a) #u
             (match-struct ($c))
         )
         ",
@@ -34,7 +34,7 @@ fn test_unify_matchcond_single_prop() {
         )
         ",
         "
-        (decl-seq (@d) #u
+        (decl-set (@d) #u
             (match-struct ($c)
                 (prop $c O:1:0 (#u $a))
             )
@@ -68,7 +68,7 @@ fn test_unify_matchcond_struct_in_struct() {
         )
         ",
         "
-        (decl-seq (@f) #u
+        (decl-set (@f) #u
             (match-struct ($d)
                 (prop $d O:1:0
                     (#u
@@ -97,6 +97,52 @@ fn test_unify_matchcond_struct_in_struct() {
                                 (push-cond-clause $d
                                     (attr '$e O:2:0 ($a $b))
                                 )
+                            )
+                        )
+                    )
+                )
+            )
+        )"
+    };
+    assert_eq!(expected, output);
+}
+
+#[test]
+// BUG: Unfinished design work
+#[should_panic]
+fn test_unify_matchcond_cartesian_set() {
+    let output = test_unify(
+        "
+        (struct ($c)
+            (prop $c S:1:0
+                (seq (@e) (iter #u $a))
+            )
+            (prop $c S:1:1
+                (seq (@f) (iter #u $b))
+            )
+        )
+        ",
+        "
+        (decl-set (@g) #u
+            (match-struct ($d)
+                (prop $d O:1:0
+                    (#u /* what goes here? */)
+                )
+            )
+        )
+        ",
+    );
+    let expected = indoc! {"
+        |$c| (match-struct ($d)
+            (push-cond-clause $d
+                (root '$d)
+            )
+            (match-prop $c S:1:0
+                ((seq $e)
+                    (match-prop $c S:1:1
+                        ((seq $f)
+                            (push-cond-clause $d
+                                (attr '$d O:1:0 (_ '$e))
                             )
                         )
                     )
