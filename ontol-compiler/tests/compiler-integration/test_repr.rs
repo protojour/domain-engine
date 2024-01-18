@@ -145,3 +145,30 @@ fn test_repr_valid_mesh1() {
         );
     });
 }
+
+#[test]
+// BUG: todo causes panic in LSP
+#[should_panic = "not yet implemented: Intersection"]
+fn union_integers_no_question() {
+    "
+    def level (
+        rel .is: 1
+        rel .is: 2
+        rel .is: 3
+    )
+    "
+    .compile_fail();
+}
+
+#[test]
+// BUG: this mirrors how enums are constucted for text, should work
+fn union_integers() {
+    "
+    def level (
+        rel .is?: 1 // ERROR cannot discriminate type
+        rel .is?: 2 // ERROR cannot discriminate type
+        rel .is?: 3 // ERROR cannot discriminate type
+    )
+    "
+    .compile_fail();
+}
