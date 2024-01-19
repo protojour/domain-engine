@@ -110,3 +110,18 @@ fn default_for_boolean() {
     "
     .compile_fail();
 }
+
+#[test]
+// BUG: a doc comment expects a def, rel, fmt or map to follow,
+// but having a commented-out section at the end can occur during deveopment.
+// This can get very confusing, as the compiler doesn't know where to put the error,
+// and it's really hard to understand what's going on.
+fn trailing_comment_confusion() {
+    "
+    def foo () // ERROR parse error: expected one of `def`, `rel`, `fmt`, `map`
+
+    /// test
+    // def bar ()
+    "
+    .compile_fail();
+}
