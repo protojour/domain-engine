@@ -52,7 +52,7 @@ def TripAlternative (
     /// estimated arrival time for the `to` Location
     rel .'stop_time': datetime
     /// ordered list of trip segments
-    rel .'segments': [TripSegment]
+    rel .'segments': {TripSegment}
 )
 
 def Trip (
@@ -61,14 +61,14 @@ def Trip (
     /// end location
     rel .'to': Location
     /// trip alternatives
-    rel .'alternatives': [TripAlternative]
+    rel .'alternatives': {TripAlternative}
 )
 
-map trip_search(
+map trip_search (
     (
-        'start_time'?: start_time,
-        'arrive_by'?: end_time,
-        'walking_speed'?: speed,
+       //  'start_time'?: start_time,
+       //  'arrive_by'?: end_time,
+       //  'walking_speed'?: speed,
     ),
-    trip: Trip
+    Trip: { ..Trip match () }
 )

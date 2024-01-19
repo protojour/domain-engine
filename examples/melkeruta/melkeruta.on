@@ -1,13 +1,13 @@
 use 'geojson' as geo
 
 def TramState (
-    rel .is?: 'in operation',
-    rel .is?: 'in maintenance',
+    rel .is?: 'in operation'
+    rel .is?: 'in maintenance'
 )
 
 def Facility (
-    rel .is?: 'toilet',
-    rel .is?: 'ticket sales',
+    rel .is?: 'toilet'
+    rel .is?: 'ticket sales'
 )
 
 def AccessibilityTags (
@@ -18,7 +18,7 @@ def AccessibilityTags (
 )
 
 def StopPlace (
-    rel .'id'|id: { fmt '' => 'NSR:StopPlace:' => i64 }
+    rel .'id'|id: ( fmt '' => 'NSR:StopPlace:' => i64 )
     rel .'name': text
     rel .'location': geo.Point
     rel .'facilities': {Facility}
@@ -26,7 +26,7 @@ def StopPlace (
 )
 
 def Line (
-    rel .'id'|id: { rel .is: text }
+    rel .'id'|id: ( rel .is: text )
     rel .'direction': text
 )
 
