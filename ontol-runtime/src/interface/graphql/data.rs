@@ -286,6 +286,7 @@ pub enum FieldKind {
         delete_arg: Option<argument::EntityDeleteInputsArg>,
         field_unit_type_addr: TypeAddr,
     },
+    Version,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

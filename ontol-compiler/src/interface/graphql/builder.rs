@@ -223,6 +223,30 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         });
     }
 
+    pub fn register_standard_queries(&mut self) {
+        let query_data = object_data_mut(self.schema.query, self.schema);
+
+        query_data.fields.insert(
+            "_version".into(),
+            FieldData {
+                kind: FieldKind::Version,
+                field_type: TypeRef {
+                    modifier: TypeModifier::Unit(Optionality::Mandatory),
+                    unit: UnitTypeRef::NativeScalar(NativeScalarRef {
+                        operator_addr: self
+                            .serde_generator
+                            .gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
+                                self.primitives.text,
+                                SerdeModifier::NONE,
+                            )))
+                            .unwrap(),
+                        kind: NativeScalarKind::String,
+                    }),
+                },
+            },
+        );
+    }
+
     pub fn get_def_type_ref(&mut self, def_id: DefId, level: QLevel) -> UnitTypeRef {
         if let Some(type_addr) = self
             .schema

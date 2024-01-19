@@ -40,6 +40,25 @@ fn test_graphql_schema_for_entityless_domain_should_not_be_generated() {
 }
 
 #[test(tokio::test)]
+async fn test_graphql_version() {
+    let (test, schema) = "
+    def foo (
+        rel .'id'|id: (rel .is: text)
+    )
+    "
+    .compile_single_schema_with_datastore();
+
+    expect_eq!(
+        actual = "{_version}"
+            .exec([], &schema, &gql_ctx_mock_data_store(&test, ROOT, ()),)
+            .await,
+        expected = Ok(graphql_value!({
+            "_version": "0.0.0",
+        })),
+    );
+}
+
+#[test(tokio::test)]
 async fn test_graphql_int_scalars() {
     let (test, schema) = "
     def foo_id (fmt '' => text => .)

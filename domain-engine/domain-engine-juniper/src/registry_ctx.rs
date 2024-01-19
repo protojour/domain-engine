@@ -481,7 +481,8 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             | FieldKind::PageInfo
             | FieldKind::Node
             | FieldKind::TotalCount
-            | FieldKind::OpenData => {}
+            | FieldKind::OpenData
+            | FieldKind::Version => {}
         }
 
         if arguments.is_empty() {

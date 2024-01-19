@@ -106,48 +106,50 @@ async fn query(
         .unwrap()
         .get(field_name)
         .unwrap();
+    let service_ctx = executor.context();
 
-    let output = {
-        let service_ctx = executor.context();
-        let AnalyzedQuery {
+    match SelectAnalyzer::new(schema_ctx, service_ctx)
+        .analyze_look_ahead(executor.look_ahead(), query_field)?
+    {
+        AnalyzedQuery::Map {
             map_key,
             input,
             mut selects,
-        } = SelectAnalyzer::new(schema_ctx, service_ctx)
-            .analyze_look_ahead(executor.look_ahead(), query_field)?;
+        } => {
+            let output = service_ctx
+                .domain_engine
+                .exec_map(map_key, input, &mut selects, service_ctx.session.clone())
+                .await?;
 
-        service_ctx
-            .domain_engine
-            .exec_map(map_key, input, &mut selects, service_ctx.session.clone())
-            .await?
-    };
+            trace!("query result: {}", ValueDebug(&output));
 
-    trace!("query result: {}", ValueDebug(&output));
-
-    if output.is_unit()
-        && matches!(
-            query_field,
-            FieldData {
-                kind: FieldKind::MapFind { .. },
-                field_type: TypeRef {
-                    modifier: TypeModifier::Unit(Optionality::Mandatory),
-                    ..
-                }
+            if output.is_unit()
+                && matches!(
+                    query_field,
+                    FieldData {
+                        kind: FieldKind::MapFind { .. },
+                        field_type: TypeRef {
+                            modifier: TypeModifier::Unit(Optionality::Mandatory),
+                            ..
+                        }
+                    }
+                )
+            {
+                return Err(DomainError::EntityNotFound.into());
             }
-        )
-    {
-        return Err(DomainError::EntityNotFound.into());
-    }
 
-    resolve_schema_type_field(
-        AttributeType {
-            attr: &output.into(),
-        },
-        schema_ctx
-            .find_schema_type_by_unit(query_field.field_type.unit, TypingPurpose::Selection)
-            .unwrap(),
-        executor,
-    )
+            resolve_schema_type_field(
+                AttributeType {
+                    attr: &output.into(),
+                },
+                schema_ctx
+                    .find_schema_type_by_unit(query_field.field_type.unit, TypingPurpose::Selection)
+                    .unwrap(),
+                executor,
+            )
+        }
+        AnalyzedQuery::Version => Ok(juniper::Value::Scalar(GqlScalar::String("0.0.0".into()))),
+    }
 }
 
 /// Execute a GraphQL mutation on the Domain Engine

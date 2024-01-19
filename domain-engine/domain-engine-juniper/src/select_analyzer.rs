@@ -34,10 +34,13 @@ pub(crate) struct SelectAnalyzer<'a> {
 }
 
 #[derive(Debug)]
-pub(crate) struct AnalyzedQuery {
-    pub map_key: MapKey,
-    pub input: Value,
-    pub selects: FnvHashMap<Var, EntitySelect>,
+pub(crate) enum AnalyzedQuery {
+    Map {
+        map_key: MapKey,
+        input: Value,
+        selects: FnvHashMap<Var, EntitySelect>,
+    },
+    Version,
 }
 
 impl<'a> SelectAnalyzer<'a> {
@@ -82,12 +85,13 @@ impl<'a> SelectAnalyzer<'a> {
                     &mut output_selects,
                 )?;
 
-                Ok(AnalyzedQuery {
+                Ok(AnalyzedQuery::Map {
                     map_key: *map_key,
                     input,
                     selects: output_selects,
                 })
             }
+            FieldKind::Version => Ok(AnalyzedQuery::Version),
             _ => panic!(),
         }
     }

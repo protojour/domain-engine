@@ -89,6 +89,7 @@ pub fn generate_graphql_schema<'c>(
     };
 
     builder.register_fundamental_types();
+    builder.register_standard_queries();
 
     for (_, def_id) in &domain.type_names {
         let type_info = domain.type_info(*def_id);
