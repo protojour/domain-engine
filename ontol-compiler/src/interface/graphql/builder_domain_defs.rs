@@ -419,6 +419,27 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         let mut fields = Default::default();
 
         let repr_kind = self.seal_ctx.get_repr_kind(&def_id).expect("NO REPR KIND");
+
+        if let Some(properties) = self.relations.properties_by_def_id(def_id) {
+            if let DefKind::Type(type_def) = self.defs.def_kind(def_id) {
+                if type_def.open {
+                    struct_flags |= SerdeStructFlags::OPEN_DATA;
+                }
+            }
+
+            if let Some(table) = &properties.table {
+                for (property_id, property) in table {
+                    self.harvest_struct_field(
+                        *property_id,
+                        property,
+                        property_field_producer,
+                        &mut field_namespace,
+                        &mut fields,
+                    );
+                }
+            }
+        };
+
         if let ReprKind::StructIntersection(members) = repr_kind {
             for (member_def_id, _) in members {
                 let Some(properties) = self.relations.properties_by_def_id(*member_def_id) else {
@@ -435,28 +456,6 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                             &mut fields,
                         );
                     }
-                }
-            }
-        } else {
-            let Some(properties) = self.relations.properties_by_def_id(def_id) else {
-                return;
-            };
-
-            if let DefKind::Type(type_def) = self.defs.def_kind(def_id) {
-                if type_def.open {
-                    struct_flags |= SerdeStructFlags::OPEN_DATA;
-                }
-            }
-
-            if let Some(table) = &properties.table {
-                for (property_id, property) in table {
-                    self.harvest_struct_field(
-                        *property_id,
-                        property,
-                        property_field_producer,
-                        &mut field_namespace,
-                        &mut fields,
-                    );
                 }
             }
         }
@@ -497,6 +496,10 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     },
                 },
             );
+        }
+
+        if fields.is_empty() {
+            return;
         }
 
         match &mut self.schema.types[type_addr.0 as usize].kind {
