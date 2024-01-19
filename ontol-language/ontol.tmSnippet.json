@@ -2,16 +2,7 @@
     "use": {
         "prefix": "use",
         "body": [
-            "use '${1:file}'",
-			"$2"
-        ],
-        "description": "Import domain"
-    },
-    "use as": {
-        "prefix": "use as",
-        "body": [
-            "use '${1:file}' as ${2:name}",
-			"$3"
+            "use '${1:file}' as ${2:name}"
         ],
         "description": "Import domain alias"
     },
@@ -66,42 +57,42 @@
 	"rel .-1": {
         "prefix": "rel .::1",
         "body": [
-            "rel .'${1:name_a}'::'${2:name_b}': ${3:object}"
+            "rel .'${1:name_a}'::'${2:name_b}' ${3:object}"
         ],
         "description": "Relation .-to-one"
     },
 	"rel .-m": {
         "prefix": "rel .::m",
         "body": [
-            "rel .'${1:name_a}'::'${2:name_b}': {${3:object}}"
+            "rel .'${1:name_a}'::'${2:name_b}' {${3:object}}"
         ],
         "description": "Relation .-to-many"
     },
 	"rel (.)-m": {
         "prefix": "rel {.}::m",
         "body": [
-            "rel {.}'${1:name_a}'::'${2:name_b}': {${3:object}}"
+            "rel {.}'${1:name_a}'::'${2:name_b}' {${3:object}}"
         ],
         "description": "Relation (.)-to-many"
     },
 	"rel 1-1": {
         "prefix": "rel 1::1",
         "body": [
-            "rel ${1:subject} '${2:name_a}'::'${3:name_b}': ${4:object}"
+            "rel ${1:subject} '${2:name_a}'::'${3:name_b}' ${4:object}"
         ],
         "description": "Relation one-to-one"
     },
 	"rel 1-m": {
         "prefix": "rel 1::m",
         "body": [
-            "rel ${1:subject} '${2:name_a}'::'${3:name_b}': {${4:object}}"
+            "rel ${1:subject} '${2:name_a}'::'${3:name_b}' {${4:object}}"
         ],
         "description": "Relation one-to-many"
     },
 	"rel m-m": {
         "prefix": "rel m::m",
         "body": [
-            "rel {${1:subject}} '${2:name_a}'::'${3:name_b}': {${4:object}}"
+            "rel {${1:subject}} '${2:name_a}'::'${3:name_b}' {${4:object}}"
         ],
         "description": "Relation many-to-many"
     },
@@ -132,6 +123,13 @@
             "rel .default := $1"
         ],
         "description": "Relation default"
+    },
+    "rel example": {
+        "prefix": "rel .example",
+        "body": [
+            "rel .example: $1"
+        ],
+        "description": "Relation example"
     },
     "fmt": {
         "prefix": "fmt",

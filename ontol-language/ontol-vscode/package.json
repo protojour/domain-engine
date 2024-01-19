@@ -2,10 +2,11 @@
   "name": "ontol",
   "displayName": "ONTOL",
   "description": "ONTOL language support for VS Code",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "publisher": "Protojour",
   "license": "MIT",
   "private": true,
+  "icon": "assets/ontol.png",
   "repository": {
     "type": "git",
     "url": "https://gitlab.com/protojour/memoriam/domain-engine.git"

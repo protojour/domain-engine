@@ -10,3 +10,5 @@ Features:
   - Goto definition
   - Hover documentation on keywords, symbols and structures
   - Code completion
+
+The extension includes a Linux binary for `ontool`, providing the language server. Future versions _may_ include binaries for other platforms.
