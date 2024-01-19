@@ -81,8 +81,8 @@ async fn test_graphql_int_scalars() {
     .compile_single_schema_with_datastore();
 
     {
-        let parser_document = schema.as_document();
-        let foo_object = find_object_type(&parser_document, "foo").unwrap();
+        let document = schema.as_document();
+        let foo_object = find_object_type(&document, "foo").unwrap();
 
         expect_eq!(
             actual = find_object_field(foo_object, "small")
@@ -179,6 +179,20 @@ async fn test_graphql_non_entity_set_mutation() {
     .compile_single_schema_with_datastore();
 
     let [foo] = test.bind(["foo"]);
+
+    {
+        let document = schema.as_document();
+        let foo_input = find_input_object_type(&document, "fooInput").unwrap();
+        let bar_field_info = FieldInfo::from(
+            foo_input
+                .fields
+                .iter()
+                .find(|field| field.name == "bars")
+                .unwrap(),
+        );
+
+        assert_eq!(bar_field_info.field_type, "[barInput!]!");
+    }
 
     expect_eq!(
         actual = "mutation {
@@ -1059,10 +1073,9 @@ async fn test_graphql_guitar_synth_union_selection() {
 #[test]
 fn test_graphql_guitar_synth_union_input_union_field_list() {
     let (_test, schema) = GUITAR_SYNTH_UNION.1.compile_single_schema_with_datastore();
-    let parser_document = schema.as_document();
+    let document = schema.as_document();
 
-    let instrument_edge_input =
-        find_input_object_type(&parser_document, "instrumentEdgeInput").unwrap();
+    let instrument_edge_input = find_input_object_type(&document, "instrumentEdgeInput").unwrap();
 
     let field_names: Vec<_> = instrument_edge_input
         .fields
@@ -1304,10 +1317,10 @@ fn test_graphql_municipalities_geojson_union() {
         .with_data_store(ROOT, DataStoreConfig::Default)
         .compile_schemas([ROOT]);
 
-    let parser_document = schema.as_document();
+    let document = schema.as_document();
 
     let geometry_union_input =
-        find_input_object_type(&parser_document, "_geojson_GeometryUnionInput").unwrap();
+        find_input_object_type(&document, "_geojson_GeometryUnionInput").unwrap();
 
     let field_names: Vec<_> = geometry_union_input
         .fields

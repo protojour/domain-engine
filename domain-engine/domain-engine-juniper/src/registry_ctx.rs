@@ -425,10 +425,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                     .schema_ctx
                     .get_schema_type(type_addr, TypingPurpose::Input);
 
-                match modifier.unit_optionality() {
-                    Optionality::Mandatory => self.registry.arg::<InputType>(name, &info),
-                    Optionality::Optional => self.registry.arg::<Option<InputType>>(name, &info),
-                }
+                self.modified_arg::<InputType>(name, modifier, &info)
             }
             SerdeOperator::IdSingletonStruct(..) => {
                 panic!()
