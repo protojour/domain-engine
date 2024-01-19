@@ -56,7 +56,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         info: &SchemaType,
         arguments: &[juniper::meta::Argument<'r, GqlScalar>],
     ) -> juniper::meta::MetaType<'r, GqlScalar> {
-        if arguments.is_empty() {
+        let mut builder = if arguments.is_empty() {
             // Hack for empty input types
             let json_scalar = self.schema_ctx.get_schema_type(
                 self.schema_ctx.schema.json_scalar,
@@ -71,12 +71,16 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
 
             self.registry
                 .build_input_object_type::<InputType>(info, &arguments)
-                .into_meta()
         } else {
             self.registry
                 .build_input_object_type::<InputType>(info, arguments)
-                .into_meta()
+        };
+
+        if let Some(description) = info.description() {
+            builder = builder.description(&description);
         }
+
+        builder.into_meta()
     }
 
     pub fn get_fields(&mut self, type_addr: TypeAddr) -> Vec<juniper::meta::Field<'r, GqlScalar>> {
@@ -138,7 +142,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         continue;
                     }
 
-                    output.push(self.get_operator_argument(
+                    let mut argument = self.get_operator_argument(
                         name,
                         property.value_addr,
                         property.rel_params_addr,
@@ -154,7 +158,17 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                             }
                         }),
                         typing_purpose,
-                    ))
+                    );
+
+                    if let Some(description) = self
+                        .schema_ctx
+                        .ontology
+                        .get_docs(property.property_id.relationship_id.0)
+                    {
+                        argument = argument.description(&description);
+                    }
+
+                    output.push(argument);
                 }
 
                 Ok(())
