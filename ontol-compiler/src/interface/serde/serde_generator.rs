@@ -30,11 +30,9 @@ use crate::{
     interface::graphql::graphql_namespace::{adapt_graphql_identifier, GqlAdaptedIdent},
     primitive::{PrimitiveKind, Primitives},
     relation::{Constructor, Properties, Relations, UnionMemberCache},
+    repr::repr_model::{ReprKind, ReprScalarKind},
     text_patterns::{TextPatternSegment, TextPatterns},
-    type_check::{
-        repr::repr_model::{ReprKind, ReprScalarKind},
-        seal::SealCtx,
-    },
+    type_check::seal::SealCtx,
     types::{DefTypes, Type, TypeRef},
     SourceSpan,
 };

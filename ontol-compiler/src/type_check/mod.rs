@@ -9,17 +9,18 @@ use crate::{
     pattern::Patterns,
     primitive::Primitives,
     relation::Relations,
+    repr::repr_check::ReprCheck,
     types::{DefTypes, FormatType, Type, TypeRef, Types, ERROR_TYPE},
     CompileErrors, Compiler, SourceSpan, SpannedNote,
 };
 
-use self::{ena_inference::KnownType, repr::repr_check::ReprCheck, seal::SealCtx};
+use self::ena_inference::KnownType;
+use self::seal::SealCtx;
 
 pub mod check_def;
 pub mod check_domain_types;
 pub mod check_union;
 pub mod ena_inference;
-pub mod repr;
 pub mod seal;
 
 mod check_map;

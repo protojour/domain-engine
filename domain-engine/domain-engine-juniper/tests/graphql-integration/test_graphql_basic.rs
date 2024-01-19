@@ -36,7 +36,7 @@ const ROOT: SourceName = SourceName::root();
 #[test]
 #[should_panic = "GraphqlInterfaceNotFound"]
 fn test_graphql_schema_for_entityless_domain_should_not_be_generated() {
-    "".compile_schemas([ROOT]);
+    "".compile_single_schema_with_datastore();
 }
 
 #[test(tokio::test)]
@@ -373,7 +373,7 @@ fn test_graphql_value_type_as_field() {
         rel .'foo': foo
     )
     "
-    .compile_schemas([ROOT]);
+    .compile_single_schema_with_datastore();
 }
 
 #[test]
@@ -385,7 +385,7 @@ fn test_graphql_value_type_in_array() {
         rel .'foo': {foo}
     )
     "
-    .compile_schemas([ROOT]);
+    .compile_single_schema_with_datastore();
 }
 
 #[test(tokio::test)]
@@ -1376,4 +1376,32 @@ async fn test_gitmesh_id_error() {
         expected =
             "invalid map value, expected `RepositoryOwner` (id or id) in input at line 5 column 31"
     );
+}
+
+// A bug when using both .is and .'member' from foreign domain
+#[test(tokio::test)]
+async fn test_extendsion_and_member_from_foreign_domain() {
+    let (_test, [_]) = TestPackages::with_sources([
+        (
+            ROOT,
+            "
+            use 'helper' as helper
+
+            def foo (
+                rel .'id'|id: (rel .is: uuid)
+                rel .is: helper.ext
+                rel .'member'?: {helper.member}
+            )
+        ",
+        ),
+        (
+            SourceName("helper"),
+            "
+            def ext (rel .'ext-field': text)
+            def member (rel .'member-field': text)
+            ",
+        ),
+    ])
+    .with_data_store(ROOT, DataStoreConfig::Default)
+    .compile_schemas([ROOT]);
 }

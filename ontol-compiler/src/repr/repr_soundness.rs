@@ -9,14 +9,13 @@ use crate::{
     def::{BuiltinRelationKind, DefKind},
     error::CompileError,
     relation::{RelObjectConstraint, TypeRelation},
-    type_check::repr::repr_model::ReprScalarKind,
     types::FormatType,
     Note, SpannedNote,
 };
 
 use super::{
     repr_check::{IsData, ReprCheck},
-    repr_model::{NumberResolution, Repr, ReprBuilder, ReprKind},
+    repr_model::{NumberResolution, Repr, ReprBuilder, ReprKind, ReprScalarKind},
 };
 
 impl<'c, 'm> ReprCheck<'c, 'm> {

@@ -14,12 +14,13 @@ use crate::{
     error::CompileError,
     primitive::PrimitiveKind,
     relation::{Constructor, Property, TypeRelation},
+    repr::repr_model::ReprKind,
     text_patterns::TextPatternSegment,
     types::{FormatType, Type},
     SourceSpan,
 };
 
-use super::{repr::repr_model::ReprKind, TypeCheck};
+use super::TypeCheck;
 
 #[derive(Debug)]
 enum Action {

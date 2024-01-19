@@ -27,7 +27,7 @@ use crate::{
     def::{DefKind, LookupRelationshipMeta, RelParams},
     interface::serde::serde_generator::SerdeGenerator,
     relation::Property,
-    type_check::repr::repr_model::{ReprKind, ReprScalarKind},
+    repr::repr_model::{ReprKind, ReprScalarKind},
 };
 
 use super::{builder::*, graphql_namespace::GraphqlNamespace};

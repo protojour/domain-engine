@@ -399,7 +399,13 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 let type_addr = self
                     .schema_ctx
                     .type_addr_by_def(def_id, QueryLevel::Node)
-                    .expect("No struct found");
+                    .unwrap_or_else(|| {
+                        let type_info = self.schema_ctx.ontology.get_type_info(def_id);
+                        panic!(
+                            "struct not found for {def_id:?} {name:?}",
+                            name = type_info.name
+                        );
+                    });
 
                 let info = self
                     .schema_ctx

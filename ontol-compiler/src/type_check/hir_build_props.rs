@@ -13,9 +13,8 @@ use crate::{
     mem::Intern,
     pattern::{CompoundPatternAttr, CompoundPatternModifier, PatternKind},
     primitive::PrimitiveKind,
-    type_check::{
-        ena_inference::Strength, hir_build::NodeInfo, repr::repr_model::ReprKind, TypeError,
-    },
+    repr::repr_model::ReprKind,
+    type_check::{ena_inference::Strength, hir_build::NodeInfo, TypeError},
     typed_hir::{Meta, TypedHir, TypedHirData, UNIT_META},
     types::{Type, TypeRef, UNIT_TYPE},
     CompileError, SourceSpan, NO_SPAN,

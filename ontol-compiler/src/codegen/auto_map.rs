@@ -7,8 +7,8 @@ use crate::{
     def::DefKind,
     map::UndirectedMapKey,
     relation::Constructor,
+    repr::repr_model::ReprKind,
     text_patterns::TextPatternSegment,
-    type_check::repr::repr_model::ReprKind,
     typed_hir::{
         IntoTypedHirData, Meta, TypedArena, TypedHir, TypedHirData, TypedRootNode, UNIT_META,
     },

@@ -29,7 +29,8 @@ use crate::{
     interface::serde::serde_generator::SerdeGenerator,
     primitive::Primitives,
     relation::{Relations, UnionMemberCache},
-    type_check::{repr::repr_model::ReprKind, seal::SealCtx},
+    repr::repr_model::ReprKind,
+    type_check::seal::SealCtx,
 };
 
 use super::graphql_namespace::GraphqlNamespace;

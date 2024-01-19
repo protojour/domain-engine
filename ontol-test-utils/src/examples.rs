@@ -3,6 +3,8 @@ use crate::SourceName;
 type Example = (SourceName, &'static str);
 
 pub mod stix {
+    use crate::TestPackages;
+
     use super::*;
 
     pub const STIX: Example = (
@@ -24,6 +26,10 @@ pub mod stix {
         SourceName("stix_open_vocab"),
         include_str!("../../examples/stix_lite/stix_open_vocab.on"),
     );
+
+    pub fn stix_bundle() -> TestPackages {
+        TestPackages::with_sources([STIX.root(), STIX_META, STIX_COMMON, STIX_OPEN_VOCAB, SI])
+    }
 }
 
 pub mod conduit {

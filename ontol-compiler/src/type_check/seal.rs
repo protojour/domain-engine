@@ -1,12 +1,11 @@
 use fnv::{FnvHashMap, FnvHashSet};
 use ontol_runtime::{DefId, PackageId};
+use tracing::debug_span;
 
 use crate::def::DefKind;
+use crate::repr::repr_model::{Repr, ReprKind};
 
-use super::{
-    repr::repr_model::{Repr, ReprKind},
-    TypeCheck,
-};
+use super::TypeCheck;
 
 #[derive(Default, Debug)]
 pub struct SealCtx {
@@ -47,6 +46,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             // Already sealed
             return;
         }
+
+        let _entered = debug_span!("seal", id = ?def_id).entered();
 
         if let Some(def) = self.defs.table.get(&def_id) {
             if let DefKind::Type(_) = def.kind {

@@ -12,7 +12,7 @@ use ontol_runtime::{
     resolve_path::ResolverGraph,
     DefId, PackageId,
 };
-use tracing::trace;
+use tracing::{debug_span, trace};
 
 use crate::{
     codegen::task::CodegenTasks,
@@ -49,6 +49,8 @@ pub fn generate_graphql_schema<'c>(
         // A domain without entities doesn't get a GraphQL schema.
         return None;
     }
+
+    let _entered = debug_span!("gql", pkg = ?package_id.0).entered();
 
     let mut schema = new_schema_with_capacity(package_id, domain.type_names.len());
     let mut namespace = GraphqlNamespace::with_domain_disambiguation(DomainDisambiguation {

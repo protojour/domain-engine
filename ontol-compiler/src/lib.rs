@@ -42,7 +42,7 @@ use tracing::debug;
 use type_check::seal::SealCtx;
 use types::{DefTypes, Types};
 
-use crate::{def::RelParams, type_check::repr::repr_model::ReprKind};
+use crate::{def::RelParams, repr::repr_model::ReprKind};
 
 pub mod error;
 pub mod hir_unify;
@@ -64,6 +64,7 @@ mod pattern;
 mod primitive;
 mod regex_util;
 mod relation;
+mod repr;
 mod sequence;
 mod strings;
 mod text_patterns;

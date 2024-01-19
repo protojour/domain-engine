@@ -5,7 +5,8 @@ use crate::{
     def::Defs,
     map::UndirectedMapKey,
     relation::Relations,
-    type_check::{repr::repr_model::ReprKind, seal::SealCtx},
+    repr::repr_model::ReprKind,
+    type_check::seal::SealCtx,
     types::{Type, TypeRef},
 };
 

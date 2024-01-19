@@ -15,6 +15,7 @@ use crate::{
     map::UndirectedMapKey,
     mem::Intern,
     pattern::{CompoundPatternModifier, PatId, Pattern, PatternKind, RegexPatternCaptureNode},
+    repr::repr_model::ReprKind,
     type_check::hir_build_ctx::{Arm, VariableMapping},
     typed_hir::TypedRootNode,
     types::{Type, TypeRef, ERROR_TYPE},
@@ -25,7 +26,6 @@ use super::{
     ena_inference::{KnownType, Strength},
     hir_build_ctx::{CtrlFlowDepth, HirBuildCtx, PatternVariable, SeqElementGroup, ARMS},
     hir_type_inference::{HirArmTypeInference, HirVariableMapper},
-    repr::repr_model::ReprKind,
     TypeCheck, TypeEquation, TypeError,
 };
 
