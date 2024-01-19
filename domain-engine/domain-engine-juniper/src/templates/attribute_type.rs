@@ -20,7 +20,7 @@ use ontol_runtime::{
     DefId,
 };
 use serde::Serialize;
-use tracing::trace;
+use tracing::trace_span;
 
 use crate::{
     context::{SchemaCtx, SchemaType},
@@ -228,6 +228,8 @@ impl<'v> AttributeType<'v> {
         let field_data = object_data.fields.get(field_name).unwrap();
         let field_type = field_data.field_type;
 
+        let _entered = trace_span!("rslv", name = field_name).entered();
+
         // trace!("resolve object field `{field_name}`: {:?}", self.attr);
 
         match (&self.attr.value, &field_data.kind) {
@@ -240,7 +242,6 @@ impl<'v> AttributeType<'v> {
             ),
             (Value::Unit(_), FieldKind::Node) => Ok(juniper::Value::Null),
             (Value::Struct(attrs, _), FieldKind::Property(property_data)) => {
-                trace!("lookup property {field_name} => {:?}", property_data);
                 Self::resolve_property(
                     attrs,
                     property_data.property_id,
@@ -369,17 +370,28 @@ impl<'v> AttributeType<'v> {
 
         match schema_ctx.lookup_type_by_addr(type_ref.unit) {
             Ok(type_addr) => {
-                let type_info = schema_ctx.get_schema_type(type_addr, TypingPurpose::Selection);
-                match &schema_ctx.type_data(type_info.type_addr).kind {
+                let schema_type = schema_ctx.get_schema_type(type_addr, TypingPurpose::Selection);
+                match &schema_ctx.type_data(schema_type.type_addr).kind {
                     TypeKind::CustomScalar(scalar_data) => Ok(schema_ctx
                         .ontology
                         .new_serde_processor(scalar_data.operator_addr, ProcessorMode::Read)
                         .serialize_value(&attribute.value, None, JuniperValueSerializer)?),
-                    TypeKind::Object(_) | TypeKind::Union(_) => resolve_schema_type_field(
-                        AttributeType { attr: attribute },
-                        type_info,
-                        executor,
-                    ),
+                    TypeKind::Object(_) | TypeKind::Union(_) => {
+                        match (type_ref.modifier, &attribute.value) {
+                            (TypeModifier::Array { .. }, Value::Sequence(seq, _)) => {
+                                resolve_schema_type_field(
+                                    SequenceType { seq },
+                                    schema_type,
+                                    executor,
+                                )
+                            }
+                            _ => resolve_schema_type_field(
+                                AttributeType { attr: attribute },
+                                schema_type,
+                                executor,
+                            ),
+                        }
+                    }
                 }
             }
             Err(scalar_ref) => match (

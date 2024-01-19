@@ -166,6 +166,56 @@ async fn test_graphql_int_scalars() {
 }
 
 #[test(tokio::test)]
+async fn test_graphql_non_entity_set_mutation() {
+    let (test, schema) = "
+    def foo (
+        rel .'id'|id: (rel .is: text)
+        rel .'bars': {bar}
+    )
+    def bar (
+        rel .'field': text
+    )
+    "
+    .compile_single_schema_with_datastore();
+
+    let [foo] = test.bind(["foo"]);
+
+    expect_eq!(
+        actual = "mutation {
+            foo(create: []) {
+                node {
+                    id
+                    bars { field }
+                }
+            }
+        }"
+        .exec(
+            [],
+            &schema,
+            &gql_ctx_mock_data_store(
+                &test,
+                ROOT,
+                DataStoreAPIMock::execute
+                    .next_call(matching!(Request::BatchWrite(_), _session))
+                    .returns(Ok(Response::one_inserted(
+                        foo.entity_builder(
+                            json!("my_id"),
+                            json!({ "id": "N/A", "bars": [{ "field": "text" }] })
+                        )
+                        .into(),
+                    )))
+            ),
+        )
+        .await,
+        expected = Ok(graphql_value!({
+            "foo": [{
+                "node": { "id": "N/A", "bars": [{"field": "text" }]}
+            }],
+        })),
+    );
+}
+
+#[test(tokio::test)]
 async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
     let (test, schema) = "
     def foo (

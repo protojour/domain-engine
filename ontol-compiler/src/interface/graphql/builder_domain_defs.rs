@@ -418,15 +418,15 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         let mut field_namespace = GraphqlNamespace::default();
         let mut fields = Default::default();
 
+        if let DefKind::Type(type_def) = self.defs.def_kind(def_id) {
+            if type_def.open {
+                struct_flags |= SerdeStructFlags::OPEN_DATA;
+            }
+        }
+
         let repr_kind = self.seal_ctx.get_repr_kind(&def_id).expect("NO REPR KIND");
 
         if let Some(properties) = self.relations.properties_by_def_id(def_id) {
-            if let DefKind::Type(type_def) = self.defs.def_kind(def_id) {
-                if type_def.open {
-                    struct_flags |= SerdeStructFlags::OPEN_DATA;
-                }
-            }
-
             if let Some(table) = &properties.table {
                 for (property_id, property) in table {
                     self.harvest_struct_field(
