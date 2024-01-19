@@ -23,8 +23,13 @@ use std::{
 };
 use thiserror::Error;
 use tower_lsp::{LspService, Server};
+use tracing::level_filters::LevelFilter;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// This environment variable is used to control logs.
+const LOG_ENV_VAR: &str = "LOG";
 
 /// ontool – ONTOlogy Language tool
 #[derive(Parser)]
@@ -98,16 +103,16 @@ pub enum OntoolError {
 }
 
 pub async fn run() -> Result<(), OntoolError> {
-    tracing_subscriber::fmt()
-        .with_writer(std::io::stderr)
-        .with_target(false)
-        .init();
-
     let cli = Cli::parse();
 
     match cli.command {
-        Some(Commands::Check(args)) => check(&args),
+        Some(Commands::Check(args)) => {
+            init_tracing();
+            check(&args)
+        }
         Some(Commands::Compile(args)) => {
+            init_tracing();
+
             let compile_output = compile(args.files, args.data_store)?;
 
             let output_path = args.output.unwrap_or_else(|| PathBuf::from("ontology"));
@@ -121,6 +126,8 @@ pub async fn run() -> Result<(), OntoolError> {
             Ok(())
         }
         Some(Commands::Generate(args)) => {
+            init_tracing();
+
             let CompileOutput {
                 ontology,
                 root_package,
@@ -141,9 +148,30 @@ pub async fn run() -> Result<(), OntoolError> {
 
             Ok(())
         }
-        Some(Commands::Lsp) => lsp().await,
+        Some(Commands::Lsp) => {
+            init_tracing_stderr();
+            lsp().await
+        }
         None => Ok(()),
     }
+}
+
+fn init_tracing() {
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer())
+        .with(
+            tracing_subscriber::EnvFilter::builder()
+                .with_default_directive(LevelFilter::INFO.into())
+                .with_env_var(LOG_ENV_VAR)
+                .from_env_lossy(),
+        )
+        .init();
+}
+
+fn init_tracing_stderr() {
+    tracing_subscriber::fmt()
+        .with_writer(std::io::stderr)
+        .init();
 }
 
 fn check(args: &Check) -> Result<(), OntoolError> {
