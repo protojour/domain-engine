@@ -202,3 +202,27 @@ fn more_members() {
     "
     .compile_fail();
 }
+
+#[test]
+// BUG: somewhat related – this should work?
+fn forward_mapping() {
+    "
+    def created (
+        rel .'created'(rel .gen: create_time)?: datetime
+    )
+    def foo_id (
+        fmt '' => 'foos/' => text => .
+    )
+    def foo (
+        rel .'_id'|id(rel .gen: auto): foo_id
+        rel .is: created
+        rel .'name': text
+    )
+
+    map foos ( // ERROR BUG: Failed to generate forward mapping
+        (),
+        foo: { ..foo match () }
+    )
+    "
+    .compile_fail();
+}
