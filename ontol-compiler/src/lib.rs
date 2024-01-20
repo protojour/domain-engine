@@ -417,18 +417,14 @@ impl<'m> Compiler<'m> {
         type_def_id: DefId,
         union_member_cache: &UnionMemberCache,
     ) -> IndexMap<PropertyId, DataRelationshipInfo> {
-        let Some(properties) = self.relations.properties_by_def_id(type_def_id) else {
-            return Default::default();
-        };
         let mut data_relationships = IndexMap::default();
+        self.add_inherent_data_relationships(type_def_id, &mut data_relationships);
 
-        if let Some(table) = &properties.table {
-            for property_id in table.keys() {
-                if let Some(data_relationship) = self
-                    .generate_data_relationship_info(*property_id, DataRelationshipSource::Inherent)
-                {
-                    data_relationships.insert(*property_id, data_relationship);
-                }
+        if let Some(ReprKind::StructIntersection(members)) =
+            self.seal_ctx.get_repr_kind(&type_def_id)
+        {
+            for (member_def_id, _) in members {
+                self.add_inherent_data_relationships(*member_def_id, &mut data_relationships);
             }
         }
 
@@ -453,6 +449,25 @@ impl<'m> Compiler<'m> {
         }
 
         data_relationships
+    }
+
+    fn add_inherent_data_relationships(
+        &self,
+        type_def_id: DefId,
+        output: &mut IndexMap<PropertyId, DataRelationshipInfo>,
+    ) {
+        let Some(properties) = self.relations.properties_by_def_id(type_def_id) else {
+            return;
+        };
+        if let Some(table) = &properties.table {
+            for property_id in table.keys() {
+                if let Some(data_relationship) = self
+                    .generate_data_relationship_info(*property_id, DataRelationshipSource::Inherent)
+                {
+                    output.insert(*property_id, data_relationship);
+                }
+            }
+        }
     }
 
     fn generate_data_relationship_info(

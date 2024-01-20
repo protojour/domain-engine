@@ -10,7 +10,7 @@ use domain_engine_test_utils::graphql_test_utils::{
 };
 use ontol_runtime::{config::DataStoreConfig, ontology::Ontology};
 use ontol_test_utils::{
-    examples::{GITMESH, GUITAR_SYNTH_UNION},
+    examples::{stix::stix_bundle, GITMESH, GUITAR_SYNTH_UNION},
     expect_eq, SourceName, TestPackages,
 };
 use test_log::test;
@@ -22,6 +22,41 @@ async fn make_domain_engine(ontology: Arc<Ontology>) -> DomainEngine {
         .build(crate::TestDataStoreFactory::default(), Session::default())
         .await
         .unwrap()
+}
+
+/// There should only be one stix test since the domain is so big
+#[test(tokio::test)]
+async fn test_graphql_stix() {
+    let (test, [schema]) = stix_bundle()
+        .with_data_store(SourceName::root(), DataStoreConfig::Default)
+        .compile_schemas([SourceName::root()]);
+    let ctx: ServiceCtx = make_domain_engine(test.ontology.clone()).await.into();
+
+    expect_eq!(
+        actual = r#"mutation {
+            url(create:[
+                {
+                    type: "url"
+                    value: "http://jøkkagnork"
+                    defanged:true
+                    object_marking_refs: []
+                    granular_markings: []
+                }
+            ]) {
+                node { defanged }
+            }
+        }
+        "#
+        .exec([], &schema, &ctx)
+        .await,
+        expected = Ok(graphql_value!({
+            "url": [{
+                "node": {
+                    "defanged": true
+                }
+            }]
+        })),
+    );
 }
 
 #[test(tokio::test)]

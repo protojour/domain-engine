@@ -131,6 +131,11 @@ pub(crate) fn find_data_relationship<'a>(
         .data_relationships
         .get(property_id)
         .ok_or_else(|| {
+            warn!(
+                "data relationship {property_id:?} not found in {keys:?}",
+                keys = type_info.data_relationships.keys()
+            );
+
             DomainError::DataStoreBadRequest(anyhow!(
                 "data relationship {property_id} does not exist"
             ))
