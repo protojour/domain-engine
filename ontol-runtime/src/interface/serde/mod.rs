@@ -59,7 +59,13 @@ impl Debug for SerdeDef {
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum SerdeKey {
     Def(SerdeDef),
-    Intersection(Box<BTreeSet<SerdeKey>>),
+    Intersection(Box<SerdeIntersection>),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+pub struct SerdeIntersection {
+    pub main: Option<SerdeDef>,
+    pub set: BTreeSet<SerdeDef>,
 }
 
 bitflags::bitflags! {

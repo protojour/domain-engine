@@ -44,8 +44,6 @@ impl InMemoryStore {
         select: &Select,
         ctx: &DbContext,
     ) -> DomainResult<Value> {
-        debug!("write new entity: {}", ValueDebug(&entity));
-
         let entity_id = self.write_new_entity_inner(entity, ctx)?;
         self.post_write_select(entity_id, select, ctx)
     }
@@ -195,7 +193,11 @@ impl InMemoryStore {
 
     /// Returns the entity ID
     fn write_new_entity_inner(&mut self, entity: Value, ctx: &DbContext) -> DomainResult<Value> {
-        debug!("write entity {}", ValueDebug(&entity));
+        debug!(
+            "write new entity {:?}: {}",
+            entity.type_def_id(),
+            ValueDebug(&entity)
+        );
 
         let type_info = ctx.ontology.get_type_info(entity.type_def_id());
         let entity_info = type_info

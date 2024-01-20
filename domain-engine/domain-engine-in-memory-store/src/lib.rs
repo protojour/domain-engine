@@ -16,6 +16,7 @@ use domain_engine_core::{
     data_store::{BatchWriteRequest, BatchWriteResponse, DataStoreAPI, Request, Response},
     DomainResult,
 };
+use tracing::debug;
 
 use crate::core::{DynamicKey, EdgeCollection, EntityTable, InMemoryStore};
 
@@ -49,6 +50,12 @@ impl InMemoryDb {
 
         for type_info in domain.type_infos() {
             if type_info.entity_info.is_some() {
+                debug!(
+                    "new collection {:?} (`{}`)",
+                    type_info.def_id,
+                    type_info.name.as_deref().unwrap_or("")
+                );
+
                 collections.insert(type_info.def_id, Default::default());
 
                 for (property_id, entity_relationship) in type_info.entity_relationships() {

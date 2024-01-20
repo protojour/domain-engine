@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashSet};
+use std::collections::HashSet;
 
 use fnv::FnvHashSet;
 use indexmap::IndexMap;
@@ -8,7 +8,7 @@ use ontol_runtime::{
             SerdeOperator, SerdeOperatorAddr, SerdeProperty, SerdePropertyFlags, StructOperator,
             UnionOperator,
         },
-        SerdeDef, SerdeKey, SerdeModifier,
+        SerdeDef, SerdeIntersection, SerdeKey, SerdeModifier,
     },
     value::PropertyId,
     value_generator::ValueGenerator,
@@ -174,56 +174,69 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     pub(super) fn populate_struct_intersection_operator(
         &mut self,
         addr: SerdeOperatorAddr,
-        intersection: BTreeSet<SerdeKey>,
+        intersection: SerdeIntersection,
     ) {
-        let mut iterator = intersection.iter();
-        let first_id = self
-            .gen_addr_lazy(iterator.next().unwrap().clone())
-            .unwrap();
+        let mut iterator = intersection.set.iter();
 
-        let mut intersected_map = self
-            .find_unambiguous_struct_operator(first_id)
-            .unwrap_or_else(|operator| {
-                panic!("Initial map not found for intersection: {operator:?}")
-            })
-            .clone();
+        let mut new_operator = match intersection.main {
+            Some(main_def) => self
+                .lookup_addr_by_key(&SerdeKey::Def(main_def))
+                .and_then(|addr| self.find_unambiguous_struct_operator(*addr).ok())
+                .cloned()
+                .unwrap(),
+            None => {
+                // Does not matter what is chosen first
+                let random_def = *iterator.next().unwrap();
+                let origin_addr = self.lookup_addr_by_key(&SerdeKey::Def(random_def)).unwrap();
+                self.find_unambiguous_struct_operator(*origin_addr)
+                    .unwrap_or_else(|operator| {
+                        panic!("Initial map not found for intersection: {operator:?}")
+                    })
+                    .clone()
+            }
+        };
 
         // avoid duplicated properties, since some properties may already be "imported" from unions in which
         // the types are members,
-        let mut property_deduplication: FnvHashSet<PropertyId> = Default::default();
+        let mut dedup: FnvHashSet<PropertyId> = Default::default();
 
-        for serde_property in intersected_map.properties.values() {
-            property_deduplication.insert(serde_property.property_id);
+        for serde_property in new_operator.properties.values() {
+            dedup.insert(serde_property.property_id);
         }
 
-        for next_key in iterator {
-            let next_id = self.gen_addr_lazy(next_key.clone()).unwrap();
+        for next_def in iterator {
+            if let Some(main) = &intersection.main {
+                if next_def == main {
+                    continue;
+                }
+            }
 
-            if let Ok(next_map_type) = self.find_unambiguous_struct_operator(next_id) {
+            let next_addr = self
+                .lookup_addr_by_key(&SerdeKey::Def(*next_def))
+                .expect("should be preregisted");
+
+            if let Ok(next_map_type) = self.find_unambiguous_struct_operator(*next_addr) {
                 for (key, serde_property) in &next_map_type.properties {
-                    if !property_deduplication.contains(&serde_property.property_id) {
+                    if dedup.insert(serde_property.property_id) {
                         insert_property(
-                            &mut intersected_map.properties,
+                            &mut new_operator.properties,
                             key,
                             *serde_property,
-                            match next_key {
-                                SerdeKey::Def(def) => def.modifier,
-                                SerdeKey::Intersection(_) => panic!(),
-                            },
+                            next_def.modifier,
                         );
                     }
                 }
             }
         }
 
-        self.operators_by_addr[addr.0 as usize] = SerdeOperator::Struct(intersected_map);
+        self.operators_by_addr[addr.0 as usize] = SerdeOperator::Struct(new_operator);
     }
 
     fn find_unambiguous_struct_operator(
         &self,
-        id: SerdeOperatorAddr,
+        addr: SerdeOperatorAddr,
     ) -> Result<&StructOperator, &SerdeOperator> {
-        let operator = &self.operators_by_addr[id.0 as usize];
+        let operator = &self.operators_by_addr[addr.0 as usize];
         match operator {
             SerdeOperator::Struct(struct_op) => Ok(struct_op),
             SerdeOperator::Union(union_op) => {
@@ -285,10 +298,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         let variants: Vec<_> = if properties.table.is_some() {
             // Need to do an intersection of the union type's _inherent_
             // properties and each variant's properties
-            let inherent_properties_key = SerdeKey::Def(SerdeDef::new(
+            let inherent_properties_def = SerdeDef::new(
                 def.def_id,
                 SerdeModifier::INHERENT_PROPS | def.modifier.cross_def_flags(),
-            ));
+            );
 
             union_builder
                 .build(self, |this, addr, result_def| {
@@ -298,9 +311,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         debug!("Intersection with {result_def:?}");
 
                         // Make the intersection:
-                        this.gen_addr_lazy(SerdeKey::Intersection(Box::new(
-                            [inherent_properties_key.clone(), SerdeKey::Def(result_def)].into(),
-                        )))
+                        this.gen_addr_lazy(SerdeKey::Intersection(Box::new(SerdeIntersection {
+                            main: None,
+                            set: [inherent_properties_def, result_def].into(),
+                        })))
                         .expect("No inner operator")
                     } else {
                         addr

@@ -13,13 +13,13 @@ use ontol_runtime::{
     },
     interface::{
         discriminator::LeafDiscriminant,
-        serde::{operator::SerdeStructFlags, SerdeDef, SerdeKey, SerdeModifier},
+        serde::{operator::SerdeStructFlags, SerdeDef, SerdeIntersection, SerdeKey, SerdeModifier},
     },
     ontology::{Cardinality, PropertyCardinality, ValueCardinality},
     smart_format, DefId,
 };
 use smartstring::alias::String;
-use tracing::{debug, error, trace, warn};
+use tracing::{error, trace, warn};
 
 use super::sequence_range_builder::SequenceRangeBuilder;
 
@@ -48,7 +48,7 @@ pub struct SerdeGenerator<'c, 'm> {
     pub union_member_cache: &'c UnionMemberCache,
 
     pub(super) lazy_struct_op_tasks: VecDeque<(SerdeOperatorAddr, SerdeDef, &'c Properties)>,
-    pub(super) lazy_struct_intersection_tasks: VecDeque<(SerdeOperatorAddr, BTreeSet<SerdeKey>)>,
+    pub(super) lazy_struct_intersection_tasks: VecDeque<(SerdeOperatorAddr, SerdeIntersection)>,
     pub(super) lazy_union_repr_tasks:
         VecDeque<(SerdeOperatorAddr, SerdeDef, &'c str, &'c Properties)>,
 
@@ -136,6 +136,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         }
     }
 
+    pub fn lookup_addr_by_key(&self, key: &SerdeKey) -> Option<&SerdeOperatorAddr> {
+        self.operators_by_key.get(key)
+    }
+
     pub fn get_operator(&self, addr: SerdeOperatorAddr) -> &SerdeOperator {
         &self.operators_by_addr[addr.0 as usize]
     }
@@ -188,18 +192,21 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
     fn alloc_serde_operator_from_key(&mut self, key: SerdeKey) -> Option<OperatorAllocation> {
         match key {
-            SerdeKey::Intersection(keys) => {
-                debug!("register intersection: {keys:?}");
-
+            SerdeKey::Intersection(intersection) => {
                 // Generate dependencies
-                for key in keys.iter() {
-                    self.gen_addr_lazy(key.clone());
+                if let Some(main) = intersection.main {
+                    self.gen_addr_lazy(SerdeKey::Def(main));
                 }
 
-                let addr = self.alloc_addr_for_key(&SerdeKey::Intersection(keys.clone()));
+                for def in intersection.set.iter() {
+                    self.gen_addr_lazy(SerdeKey::Def(*def));
+                }
+
+                let addr = self.alloc_addr_for_key(&SerdeKey::Intersection(intersection.clone()));
 
                 // This will get computed later
-                self.lazy_struct_intersection_tasks.push_back((addr, *keys));
+                self.lazy_struct_intersection_tasks
+                    .push_back((addr, *intersection));
 
                 Some(OperatorAllocation::Allocated(addr, SerdeOperator::Unit))
             }
@@ -247,7 +254,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 }
             }
             SerdeKey::Def(def) if def.modifier.contains(SerdeModifier::ARRAY) => {
-                let item_addr =
+                let element_addr =
                     self.gen_addr_lazy(SerdeKey::Def(def.remove_modifier(SerdeModifier::ARRAY)))?;
 
                 // FIXME: What about unions?
@@ -261,7 +268,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     self.alloc_addr_for_key(&key),
                     SerdeOperator::RelationSequence(RelationSequenceOperator {
                         ranges: [SequenceRange {
-                            addr: item_addr,
+                            addr: element_addr,
                             finite_repetition: None,
                         }],
                         def,
@@ -277,13 +284,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         match self.get_def_type(def.def_id) {
             Some(Type::Domain(def_id) | Type::Anonymous(def_id)) => {
                 let properties = self.relations.properties_by_def_id.get(def_id);
-                let typename = match self.defs.def_kind(*def_id) {
-                    DefKind::Type(TypeDef {
-                        ident: Some(ident), ..
-                    }) => ident,
-                    DefKind::Type(TypeDef { ident: None, .. }) => "<anonymous>",
-                    _ => "Unknown type",
-                };
+                let typename = self.get_typename(*def_id);
                 self.alloc_domain_type_serde_operator(def.with_def(*def_id), typename, properties)
             }
             Some(type_ref) => match def.modifier {
@@ -679,36 +680,28 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 Some(OperatorAllocation::Redirect(def.remove_modifier(
                     SerdeModifier::INTERSECTION | SerdeModifier::INHERENT_PROPS,
                 )))
-            } else if members.len() == 1 {
-                self.alloc_serde_operator_from_key(SerdeKey::Intersection(Box::new(
-                    [
-                        // Require intersected properties via [is] relation:
-                        SerdeKey::Def(def.remove_modifier(
-                            SerdeModifier::INTERSECTION | SerdeModifier::INHERENT_PROPS,
-                        )),
-                        // Require inherent propserties:
-                        SerdeKey::Def(def.remove_modifier(SerdeModifier::INTERSECTION)),
-                    ]
-                    .into(),
-                )))
             } else {
                 let mut intersection_keys = BTreeSet::new();
+                let inherent_def = def.remove_modifier(SerdeModifier::INTERSECTION);
 
                 if properties.table.is_some() {
                     // inherent properties:
-                    intersection_keys.insert(SerdeKey::Def(SerdeDef::new(
-                        def.def_id,
-                        def.remove_modifier(SerdeModifier::INTERSECTION).modifier,
-                    )));
+                    self.gen_addr_lazy(SerdeKey::Def(inherent_def));
+                    intersection_keys.insert(inherent_def);
                 }
 
                 for (def_id, _span) in members {
-                    intersection_keys
-                        .insert(SerdeKey::Def(SerdeDef::new(*def_id, def.modifier.reset())));
+                    let member_def = SerdeDef::new(*def_id, def.modifier.reset());
+                    self.gen_addr_lazy(SerdeKey::Def(member_def));
+
+                    intersection_keys.insert(member_def);
                 }
 
                 self.alloc_serde_operator_from_key(SerdeKey::Intersection(Box::new(
-                    intersection_keys,
+                    SerdeIntersection {
+                        main: Some(inherent_def),
+                        set: intersection_keys,
+                    },
                 )))
             }
         } else if modifier.contains(SerdeModifier::INHERENT_PROPS) {
@@ -778,23 +771,22 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         if properties.table.is_some() {
             // Need to do an intersection of the union type's _inherent_
             // properties and each variant's properties
-            let inherent_properties_key = SerdeKey::Def(SerdeDef::new(
+            let inherent_properties_def = SerdeDef::new(
                 def.def_id,
                 SerdeModifier::INHERENT_PROPS | def.modifier.cross_def_flags(),
-            ));
+            );
 
             for root_discriminator in &union_discriminator.variants {
+                let variant_def = SerdeDef::new(
+                    root_discriminator.serde_def.def_id,
+                    SerdeModifier::INHERENT_PROPS | def.modifier.cross_def_flags(),
+                );
+
                 // Intersection dependencies
-                self.gen_addr_lazy(SerdeKey::Intersection(Box::new(
-                    [
-                        inherent_properties_key.clone(),
-                        SerdeKey::Def(SerdeDef::new(
-                            root_discriminator.serde_def.def_id,
-                            SerdeModifier::INHERENT_PROPS | def.modifier.cross_def_flags(),
-                        )),
-                    ]
-                    .into(),
-                )));
+                self.gen_addr_lazy(SerdeKey::Intersection(Box::new(SerdeIntersection {
+                    main: None,
+                    set: [inherent_properties_def, variant_def].into(),
+                })));
             }
         }
 
@@ -828,7 +820,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         )
     }
 
-    fn struct_flags_from_def_id(&self, def_id: DefId) -> SerdeStructFlags {
+    pub(super) fn struct_flags_from_def_id(&self, def_id: DefId) -> SerdeStructFlags {
         let mut flags = SerdeStructFlags::empty();
         if let DefKind::Type(type_def) = self.defs.def_kind(def_id) {
             if type_def.open {
@@ -837,6 +829,16 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         }
 
         flags
+    }
+
+    pub(super) fn get_typename(&self, def_id: DefId) -> &'c str {
+        match self.defs.def_kind(def_id) {
+            DefKind::Type(TypeDef {
+                ident: Some(ident), ..
+            }) => ident,
+            DefKind::Type(TypeDef { ident: None, .. }) => "<anonymous>",
+            _ => "Unknown type",
+        }
     }
 }
 

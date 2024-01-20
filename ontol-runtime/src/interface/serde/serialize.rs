@@ -108,8 +108,8 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                     .narrow(id)
                     .serialize_value(value, rel_params, serializer),
                 FilteredVariants::Union(variants) => {
-                    let variant = variants.iter().find(|discriminator| {
-                        value.type_def_id() == discriminator.discriminator.serde_def.def_id
+                    let variant = variants.iter().find(|variant| {
+                        value.type_def_id() == variant.discriminator.serde_def.def_id
                     });
 
                     if let Some(variant) = variant {
@@ -121,7 +121,11 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 
                         processor.serialize_value(value, rel_params, serializer)
                     } else {
-                        panic!("Discriminator not found while serializing union type");
+                        panic!(
+                            "Discriminator not found while serializing union type {:?}: {:#?}",
+                            value.type_def_id(),
+                            variants
+                        );
                     }
                 }
             },
