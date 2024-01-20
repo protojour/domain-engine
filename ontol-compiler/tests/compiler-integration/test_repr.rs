@@ -172,3 +172,33 @@ fn union_integers() {
     "
     .compile_fail();
 }
+
+#[test]
+// BUG: example of "not yet implemented: More members".
+// Expected to be able to compose like this.
+#[should_panic = "not yet implemented: More members"]
+fn more_members() {
+    "
+    def created (
+        rel .'created'(rel .gen: create_time)?: datetime
+    )
+    def updated (
+        rel .'updated'(rel .gen: update_time)?: datetime
+    )
+    def foo_id (
+        fmt '' => 'foos/' => text => .
+    )
+    def foo (
+        rel .'_id'|id(rel .gen: auto): foo_id
+        rel .is: created
+        rel .is: updated
+        rel .'name': text
+    )
+
+    map foos (
+        (),
+        foo: { ..foo match () }
+    )
+    "
+    .compile_fail();
+}
