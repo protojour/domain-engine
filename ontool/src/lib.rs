@@ -65,9 +65,13 @@ struct Compile {
     #[arg(short)]
     output: Option<PathBuf>,
 
-    /// Specify a domain file as the data store
+    /// Specify a domain file to be backed by a data store
     #[arg(short('d'), long)]
     data_store: Option<PathBuf>,
+
+    /// Specify a data store backend (e.g. "arangodb")
+    #[arg(short('b'), long)]
+    backend: Option<String>,
 
     /// ONTOL (.on) files to compile
     files: Vec<PathBuf>,
@@ -113,7 +117,7 @@ pub async fn run() -> Result<(), OntoolError> {
         Some(Commands::Compile(args)) => {
             init_tracing();
 
-            let compile_output = compile(args.files, args.data_store)?;
+            let compile_output = compile(args.files, args.data_store, args.backend)?;
 
             let output_path = args.output.unwrap_or_else(|| PathBuf::from("ontology"));
 
@@ -131,7 +135,7 @@ pub async fn run() -> Result<(), OntoolError> {
             let CompileOutput {
                 ontology,
                 root_package,
-            } = compile(args.files, None)?;
+            } = compile(args.files, None, None)?;
 
             let domain = ontology.find_domain(root_package).unwrap();
             let schemas = build_openapi_schemas(&ontology, root_package, domain);
@@ -213,6 +217,7 @@ struct CompileOutput {
 fn compile(
     paths: Vec<PathBuf>,
     data_store_path: Option<PathBuf>,
+    backend: Option<String>,
 ) -> Result<CompileOutput, OntoolError> {
     if paths.is_empty() {
         return Err(OntoolError::NoInputFiles);
@@ -256,7 +261,10 @@ fn compile(
 
                     if let Some(path) = paths_by_name.get(source_name) {
                         if Some(path) == data_store_path.as_ref() {
-                            package_config.data_store = Some(DataStoreConfig::Default);
+                            package_config.data_store = match &backend {
+                                Some(backend) => Some(DataStoreConfig::ByName(backend.into())),
+                                None => Some(DataStoreConfig::Default),
+                            }
                         }
 
                         if let Some(source_text) = sources_by_name.get(source_name) {
