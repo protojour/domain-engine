@@ -159,6 +159,7 @@ impl<'m> Compiler<'m> {
 
         execute_codegen_tasks(self);
         compile_all_text_patterns(self);
+        self.relations.sort_property_tables();
         self.check_error()
     }
 

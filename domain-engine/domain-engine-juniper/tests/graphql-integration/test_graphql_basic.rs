@@ -58,6 +58,58 @@ async fn test_graphql_version() {
     );
 }
 
+#[test]
+fn test_graphql_field_order() {
+    let (_test, schema) = "
+    def ent1 (
+        rel .'id'|id: (rel .is: text)
+        rel {.} 'subjects'::'obj_1' {subject}
+    )
+    def subject (
+        rel .is: a
+        rel .is: b
+        rel .'id'|id: (rel .is: text)
+        rel {.} 'connection': {ent1}
+        rel .'field': text
+        rel .is: c
+        rel .is: d
+    )
+    def ent2 (
+        rel .'id'|id: (rel .is: text)
+        rel {.} 'subjects'::'obj_2' {subject}
+    )
+
+    def a(rel .'a': text)
+    def b(rel .'b': text)
+    def c(rel .'c': text)
+    def d(rel .'d': text)
+    "
+    .compile_single_schema_with_datastore();
+
+    let document = schema.as_document();
+    let field_names: Vec<&str> = find_object_type(&document, "subject")
+        .unwrap()
+        .fields
+        .iter()
+        .map(|field| field.name.as_ref())
+        .collect();
+
+    expect_eq!(
+        actual = field_names,
+        expected = vec![
+            "id",
+            "field",
+            "a",
+            "b",
+            "c",
+            "d",
+            "connection",
+            "obj_1",
+            "obj_2"
+        ]
+    );
+}
+
 #[test(tokio::test)]
 async fn test_graphql_int_scalars() {
     let (test, schema) = "

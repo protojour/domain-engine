@@ -416,7 +416,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
         let mut struct_flags = SerdeStructFlags::empty();
         let mut field_namespace = GraphqlNamespace::default();
-        let mut fields = Default::default();
+        let mut fields = vec![];
 
         if let DefKind::Type(type_def) = self.defs.def_kind(def_id) {
             if type_def.open {
@@ -486,7 +486,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         }
 
         if struct_flags.contains(SerdeStructFlags::OPEN_DATA) {
-            fields.insert(
+            fields.push((
                 "_open_data".into(),
                 FieldData {
                     kind: FieldKind::OpenData,
@@ -495,12 +495,35 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         unit: UnitTypeRef::Addr(self.schema.json_scalar),
                     },
                 },
-            );
+            ));
         }
 
         if fields.is_empty() {
             return;
         }
+
+        // Get the general category of each field, for deciding the overall order.
+        fn field_order_category(field_kind: &FieldKind) -> u8 {
+            match field_kind {
+                FieldKind::Property(data) | FieldKind::EdgeProperty(data) => {
+                    match data.property_id.role {
+                        Role::Subject => 0,
+                        Role::Object => 1,
+                    }
+                }
+                // Connections are placed after "plain" fields
+                FieldKind::ConnectionProperty { property_id, .. } => match property_id.role {
+                    Role::Subject => 2,
+                    Role::Object => 3,
+                },
+                _ => 4,
+            }
+        }
+
+        // note: The sort is stable.
+        fields.sort_by(|(_, a), (_, b)| {
+            field_order_category(&a.kind).cmp(&field_order_category(&b.kind))
+        });
 
         match &mut self.schema.types[type_addr.0 as usize].kind {
             TypeKind::Object(object_data) => {
@@ -516,7 +539,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         property: &Property,
         property_field_producer: PropertyFieldProducer,
         field_namespace: &mut GraphqlNamespace,
-        output: &mut IndexMap<String, FieldData>,
+        output: &mut Vec<(String, FieldData)>,
     ) {
         let meta = self.defs.relationship_meta(property_id.relationship_id);
         let (_, (prop_cardinality, value_cardinality), _) = meta.relationship.by(property_id.role);
@@ -616,12 +639,8 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     RelParams::IndexRange(_) => todo!(),
                 };
 
-                trace!("    connection/edge rel params {rel_params:?}");
-
                 self.get_def_type_ref(value_def_id, QLevel::Connection { rel_params })
             };
-
-            trace!("Connection `{prop_key}` of prop {property_id:?}");
 
             FieldData::mandatory(
                 FieldKind::ConnectionProperty {
@@ -658,7 +677,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             }
         };
 
-        output.insert(field_namespace.unique_literal(prop_key), field_data);
+        output.push((field_namespace.unique_literal(prop_key), field_data));
     }
 }
 

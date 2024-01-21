@@ -47,6 +47,19 @@ impl Relations {
         let properties = self.properties_by_def_id(domain_type_id)?;
         properties.identified_by
     }
+
+    /// Stable-sort property tables such that all Subject property roles appear before Object roles.
+    pub fn sort_property_tables(&mut self) {
+        for properties in &mut self.properties_by_def_id.values_mut() {
+            if let Some(table) = &mut properties.table {
+                let mut table_vec: Vec<_> = std::mem::take(table).into_iter().collect();
+
+                table_vec.sort_by(|(id_a, _), (id_b, _)| id_a.role.cmp(&id_b.role));
+
+                *table = table_vec.into_iter().collect();
+            }
+        }
+    }
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
