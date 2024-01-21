@@ -1,14 +1,29 @@
-use std::collections::VecDeque;
+use std::collections::{BTreeSet, VecDeque};
 
+use ontol_runtime::interface::serde::SerdeDef;
 use serde_generator::SerdeGenerator;
 
 use crate::{relation::UnionMemberCache, Compiler};
+
+use self::serde_generator::DebugTaskState;
 
 pub mod serde_generator;
 
 mod sequence_range_builder;
 mod serde_generator_lazy;
 mod union_builder;
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub enum SerdeKey {
+    Def(SerdeDef),
+    Intersection(Box<SerdeIntersection>),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct SerdeIntersection {
+    pub main: Option<SerdeDef>,
+    pub set: BTreeSet<SerdeDef>,
+}
 
 impl<'m> Compiler<'m> {
     pub fn serde_generator<'c>(
@@ -27,6 +42,7 @@ impl<'m> Compiler<'m> {
             lazy_struct_op_tasks: VecDeque::new(),
             lazy_struct_intersection_tasks: VecDeque::new(),
             lazy_union_repr_tasks: VecDeque::new(),
+            task_state: DebugTaskState::Unlocked,
             operators_by_addr: Default::default(),
             operators_by_key: Default::default(),
         }

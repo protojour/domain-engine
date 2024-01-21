@@ -6,7 +6,7 @@ use ontol_runtime::{
         discriminator::LeafDiscriminant,
         serde::{
             operator::{SerdeOperator, SerdeOperatorAddr, SerdeUnionVariant},
-            SerdeDef, SerdeKey, SerdeModifier,
+            SerdeDef, SerdeModifier,
         },
     },
     smart_format,
@@ -14,7 +14,10 @@ use ontol_runtime::{
 use smartstring::alias::String;
 use tracing::info;
 
-use super::serde_generator::{operator_to_leaf_discriminant, SerdeGenerator};
+use super::{
+    serde_generator::{operator_to_leaf_discriminant, SerdeGenerator},
+    SerdeKey,
+};
 
 pub struct UnionBuilder {
     // variants _sorted_ by purpose

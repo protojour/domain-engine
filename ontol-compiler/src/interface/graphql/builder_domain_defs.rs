@@ -1,6 +1,6 @@
 use indexmap::IndexMap;
 use ontol_runtime::{
-    interface::serde::{SerdeDef, SerdeKey},
+    interface::serde::SerdeDef,
     interface::{
         graphql::{
             argument,
@@ -25,7 +25,7 @@ use tracing::{trace, trace_span};
 
 use crate::{
     def::{DefKind, LookupRelationshipMeta, RelParams},
-    interface::serde::serde_generator::SerdeGenerator,
+    interface::serde::{serde_generator::SerdeGenerator, SerdeKey},
     relation::Property,
     repr::repr_model::{ReprKind, ReprScalarKind},
 };
@@ -411,7 +411,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         def_id: DefId,
         property_field_producer: PropertyFieldProducer,
     ) {
-        let _entered = trace_span!("harvest", def_id = ?def_id).entered();
+        let _entered = trace_span!("harvest", id = ?def_id).entered();
         // trace!("Harvest fields for {def_id:?} / {type_addr:?}");
 
         let mut struct_flags = SerdeStructFlags::empty();

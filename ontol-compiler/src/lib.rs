@@ -12,7 +12,8 @@ pub use error::*;
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use interface::{
-    graphql::generate_schema::generate_graphql_schema, serde::serde_generator::SerdeGenerator,
+    graphql::generate_schema::generate_graphql_schema,
+    serde::{serde_generator::SerdeGenerator, SerdeKey},
 };
 use lowering::Lowering;
 use mem::Mem;
@@ -20,7 +21,7 @@ use namespace::{Namespaces, Space};
 use ontol_runtime::{
     config::PackageConfig,
     interface::{
-        serde::{SerdeDef, SerdeKey, SerdeModifier},
+        serde::{SerdeDef, SerdeModifier},
         DomainInterface,
     },
     ontology::{

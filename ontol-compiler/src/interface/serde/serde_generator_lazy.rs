@@ -8,14 +8,14 @@ use ontol_runtime::{
             SerdeOperator, SerdeOperatorAddr, SerdeProperty, SerdePropertyFlags, StructOperator,
             UnionOperator,
         },
-        SerdeDef, SerdeIntersection, SerdeKey, SerdeModifier,
+        SerdeDef, SerdeModifier,
     },
     value::PropertyId,
     value_generator::ValueGenerator,
     DefId, Role,
 };
 use smartstring::alias::String;
-use tracing::debug;
+use tracing::{debug, debug_span};
 
 use crate::{
     def::{DefKind, LookupRelationshipMeta, RelParams},
@@ -25,6 +25,7 @@ use crate::{
 use super::{
     serde_generator::{insert_property, SerdeGenerator},
     union_builder::UnionBuilder,
+    SerdeIntersection, SerdeKey,
 };
 
 impl<'c, 'm> SerdeGenerator<'c, 'm> {
@@ -274,6 +275,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         typename: &'c str,
         properties: &'c Properties,
     ) {
+        let _entered = debug_span!("lazy_union", def=?def.def_id).entered();
+
         let union_discriminator = self
             .relations
             .union_discriminators

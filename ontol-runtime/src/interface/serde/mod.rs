@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, fmt::Debug};
+use std::fmt::Debug;
 
 use ::serde::{Deserialize, Serialize};
 
@@ -52,20 +52,8 @@ impl SerdeDef {
 
 impl Debug for SerdeDef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "DefVariant({:?}, {:?})", self.def_id, self.modifier)
+        write!(f, "SerdeDef({:?}, {:?})", self.def_id, self.modifier)
     }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
-pub enum SerdeKey {
-    Def(SerdeDef),
-    Intersection(Box<SerdeIntersection>),
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
-pub struct SerdeIntersection {
-    pub main: Option<SerdeDef>,
-    pub set: BTreeSet<SerdeDef>,
 }
 
 bitflags::bitflags! {

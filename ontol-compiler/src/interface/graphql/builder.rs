@@ -2,7 +2,7 @@ use fnv::FnvHashMap;
 use ontol_runtime::{
     interface::serde::{
         operator::{SerdeOperator, SerdeOperatorAddr},
-        SerdeDef, SerdeKey,
+        SerdeDef,
     },
     interface::{
         graphql::{
@@ -26,7 +26,7 @@ use smartstring::alias::String;
 
 use crate::{
     def::{DefKind, Defs},
-    interface::serde::serde_generator::SerdeGenerator,
+    interface::serde::{serde_generator::SerdeGenerator, SerdeKey},
     primitive::Primitives,
     relation::{Relations, UnionMemberCache},
     repr::repr_model::ReprKind,

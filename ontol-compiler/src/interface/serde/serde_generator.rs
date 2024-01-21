@@ -13,15 +13,15 @@ use ontol_runtime::{
     },
     interface::{
         discriminator::LeafDiscriminant,
-        serde::{operator::SerdeStructFlags, SerdeDef, SerdeIntersection, SerdeKey, SerdeModifier},
+        serde::{operator::SerdeStructFlags, SerdeDef, SerdeModifier},
     },
     ontology::{Cardinality, PropertyCardinality, ValueCardinality},
     smart_format, DefId,
 };
 use smartstring::alias::String;
-use tracing::{error, trace, warn};
+use tracing::{debug, debug_span, error, trace, warn};
 
-use super::sequence_range_builder::SequenceRangeBuilder;
+use super::{sequence_range_builder::SequenceRangeBuilder, SerdeIntersection, SerdeKey};
 
 use crate::{
     codegen::task::CodegenTasks,
@@ -51,9 +51,17 @@ pub struct SerdeGenerator<'c, 'm> {
     pub(super) lazy_struct_intersection_tasks: VecDeque<(SerdeOperatorAddr, SerdeIntersection)>,
     pub(super) lazy_union_repr_tasks:
         VecDeque<(SerdeOperatorAddr, SerdeDef, &'c str, &'c Properties)>,
+    pub(super) task_state: DebugTaskState,
 
     pub(super) operators_by_addr: Vec<SerdeOperator>,
     pub(super) operators_by_key: HashMap<SerdeKey, SerdeOperatorAddr>,
+}
+
+pub(super) enum DebugTaskState {
+    Unlocked,
+    Struct,
+    Intersection,
+    Union,
 }
 
 enum OperatorAllocation {
@@ -70,14 +78,20 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
     fn execute_tasks(&mut self) {
         while self.has_pending_tasks() {
+            self.task_state = DebugTaskState::Struct;
+
             while let Some((addr, def, properties)) = self.lazy_struct_op_tasks.pop_front() {
                 self.populate_struct_operator(addr, def, properties);
             }
+
+            self.task_state = DebugTaskState::Intersection;
 
             while let Some((addr, intersection)) = self.lazy_struct_intersection_tasks.pop_front() {
                 assert!(self.lazy_struct_op_tasks.is_empty());
                 self.populate_struct_intersection_operator(addr, intersection);
             }
+
+            self.task_state = DebugTaskState::Union;
 
             while let Some((addr, def, typename, properties)) =
                 self.lazy_union_repr_tasks.pop_front()
@@ -88,6 +102,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 self.populate_union_repr_operator(addr, def, typename, properties);
             }
         }
+
+        self.task_state = DebugTaskState::Unlocked;
     }
 
     fn has_pending_tasks(&self) -> bool {
@@ -121,8 +137,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     trace!("CREATED {addr:?} {key:?} {operator:?}");
                     self.operators_by_addr[addr.0 as usize] = operator;
 
-                    for key in discarded_keys {
-                        self.operators_by_key.insert(key, addr);
+                    self.operators_by_key.insert(key, addr);
+
+                    for discarded_key in discarded_keys {
+                        self.operators_by_key.insert(discarded_key, addr);
                     }
 
                     return Some(addr);
@@ -203,6 +221,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 }
 
                 let addr = self.alloc_addr_for_key(&SerdeKey::Intersection(intersection.clone()));
+
+                if matches!(self.task_state, DebugTaskState::Union) {
+                    panic!();
+                }
 
                 // This will get computed later
                 self.lazy_struct_intersection_tasks
@@ -768,6 +790,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             .get(&def.def_id)
             .expect("no union discriminator available. Should fail earlier");
 
+        let _entered = debug_span!("alloc_union", def=?def.def_id).entered();
+
         if properties.table.is_some() {
             // Need to do an intersection of the union type's _inherent_
             // properties and each variant's properties
@@ -781,6 +805,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     root_discriminator.serde_def.def_id,
                     SerdeModifier::INHERENT_PROPS | def.modifier.cross_def_flags(),
                 );
+
+                debug!("pre-alloc {variant_def:?}");
 
                 // Intersection dependencies
                 self.gen_addr_lazy(SerdeKey::Intersection(Box::new(SerdeIntersection {
