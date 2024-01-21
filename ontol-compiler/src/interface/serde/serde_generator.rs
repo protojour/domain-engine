@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeSet, HashMap, VecDeque},
+    collections::{HashMap, VecDeque},
     ops::RangeInclusive,
 };
 
@@ -216,7 +216,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     self.gen_addr_lazy(SerdeKey::Def(main));
                 }
 
-                for def in intersection.set.iter() {
+                for def in intersection.defs.iter() {
                     self.gen_addr_lazy(SerdeKey::Def(*def));
                 }
 
@@ -703,26 +703,26 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     SerdeModifier::INTERSECTION | SerdeModifier::INHERENT_PROPS,
                 )))
             } else {
-                let mut intersection_keys = BTreeSet::new();
+                let mut intersection_keys = vec![];
                 let inherent_def = def.remove_modifier(SerdeModifier::INTERSECTION);
 
                 if properties.table.is_some() {
                     // inherent properties:
                     self.gen_addr_lazy(SerdeKey::Def(inherent_def));
-                    intersection_keys.insert(inherent_def);
+                    intersection_keys.push(inherent_def);
                 }
 
                 for (def_id, _span) in members {
                     let member_def = SerdeDef::new(*def_id, def.modifier.reset());
                     self.gen_addr_lazy(SerdeKey::Def(member_def));
 
-                    intersection_keys.insert(member_def);
+                    intersection_keys.push(member_def);
                 }
 
                 self.alloc_serde_operator_from_key(SerdeKey::Intersection(Box::new(
                     SerdeIntersection {
                         main: Some(inherent_def),
-                        set: intersection_keys,
+                        defs: intersection_keys,
                     },
                 )))
             }
@@ -811,7 +811,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 // Intersection dependencies
                 self.gen_addr_lazy(SerdeKey::Intersection(Box::new(SerdeIntersection {
                     main: None,
-                    set: [inherent_properties_def, variant_def].into(),
+                    defs: [variant_def, inherent_properties_def].into(),
                 })));
             }
         }

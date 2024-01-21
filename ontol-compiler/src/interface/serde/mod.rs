@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, VecDeque};
+use std::collections::VecDeque;
 
 use ontol_runtime::interface::serde::SerdeDef;
 use serde_generator::SerdeGenerator;
@@ -22,7 +22,7 @@ pub enum SerdeKey {
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct SerdeIntersection {
     pub main: Option<SerdeDef>,
-    pub set: BTreeSet<SerdeDef>,
+    pub defs: Vec<SerdeDef>,
 }
 
 impl<'m> Compiler<'m> {

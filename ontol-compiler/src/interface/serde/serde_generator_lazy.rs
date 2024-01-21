@@ -177,7 +177,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         addr: SerdeOperatorAddr,
         intersection: SerdeIntersection,
     ) {
-        let mut iterator = intersection.set.iter();
+        let mut iterator = intersection.defs.iter();
 
         let mut new_operator = match intersection.main {
             Some(main_def) => self
@@ -317,7 +317,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         // Make the intersection:
                         this.gen_addr_lazy(SerdeKey::Intersection(Box::new(SerdeIntersection {
                             main: None,
-                            set: [inherent_properties_def, result_def].into(),
+                            defs: [result_def, inherent_properties_def].into(),
                         })))
                         .expect("No inner operator")
                     } else {
