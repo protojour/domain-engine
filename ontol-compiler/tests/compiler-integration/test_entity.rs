@@ -318,6 +318,27 @@ fn entity_union_simple() {
 }
 
 #[test]
+fn entity_union_with_union_def_id_larger_than_id() {
+    "
+    def Repository (
+        rel .'id'(rel .gen: auto)|id: (rel .is: uuid)
+        rel {.}'owner'::'repositories' RepositoryOwner
+    )
+
+    def org_id (fmt '' => 'org/' => text => .)
+
+    def Organization (
+        rel .'id'|id: org_id
+    )
+
+    def RepositoryOwner (
+        rel .is?: Organization
+    )
+    "
+    .compile();
+}
+
+#[test]
 fn entity_union_with_object_relation() {
     let test = GUITAR_SYNTH_UNION.1.compile();
     let [instrument] = test.bind(["instrument"]);

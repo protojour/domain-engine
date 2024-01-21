@@ -1487,3 +1487,25 @@ async fn test_extendsion_and_member_from_foreign_domain() {
     .with_data_store(ROOT, DataStoreConfig::Default)
     .compile_schemas([ROOT]);
 }
+
+#[test(tokio::test)]
+// BUG: The 'const' triggers this:
+#[should_panic(expected = "no PatchEdges available for relation sequence \"targets\"")]
+async fn test_const_in_union_bug() {
+    "
+    def union (
+        rel .is?: member
+        rel {.} 'targets'::'unions' {target}
+    )
+
+    def member (
+        rel .'id'|id(rel .gen: auto): (fmt '' => 'member/' => text => .)
+        rel .'const': 'const'
+    )
+
+    def target (
+        rel .'id'|id(rel .gen: auto): (fmt '' => 'target/' => text => .)
+    )
+    "
+    .compile_single_schema_with_datastore();
+}

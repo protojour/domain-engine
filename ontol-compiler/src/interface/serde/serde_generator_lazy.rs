@@ -15,7 +15,7 @@ use ontol_runtime::{
     DefId, Role,
 };
 use smartstring::alias::String;
-use tracing::{debug, debug_span};
+use tracing::{debug, debug_span, warn};
 
 use crate::{
     def::{DefKind, LookupRelationshipMeta, RelParams},
@@ -185,16 +185,17 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 .and_then(|addr| self.find_unambiguous_struct_operator(*addr).ok())
                 .cloned()
                 .unwrap(),
-            None => {
-                // Does not matter what is chosen first
-                let random_def = *iterator.next().unwrap();
-                let origin_addr = self.lookup_addr_by_key(&SerdeKey::Def(random_def)).unwrap();
-                self.find_unambiguous_struct_operator(*origin_addr)
-                    .unwrap_or_else(|operator| {
-                        panic!("Initial map not found for intersection: {operator:?}")
-                    })
-                    .clone()
-            }
+            None => loop {
+                if let Some(next_def) = iterator.next() {
+                    let origin_addr = self.lookup_addr_by_key(&SerdeKey::Def(*next_def)).unwrap();
+                    if let Ok(operator) = self.find_unambiguous_struct_operator(*origin_addr) {
+                        break operator.clone();
+                    }
+                } else {
+                    warn!("Intersection noop");
+                    return;
+                }
+            },
         };
 
         // avoid duplicated properties, since some properties may already be "imported" from unions in which
