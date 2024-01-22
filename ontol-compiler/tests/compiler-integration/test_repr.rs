@@ -174,9 +174,6 @@ fn union_integers() {
 }
 
 #[test]
-// BUG: example of "not yet implemented: More members".
-// Expected to be able to compose like this.
-#[should_panic = "not yet implemented: More members"]
 fn more_members() {
     "
     def created (
@@ -200,11 +197,10 @@ fn more_members() {
         foo: { ..foo match () }
     )
     "
-    .compile_fail();
+    .compile();
 }
 
 #[test]
-// BUG: somewhat related – this should work?
 fn forward_mapping() {
     "
     def created (
@@ -214,15 +210,15 @@ fn forward_mapping() {
         fmt '' => 'foos/' => text => .
     )
     def foo (
-        rel .'_id'|id(rel .gen: auto): foo_id
+        rel .'_id'(rel .gen: auto)|id: foo_id
         rel .is: created
         rel .'name': text
     )
 
-    map foos ( // ERROR BUG: Failed to generate forward mapping
+    map foos (
         (),
         foo: { ..foo match () }
     )
     "
-    .compile_fail();
+    .compile();
 }

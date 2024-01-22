@@ -39,6 +39,15 @@ impl Relations {
         self.properties_by_def_id.get(&domain_type_id)
     }
 
+    pub fn properties_table_by_def_id(
+        &self,
+        domain_type_id: DefId,
+    ) -> Option<&IndexMap<PropertyId, Property>> {
+        self.properties_by_def_id
+            .get(&domain_type_id)
+            .and_then(|properties| properties.table.as_ref())
+    }
+
     pub fn properties_by_def_id_mut(&mut self, domain_type_id: DefId) -> &mut Properties {
         self.properties_by_def_id.entry(domain_type_id).or_default()
     }

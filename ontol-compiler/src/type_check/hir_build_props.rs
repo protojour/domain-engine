@@ -13,6 +13,7 @@ use crate::{
     mem::Intern,
     pattern::{CompoundPatternAttr, CompoundPatternModifier, PatternKind},
     primitive::PrimitiveKind,
+    relation::Property,
     repr::repr_model::ReprKind,
     type_check::{ena_inference::Strength, hir_build::NodeInfo, TypeError},
     typed_hir::{Meta, TypedHir, TypedHirData, UNIT_META},
@@ -53,7 +54,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         span: SourceSpan,
         ctx: &mut HirBuildCtx<'m>,
     ) -> ontol_hir::Node {
-        let properties = self.relations.properties_by_def_id(type_def_id);
+        let property_set = self.relations.properties_table_by_def_id(type_def_id);
 
         let actual_struct_flags = match modifier {
             Some(CompoundPatternModifier::Match) => ontol_hir::StructFlags::MATCH,
@@ -63,152 +64,50 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let hir_meta = Meta { ty, span };
 
         match self.seal_ctx.get_repr_kind(&type_def_id).unwrap() {
-            ReprKind::Struct | ReprKind::Unit => {
-                match properties.and_then(|props| props.table.as_ref()) {
-                    Some(property_set) => {
-                        let struct_binder: TypedHirData<'_, ontol_hir::Binder> =
-                            TypedHirData(ctx.var_allocator.alloc().into(), hir_meta);
+            ReprKind::Struct | ReprKind::Unit => match property_set {
+                Some(property_set) => {
+                    let mut match_attributes = IndexMap::new();
+                    self.collect_match_attributes(property_set, &mut match_attributes);
 
-                        // The written attribute patterns should match against
-                        // the relations defined on the type. Compute `MatchAttributes`:
-                        let mut match_attributes = property_set
-                            .iter()
-                            .filter_map(|(property_id, _cardinality)| {
-                                let meta = self.defs.relationship_meta(property_id.relationship_id);
-                                let property_name = match property_id.role {
-                                    Role::Subject => match meta.relation_def_kind.value {
-                                        DefKind::TextLiteral(lit) => Some(*lit),
-                                        _ => panic!("BUG: Expected named subject property"),
-                                    },
-                                    Role::Object => meta.relationship.object_prop,
-                                };
-                                let (_, owner_cardinality, _) =
-                                    meta.relationship.by(property_id.role);
-                                let (value_def_id, _, _) =
-                                    meta.relationship.by(property_id.role.opposite());
-
-                                property_name.map(|property_name| {
-                                    (
-                                        property_name,
-                                        MatchAttribute {
-                                            property_id: *property_id,
-                                            cardinality: owner_cardinality,
-                                            rel_params_def: match &meta.relationship.rel_params {
-                                                RelParams::Type(def_id) => Some(*def_id),
-                                                _ => None,
-                                            },
-                                            value_def: value_def_id,
-                                            mentioned: false,
-                                        },
-                                    )
-                                })
-                            })
-                            .collect::<IndexMap<_, _>>();
-
-                        let mut hir_props = Vec::with_capacity(pattern_attrs.len());
-
-                        // Actually match the written attributes to the match attributes:
-                        for pattern_attr in pattern_attrs {
-                            let prop_node = self.build_struct_property_node(
-                                struct_binder.hir().var,
-                                pattern_attr,
-                                &mut match_attributes,
-                                actual_struct_flags,
-                                ctx,
-                            );
-                            if let Some(prop_node) = prop_node {
-                                hir_props.push(prop_node);
-                            }
-                        }
-
-                        // MatchAttributes that are not `mentioned` should be reported or auto-generated,
-                        // Unless the pattern is a `match` pattern.
-                        // A `match` pattern is only used for data extraction, so it doesn't
-                        // matter if there are unmentioned properties.
-                        if !actual_struct_flags.contains(ontol_hir::StructFlags::MATCH) {
-                            self.handle_missing_struct_attributes(
-                                struct_binder.hir().var,
-                                span,
-                                match_attributes,
-                                &mut hir_props,
-                                ctx,
-                            );
-                        }
-
-                        ctx.mk_node(
-                            ontol_hir::Kind::Struct(
-                                struct_binder,
-                                actual_struct_flags,
-                                hir_props.into(),
-                            ),
-                            hir_meta,
-                        )
-                    }
-                    None => {
-                        if !pattern_attrs.is_empty() {
-                            return self.error_node(CompileError::NoPropertiesExpected, &span, ctx);
-                        }
-                        ctx.mk_node(ontol_hir::Kind::Unit, hir_meta)
-                    }
-                }
-            }
-            ReprKind::StructIntersection(members) => {
-                let mut member_iter = members.iter();
-                let single_def_id = match member_iter.next() {
-                    Some((def_id, _span)) => {
-                        if member_iter.next().is_some() {
-                            todo!("More members");
-                        }
-                        *def_id
-                    }
-                    None => panic!("No members"),
-                };
-
-                let value_object_ty = self.check_def_sealed(single_def_id);
-                debug!("value_object_ty: {value_object_ty:?}");
-
-                match value_object_ty {
-                    Type::Domain(def_id) => self.build_unpacker(
-                        UnpackerInfo {
-                            type_def_id: *def_id,
-                            ty: value_object_ty,
-                            modifier,
-                            is_unit_binding: false,
-                            parent_struct_flags,
-                        },
+                    self.build_struct_node(
                         pattern_attrs,
+                        hir_meta,
+                        match_attributes,
+                        actual_struct_flags,
                         span,
                         ctx,
-                    ),
-                    _ => {
-                        let mut attributes = pattern_attrs.iter();
-                        match attributes.next() {
-                            Some(CompoundPatternAttr {
-                                key: (def_id, _),
-                                rel: _,
-                                bind_option: _,
-                                value,
-                            }) if *def_id == DefId::unit() => {
-                                let object_ty = self.check_def_sealed(single_def_id);
-                                let inner_node = self.build_node(
-                                    value,
-                                    NodeInfo {
-                                        expected_ty: Some((object_ty, Strength::Strong)),
-                                        parent_struct_flags,
-                                    },
-                                    ctx,
-                                );
+                    )
+                }
+                None => {
+                    if !pattern_attrs.is_empty() {
+                        return self.error_node(CompileError::NoPropertiesExpected, &span, ctx);
+                    }
+                    ctx.mk_node(ontol_hir::Kind::Unit, hir_meta)
+                }
+            },
+            ReprKind::StructIntersection(members) => {
+                let mut match_attributes = IndexMap::new();
 
-                                *ctx.hir_arena[inner_node].meta_mut() = hir_meta;
+                if let Some(property_set) = property_set {
+                    self.collect_match_attributes(property_set, &mut match_attributes);
+                }
 
-                                inner_node
-                            }
-                            _ => {
-                                self.error_node(CompileError::ExpectedPatternAttribute, &span, ctx)
-                            }
-                        }
+                for (member_def_id, _) in members {
+                    if let Some(property_set) =
+                        self.relations.properties_table_by_def_id(*member_def_id)
+                    {
+                        self.collect_match_attributes(property_set, &mut match_attributes);
                     }
                 }
+
+                self.build_struct_node(
+                    pattern_attrs,
+                    hir_meta,
+                    match_attributes,
+                    actual_struct_flags,
+                    span,
+                    ctx,
+                )
             }
             ReprKind::Scalar(..) => {
                 let mut attributes = pattern_attrs.iter();
@@ -248,6 +147,91 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             kind => todo!("{kind:?}"),
         }
+    }
+
+    /// The written attribute patterns should match against
+    /// the relations defined on the type. Compute `MatchAttributes`:
+    fn collect_match_attributes(
+        &self,
+        property_set: &IndexMap<PropertyId, Property>,
+        match_attributes: &mut IndexMap<&'m str, MatchAttribute>,
+    ) {
+        for (property_id, _property) in property_set {
+            let meta = self.defs.relationship_meta(property_id.relationship_id);
+            let property_name = match property_id.role {
+                Role::Subject => match meta.relation_def_kind.value {
+                    DefKind::TextLiteral(lit) => Some(*lit),
+                    _ => panic!("BUG: Expected named subject property"),
+                },
+                Role::Object => meta.relationship.object_prop,
+            };
+            let (_, owner_cardinality, _) = meta.relationship.by(property_id.role);
+            let (value_def_id, _, _) = meta.relationship.by(property_id.role.opposite());
+
+            if let Some(property_name) = property_name {
+                match_attributes.insert(
+                    property_name,
+                    MatchAttribute {
+                        property_id: *property_id,
+                        cardinality: owner_cardinality,
+                        rel_params_def: match &meta.relationship.rel_params {
+                            RelParams::Type(def_id) => Some(*def_id),
+                            _ => None,
+                        },
+                        value_def: value_def_id,
+                        mentioned: false,
+                    },
+                );
+            }
+        }
+    }
+
+    fn build_struct_node(
+        &mut self,
+        pattern_attrs: &[CompoundPatternAttr],
+        hir_meta: Meta<'m>,
+        mut match_attributes: IndexMap<&'m str, MatchAttribute>,
+        actual_struct_flags: StructFlags,
+        span: SourceSpan,
+        ctx: &mut HirBuildCtx<'m>,
+    ) -> ontol_hir::Node {
+        let struct_binder: TypedHirData<'_, ontol_hir::Binder> =
+            TypedHirData(ctx.var_allocator.alloc().into(), hir_meta);
+
+        let mut hir_props = Vec::with_capacity(pattern_attrs.len());
+
+        // Actually match the written attributes to the match attributes:
+        for pattern_attr in pattern_attrs {
+            let prop_node = self.build_struct_property_node(
+                struct_binder.hir().var,
+                pattern_attr,
+                &mut match_attributes,
+                actual_struct_flags,
+                ctx,
+            );
+            if let Some(prop_node) = prop_node {
+                hir_props.push(prop_node);
+            }
+        }
+
+        // MatchAttributes that are not `mentioned` should be reported or auto-generated,
+        // Unless the pattern is a `match` pattern.
+        // A `match` pattern is only used for data extraction, so it doesn't
+        // matter if there are unmentioned properties.
+        if !actual_struct_flags.contains(ontol_hir::StructFlags::MATCH) {
+            self.handle_missing_struct_attributes(
+                struct_binder.hir().var,
+                span,
+                match_attributes,
+                &mut hir_props,
+                ctx,
+            );
+        }
+
+        ctx.mk_node(
+            ontol_hir::Kind::Struct(struct_binder, actual_struct_flags, hir_props.into()),
+            hir_meta,
+        )
     }
 
     fn build_struct_property_node(
