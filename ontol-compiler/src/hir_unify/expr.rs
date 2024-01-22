@@ -123,7 +123,7 @@ impl<'m> Kind<'m> {
             Self::StringInterpolation(binder, _) => {
                 format!("StringInterpolation({})", binder.hir().var)
             }
-            Self::PredicateClosure1(..) => format!("predicate-closure1"),
+            Self::PredicateClosure1(..) => "predicate-closure1".to_string(),
             Self::HirNode(_) => "Node".to_string(),
         }
     }
