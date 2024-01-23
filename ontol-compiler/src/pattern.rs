@@ -20,8 +20,6 @@ impl Pattern {
     }
 }
 
-type PropertyKey = (DefId, SourceSpan);
-
 #[derive(Debug)]
 pub enum PatternKind {
     /// Function call
@@ -58,7 +56,7 @@ pub enum CompoundPatternModifier {
 
 #[derive(Debug)]
 pub struct CompoundPatternAttr {
-    pub key: PropertyKey,
+    pub key: (DefId, SourceSpan),
     pub rel: Option<Pattern>,
     pub bind_option: bool,
     pub value: Pattern,

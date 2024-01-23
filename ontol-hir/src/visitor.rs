@@ -3,7 +3,7 @@ use ontol_runtime::value::PropertyId;
 use crate::{
     arena::{Arena, NodeRef},
     Attribute, Binding, CaptureMatchArm, Iter, Kind, Label, Lang, Node, Nodes, Optional,
-    PropPattern, PropVariant, Var,
+    PropPattern, PropVariant, SetEntry, Var,
 };
 
 pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
@@ -52,6 +52,11 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
         arena: &'h Arena<'a, L>,
     ) {
         self.traverse_prop_match_arm(match_arm, arena);
+    }
+
+    #[allow(unused_variables)]
+    fn visit_set_entry(&mut self, index: usize, entry: &SetEntry<'a, L>, arena: &'h Arena<'a, L>) {
+        self.traverse_set_entry(index, entry, arena);
     }
 
     #[allow(unused_variables)]
@@ -112,6 +117,11 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                 self.visit_label(*L::as_hir(label));
                 self.visit_node(0, arena.node_ref(attr.rel));
                 self.visit_node(1, arena.node_ref(attr.val));
+            }
+            Kind::SetOf(entries) => {
+                for (index, entry) in entries.iter().enumerate() {
+                    self.visit_set_entry(index, entry, arena);
+                }
             }
             Kind::Struct(binder, _flags, children) => {
                 self.visit_binder(L::as_hir(binder).var);
@@ -213,6 +223,9 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                     self.visit_seq_prop_element(index, element, arena);
                 }
             }
+            PropVariant::Predicate(_) => {
+                todo!()
+            }
         }
     }
 
@@ -225,6 +238,17 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
     ) {
         self.visit_node(0, arena.node_ref(element.1.rel));
         self.visit_node(1, arena.node_ref(element.1.val));
+    }
+
+    #[allow(unused_variables)]
+    fn traverse_set_entry(
+        &mut self,
+        index: usize,
+        entry: &SetEntry<'a, L>,
+        arena: &'h Arena<'a, L>,
+    ) {
+        self.visit_node(0, arena.node_ref(entry.1.rel));
+        self.visit_node(1, arena.node_ref(entry.1.val));
     }
 
     fn traverse_prop_match_arm(

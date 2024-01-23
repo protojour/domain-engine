@@ -123,6 +123,7 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                     },
                 )
             }
+            ontol_hir::Kind::SetOf(_) => todo!(),
             ontol_hir::Kind::Struct(binder, flags, nodes) => self.enter_binder(binder, |zelf| {
                 let mut props = Vec::with_capacity(nodes.len());
                 for node in nodes {
@@ -271,6 +272,7 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                                 },
                             }
                         }
+                        PropVariant::Predicate(_) => todo!(),
                     };
 
                     output.push(prop);

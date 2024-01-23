@@ -241,6 +241,7 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
                                 );
                             }
                         }
+                        ontol_hir::PropVariant::Predicate(_) => todo!(),
                     }
                 }
             }

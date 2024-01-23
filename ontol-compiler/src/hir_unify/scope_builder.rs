@@ -149,6 +149,7 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
                 self.build_scope_binder(*arg, mapped_scalar_ty.or(Some(self.hir_arena[node].ty())))
             }
             ontol_hir::Kind::DeclSet(_label, _attr) => Err(UnifierError::SequenceInputNotSupported),
+            ontol_hir::Kind::SetOf(_entries) => Err(UnifierError::SequenceInputNotSupported),
             ontol_hir::Kind::Struct(binder, _flags, nodes) => self.enter_binder(binder, |zelf| {
                 if zelf.current_prop_analysis_map.is_none() {
                     zelf.current_prop_analysis_map = Some({
@@ -309,6 +310,7 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
                                 VarSet::default(),
                             )
                         }
+                        ontol_hir::PropVariant::Predicate(_) => todo!(),
                     };
 
                     props.push(scope::Prop {

@@ -1,6 +1,7 @@
 use std::fmt::{Debug, Display};
 
-use ontol_hir::{CaptureMatchArm, PropVariant, SetPropertyVariant};
+use ontol_hir::{CaptureMatchArm, PredicateClosure, PropVariant, SetEntry, SetPropertyVariant};
+use smallvec::SmallVec;
 
 use crate::{
     types::{TypeRef, ERROR_TYPE, UNIT_TYPE},
@@ -155,6 +156,17 @@ pub fn arena_import<'m>(
         ontol_hir::Attribute { rel, val }
     }
 
+    fn import_entries<'m>(
+        target: &mut TypedArena<'m>,
+        source: &TypedArena<'m>,
+        entries: &[ontol_hir::SetEntry<'m, TypedHir>],
+    ) -> SmallVec<[ontol_hir::SetEntry<'m, TypedHir>; 1]> {
+        entries
+            .iter()
+            .map(|SetEntry(iter, attr)| SetEntry(*iter, import_attr(target, source, *attr)))
+            .collect()
+    }
+
     use ontol_hir::Kind::*;
 
     match kind {
@@ -185,6 +197,10 @@ pub fn arena_import<'m>(
             let attr = import_attr(target, source.arena(), *attr);
             target.add(TypedHirData(DeclSet(*label, attr), *meta))
         }
+        SetOf(entries) => {
+            let entries = import_entries(target, source.arena(), entries);
+            target.add(TypedHirData(SetOf(entries), *meta))
+        }
         Struct(binder, flags, body) => {
             let body = import_nodes(target, source.arena(), body);
             target.add(TypedHirData(Struct(*binder, *flags, body), *meta))
@@ -208,6 +224,30 @@ pub fn arena_import<'m>(
                             elements,
                         })
                     }
+                    PropVariant::Predicate(closure) => PropVariant::Predicate(match closure {
+                        PredicateClosure::ContainsElement(attr) => {
+                            PredicateClosure::ContainsElement(import_attr(
+                                target,
+                                source.arena(),
+                                *attr,
+                            ))
+                        }
+                        PredicateClosure::ElementIn(node) => PredicateClosure::ElementIn(
+                            arena_import(target, source.arena().node_ref(*node)),
+                        ),
+                        PredicateClosure::AllInSet(node) => PredicateClosure::AllInSet(
+                            arena_import(target, source.arena().node_ref(*node)),
+                        ),
+                        PredicateClosure::SetContainsAll(node) => PredicateClosure::SetContainsAll(
+                            arena_import(target, source.arena().node_ref(*node)),
+                        ),
+                        PredicateClosure::SetIntersects(node) => PredicateClosure::SetIntersects(
+                            arena_import(target, source.arena().node_ref(*node)),
+                        ),
+                        PredicateClosure::SetEquals(node) => PredicateClosure::SetEquals(
+                            arena_import(target, source.arena().node_ref(*node)),
+                        ),
+                    }),
                 })
                 .collect();
             target.add(TypedHirData(

@@ -172,7 +172,10 @@ pub enum Kind<'a, L: Lang> {
     /// A map call
     Map(Node),
     /// Standalone sequence in declarative mode.
+    /// TODO: Duplicate of SetOf with one iterated entry?
     DeclSet(L::Data<'a, Label>, Attribute<Node>),
+    /// A set-builder of set entries
+    SetOf(SmallVec<[SetEntry<'a, L>; 1]>),
     /// A struct with associated binder. The value is the struct.
     Struct(L::Data<'a, Binder>, StructFlags, Nodes),
     /// A property definition associated with a struct var in scope
@@ -211,6 +214,7 @@ pub enum Kind<'a, L: Lang> {
 pub enum PropVariant<'a, L: Lang> {
     Singleton(Attribute<Node>),
     Set(SetPropertyVariant<'a, L>),
+    Predicate(PredicateClosure),
 }
 
 #[derive(Clone)]
@@ -225,7 +229,23 @@ pub enum PropPattern<'a, L: Lang> {
     /// ($rel $val)
     Attr(Binding<'a, L>, Binding<'a, L>),
     /// (.. $val)
-    /// The set/sequence is captured in $val, relation is ignored
+    /// The set/sequence is captured in $val.
+    /// The immediate rel_param is ignored.
+    ///
+    /// Pseudo-JSON example:
+    /// json```
+    /// subject[prop_id] -> {
+    ///     "rel_params": null, // ignored
+    ///     "value": [
+    ///         {
+    ///              rel_params: "item0_rel",
+    ///              value: "item0_value"
+    ///         },
+    ///         { .. },
+    ///         ..
+    ///     ]
+    /// }
+    /// ```
     Set(Binding<'a, L>, HasDefault),
     /// The property is absent
     Absent,
@@ -259,6 +279,19 @@ pub enum EvalCondTerm {
     /// Evaluate var into a CondTerm::Value
     Eval(Node),
 }
+
+#[derive(Clone)]
+pub enum PredicateClosure {
+    ContainsElement(Attribute<Node>),
+    ElementIn(Node),
+    AllInSet(Node),
+    SetContainsAll(Node),
+    SetIntersects(Node),
+    SetEquals(Node),
+}
+
+#[derive(Clone)]
+pub struct SetEntry<'a, L: Lang>(pub Option<L::Data<'a, Label>>, pub Attribute<Node>);
 
 #[derive(Clone, Copy, Debug)]
 pub enum BoolBinaryOp {

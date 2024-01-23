@@ -358,6 +358,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                                 );
                             }
                         }
+                        PropVariant::Predicate(_) => todo!(),
                     }
                 }
             }
@@ -824,6 +825,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     node_ref
                 );
             }
+            ontol_hir::Kind::SetOf(_) => todo!(),
         }
     }
 

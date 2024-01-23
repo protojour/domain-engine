@@ -115,10 +115,10 @@ fn test_unify_matchcond_cartesian_set() {
         "
         (struct ($c)
             (prop $c S:1:0
-                (seq (@e) (iter #u $a))
+                (.. (@e) (iter #u $a))
             )
             (prop $c S:1:1
-                (seq (@f) (iter #u $b))
+                (.. (@f) (iter #u $b))
             )
         )
         ",
@@ -126,7 +126,16 @@ fn test_unify_matchcond_cartesian_set() {
         (decl-set (@g) #u
             (match-struct ($d)
                 (prop $d O:1:0
-                    (#u /* what goes here? */)
+                    (element-in
+                        (set-of
+                            (iter (@f)
+                                #u
+                                (struct ($q)
+                                    (prop $q O:2:0 #u $a)
+                                )
+                            )
+                        )
+                    )
                 )
             )
         )
@@ -138,9 +147,9 @@ fn test_unify_matchcond_cartesian_set() {
                 (root '$d)
             )
             (match-prop $c S:1:0
-                ((seq $e)
+                ((.. $e)
                     (match-prop $c S:1:1
-                        ((seq $f)
+                        ((.. $f)
                             (push-cond-clause $d
                                 (attr '$d O:1:0 (_ '$e))
                             )

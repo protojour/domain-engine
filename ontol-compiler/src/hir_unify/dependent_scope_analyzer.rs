@@ -155,6 +155,7 @@ impl<'h, 'm: 'h> ontol_hir::visitor::HirVisitor<'h, 'm, TypedHir> for DepScopeAn
                 zelf.traverse_prop_variant(variant, arena);
             }
             ontol_hir::PropVariant::Set(_) => {}
+            ontol_hir::PropVariant::Predicate(_) => {}
         });
 
         self.stack.pop();

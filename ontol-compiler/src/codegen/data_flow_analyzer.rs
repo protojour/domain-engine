@@ -121,6 +121,9 @@ where
             ontol_hir::Kind::DeclSet(_, _) => {
                 unreachable!()
             }
+            ontol_hir::Kind::SetOf(_) => {
+                todo!()
+            }
             ontol_hir::Kind::Struct(binder, flags, body) => {
                 let mut var_set = VarSet::default();
                 for child in arena.refs(body) {
@@ -155,6 +158,9 @@ where
                                 var_set
                                     .union_with(&self.analyze_node(arena.node_ref(*val), *prop_id));
                             }
+                        }
+                        PropVariant::Predicate(_) => {
+                            todo!()
                         }
                     }
                 }
