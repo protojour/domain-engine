@@ -134,7 +134,7 @@ fn deserialize_object_properties() {
 fn deserialize_read_only_property_error() {
     "
     def obj ()
-    rel obj 'created'(rel .gen: create_time): datetime
+    rel obj 'created'[rel .gen: create_time]: datetime
     "
     .compile_then(|test| {
         let [obj] = test.bind(["obj"]);

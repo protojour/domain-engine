@@ -72,7 +72,7 @@ fn test_graphql_default_scalar() {
     "
     def foo (
         rel .id: (fmt '' => text => .)
-        rel .'default'(rel .default := ''): text
+        rel .'default'[rel .default := '']: text
     )
     "
     .compile_then(|test| {
@@ -278,7 +278,7 @@ fn incompatible_edge_types_are_distinct() {
 
     def source (
         rel .'id'|id: (rel .is: text)
-        rel .'targets'(rel .is: edge_type): {target}
+        rel .'targets'[rel .is: edge_type]: {target}
     )
     def target (
         rel .'id'|id: (rel .is: text)

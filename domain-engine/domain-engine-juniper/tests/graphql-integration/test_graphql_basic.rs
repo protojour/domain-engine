@@ -285,7 +285,7 @@ async fn test_graphql_non_entity_set_mutation() {
 async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
     let (test, schema) = "
     def foo (
-        rel .'id'(rel .gen: auto)|id: (rel .is: text)
+        rel .'id'[rel .gen: auto]|id: (rel .is: text)
     )
     map foos(
         (),
@@ -322,7 +322,7 @@ async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
 async fn test_graphql_basic_pagination() {
     let (test, schema) = "
     def foo (
-        rel .'id'(rel .gen: auto)|id: (rel .is: text)
+        rel .'id'[rel .gen: auto]|id: (rel .is: text)
     )
     map foos(
         (),
@@ -457,7 +457,7 @@ async fn test_graphql_basic_pagination() {
 async fn test_graphql_nodes() {
     let (test, schema) = "
     def foo (
-        rel .'id'(rel .gen: auto)|id: (rel .is: text)
+        rel .'id'[rel .gen: auto]|id: (rel .is: text)
     )
     map foos(
         (),
@@ -504,7 +504,7 @@ fn test_graphql_value_type_as_field() {
     "
     def foo (rel .is: text)
     def bar (
-        rel .'id'(rel .gen: auto)|id: (rel .is: text)
+        rel .'id'[rel .gen: auto]|id: (rel .is: text)
         rel .'foo': foo
     )
     "
@@ -516,7 +516,7 @@ fn test_graphql_value_type_in_array() {
     "
     def foo (rel .is: text)
     def bar (
-        rel .'id'(rel .gen: auto)|id: (rel .is: text)
+        rel .'id'[rel .gen: auto]|id: (rel .is: text)
         rel .'foo': {foo}
     )
     "
@@ -906,7 +906,7 @@ async fn test_create_through_mapped_domain() {
             use 'artist_and_instrument' as ai
 
             def player (
-                rel .'id'(rel .gen: auto)|id: (rel .is: uuid)
+                rel .'id'[rel .gen: auto]|id: (rel .is: uuid)
                 rel .'nick': text
             )
 
@@ -978,7 +978,7 @@ async fn test_create_through_three_domains() {
             use 'player' as player
 
             def actor (
-                rel .'ID'(rel .gen: auto)|id: (fmt '' => 'actor/' => uuid => .)
+                rel .'ID'[rel .gen: auto]|id: (fmt '' => 'actor/' => uuid => .)
                 rel .'alias': text
             )
 
@@ -994,7 +994,7 @@ async fn test_create_through_three_domains() {
             use 'artist_and_instrument' as ai
 
             def player (
-                rel .'id'(rel .gen: auto)|id: (rel .is: uuid)
+                rel .'id'[rel .gen: auto]|id: (rel .is: uuid)
                 rel .'nick': text
             )
 
@@ -1394,7 +1394,7 @@ fn test_graphql_municipalities_geojson_union() {
 async fn test_graphql_open_data() {
     let (test, schema) = "
     def(open) foo (
-        rel .'id'(rel .gen: auto)|id: (rel .is: text)
+        rel .'id'[rel .gen: auto]|id: (rel .is: text)
     )
     "
     .compile_single_schema_with_datastore();
@@ -1443,7 +1443,7 @@ async fn test_graphql_open_data() {
 async fn test_open_data_disabled() {
     let (test, schema) = "
     def(open) foo (
-        rel .'id'(rel .gen: auto)|id: (rel .is: text)
+        rel .'id'[rel .gen: auto]|id: (rel .is: text)
     )
     "
     .compile_single_schema_with_datastore();
@@ -1551,12 +1551,12 @@ async fn test_const_in_union_bug() {
     )
 
     def member (
-        rel .'id'|id(rel .gen: auto): (fmt '' => 'member/' => text => .)
+        rel .'id'[rel .gen: auto]|id: (fmt '' => 'member/' => text => .)
         rel .'const': 'const'
     )
 
     def target (
-        rel .'id'|id(rel .gen: auto): (fmt '' => 'target/' => text => .)
+        rel .'id'[rel .gen: auto]|id: (fmt '' => 'target/' => text => .)
     )
     "
     .compile_single_schema_with_datastore();

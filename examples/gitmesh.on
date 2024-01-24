@@ -1,6 +1,6 @@
 
 def Repository (
-    rel .'id'(rel .gen: auto)|id: (rel .is: uuid)
+    rel .'id'[rel .gen: auto]|id: (rel .is: uuid)
     rel .'handle': text
     rel {.}'owner'::'repositories' RepositoryOwner
     rel .'origin'?: .
@@ -18,7 +18,7 @@ def User (
 
 def Organization (
     rel .'id'|id: (fmt '' => 'org/' => text => .)
-    rel {.}'members'(rel .is: OrganizationMember)::'member_of' {User}
+    rel {.}'members'[rel .is: OrganizationMember]::'member_of' {User}
 )
 
 def OrganizationMember (

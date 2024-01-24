@@ -4,7 +4,7 @@ def tag (rel.is: text)
 
 def User (
     // TODO: This must be an Authly user id
-    rel .'user_id'(rel .gen: auto)|id: user_id
+    rel .'user_id'[rel .gen: auto]|id: user_id
     // TODO: This is.. an authly user name? Maybe?
     rel .'username': text
 
@@ -13,7 +13,7 @@ def User (
     rel .'email': text
     rel .'password_hash': text
 
-    rel .'bio'(rel .default := ''): text
+    rel .'bio'[rel .default := '']: text
     rel .'image'?: text
 
     // TODO(constraint): User cannot follow itself
@@ -21,21 +21,21 @@ def User (
 )
 
 def Article (
-    rel .'article_id'(rel .gen: auto)|id: (rel .is: uuid)
+    rel .'article_id'[rel .gen: auto]|id: (rel .is: uuid)
     // TODO(constraint): slug is unique
     rel .'slug': slug
     rel .'title': text
     rel .'description': text
     rel .'body': text
-    rel .'created_at'(rel .gen: create_time): datetime
-    rel .'updated_at'(rel .gen: update_time): datetime
+    rel .'created_at'[rel .gen: create_time]: datetime
+    rel .'updated_at'[rel .gen: update_time]: datetime
 )
 
 def Comment (
-    rel .'id'(rel .gen: auto)|id: (rel .is: i64)
+    rel .'id'[rel .gen: auto]|id: (rel .is: i64)
     rel .'body': text
-    rel .'created_at'(rel .gen: create_time): datetime
-    rel .'updated_at'(rel .gen: update_time): datetime
+    rel .'created_at'[rel .gen: create_time]: datetime
+    rel .'updated_at'[rel .gen: update_time]: datetime
 )
 
 def TagEntity (

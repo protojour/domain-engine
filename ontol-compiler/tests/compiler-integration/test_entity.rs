@@ -64,7 +64,7 @@ fn inherent_id_autogen() {
     "
     def foo_id (rel .is: text)
     def foo (
-        rel .'key'(rel .gen: auto)|id: foo_id
+        rel .'key'[rel .gen: auto]|id: foo_id
         rel .'children': {foo}
     )
     "
@@ -321,7 +321,7 @@ fn entity_union_simple() {
 fn entity_union_with_union_def_id_larger_than_id() {
     "
     def Repository (
-        rel .'id'(rel .gen: auto)|id: (rel .is: uuid)
+        rel .'id'[rel .gen: auto]|id: (rel .is: uuid)
         rel {.}'owner'::'repositories' RepositoryOwner
     )
 

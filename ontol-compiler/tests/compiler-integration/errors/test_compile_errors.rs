@@ -263,7 +263,7 @@ fn error_mix_of_index_and_edge_type() {
     def foo ()
     def bar ()
 
-    rel foo 0(rel .is: bar): text // ERROR cannot mix index relation identifiers and edge types
+    rel foo 0[rel .is: bar]: text // ERROR cannot mix index relation identifiers and edge types
     "#
     .compile_fail();
 }
@@ -456,7 +456,7 @@ fn bad_domain_relation() {
             use 'a' as a
             use 'b' as b
 
-            rel a 'to'(): b // ERROR subject must be a domain type// ERROR object must be a data type
+            rel a 'to'[]: b // ERROR subject must be a domain type// ERROR object must be a data type
             ",
         ),
     ])
@@ -474,7 +474,7 @@ fn error_nonsense_value_generator() {
     def bar ( rel .'prop': text )
     def foo (
         rel .'bar'
-            (rel .gen: auto) // ERROR Cannot generate a value of type bar
+            [rel .gen: auto] // ERROR Cannot generate a value of type bar
         : bar
     )
     "

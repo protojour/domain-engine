@@ -177,16 +177,16 @@ fn union_integers() {
 fn more_members() {
     "
     def created (
-        rel .'created'(rel .gen: create_time)?: datetime
+        rel .'created'[rel .gen: create_time]?: datetime
     )
     def updated (
-        rel .'updated'(rel .gen: update_time)?: datetime
+        rel .'updated'[rel .gen: update_time]?: datetime
     )
     def foo_id (
         fmt '' => 'foos/' => text => .
     )
     def foo (
-        rel .'_id'|id(rel .gen: auto): foo_id
+        rel .'_id'[rel .gen: auto]|id: foo_id
         rel .is: created
         rel .is: updated
         rel .'name': text
@@ -204,13 +204,13 @@ fn more_members() {
 fn forward_mapping() {
     "
     def created (
-        rel .'created'(rel .gen: create_time)?: datetime
+        rel .'created'[rel .gen: create_time]?: datetime
     )
     def foo_id (
         fmt '' => 'foos/' => text => .
     )
     def foo (
-        rel .'_id'(rel .gen: auto)|id: foo_id
+        rel .'_id'[rel .gen: auto]|id: foo_id
         rel .is: created
         rel .'name': text
     )

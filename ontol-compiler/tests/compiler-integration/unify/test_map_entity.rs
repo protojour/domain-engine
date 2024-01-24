@@ -1,7 +1,4 @@
-use ontol_test_utils::{
-    examples::{ARTIST_AND_INSTRUMENT, GUITAR_SYNTH_UNION},
-    SourceName, TestCompile, TestPackages,
-};
+use ontol_test_utils::{SourceName, TestCompile, TestPackages};
 use serde_json::json;
 use test_log::test;
 
@@ -53,7 +50,7 @@ fn test_extract_rel_params() {
 
     def a1(
         rel a1_id identifies: .
-        rel .'foreign'(rel .is: a_edge): a2
+        rel .'foreign'[rel .is: a_edge]: a2
     )
     def b1(
         rel b1_id identifies: .
@@ -62,7 +59,7 @@ fn test_extract_rel_params() {
 
     map(
         a1(
-            'foreign'('bar': b): a2('foo': f)
+            'foreign'['bar': b]: a2('foo': f)
         ),
         b1(
             'foreign': b2(
@@ -133,11 +130,11 @@ fn test_rel_params_implicit_map() {
 
     def a (
         rel a_id identifies: .
-        rel .'foreign'(rel .is: a_edge): a_inner
+        rel .'foreign'[rel .is: a_edge]: a_inner
     )
     def b (
         rel b_id identifies: .
-        rel .'foreign'(rel .is: b_edge): b_inner
+        rel .'foreign'[rel .is: b_edge]: b_inner
     )
 
     map(
@@ -289,49 +286,6 @@ fn test_map_invert() {
                     )}
                 )
             )
-            ",
-        ),
-    ])
-    .compile_fail();
-}
-
-#[test]
-fn artist_etc_routing() {
-    TestPackages::with_sources([
-        (SourceName("gsu"), GUITAR_SYNTH_UNION.1),
-        (SourceName("ai"), ARTIST_AND_INSTRUMENT.1),
-        (
-            SourceName::root(),
-            "
-            use 'gsu' as gsu
-            use 'ai' as ai
-
-            rel gsu route(
-                map(
-                    gsu.artist(
-                        'artist-id': id,
-                        'name': n,
-                        'plays': {..p}, // ERROR cannot convert this `instrument` from `instrument`: These types are not equated.
-                    ),
-                    ai.artist(
-                        'ID': id,
-                        'name': n,
-                        'plays': {..p}, // ERROR unbound variable// ERROR cannot convert this `instrument` from `instrument`: These types are not equated.
-                    )
-                )
-
-                map(
-                    gsu.synth(
-                        'instrument-id': id,
-                        'type': t, // ERROR unbound variable
-                        'polyphony': p, // ERROR unbound variable
-                    ),
-                    ai.instrument(
-                        'ID': id,
-                        'name': n, // ERROR unbound variable
-                    )
-                )
-            ): ai
             ",
         ),
     ])

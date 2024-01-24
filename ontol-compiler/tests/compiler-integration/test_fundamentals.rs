@@ -105,7 +105,7 @@ fn can_refer_to_future_definitions() {
 fn default_for_boolean() {
     "
     def foo (
-        rel .'active'(rel .default := true): boolean
+        rel .'active'[rel .default := true]: boolean
     )
     "
     .compile_fail();

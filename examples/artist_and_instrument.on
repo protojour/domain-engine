@@ -1,5 +1,5 @@
 def artist (
-    rel .'ID'(rel .gen: auto)|id: ( fmt '' => 'artist/' => uuid => . )
+    rel .'ID'[rel .gen: auto]|id: ( fmt '' => 'artist/' => uuid => . )
     rel .'name': text
 )
 
@@ -12,7 +12,7 @@ def instrument-id (
 )
 
 def instrument (
-    rel .'ID'(rel .gen: auto)|id: instrument-id
+    rel .'ID'[rel .gen: auto]|id: instrument-id
     rel .'name': text
 )
 
@@ -20,7 +20,7 @@ def plays (
     rel .'how_much': text
 )
 
-rel {artist} 'plays'(rel .is: plays)::'played_by' {instrument}
+rel {artist} 'plays'[rel .is: plays]::'played_by' {instrument}
 
 map artists (
     (),

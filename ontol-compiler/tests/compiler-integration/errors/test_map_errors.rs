@@ -169,7 +169,7 @@ fn only_entities_may_have_reverse_relationship() {
     "
     def foo ()
     def bar ()
-    rel {foo} 'a'()::'aa' bar // ERROR only entities may have named reverse relationship
+    rel {foo} 'a'[]::'aa' bar // ERROR only entities may have named reverse relationship
     rel {foo} 'b'::'bb' text // ERROR only entities may have named reverse relationship
     "
     .compile_fail();
@@ -229,7 +229,7 @@ fn map_invalid_unit_rel_params() {
     map(
         foo(
             'foo'
-                ('bug': b) // ERROR no relation parameters expected
+                ['bug': b] // ERROR no relation parameters expected
                 : s
         ),
         bar('bar': s)

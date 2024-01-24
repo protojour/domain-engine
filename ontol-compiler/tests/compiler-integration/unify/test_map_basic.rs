@@ -195,7 +195,7 @@ fn test_map_into_default_field_using_default_value() {
     "
     def empty ()
     def target (
-        rel .'field'(rel .default := 'Default!'): text
+        rel .'field'[rel .default := 'Default!']: text
     )
     map(
         empty(),
@@ -223,7 +223,7 @@ fn test_map_into_default_field_using_provided_value() {
         rel .'field': text
     )
     def target (
-        rel .'field'(rel .default := 'Default!'): text
+        rel .'field'[rel .default := 'Default!']: text
     )
     map(
         required('field': val),
@@ -249,7 +249,7 @@ fn test_map_into_default_field_using_map_provided() {
     "
     def empty ()
     def target (
-        rel .'field'(rel .default := 'Default!'): text
+        rel .'field'[rel .default := 'Default!']: text
     )
     map(
         empty(),

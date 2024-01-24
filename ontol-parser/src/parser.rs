@@ -224,7 +224,7 @@ fn forward_relation(
 
     let rel_ty = rel_ty_int_range.or(rel_ty_type);
 
-    let rel_params_block = stmt_parser.repeated().delimited_by(open('('), close(')'));
+    let rel_params_block = stmt_parser.repeated().delimited_by(open('['), close(']'));
 
     rel_ty
         .then(spanned(rel_params_block).or_not())
@@ -351,7 +351,7 @@ fn struct_pattern_attr(
                 spanned(
                     spanned(struct_pattern_attr)
                         .repeated()
-                        .delimited_by(open('('), close(')')),
+                        .delimited_by(open('['), close(']')),
                 )
                 .or_not(),
             )

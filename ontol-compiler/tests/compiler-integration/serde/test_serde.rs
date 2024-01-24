@@ -274,7 +274,7 @@ fn test_serde_datetime() {
 fn test_integer_default() {
     "
     def foo (
-        rel .'bar'(rel .default := 42): i64
+        rel .'bar'[rel .default := 42]: i64
     )
     "
     .compile_then(|test| {
@@ -350,7 +350,7 @@ fn test_f64_range_constrained() {
 fn test_float_default() {
     "
     def foo (
-        rel .'bar'(rel .default := 42): f64
+        rel .'bar'[rel .default := 42]: f64
     )
     "
     .compile_then(|test| {
@@ -364,7 +364,7 @@ fn test_float_default() {
 fn test_string_default() {
     "
     def foo (
-        rel .'bar'(rel .default := 'baz'): text
+        rel .'bar'[rel .default := 'baz']: text
     )
     "
     .compile_then(|test| {

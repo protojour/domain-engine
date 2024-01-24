@@ -331,7 +331,7 @@ def stix_cyber_observable_object (
 def attack-pattern (
     rel .is: stix_domain_object
     rel .'type': 'attack-pattern'
-    rel .'id'(rel .gen: auto)|id: attack-pattern-id
+    rel .'id'[rel .gen: auto]|id: attack-pattern-id
 
     /// A name used to identify the Attack Pattern.
     rel .'name': common.string
@@ -358,7 +358,7 @@ def attack-pattern (
 def campaign (
     rel .is: stix_domain_object
     rel .'type': 'campaign'
-    rel .'id'(rel .gen: auto)|id: campaign-id
+    rel .'id'[rel .gen: auto]|id: campaign-id
 
     /// A name used to identify the Campaign.
     rel .'name': common.string
@@ -396,7 +396,7 @@ def campaign (
 def course-of-action (
     rel .is: stix_domain_object
     rel .'type': 'course-of-action'
-    rel .'id'(rel .gen: auto)|id: course-of-action-id
+    rel .'id'[rel .gen: auto]|id: course-of-action-id
 
     /// A name used to identify the Course of Action.
     rel .'name': common.string
@@ -450,7 +450,7 @@ def course-of-action (
 def grouping (
     rel .is: stix_domain_object
     rel .'type': 'grouping'
-    rel .'id'(rel .gen: auto)|id: grouping-id
+    rel .'id'[rel .gen: auto]|id: grouping-id
 
     /// A name used to identify the Grouping.
     rel .'name': common.string
@@ -472,7 +472,7 @@ def grouping (
 def identity (
     rel .is: stix_domain_object
     rel .'type': 'identity'
-    rel .'id'(rel .gen: auto)|id: identity-id
+    rel .'id'[rel .gen: auto]|id: identity-id
 
     /// The name of this Identity.
     /// When referring to a specific entity (e.g., an individual or organization), this property SHOULD contain the canonical name of the specific entity.
@@ -501,7 +501,7 @@ def identity (
 def indicator (
     rel .is: stix_domain_object
     rel .'type': 'indicator'
-    rel .'id'(rel .gen: auto)|id: indicator-id
+    rel .'id'[rel .gen: auto]|id: indicator-id
 
     /// A name used to identify the Indicator.
     ///
@@ -548,7 +548,7 @@ def indicator (
 def infrastructure (
     rel .is: stix_domain_object
     rel .'type': 'infrastructure'
-    rel .'id'(rel .gen: auto)|id: infrastructure-id
+    rel .'id'[rel .gen: auto]|id: infrastructure-id
 
     /// A name or characterizing text used to identify the Infrastructure.
     rel .'name': common.string
@@ -587,7 +587,7 @@ def infrastructure (
 def intrusion-set (
     rel .is: stix_domain_object
     rel .'type': 'intrusion-set'
-    rel .'id'(rel .gen: auto)|id: intrusion-set-id
+    rel .'id'[rel .gen: auto]|id: intrusion-set-id
 
     /// A name used to identify this Intrusion Set.
     rel .'name': common.string
@@ -665,7 +665,7 @@ def intrusion-set (
 def location (
     rel .is: stix_domain_object
     rel .'type': 'location'
-    rel .'id'(rel .gen: auto)|id: location-id
+    rel .'id'[rel .gen: auto]|id: location-id
 
     /// A name used to identify the Location.
     rel .'name'?: common.string
@@ -731,7 +731,7 @@ def location (
 def malware (
     rel .is: stix_domain_object
     rel .'type': 'malware'
-    rel .'id'(rel .gen: auto)|id: malware-id
+    rel .'id'[rel .gen: auto]|id: malware-id
 
     /// A name used to identify the malware instance or family, as specified by the producer of the SDO.
     /// For a malware family the name MUST be defined. If a name for a malware instance is not available, the SHA-256 hash value or sample’s filename MAY be used instead.
@@ -800,7 +800,7 @@ def malware (
 def malware-analysis (
     rel .is: stix_domain_object
     rel .'type': 'malware-analysis'
-    rel .'id'(rel .gen: auto)|id: malware-analysis-id
+    rel .'id'[rel .gen: auto]|id: malware-analysis-id
 
     /// The name of the analysis engine or product that was used.
     /// Product names SHOULD be all lowercase with words separated by a dash `"-"`.
@@ -824,7 +824,7 @@ def malware-analysis (
 def note (
     rel .is: stix_domain_object
     rel .'type': 'note'
-    rel .'id'(rel .gen: auto)|id: note-id
+    rel .'id'[rel .gen: auto]|id: note-id
 
     /// A brief summary of the note content.
     rel .'abstract'?: common.string
@@ -863,7 +863,7 @@ def note (
 def observed-data (
     rel .is: stix_domain_object
     rel .'type': 'observed-data'
-    rel .'id'(rel .gen: auto)|id: observed-data-id
+    rel .'id'[rel .gen: auto]|id: observed-data-id
 
     /// The beginning of the time window during which the data was seen.
     rel .'first_observed': common.timestamp
@@ -903,7 +903,7 @@ def observed-data (
 def opinion (
     rel .is: stix_domain_object
     rel .'type': 'opinion'
-    rel .'id'(rel .gen: auto)|id: opinion-id
+    rel .'id'[rel .gen: auto]|id: opinion-id
 
     /// An explanation of why the producer has this Opinion.
     /// For example, if an Opinion of strongly-disagree is given, the explanation can contain an explanation of why the Opinion producer disagrees and what evidence they have for their disagreement.
@@ -931,7 +931,7 @@ def opinion (
 def report (
     rel .is: stix_domain_object
     rel .'type': 'report'
-    rel .'id'(rel .gen: auto)|id: report-id
+    rel .'id'[rel .gen: auto]|id: report-id
 
     /// A name used to identify the Report.
     rel .'name': common.string
@@ -962,7 +962,7 @@ def report (
 def threat-actor (
     rel .is: stix_domain_object
     rel .'type': 'threat-actor'
-    rel .'id'(rel .gen: auto)|id: threat-actor-id
+    rel .'id'[rel .gen: auto]|id: threat-actor-id
 
     /// A name used to identify this Threat Actor or Threat Actor group.
     rel .'name': common.string
@@ -1053,7 +1053,7 @@ def threat-actor (
 def tool (
     rel .is: stix_domain_object
     rel .'type': 'tool'
-    rel .'id'(rel .gen: auto)|id: tool-id
+    rel .'id'[rel .gen: auto]|id: tool-id
 
     /// The name used to identify the Tool.
     rel .'name': common.string
@@ -1086,7 +1086,7 @@ def tool (
 def vulnerability (
     rel .is: stix_domain_object
     rel .'type': 'vulnerability'
-    rel .'id'(rel .gen: auto)|id: vulnerability-id
+    rel .'id'[rel .gen: auto]|id: vulnerability-id
 
     /// A list of external references which refer to non-STIX information.
     /// This property MAY be used to provide one or more Vulnerability identifiers, such as a CVE ID [CVE].
@@ -1106,7 +1106,7 @@ def vulnerability (
 def artifact (
     rel .is: stix_cyber_observable_object
     rel .'type': 'artifact'
-    rel .'id'(rel .gen: auto)|id: artifact-id
+    rel .'id'[rel .gen: auto]|id: artifact-id
 
     /// Whenever feasible, this value SHOULD be one of the values defined in the Template column in the IANA media type registry [Media Types].
     /// Maintaining a comprehensive universal catalog of all extant file types is obviously not possible. When specifying a MIME Type not included in the IANA registry, implementers should use their best judgement so as to facilitate interoperability.
@@ -1143,7 +1143,7 @@ def artifact (
 def autonomous-system (
     rel .is: stix_cyber_observable_object
     rel .'type': 'autonomous-system'
-    rel .'id'(rel .gen: auto)|id: autonomous-system-id
+    rel .'id'[rel .gen: auto]|id: autonomous-system-id
 
     /// Specifies the number assigned to the AS. Such assignments are typically performed by a Regional Internet Registry (RIR).
     rel .'number': common.integer
@@ -1159,7 +1159,7 @@ def autonomous-system (
 def directory (
     rel .is: stix_cyber_observable_object
     rel .'type': 'directory'
-    rel .'id'(rel .gen: auto)|id: directory-id
+    rel .'id'[rel .gen: auto]|id: directory-id
 
     /// Specifies the path, as originally observed, to the directory on the file system.
     rel .'path': common.string
@@ -1192,7 +1192,7 @@ def directory (
 def domain-name (
     rel .is: stix_cyber_observable_object
     rel .'type': 'domain-name'
-    rel .'id'(rel .gen: auto)|id: domain-name-id
+    rel .'id'[rel .gen: auto]|id: domain-name-id
 
     /// Specifies the value of the domain name.
     /// The value of this property MUST conform to [RFC1034], and each domain and sub-domain contained within the domain name MUST conform to [RFC5890].
@@ -1206,7 +1206,7 @@ def domain-name (
 def email-addr (
     rel .is: stix_cyber_observable_object
     rel .'type': 'email-addr'
-    rel .'id'(rel .gen: auto)|id: email-addr-id
+    rel .'id'[rel .gen: auto]|id: email-addr-id
 
     /// Specifies the value of the email address. This MUST NOT include the display name.
     ///
@@ -1271,7 +1271,7 @@ def mime-part-type (
 def email-message (
     rel .is: stix_cyber_observable_object
     rel .'type': 'email-message'
-    rel .'id'(rel .gen: auto)|id: email-message-id
+    rel .'id'[rel .gen: auto]|id: email-message-id
 
     /// Indicates whether the email body contains multiple MIME parts.
     rel .'is_multipart': boolean
@@ -1346,7 +1346,7 @@ def email-message (
 def file (
     rel .is: stix_cyber_observable_object
     rel .'type': 'file'
-    rel .'id'(rel .gen: auto)|id: file-id
+    rel .'id'[rel .gen: auto]|id: file-id
 
     /// The File object defines the following extensions. In addition to these, producers MAY create their own.
     ///
@@ -1417,7 +1417,7 @@ def file (
 def ipv4-addr(
     rel .is: stix_cyber_observable_object
     rel .'type': 'ipv4-addr'
-    rel .'id'(rel .gen: auto)|id: ipv4-addr-id
+    rel .'id'[rel .gen: auto]|id: ipv4-addr-id
 
     /// Specifies the values of one or more IPv4 addresses expressed using CIDR notation.
     ///
@@ -1435,7 +1435,7 @@ def ipv4-addr(
 def ipv6-addr(
     rel .is: stix_cyber_observable_object
     rel .'type': 'ipv6-addr'
-    rel .'id'(rel .gen: auto)|id: ipv6-addr-id
+    rel .'id'[rel .gen: auto]|id: ipv6-addr-id
 
     /// Specifies the values of one or more IPv6 addresses expressed using CIDR notation.
     ///
@@ -1450,7 +1450,7 @@ def ipv6-addr(
 def mac-addr (
     rel .is: stix_cyber_observable_object
     rel .'type': 'mac-addr'
-    rel .'id'(rel .gen: auto)|id: mac-addr-id
+    rel .'id'[rel .gen: auto]|id: mac-addr-id
 
     /// Specifies the value of a single MAC address.
     ///
@@ -1465,7 +1465,7 @@ def mac-addr (
 def mutex (
     rel .is: stix_cyber_observable_object
     rel .'type': 'mutex'
-    rel .'id'(rel .gen: auto)|id: mutex-id
+    rel .'id'[rel .gen: auto]|id: mutex-id
 
     /// Specifies the name of the mutex object.
     rel .'name': common.string
@@ -1480,7 +1480,7 @@ def mutex (
 def network-traffic (
     rel .is: stix_cyber_observable_object
     rel .'type': 'network-traffic'
-    rel .'id'(rel .gen: auto)|id: network-traffic-id
+    rel .'id'[rel .gen: auto]|id: network-traffic-id
 
     /// The Network Traffic object defines the following extensions. In addition to these, producers MAY create their own.
     ///
@@ -1610,7 +1610,7 @@ def network-traffic (
 def process (
     rel .is: stix_cyber_observable_object
     rel .'type': 'process'
-    rel .'id'(rel .gen: auto)|id: process-id
+    rel .'id'[rel .gen: auto]|id: process-id
 
     /// The Process object defines the following extensions. In addition to these, producers MAY create their own.
     ///
@@ -1672,7 +1672,7 @@ def process (
 def software (
     rel .is: stix_cyber_observable_object
     rel .'type': 'software'
-    rel .'id'(rel .gen: auto)|id: software-id
+    rel .'id'[rel .gen: auto]|id: software-id
 
     /// Specifies the name of the software.
     rel .'name': common.string
@@ -1698,7 +1698,7 @@ def software (
 def url (
     rel .is: stix_cyber_observable_object
     rel .'type': 'url'
-    rel .'id'(rel .gen: auto)|id: url-id
+    rel .'id'[rel .gen: auto]|id: url-id
 
     /// Specifies the value of the URL.
     /// The value of this property MUST conform to [RFC3986], more specifically section 1.1.3 with reference to the definition for "Uniform Resource Locator".
@@ -1710,7 +1710,7 @@ def url (
 def user-account (
     rel .is: stix_cyber_observable_object
     rel .'type': 'user-account'
-    rel .'id'(rel .gen: auto)|id: user-account-id
+    rel .'id'[rel .gen: auto]|id: user-account-id
 
     /// The User Account object defines the following extensions. In addition to these, producers MAY create their own.
     ///
@@ -1790,7 +1790,7 @@ def windows-registry-value-type (
 def windows-registry-key (
     rel .is: stix_cyber_observable_object
     rel .'type': 'windows-registry-key'
-    rel .'id'(rel .gen: auto)|id: windows-registry-key-id
+    rel .'id'[rel .gen: auto]|id: windows-registry-key-id
 
     /// Specifies the full registry key including the hive.
     ///
@@ -1871,7 +1871,7 @@ def x509-v3-extensions-type(
 def x509-certificate(
     rel .is: stix_cyber_observable_object
     rel .'type': 'x509-certificate'
-    rel .'id'(rel .gen: auto)|id: x509-certificate-id
+    rel .'id'[rel .gen: auto]|id: x509-certificate-id
 
     /// Specifies whether the certificate is self-signed, i.e., whether it is signed by the same entity whose identity it certifies.
     rel .'is_self_signed'?: boolean
@@ -1918,7 +1918,7 @@ def x509-certificate(
 def relationship (
     rel .is: stix_relationship_object
     rel .'type': 'relationship'
-    rel .'id'(rel .gen: auto)|id: relationship-id
+    rel .'id'[rel .gen: auto]|id: relationship-id
 
     /// The name used to identify the type of Relationship.
     /// This value SHOULD be an exact value listed in the relationships for the source and target SDO, but MAY be any string.
