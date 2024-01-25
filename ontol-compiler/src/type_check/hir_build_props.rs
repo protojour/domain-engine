@@ -11,7 +11,10 @@ use tracing::debug;
 use crate::{
     def::{DefKind, LookupRelationshipMeta, RelParams},
     mem::Intern,
-    pattern::{CompoundPatternAttr, CompoundPatternModifier, PatternKind},
+    pattern::{
+        CompoundPatternAttr, CompoundPatternAttrKind, CompoundPatternModifier, Pattern,
+        PatternKind, SetBinaryOperator,
+    },
     primitive::PrimitiveKind,
     relation::Property,
     repr::repr_model::ReprKind,
@@ -114,14 +117,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 match attributes.next() {
                     Some(CompoundPatternAttr {
                         key: (attr_def_id, _),
-                        rel: _,
                         bind_option: _,
-                        value,
+                        kind: CompoundPatternAttrKind::Value { rel: _, val },
                     }) if is_unit_binding => {
                         assert!(*attr_def_id == DefId::unit());
 
                         let inner_node = self.build_node(
-                            value,
+                            val,
                             NodeInfo {
                                 expected_ty: Some((ty, Strength::Strong)),
                                 parent_struct_flags,
@@ -244,32 +246,218 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     ) -> Option<ontol_hir::Node> {
         let CompoundPatternAttr {
             key: (def_id, prop_span),
-            rel,
             bind_option,
-            value,
+            kind,
         } = attr;
 
         let DefKind::TextLiteral(attr_prop) = self.defs.def_kind(*def_id) else {
             self.error(CompileError::NamedPropertyExpected, prop_span);
             return None;
         };
-        let Some(match_property) = match_attributes.get_mut(attr_prop) else {
+        let Some(match_attribute) = match_attributes.get_mut(attr_prop) else {
             self.error(CompileError::UnknownProperty, prop_span);
             return None;
         };
-        if match_property.mentioned {
+        if match_attribute.mentioned {
+            // TODO: This is probably allowed in match
             self.error(CompileError::DuplicateProperty, prop_span);
             return None;
         }
-        match_property.mentioned = true;
+        match_attribute.mentioned = true;
 
-        let rel_params_ty = match match_property.rel_params_def {
+        let rel_params_ty = match match_attribute.rel_params_def {
             Some(rel_def_id) => self.check_def_sealed(rel_def_id),
             None => &UNIT_TYPE,
         };
+
         debug!("rel_params_ty: {rel_params_ty:?}");
 
-        let rel_node = match (rel_params_ty, rel) {
+        match kind {
+            CompoundPatternAttrKind::Value { rel, val } => {
+                let value_ty = self.check_def_sealed(match_attribute.value_def);
+                let rel_node = self.build_rel_node_from_option(
+                    rel_params_ty,
+                    rel.as_ref(),
+                    val,
+                    *prop_span,
+                    actual_struct_flags,
+                    ctx,
+                );
+                debug!("value_ty: {value_ty:?}");
+
+                let prop_variant = match match_attribute.cardinality.1 {
+                    ValueCardinality::One => {
+                        let val_node = self.build_node(
+                            val,
+                            NodeInfo {
+                                expected_ty: Some((value_ty, Strength::Strong)),
+                                parent_struct_flags: actual_struct_flags,
+                            },
+                            ctx,
+                        );
+                        ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
+                            rel: rel_node,
+                            val: val_node,
+                        })
+                    }
+                    ValueCardinality::Many => match &val.kind {
+                        PatternKind::Set { elements, .. } => {
+                            let mut hir_elements = Vec::with_capacity(elements.len());
+                            for element in elements {
+                                let val_node = self.build_node(
+                                    &element.val,
+                                    NodeInfo {
+                                        expected_ty: Some((value_ty, Strength::Strong)),
+                                        parent_struct_flags: actual_struct_flags,
+                                    },
+                                    ctx,
+                                );
+                                hir_elements.push((
+                                    ontol_hir::Iter(element.iter),
+                                    ontol_hir::Attribute {
+                                        rel: rel_node,
+                                        val: val_node,
+                                    },
+                                ));
+                            }
+
+                            let label = *ctx.label_map.get(&val.id).unwrap();
+                            let seq_ty = self.types.intern(Type::Seq(rel_params_ty, value_ty));
+
+                            ontol_hir::PropVariant::Set(ontol_hir::SetPropertyVariant {
+                                label: TypedHirData(
+                                    label,
+                                    Meta {
+                                        ty: seq_ty,
+                                        span: NO_SPAN,
+                                    },
+                                ),
+                                has_default: ontol_hir::HasDefault(matches!(
+                                    match_attribute.property_id.role,
+                                    Role::Object
+                                )),
+                                elements: hir_elements.into(),
+                            })
+                        }
+                        _ => {
+                            self.type_error(
+                                TypeError::VariableMustBeSequenceEnclosed(value_ty),
+                                &val.span,
+                            );
+                            return None;
+                        }
+                    },
+                };
+
+                let mut optional = ontol_hir::Optional(matches!(
+                    match_attribute.cardinality.0,
+                    PropertyCardinality::Optional
+                ));
+
+                if self
+                    .relations
+                    .value_generators
+                    .get(&match_attribute.property_id.relationship_id)
+                    .is_some()
+                {
+                    optional = ontol_hir::Optional(true);
+                }
+
+                let prop_variants: Vec<ontol_hir::PropVariant<'_, TypedHir>> =
+                    match match_attribute.cardinality.0 {
+                        PropertyCardinality::Mandatory => {
+                            vec![prop_variant]
+                        }
+                        PropertyCardinality::Optional => {
+                            if *bind_option {
+                                vec![prop_variant]
+                            } else {
+                                ctx.partial = true;
+                                self.error(
+                                    CompileError::TODO("required to be optional?".into()),
+                                    &val.span,
+                                );
+                                vec![]
+                            }
+                        }
+                    };
+
+                Some(ctx.mk_node(
+                    ontol_hir::Kind::Prop(
+                        optional,
+                        struct_binder_var,
+                        match_attribute.property_id,
+                        prop_variants.into(),
+                    ),
+                    Meta {
+                        ty: &UNIT_TYPE,
+                        span: *prop_span,
+                    },
+                ))
+            }
+            CompoundPatternAttrKind::ContainsElement { .. } => todo!(),
+            CompoundPatternAttrKind::SetOperator {
+                operator,
+                elements: _,
+            } => {
+                let prop_variants: Vec<ontol_hir::PropVariant<'m, TypedHir>> =
+                    match (match_attribute.cardinality.1, operator) {
+                        (ValueCardinality::One, SetBinaryOperator::ElementIn) => {
+                            vec![ontol_hir::PropVariant::Predicate(
+                                ontol_hir::PredicateClosure::ElementIn(ctx.mk_node(
+                                    ontol_hir::Kind::SetOf(Default::default()),
+                                    Meta {
+                                        ty: &UNIT_TYPE,
+                                        span: *prop_span,
+                                    },
+                                )),
+                            )]
+                        }
+                        (ValueCardinality::Many, SetBinaryOperator::ElementIn) => {
+                            self.error(
+                                CompileError::TODO("property must be a scalar".into()),
+                                prop_span,
+                            );
+                            return None;
+                        }
+                        (ValueCardinality::Many, _) => {
+                            vec![]
+                        }
+                        (ValueCardinality::One, _) => {
+                            self.error(
+                                CompileError::TODO("property must be a set".into()),
+                                prop_span,
+                            );
+                            return None;
+                        }
+                    };
+
+                Some(ctx.mk_node(
+                    ontol_hir::Kind::Prop(
+                        ontol_hir::Optional(true), // TODO
+                        struct_binder_var,
+                        match_attribute.property_id,
+                        prop_variants.into(),
+                    ),
+                    Meta {
+                        ty: &UNIT_TYPE,
+                        span: *prop_span,
+                    },
+                ))
+            }
+        }
+    }
+
+    fn build_rel_node_from_option(
+        &mut self,
+        rel_params_ty: TypeRef<'m>,
+        rel: Option<&Pattern>,
+        val: &Pattern,
+        prop_span: SourceSpan,
+        actual_struct_flags: StructFlags,
+        ctx: &mut HirBuildCtx<'m>,
+    ) -> ontol_hir::Node {
+        match (rel_params_ty, rel) {
             (Type::Primitive(PrimitiveKind::Unit, _), Some(rel)) => {
                 self.error_node(CompileError::NoRelationParametersExpected, &rel.span, ctx)
             }
@@ -277,7 +465,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 ontol_hir::Kind::Unit,
                 Meta {
                     ty,
-                    span: *prop_span,
+                    span: prop_span,
                 },
             ),
             (_, Some(rel)) => self.build_node(
@@ -290,132 +478,19 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             ),
             (ty @ Type::Anonymous(def_id), None) => {
                 match self.relations.properties_by_def_id(*def_id) {
-                    Some(_) => self.build_implicit_rel_node(ty, value, *prop_span, ctx),
+                    Some(_) => self.build_implicit_rel_node(ty, val, prop_span, ctx),
                     // An anonymous type without properties, i.e. just "meta relationships" about the relationship itself:
                     None => ctx.mk_node(
                         ontol_hir::Kind::Unit,
                         Meta {
                             ty,
-                            span: *prop_span,
+                            span: prop_span,
                         },
                     ),
                 }
             }
-            (ty, None) => self.build_implicit_rel_node(ty, value, *prop_span, ctx),
-        };
-
-        let value_ty = self.check_def_sealed(match_property.value_def);
-        debug!("value_ty: {value_ty:?}");
-
-        let prop_variant = match match_property.cardinality.1 {
-            ValueCardinality::One => {
-                let val_node = self.build_node(
-                    value,
-                    NodeInfo {
-                        expected_ty: Some((value_ty, Strength::Strong)),
-                        parent_struct_flags: actual_struct_flags,
-                    },
-                    ctx,
-                );
-                ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
-                    rel: rel_node,
-                    val: val_node,
-                })
-            }
-            ValueCardinality::Many => match &value.kind {
-                PatternKind::Set { elements, .. } => {
-                    let mut hir_elements = Vec::with_capacity(elements.len());
-                    for element in elements {
-                        let val_node = self.build_node(
-                            &element.pattern,
-                            NodeInfo {
-                                expected_ty: Some((value_ty, Strength::Strong)),
-                                parent_struct_flags: actual_struct_flags,
-                            },
-                            ctx,
-                        );
-                        hir_elements.push((
-                            ontol_hir::Iter(element.iter),
-                            ontol_hir::Attribute {
-                                rel: rel_node,
-                                val: val_node,
-                            },
-                        ));
-                    }
-
-                    let label = *ctx.label_map.get(&value.id).unwrap();
-                    let seq_ty = self.types.intern(Type::Seq(rel_params_ty, value_ty));
-
-                    ontol_hir::PropVariant::Set(ontol_hir::SetPropertyVariant {
-                        label: TypedHirData(
-                            label,
-                            Meta {
-                                ty: seq_ty,
-                                span: NO_SPAN,
-                            },
-                        ),
-                        has_default: ontol_hir::HasDefault(matches!(
-                            match_property.property_id.role,
-                            Role::Object
-                        )),
-                        elements: hir_elements.into(),
-                    })
-                }
-                _ => {
-                    self.type_error(
-                        TypeError::VariableMustBeSequenceEnclosed(value_ty),
-                        &value.span,
-                    );
-                    return None;
-                }
-            },
-        };
-
-        let mut optional = ontol_hir::Optional(matches!(
-            match_property.cardinality.0,
-            PropertyCardinality::Optional
-        ));
-
-        if self
-            .relations
-            .value_generators
-            .get(&match_property.property_id.relationship_id)
-            .is_some()
-        {
-            optional = ontol_hir::Optional(true);
+            (ty, None) => self.build_implicit_rel_node(ty, val, prop_span, ctx),
         }
-
-        let prop_variants: Vec<ontol_hir::PropVariant<'_, TypedHir>> =
-            match match_property.cardinality.0 {
-                PropertyCardinality::Mandatory => {
-                    vec![prop_variant]
-                }
-                PropertyCardinality::Optional => {
-                    if *bind_option {
-                        vec![prop_variant]
-                    } else {
-                        ctx.partial = true;
-                        self.error(
-                            CompileError::TODO("required to be optional?".into()),
-                            &value.span,
-                        );
-                        vec![]
-                    }
-                }
-            };
-
-        Some(ctx.mk_node(
-            ontol_hir::Kind::Prop(
-                optional,
-                struct_binder_var,
-                match_property.property_id,
-                prop_variants.into(),
-            ),
-            Meta {
-                ty: &UNIT_TYPE,
-                span: *prop_span,
-            },
-        ))
     }
 
     fn handle_missing_struct_attributes(

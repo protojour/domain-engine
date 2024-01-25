@@ -11,7 +11,7 @@ use tracing::info;
 
 use crate::{
     def::{Def, DefKind, Defs, LookupRelationshipMeta, RelParams, Relationship},
-    pattern::{PatId, Pattern, PatternKind, Patterns, TypePath},
+    pattern::{CompoundPatternAttrKind, PatId, Pattern, PatternKind, Patterns, TypePath},
     relation::{Property, Relations},
     CompileError, CompileErrors, Compiler, SourceSpan, SpannedCompileError,
 };
@@ -90,16 +90,24 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                 }
 
                 for pattern_attr in attributes.iter() {
-                    self.infer_attr_sub_pat(
-                        &pattern_attr.value,
-                        VarFlags {
-                            is_option: pattern_attr.bind_option,
-                            is_set: false,
-                        },
-                        pattern_attr.key.0,
-                        target_def_id,
-                        source_vars,
-                    );
+                    match &pattern_attr.kind {
+                        CompoundPatternAttrKind::Value { rel: _, val }
+                        | CompoundPatternAttrKind::ContainsElement { rel: _, val } => {
+                            self.infer_attr_sub_pat(
+                                val,
+                                VarFlags {
+                                    is_option: pattern_attr.bind_option,
+                                    is_set: false,
+                                },
+                                pattern_attr.key.0,
+                                target_def_id,
+                                source_vars,
+                            );
+                        }
+                        CompoundPatternAttrKind::SetOperator { .. } => {
+                            info!("TODO: SetOperator");
+                        }
+                    }
                 }
             }
             PatternKind::Set { .. } => todo!(),
@@ -107,8 +115,6 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
             PatternKind::ConstI64(_) => todo!(),
             PatternKind::ConstText(_) => todo!(),
             PatternKind::Regex(_) => todo!(),
-            PatternKind::ContainsElement(_) => todo!(),
-            PatternKind::SetOperator { .. } => todo!(),
         }
     }
 
@@ -176,7 +182,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
             PatternKind::Set { elements, .. } => {
                 for element in elements {
                     self.infer_attr_sub_pat(
-                        &element.pattern,
+                        &element.val,
                         VarFlags {
                             is_set: true,
                             ..flags
@@ -190,8 +196,6 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
             PatternKind::ConstI64(_) => todo!(),
             PatternKind::Regex(_) => todo!(),
             PatternKind::ConstText(_) => todo!(),
-            PatternKind::ContainsElement(_) => todo!(),
-            PatternKind::SetOperator { .. } => todo!(),
         }
     }
 
@@ -251,26 +255,63 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                     return;
                 };
                 for attr in attributes.iter() {
-                    if let Some(rel) = &attr.rel {
-                        self.scan_source_variables(rel, VarFlags::default(), output);
-                    }
+                    match &attr.kind {
+                        CompoundPatternAttrKind::Value { rel, val }
+                        | CompoundPatternAttrKind::ContainsElement { rel, val } => {
+                            if let Some(rel) = rel {
+                                self.scan_source_variables(rel, VarFlags::default(), output);
+                            }
 
-                    self.scan_compound_attr_sub_pattern_source_variables(
-                        &attr.value,
-                        attr.key.0,
-                        VarFlags {
-                            is_option: attr.bind_option,
-                            is_set: false,
-                        },
-                        table,
-                        output,
-                    );
+                            self.scan_compound_attr_sub_pattern_source_variables(
+                                val,
+                                attr.key.0,
+                                VarFlags {
+                                    is_option: attr.bind_option,
+                                    is_set: false,
+                                },
+                                table,
+                                output,
+                            );
+                        }
+                        CompoundPatternAttrKind::SetOperator {
+                            operator: _,
+                            elements,
+                        } => {
+                            let sub_flags = VarFlags {
+                                is_option: flags.is_option || attr.bind_option,
+                                is_set: true,
+                            };
+                            for element in elements.iter() {
+                                if let Some(rel) = &element.rel {
+                                    self.scan_source_variables(rel, sub_flags, output);
+                                }
+                                self.scan_compound_attr_sub_pattern_source_variables(
+                                    &element.val,
+                                    attr.key.0,
+                                    sub_flags,
+                                    table,
+                                    output,
+                                );
+                            }
+                        }
+                    }
                 }
             }
             PatternKind::Set { elements, .. } => {
                 for element in elements {
+                    if let Some(rel) = element.rel.as_ref() {
+                        self.scan_source_variables(
+                            rel,
+                            VarFlags {
+                                is_set: true,
+                                ..flags
+                            },
+                            output,
+                        );
+                    }
+
                     self.scan_source_variables(
-                        &element.pattern,
+                        &element.val,
                         VarFlags {
                             is_set: true,
                             ..flags
@@ -282,19 +323,6 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
             PatternKind::ConstI64(_) => {}
             PatternKind::Regex(_) => {}
             PatternKind::ConstText(_) => {}
-            PatternKind::ContainsElement(pattern) => {
-                self.scan_source_variables(pattern, flags, output);
-            }
-            PatternKind::SetOperator { element, .. } => {
-                self.scan_source_variables(
-                    &element.pattern,
-                    VarFlags {
-                        is_set: true,
-                        ..flags
-                    },
-                    output,
-                );
-            }
         }
     }
 
@@ -332,22 +360,6 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                     .entry(*pat_var)
                     .or_default()
                     .push(VarRelationship { val_def_id, flags });
-            }
-            PatternKind::SetOperator { element, .. } => {
-                if element.iter {
-                    self.scan_compound_attr_sub_pattern_source_variables(
-                        &element.pattern,
-                        attr_relation_id,
-                        VarFlags {
-                            is_set: true,
-                            ..flags
-                        },
-                        parent_table,
-                        output,
-                    );
-                } else {
-                    info!("Skipping !iter set operator element");
-                }
             }
             other => {
                 info!("Skipping a pattern: {other:?}");
@@ -393,7 +405,7 @@ impl<'m> Compiler<'m> {
                     if elements.len() != 1 {
                         return InfStatus::Invalid;
                     }
-                    inf_status(&elements.iter().next().unwrap().pattern)
+                    inf_status(&elements.iter().next().unwrap().val)
                 }
                 _ => InfStatus::Invalid,
             }

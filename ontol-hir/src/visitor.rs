@@ -3,7 +3,7 @@ use ontol_runtime::value::PropertyId;
 use crate::{
     arena::{Arena, NodeRef},
     Attribute, Binding, CaptureMatchArm, Iter, Kind, Label, Lang, Node, Nodes, Optional,
-    PropPattern, PropVariant, SetEntry, Var,
+    PredicateClosure, PropPattern, PropVariant, SetEntry, Var,
 };
 
 pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
@@ -223,9 +223,19 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                     self.visit_seq_prop_element(index, element, arena);
                 }
             }
-            PropVariant::Predicate(_) => {
-                todo!()
-            }
+            PropVariant::Predicate(closure) => match closure {
+                PredicateClosure::ContainsElement(attr) => {
+                    self.visit_node(0, arena.node_ref(attr.rel));
+                    self.visit_node(1, arena.node_ref(attr.val));
+                }
+                PredicateClosure::ElementIn(node)
+                | PredicateClosure::AllInSet(node)
+                | PredicateClosure::SetContainsAll(node)
+                | PredicateClosure::SetIntersects(node)
+                | PredicateClosure::SetEquals(node) => {
+                    self.visit_node(0, arena.node_ref(*node));
+                }
+            },
         }
     }
 

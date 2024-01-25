@@ -14,7 +14,10 @@ use crate::{
     error::CompileError,
     map::UndirectedMapKey,
     mem::Intern,
-    pattern::{CompoundPatternModifier, PatId, Pattern, PatternKind, RegexPatternCaptureNode},
+    pattern::{
+        CompoundPatternAttrKind, CompoundPatternModifier, PatId, Pattern, PatternKind,
+        RegexPatternCaptureNode,
+    },
     repr::repr_model::ReprKind,
     type_check::hir_build_ctx::{Arm, VariableMapping},
     typed_hir::TypedRootNode,
@@ -271,10 +274,14 @@ impl<'c> PreAnalyzer<'c> {
                 ..
             } => {
                 for attr in attrs.iter() {
-                    group_set.join(
-                        self.analyze_arm(&attr.value, parent_aggr_group, ctx)?
-                            .group_set,
-                    );
+                    match &attr.kind {
+                        CompoundPatternAttrKind::Value { val, .. }
+                        | CompoundPatternAttrKind::ContainsElement { val, .. } => {
+                            group_set
+                                .join(self.analyze_arm(val, parent_aggr_group, ctx)?.group_set);
+                        }
+                        CompoundPatternAttrKind::SetOperator { .. } => {}
+                    }
                 }
 
                 if matches!(modifier, Some(CompoundPatternModifier::Match)) {
@@ -298,7 +305,7 @@ impl<'c> PreAnalyzer<'c> {
                         for element in elements {
                             // TODO: Skip non-iter?
                             let result = self.analyze_arm(
-                                &element.pattern,
+                                &element.val,
                                 Some(SetElementGroup {
                                     label,
                                     iterated: element.iter,
@@ -325,7 +332,7 @@ impl<'c> PreAnalyzer<'c> {
                         }
 
                         ctx.enter_ctrl(|ctx| {
-                            let analysis = self.analyze_arm(&element.pattern, None, ctx).unwrap();
+                            let analysis = self.analyze_arm(&element.val, None, ctx).unwrap();
                             inner_aggr_group.join(analysis.group_set);
 
                             if !matches!(analysis.class, MapOutputClass::Data) {
@@ -397,8 +404,6 @@ impl<'c> PreAnalyzer<'c> {
                 )?);
             }
             PatternKind::ConstI64(_) | PatternKind::ConstText(_) => {}
-            PatternKind::ContainsElement(_) => {}
-            PatternKind::SetOperator { .. } => {}
         };
 
         Ok(ArmAnalysis {

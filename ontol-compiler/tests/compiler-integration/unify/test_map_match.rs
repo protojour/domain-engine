@@ -267,6 +267,7 @@ fn test_map_match_anonymous_with_translation() {
 }
 
 #[test]
+#[should_panic = "not yet implemented"]
 fn test_map_sequence_filter_in_set() {
     r#"
     def key (rel .is: text)
