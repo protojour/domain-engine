@@ -92,10 +92,14 @@ fn main() -> anyhow::Result<()> {
     );
     let data = match args.format {
         Format::Json => from_processor
-            .deserialize(&mut serde_json::Deserializer::from_str(&args.input))
+            .deserialize(&mut serde_json::Deserializer::from_reader(
+                args.input.into_reader()?,
+            ))
             .expect("Deserialization failed"),
         Format::Yaml => from_processor
-            .deserialize(serde_yaml::Deserializer::from_str(&args.input))
+            .deserialize(serde_yaml::Deserializer::from_reader(
+                args.input.into_reader()?,
+            ))
             .expect("Deserialization failed"),
     };
     let value = match ontology.new_vm(proc).run([data.value])? {

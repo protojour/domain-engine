@@ -3,7 +3,6 @@
 use std::fmt::Debug;
 
 use ::serde::{Deserialize, Serialize};
-use derive_debug_extras::DebugExtras;
 
 pub mod cast;
 pub mod condition;
@@ -25,11 +24,15 @@ pub mod vm;
 /// One package represents a domain,
 /// but one package can consist of internal subdomains (probably).
 /// So this is called package id (for now) until we have fleshed out a full architecture..
-#[derive(
-    Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, DebugExtras,
-)]
-#[debug_single_tuple_inline]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct PackageId(pub u16);
+
+/// This forces single-line output even when pretty-printed
+impl ::std::fmt::Debug for PackageId {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "PackageId({:?})", self.0)
+    }
+}
 
 /// One definition inside some domain.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
@@ -115,8 +118,12 @@ impl Role {
     }
 }
 
-#[derive(
-    Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, DebugExtras,
-)]
-#[debug_single_tuple_inline]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct RelationshipId(pub DefId);
+
+/// This forces single-line output even when pretty-printed
+impl ::std::fmt::Debug for RelationshipId {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "RelationshipId({:?})", self.0)
+    }
+}

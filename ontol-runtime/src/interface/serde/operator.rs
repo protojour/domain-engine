@@ -4,7 +4,6 @@ use std::{
 };
 
 use ::serde::{Deserialize, Serialize};
-use derive_debug_extras::DebugExtras;
 use indexmap::IndexMap;
 use smallvec::SmallVec;
 use smartstring::alias::String;
@@ -22,9 +21,15 @@ use super::{
 };
 
 /// SerdeOperatorAddr is an index into a vector of SerdeOperators.
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, DebugExtras)]
-#[debug_single_tuple_inline]
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct SerdeOperatorAddr(pub u32);
+
+impl ::std::fmt::Debug for SerdeOperatorAddr {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        let SerdeOperatorAddr(ref _0) = self;
+        f.write_fmt(format_args!("SerdeOperatorAddr({:?})", _0))
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum SerdeOperator {

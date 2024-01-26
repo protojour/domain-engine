@@ -1,8 +1,7 @@
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 
 use ::serde::{Deserialize, Serialize};
 use bit_vec::BitVec;
-use derive_debug_extras::DebugExtras;
 use smartstring::alias::String;
 
 use crate::{
@@ -59,7 +58,7 @@ pub struct NParams(pub u8);
 /// ONTOL opcode.
 ///
 /// When the documentation mentions the stack, the _leftmost_ value is the top of the stack.
-#[derive(DebugExtras, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum OpCode {
     /// Take the top of stack, and push that value onto the previous frame's stack,
     /// and continue executing at the previous frame's program counter, or exit VM with popped value
@@ -127,8 +126,14 @@ pub enum OpCode {
 }
 
 /// A reference to a local on the value stack during procedure execution.
-#[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize, DebugExtras)]
+#[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Local(pub u16);
+
+impl Debug for Local {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "L{}", self.0)
+    }
+}
 
 /// Builtin procedures.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]

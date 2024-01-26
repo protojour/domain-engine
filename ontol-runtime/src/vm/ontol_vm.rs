@@ -519,7 +519,7 @@ impl<'o> VmDebug<OntolProcessor<'o>> for Tracer {
     fn tick(&mut self, vm: &AbstractVm<OntolProcessor>, stack: &OntolProcessor) {
         if tracing::enabled!(Level::TRACE) {
             for (index, value) in stack.stack.iter().enumerate() {
-                trace!("    Local({index}): {}", ValueDebug(value));
+                trace!("    L{index}: {}", ValueDebug(value));
             }
         }
         trace!("{:?}", vm.pending_opcode());
