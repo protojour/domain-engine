@@ -273,7 +273,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                             input_meta,
                         );
                         self.mk_node(
-                            ontol_hir::Kind::Sequence(
+                            ontol_hir::Kind::MakeSeq(
                                 typed_hir::TypedHirData(
                                     ontol_hir::Binder {
                                         var: target_seq_var,

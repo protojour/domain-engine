@@ -449,7 +449,7 @@ fn test_unify_basic_seq_prop_no_default() {
                 ((.. $d)
                     (prop $c S:2:1
                         (#u
-                            (sequence ($e)
+                            (make-seq ($e)
                                 (for-each $d ($_ $a)
                                     (insert $e #u $a)
                                 )
@@ -492,7 +492,7 @@ fn test_unify_basic_seq_prop_element_iter_mix() {
                                 (($_ $c)
                                     (prop $f S:2:1
                                         (#u
-                                            (sequence ($i)
+                                            (make-seq ($i)
                                                 (insert $i #u $a)
                                                 (for-each $d ($_ $b)
                                                     (insert $i #u $b)
@@ -557,7 +557,7 @@ fn test_unify_seq_prop_deep() {
                 ((.. $f)
                     (prop $d O:1:0
                         (#u
-                            (sequence ($h)
+                            (make-seq ($h)
                                 (for-each $f ($_ $c)
                                     (insert $h #u
                                         (struct ($e)
@@ -565,7 +565,7 @@ fn test_unify_seq_prop_deep() {
                                                 ((.. $g)
                                                     (prop $e O:2:1
                                                         (#u
-                                                            (sequence ($k)
+                                                            (make-seq ($k)
                                                                 (for-each $g ($_ $a)
                                                                     (insert $k #u (map $a))
                                                                 )
@@ -632,7 +632,7 @@ fn test_unify_seq_prop_merge_rel_and_val_zwizzle() {
                 ((.. $f)
                     (prop $i O:1:0
                         (#u
-                            (sequence ($l)
+                            (make-seq ($l)
                                 (for-each $f ($g $h)
                                     (match-prop $g S:2:0
                                         (($_ $a)
@@ -704,7 +704,7 @@ fn test_unify_basic_seq_prop_default_value() {
                 ((..default $d)
                     (prop $c S:2:1
                         (#u
-                            (sequence ($e)
+                            (make-seq ($e)
                                 (for-each $d ($_ $a)
                                     (insert $e #u $a)
                                 )
@@ -740,21 +740,23 @@ fn test_unify_flat_map1() {
         )
         ",
         "
-        (decl-set (@d)
-            #u
-            (struct ($f)
-                (prop $f O:1:0
-                    (#u $a)
-                )
-                (prop $f O:2:1
-                    (#u $b)
+        (set
+            (.. (@d)
+                #u
+                (struct ($f)
+                    (prop $f O:1:0
+                        (#u $a)
+                    )
+                    (prop $f O:2:1
+                        (#u $b)
+                    )
                 )
             )
         )
         ",
     );
     let expected = indoc! {"
-        |$c| (sequence ($g)
+        |$c| (make-seq ($g)
             (match-prop $c S:1:0
                 ((.. $d)
                     (match-prop $c S:2:1
@@ -805,20 +807,23 @@ fn test_unify_flat_map2() {
         )
         ",
         "
-        (decl-set (@c) #u
-            (struct ($f)
-                (prop $f S:1:7
-                    (#u $a)
-                )
-                (prop $f S:1:8
-                    (#u $b)
+        (set
+            (.. (@c)
+                #u
+                (struct ($f)
+                    (prop $f S:1:7
+                        (#u $a)
+                    )
+                    (prop $f S:1:8
+                        (#u $b)
+                    )
                 )
             )
         )
         ",
     );
     let expected = indoc! {"
-        |$d| (sequence ($i)
+        |$d| (make-seq ($i)
             (match-prop $d S:1:5
                 ((.. $c)
                     (match-prop $d S:1:2
@@ -1401,7 +1406,7 @@ mod unify_seq_scope_escape_1 {
                                 ((.. $a)
                                     (prop $e O:2:1
                                         (#u
-                                            (sequence ($g)
+                                            (make-seq ($g)
                                                 (for-each $a ($_ $b)
                                                     (insert $g #u $b)
                                                 )
@@ -1433,7 +1438,7 @@ mod unify_seq_scope_escape_1 {
                             ((.. $a)
                                 (prop $c S:1:1
                                     (#u
-                                        (sequence ($i)
+                                        (make-seq ($i)
                                             (for-each $a ($_ $b)
                                                 (insert $i #u $b)
                                             )
@@ -1511,7 +1516,7 @@ mod unify_seq_scope_escape_2 {
                                 ((.. $c)
                                     (prop $h O:2:1
                                         (#u
-                                            (sequence ($l)
+                                            (make-seq ($l)
                                                 (for-each $c ($_ $d)
                                                     (insert $l #u $d)
                                                 )
@@ -1529,7 +1534,7 @@ mod unify_seq_scope_escape_2 {
                                                     ((.. $a)
                                                         (prop $i O:3:0
                                                             (#u
-                                                                (sequence ($o)
+                                                                (make-seq ($o)
                                                                     (for-each $a ($_ $b)
                                                                         (insert $o #u $b)
                                                                     )
@@ -1661,8 +1666,8 @@ fn test_unify_regex_loop1() {
         |$c| (struct ($d)
             (match-prop $c S:1:0
                 (($_ $e)
-                    (let ($m (sequence ($k)))
-                        (let ($l (sequence ($j)))
+                    (let ($m (make-seq ($k)))
+                        (let ($l (make-seq ($j)))
                             (match-regex-iter $e def@0:0
                                 (((1 $a))
                                     (insert $l #u $a)
@@ -1721,7 +1726,7 @@ fn test_unify_regex_loop2() {
         |$d| (struct ($e)
             (match-prop $d S:1:0
                 (($_ $c)
-                    (let ($k (sequence ($j)))
+                    (let ($k (make-seq ($j)))
                         (match-regex-iter $c def@0:0
                             (((1 $a) (2 $b))
                                 (insert $k #u
@@ -1790,8 +1795,8 @@ fn test_unify_regex_loop3() {
         |$d| (struct ($e)
             (match-prop $d S:1:2
                 (($_ $c)
-                    (let ($o (sequence ($m)))
-                        (let ($n (sequence ($l)))
+                    (let ($o (make-seq ($m)))
+                        (let ($n (make-seq ($l)))
                             (match-regex-iter $c def@0:43
                                 (((1 $a))
                                     (insert $n #u

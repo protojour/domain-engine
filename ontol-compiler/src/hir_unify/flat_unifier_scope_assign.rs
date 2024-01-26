@@ -62,7 +62,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
 
                 Ok(AssignResult::Assigned(0))
             }
-            expr::Kind::DeclSet(label, attr) if USE_FLAT_SEQ_HANDLING => {
+            expr::Kind::IterSet(label, attr) if USE_FLAT_SEQ_HANDLING => {
                 let assign_result = self.assign_to_scope(
                     expr::Expr(
                         expr::Kind::SetElement(label, 0, ontol_hir::Iter(true), attr),
@@ -128,7 +128,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                                 )
                             }
                             (rel, val) => Ok(AssignResult::Unassigned(expr::Expr(
-                                expr::Kind::DeclSet(
+                                expr::Kind::IterSet(
                                     label,
                                     Box::new(ontol_hir::Attribute { rel, val }),
                                 ),

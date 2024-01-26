@@ -118,20 +118,6 @@ impl<'a, L: Lang> Parser<'a, L> {
             ("match-struct", next) => self.parse_struct_inner(next, StructFlags::MATCH),
             ("prop", next) => self.parse_prop(Optional(false), next),
             ("prop?", next) => self.parse_prop(Optional(true), next),
-            ("decl-set", next) => {
-                let (_, next) = parse_lparen(next)?;
-                let (label, next) = parse_at_label(next)?;
-                let (_, next) = parse_rparen(next)?;
-                let (rel, next) = self.parse(next)?;
-                let (val, next) = self.parse(next)?;
-                Ok((
-                    self.make_node(Kind::DeclSet(
-                        self.make_label(label),
-                        Attribute { rel, val },
-                    )),
-                    next,
-                ))
-            }
             ("match-prop", next) => {
                 let (struct_var, next) = parse_dollar_var(next)?;
                 let (prop, next) = parse_symbol(next)?;
@@ -147,13 +133,14 @@ impl<'a, L: Lang> Parser<'a, L> {
                     next,
                 ))
             }
-            ("sequence", next) => {
+            ("set", next) => {
+                let (entries, next) = self.parse_many(next, Self::parse_set_entry)?;
+                Ok((self.make_node(Kind::Set(entries.into())), next))
+            }
+            ("make-seq", next) => {
                 let (binder, next) = self.parse_binder(next)?;
                 let (children, next) = self.parse_many(next, Self::parse)?;
-                Ok((
-                    self.make_node(Kind::Sequence(binder, children.into())),
-                    next,
-                ))
+                Ok((self.make_node(Kind::MakeSeq(binder, children.into())), next))
             }
             ("for-each", next) => {
                 let (seq_var, next) = parse_dollar_var(next)?;
@@ -345,6 +332,28 @@ impl<'a, L: Lang> Parser<'a, L> {
             let (nodes, next) = self.parse_many(next, Self::parse)?;
 
             Ok(((pattern, nodes.into()), next))
+        })
+    }
+
+    fn parse_set_entry<'s>(&mut self, next: &'s str) -> ParseResult<'s, SetEntry<'a, L>> {
+        parse_paren_delimited(next, |next| match parse_symbol(next) {
+            Ok(("..", next)) => {
+                let (label, next) = parse_paren_delimited(next, parse_at_label)?;
+                let (rel, next) = self.parse(next)?;
+                let (val, next) = self.parse(next)?;
+
+                Ok((
+                    SetEntry(Some(self.make_label(label)), Attribute { rel, val }),
+                    next,
+                ))
+            }
+            Ok(_) => {
+                let (rel, next) = self.parse(next)?;
+                let (val, next) = self.parse(next)?;
+
+                Ok((SetEntry(None, Attribute { rel, val }), next))
+            }
+            Err(e) => Err(e),
         })
     }
 

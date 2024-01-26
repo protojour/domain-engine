@@ -329,7 +329,7 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
                     }
                 }
             }
-            ontol_hir::Kind::DeclSet(..) => return Err(UnifierError::SequenceInputNotSupported),
+            ontol_hir::Kind::Set(..) => return Err(UnifierError::SequenceInputNotSupported),
             _ => todo!("{}", self.hir_arena.node_ref(node)),
         }
 

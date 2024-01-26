@@ -196,7 +196,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     }
 
                     let sequence_node = self.mk_node(
-                        ontol_hir::Kind::Sequence(
+                        ontol_hir::Kind::MakeSeq(
                             ontol_hir::Binder { var: Var(label.0) }.with_meta(Meta {
                                 ty: seq_ty,
                                 span: NO_SPAN,
@@ -351,7 +351,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 }
 
                 let sequence_node = self.mk_node(
-                    ontol_hir::Kind::Sequence(
+                    ontol_hir::Kind::MakeSeq(
                         ontol_hir::Binder {
                             var: gen_scope.output_seq,
                         }
@@ -386,7 +386,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     ),
                 })
             }
-            (expr::Kind::DeclSet(_label, attr), scope::Kind::Gen(gen_scope)) => {
+            (expr::Kind::IterSet(_label, attr), scope::Kind::Gen(gen_scope)) => {
                 let seq_ty = self
                     .types
                     .intern(Type::Seq(attr.rel.hir_meta().ty, attr.val.hir_meta().ty));
@@ -422,7 +422,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     UNIT_META,
                 );
                 let sequence = self.mk_node(
-                    ontol_hir::Kind::Sequence(
+                    ontol_hir::Kind::MakeSeq(
                         ontol_hir::Binder {
                             var: gen_scope.output_seq,
                         }
@@ -617,7 +617,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 // should be the innermost scope expansion.
                 let mut ordered_scope_vars: IndexSet<Var> = Default::default();
 
-                if let expr::Kind::DeclSet(label, _) = &expr_kind {
+                if let expr::Kind::IterSet(label, _) = &expr_kind {
                     // label is the primary scope locator for a sequence
                     ordered_scope_vars.insert(Var(label.0));
                 }
@@ -677,7 +677,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     self.unify(scope::constant(), expr)
                 }
             }
-            (expr::Kind::DeclSet(_label, attr), _scope) => {
+            (expr::Kind::IterSet(_label, attr), _scope) => {
                 if USE_FLAT_SEQ_HANDLING {
                     panic!("Should be solved in flat unifier");
                 }

@@ -352,7 +352,7 @@ fn find_and_unify_sequence_prop<'m>(
     debug!("seq_ty: {seq_ty:?}");
 
     let sequence_node = unifier.mk_node(
-        ontol_hir::Kind::Sequence(
+        ontol_hir::Kind::MakeSeq(
             ontol_hir::Binder {
                 var: output_seq_var.0,
             }

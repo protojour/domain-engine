@@ -10,8 +10,11 @@ fn test_unify_matchcond_empty() {
         (struct ($b))
         ",
         "
-        (decl-set (@a) #u
-            (match-struct ($c))
+        (set
+            (.. (@a)
+                #u
+                (match-struct ($c))
+            )
         )
         ",
     );
@@ -34,9 +37,12 @@ fn test_unify_matchcond_single_prop() {
         )
         ",
         "
-        (decl-set (@d) #u
-            (match-struct ($c)
-                (prop $c O:1:0 (#u $a))
+        (set
+            (.. (@d)
+                #u
+                (match-struct ($c)
+                    (prop $c O:1:0 (#u $a))
+                )
             )
         )
         ",
@@ -68,12 +74,15 @@ fn test_unify_matchcond_struct_in_struct() {
         )
         ",
         "
-        (decl-set (@f) #u
-            (match-struct ($d)
-                (prop $d O:1:0
-                    (#u
-                        (struct ($e)
-                            (prop $e O:2:0 ($a $b))
+        (set
+            (.. (@f)
+                #u
+                (match-struct ($d)
+                    (prop $d O:1:0
+                        (#u
+                            (struct ($e)
+                                (prop $e O:2:0 ($a $b))
+                            )
                         )
                     )
                 )
@@ -123,15 +132,18 @@ fn test_unify_matchcond_cartesian_set() {
         )
         ",
         "
-        (decl-set (@g) #u
-            (match-struct ($d)
-                (prop $d O:1:0
-                    (element-in
-                        (set-of
-                            (iter (@f)
-                                #u
-                                (struct ($q)
-                                    (prop $q O:2:0 #u $a)
+        (set
+            (.. (@g)
+                #u
+                (match-struct ($d)
+                    (prop $d O:1:0
+                        (element-in
+                            (set-of
+                                (iter (@f)
+                                    #u
+                                    (struct ($q)
+                                        (prop $q O:2:0 #u $a)
+                                    )
                                 )
                             )
                         )

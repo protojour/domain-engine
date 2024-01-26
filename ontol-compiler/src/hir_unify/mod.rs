@@ -185,6 +185,17 @@ impl VariableTracker {
             fn visit_label(&mut self, label: ontol_hir::Label) {
                 self.tracker.observe(Var(label.0));
             }
+            fn visit_set_entry(
+                &mut self,
+                index: usize,
+                entry: &ontol_hir::SetEntry<'m, L>,
+                arena: &'h ontol_hir::arena::Arena<'m, L>,
+            ) {
+                if let Some(label) = &entry.0 {
+                    self.tracker.observe(Var(L::as_hir(label).0));
+                }
+                self.traverse_set_entry(index, entry, arena);
+            }
         }
 
         Visitor { tracker: self }.visit_node(0, node_ref);

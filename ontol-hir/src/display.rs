@@ -117,14 +117,8 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
                 self.print_rparen(multi, f)?;
                 Ok(multi.or(sep))
             }
-            Kind::DeclSet(label, attr) => {
-                write!(f, "{indent}(decl-set ({})", L::as_hir(label))?;
-                let multi = self.print_all(f, Sep::Space, self.kinds(&[attr.rel, attr.val]))?;
-                self.print_rparen(multi, f)?;
-                Ok(Multiline(true))
-            }
-            Kind::SetOf(entries) => {
-                write!(f, "{indent}(set-of")?;
+            Kind::Set(entries) => {
+                write!(f, "{indent}(set")?;
                 let multi = self.print_all(f, Sep::Space, entries.iter())?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
@@ -159,9 +153,9 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
             }
-            Kind::Sequence(binder, children) => {
+            Kind::MakeSeq(binder, children) => {
                 let indent = if children.is_empty() { sep } else { indent };
-                write!(f, "{indent}(sequence ({})", L::as_hir(binder).var)?;
+                write!(f, "{indent}(make-seq ({})", L::as_hir(binder).var)?;
                 let multi = self.print_all(f, Sep::Space, self.kinds(children))?;
                 self.print_rparen(multi, f)?;
                 Ok(multi)
@@ -266,7 +260,7 @@ impl<'h, 'a, L: Lang> Print<PropVariant<'a, L>> for Printer<'h, 'a, L> {
                     self.print(f, Sep::Space, self.kind(*node))?
                 }
                 PredicateClosure::SetEquals(node) => {
-                    write!(f, "seq-equals")?;
+                    write!(f, "set-equals")?;
                     self.print(f, Sep::Space, self.kind(*node))?
                 }
             },
@@ -435,16 +429,15 @@ impl<'h, 'a, L: Lang> Print<SetEntry<'a, L>> for Printer<'h, 'a, L> {
     fn print(
         self,
         f: &mut std::fmt::Formatter,
-        sep: Sep,
+        _sep: Sep,
         SetEntry(iter_label, attr): &SetEntry<'a, L>,
     ) -> PrintResult {
-        write!(f, "({sep}")?;
-        if let Some(_iter_label) = iter_label {
-            // TODO: Need to disambiguate
-            // TODO: Need to print label
-            write!(f, "iter ")?;
+        let indent = self.indent;
+        write!(f, "{indent}(")?;
+        if let Some(iter_label) = iter_label {
+            write!(f, ".. ({})", L::as_hir(iter_label))?;
         }
-        let multi = self.print_all(f, Sep::None, self.kinds(&[attr.rel, attr.val]))?;
+        let multi = self.print_all(f, self.indent.indent(), self.kinds(&[attr.rel, attr.val]))?;
         self.print_rparen(multi, f)?;
         Ok(Multiline(true))
     }

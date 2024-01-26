@@ -319,7 +319,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 if elements.len() != 1 {
                     return self.error_node(
-                        CompileError::TODO(smart_format!("Standalone seq needs one element")),
+                        CompileError::TODO(smart_format!("Standalone set needs one element")),
                         &pattern.span,
                         ctx,
                     );
@@ -338,9 +338,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let seq_ty = self.types.intern(Type::Seq(rel_ty, val_ty));
 
                 ctx.mk_node(
-                    ontol_hir::Kind::DeclSet(
-                        label.with_ty(seq_ty),
-                        ontol_hir::Attribute { rel, val },
+                    ontol_hir::Kind::Set(
+                        [ontol_hir::SetEntry(
+                            Some(label.with_ty(seq_ty)),
+                            ontol_hir::Attribute { rel, val },
+                        )]
+                        .into(),
                     ),
                     Meta {
                         ty: seq_ty,
@@ -616,7 +619,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
 
         ctx.mk_node(
-            ontol_hir::Kind::SetOf(set_entries),
+            ontol_hir::Kind::Set(set_entries),
             Meta {
                 ty: &UNIT_TYPE,
                 span,

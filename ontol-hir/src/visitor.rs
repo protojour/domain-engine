@@ -113,12 +113,7 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                     self.visit_node(index + 1, node_ref);
                 }
             }
-            Kind::DeclSet(label, attr) => {
-                self.visit_label(*L::as_hir(label));
-                self.visit_node(0, arena.node_ref(attr.rel));
-                self.visit_node(1, arena.node_ref(attr.val));
-            }
-            Kind::SetOf(entries) => {
+            Kind::Set(entries) => {
                 for (index, entry) in entries.iter().enumerate() {
                     self.visit_set_entry(index, entry, arena);
                 }
@@ -143,7 +138,7 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                     self.visit_prop_match_arm(index, arm, arena);
                 }
             }
-            Kind::Sequence(binder, children) => {
+            Kind::MakeSeq(binder, children) => {
                 self.visit_binder(L::as_hir(binder).var);
                 for (index, child) in arena.refs(children).enumerate() {
                     self.visit_node(index, child);

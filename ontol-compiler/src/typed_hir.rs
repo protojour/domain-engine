@@ -193,13 +193,13 @@ pub fn arena_import<'m>(
             let arg = arena_import(target, source.arena().node_ref(*arg));
             target.add(TypedHirData(Map(arg), *meta))
         }
-        DeclSet(label, attr) => {
-            let attr = import_attr(target, source.arena(), *attr);
-            target.add(TypedHirData(DeclSet(*label, attr), *meta))
-        }
-        SetOf(entries) => {
+        // DeclSet(label, attr) => {
+        //     let attr = import_attr(target, source.arena(), *attr);
+        //     target.add(TypedHirData(DeclSet(*label, attr), *meta))
+        // }
+        Set(entries) => {
             let entries = import_entries(target, source.arena(), entries);
-            target.add(TypedHirData(SetOf(entries), *meta))
+            target.add(TypedHirData(Set(entries), *meta))
         }
         Struct(binder, flags, body) => {
             let body = import_nodes(target, source.arena(), body);
@@ -265,9 +265,9 @@ pub fn arena_import<'m>(
                 .collect();
             target.add(TypedHirData(MatchProp(*struct_var, *prop_id, arms), *meta))
         }
-        Sequence(binder, body) => {
+        MakeSeq(binder, body) => {
             let body = import_nodes(target, source.arena(), body);
-            target.add(TypedHirData(Sequence(*binder, body), *meta))
+            target.add(TypedHirData(MakeSeq(*binder, body), *meta))
         }
         ForEach(var, (rel, val), body) => {
             let body = import_nodes(target, source.arena(), body);

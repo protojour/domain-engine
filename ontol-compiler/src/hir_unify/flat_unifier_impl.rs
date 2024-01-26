@@ -223,7 +223,7 @@ pub(super) fn unify_root<'m>(
                     .with_meta(scope_meta.hir_meta),
                 ),
                 node: unifier.mk_node(
-                    ontol_hir::Kind::Sequence(
+                    ontol_hir::Kind::MakeSeq(
                         ontol_hir::Binder { var: output_var.0 }.with_meta(scope_meta.hir_meta),
                         body.into(),
                     ),

@@ -103,28 +103,35 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                 };
                 expr::Expr(expr::Kind::Map(Box::new(arg)), expr_meta)
             }
-            ontol_hir::Kind::DeclSet(typed_label, attr) => {
-                let rel = self.hir_to_expr(arena.node_ref(attr.rel));
-                let val = self.hir_to_expr(arena.node_ref(attr.val));
+            ontol_hir::Kind::Set(entries) => {
+                if entries.len() == 1 {
+                    let ontol_hir::SetEntry(typed_label, attr) = entries.first().unwrap();
 
-                let mut free_vars = VarSet::default();
-                free_vars.union_with(&rel.1.free_vars);
-                free_vars.union_with(&val.1.free_vars);
-                free_vars.insert((*typed_label.hir()).into());
+                    if let Some(typed_label) = typed_label {
+                        let rel = self.hir_to_expr(arena.node_ref(attr.rel));
+                        let val = self.hir_to_expr(arena.node_ref(attr.val));
 
-                expr::Expr(
-                    expr::Kind::DeclSet(
-                        *typed_label.hir(),
-                        Box::new(ontol_hir::Attribute { rel, val }),
-                    ),
-                    expr::Meta {
-                        free_vars,
-                        hir_meta,
-                    },
-                )
-            }
-            ontol_hir::Kind::SetOf(_entries) => {
-                todo!("{node_ref}")
+                        let mut free_vars = VarSet::default();
+                        free_vars.union_with(&rel.1.free_vars);
+                        free_vars.union_with(&val.1.free_vars);
+                        free_vars.insert((*typed_label.hir()).into());
+
+                        expr::Expr(
+                            expr::Kind::IterSet(
+                                *typed_label.hir(),
+                                Box::new(ontol_hir::Attribute { rel, val }),
+                            ),
+                            expr::Meta {
+                                free_vars,
+                                hir_meta,
+                            },
+                        )
+                    } else {
+                        todo!()
+                    }
+                } else {
+                    todo!()
+                }
             }
             ontol_hir::Kind::Struct(binder, flags, nodes) => self.enter_binder(binder, |zelf| {
                 let mut props = Vec::with_capacity(nodes.len());
@@ -188,7 +195,7 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                 )
             }
             ontol_hir::Kind::Prop(..) => panic!("standalone prop"),
-            ontol_hir::Kind::Sequence(..) => {
+            ontol_hir::Kind::MakeSeq(..) => {
                 todo!()
             }
             ontol_hir::Kind::Begin(_)

@@ -118,10 +118,7 @@ where
                 var_set
             }
             ontol_hir::Kind::Map(node) => self.analyze_node(arena.node_ref(*node), parent_prop),
-            ontol_hir::Kind::DeclSet(_, _) => {
-                unreachable!()
-            }
-            ontol_hir::Kind::SetOf(_) => {
+            ontol_hir::Kind::Set(_entries) => {
                 todo!()
             }
             ontol_hir::Kind::Struct(binder, flags, body) => {
@@ -213,7 +210,7 @@ where
 
                 var_set
             }
-            ontol_hir::Kind::Sequence(_, body) => {
+            ontol_hir::Kind::MakeSeq(_, body) => {
                 let mut var_set = VarSet::default();
                 for child in arena.refs(body) {
                     var_set.union_with(&self.analyze_node(child, parent_prop));

@@ -60,7 +60,9 @@ pub enum Kind<'m> {
     F64(f64),
     String(String),
     Const(DefId),
-    DeclSet(ontol_hir::Label, Box<ontol_hir::Attribute<Expr<'m>>>),
+    /// Special case of a Set with one iterated element.
+    /// TODO: This should be generalized
+    IterSet(ontol_hir::Label, Box<ontol_hir::Attribute<Expr<'m>>>),
     DestructuredSeq(ontol_hir::Label, OutputVar),
     SetElement(
         ontol_hir::Label,
@@ -108,7 +110,7 @@ impl<'m> Kind<'m> {
             Self::F64(float) => format!("f64({float})"),
             Self::String(string) => format!("String({string})"),
             Self::Const(const_def_id) => format!("Const({const_def_id:?})"),
-            Self::DeclSet(label, _) => format!("Seq({label})"),
+            Self::IterSet(label, _) => format!("Seq({label})"),
             Self::DestructuredSeq(label, output_var) => {
                 format!("DestructuredSeq({label}, {output_var:?})")
             }
@@ -174,7 +176,7 @@ impl<'m> super::dep_tree::Expression for Expr<'m> {
     }
 
     fn is_seq(&self) -> bool {
-        matches!(&self.0, Kind::DeclSet(..))
+        matches!(&self.0, Kind::IterSet(..))
     }
 }
 
@@ -226,7 +228,7 @@ impl FreeVarVisitor {
                     self.visit(arg);
                 }
             }
-            Kind::DeclSet(_, attr) => {
+            Kind::IterSet(_, attr) => {
                 self.visit_attr(attr);
             }
             Kind::DestructuredSeq(..) => {}

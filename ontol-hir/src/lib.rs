@@ -171,11 +171,8 @@ pub enum Kind<'a, L: Lang> {
     Call(BuiltinProc, Nodes),
     /// A map call
     Map(Node),
-    /// Standalone sequence in declarative mode.
-    /// TODO: Duplicate of SetOf with one iterated entry?
-    DeclSet(L::Data<'a, Label>, Attribute<Node>),
     /// A set-builder of set entries
-    SetOf(SmallVec<[SetEntry<'a, L>; 1]>),
+    Set(SmallVec<[SetEntry<'a, L>; 1]>),
     /// A struct with associated binder. The value is the struct.
     Struct(L::Data<'a, Binder>, StructFlags, Nodes),
     /// A property definition associated with a struct var in scope
@@ -186,7 +183,7 @@ pub enum Kind<'a, L: Lang> {
     MatchProp(Var, PropertyId, SmallVec<[(PropPattern<'a, L>, Nodes); 1]>),
     /// A sequence with associated binder. The value is the sequence.
     /// TODO: This can be done with Let!
-    Sequence(L::Data<'a, Binder>, Nodes),
+    MakeSeq(L::Data<'a, Binder>, Nodes),
     /// Copy a SubSequence into the the first variable, copied from the second variable
     CopySubSeq(Var, Var),
     /// Iterate attributes in sequence var,

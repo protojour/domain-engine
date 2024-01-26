@@ -527,7 +527,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     }
                 }
             }
-            ontol_hir::Kind::Sequence(binder, nodes) => {
+            ontol_hir::Kind::MakeSeq(binder, nodes) => {
                 let Type::Seq(_, val_ty) = ty else {
                     panic!("Not a sequence: {ty:?}");
                 };
@@ -818,13 +818,12 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
                 block.pop_until(top, span, self.builder);
             }
-            ontol_hir::Kind::DeclSet(..) | ontol_hir::Kind::Regex(..) => {
+            ontol_hir::Kind::Set(..) | ontol_hir::Kind::Regex(..) => {
                 unreachable!(
                     "{} is only declarative, not used in code generation",
                     node_ref
                 );
             }
-            ontol_hir::Kind::SetOf(_) => todo!(),
         }
     }
 

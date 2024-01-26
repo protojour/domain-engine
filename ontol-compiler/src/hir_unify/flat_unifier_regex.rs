@@ -191,7 +191,7 @@ pub(super) fn unify_regex<'m>(
             };
 
             let let_def = unifier.mk_node(
-                ontol_hir::Kind::Sequence(
+                ontol_hir::Kind::MakeSeq(
                     ontol_hir::Binder { var: Var(label.0) }.with_meta(sequence_meta),
                     ontol_hir::Nodes::default(),
                 ),
