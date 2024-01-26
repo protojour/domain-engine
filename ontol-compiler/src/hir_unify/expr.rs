@@ -1,4 +1,4 @@
-use ontol_hir::{BoolBinaryOp, Node, StructFlags};
+use ontol_hir::{Node, StructFlags};
 use ontol_runtime::{
     smart_format,
     value::PropertyId,
@@ -73,7 +73,6 @@ pub enum Kind<'m> {
         TypedHirData<'m, ontol_hir::Binder>,
         Vec<StringInterpolationComponent>,
     ),
-    PredicateClosure1(BoolBinaryOp, Box<Expr<'m>>),
     /// Temporarily wrap an ontol_hir::Node
     /// FIXME: This is a temporary hack for flat_unifier for dividing scoping into outside-loop and inside-loop
     HirNode(Node),
@@ -123,7 +122,6 @@ impl<'m> Kind<'m> {
             Self::StringInterpolation(binder, _) => {
                 format!("StringInterpolation({})", binder.hir().var)
             }
-            Self::PredicateClosure1(..) => "predicate-closure1".to_string(),
             Self::HirNode(_) => "Node".to_string(),
         }
     }
@@ -154,6 +152,7 @@ pub enum PropVariant<'m> {
         label: ontol_hir::Label,
         elements: Vec<(ontol_hir::Iter, ontol_hir::Attribute<Expr<'m>>)>,
     },
+    Predicate(ontol_hir::PredicateClosure<Expr<'m>>),
 }
 
 #[derive(Debug)]
@@ -245,9 +244,6 @@ impl FreeVarVisitor {
                     }
                 }
             }
-            Kind::PredicateClosure1(_, expr) => {
-                self.visit(expr);
-            }
             Kind::HirNode(_) => {}
         }
     }
@@ -262,6 +258,7 @@ impl FreeVarVisitor {
                     self.visit_attr(attr);
                 }
             }
+            PropVariant::Predicate(_) => {}
         }
     }
 

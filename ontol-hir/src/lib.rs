@@ -204,9 +204,6 @@ pub enum Kind<'a, L: Lang> {
     ),
     /// A regex matcher/unpacker
     MatchRegex(Iter, Var, DefId, Vec<CaptureMatchArm<'a, L>>),
-    /// The "closure" part is that the _left_ operand is the owner of the node, i.e. given by context,
-    /// The _right_ operand is contained inside
-    PredicateClosure1(BoolBinaryOp, Node),
     PushCondClause(Var, Clause<EvalCondTerm>),
 }
 
@@ -214,7 +211,7 @@ pub enum Kind<'a, L: Lang> {
 pub enum PropVariant<'a, L: Lang> {
     Singleton(Attribute<Node>),
     Set(SetPropertyVariant<'a, L>),
-    Predicate(PredicateClosure),
+    Predicate(PredicateClosure<Node>),
 }
 
 #[derive(Clone)]
@@ -280,14 +277,14 @@ pub enum EvalCondTerm {
     Eval(Node),
 }
 
-#[derive(Clone)]
-pub enum PredicateClosure {
-    ContainsElement(Attribute<Node>),
-    ElementIn(Node),
-    AllInSet(Node),
-    SetContainsAll(Node),
-    SetIntersects(Node),
-    SetEquals(Node),
+#[derive(Clone, Debug)]
+pub enum PredicateClosure<T> {
+    ContainsElement(Attribute<T>),
+    ElementIn(T),
+    AllInSet(T),
+    SetContainsAll(T),
+    SetIntersects(T),
+    SetEquals(T),
 }
 
 #[derive(Clone)]

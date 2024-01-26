@@ -298,10 +298,6 @@ pub fn arena_import<'m>(
                 .collect();
             target.add(TypedHirData(MatchRegex(*iter, *var, *def_id, arms), *meta))
         }
-        PredicateClosure1(op, operand) => {
-            let operand = arena_import(target, source.arena().node_ref(*operand));
-            target.add(TypedHirData(PredicateClosure1(*op, operand), *meta))
-        }
         PushCondClause(var, clause) => {
             target.add(TypedHirData(PushCondClause(*var, clause.clone()), *meta))
         }

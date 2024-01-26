@@ -4,9 +4,8 @@ use ontol_runtime::{condition::Clause, format_utils::AsAlpha, vm::proc::BuiltinP
 
 use crate::{
     arena::{Arena, NodeRef},
-    Attribute, Binding, BoolBinaryOp, CaptureGroup, CaptureMatchArm, EvalCondTerm, HasDefault,
-    Iter, Kind, Label, Lang, Node, Nodes, PredicateClosure, PropPattern, PropVariant, RootNode,
-    SetEntry, StructFlags,
+    Attribute, Binding, CaptureGroup, CaptureMatchArm, EvalCondTerm, HasDefault, Iter, Kind, Label,
+    Lang, Node, Nodes, PredicateClosure, PropPattern, PropVariant, RootNode, SetEntry, StructFlags,
 };
 
 impl<'h, 'a, L: Lang> std::fmt::Display for NodeRef<'h, 'a, L> {
@@ -209,21 +208,6 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
                 let multi = self.print_all(f, Sep::Space, arms.iter())?;
                 self.print_rparen(multi, f)?;
                 Ok(Multiline(true))
-            }
-            Kind::PredicateClosure1(op, operand) => {
-                let op_name = match op {
-                    BoolBinaryOp::ContainsElement => "contains-element",
-                    BoolBinaryOp::ElementIn => "element-in",
-                    BoolBinaryOp::AllInSet => "all-in-set",
-                    BoolBinaryOp::SetContainsAll => "set-contains-all",
-                    BoolBinaryOp::SetIntersects => "intersects",
-                    BoolBinaryOp::SetEquals => "set-equals",
-                };
-
-                write!(f, "{sep}({op_name}")?;
-                let multi = self.print(f, Sep::Space, self.kind(*operand))?;
-                self.print_rparen(multi, f)?;
-                Ok(multi)
             }
             Kind::PushCondClause(var, clause) => {
                 write!(f, "{indent}(push-cond-clause {var}")?;

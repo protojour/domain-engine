@@ -210,7 +210,7 @@ impl<'m> UnifyProps<'m> for expr::Prop<'m> {
                         val: val.node,
                     })
                 }
-                expr::PropVariant::Set { .. } => todo!(),
+                expr::PropVariant::Set { .. } | expr::PropVariant::Predicate(_) => todo!(),
             };
 
             nodes.push(unifier.mk_node(

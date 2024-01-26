@@ -187,7 +187,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                             None
                         }
                     }
-                    expr::PropVariant::Singleton(..) => None,
+                    expr::PropVariant::Singleton(..) | expr::PropVariant::Predicate(_) => None,
                 };
 
                 let slot =
@@ -252,6 +252,9 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                         let rel = self.destructure_expr(attr.rel, depth.next(), &filter, table)?;
                         let val = self.destructure_expr(attr.val, depth.next(), &filter, table)?;
                         expr::PropVariant::Singleton(ontol_hir::Attribute { rel, val })
+                    }
+                    expr::PropVariant::Predicate(_) => {
+                        todo!()
                     }
                 };
 

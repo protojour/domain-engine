@@ -21,7 +21,7 @@ use super::{
     flat_scope::{OutputVar, ScopeVar},
     flat_unifier::{unifier_todo, ExprMode, FlatUnifier, Level, MainScope},
     flat_unifier_table::Table,
-    UnifierResult,
+    UnifierError, UnifierResult,
 };
 
 pub(super) struct ExprToHir<'t, 'u, 'a, 'm> {
@@ -221,6 +221,9 @@ impl<'t, 'u, 'a, 'm> ExprToHir<'t, 'u, 'a, 'm> {
                         })]
                         .into()
                     }
+                    expr::PropVariant::Predicate { .. } => {
+                        return Err(UnifierError::ImpossibleMapping);
+                    }
                 };
 
                 Ok(self.mk_node(
@@ -261,6 +264,9 @@ impl<'t, 'u, 'a, 'm> ExprToHir<'t, 'u, 'a, 'm> {
                 expr::PropVariant::Set { .. } => Err(super::UnifierError::Unimplemented(
                     smart_format!("seq prop in condition: {}", prop.prop_id),
                 )),
+                expr::PropVariant::Predicate(_) => {
+                    todo!()
+                }
             },
         }
     }
@@ -283,11 +289,6 @@ impl<'t, 'u, 'a, 'm> ExprToHir<'t, 'u, 'a, 'm> {
                 let body =
                     self.struct_body(&binder, flags, meta.hir_meta, props, in_scope, main_scope)?;
                 Ok((EvalCondTerm::QuoteVar(var), body))
-            }
-            expr::Kind::PredicateClosure1(op, expr) => {
-                debug!("predicate closure: op={op:?}, expr={expr:?}");
-                let node = self.expr_to_hir(*expr, in_scope, main_scope)?;
-                Ok((EvalCondTerm::Eval(node), ontol_hir::Nodes::default()))
             }
             _ => {
                 let node = self.expr_to_hir(expr::Expr(kind, meta), in_scope, main_scope)?;

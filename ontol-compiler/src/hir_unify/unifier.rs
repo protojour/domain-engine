@@ -228,6 +228,9 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         ),
                     })
                 }
+                expr::PropVariant::Predicate(_) => {
+                    panic!("Should be solved in flat unifier");
+                }
             },
             (expr::Kind::StringInterpolation(binder, components), scope::Kind::Const) => {
                 let let_def = self.mk_node(ontol_hir::Kind::Text("".into()), expr_meta.hir_meta);
@@ -697,9 +700,6 @@ impl<'a, 'm> Unifier<'a, 'm> {
             }
             (expr::Kind::SetElement(..), _) => {
                 panic!("Only used in flat unifier")
-            }
-            (expr::Kind::PredicateClosure1(..), _) => {
-                panic!("Not handled in classic unifier")
             }
             (expr::Kind::HirNode(_), _) => {
                 unreachable!()

@@ -1,6 +1,8 @@
 use std::str::FromStr;
 
+use ontol_hir::StructFlags;
 use ontol_runtime::smart_format;
+use smallvec::SmallVec;
 use tracing::debug;
 
 use crate::{
@@ -8,7 +10,8 @@ use crate::{
     error::CompileError,
     mem::Intern,
     pattern::{
-        CompoundPatternModifier, PatId, Pattern, PatternKind, RegexPatternCaptureNode, TypePath,
+        CompoundPatternModifier, PatId, Pattern, PatternKind, RegexPatternCaptureNode,
+        SetPatternElement, TypePath,
     },
     primitive::PrimitiveKind,
     type_check::{
@@ -569,6 +572,56 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 ctx,
             ),
         }
+    }
+
+    pub(super) fn build_hir_set_of(
+        &mut self,
+        elements: &[SetPatternElement],
+        rel_ty: TypeRef<'m>,
+        val_ty: TypeRef<'m>,
+        span: SourceSpan,
+        parent_struct_flags: StructFlags,
+        ctx: &mut HirBuildCtx<'m>,
+    ) -> ontol_hir::Node {
+        let mut set_entries: SmallVec<[ontol_hir::SetEntry<'m, TypedHir>; 1]> =
+            SmallVec::with_capacity(elements.len());
+
+        for element in elements {
+            let hir_entry = if element.iter {
+                todo!();
+            } else {
+                let rel = match &element.rel {
+                    Some(pattern) => self.build_node(
+                        pattern,
+                        NodeInfo {
+                            expected_ty: Some((rel_ty, Strength::Strong)),
+                            parent_struct_flags,
+                        },
+                        ctx,
+                    ),
+                    None => ctx.mk_node(ontol_hir::Kind::Unit, Meta { ty: rel_ty, span }),
+                };
+                let val = self.build_node(
+                    &element.val,
+                    NodeInfo {
+                        expected_ty: Some((val_ty, Strength::Strong)),
+                        parent_struct_flags,
+                    },
+                    ctx,
+                );
+                ontol_hir::SetEntry(None, ontol_hir::Attribute { rel, val })
+            };
+
+            set_entries.push(hir_entry);
+        }
+
+        ctx.mk_node(
+            ontol_hir::Kind::SetOf(set_entries),
+            Meta {
+                ty: &UNIT_TYPE,
+                span,
+            },
+        )
     }
 
     fn build_regex_capture_alternations(

@@ -396,21 +396,22 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 ))
             }
             CompoundPatternAttrKind::ContainsElement { .. } => todo!(),
-            CompoundPatternAttrKind::SetOperator {
-                operator,
-                elements: _,
-            } => {
+            CompoundPatternAttrKind::SetOperator { operator, elements } => {
+                let value_ty = self.check_def_sealed(match_attribute.value_def);
+                let set_node = self.build_hir_set_of(
+                    elements,
+                    rel_params_ty,
+                    value_ty,
+                    *prop_span,
+                    actual_struct_flags,
+                    ctx,
+                );
+
                 let prop_variants: Vec<ontol_hir::PropVariant<'m, TypedHir>> =
                     match (match_attribute.cardinality.1, operator) {
                         (ValueCardinality::One, SetBinaryOperator::ElementIn) => {
                             vec![ontol_hir::PropVariant::Predicate(
-                                ontol_hir::PredicateClosure::ElementIn(ctx.mk_node(
-                                    ontol_hir::Kind::SetOf(Default::default()),
-                                    Meta {
-                                        ty: &UNIT_TYPE,
-                                        span: *prop_span,
-                                    },
-                                )),
+                                ontol_hir::PredicateClosure::ElementIn(set_node),
                             )]
                         }
                         (ValueCardinality::Many, SetBinaryOperator::ElementIn) => {

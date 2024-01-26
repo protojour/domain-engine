@@ -1,7 +1,7 @@
-use ontol_hir::{PropVariant, SetPropertyVariant};
+use ontol_hir::{PredicateClosure, PropVariant, SetPropertyVariant};
 use ontol_runtime::var::VarSet;
 
-use super::{dep_tree::Expression, expr};
+use super::expr;
 use crate::{
     def::Defs,
     typed_hir::{IntoTypedHirData, TypedHirData, TypedNodeRef},
@@ -123,7 +123,9 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                     },
                 )
             }
-            ontol_hir::Kind::SetOf(_) => todo!(),
+            ontol_hir::Kind::SetOf(_entries) => {
+                todo!("{node_ref}")
+            }
             ontol_hir::Kind::Struct(binder, flags, nodes) => self.enter_binder(binder, |zelf| {
                 let mut props = Vec::with_capacity(nodes.len());
                 for node in nodes {
@@ -179,17 +181,6 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                         ontol_hir::Binder { var }.with_meta(hir_meta),
                         components,
                     ),
-                    expr::Meta {
-                        hir_meta,
-                        free_vars,
-                    },
-                )
-            }
-            ontol_hir::Kind::PredicateClosure1(op, operand) => {
-                let operand = self.hir_to_expr(arena.node_ref(*operand));
-                let free_vars = operand.free_vars().clone();
-                expr::Expr(
-                    expr::Kind::PredicateClosure1(*op, Box::new(operand)),
                     expr::Meta {
                         hir_meta,
                         free_vars,
@@ -272,7 +263,49 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                                 },
                             }
                         }
-                        PropVariant::Predicate(_) => todo!(),
+                        PropVariant::Predicate(closure) => {
+                            let mut union = UnionBuilder::default();
+                            let expr_closure = match closure {
+                                PredicateClosure::ContainsElement(ontol_hir::Attribute {
+                                    rel,
+                                    val,
+                                }) => {
+                                    let rel = union.plus(self.hir_to_expr(arena.node_ref(*rel)));
+                                    let val = union.plus(self.hir_to_expr(arena.node_ref(*val)));
+                                    ontol_hir::PredicateClosure::ContainsElement(
+                                        ontol_hir::Attribute { rel, val },
+                                    )
+                                }
+                                PredicateClosure::ElementIn(node) => PredicateClosure::ElementIn(
+                                    union.plus(self.hir_to_expr(arena.node_ref(*node))),
+                                ),
+                                PredicateClosure::AllInSet(node) => PredicateClosure::AllInSet(
+                                    union.plus(self.hir_to_expr(arena.node_ref(*node))),
+                                ),
+                                PredicateClosure::SetContainsAll(node) => {
+                                    PredicateClosure::SetContainsAll(
+                                        union.plus(self.hir_to_expr(arena.node_ref(*node))),
+                                    )
+                                }
+                                PredicateClosure::SetIntersects(node) => {
+                                    PredicateClosure::SetIntersects(
+                                        union.plus(self.hir_to_expr(arena.node_ref(*node))),
+                                    )
+                                }
+                                PredicateClosure::SetEquals(node) => PredicateClosure::SetEquals(
+                                    union.plus(self.hir_to_expr(arena.node_ref(*node))),
+                                ),
+                            };
+
+                            expr::Prop {
+                                optional: *optional,
+                                prop_id: *prop_id,
+                                free_vars: union.vars,
+                                seq: None,
+                                struct_var: *struct_var,
+                                variant: expr::PropVariant::Predicate(expr_closure),
+                            }
+                        }
                     };
 
                     output.push(prop);
