@@ -29,6 +29,10 @@ mod hir_build;
 mod hir_build_ctx;
 mod hir_build_props;
 mod hir_type_inference;
+mod map_arm_analyze;
+
+// Experimental setting
+// pub const LABEL_PER_ITER_ELEMENT: bool = false;
 
 #[derive(Clone, Copy, Debug)]
 pub enum TypeError<'m> {

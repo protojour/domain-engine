@@ -886,6 +886,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             let pattern =
                 self.lower_any_pattern((ast_element.pattern.0, ast_element.pattern.1), var_table)?;
             pattern_elements.push(SetPatternElement {
+                id: self.compiler.patterns.alloc_pat_id(),
                 iter: ast_element.spread.is_some(),
                 rel: None,
                 val: pattern,
@@ -895,7 +896,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         Ok(self.mk_pattern(
             PatternKind::Set {
                 val_type_def: seq_type,
-                elements: pattern_elements,
+                elements: pattern_elements.into_boxed_slice(),
             },
             &span,
         ))
@@ -914,63 +915,80 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ));
         }
 
-        let mut sub_patterns = Vec::with_capacity(alg_pattern.len());
+        let mut elements = Vec::with_capacity(alg_pattern.len());
 
         for (ast_element, _span) in alg_pattern.elements {
-            sub_patterns.push((
-                ast_element.spread.is_some(),
-                self.lower_any_pattern(ast_element.pattern, var_table)?,
-            ));
-        }
-
-        fn to_set_pattern_elements(sub_patterns: Vec<(bool, Pattern)>) -> Box<[SetPatternElement]> {
-            sub_patterns
-                .into_iter()
-                .map(|(iter, pattern)| {
-                    SetPatternElement {
-                        iter,
-                        rel: None, // TODO
-                        val: pattern,
+            elements.push(SetElement {
+                iter: ast_element.spread.is_some(),
+                rel: match ast_element.relation_attrs {
+                    Some((relation_attrs, span)) => {
+                        let attrs = self.lower_struct_pattern_attrs(relation_attrs, var_table)?;
+                        Some(self.mk_pattern(
+                            PatternKind::Compound {
+                                type_path: TypePath::RelContextual,
+                                modifier: None,
+                                is_unit_binding: false,
+                                attributes: attrs,
+                            },
+                            &span,
+                        ))
                     }
-                })
-                .collect()
+                    None => None,
+                },
+                val: self.lower_any_pattern(ast_element.pattern, var_table)?,
+            });
         }
 
         Ok(match alg_pattern.operator.0 {
             ast::SetAlgebraicOperator::Contains => {
-                if sub_patterns.len() > 1 {
+                if elements.len() > 1 {
                     return Err((
                         CompileError::TODO(smart_format!("can only contain one sub pattern")),
                         span.clone(),
                     ));
                 }
-                let sub_pattern = sub_patterns.into_iter().next().unwrap();
+                let sub_pattern = elements.into_iter().next().unwrap();
                 CompoundPatternAttrKind::ContainsElement {
-                    rel: None, // TODO
-                    val: sub_pattern.1,
+                    rel: sub_pattern.rel,
+                    val: sub_pattern.val,
                 }
             }
             ast::SetAlgebraicOperator::In => CompoundPatternAttrKind::SetOperator {
                 operator: SetBinaryOperator::ElementIn,
-                elements: to_set_pattern_elements(sub_patterns),
+                elements: self.lower_set_pattern_elements(elements),
             },
             ast::SetAlgebraicOperator::AllIn => CompoundPatternAttrKind::SetOperator {
                 operator: SetBinaryOperator::AllIn,
-                elements: to_set_pattern_elements(sub_patterns),
+                elements: self.lower_set_pattern_elements(elements),
             },
             ast::SetAlgebraicOperator::ContainsAll => CompoundPatternAttrKind::SetOperator {
                 operator: SetBinaryOperator::ContainsAll,
-                elements: to_set_pattern_elements(sub_patterns),
+                elements: self.lower_set_pattern_elements(elements),
             },
             ast::SetAlgebraicOperator::Intersects => CompoundPatternAttrKind::SetOperator {
                 operator: SetBinaryOperator::Intersects,
-                elements: to_set_pattern_elements(sub_patterns),
+                elements: self.lower_set_pattern_elements(elements),
             },
             ast::SetAlgebraicOperator::Equals => CompoundPatternAttrKind::SetOperator {
                 operator: SetBinaryOperator::SetEquals,
-                elements: to_set_pattern_elements(sub_patterns),
+                elements: self.lower_set_pattern_elements(elements),
             },
         })
+    }
+
+    fn lower_set_pattern_elements(
+        &mut self,
+        elements: Vec<SetElement>,
+    ) -> Box<[SetPatternElement]> {
+        elements
+            .into_iter()
+            .map(|SetElement { iter, rel, val }| SetPatternElement {
+                id: self.compiler.patterns.alloc_pat_id(),
+                iter,
+                rel,
+                val,
+            })
+            .collect()
     }
 
     fn lower_expr_pattern(
@@ -1314,4 +1332,10 @@ fn convert_cardinality(
         ast::Cardinality::Many => (PropertyCardinality::Mandatory, ValueCardinality::Many),
         ast::Cardinality::OptionalMany => (PropertyCardinality::Optional, ValueCardinality::Many),
     }
+}
+
+struct SetElement {
+    iter: bool,
+    rel: Option<Pattern>,
+    val: Pattern,
 }

@@ -553,7 +553,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             PatternKind::Set { elements, .. } => {
                 // FIXME: Unsure how correct this is:
-                for element in elements {
+                for element in elements.iter() {
                     let node = self.build_implicit_rel_node(ty, &element.val, prop_span, ctx);
                     if !matches!(ctx.hir_arena[node].meta().ty, Type::Error) {
                         return node;

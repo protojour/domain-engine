@@ -36,7 +36,7 @@ pub enum PatternKind {
     /// Expression enclosed in set-notation braces: `{expr..}`
     Set {
         val_type_def: Option<DefId>,
-        elements: Vec<SetPatternElement>,
+        elements: Box<[SetPatternElement]>,
     },
     Variable(Var),
     ConstI64(i64),
@@ -74,6 +74,7 @@ pub enum CompoundPatternAttrKind {
 
 #[derive(Debug)]
 pub struct SetPatternElement {
+    pub id: PatId,
     pub iter: bool,
     pub rel: Option<Pattern>,
     pub val: Pattern,

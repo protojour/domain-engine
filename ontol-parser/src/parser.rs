@@ -378,6 +378,8 @@ fn set_pattern(
             .then(spanned(any_pattern))
             .map(|(spread, pattern)| SetPatternElement {
                 spread: spread.map(|(_, span)| span),
+                // TODO: Support parsing relation attributes
+                relation_attrs: None,
                 pattern,
             }),
     )

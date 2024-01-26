@@ -169,7 +169,11 @@ pub enum SetAlgebraicOperator {
 /// items within `{}`
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct SetPatternElement {
+    /// `..`
     pub spread: Option<Span>,
+    /// [attrs]
+    pub relation_attrs: Option<Spanned<Vec<Spanned<StructPatternAttr>>>>,
+    /// actual pattern
     pub pattern: Spanned<AnyPattern>,
 }
 

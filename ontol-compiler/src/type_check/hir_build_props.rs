@@ -303,7 +303,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ValueCardinality::Many => match &val.kind {
                         PatternKind::Set { elements, .. } => {
                             let mut hir_elements = Vec::with_capacity(elements.len());
-                            for element in elements {
+                            for element in elements.iter() {
                                 let val_node = self.build_node(
                                     &element.val,
                                     NodeInfo {

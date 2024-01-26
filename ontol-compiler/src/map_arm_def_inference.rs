@@ -180,7 +180,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                 );
             }
             PatternKind::Set { elements, .. } => {
-                for element in elements {
+                for element in elements.iter() {
                     self.infer_attr_sub_pat(
                         &element.val,
                         VarFlags {
@@ -298,7 +298,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                 }
             }
             PatternKind::Set { elements, .. } => {
-                for element in elements {
+                for element in elements.iter() {
                     if let Some(rel) = element.rel.as_ref() {
                         self.scan_source_variables(
                             rel,
