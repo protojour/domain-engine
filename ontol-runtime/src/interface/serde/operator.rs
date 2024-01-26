@@ -26,8 +26,7 @@ pub struct SerdeOperatorAddr(pub u32);
 
 impl ::std::fmt::Debug for SerdeOperatorAddr {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        let SerdeOperatorAddr(ref _0) = self;
-        f.write_fmt(format_args!("SerdeOperatorAddr({:?})", _0))
+        write!(f, "SerdeOperatorAddr({:?})", self.0)
     }
 }
 
