@@ -42,7 +42,7 @@ fn test_geojson() {
         );
         assert_error_msg!(
             serde_create(&geometry).to_value_variant(json!({ "type": "Polygon", "coordinates": [1.0, 2.0] })),
-            "invalid type: floating point `1`, expected sequence with length 2 at line 1 column 42"
+            "invalid type: floating point `1.0`, expected sequence with length 2 at line 1 column 42"
         );
         assert_error_msg!(
             serde_create(&geometry).to_value_variant(json!({ "type": "LineString", "coordinates": [[1.0, 2.0]] })),
