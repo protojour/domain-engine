@@ -110,7 +110,7 @@ pub(super) fn unify_regex<'m>(
         // Input for sequence type "inference"
         for scope_map in &mut table.scope_maps {
             for assignment in &scope_map.assignments {
-                if let expr::Kind::SetElement(label, _, _, attr) = assignment.expr.kind() {
+                if let expr::Kind::SetElem(label, _, _, attr) = assignment.expr.kind() {
                     if let Some(infer) = seq_type_inferers.get_mut(label) {
                         infer
                             .types

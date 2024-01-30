@@ -106,7 +106,7 @@ impl<'c> PreAnalyzer<'c> {
         (group_set, arm_class): (&mut AggrGroupSet, &mut MapOutputClass),
         ctx: &mut HirBuildCtx<'_>,
     ) -> Result<(), CheckMapError> {
-        let contains_iter_element = elements.iter().any(|element| element.iter);
+        let contains_iter_element = elements.iter().any(|element| element.is_iter);
 
         if ctx.current_arm.is_first() {
             group_set.add(parent_aggr_group);
@@ -125,7 +125,7 @@ impl<'c> PreAnalyzer<'c> {
                         &element.val,
                         Some(SetElementGroup {
                             label,
-                            iterated: element.iter,
+                            iterated: element.is_iter,
                             bind_depth: ctx.current_ctrl_flow_depth(),
                         }),
                         ctx,
@@ -142,7 +142,7 @@ impl<'c> PreAnalyzer<'c> {
             let mut iter_match_element_count = 0;
 
             for element in elements.iter() {
-                if element.iter {
+                if element.is_iter {
                     iter_element_count += 1;
                 } else if contains_iter_element {
                     continue;

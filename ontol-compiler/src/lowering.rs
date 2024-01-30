@@ -887,7 +887,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 self.lower_any_pattern((ast_element.pattern.0, ast_element.pattern.1), var_table)?;
             pattern_elements.push(SetPatternElement {
                 id: self.compiler.patterns.alloc_pat_id(),
-                iter: ast_element.spread.is_some(),
+                is_iter: ast_element.spread.is_some(),
                 rel: None,
                 val: pattern,
             })
@@ -984,7 +984,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             .into_iter()
             .map(|SetElement { iter, rel, val }| SetPatternElement {
                 id: self.compiler.patterns.alloc_pat_id(),
-                iter,
+                is_iter: iter,
                 rel,
                 val,
             })

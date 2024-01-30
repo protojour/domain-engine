@@ -258,7 +258,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             if elements.len() == 1 {
                                 let pat_element = elements.iter().next().unwrap();
                                 if let PatternKind::Regex(regex_pattern) = &pat_element.val.kind {
-                                    if pat_element.iter {
+                                    if pat_element.is_iter {
                                         let label = *ctx.label_map.get(&pattern.id).unwrap();
 
                                         let capture_groups_list = self
@@ -590,32 +590,43 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             SmallVec::with_capacity(elements.len());
 
         for element in elements {
-            let hir_entry = if element.iter {
-                todo!();
-            } else {
-                let rel = match &element.rel {
-                    Some(pattern) => self.build_node(
-                        pattern,
-                        NodeInfo {
-                            expected_ty: Some((rel_ty, Strength::Strong)),
-                            parent_struct_flags,
-                        },
-                        ctx,
-                    ),
-                    None => ctx.mk_node(ontol_hir::Kind::Unit, Meta { ty: rel_ty, span }),
-                };
-                let val = self.build_node(
-                    &element.val,
+            let rel = match &element.rel {
+                Some(pattern) => self.build_node(
+                    pattern,
                     NodeInfo {
-                        expected_ty: Some((val_ty, Strength::Strong)),
+                        expected_ty: Some((rel_ty, Strength::Strong)),
                         parent_struct_flags,
                     },
                     ctx,
-                );
-                ontol_hir::SetEntry(None, ontol_hir::Attribute { rel, val })
+                ),
+                None => ctx.mk_node(ontol_hir::Kind::Unit, Meta { ty: rel_ty, span }),
+            };
+            let val = self.build_node(
+                &element.val,
+                NodeInfo {
+                    expected_ty: Some((val_ty, Strength::Strong)),
+                    parent_struct_flags,
+                },
+                ctx,
+            );
+
+            let label = if element.is_iter {
+                let label = ctx.label_map.get(&element.id).expect("No label found");
+                Some(TypedHirData(
+                    *label,
+                    Meta {
+                        ty: &UNIT_TYPE,
+                        span,
+                    },
+                ))
+            } else {
+                None
             };
 
-            set_entries.push(hir_entry);
+            set_entries.push(ontol_hir::SetEntry(
+                label,
+                ontol_hir::Attribute { rel, val },
+            ));
         }
 
         ctx.mk_node(

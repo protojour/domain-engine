@@ -64,7 +64,7 @@ pub enum Kind<'m> {
     /// TODO: This should be generalized
     IterSet(ontol_hir::Label, Box<ontol_hir::Attribute<Expr<'m>>>),
     DestructuredSeq(ontol_hir::Label, OutputVar),
-    SetElement(
+    SetElem(
         ontol_hir::Label,
         usize,
         ontol_hir::Iter,
@@ -110,15 +110,15 @@ impl<'m> Kind<'m> {
             Self::F64(float) => format!("f64({float})"),
             Self::String(string) => format!("String({string})"),
             Self::Const(const_def_id) => format!("Const({const_def_id:?})"),
-            Self::IterSet(label, _) => format!("Seq({label})"),
+            Self::IterSet(label, _) => format!("IterSet({label})"),
             Self::DestructuredSeq(label, output_var) => {
                 format!("DestructuredSeq({label}, {output_var:?})")
             }
-            Self::SetElement(label, index, iter, attr) => format!(
-                "{}SeqItem({label}, {index}, ({}, {}))",
-                if iter.0 { "Iter" } else { "" },
-                attr.rel.kind().debug_short(),
-                attr.val.kind().debug_short()
+            Self::SetElem(label, index, iter, attr) => format!(
+                "{iter}SetElem({label}, {index}, ({rel}, {val}))",
+                iter = if iter.0 { "Iter" } else { "" },
+                rel = attr.rel.kind().debug_short(),
+                val = attr.val.kind().debug_short()
             ),
             Self::Push(var, _) => format!("Push({var})"),
             Self::StringInterpolation(binder, _) => {
@@ -232,7 +232,7 @@ impl FreeVarVisitor {
                 self.visit_attr(attr);
             }
             Kind::DestructuredSeq(..) => {}
-            Kind::SetElement(_, _, _, attr) => self.visit_attr(attr),
+            Kind::SetElem(_, _, _, attr) => self.visit_attr(attr),
             Kind::Push(_, attr) => {
                 self.visit_attr(attr);
             }

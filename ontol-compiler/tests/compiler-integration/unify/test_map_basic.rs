@@ -702,14 +702,14 @@ fn test_map_delegation() {
 }
 
 #[test]
-// BUG: Not yet implemented
-#[should_panic]
+// BUG
+#[should_panic = "called `Option::unwrap()` on a `None` value"]
 fn test_map_delegation_abstract_types() {
     TestPackages::with_sources([
         (
             SourceName("SI"),
             "
-            def meters (rel .is: number}
+            def meters (rel .is: number)
             def millimeters (rel .is: number)
 
             map(
@@ -916,6 +916,27 @@ fn test_map_open_data_on_root_struct() {
             json!({ "p1": ["X"], "open": { "key": "value" }}),
         );
     });
+}
+
+#[test]
+// BUG: should work. Sequence label model is wrong.
+// https://gitlab.com/protojour/memoriam/domain-engine/-/issues/63
+fn test_map_spread_concat() {
+    "
+    def foo (rel .'p0': {text} rel .'p1': {text})
+    def bar (rel .'p2': {text})
+
+    map(
+        bar match('p0': {..p0}, 'p1': {..p1}),
+        bar(
+            'p2': { // ERROR TODO: Incompatible aggregation group
+                ..p1,
+                ..p0
+            }
+        ),
+    )
+    "
+    .compile_fail();
 }
 
 #[test]

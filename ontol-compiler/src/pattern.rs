@@ -75,7 +75,7 @@ pub enum CompoundPatternAttrKind {
 #[derive(Debug)]
 pub struct SetPatternElement {
     pub id: PatId,
-    pub iter: bool,
+    pub is_iter: bool,
     pub rel: Option<Pattern>,
     pub val: Pattern,
 }

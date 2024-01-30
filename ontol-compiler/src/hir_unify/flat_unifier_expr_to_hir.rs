@@ -83,7 +83,7 @@ impl<'t, 'u, 'a, 'm> ExprToHir<'t, 'u, 'a, 'm> {
                     self.mk_node(ontol_hir::Kind::Struct(binder, flags, body), meta.hir_meta);
                 Ok(self.unifier.maybe_map_node(struct_node, opt_output_type))
             }
-            expr::Kind::SetElement(label, _index, _iter, attr) => {
+            expr::Kind::SetElem(label, _index, _iter, attr) => {
                 let (scope_var, output_var) = match main_scope {
                     MainScope::Sequence(scope_var, output_var) => (scope_var, output_var),
                     MainScope::MultiSequence(table) => {

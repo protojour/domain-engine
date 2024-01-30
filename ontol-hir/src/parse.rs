@@ -260,6 +260,13 @@ impl<'a, L: Lang> Parser<'a, L> {
                     next,
                 ))
             }
+            Ok(("element-in", next)) => {
+                let (node, next) = self.parse(next)?;
+                Ok((
+                    PropVariant::Predicate(PredicateClosure::ElementIn(node)),
+                    next,
+                ))
+            }
             Ok((sym, _)) => return Err(Error::Expected(Class::Set, Found(Token::Symbol(sym)))),
             Err(_) => {
                 let (rel, next) = self.parse(next)?;
