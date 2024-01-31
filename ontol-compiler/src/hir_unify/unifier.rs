@@ -1,6 +1,7 @@
 use fnv::FnvHashMap;
 use indexmap::IndexSet;
 use ontol_runtime::var::Var;
+use thin_vec::thin_vec;
 use tracing::{debug, trace};
 
 use crate::{
@@ -94,7 +95,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                             ontol_hir::Iter(false),
                             string_var,
                             regex_def_id,
-                            vec![ontol_hir::CaptureMatchArm {
+                            thin_vec![ontol_hir::CaptureMatchArm {
                                 capture_groups,
                                 nodes: [unified.node].into_iter().collect(),
                             }],
@@ -143,7 +144,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         typed_binder: None,
                         node: self.mk_node(
                             ontol_hir::Kind::Prop(
-                                ontol_hir::Optional(false),
+                                ontol_hir::PropFlags::empty(),
                                 prop.struct_var,
                                 prop.prop_id,
                                 [ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
@@ -215,7 +216,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                         typed_binder: None,
                         node: self.mk_node(
                             ontol_hir::Kind::Prop(
-                                ontol_hir::Optional(false),
+                                ontol_hir::PropFlags::empty(),
                                 prop.struct_var,
                                 prop.prop_id,
                                 [ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
@@ -258,7 +259,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                 Ok(UnifiedNode {
                     typed_binder: None,
                     node: self.mk_node(
-                        ontol_hir::Kind::Let(binder, let_def, components),
+                        ontol_hir::Kind::With(binder, let_def, components),
                         expr_meta.hir_meta,
                     ),
                 })
@@ -278,7 +279,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     typed_binder: None,
                     node: self.mk_node(
                         ontol_hir::Kind::Prop(
-                            ontol_hir::Optional(false),
+                            ontol_hir::PropFlags::empty(),
                             prop.struct_var,
                             prop.prop_id,
                             [ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
@@ -373,7 +374,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     typed_binder: None,
                     node: self.mk_node(
                         ontol_hir::Kind::Prop(
-                            ontol_hir::Optional(false),
+                            ontol_hir::PropFlags::empty(),
                             prop.struct_var,
                             prop.prop_id,
                             [ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
@@ -754,7 +755,7 @@ impl<'a, 'm> Unifier<'a, 'm> {
 
                 let def = arena_import(&mut self.hir_arena, let_scope.def.as_ref());
                 let node = self.mk_node(
-                    ontol_hir::Kind::Let(let_scope.inner_binder, def, block.into()),
+                    ontol_hir::Kind::With(let_scope.inner_binder, def, block.into()),
                     Meta { ty, span: NO_SPAN },
                 );
 

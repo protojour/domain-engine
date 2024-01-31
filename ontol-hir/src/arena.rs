@@ -31,6 +31,10 @@ impl<'a, L: Lang> Arena<'a, L> {
         NodeRef { arena: self, node }
     }
 
+    pub fn data_mut(&mut self, node: Node) -> &mut L::Data<'a, Kind<'a, L>> {
+        &mut self.entries[node.0 as usize]
+    }
+
     pub fn iter_data(&self) -> impl Iterator<Item = &L::Data<'a, Kind<'a, L>>> {
         self.entries.iter()
     }
@@ -39,7 +43,7 @@ impl<'a, L: Lang> Arena<'a, L> {
         self.entries.iter_mut()
     }
 
-    pub fn refs<'n>(
+    pub fn node_refs<'n>(
         &self,
         nodes: impl IntoIterator<Item = &'n Node>,
     ) -> impl Iterator<Item = NodeRef<'_, 'a, L>> {

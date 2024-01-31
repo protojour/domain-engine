@@ -132,7 +132,7 @@ pub struct Gen<'m> {
 #[derive(Clone, Debug)]
 pub struct Prop<'m> {
     pub struct_var: Var,
-    pub optional: ontol_hir::Optional,
+    pub flags: ontol_hir::PropFlags,
     pub prop_id: PropertyId,
     pub disjoint_group: usize,
     pub dependencies: VarSet,

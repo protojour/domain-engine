@@ -19,9 +19,11 @@ fn test_unify_matchcond_empty() {
         ",
     );
     let expected = indoc! {"
-        |$b| (match-struct ($c)
-            (push-cond-clause $c
-                (root '$c)
+        |$b| (block
+            (match-struct ($c)
+                (push-cond-clause $c
+                    (root '$c)
+                )
             )
         )"
     };
@@ -33,7 +35,7 @@ fn test_unify_matchcond_single_prop() {
     let output = test_unify(
         "
         (struct ($b)
-            (prop $b S:1:0 (#u $a))
+            (prop! $b S:1:0 (#u $a))
         )
         ",
         "
@@ -41,22 +43,21 @@ fn test_unify_matchcond_single_prop() {
             (.. (@d)
                 #u
                 (match-struct ($c)
-                    (prop $c O:1:0 (#u $a))
+                    (prop! $c O:1:0 (#u $a))
                 )
             )
         )
         ",
     );
     let expected = indoc! {"
-        |$b| (match-struct ($c)
-            (push-cond-clause $c
-                (root '$c)
-            )
-            (match-prop $b S:1:0
-                (($_ $a)
-                    (push-cond-clause $c
-                        (attr '$c O:1:0 (_ $a))
-                    )
+        |$b| (block
+            (let-prop $_ $a ($b S:1:0))
+            (match-struct ($c)
+                (push-cond-clause $c
+                    (root '$c)
+                )
+                (push-cond-clause $c
+                    (attr '$c O:1:0 (_ $a))
                 )
             )
         )"
@@ -69,8 +70,8 @@ fn test_unify_matchcond_struct_in_struct() {
     let output = test_unify(
         "
         (struct ($c)
-            (prop $c S:1:0 (#u $a))
-            (prop $c S:1:1 (#u $b))
+            (prop! $c S:1:0 (#u $a))
+            (prop! $c S:1:1 (#u $b))
         )
         ",
         "
@@ -78,10 +79,10 @@ fn test_unify_matchcond_struct_in_struct() {
             (.. (@f)
                 #u
                 (match-struct ($d)
-                    (prop $d O:1:0
+                    (prop! $d O:1:0
                         (#u
                             (struct ($e)
-                                (prop $e O:2:0 ($a $b))
+                                (prop! $e O:2:0 ($a $b))
                             )
                         )
                     )
@@ -91,24 +92,18 @@ fn test_unify_matchcond_struct_in_struct() {
         ",
     );
     let expected = indoc! {"
-        |$c| (match-struct ($d)
-            (push-cond-clause $d
-                (root '$d)
-            )
-            (match-prop $c S:1:0
-                (($_ $a)
-                    (match-prop $c S:1:1
-                        (($_ $b)
-                            (begin
-                                (push-cond-clause $d
-                                    (attr '$d O:1:0 (_ '$e))
-                                )
-                                (push-cond-clause $d
-                                    (attr '$e O:2:0 ($a $b))
-                                )
-                            )
-                        )
-                    )
+        |$c| (block
+            (let-prop $_ $a ($c S:1:0))
+            (let-prop $_ $b ($c S:1:1))
+            (match-struct ($d)
+                (push-cond-clause $d
+                    (root '$d)
+                )
+                (push-cond-clause $d
+                    (attr '$d O:1:0 (_ '$e))
+                )
+                (push-cond-clause $d
+                    (attr '$e O:2:0 ($a $b))
                 )
             )
         )"

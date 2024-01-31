@@ -98,6 +98,12 @@ pub struct Meta<'m> {
     pub span: SourceSpan,
 }
 
+impl<'m> Meta<'m> {
+    pub fn new(ty: TypeRef<'m>, span: SourceSpan) -> Self {
+        Self { ty, span }
+    }
+}
+
 pub static UNIT_META: Meta<'static> = Meta {
     ty: &UNIT_TYPE,
     span: NO_SPAN,
@@ -170,20 +176,65 @@ pub fn arena_import<'m>(
     use ontol_hir::Kind::*;
 
     match kind {
+        NoOp => target.add(TypedHirData(kind.clone(), *meta)),
         Var(_) | Unit | I64(_) | F64(_) | Text(_) | Const(_) | CopySubSeq(..)
         | MoveRestAttrs(..) => {
             // No subnodes
             target.add(TypedHirData(kind.clone(), *meta))
         }
-        Begin(body) => {
+        Block(body) => {
             let imported_body = import_nodes(target, source.arena(), body);
-            target.add(TypedHirData(Begin(imported_body), *meta))
+            target.add(TypedHirData(Block(imported_body), *meta))
         }
-        Let(binder, def, body) => {
+        Catch(label, body) => {
+            let imported_body = import_nodes(target, source.arena(), body);
+            target.add(TypedHirData(Catch(*label, imported_body), *meta))
+        }
+        Try(label, var) => target.add(TypedHirData(Try(*label, *var), *meta)),
+        Let(binder, node) => {
+            let node = arena_import(target, source.arena().node_ref(*node));
+            target.add(TypedHirData(Let(*binder, node), *meta))
+        }
+        TryLet(label, binder, node) => {
+            let node = arena_import(target, source.arena().node_ref(*node));
+            target.add(TypedHirData(TryLet(*label, *binder, node), *meta))
+        }
+        LetProp(binding, (var, prop_id)) => {
+            target.add(TypedHirData(LetProp(*binding, (*var, *prop_id)), *meta))
+        }
+        LetPropDefault(binding, (var, prop_id), default) => {
+            let rel = arena_import(target, source.arena().node_ref(default.rel));
+            let val = arena_import(target, source.arena().node_ref(default.val));
+            target.add(TypedHirData(
+                LetPropDefault(
+                    *binding,
+                    (*var, *prop_id),
+                    ontol_hir::Attribute { rel, val },
+                ),
+                *meta,
+            ))
+        }
+        TryLetProp(catch, attr, (var, prop_id)) => target.add(TypedHirData(
+            TryLetProp(*catch, *attr, (*var, *prop_id)),
+            *meta,
+        )),
+        TryLetTup(catch, bindings, source) => target.add(TypedHirData(
+            TryLetTup(*catch, bindings.clone(), *source),
+            *meta,
+        )),
+        LetRegex(groups_list, regex_def_id, var) => target.add(TypedHirData(
+            LetRegex(groups_list.clone(), *regex_def_id, *var),
+            *meta,
+        )),
+        LetRegexIter(binding, groups_list, regex_def_id, var) => target.add(TypedHirData(
+            LetRegexIter(*binding, groups_list.clone(), *regex_def_id, *var),
+            *meta,
+        )),
+        With(binder, def, body) => {
             let def = arena_import(target, source.arena().node_ref(*def));
             let body = import_nodes(target, source.arena(), body);
 
-            target.add(TypedHirData(Let(*binder, def, body), *meta))
+            target.add(TypedHirData(With(*binder, def, body), *meta))
         }
         Call(proc, args) => {
             let args = import_nodes(target, source.arena(), args);

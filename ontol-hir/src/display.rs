@@ -1,6 +1,7 @@
 use std::fmt::{Debug, Display};
 
 use ontol_runtime::{condition::Clause, format_utils::AsAlpha, vm::proc::BuiltinProc};
+use thin_vec::ThinVec;
 
 use crate::{
     arena::{Arena, NodeRef},
@@ -60,15 +61,93 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
     fn print(self, f: &mut std::fmt::Formatter, sep: Sep, kind: &Kind<'a, L>) -> PrintResult {
         let indent = self.indent;
         match kind {
+            Kind::NoOp => Ok(Multiline(false)),
             Kind::Var(var) => {
                 write!(f, "{sep}{}", var)?;
                 Ok(sep.multiline())
             }
-            Kind::Begin(nodes) => {
-                write!(f, "{indent}(begin")?;
+            Kind::Block(nodes) => {
+                write!(f, "{indent}(block")?;
                 let multi = self.print_all(f, Sep::Space, self.kinds(nodes))?;
-                self.print_rparen(multi, f)?;
+                self.print_rparen(f, multi)?;
                 Ok(Multiline(true))
+            }
+            Kind::Catch(label, nodes) => {
+                write!(f, "{indent}(catch ({label})")?;
+                let multi = self.print_all(f, Sep::Space, self.kinds(nodes))?;
+                self.print_rparen(f, multi)?;
+                Ok(Multiline(true))
+            }
+            Kind::Try(label, var) => {
+                write!(f, "{indent}(try? {label} {var})")?;
+                Ok(Multiline(false))
+            }
+            Kind::Let(binder, node) => {
+                write!(f, "{indent}(let {binder}", binder = L::as_hir(binder).var)?;
+                let multi = self.print_all(f, Sep::Space, [self.kind(*node)].into_iter())?;
+                self.print_rparen(f, multi)?;
+                Ok(multi)
+            }
+            Kind::TryLet(label, binder, node) => {
+                write!(
+                    f,
+                    "{indent}(let? {label} {binder}",
+                    binder = L::as_hir(binder).var
+                )?;
+                let multi = self.print(f, Sep::Space, self.kind(*node))?;
+                self.print_rparen(f, multi)?;
+                Ok(multi)
+            }
+            Kind::LetProp(Attribute { rel, val }, (var, prop_id)) => {
+                write!(f, "{indent}(let-prop")?;
+                self.print(f, Sep::Space, rel)?;
+                self.print(f, Sep::Space, val)?;
+                write!(f, " ({var} {prop_id})")?;
+                self.print_rparen(f, Multiline(false))?;
+                Ok(Multiline(true))
+            }
+            Kind::LetPropDefault(binding, (var, prop_id), default) => {
+                write!(f, "{indent}(let-prop-default")?;
+                self.print(f, Sep::Space, &binding.rel)?;
+                self.print(f, Sep::Space, &binding.val)?;
+                write!(f, " ({var} {prop_id})")?;
+                self.print_all(
+                    f,
+                    Sep::Space,
+                    [self.kind(default.rel), self.kind(default.val)].into_iter(),
+                )?;
+                self.print_rparen(f, Multiline(false))?;
+                Ok(Multiline(true))
+            }
+            Kind::TryLetProp(try_label, Attribute { rel, val }, (var, prop_id)) => {
+                write!(f, "{indent}(let-prop? {try_label}")?;
+                self.print(f, Sep::Space, rel)?;
+                self.print(f, Sep::Space, val)?;
+                write!(f, " ({var} {prop_id})")?;
+                self.print_rparen(f, Multiline(false))?;
+                Ok(Multiline(true))
+            }
+            Kind::TryLetTup(try_label, bindings, node) => {
+                write!(f, "{indent}(let-tup? {try_label} (")?;
+                self.print_all(f, Sep::None, bindings.iter())?;
+                write!(f, ")")?;
+                let multi = self.print(f, Sep::Space, self.kind(*node))?;
+                self.print_rparen(f, multi)?;
+                Ok(multi)
+            }
+            Kind::LetRegex(groups, regex_def_id, var) => {
+                write!(f, "{indent}(let-regex")?;
+                self.print_all(f, Sep::Space, groups.iter())?;
+                write!(f, " {regex_def_id:?} {var}")?;
+                self.print_rparen(f, Multiline(false))?;
+                Ok(sep.multiline())
+            }
+            Kind::LetRegexIter(binder, groups, regex_def_id, var) => {
+                write!(f, "{indent}(let-regex-iter {}", L::as_hir(binder).var)?;
+                self.print_all(f, Sep::Space, groups.iter())?;
+                write!(f, " {regex_def_id:?} {var}")?;
+                self.print_rparen(f, Multiline(false))?;
+                Ok(sep.multiline())
             }
             Kind::Unit => {
                 write!(f, "{sep}#u")?;
@@ -90,12 +169,12 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
                 write!(f, "{sep}(const {const_def_id:?})")?;
                 Ok(sep.multiline())
             }
-            Kind::Let(binder, definition, body) => {
-                write!(f, "{indent}(let ({}", L::as_hir(binder).var)?;
+            Kind::With(binder, definition, body) => {
+                write!(f, "{indent}(with ({}", L::as_hir(binder).var)?;
                 let multi = self.print(f, Sep::Space, self.kind(*definition))?;
-                self.print_rparen(multi, f)?;
+                self.print_rparen(f, multi)?;
                 let multi = self.print_all(f, self.indent.indent(), self.kinds(body))?;
-                self.print_rparen(multi, f)?;
+                self.print_rparen(f, multi)?;
                 Ok(Multiline(true))
             }
             Kind::Call(proc, args) => {
@@ -108,19 +187,19 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
                 };
                 write!(f, "{sep}({proc}")?;
                 let multi = self.print_all(f, Sep::Space, self.kinds(args))?;
-                self.print_rparen(multi, f)?;
+                self.print_rparen(f, multi)?;
                 Ok(multi.or(sep))
             }
             Kind::Map(arg) => {
                 write!(f, "{sep}(map")?;
                 let multi = self.print_all(f, Sep::Space, [self.kind(*arg)].into_iter())?;
-                self.print_rparen(multi, f)?;
+                self.print_rparen(f, multi)?;
                 Ok(multi.or(sep))
             }
             Kind::Set(entries) => {
                 write!(f, "{indent}(set")?;
                 let multi = self.print_all(f, Sep::Space, entries.iter())?;
-                self.print_rparen(multi, f)?;
+                self.print_rparen(f, multi)?;
                 Ok(Multiline(true))
             }
             Kind::Struct(binder, flags, children) => {
@@ -130,17 +209,13 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
                     write!(f, "{indent}(struct ({})", L::as_hir(binder).var)?;
                 }
                 let multi = self.print_all(f, Sep::Space, self.kinds(children))?;
-                self.print_rparen(multi, f)?;
+                self.print_rparen(f, multi)?;
                 Ok(Multiline(true))
             }
-            Kind::Prop(optional, struct_var, prop_id, variants) => {
-                write!(
-                    f,
-                    "{indent}(prop{} {struct_var} {prop_id}",
-                    if optional.0 { "?" } else { "" }
-                )?;
+            Kind::Prop(flags, struct_var, prop_id, variants) => {
+                write!(f, "{indent}(prop{flags} {struct_var} {prop_id}",)?;
                 let multi = self.print_all(f, Sep::Space, variants.iter())?;
-                self.print_rparen(multi, f)?;
+                self.print_rparen(f, multi)?;
                 Ok(Multiline(true))
             }
             Kind::MoveRestAttrs(target, source) => {
@@ -150,14 +225,14 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
             Kind::MatchProp(struct_var, id, arms) => {
                 write!(f, "{indent}(match-prop {struct_var} {id}")?;
                 let multi = self.print_all(f, Sep::Space, arms.iter())?;
-                self.print_rparen(multi, f)?;
+                self.print_rparen(f, multi)?;
                 Ok(Multiline(true))
             }
             Kind::MakeSeq(binder, children) => {
                 let indent = if children.is_empty() { sep } else { indent };
                 write!(f, "{indent}(make-seq ({})", L::as_hir(binder).var)?;
                 let multi = self.print_all(f, Sep::Space, self.kinds(children))?;
-                self.print_rparen(multi, f)?;
+                self.print_rparen(f, multi)?;
                 Ok(multi)
             }
             Kind::CopySubSeq(target, source) => {
@@ -167,19 +242,19 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
             Kind::ForEach(var, (rel, val), children) => {
                 write!(f, "{indent}(for-each {var} ({rel} {val})")?;
                 let multi = self.print_all(f, Sep::Space, self.kinds(children))?;
-                self.print_rparen(multi, f)?;
+                self.print_rparen(f, multi)?;
                 Ok(Multiline(true))
             }
             Kind::Insert(seq_var, attr) => {
                 write!(f, "{indent}(insert {seq_var}",)?;
                 let multi = self.print_all(f, Sep::Space, self.kinds(&[attr.rel, attr.val]))?;
-                self.print_rparen(multi, f)?;
+                self.print_rparen(f, multi)?;
                 Ok(Multiline(true))
             }
             Kind::StringPush(to_var, node) => {
                 write!(f, "{indent}(string-push {to_var}",)?;
                 let multi = self.print(f, Sep::Space, self.kind(*node))?;
-                self.print_rparen(multi, f)?;
+                self.print_rparen(f, multi)?;
                 Ok(Multiline(true))
             }
             Kind::Regex(label, regex_def_id, captures) => {
@@ -189,7 +264,7 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
                     write!(f, "{sep}(regex {regex_def_id:?}")?;
                 }
                 let multi = self.print_all(f, Sep::Space, captures.iter())?;
-                self.print_rparen(multi, f)?;
+                self.print_rparen(f, multi)?;
                 Ok(sep.multiline())
             }
             Kind::MatchRegex(iter, var, regex_def_id, arms) => {
@@ -200,13 +275,13 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
                 }
                 write!(f, " {var} {regex_def_id:?}")?;
                 let multi = self.print_all(f, Sep::Space, arms.iter())?;
-                self.print_rparen(multi, f)?;
+                self.print_rparen(f, multi)?;
                 Ok(Multiline(true))
             }
             Kind::PushCondClause(var, clause) => {
                 write!(f, "{indent}(push-cond-clause {var}")?;
                 let multi = self.print_all(f, self.indent.indent(), [clause].into_iter())?;
-                self.print_rparen(multi, f)?;
+                self.print_rparen(f, multi)?;
                 Ok(Multiline(true))
             }
         }
@@ -266,7 +341,7 @@ impl<'h, 'a, L: Lang> Print<PropVariant<'a, L>> for Printer<'h, 'a, L> {
             },
         };
 
-        self.print_rparen(multi, f)?;
+        self.print_rparen(f, multi)?;
         Ok(Multiline(true))
     }
 }
@@ -290,7 +365,7 @@ impl<'h, 'a, L: Lang> Print<(Iter, Attribute<Node>)> for Printer<'h, 'a, L> {
 
         let multi = self.print_all(f, sep, self.kinds(&[attr.rel, attr.val]))?;
 
-        self.print_rparen(multi, f)?;
+        self.print_rparen(f, multi)?;
         Ok(Multiline(true))
     }
 }
@@ -327,7 +402,7 @@ impl<'h, 'a, L: Lang> Print<(PropPattern<'a, L>, Nodes)> for Printer<'h, 'a, L> 
             }
         }
         let multi = self.print_all(f, Sep::Space, self.kinds(nodes))?;
-        self.print_rparen(multi, f)?;
+        self.print_rparen(f, multi)?;
         Ok(Multiline(true))
     }
 }
@@ -355,8 +430,8 @@ impl<'h, 'a, L: Lang> Print<Clause<EvalCondTerm>> for Printer<'h, 'a, L> {
             Clause::Attr(var, prop_id, (rel, val)) => {
                 write!(f, "(attr '{var} {prop_id} (")?;
                 let multi = self.print_all(f, Sep::None, [rel, val].into_iter())?;
-                self.print_rparen(multi, f)?;
-                self.print_rparen(multi, f)?;
+                self.print_rparen(f, multi)?;
+                self.print_rparen(f, multi)?;
                 Ok(Multiline(true))
             }
             _ => todo!(),
@@ -392,9 +467,9 @@ impl<'h, 'a, L: Lang> Print<CaptureMatchArm<'a, L>> for Printer<'h, 'a, L> {
         let indent = self.indent;
         write!(f, "{indent}((")?;
         let multi = self.print_all(f, Sep::None, arm.capture_groups.iter())?;
-        self.print_rparen(multi, f)?;
+        self.print_rparen(f, multi)?;
         let multi = self.print_all(f, Sep::Space, self.kinds(&arm.nodes))?;
-        self.print_rparen(multi, f)?;
+        self.print_rparen(f, multi)?;
         Ok(Multiline(true))
     }
 }
@@ -438,7 +513,7 @@ impl<'h, 'a, L: Lang> Print<SetEntry<'a, L>> for Printer<'h, 'a, L> {
             write!(f, ".. ({})", L::as_hir(iter_label))?;
         }
         let multi = self.print_all(f, self.indent.indent(), self.kinds(&[attr.rel, attr.val]))?;
-        self.print_rparen(multi, f)?;
+        self.print_rparen(f, multi)?;
         Ok(Multiline(true))
     }
 }
@@ -450,13 +525,25 @@ where
     fn print(self, f: &mut std::fmt::Formatter, sep: Sep, node: &Vec<T>) -> PrintResult {
         write!(f, "{sep}(")?;
         let multi = self.print_all(f, Sep::None, node.iter())?;
-        self.print_rparen(multi, f)?;
+        self.print_rparen(f, multi)?;
+        Ok(multi)
+    }
+}
+
+impl<'h, 'a, L: Lang, T> Print<ThinVec<T>> for Printer<'h, 'a, L>
+where
+    Printer<'h, 'a, L>: Print<T>,
+{
+    fn print(self, f: &mut std::fmt::Formatter, sep: Sep, node: &ThinVec<T>) -> PrintResult {
+        write!(f, "{sep}(")?;
+        let multi = self.print_all(f, Sep::None, node.iter())?;
+        self.print_rparen(f, multi)?;
         Ok(multi)
     }
 }
 
 impl<'h, 'a, L: Lang> Printer<'h, 'a, L> {
-    fn print_rparen(self, multi: Multiline, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn print_rparen(self, f: &mut std::fmt::Formatter, multi: Multiline) -> std::fmt::Result {
         if multi.0 {
             let indent = self.indent.force_indent();
             write!(f, "{indent})")?;

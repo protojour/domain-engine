@@ -95,7 +95,7 @@ impl<'m> Kind<'m> {
             }
             Self::Prop(prop) => format!(
                 "Prop{}({}{}[{}])",
-                if prop.optional.0 { "?" } else { "" },
+                prop.flags,
                 if let Some(label) = prop.seq {
                     smart_format!("seq({label}) ")
                 } else {
@@ -138,7 +138,7 @@ pub struct Struct<'m>(
 
 #[derive(Debug)]
 pub struct Prop<'m> {
-    pub optional: ontol_hir::Optional,
+    pub flags: ontol_hir::PropFlags,
     pub struct_var: Var,
     pub prop_id: PropertyId,
     pub seq: Option<ontol_hir::Label>,
@@ -186,7 +186,7 @@ impl<'m> super::dep_tree::Expression for Prop<'m> {
     }
 
     fn is_optional(&self) -> bool {
-        self.optional.0
+        self.flags.rel_optional()
     }
 
     fn is_seq(&self) -> bool {

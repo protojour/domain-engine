@@ -1447,6 +1447,7 @@ dependencies = [
  "smallvec",
  "smartstring",
  "test-log",
+ "thin-vec",
  "thiserror",
  "tracing",
  "tracing-subscriber",
@@ -1478,6 +1479,7 @@ dependencies = [
  "smallvec",
  "smartstring",
  "test-log",
+ "thin-vec",
  "tracing-subscriber",
 ]
 

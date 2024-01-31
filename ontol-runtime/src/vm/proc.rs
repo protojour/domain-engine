@@ -110,14 +110,11 @@ pub enum OpCode {
     /// Run a regex search on the first match of string at Local.
     /// The next instruction must be a `RegexCaptureIndexes`.
     /// RegexCaptureIndexes contains a bit vector of the capture groups to save, and push on the stack.
-    /// If successful, pushes n values on the stack: [I64(1), ..captures]
-    /// If unsuccessful, pushes one value on the stakc: [I64(0)]
+    /// Pushes one value to the stack: A sequence of strings if successful, #void otherwise
     RegexCapture(Local, DefId),
     RegexCaptureIter(Local, DefId),
     /// Required parameter to RegexCapture and RegexCaptureIter
     RegexCaptureIndexes(BitVec),
-    /// Yanks True from the stack and crashes unless true
-    AssertTrue,
     /// Push a condition clause into the condition at local
     PushCondClause(Local, Clause<OpCodeCondTerm>),
     /// Execute a match on a datastore, using the condition at top of stack
@@ -147,40 +144,32 @@ pub enum BuiltinProc {
     NewSeq,
     NewUnit,
     NewCondition,
+    NewVoid,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Predicate {
     MatchesDiscriminant(Local, DefId),
-    IsUnit(Local),
-    /// Test if true. NB: Yanks from stack.
-    YankTrue(Local),
-    /// Test if not true. NB: Yanks from stack.
-    YankFalse(Local),
+    IsVoid(Local),
+    IsNotVoid(Local),
 }
 
 bitflags::bitflags! {
     ///
     #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug, Serialize, Deserialize)]
     pub struct GetAttrFlags: u8 {
-        /// Push true/false on stack as status on whether the attr is present
-        const TRY   = 0b00000001;
         /// If flag is set, take the attribute instead of cloning it
-        const TAKE  = 0b00000010;
+        const TAKE  = 0b00000001;
         /// Push attr rel param on top of stack, if present
-        const REL   = 0b00000100;
+        const REL   = 0b00000010;
         /// Push attr val on top of stack, if present
-        const VAL   = 0b00001000;
+        const VAL   = 0b00000100;
     }
 }
 
 impl GetAttrFlags {
     pub fn take2() -> Self {
         Self::TAKE | Self::REL | Self::VAL
-    }
-
-    pub fn try_take2() -> Self {
-        Self::TRY | Self::TAKE | Self::REL | Self::VAL
     }
 }
 

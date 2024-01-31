@@ -73,13 +73,11 @@ mod type_check;
 mod typed_hir;
 mod types;
 
-/// Temporary configuration: Use the new flat unifier
-const USE_FLAT_UNIFIER: bool = true;
-
-/// Temporary configuration: Fall back to the classic unifier if the flat unifier fails
+pub const USE_SSA_UNIFIER: bool = true;
+const SSA_UNIFIER_FALLBACK: bool = true;
+const USE_FLAT_UNIFIER: bool = false;
+const FLAT_UNIFIER_FALLBACK: bool = true;
 const CLASSIC_UNIFIER_FALLBACK: bool = true;
-
-/// Temporary configuration: Handle seq/DeclSeq in the flat unifier
 const USE_FLAT_SEQ_HANDLING: bool = true;
 
 #[derive(Debug)]

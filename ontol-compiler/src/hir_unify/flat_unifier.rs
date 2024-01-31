@@ -180,128 +180,127 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
     ) -> ontol_hir::Node {
         let input_meta = *self.hir_arena[input].meta();
 
-        if let Some(output_type) = output_type {
-            match output_type {
-                Type::Seq(_outer_rel_type, outer_val_type) => {
-                    // TODO: Should maybe handle rel types
-                    let inner_val_type = match input_meta.ty {
-                        Type::Seq(_inner_rel_type, inner_val_type) => inner_val_type,
-                        other => {
-                            warn!("Inner type should be sequence!");
-                            other
-                        }
-                    };
+        let Some(output_type) = output_type else {
+            return input;
+        };
+        match output_type {
+            Type::Seq(_outer_rel_type, outer_val_type) => {
+                // TODO: Should maybe handle rel types
+                let inner_val_type = match input_meta.ty {
+                    Type::Seq(_inner_rel_type, inner_val_type) => inner_val_type,
+                    other => {
+                        warn!("Inner type should be sequence!");
+                        other
+                    }
+                };
 
-                    let unit_meta = typed_hir::Meta {
-                        ty: &UNIT_TYPE,
-                        span: input_meta.span,
-                    };
+                let unit_meta = typed_hir::Meta {
+                    ty: &UNIT_TYPE,
+                    span: input_meta.span,
+                };
 
-                    let source_seq_var = self.var_allocator.alloc();
-                    let target_seq_var = self.var_allocator.alloc();
-                    let item_var = self.var_allocator.alloc();
+                let source_seq_var = self.var_allocator.alloc();
+                let target_seq_var = self.var_allocator.alloc();
+                let item_var = self.var_allocator.alloc();
 
-                    let item_map = {
-                        let item_var_ref = self.mk_node(
-                            ontol_hir::Kind::Var(item_var),
-                            typed_hir::Meta {
-                                ty: inner_val_type,
-                                span: input_meta.span,
-                            },
-                        );
+                let item_map = {
+                    let item_var_ref = self.mk_node(
+                        ontol_hir::Kind::Var(item_var),
+                        typed_hir::Meta {
+                            ty: inner_val_type,
+                            span: input_meta.span,
+                        },
+                    );
 
+                    self.mk_node(
+                        ontol_hir::Kind::Map(item_var_ref),
+                        typed_hir::Meta {
+                            ty: outer_val_type,
+                            span: input_meta.span,
+                        },
+                    )
+                };
+
+                let for_each = {
+                    let push = {
+                        let unit_node = self.mk_node(ontol_hir::Kind::Unit, UNIT_META);
                         self.mk_node(
-                            ontol_hir::Kind::Map(item_var_ref),
-                            typed_hir::Meta {
-                                ty: outer_val_type,
-                                span: input_meta.span,
-                            },
-                        )
-                    };
-
-                    let for_each = {
-                        let push = {
-                            let unit_node = self.mk_node(ontol_hir::Kind::Unit, UNIT_META);
-                            self.mk_node(
-                                ontol_hir::Kind::Insert(
-                                    target_seq_var,
-                                    ontol_hir::Attribute {
-                                        rel: unit_node,
-                                        val: item_map,
-                                    },
-                                ),
-                                unit_meta,
-                            )
-                        };
-
-                        self.mk_node(
-                            ontol_hir::Kind::ForEach(
-                                source_seq_var,
-                                (
-                                    ontol_hir::Binding::Wildcard,
-                                    ontol_hir::Binding::Binder(typed_hir::TypedHirData(
-                                        ontol_hir::Binder { var: item_var },
-                                        typed_hir::Meta {
-                                            ty: inner_val_type,
-                                            span: input_meta.span,
-                                        },
-                                    )),
-                                ),
-                                [push].into_iter().collect(),
+                            ontol_hir::Kind::Insert(
+                                target_seq_var,
+                                ontol_hir::Attribute {
+                                    rel: unit_node,
+                                    val: item_map,
+                                },
                             ),
                             unit_meta,
                         )
                     };
 
-                    let inherit_sub_seq = self.mk_node(
-                        ontol_hir::Kind::CopySubSeq(target_seq_var, source_seq_var),
-                        unit_meta,
-                    );
-
-                    {
-                        let source_let = self.mk_node(
-                            ontol_hir::Kind::Let(
-                                typed_hir::TypedHirData(
-                                    ontol_hir::Binder {
-                                        var: source_seq_var,
-                                    },
-                                    input_meta,
-                                ),
-                                input,
-                                [inherit_sub_seq, for_each].into_iter().collect(),
-                            ),
-                            input_meta,
-                        );
-                        self.mk_node(
-                            ontol_hir::Kind::MakeSeq(
-                                typed_hir::TypedHirData(
-                                    ontol_hir::Binder {
-                                        var: target_seq_var,
-                                    },
+                    self.mk_node(
+                        ontol_hir::Kind::ForEach(
+                            source_seq_var,
+                            (
+                                ontol_hir::Binding::Wildcard,
+                                ontol_hir::Binding::Binder(typed_hir::TypedHirData(
+                                    ontol_hir::Binder { var: item_var },
                                     typed_hir::Meta {
-                                        ty: output_type,
-                                        span: NO_SPAN,
+                                        ty: inner_val_type,
+                                        span: input_meta.span,
                                     },
-                                ),
-                                [source_let].into_iter().collect(),
+                                )),
                             ),
-                            typed_hir::Meta {
-                                ty: output_type,
-                                span: input_meta.span,
-                            },
-                        )
-                    }
+                            [push].into_iter().collect(),
+                        ),
+                        unit_meta,
+                    )
+                };
+
+                let inherit_sub_seq = self.mk_node(
+                    ontol_hir::Kind::CopySubSeq(target_seq_var, source_seq_var),
+                    unit_meta,
+                );
+
+                {
+                    let source_let = self.mk_node(
+                        ontol_hir::Kind::With(
+                            typed_hir::TypedHirData(
+                                ontol_hir::Binder {
+                                    var: source_seq_var,
+                                },
+                                input_meta,
+                            ),
+                            input,
+                            [inherit_sub_seq, for_each].into_iter().collect(),
+                        ),
+                        input_meta,
+                    );
+                    self.mk_node(
+                        ontol_hir::Kind::MakeSeq(
+                            typed_hir::TypedHirData(
+                                ontol_hir::Binder {
+                                    var: target_seq_var,
+                                },
+                                typed_hir::Meta {
+                                    ty: output_type,
+                                    span: NO_SPAN,
+                                },
+                            ),
+                            [source_let].into_iter().collect(),
+                        ),
+                        typed_hir::Meta {
+                            ty: output_type,
+                            span: input_meta.span,
+                        },
+                    )
                 }
-                _ => self.mk_node(
-                    ontol_hir::Kind::Map(input),
-                    typed_hir::Meta {
-                        ty: output_type,
-                        span: input_meta.span,
-                    },
-                ),
             }
-        } else {
-            input
+            _ => self.mk_node(
+                ontol_hir::Kind::Map(input),
+                typed_hir::Meta {
+                    ty: output_type,
+                    span: input_meta.span,
+                },
+            ),
         }
     }
 

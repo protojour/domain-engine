@@ -1,12 +1,13 @@
 use indexmap::IndexMap;
-use ontol_hir::StructFlags;
+use ontol_hir::{PropFlags, StructFlags};
 use ontol_runtime::{
     ontology::{Cardinality, PropertyCardinality, ValueCardinality},
+    smart_format,
     value::PropertyId,
     var::Var,
     DefId, Role,
 };
-use tracing::debug;
+use tracing::{debug, info};
 
 use crate::{
     def::{DefKind, LookupRelationshipMeta, RelParams},
@@ -244,23 +245,27 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         actual_struct_flags: StructFlags,
         ctx: &mut HirBuildCtx<'m>,
     ) -> Option<ontol_hir::Node> {
-        let CompoundPatternAttr {
-            key: (def_id, prop_span),
-            bind_option,
-            kind,
-        } = attr;
+        let (def_id, prop_span) = attr.key;
+        let bind_option = attr.bind_option;
+        let kind = &attr.kind;
 
-        let DefKind::TextLiteral(attr_prop) = self.defs.def_kind(*def_id) else {
-            self.error(CompileError::NamedPropertyExpected, prop_span);
+        let mut flags = PropFlags::empty();
+
+        if bind_option {
+            flags.insert(PropFlags::PAT_OPTIONAL);
+        }
+
+        let DefKind::TextLiteral(attr_prop) = self.defs.def_kind(def_id) else {
+            self.error(CompileError::NamedPropertyExpected, &prop_span);
             return None;
         };
         let Some(match_attribute) = match_attributes.get_mut(attr_prop) else {
-            self.error(CompileError::UnknownProperty, prop_span);
+            self.error(CompileError::UnknownProperty, &prop_span);
             return None;
         };
         if match_attribute.mentioned {
             // TODO: This is probably allowed in match
-            self.error(CompileError::DuplicateProperty, prop_span);
+            self.error(CompileError::DuplicateProperty, &prop_span);
             return None;
         }
         match_attribute.mentioned = true;
@@ -279,7 +284,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     rel_params_ty,
                     rel.as_ref(),
                     val,
-                    *prop_span,
+                    prop_span,
                     actual_struct_flags,
                     ctx,
                 );
@@ -349,10 +354,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     },
                 };
 
-                let mut optional = ontol_hir::Optional(matches!(
-                    match_attribute.cardinality.0,
-                    PropertyCardinality::Optional
-                ));
+                if matches!(match_attribute.cardinality.0, PropertyCardinality::Optional) {
+                    flags.insert(PropFlags::REL_OPTIONAL);
+                }
 
                 if self
                     .relations
@@ -360,7 +364,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .get(&match_attribute.property_id.relationship_id)
                     .is_some()
                 {
-                    optional = ontol_hir::Optional(true);
+                    flags.insert(PropFlags::REL_OPTIONAL);
+                }
+
+                if actual_struct_flags.contains(StructFlags::MATCH) && bind_option {
+                    // When in a MATCH context, the rel optionality always matches what is written in map
+                    flags.insert(PropFlags::REL_OPTIONAL);
                 }
 
                 let prop_variants: Vec<ontol_hir::PropVariant<'_, TypedHir>> =
@@ -369,29 +378,30 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             vec![prop_variant]
                         }
                         PropertyCardinality::Optional => {
-                            if *bind_option {
+                            if bind_option {
                                 vec![prop_variant]
                             } else {
                                 ctx.partial = true;
-                                self.error(
-                                    CompileError::TODO("required to be optional?".into()),
-                                    &val.span,
-                                );
-                                vec![]
+                                vec![prop_variant]
                             }
                         }
                     };
 
+                if flags.rel_optional() && !flags.pat_optional() {
+                    self.check_can_construct_default(rel_params_ty, prop_span);
+                    self.check_can_construct_default(value_ty, prop_span);
+                }
+
                 Some(ctx.mk_node(
                     ontol_hir::Kind::Prop(
-                        optional,
+                        flags,
                         struct_binder_var,
                         match_attribute.property_id,
                         prop_variants.into(),
                     ),
                     Meta {
                         ty: &UNIT_TYPE,
-                        span: *prop_span,
+                        span: prop_span,
                     },
                 ))
             }
@@ -402,7 +412,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     elements,
                     rel_params_ty,
                     value_ty,
-                    *prop_span,
+                    prop_span,
                     actual_struct_flags,
                     ctx,
                 );
@@ -417,7 +427,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         (ValueCardinality::Many, SetBinaryOperator::ElementIn) => {
                             self.error(
                                 CompileError::TODO("property must be a scalar".into()),
-                                prop_span,
+                                &prop_span,
                             );
                             return None;
                         }
@@ -427,7 +437,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         (ValueCardinality::One, _) => {
                             self.error(
                                 CompileError::TODO("property must be a set".into()),
-                                prop_span,
+                                &prop_span,
                             );
                             return None;
                         }
@@ -435,14 +445,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 Some(ctx.mk_node(
                     ontol_hir::Kind::Prop(
-                        ontol_hir::Optional(true), // TODO
+                        flags | PropFlags::REL_OPTIONAL, // TODO
                         struct_binder_var,
                         match_attribute.property_id,
                         prop_variants.into(),
                     ),
                     Meta {
                         ty: &UNIT_TYPE,
-                        span: *prop_span,
+                        span: prop_span,
                     },
                 ))
             }
@@ -535,7 +545,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     );
                     ctx.mk_node(
                         ontol_hir::Kind::Prop(
-                            ontol_hir::Optional(false),
+                            ontol_hir::PropFlags::empty(),
                             struct_binder_var,
                             match_attr.property_id,
                             [ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
@@ -592,5 +602,63 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 .or_default()
                 .push(name.into());
         }
+    }
+
+    fn check_can_construct_default(&mut self, ty: TypeRef<'m>, span: SourceSpan) {
+        let Some(def_id) = ty.get_single_def_id() else {
+            self.error(
+                CompileError::TODO(smart_format!("Type not found")),
+                &NO_SPAN,
+            );
+            return;
+        };
+
+        if !self.check_can_construct_default_inner(def_id) {
+            self.error(
+                CompileError::TODO(smart_format!(
+                    "optional binding required, as a default value cannot be created"
+                )),
+                &span,
+            );
+        } else {
+            info!("CAN MAKE DEFAULT: {ty:?}");
+        }
+    }
+
+    fn check_can_construct_default_inner(&self, def_id: DefId) -> bool {
+        match self.seal_ctx.get_repr_kind(&def_id) {
+            Some(ReprKind::Struct) => self.check_relations_can_construct_default(def_id),
+            Some(ReprKind::StructIntersection(members)) => {
+                if !self.check_relations_can_construct_default(def_id) {
+                    return false;
+                }
+                for (def_id, _) in members {
+                    if !self.check_relations_can_construct_default(*def_id) {
+                        return false;
+                    }
+                }
+                true
+            }
+            Some(ReprKind::Unit) => true,
+            _ => false,
+        }
+    }
+
+    fn check_relations_can_construct_default(&self, def_id: DefId) -> bool {
+        if let Some(property_set) = self.relations.properties_table_by_def_id(def_id) {
+            let mut match_attributes = Default::default();
+            self.collect_match_attributes(property_set, &mut match_attributes);
+
+            for (_, match_attribute) in match_attributes {
+                match match_attribute.cardinality {
+                    (PropertyCardinality::Mandatory, ValueCardinality::One) => {
+                        return false;
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        true
     }
 }

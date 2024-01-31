@@ -1,4 +1,5 @@
 use indexmap::IndexMap;
+use ontol_hir::PropFlags;
 use ontol_runtime::{value::PropertyId, var::Var};
 
 use crate::{
@@ -22,7 +23,7 @@ pub(super) struct LevelBuilder<'m> {
 
 #[derive(Default)]
 pub(super) struct MergedMatchArms<'m> {
-    optional: ontol_hir::Optional,
+    flags: ontol_hir::PropFlags,
     match_arms: Vec<(ontol_hir::PropPattern<'m, TypedHir>, ontol_hir::Nodes)>,
 }
 
@@ -30,7 +31,7 @@ impl<'m> LevelBuilder<'m> {
     pub fn build<'a>(mut self, unifier: &mut FlatUnifier<'a, 'm>) -> Vec<ontol_hir::Node> {
         for ((struct_var, property_id), mut merged_match_arms) in self.merged_match_arms_table {
             if !merged_match_arms.match_arms.is_empty() {
-                if merged_match_arms.optional.0 {
+                if merged_match_arms.flags.rel_optional() {
                     merged_match_arms
                         .match_arms
                         .push((ontol_hir::PropPattern::Absent, ontol_hir::Nodes::default()));
@@ -63,7 +64,7 @@ impl<'m> LevelBuilder<'m> {
 
     pub fn add_prop_variant_scope(
         &mut self,
-        (optional, struct_var, property_id): (ontol_hir::Optional, Var, PropertyId),
+        (flags, struct_var, property_id): (ontol_hir::PropFlags, Var, PropertyId),
         bindings: RelValBindings<'m>,
         body: Vec<ontol_hir::Node>,
     ) {
@@ -72,8 +73,8 @@ impl<'m> LevelBuilder<'m> {
             .entry((struct_var, property_id))
             .or_default();
 
-        if optional.0 {
-            merged_match_arms.optional.0 = true;
+        if flags.rel_optional() {
+            merged_match_arms.flags.insert(PropFlags::REL_OPTIONAL);
         }
 
         if !body.is_empty() {
@@ -87,8 +88,8 @@ impl<'m> LevelBuilder<'m> {
     pub fn add_seq_prop_variant_scope(
         &mut self,
         scope_var: ScopeVar,
-        (optional, has_default, struct_var, property_id): (
-            ontol_hir::Optional,
+        (flags, has_default, struct_var, property_id): (
+            ontol_hir::PropFlags,
             ontol_hir::HasDefault,
             Var,
             PropertyId,
@@ -111,8 +112,8 @@ impl<'m> LevelBuilder<'m> {
             .entry((struct_var, property_id))
             .or_default();
 
-        if optional.0 {
-            merged_match_arms.optional.0 = true;
+        if flags.rel_optional() {
+            merged_match_arms.flags.insert(PropFlags::REL_OPTIONAL);
         }
 
         if !body.is_empty() {

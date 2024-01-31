@@ -3,6 +3,7 @@ use std::str::FromStr;
 use ontol_hir::StructFlags;
 use ontol_runtime::smart_format;
 use smallvec::SmallVec;
+use thin_vec::{thin_vec, ThinVec};
 use tracing::debug;
 
 use crate::{
@@ -646,7 +647,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         // that falls back to text if both sides are unknown
         expected_ty: TypeRef<'m>,
         ctx: &mut HirBuildCtx<'m>,
-    ) -> Vec<Vec<ontol_hir::CaptureGroup<'m, TypedHir>>> {
+    ) -> ThinVec<ThinVec<ontol_hir::CaptureGroup<'m, TypedHir>>> {
         match node {
             RegexPatternCaptureNode::Alternation { variants } => variants
                 .iter()
@@ -655,7 +656,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 })
                 .collect(),
             node => {
-                vec![self.build_regex_capture_groups(node, pattern_span, expected_ty, ctx)]
+                thin_vec![self.build_regex_capture_groups(node, pattern_span, expected_ty, ctx)]
             }
         }
     }
@@ -668,7 +669,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         // that falls back to text if both sides are unknown
         expected_ty: TypeRef<'m>,
         ctx: &mut HirBuildCtx<'m>,
-    ) -> Vec<ontol_hir::CaptureGroup<'m, TypedHir>> {
+    ) -> ThinVec<ontol_hir::CaptureGroup<'m, TypedHir>> {
         match node {
             RegexPatternCaptureNode::Capture {
                 var,
@@ -695,7 +696,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 let _type_var = ctx.inference.new_type_variable(arm_pat_id);
 
-                vec![ontol_hir::CaptureGroup::<'m, TypedHir> {
+                thin_vec![ontol_hir::CaptureGroup::<'m, TypedHir> {
                     index: *capture_index,
                     binder: ontol_hir::Binder { var: *var }.with_meta(Meta {
                         ty: expected_ty,

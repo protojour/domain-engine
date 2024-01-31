@@ -2,8 +2,8 @@ use ontol_runtime::value::PropertyId;
 
 use crate::{
     arena::{Arena, NodeRef},
-    Attribute, Binding, CaptureMatchArm, Iter, Kind, Label, Lang, Node, Nodes, Optional,
-    PredicateClosure, PropPattern, PropVariant, SetEntry, Var,
+    Attribute, Binding, CaptureMatchArm, Iter, Kind, Label, Lang, Node, Nodes, PredicateClosure,
+    PropFlags, PropPattern, PropVariant, SetEntry, Var,
 };
 
 pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
@@ -15,7 +15,7 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
     #[allow(unused_variables)]
     fn visit_prop(
         &mut self,
-        optional: Optional,
+        flags: PropFlags,
         struct_var: Var,
         prop_id: PropertyId,
         variants: &[PropVariant<'a, L>],
@@ -89,27 +89,89 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
     fn traverse_node(&mut self, node_ref: NodeRef<'h, 'a, L>) {
         let arena = node_ref.arena;
         match node_ref.kind() {
+            Kind::NoOp => {}
             Kind::Var(var) => {
                 self.visit_var(*var);
             }
-            Kind::Begin(nodes) => {
-                for (index, node) in arena.refs(nodes).enumerate() {
+            Kind::Block(nodes) => {
+                for (index, node) in arena.node_refs(nodes).enumerate() {
                     self.visit_node(index, node)
                 }
             }
+            Kind::Catch(label, nodes) => {
+                self.visit_label(*label);
+                for (index, node) in arena.node_refs(nodes).enumerate() {
+                    self.visit_node(index, node)
+                }
+            }
+            Kind::Try(label, var) => {
+                self.visit_label(*label);
+                self.visit_var(*var);
+            }
+            Kind::Let(binder, node) => {
+                self.visit_binder(L::as_hir(binder).var);
+                self.visit_node(0, arena.node_ref(*node));
+            }
+            Kind::TryLet(label, binder, node) => {
+                self.visit_label(*label);
+                self.visit_binder(L::as_hir(binder).var);
+                self.visit_node(0, arena.node_ref(*node));
+            }
+            Kind::LetProp(Attribute { rel, val }, (var, _prop_id)) => {
+                self.traverse_pattern_binding(rel);
+                self.traverse_pattern_binding(val);
+                self.visit_var(*var);
+            }
+            Kind::LetPropDefault(binding, (var, _prop_id), default) => {
+                self.traverse_pattern_binding(&binding.rel);
+                self.traverse_pattern_binding(&binding.val);
+                self.visit_var(*var);
+                self.visit_node(0, arena.node_ref(default.rel));
+                self.visit_node(1, arena.node_ref(default.val));
+            }
+            Kind::TryLetProp(try_label, Attribute { rel, val }, (var, _prop_id)) => {
+                self.visit_label(*try_label);
+                self.traverse_pattern_binding(rel);
+                self.traverse_pattern_binding(val);
+                self.visit_var(*var);
+            }
+            Kind::TryLetTup(try_label, bindings, node) => {
+                self.visit_label(*try_label);
+                for (index, binding) in bindings.iter().enumerate() {
+                    self.visit_pattern_binding(index, binding);
+                }
+                self.visit_node(0, arena.node_ref(*node));
+            }
+            Kind::LetRegex(groups_list, _regex_def_id, var) => {
+                for capture_groups in groups_list.iter() {
+                    for capture_group in capture_groups.iter() {
+                        self.visit_binder(L::as_hir(&capture_group.binder).var);
+                    }
+                }
+                self.visit_var(*var);
+            }
+            Kind::LetRegexIter(binder, groups_list, _regex_def_id, var) => {
+                self.visit_binder(L::as_hir(binder).var);
+                for capture_groups in groups_list.iter() {
+                    for capture_group in capture_groups.iter() {
+                        self.visit_binder(L::as_hir(&capture_group.binder).var);
+                    }
+                }
+                self.visit_var(*var);
+            }
             Kind::Unit | Kind::I64(_) | Kind::F64(_) | Kind::Text(_) | Kind::Const(_) => {}
             Kind::Call(_proc, params) => {
-                for (index, arg) in arena.refs(params).enumerate() {
+                for (index, arg) in arena.node_refs(params).enumerate() {
                     self.visit_node(index, arg);
                 }
             }
             Kind::Map(arg) => {
                 self.visit_node(0, arena.node_ref(*arg));
             }
-            Kind::Let(binder, def, body) => {
+            Kind::With(binder, def, body) => {
                 self.visit_binder(L::as_hir(binder).var);
                 self.visit_node(0, arena.node_ref(*def));
-                for (index, node_ref) in arena.refs(body).enumerate() {
+                for (index, node_ref) in arena.node_refs(body).enumerate() {
                     self.visit_node(index + 1, node_ref);
                 }
             }
@@ -120,7 +182,7 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
             }
             Kind::Struct(binder, _flags, children) => {
                 self.visit_binder(L::as_hir(binder).var);
-                for (index, child) in arena.refs(children).enumerate() {
+                for (index, child) in arena.node_refs(children).enumerate() {
                     self.visit_node(index, child);
                 }
             }
@@ -140,7 +202,7 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
             }
             Kind::MakeSeq(binder, children) => {
                 self.visit_binder(L::as_hir(binder).var);
-                for (index, child) in arena.refs(children).enumerate() {
+                for (index, child) in arena.node_refs(children).enumerate() {
                     self.visit_node(index, child);
                 }
             }
@@ -152,7 +214,7 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                 self.visit_var(*seq_var);
                 self.traverse_pattern_binding(rel);
                 self.traverse_pattern_binding(val);
-                for (index, node_ref) in arena.refs(body).enumerate() {
+                for (index, node_ref) in arena.node_refs(body).enumerate() {
                     self.visit_node(index, node_ref);
                 }
             }

@@ -912,11 +912,11 @@ async fn test_create_through_mapped_domain() {
 
             map(
                 player(
-                    'id': id,
+                    'id'?: id,
                     'nick': n,
                 ),
                 ai.artist(
-                    'ID': id,
+                    'ID'?: id,
                     'name': n,
                 ),
             )
@@ -983,8 +983,8 @@ async fn test_create_through_three_domains() {
             )
 
             map(
-                actor('ID': id, 'alias': c),
-                player.player('id': id, 'nick': c),
+                actor('ID'?: id, 'alias': c),
+                player.player('id'?: id, 'nick': c),
             )
         ",
         ),
@@ -999,8 +999,8 @@ async fn test_create_through_three_domains() {
             )
 
             map(
-                player('id': id, 'nick': n),
-                ai.artist('ID': id, 'name': n),
+                player('id'?: id, 'nick': n),
+                ai.artist('ID'?: id, 'name': n),
             )
         ",
         ),

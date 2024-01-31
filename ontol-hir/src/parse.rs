@@ -99,14 +99,62 @@ impl<'a, L: Lang> Parser<'a, L> {
             ("-", next) => self.parse_binary_call(BuiltinProc::Sub, next),
             ("*", next) => self.parse_binary_call(BuiltinProc::Mul, next),
             ("/", next) => self.parse_binary_call(BuiltinProc::Div, next),
-            ("let", next) => {
+            ("with", next) => {
                 let (_, next) = parse_lparen(next)?;
                 let (bind_var, next) = parse_dollar_var(next)?;
                 let (def, next) = self.parse(next)?;
                 let (_, next) = parse_rparen(next)?;
                 let (body, next) = self.parse_many(next, Self::parse)?;
                 Ok((
-                    self.make_node(Kind::Let(self.make_binder(bind_var), def, body.into())),
+                    self.make_node(Kind::With(self.make_binder(bind_var), def, body.into())),
+                    next,
+                ))
+            }
+            ("block", next) => {
+                let (body, next) = self.parse_many(next, Self::parse)?;
+                Ok((self.make_node(Kind::Block(body.into())), next))
+            }
+            ("try-block", next) => {
+                let (label, next) = parse_paren_delimited(next, parse_at_label)?;
+                let (body, next) = self.parse_many(next, Self::parse)?;
+                Ok((self.make_node(Kind::Catch(label, body.into())), next))
+            }
+            ("try", next) => {
+                let (label, next) = parse_at_label(next)?;
+                let (var, next) = parse_dollar_var(next)?;
+                Ok((self.make_node(Kind::Try(label, var)), next))
+            }
+            ("let-prop", next) => {
+                let (rel, next) = self.parse_pattern_binding(next)?;
+                let (val, next) = self.parse_pattern_binding(next)?;
+                let (_, next) = parse_lparen(next)?;
+                let (var, next) = parse_dollar_var(next)?;
+                let (prop_id, next) = parse_prop_id(next)?;
+                let (_, next) = parse_rparen(next)?;
+                Ok((
+                    self.make_node(Kind::LetProp(Attribute { rel, val }, (var, prop_id))),
+                    next,
+                ))
+            }
+            ("let-prop-default", next) => {
+                let (binding, next) = {
+                    let (rel, next) = self.parse_pattern_binding(next)?;
+                    let (val, next) = self.parse_pattern_binding(next)?;
+
+                    (Attribute { rel, val }, next)
+                };
+                let (_, next) = parse_lparen(next)?;
+                let (var, next) = parse_dollar_var(next)?;
+                let (prop_id, next) = parse_prop_id(next)?;
+                let (_, next) = parse_rparen(next)?;
+                let (attr, next) = {
+                    let (rel, next) = self.parse(next)?;
+                    let (val, next) = self.parse(next)?;
+
+                    (Attribute { rel, val }, next)
+                };
+                Ok((
+                    self.make_node(Kind::LetPropDefault(binding, (var, prop_id), attr)),
                     next,
                 ))
             }
@@ -116,8 +164,12 @@ impl<'a, L: Lang> Parser<'a, L> {
             }
             ("struct", next) => self.parse_struct_inner(next, StructFlags::empty()),
             ("match-struct", next) => self.parse_struct_inner(next, StructFlags::MATCH),
-            ("prop", next) => self.parse_prop(Optional(false), next),
-            ("prop?", next) => self.parse_prop(Optional(true), next),
+            ("prop", next) => self.parse_prop(PropFlags::REL_OPTIONAL, next),
+            ("prop?", next) => {
+                self.parse_prop(PropFlags::PAT_OPTIONAL | PropFlags::REL_OPTIONAL, next)
+            }
+            ("prop!", next) => self.parse_prop(PropFlags::empty(), next),
+            ("prop?!", next) => self.parse_prop(PropFlags::PAT_OPTIONAL, next),
             ("match-prop", next) => {
                 let (struct_var, next) = parse_dollar_var(next)?;
                 let (prop, next) = parse_symbol(next)?;
@@ -175,11 +227,12 @@ impl<'a, L: Lang> Parser<'a, L> {
                 let (match_arms, next) = self.parse_many(next, |zelf, next| {
                     parse_paren_delimited(next, |next| {
                         zelf.parse_many(next, Self::parse_capture_group)
+                            .map(|(vec, next)| (ThinVec::from(vec), next))
                     })
                 })?;
 
                 Ok((
-                    self.make_node(Kind::Regex(label, regex_def_id, match_arms)),
+                    self.make_node(Kind::Regex(label, regex_def_id, ThinVec::from(match_arms))),
                     next,
                 ))
             }
@@ -189,15 +242,25 @@ impl<'a, L: Lang> Parser<'a, L> {
                 let (regex_def_id, next) = parse_def_id(next)?;
                 let (match_arms, next) = self.parse_many(next, Self::parse_capture_match_arm)?;
                 Ok((
-                    self.make_node(Kind::MatchRegex(iter, text_var, regex_def_id, match_arms)),
+                    self.make_node(Kind::MatchRegex(
+                        iter,
+                        text_var,
+                        regex_def_id,
+                        ThinVec::from(match_arms),
+                    )),
                     next,
                 ))
+            }
+            ("move-rest-attrs", next) => {
+                let (dest, next) = parse_dollar_var(next)?;
+                let (src, next) = parse_dollar_var(next)?;
+                Ok((self.make_node(Kind::MoveRestAttrs(dest, src)), next))
             }
             (sym, _) => Err(Error::InvalidSymbol(sym)),
         }
     }
 
-    pub fn parse_prop<'s>(&mut self, optional: Optional, next: &'s str) -> ParseResult<'s, Node> {
+    pub fn parse_prop<'s>(&mut self, optional: PropFlags, next: &'s str) -> ParseResult<'s, Node> {
         let (var, next) = parse_dollar_var(next)?;
         let (prop, next) = parse_symbol(next)?;
         let (variants, next) = self.parse_many(next, Self::parse_prop_variant)?;
@@ -304,6 +367,8 @@ impl<'a, L: Lang> Parser<'a, L> {
         parse_paren_delimited(next, |next| {
             let (_, next) = parse_lparen(next)?;
             let (seq_default, next) = match parse_symbol(next) {
+                Ok(("..", next)) => (Some(HasDefault(false)), next),
+                Ok(("..default", next)) => (Some(HasDefault(true)), next),
                 Ok(("seq", next)) => (Some(HasDefault(false)), next),
                 Ok(("seq-default", next)) => (Some(HasDefault(true)), next),
                 Ok((sym, _)) => return Err(Error::Expected(Class::Set, Found(Token::Symbol(sym)))),
@@ -435,6 +500,14 @@ impl<'a, L: Lang> Parser<'a, L> {
     fn make_label(&self, label: Label) -> L::Data<'a, Label> {
         self.lang.default_data(label)
     }
+}
+
+fn parse_prop_id(next: &str) -> ParseResult<PropertyId> {
+    let (sym, next) = parse_symbol(next)?;
+    let prop_id: PropertyId = sym
+        .parse()
+        .map_err(|_| Error::Expected(Class::Property, Found(Token::Symbol(sym))))?;
+    Ok((prop_id, next))
 }
 
 fn parse_symbol(next: &str) -> ParseResult<&str> {

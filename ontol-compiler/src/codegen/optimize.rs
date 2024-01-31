@@ -4,7 +4,7 @@ use fnv::FnvHashSet;
 use ontol_runtime::vm::proc::OpCode;
 
 use super::{
-    ir::{BlockIndex, Ir, Terminator},
+    ir::{BlockLabel, Ir, Terminator},
     proc_builder::ProcBuilder,
 };
 
@@ -20,33 +20,33 @@ enum BlockKind {
 }
 
 pub fn optimize(builder: &mut ProcBuilder) {
-    if builder.blocks.is_empty() {
+    let Some(first_block) = builder.blocks.first() else {
         return;
-    }
+    };
 
     let mut block_clone_optimizer = CloneToBumpOptimizer::default();
-    block_clone_optimizer.optimize_block(builder, BlockIndex(0), BlockKind::Linear);
+    block_clone_optimizer.optimize_block(builder, first_block.label(), BlockKind::Linear);
 }
 
 #[derive(Default)]
 struct CloneToBumpOptimizer {
     locals: Vec<LocalUsage>,
-    optimized_blocks: FnvHashSet<BlockIndex>,
+    optimized_blocks: FnvHashSet<BlockLabel>,
 }
 
 impl CloneToBumpOptimizer {
     fn optimize_block(
         &mut self,
         builder: &mut ProcBuilder,
-        block_index: BlockIndex,
+        block_label: BlockLabel,
         block_kind: BlockKind,
     ) {
-        if self.optimized_blocks.contains(&block_index) {
+        if self.optimized_blocks.contains(&block_label) {
             return;
         }
-        self.optimized_blocks.insert(block_index);
+        self.optimized_blocks.insert(block_label);
 
-        let block = builder.blocks.get_mut(block_index.0 as usize).unwrap();
+        let block = builder.block_mut(block_label);
         let stack_start = block.stack_start();
 
         let mut sub_blocks = Vec::new();
@@ -79,7 +79,7 @@ impl CloneToBumpOptimizer {
             self.optimize_block(builder, block_index, block_kind);
         }
 
-        let block = builder.blocks.get_mut(block_index.0 as usize).unwrap();
+        let block = builder.block_mut(block_label);
 
         // optimize (Clone => Bump):
         for (ir, _) in block.ir_mut() {

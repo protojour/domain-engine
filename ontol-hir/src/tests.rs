@@ -1,3 +1,5 @@
+use std::mem::size_of;
+
 use crate::parse::Parser;
 
 use super::*;
@@ -17,6 +19,14 @@ impl Lang for TestLang {
     fn as_hir<'m, 'a, H: Clone>(data: &'m Self::Data<'a, H>) -> &'m H {
         data
     }
+}
+
+/// Kind with unit metadata
+type TestKind<'a> = Kind<'a, TestLang>;
+
+#[test]
+fn assert_size() {
+    assert_eq!(80, size_of::<TestKind>());
 }
 
 fn parse_print(src: &str) -> String {
@@ -156,9 +166,9 @@ fn test_map_seq() {
 }
 
 #[test]
-fn test_let() {
+fn test_with() {
     let src = indoc! {"
-        (let ($a (+ 1 2))
+        (with ($a (+ 1 2))
             (prop $b S:0:0
                 (#u $a)
             )

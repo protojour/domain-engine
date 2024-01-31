@@ -1,6 +1,7 @@
 use std::fmt::{Debug, Display};
 
 use serde::{Deserialize, Serialize};
+use thin_vec::ThinVec;
 
 use crate::{
     format_utils::Literal,
@@ -38,7 +39,7 @@ pub enum Clause<Term> {
     IsEntity(Term, DefId),
     Attr(Var, PropertyId, (Term, Term)),
     Eq(Var, Term),
-    Or(Vec<Term>),
+    Or(ThinVec<Term>),
 }
 
 #[derive(Clone, Serialize, Deserialize)]

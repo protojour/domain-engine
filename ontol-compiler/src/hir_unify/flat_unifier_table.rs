@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use ontol_hir::Label;
+use ontol_hir::{Label, PropFlags};
 use ontol_runtime::var::{Var, VarSet};
 use tracing::debug;
 
@@ -65,7 +65,7 @@ impl<'m> Table<'m> {
         &mut self,
         free_vars: &VarSet,
         seq_label: Option<ScopeVar>,
-        optional: ontol_hir::Optional,
+        prop_flags: PropFlags,
         filter: &mut ScopeFilter,
     ) -> Option<AssignmentSlot> {
         let mut candidate: Option<usize> = None;
@@ -78,7 +78,7 @@ impl<'m> Table<'m> {
             if let Some((index, _)) = self.find_scope_map_by_scope_var(seq_label) {
                 candidate = Some(index);
             }
-        } else if optional.0 {
+        } else if prop_flags.rel_optional() {
             // optional property strategy
             let filter_req_len = filter.req_constraints.0.len();
 
@@ -174,8 +174,8 @@ impl<'m> Table<'m> {
             let scope_map = &mut self.scope_maps[index];
             let scope_var = scope_map.scope.meta().scope_var;
             match scope_map.scope.kind() {
-                flat_scope::Kind::PropVariant(_, optional, ..) => {
-                    if optional.0 {
+                flat_scope::Kind::PropVariant(_, flags, ..) => {
+                    if flags.rel_optional() {
                         filter.req_constraints.insert(scope_var.0);
                     }
                 }

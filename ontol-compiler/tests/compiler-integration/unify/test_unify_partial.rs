@@ -15,7 +15,7 @@ fn test_unify_partial() {
     )
 
     map(
-        Filter('foo': foo), // ERROR TODO: required to be optional?
+        Filter('foo': foo), // ERROR TODO: optional binding required, as a default value cannot be created
         Foo('foo': foo) // ERROR missing property `bar`// NOTE Consider using `match {}`
     )
     "

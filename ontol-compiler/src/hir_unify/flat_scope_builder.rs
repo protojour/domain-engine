@@ -146,7 +146,7 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
                     },
                 ));
             }
-            ontol_hir::Kind::Prop(optional, struct_var, property_id, variants) => {
+            ontol_hir::Kind::Prop(flags, struct_var, property_id, variants) => {
                 deps.insert(*struct_var);
 
                 for variant in variants {
@@ -154,7 +154,7 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
                         ontol_hir::PropVariant::Singleton(attr) => {
                             let variant_var = self.var_allocator.alloc();
 
-                            let constraints = if optional.0 {
+                            let constraints = if flags.rel_optional() {
                                 Rc::new(constraints.union_one(variant_var))
                             } else {
                                 constraints.clone()
@@ -163,7 +163,7 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
                             self.scope_nodes.push(ScopeNode(
                                 flat_scope::Kind::PropVariant(
                                     prop_depth,
-                                    *optional,
+                                    *flags,
                                     *struct_var,
                                     *property_id,
                                 ),
@@ -198,7 +198,7 @@ impl<'h, 'm> FlatScopeBuilder<'h, 'm> {
                                 flat_scope::Kind::SeqPropVariant(
                                     *label,
                                     output_var,
-                                    *optional,
+                                    *flags,
                                     *has_default,
                                     *struct_var,
                                     *property_id,

@@ -1,4 +1,4 @@
-use ontol_hir::{Optional, StructFlags};
+use ontol_hir::{PropFlags, StructFlags};
 use ontol_runtime::{
     smart_format,
     var::{Var, VarSet},
@@ -157,7 +157,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
             }
             expr::Kind::Prop(prop) => {
                 let expr::Prop {
-                    optional,
+                    flags,
                     struct_var,
                     prop_id,
                     seq,
@@ -191,7 +191,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                 };
 
                 let slot =
-                    table.find_assignment_slot(&free_vars, seq_label, prop.optional, &mut filter);
+                    table.find_assignment_slot(&free_vars, seq_label, prop.flags, &mut filter);
 
                 // Split off/assign individual property variants
                 let variant = match variant {
@@ -262,7 +262,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                     slot,
                     expr::Expr(
                         expr::Kind::Prop(Box::new(expr::Prop {
-                            optional,
+                            flags,
                             struct_var,
                             prop_id,
                             variant,
@@ -296,7 +296,7 @@ impl<'a, 'm> FlatUnifier<'a, 'm> {
                                     let slot = table.find_assignment_slot(
                                         &meta.free_vars,
                                         None,
-                                        Optional(false),
+                                        PropFlags::empty(),
                                         &mut filter,
                                     );
                                     Ok(Self::assign_to_assignment_slot(

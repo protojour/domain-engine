@@ -4,6 +4,7 @@ use ontol_runtime::{
     var::{Var, VarSet},
     DefId,
 };
+use thin_vec::{thin_vec, ThinVec};
 use tracing::debug;
 
 use crate::{
@@ -67,7 +68,7 @@ pub(super) fn unify_regex<'m>(
     } else if let Some(seq_label) = opt_seq_label {
         debug!("{level}looping regex");
         // looping regex
-        let mut match_arms: Vec<ontol_hir::CaptureMatchArm<'m, TypedHir>> = vec![];
+        let mut match_arms: ThinVec<ontol_hir::CaptureMatchArm<'m, TypedHir>> = thin_vec![];
 
         let mut seq_type_inferers: IndexMap<ontol_hir::Label, SeqTypeInfer<'m>> =
             Default::default();
@@ -91,7 +92,7 @@ pub(super) fn unify_regex<'m>(
                     hir_props.push(
                         unifier.mk_node(
                             ontol_hir::Kind::Prop(
-                                prop.optional,
+                                prop.flags,
                                 prop.struct_var,
                                 prop.prop_id,
                                 [ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
@@ -199,7 +200,7 @@ pub(super) fn unify_regex<'m>(
             );
 
             let let_node = unifier.mk_node(
-                ontol_hir::Kind::Let(
+                ontol_hir::Kind::With(
                     ontol_hir::Binder {
                         var: output_seq_var.0,
                     }
@@ -217,7 +218,7 @@ pub(super) fn unify_regex<'m>(
         builder.output.extend(nodes);
     } else {
         // normal, one-shot regex
-        let mut match_arms: Vec<ontol_hir::CaptureMatchArm<'m, TypedHir>> = vec![];
+        let mut match_arms: ThinVec<ontol_hir::CaptureMatchArm<'m, TypedHir>> = thin_vec![];
 
         // alternations:
         for alt_idx in table.dependees(Some(scope_var)) {

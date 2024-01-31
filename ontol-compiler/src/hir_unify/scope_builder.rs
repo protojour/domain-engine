@@ -70,6 +70,7 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
     ) -> UnifierResult<ScopeBinder<'m>> {
         let hir_meta = *self.hir_arena[node].meta();
         match self.hir_arena.kind_of(node) {
+            ontol_hir::Kind::NoOp => panic!("NoOp"),
             ontol_hir::Kind::Var(var) => Ok(ScopeBinder {
                 binder: Some(ontol_hir::Binder { var: *var }.with_meta(hir_meta)),
                 scope: scope::Scope(
@@ -100,7 +101,7 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
                     },
                 ),
             }),
-            ontol_hir::Kind::Let(..) => todo!(),
+            ontol_hir::Kind::With(..) => todo!(),
             ontol_hir::Kind::Call(proc, args) => {
                 let (defined_var, dependencies) = match &self.current_prop_analysis_map {
                     Some(map) => {
@@ -232,7 +233,17 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
             ontol_hir::Kind::Insert(..) => {
                 todo!()
             }
-            ontol_hir::Kind::Begin(_)
+            ontol_hir::Kind::Block(_)
+            | ontol_hir::Kind::Catch(..)
+            | ontol_hir::Kind::Try(..)
+            | ontol_hir::Kind::Let(..)
+            | ontol_hir::Kind::TryLet(..)
+            | ontol_hir::Kind::LetProp(..)
+            | ontol_hir::Kind::LetPropDefault(..)
+            | ontol_hir::Kind::TryLetProp(..)
+            | ontol_hir::Kind::TryLetTup(..)
+            | ontol_hir::Kind::LetRegex(..)
+            | ontol_hir::Kind::LetRegexIter(..)
             | ontol_hir::Kind::MatchProp(..)
             | ontol_hir::Kind::MatchRegex(..)
             | ontol_hir::Kind::StringPush(..)
@@ -311,7 +322,7 @@ impl<'h, 'm> ScopeBuilder<'h, 'm> {
 
                     props.push(scope::Prop {
                         struct_var: *struct_var,
-                        optional: *optional,
+                        flags: *optional,
                         prop_id: *prop_id,
                         disjoint_group,
                         dependencies,

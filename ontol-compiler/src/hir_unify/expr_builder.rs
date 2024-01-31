@@ -29,6 +29,7 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
     pub fn hir_to_expr(&mut self, node_ref: TypedNodeRef<'_, 'm>) -> expr::Expr<'m> {
         let (arena, hir_meta) = (node_ref.arena(), *node_ref.meta());
         match node_ref.kind() {
+            ontol_hir::Kind::NoOp => panic!("NoOp"),
             ontol_hir::Kind::Var(var) => {
                 let mut free_vars = VarSet::default();
                 free_vars.insert(*var);
@@ -76,7 +77,7 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                     free_vars: Default::default(),
                 },
             ),
-            ontol_hir::Kind::Let(..) => panic!(),
+            ontol_hir::Kind::With(..) => panic!(),
             ontol_hir::Kind::Call(proc, args) => {
                 let mut expr_args = Vec::with_capacity(args.len());
                 for arg in args {
@@ -198,7 +199,17 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
             ontol_hir::Kind::MakeSeq(..) => {
                 todo!()
             }
-            ontol_hir::Kind::Begin(_)
+            ontol_hir::Kind::Block(_)
+            | ontol_hir::Kind::Catch(..)
+            | ontol_hir::Kind::Try(..)
+            | ontol_hir::Kind::Let(..)
+            | ontol_hir::Kind::TryLet(..)
+            | ontol_hir::Kind::LetProp(..)
+            | ontol_hir::Kind::LetPropDefault(..)
+            | ontol_hir::Kind::TryLetProp(..)
+            | ontol_hir::Kind::TryLetTup(..)
+            | ontol_hir::Kind::LetRegex(..)
+            | ontol_hir::Kind::LetRegexIter(..)
             | ontol_hir::Kind::MatchProp(..)
             | ontol_hir::Kind::MatchRegex(..)
             | ontol_hir::Kind::ForEach(..)
@@ -215,7 +226,7 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
     fn node_to_props(&mut self, node_ref: TypedNodeRef<'_, 'm>) -> Vec<expr::Prop<'m>> {
         let arena = node_ref.arena();
         match node_ref.kind() {
-            ontol_hir::Kind::Prop(optional, struct_var, prop_id, variants) => {
+            ontol_hir::Kind::Prop(flags, struct_var, prop_id, variants) => {
                 let mut output = Vec::with_capacity(variants.len());
                 for variant in variants {
                     let prop = match variant {
@@ -225,7 +236,7 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                             let val = union.plus(self.hir_to_expr(arena.node_ref(*val)));
 
                             expr::Prop {
-                                optional: *optional,
+                                flags: *flags,
                                 prop_id: *prop_id,
                                 free_vars: union.vars,
                                 seq: None,
@@ -259,7 +270,7 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                             union.vars.insert((*label.hir()).into());
 
                             expr::Prop {
-                                optional: *optional,
+                                flags: *flags,
                                 prop_id: *prop_id,
                                 free_vars: union.vars,
                                 seq: Some(*label.hir()),
@@ -305,7 +316,7 @@ impl<'c, 'm> ExprBuilder<'c, 'm> {
                             };
 
                             expr::Prop {
-                                optional: *optional,
+                                flags: *flags,
                                 prop_id: *prop_id,
                                 free_vars: union.vars,
                                 seq: None,

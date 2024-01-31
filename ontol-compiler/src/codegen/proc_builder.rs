@@ -8,7 +8,7 @@ use tracing::{debug, trace, Level};
 
 use crate::{codegen::optimize::optimize, SourceSpan};
 
-use super::ir::{BlockIndex, BlockOffset, Ir, Terminator};
+use super::ir::{BlockLabel, BlockOffset, Ir, Terminator};
 
 /// How an instruction influences the size of the stack
 pub struct Delta(pub i32);
@@ -20,7 +20,7 @@ pub struct Scope {
 
 pub struct ProcBuilder {
     pub n_params: NParams,
-    pub blocks: SmallVec<[Block; 8]>,
+    pub blocks: Vec<Block>,
     pub stack_size: i32,
 }
 
@@ -41,17 +41,17 @@ impl ProcBuilder {
         let stack_start = self.stack_size as u32;
         self.stack_size += stack_delta.0;
 
-        let index = BlockIndex(self.blocks.len() as u32);
+        let label = BlockLabel(Var(self.blocks.len() as u32));
 
         self.blocks.push(Block {
-            index,
+            label,
             stack_start,
             ir: Default::default(),
             terminator: None,
             terminator_span: span,
         });
         Block {
-            index,
+            label,
             stack_start,
             ir: Default::default(),
             terminator: None,
@@ -61,10 +61,17 @@ impl ProcBuilder {
 
     /// Make a split of the given block, so that the block reference points
     /// at the continuation block, returning a block pointing _before_ the split.
-    pub fn split_block(&mut self, block: &mut Block) -> Block {
+    pub fn split_block(&mut self, block: &mut Block) -> (BlockLabel, Block) {
         let mut block2 = self.new_block(Delta(0), block.terminator_span());
         std::mem::swap(block, &mut block2);
-        block2
+        (block2.label(), block2)
+    }
+
+    pub fn block_mut(&mut self, label: BlockLabel) -> &mut Block {
+        self.blocks
+            .iter_mut()
+            .find(|block| block.label == label)
+            .unwrap()
     }
 
     pub fn top(&self) -> Local {
@@ -85,21 +92,31 @@ impl ProcBuilder {
     }
 
     pub fn build(mut self) -> SpannedOpCodes {
-        let mut block_addresses: SmallVec<[u32; 8]> = smallvec![];
+        // let mut block_addresses: SmallVec<[u32; 8]> = smallvec![];
+        let mut block_addresses: FnvHashMap<BlockLabel, u32> = Default::default();
+        let indexes_by_label: FnvHashMap<BlockLabel, usize> = self
+            .blocks
+            .iter()
+            .enumerate()
+            .map(|(index, block)| (block.label, index))
+            .collect();
 
         // compute addresses
         let mut block_addr = 0;
-        for (block_index, block) in self.blocks.iter_mut().enumerate() {
+        for block in self.blocks.iter_mut() {
             let mut terminator_size = 1;
-            if let Some(Terminator::Goto(dest_index, offset)) = &block.terminator {
+            if let Some(Terminator::Goto(dest_label, offset)) = &block.terminator {
+                let self_index = indexes_by_label.get(&block.label).unwrap();
+                let dest_index = indexes_by_label.get(dest_label).unwrap();
+
                 // If it's just entering the next block, an instruction is not needed:
-                if dest_index.0 as usize == block_index + 1 && offset.0 == 0 {
+                if *dest_index == self_index + 1 && offset.0 == 0 {
                     block.terminator = Some(Terminator::GotoNext);
                     terminator_size = 0;
                 }
             }
 
-            block_addresses.push(block_addr);
+            block_addresses.insert(block.label, block_addr);
 
             // account for the terminator:
             block_addr += block.ir.len() as u32 + terminator_size;
@@ -116,14 +133,14 @@ impl ProcBuilder {
         for block in self.blocks {
             for (ir, span) in block.ir {
                 let opcode = match ir {
-                    Ir::Iter(seq, counter, block_index) => OpCode::Iter(
+                    Ir::Iter(seq, counter, block_label) => OpCode::Iter(
                         seq,
                         counter,
-                        AddressOffset(block_addresses[block_index.0 as usize]),
+                        AddressOffset(*block_addresses.get(&block_label).unwrap()),
                     ),
-                    Ir::Cond(predicate, block_index) => OpCode::Cond(
+                    Ir::Cond(predicate, block_label) => OpCode::Cond(
                         predicate,
-                        AddressOffset(block_addresses[block_index.0 as usize]),
+                        AddressOffset(*block_addresses.get(&block_label).unwrap()),
                     ),
                     Ir::Op(opcode) => opcode,
                 };
@@ -134,11 +151,11 @@ impl ProcBuilder {
             match block.terminator {
                 Some(Terminator::Return) => output.push((OpCode::Return, span)),
                 Some(
-                    Terminator::PopGoto(block_index, offset)
-                    | Terminator::Goto(block_index, offset),
+                    Terminator::PopGoto(block_label, offset)
+                    | Terminator::Goto(block_label, offset),
                 ) => output.push((
                     OpCode::Goto(AddressOffset(
-                        block_addresses[block_index.0 as usize] + offset.0,
+                        *block_addresses.get(&block_label).unwrap() + offset.0,
                     )),
                     span,
                 )),
@@ -157,8 +174,8 @@ impl ProcBuilder {
 
     fn debug_blocks(&self) {
         debug!("Proc ({:?}):", self.n_params);
-        for (block_index, block) in self.blocks.iter().enumerate() {
-            debug!("  BlockIndex({block_index}):");
+        for block in &self.blocks {
+            debug!("  BlockLabel({}):", block.label.0);
 
             for (index, (ir, _)) in block.ir.iter().enumerate() {
                 debug!("    {index}: {ir:?}");
@@ -182,7 +199,7 @@ fn debug_output(n_params: NParams, output: &SpannedOpCodes) {
 }
 
 pub struct Block {
-    index: BlockIndex,
+    label: BlockLabel,
     stack_start: u32,
     ir: SmallVec<[(Ir, SourceSpan); 32]>,
     terminator: Option<Terminator>,
@@ -231,15 +248,14 @@ impl Block {
         }
     }
 
-    pub fn commit(self, terminator: Terminator, builder: &mut ProcBuilder) -> BlockIndex {
-        let index = self.index;
-        builder.blocks[index.0 as usize].ir = self.ir;
-        builder.blocks[index.0 as usize].terminator = Some(terminator);
-        index
+    pub fn commit(self, terminator: Terminator, builder: &mut ProcBuilder) {
+        let dest = builder.block_mut(self.label);
+        dest.ir = self.ir;
+        dest.terminator = Some(terminator);
     }
 
-    pub fn index(&self) -> BlockIndex {
-        self.index
+    pub fn label(&self) -> BlockLabel {
+        self.label
     }
 
     pub fn stack_start(&self) -> u32 {

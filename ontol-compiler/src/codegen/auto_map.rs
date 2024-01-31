@@ -220,7 +220,7 @@ fn autogenerate_fmt_segment_property<'m>(
         Some(
             arena.add(TypedHirData(
                 ontol_hir::Kind::Prop(
-                    ontol_hir::Optional(false),
+                    ontol_hir::PropFlags::empty(),
                     binder_var,
                     *property_id,
                     [ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {

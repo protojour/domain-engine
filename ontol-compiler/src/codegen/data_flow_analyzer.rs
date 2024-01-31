@@ -11,12 +11,19 @@ use ontol_runtime::{
     DefId, RelationshipId, Role,
 };
 
-use crate::{def::LookupRelationshipMeta, typed_hir::TypedNodeRef, types::Type};
+use crate::{
+    def::LookupRelationshipMeta,
+    typed_hir::TypedNodeRef,
+    types::{Type, UNIT_TYPE},
+};
 
 pub struct DataFlowAnalyzer<'c, R> {
     defs: &'c R,
+    prop_origins: FnvHashMap<PropertyId, Var>,
     /// A table of which variable produce which properties
-    var_to_property: FnvHashMap<Var, FnvHashSet<PropertyId>>,
+    prop_origins_inverted: FnvHashMap<Var, FnvHashSet<PropertyId>>,
+    /// A mapping from a variable to its origin property
+    var_origins: FnvHashMap<Var, PropertyId>,
     /// A mapping from variable to its dependencies
     var_dependencies: FnvHashMap<Var, VarSet>,
     property_flow: BTreeSet<PropertyFlow>,
@@ -25,7 +32,9 @@ pub struct DataFlowAnalyzer<'c, R> {
 impl<'c, R> Debug for DataFlowAnalyzer<'c, R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DataFlowAnalyzer")
-            .field("var_to_property", &self.var_to_property)
+            .field("prop_origins", &self.prop_origins)
+            .field("prop_origins_inv", &self.prop_origins_inverted)
+            .field("var_origins", &self.var_origins)
             .field("var_dependencies", &self.var_dependencies)
             .finish()
     }
@@ -38,7 +47,9 @@ where
     pub fn new(defs: &'c R) -> Self {
         Self {
             defs,
-            var_to_property: FnvHashMap::default(),
+            prop_origins: FnvHashMap::default(),
+            prop_origins_inverted: FnvHashMap::default(),
+            var_origins: FnvHashMap::default(),
             var_dependencies: FnvHashMap::default(),
             property_flow: BTreeSet::default(),
         }
@@ -54,9 +65,7 @@ where
 
         match body.kind() {
             ontol_hir::Kind::Struct(binder, flags, nodes) => {
-                self.var_dependencies
-                    .insert(binder.hir().var, VarSet::default());
-                for node_ref in body.arena().refs(nodes) {
+                for node_ref in body.arena().node_refs(nodes) {
                     self.analyze_node(node_ref, unit_prop_id);
                 }
 
@@ -68,11 +77,22 @@ where
                 }
             }
             _ => {
-                self.var_to_property
-                    .insert(arg, FnvHashSet::from_iter([unit_prop_id]));
+                // self.var_to_property
+                //     .entry(arg)
+                //     .or_default()
+                //     .insert(unit_prop_id);
 
                 let deps = self.analyze_node(body, unit_prop_id);
                 self.reg_output_prop(arg, unit_prop_id, deps);
+            }
+        }
+
+        for (property_id, var) in &self.prop_origins {
+            if let Some(parent) = self.var_origins.get(var) {
+                self.property_flow.insert(PropertyFlow {
+                    id: *property_id,
+                    data: PropertyFlowData::ChildOf(*parent),
+                });
             }
         }
 
@@ -84,27 +104,97 @@ where
     }
 
     fn analyze_node(&mut self, node_ref: TypedNodeRef<'_, 'm>, parent_prop: PropertyId) -> VarSet {
+        // debug!("{node_ref}");
+
         let arena = node_ref.arena();
         match node_ref.kind() {
+            ontol_hir::Kind::NoOp => VarSet::default(),
             ontol_hir::Kind::Var(var) => VarSet::from([*var]),
-            ontol_hir::Kind::Begin(body) => {
+            ontol_hir::Kind::Block(body) | ontol_hir::Kind::Catch(_, body) => {
                 let mut var_set = VarSet::default();
-                for child in arena.refs(body) {
+                for child in arena.node_refs(body) {
                     var_set.union_with(&self.analyze_node(child, parent_prop));
                 }
                 var_set
+            }
+            ontol_hir::Kind::Try(..) => VarSet::default(),
+            ontol_hir::Kind::LetProp(ontol_hir::Attribute { rel, val }, (struct_var, prop_id))
+            | ontol_hir::Kind::LetPropDefault(
+                ontol_hir::Attribute { rel, val },
+                (struct_var, prop_id),
+                _,
+            )
+            | ontol_hir::Kind::TryLetProp(
+                _,
+                ontol_hir::Attribute { rel, val },
+                (struct_var, prop_id),
+            ) => {
+                self.prop_origins.insert(*prop_id, *struct_var);
+                self.prop_origins_inverted
+                    .entry(*struct_var)
+                    .or_default()
+                    .insert(*prop_id);
+
+                let mut value_ty = &UNIT_TYPE;
+
+                if let ontol_hir::Binding::Binder(binder) = rel {
+                    self.var_origins.insert(binder.hir().var, *prop_id);
+                    self.add_dep(binder.hir().var, *struct_var);
+                }
+                if let ontol_hir::Binding::Binder(binder) = val {
+                    self.var_origins.insert(binder.hir().var, *prop_id);
+                    self.add_dep(binder.hir().var, *struct_var);
+                    value_ty = binder.ty();
+                }
+
+                let value_def_id = match value_ty {
+                    Type::Seq(_rel, val) => val.get_single_def_id(),
+                    other => other.get_single_def_id(),
+                };
+
+                self.reg_scope_prop(*struct_var, *prop_id, value_def_id.unwrap_or(DefId::unit()));
+
+                VarSet::default()
+            }
+            ontol_hir::Kind::Let(binder, definition)
+            | ontol_hir::Kind::TryLet(_, binder, definition) => {
+                let var_deps = self.analyze_node(arena.node_ref(*definition), parent_prop);
+                self.var_dependencies.insert(binder.hir().var, var_deps);
+                VarSet::default()
+            }
+            ontol_hir::Kind::TryLetTup(_, bindings, source) => {
+                let var_deps = self.analyze_node(arena.node_ref(*source), parent_prop);
+                for binding in bindings {
+                    if let ontol_hir::Binding::Binder(binder) = binding {
+                        self.var_dependencies
+                            .insert(binder.hir().var, var_deps.clone());
+                    }
+                }
+                VarSet::default()
+            }
+            ontol_hir::Kind::LetRegex(groups_list, _regex_def_id, var) => {
+                for groups in groups_list {
+                    for group in groups {
+                        self.add_dep(group.binder.hir().var, *var);
+                    }
+                }
+                VarSet::default()
+            }
+            ontol_hir::Kind::LetRegexIter(binder, _groups_list, _regex_def_id, var) => {
+                self.add_dep(binder.hir().var, *var);
+                VarSet::default()
             }
             ontol_hir::Kind::Unit => VarSet::default(),
             ontol_hir::Kind::I64(_) => VarSet::default(),
             ontol_hir::Kind::F64(_) => VarSet::default(),
             ontol_hir::Kind::Text(_) => VarSet::default(),
             ontol_hir::Kind::Const(_) => VarSet::default(),
-            ontol_hir::Kind::Let(binder, definition, body) => {
+            ontol_hir::Kind::With(binder, definition, body) => {
                 let var_deps = self.analyze_node(arena.node_ref(*definition), parent_prop);
                 self.var_dependencies.insert(binder.hir().var, var_deps);
 
                 let mut var_set = VarSet::default();
-                for child in arena.refs(body) {
+                for child in arena.node_refs(body) {
                     var_set.union_with(&self.analyze_node(child, parent_prop));
                 }
 
@@ -112,7 +202,7 @@ where
             }
             ontol_hir::Kind::Call(_, params) => {
                 let mut var_set = VarSet::default();
-                for child in arena.refs(params) {
+                for child in arena.node_refs(params) {
                     var_set.union_with(&self.analyze_node(child, parent_prop));
                 }
                 var_set
@@ -123,7 +213,7 @@ where
             }
             ontol_hir::Kind::Struct(binder, flags, body) => {
                 let mut var_set = VarSet::default();
-                for child in arena.refs(body) {
+                for child in arena.node_refs(body) {
                     var_set.union_with(&self.analyze_node(child, parent_prop));
                 }
 
@@ -137,8 +227,11 @@ where
                 var_set
             }
             ontol_hir::Kind::Prop(_, struct_var, prop_id, variants) => {
-                self.var_to_property
-                    .insert(*struct_var, FnvHashSet::from_iter([*prop_id]));
+                self.prop_origins.insert(*prop_id, *struct_var);
+                self.prop_origins_inverted
+                    .entry(*struct_var)
+                    .or_default()
+                    .insert(*prop_id);
 
                 let mut var_set = VarSet::default();
 
@@ -167,8 +260,11 @@ where
                 Default::default()
             }
             ontol_hir::Kind::MatchProp(struct_var, property_id, arms) => {
-                self.var_to_property
-                    .insert(*struct_var, FnvHashSet::from_iter([*property_id]));
+                self.prop_origins.insert(*property_id, *struct_var);
+                self.prop_origins_inverted
+                    .entry(*struct_var)
+                    .or_default()
+                    .insert(*property_id);
 
                 let mut var_set = VarSet::default();
 
@@ -178,15 +274,18 @@ where
                     match pattern {
                         ontol_hir::PropPattern::Attr(rel, val) => {
                             if let ontol_hir::Binding::Binder(binder) = rel {
+                                self.var_origins.insert(binder.hir().var, *property_id);
                                 self.add_dep(binder.hir().var, *struct_var);
                             }
                             if let ontol_hir::Binding::Binder(binder) = val {
+                                self.var_origins.insert(binder.hir().var, *property_id);
                                 self.add_dep(binder.hir().var, *struct_var);
                                 value_def_id = binder.ty().get_single_def_id();
                             }
                         }
                         ontol_hir::PropPattern::Set(binding, _has_default) => {
                             if let ontol_hir::Binding::Binder(binder) = binding {
+                                self.var_origins.insert(binder.hir().var, *property_id);
                                 self.add_dep(binder.hir().var, *struct_var);
                                 value_def_id = match binder.ty() {
                                     Type::Seq(_, val) => val.get_single_def_id(),
@@ -197,7 +296,7 @@ where
                         ontol_hir::PropPattern::Absent => {}
                     }
 
-                    for child in arena.refs(body) {
+                    for child in arena.node_refs(body) {
                         var_set.0.extend(&self.analyze_node(child, parent_prop).0);
                     }
                 }
@@ -212,7 +311,7 @@ where
             }
             ontol_hir::Kind::MakeSeq(_, body) => {
                 let mut var_set = VarSet::default();
-                for child in arena.refs(body) {
+                for child in arena.node_refs(body) {
                     var_set.union_with(&self.analyze_node(child, parent_prop));
                 }
                 var_set
@@ -225,7 +324,7 @@ where
                     self.add_dep(binder.hir().var, *var);
                 }
                 let mut var_set = VarSet::default();
-                for child in arena.refs(body) {
+                for child in arena.node_refs(body) {
                     var_set.union_with(&self.analyze_node(child, parent_prop));
                 }
                 var_set
@@ -249,7 +348,7 @@ where
                     for group in &match_arm.capture_groups {
                         self.add_dep(group.binder.hir().var, *var);
                     }
-                    for child in arena.refs(&match_arm.nodes) {
+                    for child in arena.node_refs(&match_arm.nodes) {
                         var_set.union_with(&self.analyze_node(child, parent_prop));
                     }
                 }
@@ -272,21 +371,39 @@ where
         property_id: PropertyId,
         mut var_dependencies: VarSet,
     ) {
+        // debug!("START reg output prop {property_id:?} deps: {var_dependencies:?}");
+
         while !var_dependencies.0.is_empty() {
             let mut next_deps = VarSet::default();
 
             for var in &var_dependencies {
-                if let Some(deps) = self.var_to_property.get(&var) {
-                    for dep in deps {
+                // debug!("    handle {var}");
+
+                if true {
+                    if let Some(source_prop) = self.var_origins.get(&var) {
                         self.property_flow.insert(PropertyFlow {
                             id: property_id,
-                            data: PropertyFlowData::DependentOn(*dep),
+                            data: PropertyFlowData::DependentOn(*source_prop),
                         });
+                    } else if let Some(parent_vars) = self.var_dependencies.get(&var) {
+                        next_deps.union_with(parent_vars);
                     }
-                } else if let Some(parent_vars) = self.var_dependencies.get(&var) {
-                    next_deps.union_with(parent_vars);
+                } else {
+                    if let Some(deps) = self.prop_origins_inverted.get(&var) {
+                        for dep_prop_id in deps {
+                            // debug!("      insert {dep_prop_id}");
+                            self.property_flow.insert(PropertyFlow {
+                                id: property_id,
+                                data: PropertyFlowData::DependentOn(*dep_prop_id),
+                            });
+                        }
+                    } else if let Some(parent_vars) = self.var_dependencies.get(&var) {
+                        next_deps.union_with(parent_vars);
+                    }
                 }
             }
+
+            // debug!("  next deps: {next_deps:?}");
 
             var_dependencies = next_deps;
         }
@@ -312,7 +429,7 @@ where
             struct_var,
             property_id,
             &self.var_dependencies,
-            &self.var_to_property,
+            &self.var_origins,
             &mut self.property_flow,
         );
     }
@@ -322,25 +439,24 @@ fn register_children_recursive(
     var: Var,
     property_id: PropertyId,
     var_dependencies: &FnvHashMap<Var, VarSet>,
-    var_to_property: &FnvHashMap<Var, FnvHashSet<PropertyId>>,
+    // var_to_prop: &FnvHashMap<Var, FnvHashSet<PropertyId>>,
+    var_origins: &FnvHashMap<Var, PropertyId>,
     output: &mut BTreeSet<PropertyFlow>,
 ) {
     if let Some(dependencies) = var_dependencies.get(&var) {
         for var_dependency in dependencies {
-            if let Some(props) = var_to_property.get(&var_dependency) {
+            if let Some(prop_id) = var_origins.get(&var_dependency) {
                 // recursion stops here, as there is a property associated with the variable:
-                for prop in props {
-                    output.insert(PropertyFlow {
-                        id: property_id,
-                        data: PropertyFlowData::ChildOf(*prop),
-                    });
-                }
+                output.insert(PropertyFlow {
+                    id: property_id,
+                    data: PropertyFlowData::ChildOf(*prop_id),
+                });
             } else {
                 register_children_recursive(
                     var_dependency,
                     property_id,
                     var_dependencies,
-                    var_to_property,
+                    var_origins,
                     output,
                 );
             }

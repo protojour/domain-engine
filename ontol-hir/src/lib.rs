@@ -1,11 +1,15 @@
 #![forbid(unsafe_code)]
 
-use std::{fmt::Debug, ops::Index};
+use std::{
+    fmt::{Debug, Display},
+    ops::Index,
+};
 
 use arena::{Arena, NodeRef};
 use ontol_runtime::{condition::Clause, value::PropertyId, var::Var, vm::proc::BuiltinProc, DefId};
 use smallvec::SmallVec;
 use smartstring::alias::String;
+use thin_vec::ThinVec;
 
 pub mod arena;
 pub mod display;
@@ -40,19 +44,6 @@ impl From<Label> for Var {
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub struct Label(pub u32);
-
-#[derive(Default, Clone, Copy)]
-pub struct Optional(pub bool);
-
-impl Debug for Optional {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.0 {
-            write!(f, "opt=t")
-        } else {
-            write!(f, "opt=f")
-        }
-    }
-}
 
 #[derive(Clone, Copy, Debug)]
 pub struct HasDefault(pub bool);
@@ -151,10 +142,42 @@ pub type Nodes = SmallVec<[Node; 2]>;
 /// The syntax kind of a node.
 #[derive(Clone)]
 pub enum Kind<'a, L: Lang> {
+    /// Do nothing
+    NoOp,
     /// A variable reference.
     Var(Var),
-    /// Begin - a sequence of nodes where the last node is the value
-    Begin(Nodes),
+    /// Block - a sequence of nodes where the last node is the value.
+    /// Blocks support local variable scope.
+    Block(Nodes),
+    /// Try block
+    /// Statements within may refer to the try label to immediately exit the try block
+    /// with a #void value
+    Catch(Label, Nodes),
+    /// Try a variable. Exists labelled try block if #void.
+    Try(Label, Var),
+    /// Bind expression to a variable.
+    Let(L::Data<'a, Binder>, Node),
+    /// Tries to bind expression to a variable. Exits labelled try block if #void.
+    TryLet(Label, L::Data<'a, Binder>, Node),
+    /// Defines two variables from a struct property
+    LetProp(Attribute<Binding<'a, L>>, (Var, PropertyId)),
+    /// Defines two variables from a struct property, or a default attribute if not present
+    LetPropDefault(
+        Attribute<Binding<'a, L>>,
+        (Var, PropertyId),
+        Attribute<Node>,
+    ),
+    /// Tries to define two variables from a struct propery, and exits to the try label if unsuccessful.
+    TryLetProp(Label, Attribute<Binding<'a, L>>, (Var, PropertyId)),
+    /// Unpack a tuple-like sequence to bind each element to a variable
+    TryLetTup(Label, ThinVec<Binding<'a, L>>, Node),
+    LetRegex(ThinVec<ThinVec<CaptureGroup<'a, L>>>, DefId, Var),
+    LetRegexIter(
+        L::Data<'a, Binder>,
+        ThinVec<ThinVec<CaptureGroup<'a, L>>>,
+        DefId,
+        Var,
+    ),
     /// A unit value.
     Unit,
     /// A 64 bit signed integer
@@ -165,8 +188,9 @@ pub enum Kind<'a, L: Lang> {
     Text(String),
     /// Const procedure
     Const(DefId),
-    /// A let expression
-    Let(L::Data<'a, Binder>, Node, Nodes),
+    /// A with expression. Introduces one binding and executes a block.
+    /// TODO: Superseded by let statements in blocks
+    With(L::Data<'a, Binder>, Node, Nodes),
     /// A function call
     Call(BuiltinProc, Nodes),
     /// A map call
@@ -176,7 +200,12 @@ pub enum Kind<'a, L: Lang> {
     /// A struct with associated binder. The value is the struct.
     Struct(L::Data<'a, Binder>, StructFlags, Nodes),
     /// A property definition associated with a struct var in scope
-    Prop(Optional, Var, PropertyId, SmallVec<[PropVariant<'a, L>; 1]>),
+    Prop(
+        PropFlags,
+        Var,
+        PropertyId,
+        SmallVec<[PropVariant<'a, L>; 1]>,
+    ),
     /// Move rest of attributes into the first var, from the second var
     MoveRestAttrs(Var, Var),
     /// A property matcher/unpacker associated with a struct var
@@ -197,10 +226,10 @@ pub enum Kind<'a, L: Lang> {
     Regex(
         Option<L::Data<'a, Label>>,
         DefId,
-        Vec<Vec<CaptureGroup<'a, L>>>,
+        ThinVec<ThinVec<CaptureGroup<'a, L>>>,
     ),
     /// A regex matcher/unpacker
-    MatchRegex(Iter, Var, DefId, Vec<CaptureMatchArm<'a, L>>),
+    MatchRegex(Iter, Var, DefId, ThinVec<CaptureMatchArm<'a, L>>),
     PushCondClause(Var, Clause<EvalCondTerm>),
 }
 
@@ -328,7 +357,48 @@ impl From<Var> for VarAllocator {
 
 bitflags::bitflags! {
     #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
+    pub struct PropFlags: u8 {
+        const PAT_OPTIONAL  = 0b00000001;
+        const REL_OPTIONAL  = 0b00000010;
+    }
+}
+
+impl PropFlags {
+    pub fn pat_optional(self) -> bool {
+        self.contains(Self::PAT_OPTIONAL)
+    }
+
+    pub fn rel_optional(self) -> bool {
+        self.contains(Self::REL_OPTIONAL)
+    }
+}
+
+impl Display for PropFlags {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{pat}{rel}",
+            pat = if self.pat_optional() { "?" } else { "" },
+            rel = if self.rel_optional() { "" } else { "!" }
+        )
+    }
+}
+
+bitflags::bitflags! {
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
     pub struct StructFlags: u32 {
         const MATCH = 0b00000001;
+    }
+}
+
+pub fn find_value_node<'h, 'a, L: Lang>(
+    node_ref: NodeRef<'h, 'a, L>,
+) -> Option<NodeRef<'h, 'a, L>> {
+    match L::as_hir(&node_ref) {
+        Kind::Block(nodes) | Kind::Catch(_, nodes) => {
+            let last = nodes.last()?;
+            find_value_node(node_ref.arena().node_ref(*last))
+        }
+        _ => Some(node_ref),
     }
 }

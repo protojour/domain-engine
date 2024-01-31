@@ -2,6 +2,7 @@ use std::fmt::Debug;
 
 use ontol_hir::visitor::HirVisitor;
 use ontol_runtime::{
+    smart_format,
     var::{Var, VarSet},
     MapFlags,
 };
@@ -11,11 +12,13 @@ use tracing::info;
 use crate::{
     hir_unify::{expr_builder::ExprBuilder, scope_builder::ScopeBuilder, unifier::Unifier},
     typed_hir::{HirFunc, IntoTypedHirData, TypedHir},
-    Compiler, SourceSpan, CLASSIC_UNIFIER_FALLBACK, USE_FLAT_UNIFIER,
+    Compiler, SourceSpan, CLASSIC_UNIFIER_FALLBACK, FLAT_UNIFIER_FALLBACK, SSA_UNIFIER_FALLBACK,
+    USE_FLAT_UNIFIER, USE_SSA_UNIFIER,
 };
 
 use self::{
-    flat_scope_builder::FlatScopeBuilder, flat_unifier::FlatUnifier, unifier::UnifiedRootNode,
+    flat_scope_builder::FlatScopeBuilder, flat_unifier::FlatUnifier, ssa_unifier::SsaUnifier,
+    unifier::UnifiedRootNode,
 };
 
 mod dep_tree;
@@ -35,6 +38,9 @@ mod regroup_match_prop;
 mod scope;
 mod scope_builder;
 mod seq_type_infer;
+mod ssa_unifier;
+mod ssa_unifier_scope;
+mod ssa_util;
 mod unifier;
 mod unify_props;
 
@@ -46,6 +52,7 @@ pub enum UnifierError {
     MultipleVariablesInExpression(SourceSpan),
     NonEntityQuery,
     ImpossibleMapping,
+    NoIterationSource,
     Unimplemented(String),
     TODO(String),
 }
@@ -62,26 +69,39 @@ pub fn unify_to_function<'m>(
     var_tracker.track_largest(scope.as_ref());
     var_tracker.track_largest(expr.as_ref());
 
-    let (unified, mut var_allocator) = if !USE_FLAT_UNIFIER {
-        unify_classic(scope, expr, var_tracker.var_allocator(), compiler)?
-    } else {
-        match unify_flat(
-            scope,
-            expr,
-            map_flags,
-            var_tracker.var_allocator(),
-            compiler,
-        ) {
-            Err(err) => {
-                if !CLASSIC_UNIFIER_FALLBACK || !matches!(&err, UnifierError::TODO(_)) {
-                    return Err(err);
-                }
-
-                info!("Using classic unifier output because {err:?}");
-                unify_classic(scope, expr, var_tracker.var_allocator(), compiler)?
+    let (unified, mut var_allocator) = match unify_ssa(
+        scope,
+        expr,
+        map_flags,
+        var_tracker.var_allocator(),
+        compiler,
+    ) {
+        Err(err) => {
+            if !SSA_UNIFIER_FALLBACK || !matches!(&err, UnifierError::TODO(_)) {
+                return Err(err);
             }
-            Ok(value) => value,
+
+            info!("Fallback to flat unifier because {err:?}");
+
+            match unify_flat(
+                scope,
+                expr,
+                map_flags,
+                var_tracker.var_allocator(),
+                compiler,
+            ) {
+                Err(err) => {
+                    if !FLAT_UNIFIER_FALLBACK || !matches!(&err, UnifierError::TODO(_)) {
+                        return Err(err);
+                    }
+
+                    info!("Fallback to classic unifier because {err:?}");
+                    unify_classic(scope, expr, var_tracker.var_allocator(), compiler)?
+                }
+                Ok(value) => value,
+            }
         }
+        Ok(value) => value,
     };
 
     Ok(HirFunc {
@@ -132,6 +152,12 @@ fn unify_flat<'m>(
     var_allocator: ontol_hir::VarAllocator,
     compiler: &mut Compiler<'m>,
 ) -> UnifierResult<(UnifiedRootNode<'m>, ontol_hir::VarAllocator)> {
+    if !USE_FLAT_UNIFIER {
+        return Err(UnifierError::TODO(smart_format!(
+            "flat unifier not enabled"
+        )));
+    }
+
     let (flat_scope, var_allocator) = {
         let mut scope_builder = FlatScopeBuilder::new(var_allocator, scope.arena());
         let flat_scope = scope_builder.build_flat_scope(scope.node())?;
@@ -156,6 +182,39 @@ fn unify_flat<'m>(
         UnifiedRootNode {
             typed_binder: unified.typed_binder,
             node: ontol_hir::RootNode::new(unified.node, unifier.hir_arena),
+        },
+        unifier.var_allocator,
+    ))
+}
+
+fn unify_ssa<'m>(
+    scope: &ontol_hir::RootNode<'m, TypedHir>,
+    expr: &ontol_hir::RootNode<'m, TypedHir>,
+    map_flags: MapFlags,
+    var_allocator: ontol_hir::VarAllocator,
+    compiler: &mut Compiler<'m>,
+) -> UnifierResult<(UnifiedRootNode<'m>, ontol_hir::VarAllocator)> {
+    if !USE_SSA_UNIFIER {
+        return Err(UnifierError::TODO(smart_format!("ssa not enabled")));
+    }
+
+    let mut unifier = SsaUnifier::new(
+        &mut compiler.types,
+        &compiler.relations,
+        &compiler.seal_ctx,
+        &compiler.primitives,
+        scope.arena(),
+        expr.arena(),
+        var_allocator,
+        map_flags,
+    );
+
+    let unified = unifier.unify(scope.node(), expr.node())?;
+
+    Ok((
+        UnifiedRootNode {
+            typed_binder: unified.typed_binder,
+            node: ontol_hir::RootNode::new(unified.node, unifier.out_arena),
         },
         unifier.var_allocator,
     ))

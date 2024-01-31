@@ -48,6 +48,12 @@ pub const NO_SPAN: SourceSpan = SourceSpan {
     end: 0,
 };
 
+impl SourceSpan {
+    pub fn is_native(&self) -> bool {
+        self.source_id == NATIVE_SOURCE
+    }
+}
+
 impl Debug for SourceSpan {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let len = self.end - self.start;

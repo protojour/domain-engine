@@ -8,7 +8,6 @@ use super::{
 use crate::{
     condition::Clause,
     ontology::{Ontology, ValueCardinality},
-    text_pattern::TextPattern,
     value::PropertyId,
     var::Var,
     vm::proc::{BuiltinProc, Local, OpCode, Predicate, Procedure},
@@ -74,13 +73,13 @@ pub trait Processor {
     fn regex_capture(
         &mut self,
         local: Local,
-        text_pattern: &TextPattern,
+        pattern_id: DefId,
         index_filter: &BitVec,
     ) -> VmResult<()>;
     fn regex_capture_iter(
         &mut self,
         local: Local,
-        text_pattern: &TextPattern,
+        pattern_id: DefId,
         index_filter: &BitVec,
     ) -> VmResult<()>;
     fn assert_true(&mut self) -> VmResult<()>;
@@ -248,26 +247,17 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                     processor.type_pun(Some(*local), *def_id)?;
                     self.program_counter += 1;
                 }
-                opcode @ (OpCode::RegexCapture(local, def_id)
-                | OpCode::RegexCaptureIter(local, def_id)) => {
-                    let text_pattern = self.ontology.get_text_pattern(*def_id).unwrap();
+                OpCode::RegexCapture(local, pattern_id) => {
+                    let index_filter = self.read_regex_capture_indexes();
+                    processor.regex_capture(*local, *pattern_id, index_filter)?;
                     self.program_counter += 1;
-                    let OpCode::RegexCaptureIndexes(index_filter) = &opcodes[self.program_counter]
-                    else {
-                        panic!("Expected capture indexes");
-                    };
-                    if matches!(opcode, OpCode::RegexCaptureIter(..)) {
-                        processor.regex_capture_iter(*local, text_pattern, index_filter)?;
-                    } else {
-                        processor.regex_capture(*local, text_pattern, index_filter)?;
-                    }
+                }
+                OpCode::RegexCaptureIter(local, pattern_id) => {
+                    let index_filter = self.read_regex_capture_indexes();
+                    processor.regex_capture_iter(*local, *pattern_id, index_filter)?;
                     self.program_counter += 1;
                 }
                 OpCode::RegexCaptureIndexes(_) => unreachable!(),
-                OpCode::AssertTrue => {
-                    processor.assert_true()?;
-                    self.program_counter += 1;
-                }
                 OpCode::PushCondClause(cond_local, clause) => {
                     processor.push_cond_clause(*cond_local, clause)?;
                     self.program_counter += 1;
@@ -281,6 +271,15 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                 }
             }
         }
+    }
+
+    fn read_regex_capture_indexes(&mut self) -> &BitVec {
+        let opcodes = self.ontology.lib.opcodes.as_slice();
+        self.program_counter += 1;
+        let OpCode::RegexCaptureIndexes(index_filter) = &opcodes[self.program_counter] else {
+            panic!("Expected capture indexes");
+        };
+        index_filter
     }
 }
 

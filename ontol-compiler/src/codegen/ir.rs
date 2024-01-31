@@ -1,8 +1,11 @@
-use ontol_runtime::vm::proc::{Local, OpCode, Predicate};
+use ontol_runtime::{
+    var::Var,
+    vm::proc::{Local, OpCode, Predicate},
+};
 use smartstring::alias::String;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-pub struct BlockIndex(pub u32);
+pub struct BlockLabel(pub Var);
 
 #[derive(Clone, Copy, Debug)]
 pub struct BlockOffset(pub u32);
@@ -24,9 +27,9 @@ pub enum Ir {
     /// For these, there are special Ir versions.
     Op(OpCode),
     /// Take attribute and push two values on the stack: value(top), rel_params
-    Cond(Predicate, BlockIndex),
+    Cond(Predicate, BlockLabel),
     /// Iterate sequence using param(1) as counter. Call block for each iteration.
-    Iter(Local, Local, BlockIndex),
+    Iter(Local, Local, BlockLabel),
 }
 
 #[derive(Clone, Debug)]
@@ -34,10 +37,10 @@ pub enum Terminator {
     /// Return the top of the stack
     Return,
     /// Just a "goto", nothing is popped
-    Goto(BlockIndex, BlockOffset),
+    Goto(BlockLabel, BlockOffset),
     /// Just enter the next block. No instruction needed.
     GotoNext,
     /// All the block locals are popped and control resumes at the parent block
-    PopGoto(BlockIndex, BlockOffset),
+    PopGoto(BlockLabel, BlockOffset),
     Panic(String),
 }

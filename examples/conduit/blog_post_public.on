@@ -9,7 +9,7 @@ def BlogPost (
 
 map(
     db.Article match(
-        'article_id': id,
+        'article_id'?: id,
         'body': body,
         'author': db.User(
             'username': author
@@ -19,7 +19,7 @@ map(
         },
     ),
     BlogPost(
-        'post_id': id,
+        'post_id'?: id,
         'contents': body,
         'written_by': author,
         'tags': {..tag},

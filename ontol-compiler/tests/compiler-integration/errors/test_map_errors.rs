@@ -307,3 +307,35 @@ fn map_error_inference_cardinality_mismatch() {
     "
     .compile_fail();
 }
+
+#[test]
+fn must_bind_as_option_if_default_cannot_be_constructed() {
+    "
+    def outer1(rel .'a'?: inner1)
+    def outer2(rel .'a'?: inner2)
+    def inner1(rel .'b': text)
+    def inner2(rel .'b': text)
+
+    map(
+        outer1(
+            'a': // ERROR TODO: optional binding required, as a default value cannot be created
+                inner1('b': x)
+        ),
+        outer2('a': inner2('b': x)), // ERROR TODO: optional binding required, as a default value cannot be created
+    )
+    "
+    .compile_fail();
+}
+
+#[test]
+fn autogen_primary_ids_must_be_optional() {
+    "
+    def a(rel .'id'[rel .gen: auto]|id: (rel .is: text))
+    def b(rel .'id'[rel .gen: auto]|id: (rel .is: text))
+    map(
+        a('id': id), // ERROR TODO: optional binding required, as a default value cannot be created
+        b('id': id), // ERROR TODO: optional binding required, as a default value cannot be created
+    )
+    "
+    .compile_fail();
+}

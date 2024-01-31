@@ -315,17 +315,17 @@ pub(super) fn unify_scope_structural<'m>(
 
                     next_indexes.extend(table.dependees(Some(scope_var)));
                 }
-                flat_scope::Kind::PropVariant(_, optional, prop_struct_var, property_id) => {
-                    let optional = *optional;
+                flat_scope::Kind::PropVariant(_, flags, prop_struct_var, property_id) => {
+                    let flags = *flags;
                     let property_id = *property_id;
-                    let prop_key = (optional, *prop_struct_var, property_id);
+                    let prop_key = (flags, *prop_struct_var, property_id);
                     let mut body = vec![];
                     let inner_scope = in_scope.union(&scope_map.scope.meta().defs);
 
                     let mut assignments = scope_map.select_assignments(selector);
                     let assignments_len = assignments.len();
 
-                    if optional.0 {
+                    if flags.rel_optional() {
                         for assignment in &mut assignments {
                             // FIXME: Did not remodel "expr" yet,
                             // so re-traverse for free vars here.

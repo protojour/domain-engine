@@ -1,3 +1,4 @@
+use ontol_compiler::USE_SSA_UNIFIER;
 use ontol_test_utils::{
     serde_helper::serde_raw, test_map::AsKey, SourceName, TestCompile, TestPackages,
 };
@@ -117,12 +118,12 @@ fn test_nested_optional_attribute() {
 
     map(
         person_container(
-            'person'?: person(
+            'person': person(
                 'age'?: a
             )
         ),
         creature_container(
-            'creature'?: creature(
+            'creature': creature(
                 'age'?: a
             )
         ),
@@ -136,11 +137,20 @@ fn test_nested_optional_attribute() {
             json!({ "age": 42 }),
             json!({ "age": 1324512000 }),
         );
-        test.mapper().assert_map_eq(
-            ("person_container", "creature_container"),
-            json!({}),
-            json!({}),
-        );
+        if USE_SSA_UNIFIER {
+            // The SSA unifier respects what's written:
+            test.mapper().assert_map_eq(
+                ("person_container", "creature_container"),
+                json!({}),
+                json!({ "creature": {} }),
+            );
+        } else {
+            test.mapper().assert_map_eq(
+                ("person_container", "creature_container"),
+                json!({}),
+                json!({}),
+            );
+        }
         test.mapper().assert_map_eq(
             ("person_container", "creature_container"),
             json!({ "person": {} }),
@@ -636,7 +646,7 @@ fn test_map_complex_flow() {
     )
 
     map(
-        one(
+        one match(
             'a': x,
             'b': y,
         ),

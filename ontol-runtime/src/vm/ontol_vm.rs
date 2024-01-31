@@ -4,6 +4,7 @@ use bit_vec::BitVec;
 use fnv::FnvHashMap;
 use regex::Captures;
 use smartstring::alias::String;
+use thin_vec::ThinVec;
 use tracing::{trace, Level};
 
 use crate::{
@@ -11,7 +12,6 @@ use crate::{
     condition::{Clause, CondTerm, Condition},
     ontology::{Ontology, ValueCardinality},
     sequence::Sequence,
-    text_pattern::TextPattern,
     value::{Attribute, PropertyId, Value, ValueDebug},
     var::Var,
     vm::proc::{BuiltinProc, Local, Procedure},
@@ -124,8 +124,8 @@ impl<'o> Processor for OntolProcessor<'o> {
                 if seq.attrs.len() <= i {
                     Ok(false)
                 } else {
-                    let mut attr = Value::unit().to_unit_attr();
-                    std::mem::swap(&mut seq.attrs[i], &mut attr);
+                    // TODO(optimize): Figure out when clone is needed!
+                    let attr = seq.attrs[i].clone();
 
                     self.stack.push(attr.rel_params);
                     self.stack.push(attr.value);
@@ -135,11 +135,11 @@ impl<'o> Processor for OntolProcessor<'o> {
                     Ok(true)
                 }
             }
-            Value::None(_) => {
-                // Yields one #none item, then stops
+            Value::Void(_) => {
+                // Yields one #void item, then stops
                 if i == 0 {
-                    self.push_none();
-                    self.push_none();
+                    self.push_void();
+                    self.push_void();
                     *self.int_local_mut(index)? += 1;
                     Ok(true)
                 } else {
@@ -165,9 +165,6 @@ impl<'o> Processor for OntolProcessor<'o> {
         };
         match attr {
             Some(attr) => {
-                if flags.contains(GetAttrFlags::TRY) {
-                    self.push_true();
-                }
                 if flags.contains(GetAttrFlags::REL) {
                     self.stack.push(attr.rel_params);
                 }
@@ -177,18 +174,13 @@ impl<'o> Processor for OntolProcessor<'o> {
                 Ok(())
             }
             None => {
-                if flags.contains(GetAttrFlags::TRY) {
-                    self.push_false();
-                    Ok(())
-                } else {
-                    if flags.contains(GetAttrFlags::REL) {
-                        self.push_none();
-                    }
-                    if flags.contains(GetAttrFlags::VAL) {
-                        self.push_none();
-                    }
-                    Ok(())
+                if flags.contains(GetAttrFlags::REL) {
+                    self.push_void();
                 }
+                if flags.contains(GetAttrFlags::VAL) {
+                    self.push_void();
+                }
+                Ok(())
             }
         }
     }
@@ -255,13 +247,12 @@ impl<'o> Processor for OntolProcessor<'o> {
     #[inline(always)]
     fn cond_predicate(&mut self, predicate: &Predicate) -> VmResult<bool> {
         match predicate {
-            Predicate::IsUnit(local) => Ok(matches!(self.local(*local), Value::Unit(_))),
+            Predicate::IsVoid(local) => Ok(matches!(self.local(*local), Value::Void(_))),
+            Predicate::IsNotVoid(local) => Ok(!matches!(self.local(*local), Value::Void(_))),
             Predicate::MatchesDiscriminant(local, def_id) => {
                 let value = self.local(*local);
                 Ok(value.type_def_id() == *def_id)
             }
-            Predicate::YankTrue(local) => Ok(!matches!(self.yank(*local), Value::I64(0, _))),
-            Predicate::YankFalse(local) => Ok(matches!(self.yank(*local), Value::I64(0, _))),
         }
     }
 
@@ -292,25 +283,32 @@ impl<'o> Processor for OntolProcessor<'o> {
     fn regex_capture(
         &mut self,
         local: Local,
-        text_pattern: &TextPattern,
+        pattern_id: DefId,
         group_filter: &BitVec,
     ) -> VmResult<()> {
         let Value::Text(haystack, _) = &self.local(local) else {
             return Err(VmError::InvalidType(local));
         };
 
+        let text_pattern = self.ontology.get_text_pattern(pattern_id).unwrap();
+
         match text_pattern.regex.captures(haystack) {
             Some(captures) => {
-                let values = extract_regex_captures(
+                let attributes = extract_regex_captures(
                     &captures,
                     group_filter,
                     self.ontology.ontol_domain_meta.text,
                 );
-                self.stack.extend(values);
-                self.push_true();
+                self.stack.push(Value::Sequence(
+                    Sequence {
+                        attrs: attributes,
+                        sub_seq: None,
+                    },
+                    self.ontology.ontol_domain_meta.text,
+                ));
             }
             None => {
-                self.push_false();
+                self.push_void();
             }
         }
         Ok(())
@@ -319,22 +317,25 @@ impl<'o> Processor for OntolProcessor<'o> {
     fn regex_capture_iter(
         &mut self,
         local: Local,
-        text_pattern: &TextPattern,
+        pattern_id: DefId,
         group_filter: &BitVec,
     ) -> VmResult<()> {
         let Value::Text(haystack, _) = &self.local(local) else {
             return Err(VmError::InvalidType(local));
         };
 
+        let text_pattern = self.ontology.get_text_pattern(pattern_id).unwrap();
+
         let mut attrs: Vec<Attribute> = Vec::new();
         let text_def_id = self.ontology.ontol_domain_meta.text;
 
         for captures in text_pattern.regex.captures_iter(haystack) {
-            let value_attributes = extract_regex_captures(&captures, group_filter, text_def_id)
-                .into_iter()
-                .map(Attribute::from);
+            let value_attributes = extract_regex_captures(&captures, group_filter, text_def_id);
             attrs.push(Attribute::from(Value::Sequence(
-                Sequence::new(value_attributes),
+                Sequence {
+                    attrs: value_attributes,
+                    sub_seq: None,
+                },
                 text_def_id,
             )));
         }
@@ -419,6 +420,7 @@ impl<'o> OntolProcessor<'o> {
             BuiltinProc::NewSeq => Value::Sequence(Sequence::new(vec![]), result_type),
             BuiltinProc::NewUnit => Value::Unit(result_type),
             BuiltinProc::NewCondition => Value::Condition(Condition::default(), result_type),
+            BuiltinProc::NewVoid => Value::Void(result_type),
         }
     }
 
@@ -485,23 +487,8 @@ impl<'o> OntolProcessor<'o> {
     }
 
     #[inline(always)]
-    fn yank(&mut self, local: Local) -> Value {
-        self.stack.remove(local.0 as usize)
-    }
-
-    #[inline(always)]
-    fn push_true(&mut self) {
-        self.stack.push(Value::I64(1, DefId::unit()));
-    }
-
-    #[inline(always)]
-    fn push_false(&mut self) {
-        self.stack.push(Value::I64(0, DefId::unit()));
-    }
-
-    #[inline(always)]
-    fn push_none(&mut self) {
-        self.stack.push(Value::None(DefId::unit()));
+    fn push_void(&mut self) {
+        self.stack.push(Value::Void(DefId::unit()));
     }
 
     fn opcode_term_to_cond_term(&mut self, term: &OpCodeCondTerm) -> CondTerm {
@@ -530,17 +517,17 @@ fn extract_regex_captures(
     captures: &Captures,
     group_filter: &BitVec,
     text_def_id: DefId,
-) -> Vec<Value> {
+) -> ThinVec<Attribute> {
     group_filter
         .iter()
         .enumerate()
         .filter_map(|(index, value)| if value { Some(index) } else { None })
         .map(|index| {
-            if let Some(capture_match) = captures.get(index) {
+            Attribute::from(if let Some(capture_match) = captures.get(index) {
                 Value::Text(capture_match.as_str().into(), text_def_id)
             } else {
-                Value::unit()
-            }
+                Value::Void(DefId::unit())
+            })
         })
         .collect()
 }
@@ -791,8 +778,8 @@ mod tests {
             NParams(1),
             [
                 OpCode::CallBuiltin(BuiltinProc::NewStruct, def_id(7)),
-                OpCode::GetAttr(Local(0), prop, GetAttrFlags::try_take2()),
-                OpCode::Cond(Predicate::YankTrue(Local(2)), AddressOffset(5)),
+                OpCode::GetAttr(Local(0), prop, GetAttrFlags::take2()),
+                OpCode::Cond(Predicate::IsNotVoid(Local(2)), AddressOffset(5)),
                 // AddressOffset(3):
                 OpCode::PopUntil(Local(1)),
                 OpCode::Return,

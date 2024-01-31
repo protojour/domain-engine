@@ -16,19 +16,19 @@ pub fn sanitize_update(update: &mut Value) {
 }
 
 fn remove_none_attrs(attrs: &mut FnvHashMap<PropertyId, Attribute>) {
-    attrs.retain(|_, attr| is_some(&attr.rel_params) && is_some(&attr.value))
+    attrs.retain(|_, attr| exists(&attr.rel_params) && exists(&attr.value))
 }
 
-fn is_some(value: &Value) -> bool {
+fn exists(value: &Value) -> bool {
     match value {
-        Value::None(_) => false,
+        Value::Void(_) => false,
         Value::Struct(attrs, _) | Value::StructUpdate(attrs, _) => attrs
             .iter()
-            .all(|(_, attr)| is_some(&attr.rel_params) && is_some(&attr.value)),
+            .all(|(_, attr)| exists(&attr.rel_params) && exists(&attr.value)),
         Value::Sequence(seq, _) => seq
             .attrs
             .iter()
-            .all(|attr| is_some(&attr.rel_params) && is_some(&attr.value)),
+            .all(|attr| exists(&attr.rel_params) && exists(&attr.value)),
         _other => true,
     }
 }

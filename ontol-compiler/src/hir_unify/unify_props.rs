@@ -102,7 +102,7 @@ pub(super) trait UnifyProps<'m>: Sized {
 
         let mut match_arms = vec![match_arm];
 
-        if scope_prop.optional.0 {
+        if scope_prop.flags.rel_optional() {
             match_arms.push((ontol_hir::PropPattern::Absent, ontol_hir::Nodes::default()));
         }
 
@@ -139,7 +139,7 @@ pub(super) trait UnifyProps<'m>: Sized {
 
                 let let_def = arena_import(&mut unifier.hir_arena, let_scope.def.as_ref());
                 let node = unifier.mk_node(
-                    ontol_hir::Kind::Let(let_scope.inner_binder, let_def, block),
+                    ontol_hir::Kind::With(let_scope.inner_binder, let_def, block),
                     Meta { ty, span: NO_SPAN },
                 );
 
@@ -215,7 +215,7 @@ impl<'m> UnifyProps<'m> for expr::Prop<'m> {
 
             nodes.push(unifier.mk_node(
                 ontol_hir::Kind::Prop(
-                    ontol_hir::Optional(false),
+                    ontol_hir::PropFlags::empty(),
                     prop.struct_var,
                     prop.prop_id,
                     [variant].into(),

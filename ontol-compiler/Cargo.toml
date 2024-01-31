@@ -22,6 +22,7 @@ tracing.workspace = true
 chumsky.workspace = true
 either.workspace = true
 bit-set.workspace = true
+thin-vec.workspace = true
 ena = "0.14"
 bumpalo = "3"
 regex-syntax = "0.8"

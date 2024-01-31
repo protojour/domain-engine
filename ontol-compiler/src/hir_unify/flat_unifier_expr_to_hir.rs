@@ -127,7 +127,7 @@ impl<'t, 'u, 'a, 'm> ExprToHir<'t, 'u, 'a, 'm> {
                     .collect();
 
                 Ok(self.mk_node(
-                    ontol_hir::Kind::Let(binder, let_def, components),
+                    ontol_hir::Kind::With(binder, let_def, components),
                     meta.hir_meta,
                 ))
             }
@@ -228,7 +228,7 @@ impl<'t, 'u, 'a, 'm> ExprToHir<'t, 'u, 'a, 'm> {
 
                 Ok(self.mk_node(
                     ontol_hir::Kind::Prop(
-                        ontol_hir::Optional(false),
+                        ontol_hir::PropFlags::empty(),
                         prop.struct_var,
                         prop.prop_id,
                         variants,
@@ -258,11 +258,11 @@ impl<'t, 'u, 'a, 'm> ExprToHir<'t, 'u, 'a, 'm> {
                     Ok(if body.len() == 1 {
                         body.into_iter().next().unwrap()
                     } else {
-                        self.mk_node(ontol_hir::Kind::Begin(body.into()), UNIT_META)
+                        self.mk_node(ontol_hir::Kind::Block(body.into()), UNIT_META)
                     })
                 }
                 expr::PropVariant::Set { .. } => Err(super::UnifierError::Unimplemented(
-                    smart_format!("seq prop in condition: {}", prop.prop_id),
+                    smart_format!("set-prop in condition: {}", prop.prop_id),
                 )),
                 expr::PropVariant::Predicate(_) => {
                     todo!()

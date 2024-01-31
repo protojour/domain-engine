@@ -223,7 +223,14 @@ fn generate_map_procs<'m>(
     compiler: &mut Compiler<'m>,
 ) -> Option<MapKey> {
     let needs_pure_partial = match expr.as_ref().kind() {
-        ontol_hir::Kind::Struct(_, flags, _) => flags.contains(StructFlags::MATCH),
+        ontol_hir::Kind::Struct(_, flags, _) if flags.contains(StructFlags::MATCH) => expr
+            .as_ref()
+            .meta()
+            .ty
+            .get_single_def_id()
+            .and_then(|def_id| compiler.relations.properties_by_def_id(def_id))
+            .map(|properties| properties.identified_by.is_some())
+            .unwrap_or(false),
         _ => false,
     };
 

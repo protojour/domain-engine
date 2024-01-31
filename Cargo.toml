@@ -41,6 +41,7 @@ bitflags = { version = "2", features = ["serde"] }
 chumsky = "0.9"
 either = "1"
 bit-set = "0.5"
+thin-vec = { version = "0.2", features = ["serde"] }
 
 [profile.release]
 strip = true

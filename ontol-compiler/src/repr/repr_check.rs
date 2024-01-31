@@ -264,12 +264,14 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                         );
                     } else {
                         match kind {
+                            PrimitiveKind::Unit => {
+                                self.merge_repr(&mut builder, ReprKind::Unit, def_id, data);
+                            }
                             PrimitiveKind::Boolean
                             | PrimitiveKind::False
                             | PrimitiveKind::True
                             | PrimitiveKind::Text
-                            | PrimitiveKind::Number
-                            | PrimitiveKind::Unit => {
+                            | PrimitiveKind::Number => {
                                 self.merge_repr(
                                     &mut builder,
                                     ReprKind::Scalar(def_id, ReprScalarKind::Other, data.rel_span),
