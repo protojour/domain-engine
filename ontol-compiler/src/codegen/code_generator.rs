@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use bit_set::BitSet;
 use fnv::FnvHashMap;
-use ontol_hir::{EvalCondTerm, HasDefault, PropPattern, PropVariant, StructFlags};
+use ontol_hir::{EvalCondTerm, PropVariant, StructFlags};
 use ontol_runtime::{
     condition::Clause,
     ontology::{MapLossiness, ValueCardinality},
@@ -27,7 +27,7 @@ use crate::{
     primitive::Primitives,
     typed_hir::{HirFunc, TypedArena, TypedHir, TypedNodeRef},
     types::{Type, UNIT_TYPE},
-    CompileErrors, Compiler, SourceSpan, NO_SPAN,
+    CompileErrors, Compiler, SourceSpan,
 };
 
 use super::{
@@ -151,6 +151,7 @@ pub(super) struct CodeGenerator<'a, 'm> {
     proc_table: &'a mut ProcTable,
     pub builder: &'a mut ProcBuilder,
     pub errors: &'a mut CompileErrors,
+    #[allow(unused)]
     pub primitives: &'a Primitives,
     pub type_mapper: TypeMapper<'a, 'm>,
 
@@ -653,158 +654,6 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     self.builder,
                 );
             }
-            ontol_hir::Kind::MatchProp(struct_var, prop_id, arms) => {
-                let Ok(struct_local) = self.var_local(*struct_var, &span) else {
-                    return;
-                };
-
-                if arms.len() > 1 {
-                    if arms
-                        .iter()
-                        .any(|(pattern, _)| matches!(pattern, ontol_hir::PropPattern::Absent))
-                    {
-                        block.op(
-                            OpCode::GetAttr(
-                                struct_local,
-                                *prop_id,
-                                GetAttrFlags::REL | GetAttrFlags::VAL,
-                            ),
-                            Delta(2),
-                            span,
-                            self.builder,
-                        );
-
-                        let post_cond_offset = block.current_offset().plus(1);
-
-                        let val_local = self.builder.top();
-                        let rel_local = self.builder.top_minus(1);
-
-                        let present_body_label = {
-                            let mut present_block = self.builder.new_block(Delta(0), span);
-                            let label = present_block.label();
-
-                            for arm in arms {
-                                if !matches!(arm.0, ontol_hir::PropPattern::Absent) {
-                                    self.gen_match_arm(
-                                        arm,
-                                        (rel_local, val_local),
-                                        arena,
-                                        &mut present_block,
-                                    );
-                                }
-                            }
-
-                            present_block.commit(
-                                Terminator::PopGoto(block.label(), post_cond_offset),
-                                self.builder,
-                            );
-                            label
-                        };
-
-                        block.ir(
-                            Ir::Cond(Predicate::IsNotVoid(val_local), present_body_label),
-                            Delta(0),
-                            span,
-                            self.builder,
-                        );
-                    } else {
-                        todo!();
-                    }
-                } else {
-                    let arm = arms.into_iter().next().unwrap();
-
-                    match &arm.0 {
-                        PropPattern::Set(ontol_hir::Binding::Binder(binder), HasDefault(true)) => {
-                            let before = self.builder.top();
-                            block.op(
-                                OpCode::GetAttr(
-                                    struct_local,
-                                    *prop_id,
-                                    GetAttrFlags::REL | GetAttrFlags::VAL,
-                                ),
-                                Delta(2),
-                                span,
-                                self.builder,
-                            );
-
-                            let post_cond_offset = block.current_offset().plus(1);
-
-                            let val_local = self.builder.top();
-                            let rel_local = self.builder.top_minus(1);
-
-                            let Type::Seq(_, seq_item_ty) = binder.meta().ty else {
-                                panic!("Not a sequence:");
-                            };
-
-                            // Code for generating the default values:
-                            let default_fallback_body_label = {
-                                let mut default_block = self.builder.new_block(Delta(0), span);
-                                let label = default_block.label();
-
-                                // Just pop without adjusting the delta.
-                                // New default values generated below
-                                default_block.op(
-                                    OpCode::PopUntil(before),
-                                    Delta(0),
-                                    NO_SPAN,
-                                    self.builder,
-                                );
-                                // rel_params (unit)
-                                default_block.op(
-                                    OpCode::CallBuiltin(BuiltinProc::NewUnit, DefId::unit()),
-                                    Delta(0),
-                                    NO_SPAN,
-                                    self.builder,
-                                );
-                                // empty sequence
-                                default_block.op(
-                                    OpCode::CallBuiltin(
-                                        BuiltinProc::NewSeq,
-                                        seq_item_ty.get_single_def_id().unwrap(),
-                                    ),
-                                    Delta(0),
-                                    NO_SPAN,
-                                    self.builder,
-                                );
-
-                                default_block.commit(
-                                    Terminator::PopGoto(block.label(), post_cond_offset),
-                                    self.builder,
-                                );
-                                label
-                            };
-
-                            // If the TryTakeAttr2 was false, run the default body
-                            block.ir(
-                                Ir::Cond(Predicate::IsVoid(val_local), default_fallback_body_label),
-                                Delta(0),
-                                span,
-                                self.builder,
-                            );
-
-                            self.gen_match_arm(arm, (rel_local, val_local), arena, block);
-                        }
-                        _ => {
-                            block.op(
-                                OpCode::GetAttr(
-                                    struct_local,
-                                    *prop_id,
-                                    // note: No TRY
-                                    GetAttrFlags::REL | GetAttrFlags::VAL,
-                                ),
-                                Delta(2),
-                                span,
-                                self.builder,
-                            );
-
-                            let val_local = self.builder.top();
-                            let rel_local = self.builder.top_minus(1);
-
-                            self.gen_match_arm(arm, (rel_local, val_local), arena, block);
-                        }
-                    }
-                }
-            }
             ontol_hir::Kind::MakeSeq(binder, nodes) => {
                 let Type::Seq(_, val_ty) = ty else {
                     panic!("Not a sequence: {ty:?}");
@@ -918,150 +767,6 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 );
                 block.pop_until(before, span, self.builder);
             }
-            ontol_hir::Kind::MatchRegex(
-                ontol_hir::Iter(false),
-                haystack_var,
-                regex_def_id,
-                match_arms,
-            ) => {
-                if match_arms.is_empty() {
-                    return;
-                }
-                let Ok(haystack_local) = self.var_local(*haystack_var, &span) else {
-                    return;
-                };
-                let before = self.builder.top();
-
-                let (_label, mut pre) = self.builder.split_block(block);
-                let mut arms_gen =
-                    CaptureMatchArmsGenerator::new_with_blocks(match_arms, self.builder, span);
-
-                self.gen_capture_match_arms(
-                    &mut arms_gen,
-                    self.builder.top_plus(2),
-                    Terminator::Goto(block.label(), BlockOffset(0)),
-                    arena,
-                    span,
-                );
-
-                pre.op(
-                    OpCode::RegexCapture(haystack_local, *regex_def_id),
-                    Delta(1),
-                    span,
-                    self.builder,
-                );
-                pre.op(
-                    OpCode::RegexCaptureIndexes(
-                        arms_gen.capture_index_union.clone().into_bit_vec(),
-                    ),
-                    Delta(0),
-                    span,
-                    self.builder,
-                );
-                // check if the regex succeeded
-                pre.ir(
-                    Ir::Cond(
-                        Predicate::IsVoid(self.builder.top()),
-                        arms_gen.fail_block_label,
-                    ),
-                    Delta(0),
-                    span,
-                    self.builder,
-                );
-
-                pre.op(
-                    OpCode::MoveSeqValsToStack(self.builder.top()),
-                    Delta((arms_gen.capture_index_union.len()) as i32),
-                    span,
-                    self.builder,
-                );
-                pre.commit(
-                    Terminator::Goto(arms_gen.first_block_label, BlockOffset(0)),
-                    self.builder,
-                );
-
-                block.pop_until(before, span, self.builder);
-            }
-            ontol_hir::Kind::MatchRegex(
-                ontol_hir::Iter(true),
-                haystack_var,
-                regex_def_id,
-                match_arms,
-            ) => {
-                if match_arms.is_empty() {
-                    return;
-                }
-                let Ok(haystack_local) = self.var_local(*haystack_var, &span) else {
-                    return;
-                };
-                let before = self.builder.top();
-                let iter_offset = BlockOffset(block.current_offset().0 + 3);
-                let all_matches_seq_local = self.builder.top_plus(1);
-                let counter_local = self.builder.top_plus(2);
-                let current_matches_seq_local = self.builder.top_plus(4);
-
-                // compensating for the iterated list and the counter below
-                self.builder.prealloc_stack(Delta(2));
-
-                let (iter_block_label, arms_gen) = {
-                    let mut pre = self.builder.new_block(Delta(2), span);
-                    let iter_block_label = pre.label();
-                    let mut arms_gen =
-                        CaptureMatchArmsGenerator::new_with_blocks(match_arms, self.builder, span);
-                    let mut post = self.builder.new_block(Delta(0), span);
-
-                    pre.op(
-                        OpCode::MoveSeqValsToStack(current_matches_seq_local),
-                        Delta((arms_gen.capture_index_union.len()) as i32),
-                        span,
-                        self.builder,
-                    );
-                    pre.commit(
-                        Terminator::Goto(arms_gen.first_block_label, BlockOffset(0)),
-                        self.builder,
-                    );
-
-                    self.gen_capture_match_arms(
-                        &mut arms_gen,
-                        Local(current_matches_seq_local.0 + 1),
-                        Terminator::Goto(post.label(), BlockOffset(0)),
-                        arena,
-                        span,
-                    );
-
-                    post.pop_until(counter_local, span, self.builder);
-                    post.commit(
-                        Terminator::PopGoto(block.label(), iter_offset),
-                        self.builder,
-                    );
-
-                    (iter_block_label, arms_gen)
-                };
-
-                // Generate sequence
-                block.op(
-                    OpCode::RegexCaptureIter(haystack_local, *regex_def_id),
-                    Delta(0),
-                    span,
-                    self.builder,
-                );
-                block.op(
-                    OpCode::RegexCaptureIndexes(
-                        arms_gen.capture_index_union.clone().into_bit_vec(),
-                    ),
-                    Delta(0),
-                    span,
-                    self.builder,
-                );
-                block.op(OpCode::I64(0, DefId::unit()), Delta(0), span, self.builder);
-                block.ir(
-                    Ir::Iter(all_matches_seq_local, counter_local, iter_block_label),
-                    Delta(0),
-                    span,
-                    self.builder,
-                );
-                block.pop_until(before, span, self.builder);
-            }
             ontol_hir::Kind::PushCondClause(cond_var, clause) => {
                 let Ok(cond_local) = self.var_local(*cond_var, &span) else {
                     return;
@@ -1129,35 +834,6 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 let top = self.builder.top();
 
                 OpCodeCondTerm::Value(top)
-            }
-        }
-    }
-
-    fn gen_match_arm(
-        &mut self,
-        (pattern, nodes): &(ontol_hir::PropPattern<'m, TypedHir>, ontol_hir::Nodes),
-        (rel_local, val_local): (Local, Local),
-        arena: &TypedArena<'m>,
-        block: &mut Block,
-    ) {
-        match pattern {
-            ontol_hir::PropPattern::Attr(rel_binding, val_binding) => self.gen_in_scope(
-                &[(rel_local, *rel_binding), (val_local, *val_binding)],
-                nodes,
-                arena,
-                block,
-            ),
-            ontol_hir::PropPattern::Set(binding, _has_default) => self.gen_in_scope(
-                &[
-                    (rel_local, ontol_hir::Binding::Wildcard),
-                    (val_local, *binding),
-                ],
-                nodes,
-                arena,
-                block,
-            ),
-            ontol_hir::PropPattern::Absent => {
-                todo!("Arm pattern not present")
             }
         }
     }
@@ -1258,102 +934,6 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
         capture_index_union
     }
 
-    fn gen_capture_match_arms(
-        &mut self,
-        arms_gen: &mut CaptureMatchArmsGenerator<'_, 'm>,
-        first_capture_local: Local,
-        terminator: Terminator,
-        arena: &TypedArena<'m>,
-        span: SourceSpan,
-    ) {
-        let branch_block_labels: Vec<BlockLabel> = (0..arms_gen.match_arms.len())
-            .map(|index| arms_gen.branch_blocks.get(&index).unwrap().label())
-            .collect();
-
-        {
-            let fail_block = self.builder.new_block(Delta(0), span);
-            let fail_label = fail_block.label();
-            fail_block.commit(
-                Terminator::Panic("Regex did not match".into()),
-                self.builder,
-            );
-
-            arms_gen.fail_block_label = fail_label;
-        }
-
-        for (arm_index, match_arm) in std::mem::take(&mut arms_gen.match_arms).iter().enumerate() {
-            let mut branch_block = arms_gen.branch_blocks.remove(&arm_index).unwrap();
-
-            struct ArmCapture {
-                local: Local,
-                var: Var,
-                def_id: DefId,
-            }
-
-            let mut arm_captures = Vec::with_capacity(match_arm.capture_groups.len());
-
-            for capture_group in &match_arm.capture_groups {
-                let (local_position, _) = arms_gen
-                    .capture_index_union
-                    .iter()
-                    .enumerate()
-                    .find(|(_, group_index)| *group_index == capture_group.index as usize)
-                    .unwrap();
-
-                debug!("guard capture local pos {:?}", local_position);
-
-                arm_captures.push(ArmCapture {
-                    local: Local(first_capture_local.0 + local_position as u16),
-                    var: capture_group.binder.hir().var,
-                    def_id: capture_group.binder.meta().ty.get_single_def_id().unwrap(),
-                });
-            }
-
-            // guard - advance to the next arm (or panic block) if some condition is not true,
-            // in this case that a required capture group was not defined (encoded as a unit value).
-            // If there are no bound capture groups, this is a _catch all_ arm.
-            if let Some(guard_capture) = arm_captures.first() {
-                let else_block_label = if arm_index < branch_block_labels.len() - 1 {
-                    *branch_block_labels.get(arm_index + 1).unwrap()
-                } else {
-                    arms_gen.fail_block_label
-                };
-
-                branch_block.ir(
-                    Ir::Cond(Predicate::IsVoid(guard_capture.local), else_block_label),
-                    Delta(0),
-                    span,
-                    self.builder,
-                );
-            }
-
-            // define scope for capture and type pun
-            for arm_capture in &arm_captures {
-                self.scope_insert(arm_capture.var, arm_capture.local, &span);
-
-                if arm_capture.def_id != self.primitives.text {
-                    branch_block.op(
-                        OpCode::TypePun(arm_capture.local, arm_capture.def_id),
-                        Delta(0),
-                        span,
-                        self.builder,
-                    );
-                }
-            }
-
-            for node_ref in arena.node_refs(&match_arm.nodes) {
-                self.gen_node(node_ref, &mut branch_block);
-            }
-
-            // pop scope
-            for arm_capture in arm_captures {
-                self.scope.remove(&arm_capture.var);
-            }
-
-            branch_block.commit(terminator.clone(), self.builder);
-        }
-    }
-
     fn scope_insert(&mut self, var: Var, local: Local, span: &SourceSpan) {
         if self.scope.insert(var, local).is_some() {
             assert!(
@@ -1391,47 +971,5 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
             return BlockLabel(Var(0));
         };
         fail_label
-    }
-}
-
-struct CaptureMatchArmsGenerator<'h, 'm> {
-    match_arms: &'h [ontol_hir::CaptureMatchArm<'m, TypedHir>],
-    branch_blocks: FnvHashMap<usize, Block>,
-    capture_index_union: BitSet,
-    first_block_label: BlockLabel,
-    fail_block_label: BlockLabel,
-}
-
-impl<'h, 'm> CaptureMatchArmsGenerator<'h, 'm> {
-    fn new_with_blocks(
-        match_arms: &'h [ontol_hir::CaptureMatchArm<'m, TypedHir>],
-        builder: &mut ProcBuilder,
-        span: SourceSpan,
-    ) -> Self {
-        let mut capture_index_union: BitSet = BitSet::default();
-        let mut branch_blocks: FnvHashMap<usize, Block> = Default::default();
-        let mut first_block_label = BlockLabel(Var(0));
-
-        for (arm_index, match_arm) in match_arms.iter().enumerate() {
-            for capture_group in &match_arm.capture_groups {
-                capture_index_union.insert(capture_group.index as usize);
-            }
-
-            let branch_block = builder.new_block(Delta(0), span);
-
-            if arm_index == 0 {
-                first_block_label = branch_block.label();
-            }
-
-            branch_blocks.insert(arm_index, branch_block);
-        }
-
-        Self {
-            match_arms,
-            branch_blocks,
-            capture_index_union,
-            first_block_label,
-            fail_block_label: BlockLabel(Var(0)),
-        }
     }
 }

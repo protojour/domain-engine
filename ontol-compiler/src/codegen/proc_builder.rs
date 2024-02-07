@@ -87,12 +87,7 @@ impl ProcBuilder {
         Local(self.stack_size as u16 - 1 - minus)
     }
 
-    pub fn prealloc_stack(&mut self, delta: Delta) {
-        self.stack_size += delta.0;
-    }
-
     pub fn build(mut self) -> SpannedOpCodes {
-        // let mut block_addresses: SmallVec<[u32; 8]> = smallvec![];
         let mut block_addresses: FnvHashMap<BlockLabel, u32> = Default::default();
         let indexes_by_label: FnvHashMap<BlockLabel, usize> = self
             .blocks
@@ -160,7 +155,6 @@ impl ProcBuilder {
                     span,
                 )),
                 Some(Terminator::GotoNext) => {}
-                Some(Terminator::Panic(message)) => output.push((OpCode::Panic(message), span)),
                 None => panic!("Block has no terminator!"),
             }
         }

@@ -208,8 +208,6 @@ pub enum Kind<'a, L: Lang> {
     ),
     /// Move rest of attributes into the first var, from the second var
     MoveRestAttrs(Var, Var),
-    /// A property matcher/unpacker associated with a struct var
-    MatchProp(Var, PropertyId, SmallVec<[(PropPattern<'a, L>, Nodes); 1]>),
     /// A sequence with associated binder. The value is the sequence.
     /// TODO: This can be done with Let!
     MakeSeq(L::Data<'a, Binder>, Nodes),
@@ -228,8 +226,6 @@ pub enum Kind<'a, L: Lang> {
         DefId,
         ThinVec<ThinVec<CaptureGroup<'a, L>>>,
     ),
-    /// A regex matcher/unpacker
-    MatchRegex(Iter, Var, DefId, ThinVec<CaptureMatchArm<'a, L>>),
     PushCondClause(Var, Clause<EvalCondTerm>),
 }
 
@@ -247,33 +243,6 @@ pub struct SetPropertyVariant<'a, L: Lang> {
     pub elements: SmallVec<[(Iter, Attribute<Node>); 1]>,
 }
 
-#[derive(Clone)]
-pub enum PropPattern<'a, L: Lang> {
-    /// ($rel $val)
-    Attr(Binding<'a, L>, Binding<'a, L>),
-    /// (.. $val)
-    /// The set/sequence is captured in $val.
-    /// The immediate rel_param is ignored.
-    ///
-    /// Pseudo-JSON example:
-    /// json```
-    /// subject[prop_id] -> {
-    ///     "rel_params": null, // ignored
-    ///     "value": [
-    ///         {
-    ///              rel_params: "item0_rel",
-    ///              value: "item0_value"
-    ///         },
-    ///         { .. },
-    ///         ..
-    ///     ]
-    /// }
-    /// ```
-    Set(Binding<'a, L>, HasDefault),
-    /// The property is absent
-    Absent,
-}
-
 #[derive(Clone, Copy)]
 pub enum Binding<'a, L: Lang> {
     Wildcard,
@@ -284,12 +253,6 @@ pub enum Binding<'a, L: Lang> {
 pub struct CaptureGroup<'a, L: Lang> {
     pub index: u32,
     pub binder: L::Data<'a, Binder>,
-}
-
-#[derive(Clone)]
-pub struct CaptureMatchArm<'a, L: Lang> {
-    pub capture_groups: Vec<CaptureGroup<'a, L>>,
-    pub nodes: Nodes,
 }
 
 /// Evaluated version of ontol_runtime::condition::CondTerm

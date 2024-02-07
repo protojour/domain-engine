@@ -5,8 +5,8 @@ use thin_vec::ThinVec;
 
 use crate::{
     arena::{Arena, NodeRef},
-    Attribute, Binding, CaptureGroup, CaptureMatchArm, EvalCondTerm, HasDefault, Iter, Kind, Label,
-    Lang, Node, Nodes, PredicateClosure, PropPattern, PropVariant, RootNode, SetEntry, StructFlags,
+    Attribute, Binding, CaptureGroup, EvalCondTerm, Iter, Kind, Label, Lang, Node,
+    PredicateClosure, PropVariant, RootNode, SetEntry, StructFlags,
 };
 
 impl<'h, 'a, L: Lang> std::fmt::Display for NodeRef<'h, 'a, L> {
@@ -222,12 +222,6 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
                 write!(f, "{sep}(move-rest-attrs {} {})", target, source)?;
                 Ok(Multiline(false))
             }
-            Kind::MatchProp(struct_var, id, arms) => {
-                write!(f, "{indent}(match-prop {struct_var} {id}")?;
-                let multi = self.print_all(f, Sep::Space, arms.iter())?;
-                self.print_rparen(f, multi)?;
-                Ok(Multiline(true))
-            }
             Kind::MakeSeq(binder, children) => {
                 let indent = if children.is_empty() { sep } else { indent };
                 write!(f, "{indent}(make-seq ({})", L::as_hir(binder).var)?;
@@ -266,17 +260,6 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
                 let multi = self.print_all(f, Sep::Space, captures.iter())?;
                 self.print_rparen(f, multi)?;
                 Ok(sep.multiline())
-            }
-            Kind::MatchRegex(iter, var, regex_def_id, arms) => {
-                if iter.0 {
-                    write!(f, "{indent}(match-regex-iter")?;
-                } else {
-                    write!(f, "{indent}(match-regex")?;
-                }
-                write!(f, " {var} {regex_def_id:?}")?;
-                let multi = self.print_all(f, Sep::Space, arms.iter())?;
-                self.print_rparen(f, multi)?;
-                Ok(Multiline(true))
             }
             Kind::PushCondClause(var, clause) => {
                 write!(f, "{indent}(push-cond-clause {var}")?;
@@ -370,43 +353,6 @@ impl<'h, 'a, L: Lang> Print<(Iter, Attribute<Node>)> for Printer<'h, 'a, L> {
     }
 }
 
-impl<'h, 'a, L: Lang> Print<(PropPattern<'a, L>, Nodes)> for Printer<'h, 'a, L> {
-    fn print(
-        self,
-        f: &mut std::fmt::Formatter,
-        _sep: Sep,
-        arm: &(PropPattern<'a, L>, Nodes),
-    ) -> PrintResult {
-        let indent = self.indent;
-        write!(f, "{indent}(")?;
-        let (pattern, nodes) = arm;
-        match pattern {
-            PropPattern::Attr(rel, val) => {
-                write!(f, "(")?;
-                self.print(f, Sep::None, rel)?;
-                self.print(f, Sep::Space, val)?;
-                write!(f, ")")?;
-            }
-            PropPattern::Set(val, HasDefault(false)) => {
-                write!(f, "(..")?;
-                self.print(f, Sep::Space, val)?;
-                write!(f, ")")?;
-            }
-            PropPattern::Set(val, HasDefault(true)) => {
-                write!(f, "(..default")?;
-                self.print(f, Sep::Space, val)?;
-                write!(f, ")")?;
-            }
-            PropPattern::Absent => {
-                write!(f, "()")?;
-            }
-        }
-        let multi = self.print_all(f, Sep::Space, self.kinds(nodes))?;
-        self.print_rparen(f, multi)?;
-        Ok(Multiline(true))
-    }
-}
-
 impl<'h, 'a, L: Lang> Print<Clause<EvalCondTerm>> for Printer<'h, 'a, L> {
     fn print(
         self,
@@ -454,23 +400,6 @@ impl<'h, 'a, L: Lang> Print<EvalCondTerm> for Printer<'h, 'a, L> {
             }
             EvalCondTerm::Eval(node) => self.print(f, sep, self.kind(*node)),
         }
-    }
-}
-
-impl<'h, 'a, L: Lang> Print<CaptureMatchArm<'a, L>> for Printer<'h, 'a, L> {
-    fn print(
-        self,
-        f: &mut std::fmt::Formatter,
-        _sep: Sep,
-        arm: &CaptureMatchArm<'a, L>,
-    ) -> PrintResult {
-        let indent = self.indent;
-        write!(f, "{indent}((")?;
-        let multi = self.print_all(f, Sep::None, arm.capture_groups.iter())?;
-        self.print_rparen(f, multi)?;
-        let multi = self.print_all(f, Sep::Space, self.kinds(&arm.nodes))?;
-        self.print_rparen(f, multi)?;
-        Ok(Multiline(true))
     }
 }
 

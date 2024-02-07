@@ -1,4 +1,5 @@
 use ontol_runtime::{vm::proc::BuiltinProc, PackageId};
+use thin_vec::thin_vec;
 
 use crate::*;
 
@@ -114,15 +115,20 @@ impl<'a, L: Lang> Parser<'a, L> {
                 let (body, next) = self.parse_many(next, Self::parse)?;
                 Ok((self.make_node(Kind::Block(body.into())), next))
             }
-            ("try-block", next) => {
+            ("catch", next) => {
                 let (label, next) = parse_paren_delimited(next, parse_at_label)?;
                 let (body, next) = self.parse_many(next, Self::parse)?;
                 Ok((self.make_node(Kind::Catch(label, body.into())), next))
             }
-            ("try", next) => {
+            ("try?", next) => {
                 let (label, next) = parse_at_label(next)?;
                 let (var, next) = parse_dollar_var(next)?;
                 Ok((self.make_node(Kind::Try(label, var)), next))
+            }
+            ("let", next) => {
+                let (var, next) = parse_dollar_var(next)?;
+                let (node, next) = self.parse(next)?;
+                Ok((self.make_node(Kind::Let(self.make_binder(var), node)), next))
             }
             ("let-prop", next) => {
                 let (rel, next) = self.parse_pattern_binding(next)?;
@@ -170,21 +176,6 @@ impl<'a, L: Lang> Parser<'a, L> {
             }
             ("prop!", next) => self.parse_prop(PropFlags::empty(), next),
             ("prop?!", next) => self.parse_prop(PropFlags::PAT_OPTIONAL, next),
-            ("match-prop", next) => {
-                let (struct_var, next) = parse_dollar_var(next)?;
-                let (prop, next) = parse_symbol(next)?;
-                let (arms, next) = self.parse_many(next, Self::parse_prop_match_arm)?;
-                Ok((
-                    self.make_node(Kind::MatchProp(
-                        struct_var,
-                        prop.parse().map_err(|_| {
-                            Error::Expected(Class::Property, Found(Token::Symbol(prop)))
-                        })?,
-                        arms.into(),
-                    )),
-                    next,
-                ))
-            }
             ("set", next) => {
                 let (entries, next) = self.parse_many(next, Self::parse_set_entry)?;
                 Ok((self.make_node(Kind::Set(entries.into())), next))
@@ -216,6 +207,25 @@ impl<'a, L: Lang> Parser<'a, L> {
                     next,
                 ))
             }
+            ("let-regex", mut next) => {
+                let mut groups_list = thin_vec![];
+                while parse_lparen(next).is_ok() {
+                    let (groups, next_next) = parse_paren_delimited(next, |next| {
+                        self.parse_many(next, Self::parse_capture_group)
+                            .map(|(vec, next)| (ThinVec::from(vec), next))
+                    })?;
+                    groups_list.push(groups);
+
+                    next = next_next;
+                }
+                let (regex_def_id, next) = parse_def_id(next)?;
+                let (var, next) = parse_dollar_var(next)?;
+
+                Ok((
+                    self.make_node(Kind::LetRegex(groups_list, regex_def_id, var)),
+                    next,
+                ))
+            }
             (sym @ ("regex" | "regex-seq"), next) => {
                 let (label, next) = if sym.contains("seq") {
                     let (label, next) = parse_paren_delimited(next, parse_at_label)?;
@@ -233,21 +243,6 @@ impl<'a, L: Lang> Parser<'a, L> {
 
                 Ok((
                     self.make_node(Kind::Regex(label, regex_def_id, ThinVec::from(match_arms))),
-                    next,
-                ))
-            }
-            (sym @ ("match-regex" | "match-regex-iter"), next) => {
-                let iter = Iter(sym.contains("iter"));
-                let (text_var, next) = parse_dollar_var(next)?;
-                let (regex_def_id, next) = parse_def_id(next)?;
-                let (match_arms, next) = self.parse_many(next, Self::parse_capture_match_arm)?;
-                Ok((
-                    self.make_node(Kind::MatchRegex(
-                        iter,
-                        text_var,
-                        regex_def_id,
-                        ThinVec::from(match_arms),
-                    )),
                     next,
                 ))
             }
@@ -360,53 +355,6 @@ impl<'a, L: Lang> Parser<'a, L> {
         })
     }
 
-    fn parse_prop_match_arm<'s>(
-        &mut self,
-        next: &'s str,
-    ) -> ParseResult<'s, (PropPattern<'a, L>, Nodes)> {
-        parse_paren_delimited(next, |next| {
-            let (_, next) = parse_lparen(next)?;
-            let (seq_default, next) = match parse_symbol(next) {
-                Ok(("..", next)) => (Some(HasDefault(false)), next),
-                Ok(("..default", next)) => (Some(HasDefault(true)), next),
-                Ok(("seq", next)) => (Some(HasDefault(false)), next),
-                Ok(("seq-default", next)) => (Some(HasDefault(true)), next),
-                Ok((sym, _)) => return Err(Error::Expected(Class::Set, Found(Token::Symbol(sym)))),
-                _ => (None, next),
-            };
-            let (pattern, next) = match self.parse_pattern_binding(next) {
-                Ok((first_binding, next)) => {
-                    match (self.parse_pattern_binding(next), seq_default) {
-                        (Ok((val_binding, next)), seq_default) => {
-                            let (_, next) = parse_rparen(next)?;
-                            (
-                                if seq_default.is_some() {
-                                    return Err(Error::Unexpected(Class::Set));
-                                } else {
-                                    PropPattern::Attr(first_binding, val_binding)
-                                },
-                                next,
-                            )
-                        }
-                        (Err(Error::Unexpected(Class::RParen)), Some(has_default)) => {
-                            let (_, next) = parse_rparen(next)?;
-                            (PropPattern::Set(first_binding, has_default), next)
-                        }
-                        (Err(err), _) => return Err(err),
-                    }
-                }
-                Err(Error::Unexpected(Class::RParen)) => {
-                    let (_, next) = parse_rparen(next)?;
-                    (PropPattern::Absent, next)
-                }
-                Err(other) => return Err(other),
-            };
-            let (nodes, next) = self.parse_many(next, Self::parse)?;
-
-            Ok(((pattern, nodes.into()), next))
-        })
-    }
-
     fn parse_set_entry<'s>(&mut self, next: &'s str) -> ParseResult<'s, SetEntry<'a, L>> {
         parse_paren_delimited(next, |next| match parse_symbol(next) {
             Ok(("..", next)) => {
@@ -426,25 +374,6 @@ impl<'a, L: Lang> Parser<'a, L> {
                 Ok((SetEntry(None, Attribute { rel, val }), next))
             }
             Err(e) => Err(e),
-        })
-    }
-
-    fn parse_capture_match_arm<'s>(
-        &mut self,
-        next: &'s str,
-    ) -> ParseResult<'s, CaptureMatchArm<'a, L>> {
-        parse_paren_delimited(next, |next| {
-            let (capture_groups, next) = parse_paren_delimited(next, |next| {
-                self.parse_many(next, Self::parse_capture_group)
-            })?;
-            let (nodes, next) = self.parse_many(next, Self::parse)?;
-            Ok((
-                CaptureMatchArm {
-                    capture_groups,
-                    nodes: nodes.into(),
-                },
-                next,
-            ))
         })
     }
 

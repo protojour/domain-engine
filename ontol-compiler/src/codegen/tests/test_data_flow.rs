@@ -25,6 +25,7 @@ const MOCK_RELATIONSHIP: Relationship = Relationship {
 };
 const MOCK_RELATION: DefKind = DefKind::TextLiteral("mock-relation");
 
+#[track_caller]
 fn analyze<'a>(arg: &str, hir: &str) -> Vec<PropertyFlow> {
     let node = ontol_hir::parse::Parser::new(TypedHir)
         .parse_root(hir)
@@ -81,50 +82,6 @@ const fn default_type() -> PropertyFlowData {
 }
 
 #[test]
-fn test_analyze1() {
-    let data_flow = analyze(
-        "$b",
-        "
-        (struct ($a)
-            (match-prop $b O:1:0
-                (($_ $c)
-                    (prop $a S:1:0
-                        (#u (map $c))
-                    )
-                )
-            )
-            (match-prop $b O:2:1
-                (($_ $d)
-                    (prop $a S:2:1
-                        (#u
-                            (match-prop $d O:3:2
-                                (($_ $e) $e)
-                            )
-                        )
-                    )
-                )
-            )
-        )
-        ",
-    );
-
-    expect_eq!(
-        actual = data_flow,
-        expected = vec![
-            prop_flow("S:1:0", dependent_on("O:1:0")),
-            prop_flow("S:2:1", dependent_on("O:3:2")),
-            prop_flow("O:1:0", default_type()),
-            prop_flow("O:1:0", default_cardinality()),
-            prop_flow("O:2:1", default_type()),
-            prop_flow("O:2:1", default_cardinality()),
-            prop_flow("O:3:2", default_type()),
-            prop_flow("O:3:2", default_cardinality()),
-            prop_flow("O:3:2", child_of("O:2:1")),
-        ]
-    );
-}
-
-#[test]
 fn test_analyze_ssa1() {
     let data_flow = analyze(
         "$b",
@@ -158,85 +115,6 @@ fn test_analyze_ssa1() {
 }
 
 #[test]
-fn test_analyze2() {
-    let data_flow = analyze(
-        "$f",
-        "
-        (struct ($i)
-            (match-prop $f S:2:26
-                (($_ $a)
-                    (prop! $i S:1:4
-                        (#u (map $a))
-                    )
-                )
-                (())
-            )
-            (match-prop $f S:2:33
-                (($_ $b)
-                    (prop! $i S:1:6
-                        (#u $b)
-                    )
-                )
-            )
-            (match-prop $f S:2:55
-                (($_ $g)
-                    (match-prop $g S:2:15
-                        (($_ $c)
-                            (prop! $i S:1:7
-                                (#u $c)
-                            )
-                        )
-                    )
-                )
-            )
-            (match-prop $f O:2:57
-                ((..default $e)
-                    (prop! $i S:1:8
-                        (#u
-                            (make-seq ($p)
-                                (for-each $e ($_ $h)
-                                    (match-prop $h S:2:53
-                                        (($_ $d)
-                                            (insert $p #u (map $d))
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                    )
-                )
-            )
-            (move-rest-attrs $i $f)
-        )
-        ",
-    );
-
-    expect_eq!(
-        actual = data_flow,
-        expected = vec![
-            prop_flow("S:1:4", dependent_on("S:2:26")),
-            prop_flow("S:1:6", dependent_on("S:2:33")),
-            prop_flow("S:1:7", dependent_on("S:2:15")),
-            prop_flow("S:1:8", dependent_on("S:2:53")),
-            prop_flow("S:2:15", default_type()),
-            prop_flow("S:2:15", default_cardinality()),
-            prop_flow("S:2:15", child_of("S:2:55")),
-            prop_flow("S:2:26", default_type()),
-            prop_flow("S:2:26", default_cardinality()),
-            prop_flow("S:2:33", default_type()),
-            prop_flow("S:2:33", default_cardinality()),
-            prop_flow("S:2:53", default_type()),
-            prop_flow("S:2:53", default_cardinality()),
-            prop_flow("S:2:53", child_of("O:2:57")),
-            prop_flow("S:2:55", default_type()),
-            prop_flow("S:2:55", default_cardinality()),
-            prop_flow("O:2:57", default_type()),
-            prop_flow("O:2:57", default_cardinality()),
-        ]
-    );
-}
-
-#[test]
 fn test_analyze_ssa2() {
     let data_flow = analyze(
         "$f",
@@ -248,8 +126,8 @@ fn test_analyze_ssa2() {
             (let-prop $_ $c ($g S:2:15))
             (let-prop-default $_ $e ($f O:2:57) #u (make-seq ($j)))
             (struct ($i)
-                (try-block (@k)
-                    (try @k $a)
+                (catch (@k)
+                    (try? @k $a)
                     (prop?! $i S:1:4
                         (#u (map $a))
                     )
@@ -305,19 +183,15 @@ fn test_analyze_seq1() {
     let data_flow = analyze(
         "$b",
         "
-        (struct ($a)
-            (match-prop $b O:1:0
-                ((seq-default $c)
-                    (prop $a S:1:0
-                        (#u
-                            (make-seq ($d)
-                                (for-each $c ($_ $e)
-                                    (insert $d #u
-                                        (match-prop $e O:2:1
-                                            (($_ $f) $f)
-                                        )
-                                    )
-                                )
+        (block
+            (let-prop-default $_ $c ($b O:1:0) #u (make-seq ($s)))
+            (struct ($a)
+                (prop $a S:1:0
+                    (#u
+                        (make-seq ($d)
+                            (for-each $c ($_ $e)
+                                (let-prop $_ $f ($e O:2:1))
+                                (insert $d #u $f)
                             )
                         )
                     )
@@ -345,20 +219,20 @@ fn test_analyze_regex_match1() {
     let data_flow = analyze(
         "$b",
         "
-        (struct ($a)
-            (match-prop $b O:1:0
-                (($_ $c)
-                    (match-regex $c def@0:0
-                        (((1 $d))
-                            (prop $a S:1:0
-                                (#u $d)
-                            )
-                        )
-                        (((2 $e))
-                            (prop $a S:1:1
-                                (#u $e)
-                            )
-                        )
+        (block
+            (let-prop $_ $c ($b O:1:0))
+            (let-regex ((1 $d)) ((2 $e)) def@0:0 $c)
+            (struct ($a)
+                (catch (@f)
+                    (try? @f $d)
+                    (prop $a S:1:0
+                        (#u $d)
+                    )
+                )
+                (catch (@g)
+                    (try? @g $e)
+                    (prop $a S:1:1
+                        (#u $e)
                     )
                 )
             )

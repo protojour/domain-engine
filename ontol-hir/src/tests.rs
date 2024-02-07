@@ -26,7 +26,7 @@ type TestKind<'a> = Kind<'a, TestLang>;
 
 #[test]
 fn assert_size() {
-    assert_eq!(80, size_of::<TestKind>());
+    assert_eq!(72, size_of::<TestKind>());
 }
 
 fn parse_print(src: &str) -> String {
@@ -53,33 +53,6 @@ fn test_big_var() {
 #[test]
 fn test_fn_call() {
     let src = "(+ $a 2)";
-    assert_eq!(src, parse_print(src));
-}
-
-#[test]
-fn test_match_prop1() {
-    let src = indoc! {"
-        (match-prop $a S:10:10
-            (($_ $b) #u)
-            (() #u)
-        )"
-    };
-    assert_eq!(src, parse_print(src));
-}
-
-#[test]
-fn test_match_prop2() {
-    let src = indoc! {"
-        (match-prop $a S:0:0
-            (($_ $b)
-                (match-prop $b S:0:1
-                    (($_ $c) #u)
-                    (() #u)
-                )
-            )
-            (() #u)
-        )"
-    };
     assert_eq!(src, parse_print(src));
 }
 
@@ -152,11 +125,14 @@ fn test_multi_prop() {
 #[test]
 fn test_map_seq() {
     let src = indoc! {"
-        (struct ($a)
-            (match-prop $b S:0:0
-                (($_ $c)
-                    (make-seq ($d)
-                        (for-each $c ($e $f) $d)
+        (block
+            (let-prop $_ $c ($b S:0:0))
+            (struct ($a)
+                (prop $a S:0:0
+                    (#u
+                        (make-seq ($d)
+                            (for-each $c ($e $f) $d)
+                        )
                     )
                 )
             )
@@ -181,16 +157,6 @@ fn test_with() {
 fn test_regex() {
     let src = indoc! {"
         (regex def@0:0 () ((1 $a)))"
-    };
-    assert_eq!(src, parse_print(src));
-}
-
-#[test]
-fn test_match_regex() {
-    let src = indoc! {"
-        (match-regex $a def@0:0
-            (((1 $b) (2 $c)) $b)
-        )"
     };
     assert_eq!(src, parse_print(src));
 }

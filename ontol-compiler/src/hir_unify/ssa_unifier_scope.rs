@@ -492,13 +492,11 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 }
             }
             Kind::MoveRestAttrs(_, _)
-            | Kind::MatchProp(_, _, _)
             | Kind::MakeSeq(_, _)
             | Kind::CopySubSeq(_, _)
             | Kind::ForEach(_, _, _)
             | Kind::Insert(_, _)
             | Kind::StringPush(_, _)
-            | Kind::MatchRegex(_, _, _, _)
             | Kind::PushCondClause(_, _)
             | Kind::Try(..)
             | Kind::Let(..)

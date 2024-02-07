@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Display};
 
-use ontol_hir::{CaptureMatchArm, PredicateClosure, PropVariant, SetEntry, SetPropertyVariant};
+use ontol_hir::{PredicateClosure, PropVariant, SetEntry, SetPropertyVariant};
 use smallvec::SmallVec;
 
 use crate::{
@@ -298,16 +298,6 @@ pub fn arena_import<'m>(
                 *meta,
             ))
         }
-        MatchProp(struct_var, prop_id, arms) => {
-            let arms = arms
-                .iter()
-                .map(|(pattern, body)| {
-                    let body = import_nodes(target, source.arena(), body);
-                    (pattern.clone(), body)
-                })
-                .collect();
-            target.add(TypedHirData(MatchProp(*struct_var, *prop_id, arms), *meta))
-        }
         MakeSeq(binder, body) => {
             let body = import_nodes(target, source.arena(), body);
             target.add(TypedHirData(MakeSeq(*binder, body), *meta))
@@ -328,19 +318,6 @@ pub fn arena_import<'m>(
             Regex(*label, *def_id, groups_list.clone()),
             *meta,
         )),
-        MatchRegex(iter, var, def_id, arms) => {
-            let arms = arms
-                .iter()
-                .map(|arm| {
-                    let nodes = import_nodes(target, source.arena(), &arm.nodes);
-                    CaptureMatchArm {
-                        capture_groups: arm.capture_groups.clone(),
-                        nodes,
-                    }
-                })
-                .collect();
-            target.add(TypedHirData(MatchRegex(*iter, *var, *def_id, arms), *meta))
-        }
         PushCondClause(var, clause) => {
             target.add(TypedHirData(PushCondClause(*var, clause.clone()), *meta))
         }

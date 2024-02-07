@@ -2,8 +2,8 @@ use ontol_runtime::value::PropertyId;
 
 use crate::{
     arena::{Arena, NodeRef},
-    Attribute, Binding, CaptureMatchArm, Iter, Kind, Label, Lang, Node, Nodes, PredicateClosure,
-    PropFlags, PropPattern, PropVariant, SetEntry, Var,
+    Attribute, Binding, Iter, Kind, Label, Lang, Node, PredicateClosure, PropFlags, PropVariant,
+    SetEntry, Var,
 };
 
 pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
@@ -45,28 +45,8 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
     }
 
     #[allow(unused_variables)]
-    fn visit_prop_match_arm(
-        &mut self,
-        index: usize,
-        match_arm: &(PropPattern<'a, L>, Nodes),
-        arena: &'h Arena<'a, L>,
-    ) {
-        self.traverse_prop_match_arm(match_arm, arena);
-    }
-
-    #[allow(unused_variables)]
     fn visit_set_entry(&mut self, index: usize, entry: &SetEntry<'a, L>, arena: &'h Arena<'a, L>) {
         self.traverse_set_entry(index, entry, arena);
-    }
-
-    #[allow(unused_variables)]
-    fn visit_capture_match_arm(
-        &mut self,
-        index: usize,
-        match_arm: &CaptureMatchArm<'a, L>,
-        arena: &'h Arena<'a, L>,
-    ) {
-        self.traverse_capture_match_arm(match_arm, arena);
     }
 
     #[allow(unused_variables)]
@@ -193,13 +173,6 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                 self.visit_var(*target);
                 self.visit_var(*source);
             }
-            Kind::MatchProp(struct_var, prop_id, arms) => {
-                self.visit_var(*struct_var);
-                self.visit_property_id(*prop_id);
-                for (index, arm) in arms.iter().enumerate() {
-                    self.visit_prop_match_arm(index, arm, arena);
-                }
-            }
             Kind::MakeSeq(binder, children) => {
                 self.visit_binder(L::as_hir(binder).var);
                 for (index, child) in arena.node_refs(children).enumerate() {
@@ -236,12 +209,6 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                     for capture_group in capture_groups.iter() {
                         self.visit_binder(L::as_hir(&capture_group.binder).var);
                     }
-                }
-            }
-            Kind::MatchRegex(_iter, string_var, _regex_def_id, capture_match_arms) => {
-                self.visit_var(*string_var);
-                for (index, arm) in capture_match_arms.iter().enumerate() {
-                    self.visit_capture_match_arm(index, arm, arena);
                 }
             }
             Kind::PushCondClause(var, _) => {
@@ -313,39 +280,6 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
     ) {
         self.visit_node(0, arena.node_ref(entry.1.rel));
         self.visit_node(1, arena.node_ref(entry.1.val));
-    }
-
-    fn traverse_prop_match_arm(
-        &mut self,
-        (pattern, nodes): &(PropPattern<'a, L>, Nodes),
-        arena: &'h Arena<'a, L>,
-    ) {
-        match pattern {
-            PropPattern::Attr(rel, val) => {
-                self.visit_pattern_binding(0, rel);
-                self.visit_pattern_binding(1, val);
-            }
-            PropPattern::Set(val, _) => {
-                self.visit_pattern_binding(0, val);
-            }
-            PropPattern::Absent => {}
-        }
-        for (index, node) in nodes.iter().enumerate() {
-            self.visit_node(index, arena.node_ref(*node));
-        }
-    }
-
-    fn traverse_capture_match_arm(
-        &mut self,
-        match_arm: &CaptureMatchArm<'a, L>,
-        arena: &'h Arena<'a, L>,
-    ) {
-        for group in match_arm.capture_groups.iter() {
-            self.visit_binder(L::as_hir(&group.binder).var);
-        }
-        for (index, node) in match_arm.nodes.iter().enumerate() {
-            self.visit_node(index, arena.node_ref(*node));
-        }
     }
 
     fn traverse_pattern_binding(&mut self, binding: &Binding<'a, L>) {

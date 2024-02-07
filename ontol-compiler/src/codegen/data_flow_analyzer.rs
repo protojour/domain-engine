@@ -254,56 +254,6 @@ where
 
                 Default::default()
             }
-            ontol_hir::Kind::MatchProp(struct_var, property_id, arms) => {
-                self.prop_origins.insert(*property_id, *struct_var);
-                self.prop_origins_inverted
-                    .entry(*struct_var)
-                    .or_default()
-                    .insert(*property_id);
-
-                let mut var_set = VarSet::default();
-
-                let mut value_def_id = None;
-
-                for (pattern, body) in arms {
-                    match pattern {
-                        ontol_hir::PropPattern::Attr(rel, val) => {
-                            if let ontol_hir::Binding::Binder(binder) = rel {
-                                self.var_origins.insert(binder.hir().var, *property_id);
-                                self.add_dep(binder.hir().var, *struct_var);
-                            }
-                            if let ontol_hir::Binding::Binder(binder) = val {
-                                self.var_origins.insert(binder.hir().var, *property_id);
-                                self.add_dep(binder.hir().var, *struct_var);
-                                value_def_id = binder.ty().get_single_def_id();
-                            }
-                        }
-                        ontol_hir::PropPattern::Set(binding, _has_default) => {
-                            if let ontol_hir::Binding::Binder(binder) = binding {
-                                self.var_origins.insert(binder.hir().var, *property_id);
-                                self.add_dep(binder.hir().var, *struct_var);
-                                value_def_id = match binder.ty() {
-                                    Type::Seq(_, val) => val.get_single_def_id(),
-                                    _ => None,
-                                };
-                            }
-                        }
-                        ontol_hir::PropPattern::Absent => {}
-                    }
-
-                    for child in arena.node_refs(body) {
-                        var_set.0.extend(&self.analyze_node(child, parent_prop).0);
-                    }
-                }
-
-                self.reg_scope_prop(
-                    *struct_var,
-                    *property_id,
-                    value_def_id.unwrap_or(DefId::unit()),
-                );
-
-                var_set
-            }
             ontol_hir::Kind::MakeSeq(_, body) => {
                 let mut var_set = VarSet::default();
                 for child in arena.node_refs(body) {
@@ -335,18 +285,6 @@ where
             ontol_hir::Kind::StringPush(to_var, node) => {
                 let var_set = self.analyze_node(arena.node_ref(*node), parent_prop);
                 self.var_dependencies.insert(*to_var, var_set.clone());
-                var_set
-            }
-            ontol_hir::Kind::MatchRegex(_iter, var, _, match_arms) => {
-                let mut var_set = VarSet::default();
-                for match_arm in match_arms {
-                    for group in &match_arm.capture_groups {
-                        self.add_dep(group.binder.hir().var, *var);
-                    }
-                    for child in arena.node_refs(&match_arm.nodes) {
-                        var_set.union_with(&self.analyze_node(child, parent_prop));
-                    }
-                }
                 var_set
             }
             ontol_hir::Kind::Regex(..)

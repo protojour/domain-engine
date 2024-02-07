@@ -2,19 +2,12 @@ use ontol_runtime::{
     var::Var,
     vm::proc::{Local, OpCode, Predicate},
 };
-use smartstring::alias::String;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub struct BlockLabel(pub Var);
 
 #[derive(Clone, Copy, Debug)]
 pub struct BlockOffset(pub u32);
-
-impl BlockOffset {
-    pub fn plus(self, offset: u32) -> Self {
-        Self(self.0 + offset)
-    }
-}
 
 /// "Intermediate representation" of opcodes.
 /// Some opcodes that involve branching use addresses,
@@ -42,5 +35,4 @@ pub enum Terminator {
     GotoNext,
     /// All the block locals are popped and control resumes at the parent block
     PopGoto(BlockLabel, BlockOffset),
-    Panic(String),
 }
