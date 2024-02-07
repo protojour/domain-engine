@@ -29,6 +29,7 @@ pub enum UnifierError {
     NonEntityQuery,
     ImpossibleMapping,
     NoIterationSource,
+    Unsolvable,
     Unimplemented(String),
     TODO(String),
 }

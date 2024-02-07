@@ -339,3 +339,48 @@ fn autogen_primary_ids_must_be_optional() {
     "
     .compile_fail();
 }
+
+#[test]
+fn map_error_unsolvable_equation() {
+    "
+    def foo (
+        rel .'a': i64
+        rel .'b': i64
+    )
+    def bar (
+        rel .'a': i64
+        rel .'b': i64
+    )
+    map(
+        foo(
+            'a': x + y, // ERROR unsolvable equation
+            'b': y * x // ERROR unsolvable equation
+        ),
+        bar(
+            'a': x,
+            'b': y
+        )
+    )
+    "
+    .compile_fail();
+}
+
+#[test]
+fn map_error_duplicate_in_equation() {
+    "
+    def foo (rel .'a': i64)
+    def bar (rel .'a': i64)
+    map(
+        foo(
+            'a':
+                x // ERROR unsupported variable duplication. Try to simplify the expression
+                +
+                x // ERROR unsupported variable duplication. Try to simplify the expression
+        ),
+        bar(
+            'a': x
+        )
+    )
+    "
+    .compile_fail();
+}

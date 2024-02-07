@@ -12,7 +12,7 @@ use tracing::{debug, warn};
 use crate::{
     hir_unify::{ssa_util::scan_all_vars_and_labels, UnifierError},
     typed_hir::{arena_import, TypedHir, TypedHirData},
-    SourceSpan,
+    CompileError, SourceSpan,
 };
 
 use super::{ssa_unifier::SsaUnifier, UnifierResult};
@@ -164,7 +164,10 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 break;
             } else if ambiguous_list.len() == list_len {
                 debug!("not able to make progress");
-                break;
+                for (_, span) in ambiguous_list {
+                    self.errors.error(CompileError::UnsolvableEquation, &span);
+                }
+                return Err(UnifierError::Unsolvable);
             }
         }
 
@@ -200,9 +203,13 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 }
 
                 if subst_params.len() > 1 {
-                    return Err(UnifierError::Unimplemented(smart_format!(
-                        "Ambiguous inversion"
-                    )));
+                    for (_, param_ref) in subst_params {
+                        self.errors.error(
+                            CompileError::UnsupportedVariableDuplication,
+                            &param_ref.meta().span,
+                        );
+                    }
+                    return Err(UnifierError::Unsolvable);
                 }
                 let (subst_param_index, subst_node_ref) = subst_params.into_iter().next().unwrap();
                 let mut out_params = Nodes::default();

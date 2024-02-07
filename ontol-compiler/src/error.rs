@@ -90,6 +90,8 @@ pub enum CompileError {
     DuplicateTypeParam(String),
     RequiresSpreading,
     DuplicateMapIdentifier,
+    UnsolvableEquation,
+    UnsupportedVariableDuplication,
     BUG(String),
     TODO(String),
 }
@@ -229,6 +231,11 @@ impl std::fmt::Display for CompileError {
             Self::DuplicateTypeParam(ident) => write!(f, "duplicate type param `{ident}`"),
             Self::RequiresSpreading => write!(f, "requires spreading (`..`)"),
             Self::DuplicateMapIdentifier => write!(f, "duplicate map identifier"),
+            Self::UnsolvableEquation => write!(f, "unsolvable equation"),
+            Self::UnsupportedVariableDuplication => write!(
+                f,
+                "unsupported variable duplication. Try to simplify the expression"
+            ),
             Self::BUG(msg) => write!(f, "BUG: {msg}"),
             Self::TODO(msg) => write!(f, "TODO: {msg}"),
         }

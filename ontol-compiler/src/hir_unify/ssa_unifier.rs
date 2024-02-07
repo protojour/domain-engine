@@ -26,7 +26,7 @@ use crate::{
     type_check::seal::SealCtx,
     typed_hir::{arena_import, Meta, TypedHir, TypedHirData, TypedNodeRef, UNIT_META},
     types::{Type, Types, UNIT_TYPE},
-    Compiler, NO_SPAN,
+    CompileErrors, Compiler, NO_SPAN,
 };
 
 use super::{
@@ -45,6 +45,7 @@ pub struct SsaUnifier<'c, 'm> {
     pub(super) relations: &'c Relations,
     pub(super) seal_ctx: &'c SealCtx,
     pub(super) defs: &'c Defs<'m>,
+    pub(super) errors: &'c mut CompileErrors,
     pub(super) primitives: &'c Primitives,
     pub(super) var_allocator: ontol_hir::VarAllocator,
     pub(super) scope_arena: &'c ontol_hir::arena::Arena<'m, TypedHir>,
@@ -78,6 +79,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             seal_ctx: &compiler.seal_ctx,
             defs: &compiler.defs,
             primitives: &compiler.primitives,
+            errors: &mut compiler.errors,
             var_allocator,
             scope_arena,
             expr_arena,
