@@ -237,11 +237,9 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     out_binder,
                 )
             }
-            _other => {
-                return Err(super::UnifierError::Unimplemented(smart_format!(
-                    "cannot invert non-function"
-                )));
-            }
+            _other => Err(super::UnifierError::Unimplemented(smart_format!(
+                "cannot invert non-function"
+            ))),
         }
     }
 }
