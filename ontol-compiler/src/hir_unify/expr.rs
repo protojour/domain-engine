@@ -14,6 +14,8 @@ use crate::{
     SourceSpan,
 };
 
+use super::regex_interpolation::StringInterpolationComponent;
+
 #[derive(Debug)]
 pub struct Expr<'m>(pub Kind<'m>, pub Meta<'m>);
 
@@ -128,12 +130,6 @@ pub enum PropVariant<'m> {
         elements: Vec<(ontol_hir::Iter, ontol_hir::Attribute<Expr<'m>>)>,
     },
     Predicate(ontol_hir::PredicateClosure<Expr<'m>>),
-}
-
-#[derive(Debug)]
-pub enum StringInterpolationComponent {
-    Const(String),
-    Var(Var, SourceSpan),
 }
 
 #[derive(Debug)]

@@ -21,6 +21,7 @@ mod dep_tree;
 mod dependent_scope_analyzer;
 mod expr;
 mod expr_builder;
+mod regex_interpolation;
 mod regroup_match_prop;
 mod scope;
 mod scope_builder;

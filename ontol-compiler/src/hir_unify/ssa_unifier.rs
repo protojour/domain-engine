@@ -14,7 +14,11 @@ use smallvec::{smallvec, SmallVec};
 use tracing::debug;
 
 use crate::{
-    hir_unify::ssa_util::{scan_immediate_free_vars, NodesExt},
+    def::Defs,
+    hir_unify::{
+        regex_interpolation::RegexStringInterpolator,
+        ssa_util::{scan_immediate_free_vars, NodesExt},
+    },
     mem::Intern,
     primitive::Primitives,
     relation::Relations,
@@ -26,6 +30,7 @@ use crate::{
 };
 
 use super::{
+    regex_interpolation::StringInterpolationComponent,
     ssa_util::{
         scan_all_vars_and_labels, ExprMode, ExtendedScope, ScopeTracker, Scoped, TypeMapping,
     },
@@ -40,6 +45,7 @@ pub struct SsaUnifier<'c, 'm> {
     #[allow(unused)]
     pub(super) relations: &'c Relations,
     pub(super) seal_ctx: &'c SealCtx,
+    pub(super) defs: &'c Defs<'m>,
     pub(super) primitives: &'c Primitives,
     pub(super) var_allocator: ontol_hir::VarAllocator,
     pub(super) scope_arena: &'c ontol_hir::arena::Arena<'m, TypedHir>,
@@ -71,6 +77,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             types: &mut compiler.types,
             relations: &compiler.relations,
             seal_ctx: &compiler.seal_ctx,
+            defs: &compiler.defs,
             primitives: &compiler.primitives,
             var_allocator,
             scope_arena,
@@ -241,8 +248,59 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             ontol_hir::Kind::Prop(optional, var, prop_id, variants) => {
                 self.write_prop_expr((*optional, *var, *prop_id), variants, node_ref.meta(), mode)
             }
-            ontol_hir::Kind::Regex(..) => {
-                Err(UnifierError::TODO(smart_format!("SSA regex interpolation")))
+            ontol_hir::Kind::Regex(_seq_label, regex_def_id, capture_group_alternation) => {
+                let regex_meta = self
+                    .defs
+                    .literal_regex_meta_table
+                    .get(regex_def_id)
+                    .unwrap();
+
+                let first_alternation = capture_group_alternation.first().unwrap();
+
+                let mut components = vec![];
+                let mut interpolator = RegexStringInterpolator {
+                    capture_groups: first_alternation,
+                    current_constant: "".into(),
+                    components: &mut components,
+                };
+                interpolator.traverse_hir(&regex_meta.hir);
+                interpolator.commit_constant();
+
+                let initial_string =
+                    self.mk_node(ontol_hir::Kind::Text("".into()), *node_ref.meta());
+                let with_node = self.prealloc_node();
+
+                let string_binder = self.var_allocator.alloc();
+                let mut body = ontol_hir::Nodes::default();
+
+                for component in components {
+                    let string_push_param = match component {
+                        StringInterpolationComponent::Const(string) => {
+                            self.mk_node(ontol_hir::Kind::Text(string), UNIT_META)
+                        }
+                        StringInterpolationComponent::Var(var, span) => self.mk_node(
+                            ontol_hir::Kind::Var(var),
+                            Meta {
+                                ty: &UNIT_TYPE,
+                                span,
+                            },
+                        ),
+                    };
+                    body.push(self.mk_node(
+                        ontol_hir::Kind::StringPush(string_binder, string_push_param),
+                        UNIT_META,
+                    ));
+                }
+
+                Ok(smallvec![self.write_node(
+                    with_node,
+                    ontol_hir::Kind::With(
+                        TypedHirData(ontol_hir::Binder { var: string_binder }, *node_ref.meta()),
+                        initial_string,
+                        body,
+                    ),
+                    *node_ref.meta()
+                )])
             }
             _other => Ok(smallvec![arena_import(
                 &mut self.out_arena,

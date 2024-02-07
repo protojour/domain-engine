@@ -14,7 +14,8 @@ use crate::{
 
 use super::{
     dep_tree::{DepTreeBuilder, SubTree},
-    expr::{self, StringInterpolationComponent},
+    expr::{self},
+    regex_interpolation::StringInterpolationComponent,
     regroup_match_prop::regroup_match_prop,
     scope,
     unify_props::UnifyProps,
