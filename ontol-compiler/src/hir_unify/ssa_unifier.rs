@@ -34,8 +34,7 @@ use super::{
     ssa_util::{
         scan_all_vars_and_labels, ExprMode, ExtendedScope, ScopeTracker, Scoped, TypeMapping,
     },
-    unifier::UnifiedNode,
-    UnifierError, UnifierResult,
+    UnifiedNode, UnifierError, UnifierResult,
 };
 
 /// Unifier that strives to produce Static Single-Assignment form flat hir blocks
