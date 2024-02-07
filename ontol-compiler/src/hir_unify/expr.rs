@@ -1,4 +1,4 @@
-use ontol_hir::{Node, StructFlags};
+use ontol_hir::StructFlags;
 use ontol_runtime::{
     smart_format,
     value::PropertyId,
@@ -14,17 +14,10 @@ use crate::{
     SourceSpan,
 };
 
-use super::flat_scope::OutputVar;
-
 #[derive(Debug)]
 pub struct Expr<'m>(pub Kind<'m>, pub Meta<'m>);
 
 impl<'m> Expr<'m> {
-    #[inline]
-    pub fn kind(&self) -> &Kind<'m> {
-        &self.0
-    }
-
     #[inline]
     pub fn meta(&self) -> &Meta<'m> {
         &self.1
@@ -63,21 +56,11 @@ pub enum Kind<'m> {
     /// Special case of a Set with one iterated element.
     /// TODO: This should be generalized
     IterSet(ontol_hir::Label, Box<ontol_hir::Attribute<Expr<'m>>>),
-    DestructuredSeq(ontol_hir::Label, OutputVar),
-    SetElem(
-        ontol_hir::Label,
-        usize,
-        ontol_hir::Iter,
-        Box<ontol_hir::Attribute<Expr<'m>>>,
-    ),
     Push(Var, Box<ontol_hir::Attribute<Expr<'m>>>),
     StringInterpolation(
         TypedHirData<'m, ontol_hir::Binder>,
         Vec<StringInterpolationComponent>,
     ),
-    /// Temporarily wrap an ontol_hir::Node
-    /// FIXME: This is a temporary hack for flat_unifier for dividing scoping into outside-loop and inside-loop
-    HirNode(Node),
 }
 
 impl<'m> Kind<'m> {
@@ -111,20 +94,10 @@ impl<'m> Kind<'m> {
             Self::String(string) => format!("String({string})"),
             Self::Const(const_def_id) => format!("Const({const_def_id:?})"),
             Self::IterSet(label, _) => format!("IterSet({label})"),
-            Self::DestructuredSeq(label, output_var) => {
-                format!("DestructuredSeq({label}, {output_var:?})")
-            }
-            Self::SetElem(label, index, iter, attr) => format!(
-                "{iter}SetElem({label}, {index}, ({rel}, {val}))",
-                iter = if iter.0 { "Iter" } else { "" },
-                rel = attr.rel.kind().debug_short(),
-                val = attr.val.kind().debug_short()
-            ),
             Self::Push(var, _) => format!("Push({var})"),
             Self::StringInterpolation(binder, _) => {
                 format!("StringInterpolation({})", binder.hir().var)
             }
-            Self::HirNode(_) => "Node".to_string(),
         }
     }
 }
@@ -191,81 +164,5 @@ impl<'m> super::dep_tree::Expression for Prop<'m> {
 
     fn is_seq(&self) -> bool {
         self.seq.is_some()
-    }
-}
-
-pub fn collect_free_vars(expr: &Expr) -> VarSet {
-    let mut visitor = FreeVarVisitor::default();
-    visitor.visit(expr);
-    visitor.free_vars
-}
-
-#[derive(Default)]
-struct FreeVarVisitor {
-    pub free_vars: VarSet,
-}
-
-impl FreeVarVisitor {
-    pub fn visit(&mut self, expr: &Expr) {
-        match expr.kind() {
-            Kind::Var(var) => {
-                self.free_vars.insert(*var);
-            }
-            Kind::Unit | Kind::I64(_) | Kind::F64(_) | Kind::String(_) | Kind::Const(_) => {}
-            Kind::Struct { props, .. } => {
-                for prop in props {
-                    self.visit_prop_variant(&prop.variant);
-                }
-            }
-            Kind::Prop(prop) => {
-                self.visit_prop_variant(&prop.variant);
-            }
-            Kind::Map(inner) => {
-                self.visit(inner);
-            }
-            Kind::Call(call) => {
-                for arg in &call.1 {
-                    self.visit(arg);
-                }
-            }
-            Kind::IterSet(_, attr) => {
-                self.visit_attr(attr);
-            }
-            Kind::DestructuredSeq(..) => {}
-            Kind::SetElem(_, _, _, attr) => self.visit_attr(attr),
-            Kind::Push(_, attr) => {
-                self.visit_attr(attr);
-            }
-            Kind::StringInterpolation(_, components) => {
-                for component in components {
-                    match component {
-                        StringInterpolationComponent::Var(var, _) => {
-                            self.free_vars.insert(*var);
-                        }
-                        StringInterpolationComponent::Const(_) => {}
-                    }
-                }
-            }
-            Kind::HirNode(_) => {}
-        }
-    }
-
-    fn visit_prop_variant(&mut self, variant: &PropVariant) {
-        match variant {
-            PropVariant::Singleton(attr) => {
-                self.visit_attr(attr);
-            }
-            PropVariant::Set { elements, .. } => {
-                for (_iter, attr) in elements {
-                    self.visit_attr(attr);
-                }
-            }
-            PropVariant::Predicate(_) => {}
-        }
-    }
-
-    fn visit_attr(&mut self, attr: &ontol_hir::Attribute<Expr>) {
-        self.visit(&attr.rel);
-        self.visit(&attr.val);
     }
 }

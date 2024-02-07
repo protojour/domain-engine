@@ -124,14 +124,6 @@ impl<'m> Display for HirFunc<'m> {
     }
 }
 
-pub fn arena_import_root<'h, 'm>(
-    source: TypedNodeRef<'h, 'm>,
-) -> ontol_hir::RootNode<'m, TypedHir> {
-    let mut target: TypedArena<'m> = Default::default();
-    let node = arena_import(&mut target, source);
-    ontol_hir::RootNode::new(node, target)
-}
-
 // TODO: Generalize this in ontol-hir
 pub fn arena_import<'m>(
     target: &mut TypedArena<'m>,

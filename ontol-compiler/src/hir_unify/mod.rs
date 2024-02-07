@@ -12,32 +12,28 @@ use tracing::info;
 use crate::{
     hir_unify::{expr_builder::ExprBuilder, scope_builder::ScopeBuilder, unifier::Unifier},
     typed_hir::{HirFunc, IntoTypedHirData, TypedHir},
-    Compiler, SourceSpan, CLASSIC_UNIFIER_FALLBACK, FLAT_UNIFIER_FALLBACK, SSA_UNIFIER_FALLBACK,
-    USE_FLAT_UNIFIER, USE_SSA_UNIFIER,
+    Compiler, SourceSpan, SSA_UNIFIER_FALLBACK, USE_SSA_UNIFIER,
 };
 
-use self::{
-    flat_scope_builder::FlatScopeBuilder, flat_unifier::FlatUnifier, ssa_unifier::SsaUnifier,
-    unifier::UnifiedRootNode,
-};
+use self::{ssa_unifier::SsaUnifier, unifier::UnifiedRootNode};
 
 mod dep_tree;
 mod dependent_scope_analyzer;
 mod expr;
 mod expr_builder;
-mod flat_level_builder;
-mod flat_scope;
-mod flat_scope_builder;
-mod flat_unifier;
-mod flat_unifier_expr_to_hir;
-mod flat_unifier_impl;
-mod flat_unifier_regex;
-mod flat_unifier_scope_assign;
-mod flat_unifier_table;
+// mod flat_level_builder;
+// mod flat_scope;
+// mod flat_scope_builder;
+// mod flat_unifier;
+// mod flat_unifier_expr_to_hir;
+// mod flat_unifier_impl;
+// mod flat_unifier_regex;
+// mod flat_unifier_scope_assign;
+// mod flat_unifier_table;
 mod regroup_match_prop;
 mod scope;
 mod scope_builder;
-mod seq_type_infer;
+// mod seq_type_infer;
 mod ssa_unifier;
 mod ssa_unifier_scope;
 mod ssa_util;
@@ -81,25 +77,8 @@ pub fn unify_to_function<'m>(
                 return Err(err);
             }
 
-            info!("Fallback to flat unifier because {err:?}");
-
-            match unify_flat(
-                scope,
-                expr,
-                map_flags,
-                var_tracker.var_allocator(),
-                compiler,
-            ) {
-                Err(err) => {
-                    if !FLAT_UNIFIER_FALLBACK || !matches!(&err, UnifierError::TODO(_)) {
-                        return Err(err);
-                    }
-
-                    info!("Fallback to classic unifier because {err:?}");
-                    unify_classic(scope, expr, var_tracker.var_allocator(), compiler)?
-                }
-                Ok(value) => value,
-            }
+            info!("Fallback to classic unifier because {err:?}");
+            unify_classic(scope, expr, var_tracker.var_allocator(), compiler)?
         }
         Ok(value) => value,
     };
@@ -135,48 +114,6 @@ fn unify_classic<'m>(
 
     let mut unifier = Unifier::new(&mut compiler.types, var_allocator);
     let unified = unifier.unify(scope_binder.scope, expr)?;
-
-    Ok((
-        UnifiedRootNode {
-            typed_binder: unified.typed_binder,
-            node: ontol_hir::RootNode::new(unified.node, unifier.hir_arena),
-        },
-        unifier.var_allocator,
-    ))
-}
-
-fn unify_flat<'m>(
-    scope: &ontol_hir::RootNode<'m, TypedHir>,
-    expr: &ontol_hir::RootNode<'m, TypedHir>,
-    map_flags: MapFlags,
-    var_allocator: ontol_hir::VarAllocator,
-    compiler: &mut Compiler<'m>,
-) -> UnifierResult<(UnifiedRootNode<'m>, ontol_hir::VarAllocator)> {
-    if !USE_FLAT_UNIFIER {
-        return Err(UnifierError::TODO(smart_format!(
-            "flat unifier not enabled"
-        )));
-    }
-
-    let (flat_scope, var_allocator) = {
-        let mut scope_builder = FlatScopeBuilder::new(var_allocator, scope.arena());
-        let flat_scope = scope_builder.build_flat_scope(scope.node())?;
-        (flat_scope, scope_builder.var_allocator())
-    };
-
-    let (expr, var_allocator) = {
-        let mut expr_builder = ExprBuilder::new(var_allocator, &compiler.defs);
-        let expr = expr_builder.hir_to_expr(expr.as_ref());
-        (expr, expr_builder.var_allocator())
-    };
-
-    let mut unifier = FlatUnifier::new(
-        &mut compiler.types,
-        &compiler.relations,
-        var_allocator,
-        map_flags,
-    );
-    let unified = unifier.unify(flat_scope, expr)?;
 
     Ok((
         UnifiedRootNode {
@@ -284,8 +221,6 @@ pub mod test_api {
 
     use crate::{hir_unify::unify_to_function, mem::Mem, typed_hir::TypedHir, Compiler};
 
-    use super::{flat_scope_builder::FlatScopeBuilder, VariableTracker};
-
     fn parse_typed<'m>(src: &str) -> ontol_hir::RootNode<'m, TypedHir> {
         ontol_hir::parse::Parser::new(TypedHir)
             .parse_root(src)
@@ -305,22 +240,6 @@ pub mod test_api {
         .unwrap();
         let mut output = String::new();
         write!(&mut output, "{func}").unwrap();
-        output
-    }
-
-    pub fn mk_flat_scope(hir: &str) -> std::string::String {
-        let hir_node = parse_typed(hir);
-
-        let mut var_tracker = VariableTracker::default();
-        var_tracker.track_largest(hir_node.as_ref());
-
-        let mut builder = FlatScopeBuilder::new(var_tracker.var_allocator(), hir_node.arena());
-        let flat_scope = builder.build_flat_scope(hir_node.node()).unwrap();
-        let mut output = String::new();
-        write!(&mut output, "{flat_scope}").unwrap();
-
-        drop(builder);
-
         output
     }
 }

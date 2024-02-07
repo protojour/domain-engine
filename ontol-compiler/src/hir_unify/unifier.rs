@@ -696,15 +696,6 @@ impl<'a, 'm> Unifier<'a, 'm> {
                     node: val.node,
                 })
             }
-            (expr::Kind::DestructuredSeq(..), _) => {
-                panic!("Should not be used here")
-            }
-            (expr::Kind::SetElem(..), _) => {
-                panic!("Only used in flat unifier")
-            }
-            (expr::Kind::HirNode(_), _) => {
-                unreachable!()
-            }
             (expr_kind, scope::Kind::Gen(_)) => {
                 todo!("{expr_kind:#?} with gen scope")
             }
