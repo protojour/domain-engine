@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use chumsky::chain::Chain;
-use ontol_hir::{Attribute, Kind, Label, Nodes};
+use ontol_hir::{Attribute, Binder, Kind, Label, Nodes};
 use ontol_runtime::{
     smart_format,
     var::{Var, VarSet},
@@ -11,7 +11,7 @@ use thin_vec::thin_vec;
 use tracing::debug;
 
 use crate::{
-    hir_unify::UnifierError,
+    hir_unify::{ssa_util::scan_all_vars_and_labels, UnifierError},
     mem::Intern,
     primitive::PrimitiveKind,
     typed_hir::{Meta, TypedHir, TypedHirData, UNIT_META},
@@ -20,8 +20,9 @@ use crate::{
 };
 
 use super::{
+    ssa_scope_graph::{AmbiguousExpr, Let, SpannedLet},
     ssa_unifier::SsaUnifier,
-    ssa_util::{Catcher, ExtendedScope, Let, Scoped, SpannedLet},
+    ssa_util::{Catcher, ExtendedScope, Scoped},
     UnifierResult,
 };
 
@@ -83,6 +84,8 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         let mut scoped_lets = vec![];
         let binding = self.traverse(scope_node, scoped, &mut scoped_lets)?;
 
+        let scoped_lets = self.process_let_graph(scoped_lets)?;
+
         for (let_node, span) in scoped_lets {
             let kind = match let_node {
                 Let::Prop(attr, var_prop) => ontol_hir::Kind::LetProp(attr, var_prop),
@@ -94,6 +97,16 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 }
                 Let::RegexIter(binder, groups_list, def, var) => {
                     ontol_hir::Kind::LetRegexIter(binder, groups_list, def, var)
+                }
+                Let::Expr(binder, node) => {
+                    // generated "let graph" expression from ambiguous source.
+                    // update scope table:
+                    self.scope_tracker.in_scope.insert(binder.hir().var);
+
+                    ontol_hir::Kind::Let(binder, node)
+                }
+                Let::AmbiguousExpr(AmbiguousExpr { .. }) => {
+                    continue;
                 }
             };
             body.push(self.mk_node(kind, Meta::new(&UNIT_TYPE, span)));
@@ -230,7 +243,24 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             Kind::Text(_) => Ok(Binding::Wildcard),
             Kind::Const(_) => Ok(Binding::Wildcard),
             Kind::With(_, _, _) => Err(UnifierError::TODO(smart_format!("with scope"))),
-            Kind::Call(_, _) => Err(UnifierError::TODO(smart_format!("call scope"))),
+            Kind::Call(_, nodes) => {
+                let var = self.var_allocator.alloc();
+                let free_vars = scan_all_vars_and_labels(self.scope_arena, nodes.iter().cloned());
+                self.push_let(
+                    Let::AmbiguousExpr(AmbiguousExpr {
+                        dependency: TypedHirData(Binder { var }, *node_ref.meta()),
+                        produces: free_vars,
+                        scope_node,
+                    }),
+                    node_ref.span(),
+                    scoped,
+                    lets,
+                );
+                Ok(Binding::Binder(TypedHirData(
+                    Binder { var },
+                    *node_ref.meta(),
+                )))
+            }
             Kind::Map(inner) => match self.traverse(*inner, scoped, lets)? {
                 ontol_hir::Binding::Wildcard => Ok(ontol_hir::Binding::Wildcard),
                 ontol_hir::Binding::Binder(binder) => Ok(ontol_hir::Binding::Binder(TypedHirData(
@@ -518,9 +548,10 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             if defines.contains(var) {
                 self.scope_tracker.in_scope.0.extend(&defines.0);
 
-                let dependency = let_node.dependency();
-                assert_ne!(dependency, var);
-                self.make_try_let(dependency, catch_label, *span, potential_lets, output)?;
+                for dependency in let_node.dependencies().iter() {
+                    assert_ne!(dependency, var);
+                    self.make_try_let(dependency, catch_label, *span, potential_lets, output)?;
+                }
 
                 let kind = match let_node {
                     Let::Prop(attr, var_prop) => Kind::TryLetProp(catch_label, *attr, *var_prop),

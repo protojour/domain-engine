@@ -13,9 +13,8 @@ fn test_unify_no_op() {
 fn test_unify_expr1() {
     let output = test_unify("(- $a 10)", "$a");
     let expected = indoc! {"
-        |$b| (with ($a (map (+ $b 10)))
-            $a
-        )"
+        |$b| (block
+            (let $a (+ $b 10)) $a)"
     };
     assert_eq!(expected, output);
 }
@@ -30,9 +29,8 @@ fn test_unify_expr2() {
 fn test_unify_symmetric_exprs() {
     let output = test_unify("(- $a 10)", "(+ $a 20)");
     let expected = indoc! {"
-        |$b| (with ($a (map (+ $b 10)))
-            (+ $a 20)
-        )"
+        |$b| (block
+            (let $a (+ $b 10)) (+ $a 20))"
     };
     assert_eq!(expected, output);
 }
@@ -214,15 +212,14 @@ fn test_unify_struct_simple_arithmetic() {
         ",
     );
     let expected = indoc! {"
-        |$b| (struct ($c)
-            (match-prop $b S:1:0
-                (($_ $d)
-                    (with ($a (map (+ $d 10)))
-                        (prop! $c S:1:1
-                            (#u (+ $a 20))
-                        )
-                    )
+        |$b| (block
+            (let-prop $_ $d ($b S:1:0))
+            (let $a (+ $d 10))
+            (struct ($c)
+                (prop! $c S:1:1
+                    (#u (+ $a 20))
                 )
+                (move-rest-attrs $c $b)
             )
         )"
     };
@@ -247,27 +244,22 @@ fn test_struct_arithmetic_property_dependency() {
         ",
     );
     let expected = indoc! {"
-        |$c| (struct ($d)
-            (match-prop $c S:1:0
-                (($_ $e)
-                    (with ($a (map (+ $e 10)))
-                        (prop! $d O:1:1
-                            (#u (+ $a 20))
-                        )
-                        (match-prop $c S:1:1
-                            (($_ $f)
-                                (with ($b (map (+ $f 10)))
-                                    (prop! $d O:1:0
-                                        (#u (+ $a $b))
-                                    )
-                                    (prop! $d O:1:2
-                                        (#u (+ $b 20))
-                                    )
-                                )
-                            )
-                        )
-                    )
+        |$c| (block
+            (let-prop $_ $e ($c S:1:0))
+            (let-prop $_ $f ($c S:1:1))
+            (let $a (+ $e 10))
+            (let $b (+ $f 10))
+            (struct ($d)
+                (prop! $d O:1:0
+                    (#u (+ $a $b))
                 )
+                (prop! $d O:1:1
+                    (#u (+ $a 20))
+                )
+                (prop! $d O:1:2
+                    (#u (+ $b 20))
+                )
+                (move-rest-attrs $d $c)
             )
         )"
     };
@@ -297,74 +289,25 @@ fn test_struct_arithmetic_property_dependency_within_struct() {
         )
         ",
     );
-    // FIXME: prop S:1:0 is extracted twice.
-    // This will be fixed when scope properties get flattened and rebuilt.
-    let _expected_when_fixed = indoc! {"
-        |$c| (struct ($d)
-            (match-prop $c S:1:0
-                (($_ $f)
-                    (with ($a (map (+ $f 10)))
-                        (prop! $d O:1:1
-                            (#u (+ $a 20))
-                        )
-                        (match-prop $c S:1:1
-                            (($_ $e)
-                                (match-prop $e S:2:0
-                                    (($_ $g)
-                                        (with ($b (map (+ $g 10)))
-                                            (prop! $d O:1:0
-                                                (#u (+ $a $b))
-                                            )
-                                            (prop! $d O:1:2
-                                                (#u (+ $b 20))
-                                            )
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                    )
-                )
-            )
-        )"
-    };
 
     let expected = indoc! {"
-        |$c| (struct ($d)
-            (match-prop $c S:1:0
-                (($_ $f)
-                    (with ($a (map (+ $f 10)))
-                        (prop! $d O:1:1
-                            (#u (+ $a 20))
-                        )
-                        (match-prop $c S:1:1
-                            (($_ $e)
-                                (prop! $d O:1:0
-                                    (#u
-                                        (match-prop $e S:2:0
-                                            (($_ $g)
-                                                (with ($b (map (+ $g 10)))
-                                                    (+ $a $b)
-                                                )
-                                            )
-                                        )
-                                    )
-                                )
-                                (prop! $d O:1:2
-                                    (#u
-                                        (match-prop $e S:2:0
-                                            (($_ $g)
-                                                (with ($b (map (+ $g 10)))
-                                                    (+ $b 20)
-                                                )
-                                            )
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                    )
+        |$c| (block
+            (let-prop $_ $f ($c S:1:0))
+            (let-prop $_ $e ($c S:1:1))
+            (let-prop $_ $g ($e S:2:0))
+            (let $a (+ $f 10))
+            (let $b (+ $g 10))
+            (struct ($d)
+                (prop! $d O:1:0
+                    (#u (+ $a $b))
                 )
+                (prop! $d O:1:1
+                    (#u (+ $a 20))
+                )
+                (prop! $d O:1:2
+                    (#u (+ $b 20))
+                )
+                (move-rest-attrs $d $c)
             )
         )"
     };
@@ -1127,36 +1070,27 @@ mod dependent_scoping {
     )
     ";
 
-    // NOTE: Still uses classic unifier because of function calls in scope
     #[test]
     fn forwards() {
         let output = test_unify(EXPR_1, EXPR_2);
         let expected = indoc! {"
-            |$c| (struct ($f)
-                (match-prop $c S:3:2
-                    (($_ $a)
-                        (prop! $f O:1:0
-                            (#u $a)
-                        )
-                        (match-prop $c S:2:1
-                            (($_ $h)
-                                (with ($b (map (- $a $h)))
-                                    (prop! $f O:2:1
-                                        (#u $b)
-                                    )
-                                    (match-prop $c S:1:0
-                                        (($_ $g)
-                                            (with ($c (map (- $b $g)))
-                                                (prop! $f O:3:2
-                                                    (#u $c)
-                                                )
-                                            )
-                                        )
-                                    )
-                                )
-                            )
-                        )
+            |$c| (block
+                (let-prop $_ $g ($c S:1:0))
+                (let-prop $_ $h ($c S:2:1))
+                (let-prop $_ $a ($c S:3:2))
+                (let $b (- $a $h))
+                (let $c (- $b $g))
+                (struct ($f)
+                    (prop! $f O:1:0
+                        (#u $a)
                     )
+                    (prop! $f O:2:1
+                        (#u $b)
+                    )
+                    (prop! $f O:3:2
+                        (#u $c)
+                    )
+                    (move-rest-attrs $f $c)
                 )
             )"
         };

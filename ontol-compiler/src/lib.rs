@@ -74,7 +74,7 @@ mod typed_hir;
 mod types;
 
 pub const USE_SSA_UNIFIER: bool = true;
-const SSA_UNIFIER_FALLBACK: bool = true;
+const SSA_UNIFIER_FALLBACK: bool = false;
 const USE_FLAT_SEQ_HANDLING: bool = true;
 
 #[derive(Debug)]

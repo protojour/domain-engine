@@ -241,7 +241,9 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             ontol_hir::Kind::Prop(optional, var, prop_id, variants) => {
                 self.write_prop_expr((*optional, *var, *prop_id), variants, node_ref.meta(), mode)
             }
-            ontol_hir::Kind::Regex(..) => Err(UnifierError::TODO(smart_format!("SSA regex"))),
+            ontol_hir::Kind::Regex(..) => {
+                Err(UnifierError::TODO(smart_format!("SSA regex interpolation")))
+            }
             _other => Ok(smallvec![arena_import(
                 &mut self.out_arena,
                 self.expr_arena.node_ref(expr_node),

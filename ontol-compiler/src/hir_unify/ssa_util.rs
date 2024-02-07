@@ -1,19 +1,17 @@
-use ontol_hir::{
-    visitor::HirVisitor, Attribute, Binder, Binding, CaptureGroup, Node, PropFlags, PropVariant,
-    VarAllocator,
-};
+use ontol_hir::{visitor::HirVisitor, Node, PropFlags, PropVariant, VarAllocator};
 use ontol_runtime::{
     value::PropertyId,
     var::{Var, VarSet},
-    DefId, MapFlags,
+    MapFlags,
 };
 use thin_vec::ThinVec;
 
 use crate::{
-    typed_hir::{Meta, TypedHir, TypedHirData},
+    typed_hir::{Meta, TypedHir},
     types::TypeRef,
-    SourceSpan,
 };
+
+use super::ssa_scope_graph::SpannedLet;
 
 #[derive(Clone, Default)]
 pub struct ScopeTracker<'m> {
@@ -74,60 +72,6 @@ impl Scoped {
         }
     }
 }
-
-#[derive(Clone)]
-pub enum Let<'m> {
-    Prop(Attribute<Binding<'m, TypedHir>>, (Var, PropertyId)),
-    PropDefault(
-        Attribute<Binding<'m, TypedHir>>,
-        (Var, PropertyId),
-        Attribute<Node>,
-    ),
-    Regex(ThinVec<ThinVec<CaptureGroup<'m, TypedHir>>>, DefId, Var),
-    RegexIter(
-        TypedHirData<'m, Binder>,
-        ThinVec<ThinVec<CaptureGroup<'m, TypedHir>>>,
-        DefId,
-        Var,
-    ),
-}
-
-impl<'m> Let<'m> {
-    pub fn defines(&self) -> VarSet {
-        match self {
-            Self::Prop(attr, _) | Self::PropDefault(attr, ..) => {
-                Self::binding_defines(&attr.rel).union(&Self::binding_defines(&attr.val))
-            }
-            Self::Regex(groups_list, ..) => {
-                let mut var_set = VarSet::default();
-                for groups in groups_list {
-                    for group in groups {
-                        var_set.insert(group.binder.hir().var);
-                    }
-                }
-                var_set
-            }
-            Self::RegexIter(binder, ..) => VarSet::from_iter([binder.hir().var]),
-        }
-    }
-
-    pub fn dependency(&self) -> Var {
-        match self {
-            Self::Prop(_, (var, _)) | Self::PropDefault(_, (var, _), _) => *var,
-            Self::Regex(.., var) => *var,
-            Self::RegexIter(.., var) => *var,
-        }
-    }
-
-    fn binding_defines(binding: &Binding<'m, TypedHir>) -> VarSet {
-        match binding {
-            Binding::Binder(binder) => VarSet::from_iter([binder.hir().var]),
-            Binding::Wildcard => VarSet::default(),
-        }
-    }
-}
-
-pub type SpannedLet<'m> = (Let<'m>, SourceSpan);
 
 #[derive(Default)]
 pub struct Catcher {
@@ -257,9 +201,9 @@ pub fn scan_immediate_free_vars<const N: usize>(
     analyzer.free_vars
 }
 
-pub fn scan_all_vars_and_labels<const N: usize>(
+pub fn scan_all_vars_and_labels(
     arena: &ontol_hir::arena::Arena<TypedHir>,
-    nodes: [ontol_hir::Node; N],
+    nodes: impl IntoIterator<Item = Node>,
 ) -> VarSet {
     #[derive(Default)]
     struct FreeVarsAnalyzer {
