@@ -199,14 +199,11 @@ fn unify_ssa<'m>(
     }
 
     let mut unifier = SsaUnifier::new(
-        &mut compiler.types,
-        &compiler.relations,
-        &compiler.seal_ctx,
-        &compiler.primitives,
         scope.arena(),
         expr.arena(),
         var_allocator,
         map_flags,
+        compiler,
     );
 
     let unified = unifier.unify(scope.node(), expr.node())?;

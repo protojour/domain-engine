@@ -22,7 +22,7 @@ use crate::{
     type_check::seal::SealCtx,
     typed_hir::{arena_import, Meta, TypedHir, TypedHirData, TypedNodeRef, UNIT_META},
     types::{Type, Types, UNIT_TYPE},
-    NO_SPAN,
+    Compiler, NO_SPAN,
 };
 
 use super::{
@@ -56,25 +56,22 @@ pub struct SsaUnifier<'c, 'm> {
     pub(super) all_scope_vars_and_labels: VarSet,
     pub(super) iter_extended_scope_table:
         FnvHashMap<ontol_hir::Label, Attribute<ExtendedScope<'m>>>,
-    pub(super) scope_tracker: ScopeTracker,
+    pub(super) scope_tracker: ScopeTracker<'m>,
 }
 
 impl<'c, 'm> SsaUnifier<'c, 'm> {
     pub fn new(
-        types: &'c mut Types<'m>,
-        relations: &'c Relations,
-        seal_ctx: &'c SealCtx,
-        primitives: &'c Primitives,
         scope_arena: &'c ontol_hir::arena::Arena<'m, TypedHir>,
         expr_arena: &'c ontol_hir::arena::Arena<'m, TypedHir>,
         var_allocator: ontol_hir::VarAllocator,
         map_flags: MapFlags,
+        compiler: &'c mut Compiler<'m>,
     ) -> Self {
         Self {
-            types,
-            relations,
-            seal_ctx,
-            primitives,
+            types: &mut compiler.types,
+            relations: &compiler.relations,
+            seal_ctx: &compiler.seal_ctx,
+            primitives: &compiler.primitives,
             var_allocator,
             scope_arena,
             expr_arena,
@@ -93,7 +90,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         scope_node: ontol_hir::Node,
         expr_node: ontol_hir::Node,
     ) -> UnifierResult<UnifiedNode<'m>> {
-        self.all_scope_vars_and_labels = scan_all_vars_and_labels(&self.scope_arena, [scope_node]);
+        self.all_scope_vars_and_labels = scan_all_vars_and_labels(self.scope_arena, [scope_node]);
 
         self.block_unify(scope_node, expr_node, Scoped::Yes)
     }
@@ -265,7 +262,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
 
         match (mode, variants.first().unwrap()) {
             (ExprMode::Expr(_), PropVariant::Singleton(Attribute { rel, val })) => {
-                let free_vars = scan_immediate_free_vars(&self.expr_arena, [*rel, *val]);
+                let free_vars = scan_immediate_free_vars(self.expr_arena, [*rel, *val]);
                 self.maybe_apply_catch_block(free_vars, meta.span, &|zelf| {
                     let rel = zelf.write_one_expr(*rel, mode)?;
                     let val = zelf.write_one_expr(*val, mode)?;
@@ -415,7 +412,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     // panic!("set prop: no iteration source");
                     return Ok(self.mk_node(ontol_hir::Kind::Unit, seq_meta));
                 };
-                let free_vars = scan_immediate_free_vars(&self.expr_arena, [rel, val]);
+                let free_vars = scan_immediate_free_vars(self.expr_arena, [rel, val]);
 
                 let for_each = self.prealloc_node();
                 let ((rel_binding, val_binding), for_each_body) = self.new_loop_scope(

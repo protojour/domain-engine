@@ -650,11 +650,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             self.collect_match_attributes(property_set, &mut match_attributes);
 
             for (_, match_attribute) in match_attributes {
-                match match_attribute.cardinality {
-                    (PropertyCardinality::Mandatory, ValueCardinality::One) => {
-                        return false;
-                    }
-                    _ => {}
+                if let (PropertyCardinality::Mandatory, ValueCardinality::One) =
+                    match_attribute.cardinality
+                {
+                    return false;
                 }
             }
         }

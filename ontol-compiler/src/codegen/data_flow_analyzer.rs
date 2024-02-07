@@ -77,11 +77,6 @@ where
                 }
             }
             _ => {
-                // self.var_to_property
-                //     .entry(arg)
-                //     .or_default()
-                //     .insert(unit_prop_id);
-
                 let deps = self.analyze_node(body, unit_prop_id);
                 self.reg_output_prop(arg, unit_prop_id, deps);
             }
@@ -371,14 +366,10 @@ where
         property_id: PropertyId,
         mut var_dependencies: VarSet,
     ) {
-        // debug!("START reg output prop {property_id:?} deps: {var_dependencies:?}");
-
         while !var_dependencies.0.is_empty() {
             let mut next_deps = VarSet::default();
 
             for var in &var_dependencies {
-                // debug!("    handle {var}");
-
                 if true {
                     if let Some(source_prop) = self.var_origins.get(&var) {
                         self.property_flow.insert(PropertyFlow {
@@ -388,18 +379,16 @@ where
                     } else if let Some(parent_vars) = self.var_dependencies.get(&var) {
                         next_deps.union_with(parent_vars);
                     }
-                } else {
-                    if let Some(deps) = self.prop_origins_inverted.get(&var) {
-                        for dep_prop_id in deps {
-                            // debug!("      insert {dep_prop_id}");
-                            self.property_flow.insert(PropertyFlow {
-                                id: property_id,
-                                data: PropertyFlowData::DependentOn(*dep_prop_id),
-                            });
-                        }
-                    } else if let Some(parent_vars) = self.var_dependencies.get(&var) {
-                        next_deps.union_with(parent_vars);
+                } else if let Some(deps) = self.prop_origins_inverted.get(&var) {
+                    for dep_prop_id in deps {
+                        // debug!("      insert {dep_prop_id}");
+                        self.property_flow.insert(PropertyFlow {
+                            id: property_id,
+                            data: PropertyFlowData::DependentOn(*dep_prop_id),
+                        });
                     }
+                } else if let Some(parent_vars) = self.var_dependencies.get(&var) {
+                    next_deps.union_with(parent_vars);
                 }
             }
 

@@ -1,57 +1,24 @@
-use ontol_hir::{visitor::HirVisitor, PropFlags, PropVariant, VarAllocator};
+use ontol_hir::{
+    visitor::HirVisitor, Attribute, Binder, Binding, CaptureGroup, Node, PropFlags, PropVariant,
+    VarAllocator,
+};
 use ontol_runtime::{
     value::PropertyId,
     var::{Var, VarSet},
-    MapFlags,
+    DefId, MapFlags,
 };
 use thin_vec::ThinVec;
 
 use crate::{
-    typed_hir::{Meta, TypedHir},
+    typed_hir::{Meta, TypedHir, TypedHirData},
     types::TypeRef,
+    SourceSpan,
 };
 
 #[derive(Clone, Default)]
-pub struct ScopeTracker {
+pub struct ScopeTracker<'m> {
     pub in_scope: VarSet,
-}
-
-#[derive(Default)]
-pub struct Catcher {
-    catch_label: Option<ontol_hir::Label>,
-}
-
-impl Catcher {
-    pub fn make_catch_label(&mut self, var_allocator: &mut VarAllocator) -> ontol_hir::Label {
-        match &self.catch_label {
-            Some(label) => *label,
-            None => {
-                let label = ontol_hir::Label(var_allocator.alloc().0);
-                self.catch_label = Some(label);
-                label
-            }
-        }
-    }
-
-    pub fn finish(self) -> Option<ontol_hir::Label> {
-        self.catch_label
-    }
-}
-
-#[derive(Clone, Copy)]
-pub enum Scoped {
-    Yes,
-    MaybeVoid,
-}
-
-impl Scoped {
-    pub fn prop(flags: MapFlags) -> Self {
-        if flags.contains(MapFlags::PURE_PARTIAL) {
-            Self::MaybeVoid
-        } else {
-            Self::Yes
-        }
-    }
+    pub potential_lets: Vec<SpannedLet<'m>>,
 }
 
 #[derive(Clone, Copy)]
@@ -92,6 +59,98 @@ impl ExprMode {
     }
 }
 
+#[derive(Clone, Copy)]
+pub enum Scoped {
+    Yes,
+    MaybeVoid,
+}
+
+impl Scoped {
+    pub fn prop(self, flags: MapFlags) -> Self {
+        if flags.contains(MapFlags::PURE_PARTIAL) {
+            Self::MaybeVoid
+        } else {
+            self
+        }
+    }
+}
+
+#[derive(Clone)]
+pub enum Let<'m> {
+    Prop(Attribute<Binding<'m, TypedHir>>, (Var, PropertyId)),
+    PropDefault(
+        Attribute<Binding<'m, TypedHir>>,
+        (Var, PropertyId),
+        Attribute<Node>,
+    ),
+    Regex(ThinVec<ThinVec<CaptureGroup<'m, TypedHir>>>, DefId, Var),
+    RegexIter(
+        TypedHirData<'m, Binder>,
+        ThinVec<ThinVec<CaptureGroup<'m, TypedHir>>>,
+        DefId,
+        Var,
+    ),
+}
+
+impl<'m> Let<'m> {
+    pub fn defines(&self) -> VarSet {
+        match self {
+            Self::Prop(attr, _) | Self::PropDefault(attr, ..) => {
+                Self::binding_defines(&attr.rel).union(&Self::binding_defines(&attr.val))
+            }
+            Self::Regex(groups_list, ..) => {
+                let mut var_set = VarSet::default();
+                for groups in groups_list {
+                    for group in groups {
+                        var_set.insert(group.binder.hir().var);
+                    }
+                }
+                var_set
+            }
+            Self::RegexIter(binder, ..) => VarSet::from_iter([binder.hir().var]),
+        }
+    }
+
+    pub fn dependency(&self) -> Var {
+        match self {
+            Self::Prop(_, (var, _)) | Self::PropDefault(_, (var, _), _) => *var,
+            Self::Regex(.., var) => *var,
+            Self::RegexIter(.., var) => *var,
+        }
+    }
+
+    fn binding_defines(binding: &Binding<'m, TypedHir>) -> VarSet {
+        match binding {
+            Binding::Binder(binder) => VarSet::from_iter([binder.hir().var]),
+            Binding::Wildcard => VarSet::default(),
+        }
+    }
+}
+
+pub type SpannedLet<'m> = (Let<'m>, SourceSpan);
+
+#[derive(Default)]
+pub struct Catcher {
+    catch_label: Option<ontol_hir::Label>,
+}
+
+impl Catcher {
+    pub fn make_catch_label(&mut self, var_allocator: &mut VarAllocator) -> ontol_hir::Label {
+        match &self.catch_label {
+            Some(label) => *label,
+            None => {
+                let label = ontol_hir::Label(var_allocator.alloc().0);
+                self.catch_label = Some(label);
+                label
+            }
+        }
+    }
+
+    pub fn finish(self) -> Option<ontol_hir::Label> {
+        self.catch_label
+    }
+}
+
 #[derive(Clone)]
 pub enum ExtendedScope<'m> {
     Wildcard,
@@ -116,8 +175,8 @@ pub struct TypeMapping<'m> {
     pub to: TypeRef<'m>,
 }
 
-pub fn scan_immediate_free_vars<'m, const N: usize>(
-    arena: &ontol_hir::arena::Arena<'m, TypedHir>,
+pub fn scan_immediate_free_vars<const N: usize>(
+    arena: &ontol_hir::arena::Arena<TypedHir>,
     nodes: [ontol_hir::Node; N],
 ) -> VarSet {
     #[derive(Default)]
@@ -198,8 +257,8 @@ pub fn scan_immediate_free_vars<'m, const N: usize>(
     analyzer.free_vars
 }
 
-pub fn scan_all_vars_and_labels<'m, const N: usize>(
-    arena: &ontol_hir::arena::Arena<'m, TypedHir>,
+pub fn scan_all_vars_and_labels<const N: usize>(
+    arena: &ontol_hir::arena::Arena<TypedHir>,
     nodes: [ontol_hir::Node; N],
 ) -> VarSet {
     #[derive(Default)]

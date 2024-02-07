@@ -379,7 +379,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 };
 
                 let capture_index_union =
-                    self.gen_regex_capture_index_union(&groups_list, span, true);
+                    self.gen_regex_capture_index_union(groups_list, span, true);
                 let bind_size = capture_index_union.len();
 
                 let (_label, mut pre) = self.builder.split_block(block);
@@ -432,7 +432,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     return;
                 };
                 let capture_index_union =
-                    self.gen_regex_capture_index_union(&groups_list, span, false);
+                    self.gen_regex_capture_index_union(groups_list, span, false);
                 block.op(
                     OpCode::RegexCaptureIter(haystack_local, *regex_def_id),
                     Delta(1),
@@ -1386,7 +1386,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
         let Some(fail_label) = self.catch_points.get(&hir_label).cloned() else {
             self.errors.error(
                 CompileError::TODO(smart_format!("catch block not found")),
-                &span,
+                span,
             );
             return BlockLabel(Var(0));
         };

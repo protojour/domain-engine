@@ -833,6 +833,7 @@ fn test_unify_opt_props2() {
                     (#u
                         (struct ($e)
                             (catch (@f)
+                                (try? @f $c)
                                 (let-prop? @f $_ $a ($c S:2:1))
                                 (prop? $e O:2:1
                                     (#u $a)
@@ -901,13 +902,15 @@ fn test_unify_opt_props3() {
                     (#u
                         (struct ($g)
                             (catch (@h)
+                                (try? @h $d)
                                 (let-prop? @h $_ $a ($d S:2:0))
                                 (prop? $g O:2:0
                                     (#u $a)
                                 )
                             )
                             (catch (@i)
-                                (let-prop? @h $_ $b ($e S:2:1))
+                                (try? @i $e)
+                                (let-prop? @i $_ $b ($e S:2:1))
                                 (prop? $g O:2:1
                                     (#u $b)
                                 )
@@ -978,13 +981,15 @@ fn test_unify_opt_props4() {
                     (#u
                         (struct ($g)
                             (catch (@i)
-                                (let-prop? @i @i $a ($d S:2:0))
+                                (try? @i $d)
+                                (let-prop? @i $_ $a ($d S:2:0))
                                 (prop? $g O:2:0
                                     (#u $a)
                                 )
                             )
                             (catch (@j)
-                                (let-prop? @i @i $b ($e S:2:1))
+                                (try? @j $e)
+                                (let-prop? @j $_ $b ($e S:2:1))
                                 (prop? $g O:2:1
                                     (#u $b)
                                 )
@@ -1064,8 +1069,10 @@ fn test_unify_opt_rel_and_val_struct_merge1() {
             (let-prop $d $e ($c S:1:0))
             (struct ($f)
                 (catch (@g)
+                    (try? @g $d)
                     (let-prop? @g $_ $a ($d S:2:0))
-                    (let-prop? @g $_ $b ($b S:2:1))
+                    (try? @g $e)
+                    (let-prop? @g $_ $b ($e S:2:1))
                     (prop? $f O:1:0
                         (#u (+ $a $b))
                     )

@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use chumsky::chain::Chain;
-use ontol_hir::{Attribute, Nodes};
+use ontol_hir::{Attribute, Kind, Label, Nodes};
 use ontol_runtime::{
     smart_format,
     var::{Var, VarSet},
@@ -11,7 +11,7 @@ use thin_vec::thin_vec;
 use tracing::debug;
 
 use crate::{
-    hir_unify::{ssa_util::NodesExt, UnifierError},
+    hir_unify::UnifierError,
     mem::Intern,
     primitive::PrimitiveKind,
     typed_hir::{Meta, TypedHir, TypedHirData, UNIT_META},
@@ -21,7 +21,7 @@ use crate::{
 
 use super::{
     ssa_unifier::SsaUnifier,
-    ssa_util::{Catcher, ExtendedScope, Scoped},
+    ssa_util::{Catcher, ExtendedScope, Let, Scoped, SpannedLet},
     UnifierResult,
 };
 
@@ -80,9 +80,132 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         scoped: Scoped,
         body: &mut Nodes,
     ) -> UnifierResult<ontol_hir::Binding<'m, TypedHir>> {
+        let mut scoped_lets = vec![];
+        let binding = self.traverse(scope_node, scoped, &mut scoped_lets)?;
+
+        for (let_node, span) in scoped_lets {
+            let kind = match let_node {
+                Let::Prop(attr, var_prop) => ontol_hir::Kind::LetProp(attr, var_prop),
+                Let::PropDefault(attr, var_prop, default) => {
+                    ontol_hir::Kind::LetPropDefault(attr, var_prop, default)
+                }
+                Let::Regex(groups_list, def, var) => {
+                    ontol_hir::Kind::LetRegex(groups_list, def, var)
+                }
+                Let::RegexIter(binder, groups_list, def, var) => {
+                    ontol_hir::Kind::LetRegexIter(binder, groups_list, def, var)
+                }
+            };
+            body.push(self.mk_node(kind, Meta::new(&UNIT_TYPE, span)));
+        }
+
+        Ok(binding)
+    }
+
+    pub(super) fn new_loop_scope<T>(
+        &mut self,
+        span: SourceSpan,
+        func: impl FnOnce(
+            &mut SsaUnifier<'c, 'm>,
+            &mut ontol_hir::Nodes,
+            &mut Catcher,
+        ) -> UnifierResult<(T, ontol_hir::Nodes)>,
+    ) -> UnifierResult<(T, ontol_hir::Nodes)> {
+        let mut scope_body = smallvec![];
+        let mut catch_helper = Catcher::default();
+
+        let scope_backup = self.scope_tracker.clone();
+
+        let (ret, body) = func(self, &mut scope_body, &mut catch_helper)?;
+
+        let body = if let Some(catch_label) = catch_helper.finish() {
+            let catch_block = self.prealloc_node();
+
+            scope_body.extend(body);
+
+            smallvec![self.write_node(
+                catch_block,
+                ontol_hir::Kind::Catch(catch_label, scope_body),
+                Meta::new(&UNIT_TYPE, span),
+            )]
+        } else {
+            scope_body.extend(body);
+            scope_body
+        };
+
+        self.scope_tracker = scope_backup;
+
+        Ok((ret, body))
+    }
+
+    pub(super) fn maybe_apply_catch_block(
+        &mut self,
+        mut free_vars: VarSet,
+        span: SourceSpan,
+        body_func: &dyn Fn(&mut SsaUnifier<'c, 'm>) -> UnifierResult<ontol_hir::Nodes>,
+    ) -> UnifierResult<ontol_hir::Nodes> {
+        // disregard variables that are never in scope,
+        // to not confuse error reporting
+        free_vars
+            .0
+            .intersect_with(&self.all_scope_vars_and_labels.0);
+
+        debug!("catch block: free vars: {free_vars:?}");
+        debug!("catch block: in scope: {:?}", self.scope_tracker.in_scope);
+        debug!(
+            "catch block: total scope: {:?}",
+            self.all_scope_vars_and_labels
+        );
+
+        let unscoped = VarSet(
+            free_vars
+                .0
+                .difference(&self.scope_tracker.in_scope.0)
+                .collect(),
+        );
+
+        if unscoped.0.is_empty() {
+            return body_func(self);
+        }
+
+        let scope_backup = self.scope_tracker.clone();
+
+        let catch_block = self.prealloc_node();
+        let catch_label = ontol_hir::Label(self.var_allocator.alloc().0);
+        let mut catch_body = smallvec![];
+
+        debug!("apply catch block: {unscoped:?}");
+
+        for var in unscoped.iter() {
+            self.make_try_let(
+                var,
+                catch_label,
+                span,
+                &scope_backup.potential_lets,
+                &mut catch_body,
+            )?;
+        }
+
+        catch_body.extend(body_func(self)?);
+
+        self.scope_tracker = scope_backup;
+
+        Ok(smallvec![self.write_node(
+            catch_block,
+            ontol_hir::Kind::Catch(catch_label, catch_body),
+            Meta::new(&UNIT_TYPE, span),
+        )])
+    }
+
+    fn traverse(
+        &mut self,
+        scope_node: ontol_hir::Node,
+        scoped: Scoped,
+        lets: &mut Vec<SpannedLet<'m>>,
+    ) -> UnifierResult<ontol_hir::Binding<'m, TypedHir>> {
         let node_ref = self.scope_arena.node_ref(scope_node);
 
-        use ontol_hir::{Binding, Kind};
+        use ontol_hir::Binding;
         match node_ref.hir() {
             Kind::NoOp => Ok(Binding::Wildcard),
             Kind::Var(var) => {
@@ -95,8 +218,11 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 )))
             }
             Kind::Block(block_body) | Kind::Catch(_, block_body) => {
-                body.extend(block_body.iter().cloned());
-                Ok(Binding::Wildcard)
+                if let Some(last) = block_body.last() {
+                    self.traverse(*last, scoped, lets)
+                } else {
+                    Ok(Binding::Wildcard)
+                }
             }
             Kind::Unit => Ok(Binding::Wildcard),
             Kind::I64(_) => Ok(Binding::Wildcard),
@@ -105,7 +231,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             Kind::Const(_) => Ok(Binding::Wildcard),
             Kind::With(_, _, _) => Err(UnifierError::TODO(smart_format!("with scope"))),
             Kind::Call(_, _) => Err(UnifierError::TODO(smart_format!("call scope"))),
-            Kind::Map(inner) => match self.define_scope(*inner, scoped, body)? {
+            Kind::Map(inner) => match self.traverse(*inner, scoped, lets)? {
                 ontol_hir::Binding::Wildcard => Ok(ontol_hir::Binding::Wildcard),
                 ontol_hir::Binding::Binder(binder) => Ok(ontol_hir::Binding::Binder(TypedHirData(
                     *binder.hir(),
@@ -115,19 +241,18 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             },
             Kind::Set(_) => Err(UnifierError::SequenceInputNotSupported),
             Kind::Struct(binder, _, struct_body) => {
-                if matches!(scoped, Scoped::Yes) {
-                    for node in struct_body {
-                        self.define_scope(*node, scoped, body)?;
-                    }
+                for node in struct_body {
+                    self.traverse(*node, scoped, lets)?;
                 }
                 Ok(Binding::Binder(*binder))
             }
             Kind::Prop(flags, var, prop_id, variants) => {
+                let mut sub_lets = vec![];
+
                 for variant in variants {
                     match variant {
                         ontol_hir::PropVariant::Singleton(ontol_hir::Attribute { rel, val }) => {
-                            let let_prop = body.push_node(self.prealloc_node());
-                            let scoped_prop = Scoped::prop(self.map_flags);
+                            let prop_scoped = scoped.prop(self.map_flags);
 
                             match (flags.rel_optional(), flags.pat_optional()) {
                                 (true, false) => {
@@ -141,36 +266,35 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                                         ),
                                     };
 
-                                    let rel = self.define_scope(*rel, scoped_prop, body)?;
-                                    let val = self.define_scope(*val, scoped_prop, body)?;
+                                    let rel = self.traverse(*rel, prop_scoped, &mut sub_lets)?;
+                                    let val = self.traverse(*val, prop_scoped, &mut sub_lets)?;
 
-                                    self.write_node(
-                                        let_prop,
-                                        ontol_hir::Kind::LetPropDefault(
+                                    self.push_let(
+                                        Let::PropDefault(
                                             Attribute { rel, val },
                                             (*var, *prop_id),
                                             default,
                                         ),
-                                        Meta::new(&UNIT_TYPE, node_ref.span()),
+                                        node_ref.span(),
+                                        scoped,
+                                        lets,
                                     );
                                 }
                                 (rel_optional, _) => {
                                     let next_scoped = if rel_optional {
                                         Scoped::MaybeVoid
                                     } else {
-                                        scoped_prop
+                                        prop_scoped
                                     };
 
-                                    let rel = self.define_scope(*rel, next_scoped, body)?;
-                                    let val = self.define_scope(*val, next_scoped, body)?;
+                                    let rel = self.traverse(*rel, next_scoped, &mut sub_lets)?;
+                                    let val = self.traverse(*val, next_scoped, &mut sub_lets)?;
 
-                                    self.write_node(
-                                        let_prop,
-                                        ontol_hir::Kind::LetProp(
-                                            Attribute { rel, val },
-                                            (*var, *prop_id),
-                                        ),
-                                        Meta::new(&UNIT_TYPE, node_ref.span()),
+                                    self.push_let(
+                                        Let::Prop(Attribute { rel, val }, (*var, *prop_id)),
+                                        node_ref.span(),
+                                        scoped,
+                                        lets,
                                     );
                                 }
                             };
@@ -227,19 +351,23 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                                     seq_meta,
                                 );
 
-                                body.push(self.mk_node(
-                                    ontol_hir::Kind::LetPropDefault(
+                                self.push_let(
+                                    Let::PropDefault(
                                         binding,
                                         (*var, *prop_id),
                                         ontol_hir::Attribute { rel, val },
                                     ),
-                                    Meta::new(&UNIT_TYPE, node_ref.span()),
-                                ));
+                                    node_ref.span(),
+                                    scoped,
+                                    lets,
+                                );
                             } else {
-                                body.push(self.mk_node(
-                                    ontol_hir::Kind::LetProp(binding, (*var, *prop_id)),
-                                    Meta::new(&UNIT_TYPE, node_ref.span()),
-                                ));
+                                self.push_let(
+                                    Let::Prop(binding, (*var, *prop_id)),
+                                    node_ref.span(),
+                                    scoped,
+                                    lets,
+                                );
                             }
                         }
                         ontol_hir::PropVariant::Predicate(_) => {
@@ -247,6 +375,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                         }
                     }
                 }
+                lets.extend(sub_lets);
                 Ok(Binding::Wildcard)
             }
             Kind::Regex(iter_label, regex_def_id, groups_list) => {
@@ -301,29 +430,30 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                             );
                         }
 
-                        body.push(self.mk_node(
-                            ontol_hir::Kind::LetRegexIter(
+                        self.push_let(
+                            Let::RegexIter(
                                 TypedHirData(ontol_hir::Binder { var: seq_var }, *node_ref.meta()),
                                 groups_list.clone(),
                                 *regex_def_id,
                                 haystack_var,
                             ),
-                            Meta::new(&UNIT_TYPE, node_ref.span()),
-                        ));
+                            node_ref.span(),
+                            scoped,
+                            lets,
+                        );
+
                         Ok(Binding::Binder(TypedHirData(
                             ontol_hir::Binder { var: haystack_var },
                             *node_ref.meta(),
                         )))
                     }
                     None => {
-                        body.push(self.mk_node(
-                            ontol_hir::Kind::LetRegex(
-                                groups_list.clone(),
-                                *regex_def_id,
-                                haystack_var,
-                            ),
-                            Meta::new(&UNIT_TYPE, node_ref.span()),
-                        ));
+                        self.push_let(
+                            Let::Regex(groups_list.clone(), *regex_def_id, haystack_var),
+                            node_ref.span(),
+                            scoped,
+                            lets,
+                        );
                         Ok(Binding::Binder(TypedHirData(
                             ontol_hir::Binder { var: haystack_var },
                             *node_ref.meta(),
@@ -354,95 +484,63 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         }
     }
 
-    pub(super) fn new_loop_scope<T>(
+    fn push_let(
         &mut self,
+        let_node: Let<'m>,
         span: SourceSpan,
-        func: impl FnOnce(
-            &mut SsaUnifier<'c, 'm>,
-            &mut ontol_hir::Nodes,
-            &mut Catcher,
-        ) -> UnifierResult<(T, ontol_hir::Nodes)>,
-    ) -> UnifierResult<(T, ontol_hir::Nodes)> {
-        let mut scope_body = smallvec![];
-        let mut catch_helper = Catcher::default();
-
-        let scope_backup = self.scope_tracker.clone();
-
-        let (ret, body) = func(self, &mut scope_body, &mut catch_helper)?;
-
-        let body = if let Some(catch_label) = catch_helper.finish() {
-            let catch_block = self.prealloc_node();
-
-            scope_body.extend(body);
-
-            smallvec![self.write_node(
-                catch_block,
-                ontol_hir::Kind::Catch(catch_label, scope_body),
-                Meta::new(&UNIT_TYPE, span),
-            )]
-        } else {
-            scope_body.extend(body);
-            scope_body
-        };
-
-        self.scope_tracker = scope_backup;
-
-        Ok((ret, body))
+        scoped: Scoped,
+        scoped_lets: &mut Vec<SpannedLet<'m>>,
+    ) {
+        match scoped {
+            Scoped::Yes => {
+                scoped_lets.push((let_node, span));
+            }
+            Scoped::MaybeVoid => {
+                self.scope_tracker.potential_lets.push((let_node, span));
+            }
+        }
     }
 
-    pub(super) fn maybe_apply_catch_block(
+    fn make_try_let(
         &mut self,
-        mut free_vars: VarSet,
-        span: SourceSpan,
-        body_func: &dyn Fn(&mut SsaUnifier<'c, 'm>) -> UnifierResult<ontol_hir::Nodes>,
-    ) -> UnifierResult<ontol_hir::Nodes> {
-        // disregard variables that are never in scope,
-        // to not confuse error reporting
-        free_vars
-            .0
-            .intersect_with(&self.all_scope_vars_and_labels.0);
-
-        let unscoped = VarSet(
-            free_vars
-                .0
-                .difference(&self.scope_tracker.in_scope.0)
-                .collect(),
-        );
-
-        if unscoped.0.is_empty() {
-            return body_func(self);
+        var: Var,
+        catch_label: Label,
+        default_span: SourceSpan,
+        potential_lets: &[SpannedLet<'m>],
+        output: &mut ontol_hir::Nodes,
+    ) -> UnifierResult<()> {
+        if self.scope_tracker.in_scope.contains(var) {
+            return Ok(());
         }
 
-        debug!("catch block: free vars: {free_vars:?}");
-        debug!(
-            "catch block: total scope: {:?}",
-            self.all_scope_vars_and_labels
-        );
+        for (let_node, span) in potential_lets {
+            let defines = let_node.defines();
+            if defines.contains(var) {
+                self.scope_tracker.in_scope.0.extend(&defines.0);
 
-        let scope_backup = self.scope_tracker.clone();
+                let dependency = let_node.dependency();
+                assert_ne!(dependency, var);
+                self.make_try_let(dependency, catch_label, *span, potential_lets, output)?;
 
-        let catch_block = self.prealloc_node();
-        let catch_label = ontol_hir::Label(self.var_allocator.alloc().0);
-        let mut catch_body = smallvec![];
-
-        debug!("apply catch block: {unscoped:?}");
-
-        for var in unscoped.iter() {
-            self.scope_tracker.in_scope.insert(var);
-            catch_body.push(self.mk_node(
-                ontol_hir::Kind::Try(catch_label, var),
-                Meta::new(&UNIT_TYPE, span),
-            ));
+                let kind = match let_node {
+                    Let::Prop(attr, var_prop) => Kind::TryLetProp(catch_label, *attr, *var_prop),
+                    _ => {
+                        return Err(UnifierError::Unimplemented(smart_format!(
+                            "unhandled try let variant"
+                        )))
+                    }
+                };
+                output.push(self.mk_node(kind, Meta::new(&UNIT_TYPE, *span)));
+                return Ok(());
+            }
         }
 
-        catch_body.extend(body_func(self)?);
+        self.scope_tracker.in_scope.insert(var);
+        output.push(self.mk_node(
+            Kind::Try(catch_label, var),
+            Meta::new(&UNIT_TYPE, default_span),
+        ));
 
-        self.scope_tracker = scope_backup;
-
-        Ok(smallvec![self.write_node(
-            catch_block,
-            ontol_hir::Kind::Catch(catch_label, catch_body),
-            Meta::new(&UNIT_TYPE, span),
-        )])
+        Ok(())
     }
 }
