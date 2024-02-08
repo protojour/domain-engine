@@ -1,14 +1,14 @@
 use std::collections::BTreeMap;
 
 use chumsky::chain::Chain;
-use ontol_hir::{Attribute, Binder, Kind, Label, Nodes};
+use ontol_hir::{Attribute, Binder, Binding, Kind, Label, Node, Nodes, PropVariant, SetEntry};
 use ontol_runtime::{
     smart_format,
     var::{Var, VarSet},
 };
 use smallvec::smallvec;
 use thin_vec::thin_vec;
-use tracing::debug;
+use tracing::trace;
 
 use crate::{
     hir_unify::{ssa_util::scan_all_vars_and_labels, UnifierError},
@@ -16,11 +16,11 @@ use crate::{
     primitive::PrimitiveKind,
     typed_hir::{Meta, TypedHir, TypedHirData, UNIT_META},
     types::{Type, UNIT_TYPE},
-    SourceSpan,
+    CompileError, SourceSpan,
 };
 
 use super::{
-    ssa_scope_graph::{AmbiguousExpr, Let, SpannedLet},
+    ssa_scope_graph::{ComplexExpr, Let, SpannedLet},
     ssa_unifier::SsaUnifier,
     ssa_util::{Catcher, ExtendedScope, Scoped},
     UnifierResult,
@@ -34,53 +34,50 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         free_vars: &VarSet,
         body: &mut Nodes,
         catcher: &mut Catcher,
-    ) -> UnifierResult<ontol_hir::Binding<'m, TypedHir>> {
+    ) -> UnifierResult<Binding<'m, TypedHir>> {
         match scope_node {
-            ExtendedScope::Wildcard => Ok(ontol_hir::Binding::Wildcard),
+            ExtendedScope::Wildcard => Ok(Binding::Wildcard),
             ExtendedScope::Node(node) => self.define_scope(node, scoped, body),
             ExtendedScope::SeqUnpack(bindings, source_meta) => {
                 let var = self.var_allocator.alloc();
 
                 let catch_label = catcher.make_catch_label(&mut self.var_allocator);
 
-                let var_node = self.mk_node(ontol_hir::Kind::Var(var), source_meta);
+                let var_node = self.mk_node(Kind::Var(var), source_meta);
 
                 let mut new_bindings = thin_vec![];
                 for binding in bindings {
                     match binding {
-                        ontol_hir::Binding::Wildcard => {
-                            new_bindings.push(ontol_hir::Binding::Wildcard);
+                        Binding::Wildcard => {
+                            new_bindings.push(Binding::Wildcard);
                         }
-                        ontol_hir::Binding::Binder(binder) => {
+                        Binding::Binder(binder) => {
                             if free_vars.contains(binder.hir().var) {
                                 self.scope_tracker.in_scope.insert(binder.hir().var);
-                                new_bindings.push(ontol_hir::Binding::Binder(binder))
+                                new_bindings.push(Binding::Binder(binder))
                             } else {
-                                new_bindings.push(ontol_hir::Binding::Wildcard);
+                                new_bindings.push(Binding::Wildcard);
                             }
                         }
                     }
                 }
 
                 body.push(self.mk_node(
-                    ontol_hir::Kind::TryLetTup(catch_label, new_bindings, var_node),
+                    Kind::TryLetTup(catch_label, new_bindings, var_node),
                     UNIT_META,
                 ));
 
-                Ok(ontol_hir::Binding::Binder(TypedHirData(
-                    ontol_hir::Binder { var },
-                    UNIT_META,
-                )))
+                Ok(Binding::Binder(TypedHirData(Binder { var }, UNIT_META)))
             }
         }
     }
 
     pub(super) fn define_scope(
         &mut self,
-        scope_node: ontol_hir::Node,
+        scope_node: Node,
         scoped: Scoped,
         body: &mut Nodes,
-    ) -> UnifierResult<ontol_hir::Binding<'m, TypedHir>> {
+    ) -> UnifierResult<Binding<'m, TypedHir>> {
         let mut scoped_lets = vec![];
         let binding = self.traverse(scope_node, scoped, &mut scoped_lets)?;
 
@@ -88,24 +85,16 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
 
         for (let_node, span) in scoped_lets {
             let kind = match let_node {
-                Let::Prop(attr, var_prop) => ontol_hir::Kind::LetProp(attr, var_prop),
+                Let::Prop(attr, var_prop) => Kind::LetProp(attr, var_prop),
                 Let::PropDefault(attr, var_prop, default) => {
-                    ontol_hir::Kind::LetPropDefault(attr, var_prop, default)
+                    Kind::LetPropDefault(attr, var_prop, default)
                 }
-                Let::Regex(groups_list, def, var) => {
-                    ontol_hir::Kind::LetRegex(groups_list, def, var)
-                }
+                Let::Regex(groups_list, def, var) => Kind::LetRegex(groups_list, def, var),
                 Let::RegexIter(binder, groups_list, def, var) => {
-                    ontol_hir::Kind::LetRegexIter(binder, groups_list, def, var)
+                    Kind::LetRegexIter(binder, groups_list, def, var)
                 }
-                Let::Expr(binder, node) => {
-                    // generated "let graph" expression from ambiguous source.
-                    // update scope table:
-                    self.scope_tracker.in_scope.insert(binder.hir().var);
-
-                    ontol_hir::Kind::Let(binder, node)
-                }
-                Let::AmbiguousExpr(AmbiguousExpr { .. }) => {
+                Let::Expr(binder, node) => Kind::Let(binder, node),
+                Let::Complex(ComplexExpr { .. }) => {
                     continue;
                 }
             };
@@ -163,9 +152,9 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             .0
             .intersect_with(&self.all_scope_vars_and_labels.0);
 
-        debug!("catch block: free vars: {free_vars:?}");
-        debug!("catch block: in scope: {:?}", self.scope_tracker.in_scope);
-        debug!(
+        trace!("catch block: free vars: {free_vars:?}");
+        trace!("catch block: in scope: {:?}", self.scope_tracker.in_scope);
+        trace!(
             "catch block: total scope: {:?}",
             self.all_scope_vars_and_labels
         );
@@ -187,7 +176,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         let catch_label = ontol_hir::Label(self.var_allocator.alloc().0);
         let mut catch_body = smallvec![];
 
-        debug!("apply catch block: {unscoped:?}");
+        trace!("apply catch block: {unscoped:?}");
 
         for var in unscoped.iter() {
             self.make_try_let(
@@ -218,7 +207,6 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
     ) -> UnifierResult<ontol_hir::Binding<'m, TypedHir>> {
         let node_ref = self.scope_arena.node_ref(scope_node);
 
-        use ontol_hir::Binding;
         match node_ref.hir() {
             Kind::NoOp => Ok(Binding::Wildcard),
             Kind::Var(var) => {
@@ -242,12 +230,11 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             Kind::F64(_) => Ok(Binding::Wildcard),
             Kind::Text(_) => Ok(Binding::Wildcard),
             Kind::Const(_) => Ok(Binding::Wildcard),
-            Kind::With(_, _, _) => Err(UnifierError::TODO(smart_format!("with scope"))),
             Kind::Call(_, nodes) => {
                 let var = self.var_allocator.alloc();
                 let free_vars = scan_all_vars_and_labels(self.scope_arena, nodes.iter().cloned());
                 self.push_let(
-                    Let::AmbiguousExpr(AmbiguousExpr {
+                    Let::Complex(ComplexExpr {
                         dependency: TypedHirData(Binder { var }, *node_ref.meta()),
                         produces: free_vars,
                         scope_node,
@@ -262,14 +249,56 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 )))
             }
             Kind::Map(inner) => match self.traverse(*inner, scoped, lets)? {
-                ontol_hir::Binding::Wildcard => Ok(ontol_hir::Binding::Wildcard),
-                ontol_hir::Binding::Binder(binder) => Ok(ontol_hir::Binding::Binder(TypedHirData(
+                Binding::Wildcard => Ok(Binding::Wildcard),
+                Binding::Binder(binder) => Ok(Binding::Binder(TypedHirData(
                     *binder.hir(),
                     // write the outer metadata into the inner binder:
                     *node_ref.meta(),
                 ))),
             },
-            Kind::Set(_) => Err(UnifierError::SequenceInputNotSupported),
+            Kind::Set(entries) => {
+                if entries.len() == 1 {
+                    let SetEntry(iter, Attribute { rel, val }) = entries.first().unwrap();
+                    if let Some(iter_label) = iter {
+                        let iter_var: Var = (*iter_label.hir()).into();
+                        if self
+                            .iter_extended_scope_table
+                            .insert(
+                                *iter_label.hir(),
+                                Attribute {
+                                    rel: ExtendedScope::Node(*rel),
+                                    val: ExtendedScope::Node(*val),
+                                },
+                            )
+                            .is_some()
+                        {
+                            return Err(UnifierError::TODO(smart_format!(
+                                "fix duplicate iter scope"
+                            )));
+                        }
+
+                        if matches!(scoped, Scoped::Yes) {
+                            self.scope_tracker.in_scope.insert(iter_var);
+                        }
+
+                        Ok(Binding::Binder(TypedHirData(
+                            Binder { var: iter_var },
+                            *iter_label.meta(),
+                        )))
+                    } else {
+                        // TODO
+                        // Ok(Binding::Wildcard)
+                        self.errors.error(
+                            CompileError::PatternRequiresIteratedVariable,
+                            &node_ref.span(),
+                        );
+                        Ok(Binding::Wildcard)
+                    }
+                } else {
+                    // TODO
+                    Ok(Binding::Wildcard)
+                }
+            }
             Kind::Struct(binder, _, struct_body) => {
                 for node in struct_body {
                     self.traverse(*node, scoped, lets)?;
@@ -281,7 +310,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
 
                 for variant in variants {
                     match variant {
-                        ontol_hir::PropVariant::Singleton(ontol_hir::Attribute { rel, val }) => {
+                        PropVariant::Singleton(ontol_hir::Attribute { rel, val }) => {
                             let prop_scoped = scoped.prop(self.map_flags);
 
                             match (flags.rel_optional(), flags.pat_optional()) {
@@ -329,7 +358,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                                 }
                             };
                         }
-                        ontol_hir::PropVariant::Set(variant) => {
+                        PropVariant::Set(variant) => {
                             let label = *variant.label.hir();
 
                             for (iter, attr) in &variant.elements {
@@ -400,7 +429,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                                 );
                             }
                         }
-                        ontol_hir::PropVariant::Predicate(_) => {
+                        PropVariant::Predicate(_) => {
                             return Err(UnifierError::TODO(smart_format!("predicate prop scope")));
                         }
                     }
@@ -439,8 +468,8 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                                     )));
                                 }
                                 let var = Var(vars.0.iter().next().unwrap() as u32);
-                                unpack.push(ontol_hir::Binding::Binder(TypedHirData(
-                                    ontol_hir::Binder { var },
+                                unpack.push(Binding::Binder(TypedHirData(
+                                    Binder { var },
                                     Meta::new(
                                         self.types.intern(Type::Primitive(
                                             PrimitiveKind::Text,
@@ -453,7 +482,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
 
                             self.iter_extended_scope_table.insert(
                                 *iter_label.hir(),
-                                ontol_hir::Attribute {
+                                Attribute {
                                     rel: ExtendedScope::Wildcard,
                                     val: ExtendedScope::SeqUnpack(unpack, *node_ref.meta()),
                                 },
@@ -462,7 +491,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
 
                         self.push_let(
                             Let::RegexIter(
-                                TypedHirData(ontol_hir::Binder { var: seq_var }, *node_ref.meta()),
+                                TypedHirData(Binder { var: seq_var }, *node_ref.meta()),
                                 groups_list.clone(),
                                 *regex_def_id,
                                 haystack_var,
@@ -473,7 +502,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                         );
 
                         Ok(Binding::Binder(TypedHirData(
-                            ontol_hir::Binder { var: haystack_var },
+                            Binder { var: haystack_var },
                             *node_ref.meta(),
                         )))
                     }
@@ -485,13 +514,14 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                             lets,
                         );
                         Ok(Binding::Binder(TypedHirData(
-                            ontol_hir::Binder { var: haystack_var },
+                            Binder { var: haystack_var },
                             *node_ref.meta(),
                         )))
                     }
                 }
             }
-            Kind::MoveRestAttrs(_, _)
+            Kind::With(..)
+            | Kind::MoveRestAttrs(_, _)
             | Kind::MakeSeq(_, _)
             | Kind::CopySubSeq(_, _)
             | Kind::ForEach(_, _, _)
@@ -535,7 +565,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         catch_label: Label,
         default_span: SourceSpan,
         potential_lets: &[SpannedLet<'m>],
-        output: &mut ontol_hir::Nodes,
+        output: &mut Nodes,
     ) -> UnifierResult<()> {
         if self.scope_tracker.in_scope.contains(var) {
             return Ok(());

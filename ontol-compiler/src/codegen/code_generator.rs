@@ -169,6 +169,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
             ontol_hir::Kind::NoOp => {}
             ontol_hir::Kind::Var(var) => {
                 let Some(local) = self.scope.get(var) else {
+                    debug!("unbound variable {var}");
                     return self.errors.error(CompileError::UnboundVariable, &span);
                 };
 
@@ -232,6 +233,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     }
                     _ => {
                         self.gen_node(arena.node_ref(*definition), block);
+                        self.scope_insert(binder.hir().var, self.builder.top(), &span);
                         self.builder.top()
                     }
                 };

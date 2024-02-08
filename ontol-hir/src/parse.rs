@@ -358,7 +358,7 @@ impl<'a, L: Lang> Parser<'a, L> {
     fn parse_set_entry<'s>(&mut self, next: &'s str) -> ParseResult<'s, SetEntry<'a, L>> {
         parse_paren_delimited(next, |next| match parse_symbol(next) {
             Ok(("..", next)) => {
-                let (label, next) = parse_paren_delimited(next, parse_at_label)?;
+                let (label, next) = parse_at_label(next)?;
                 let (rel, next) = self.parse(next)?;
                 let (val, next) = self.parse(next)?;
 

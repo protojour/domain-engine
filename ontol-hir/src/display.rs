@@ -439,9 +439,9 @@ impl<'h, 'a, L: Lang> Print<SetEntry<'a, L>> for Printer<'h, 'a, L> {
         let indent = self.indent;
         write!(f, "{indent}(")?;
         if let Some(iter_label) = iter_label {
-            write!(f, ".. ({})", L::as_hir(iter_label))?;
+            write!(f, ".. {}", L::as_hir(iter_label))?;
         }
-        let multi = self.print_all(f, self.indent.indent(), self.kinds(&[attr.rel, attr.val]))?;
+        let multi = self.print_all(f, Sep::Space, self.kinds(&[attr.rel, attr.val]))?;
         self.print_rparen(f, multi)?;
         Ok(Multiline(true))
     }

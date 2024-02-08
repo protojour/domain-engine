@@ -522,7 +522,7 @@ fn test_sequence_flat_map1() {
     )
 
     map(
-        foo(
+        foo match(
             'a': a,
             'inner': {..foo_inner(
                 'b': b

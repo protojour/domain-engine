@@ -1,5 +1,5 @@
 use indexmap::IndexMap;
-use ontol_hir::{PropFlags, StructFlags};
+use ontol_hir::{Attribute, PropFlags, StructFlags};
 use ontol_runtime::{
     ontology::{Cardinality, PropertyCardinality, ValueCardinality},
     smart_format,
@@ -7,6 +7,7 @@ use ontol_runtime::{
     var::Var,
     DefId, Role,
 };
+use smallvec::smallvec;
 use tracing::{debug, info};
 
 use crate::{
@@ -307,7 +308,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                     ValueCardinality::Many => match &val.kind {
                         PatternKind::Set { elements, .. } => {
-                            let mut hir_elements = Vec::with_capacity(elements.len());
+                            let mut hir_set_elements = smallvec![];
+                            let label = *ctx.label_map.get(&val.id).unwrap();
+                            let seq_ty = self.types.intern(Type::Seq(rel_params_ty, value_ty));
+
                             for element in elements.iter() {
                                 let val_node = self.build_node(
                                     &element.val,
@@ -317,8 +321,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     },
                                     ctx,
                                 );
-                                hir_elements.push((
-                                    ontol_hir::Iter(element.is_iter),
+                                hir_set_elements.push(ontol_hir::SetEntry(
+                                    if element.is_iter {
+                                        Some(TypedHirData(label, Meta::new(seq_ty, prop_span)))
+                                    } else {
+                                        None
+                                    },
                                     ontol_hir::Attribute {
                                         rel: rel_node,
                                         val: val_node,
@@ -326,22 +334,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 ));
                             }
 
-                            let label = *ctx.label_map.get(&val.id).unwrap();
-                            let seq_ty = self.types.intern(Type::Seq(rel_params_ty, value_ty));
+                            if matches!(match_attribute.property_id.role, Role::Object) {
+                                flags.insert(PropFlags::REL_OPTIONAL);
+                            }
 
-                            ontol_hir::PropVariant::Set(ontol_hir::SetPropertyVariant {
-                                label: TypedHirData(
-                                    label,
-                                    Meta {
-                                        ty: seq_ty,
-                                        span: NO_SPAN,
-                                    },
+                            ontol_hir::PropVariant::Singleton(Attribute {
+                                rel: ctx.mk_node(ontol_hir::Kind::Unit, UNIT_META),
+                                val: ctx.mk_node(
+                                    ontol_hir::Kind::Set(hir_set_elements),
+                                    Meta::new(seq_ty, prop_span),
                                 ),
-                                has_default: ontol_hir::HasDefault(matches!(
-                                    match_attribute.property_id.role,
-                                    Role::Object
-                                )),
-                                elements: hir_elements.into(),
                             })
                         }
                         _ => {
@@ -387,7 +389,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         }
                     };
 
-                if flags.rel_optional() && !flags.pat_optional() {
+                if flags.rel_optional()
+                    && !flags.pat_optional()
+                    && !matches!(match_attribute.cardinality.1, ValueCardinality::Many)
+                {
                     self.check_can_construct_default(rel_params_ty, prop_span);
                     self.check_can_construct_default(value_ty, prop_span);
                 }

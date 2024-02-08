@@ -340,6 +340,29 @@ fn autogen_primary_ids_must_be_optional() {
     .compile_fail();
 }
 
+// TODO: This should perhaps compile?
+#[test]
+fn error_non_iterated_variable() {
+    "
+    def foo (
+        rel .'p0': {text}
+    )
+    def bar (
+        rel .'p1': {text}
+    )
+
+    map(
+        foo(
+            'p0': {x} // ERROR pattern requires an iterated variable (`..x`)
+        ),
+        bar(
+            'p1': {x} // ERROR pattern requires an iterated variable (`..x`)
+        )
+    )
+    "
+    .compile_fail();
+}
+
 #[test]
 fn map_error_unsolvable_equation() {
     "

@@ -604,7 +604,7 @@ fn test_unify_flat_map1() {
         ",
         "
         (set
-            (.. (@d)
+            (.. @d
                 #u
                 (struct ($f)
                     (prop! $f O:1:0
@@ -664,7 +664,7 @@ fn test_unify_flat_map2() {
         ",
         "
         (set
-            (.. (@c)
+            (.. @c
                 #u
                 (struct ($f)
                     (prop! $f S:1:7

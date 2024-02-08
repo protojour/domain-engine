@@ -96,10 +96,7 @@ fn test_set() {
             (prop $a S:0:0
                 (#u
                     (set
-                        (.. (@c)
-                            #u
-                            $b
-                        )
+                        (.. @c #u $b)
                     )
                 )
             )

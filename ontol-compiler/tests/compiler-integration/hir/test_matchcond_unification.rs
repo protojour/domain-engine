@@ -11,7 +11,7 @@ fn test_unify_matchcond_empty() {
         ",
         "
         (set
-            (.. (@a)
+            (.. @a
                 #u
                 (match-struct ($c))
             )
@@ -40,7 +40,7 @@ fn test_unify_matchcond_single_prop() {
         ",
         "
         (set
-            (.. (@d)
+            (.. @d
                 #u
                 (match-struct ($c)
                     (prop! $c O:1:0 (#u $a))
@@ -76,7 +76,7 @@ fn test_unify_matchcond_struct_in_struct() {
         ",
         "
         (set
-            (.. (@f)
+            (.. @f
                 #u
                 (match-struct ($d)
                     (prop! $d O:1:0
@@ -128,13 +128,13 @@ fn test_unify_matchcond_cartesian_set() {
         ",
         "
         (set
-            (.. (@g)
+            (.. @g
                 #u
                 (match-struct ($d)
                     (prop $d O:1:0
                         (element-in
                             (set
-                                (.. (@f)
+                                (.. @f
                                     #u
                                     (struct ($q)
                                         (prop $q O:2:0 (#u $a))

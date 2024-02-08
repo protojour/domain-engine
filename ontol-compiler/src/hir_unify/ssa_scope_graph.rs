@@ -33,11 +33,12 @@ pub enum Let<'m> {
         Var,
     ),
     Expr(TypedHirData<'m, Binder>, Node),
-    AmbiguousExpr(AmbiguousExpr<'m>),
+    /// Unsolved complex expression that does not yet expose a data point
+    Complex(ComplexExpr<'m>),
 }
 
 #[derive(Clone)]
-pub struct AmbiguousExpr<'m> {
+pub struct ComplexExpr<'m> {
     pub dependency: TypedHirData<'m, Binder>,
     pub produces: VarSet,
     pub scope_node: Node,
@@ -60,7 +61,7 @@ impl<'m> Let<'m> {
             }
             Self::RegexIter(binder, ..) => VarSet::from_iter([binder.hir().var]),
             Self::Expr(binder, _) => VarSet::from_iter([binder.hir().var]),
-            Self::AmbiguousExpr(AmbiguousExpr { dependency, .. }) => {
+            Self::Complex(ComplexExpr { dependency, .. }) => {
                 VarSet::from_iter([dependency.hir().var])
             }
         }
@@ -74,7 +75,7 @@ impl<'m> Let<'m> {
             Self::Regex(.., var) => VarSet::from_iter([*var]),
             Self::RegexIter(.., var) => VarSet::from_iter([*var]),
             Self::Expr(..) => VarSet::default(),
-            Self::AmbiguousExpr { .. } => VarSet::default(),
+            Self::Complex { .. } => VarSet::default(),
         }
     }
 
@@ -94,12 +95,12 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         graph: Vec<SpannedLet<'m>>,
     ) -> UnifierResult<Vec<SpannedLet<'m>>> {
         let mut bounded_list = vec![];
-        let mut ambiguous_list = vec![];
+        let mut complex_list = vec![];
 
         for (let_node, span) in graph {
             match let_node {
-                Let::AmbiguousExpr(ambiguous) => {
-                    ambiguous_list.push((ambiguous, span));
+                Let::Complex(complex) => {
+                    complex_list.push((complex, span));
                 }
                 node => {
                     bounded_list.push((node, span));
@@ -108,14 +109,14 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         }
 
         loop {
-            let next_list = std::mem::take(&mut ambiguous_list);
+            let next_list = std::mem::take(&mut complex_list);
             let list_len = next_list.len();
 
             // a "fix-point" algorithm.
             // it's rerun until no progress can be made.
-            for (ambiguous, span) in next_list {
+            for (complex, span) in next_list {
                 let unique_produces = VarSet(
-                    ambiguous
+                    complex
                         .produces
                         .0
                         .difference(&self.scope_tracker.in_scope.0)
@@ -127,19 +128,19 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     1 => {
                         debug!(
                             "single variable producer. dependency={dependency:?} produces={produces:?} unique={unique_produces:?}",
-                            dependency = ambiguous.dependency,
-                            produces = ambiguous.produces
+                            dependency = complex.dependency,
+                            produces = complex.produces
                         );
 
                         let produces_var = unique_produces.iter().next().unwrap();
-                        let dependency = ambiguous.dependency;
+                        let dependency = complex.dependency;
 
                         let mut out_binder = None;
 
                         let substitution =
                             self.mk_node(Kind::Var(dependency.hir().var), *dependency.meta());
                         let node = self.invert_call(
-                            ambiguous.scope_node,
+                            complex.scope_node,
                             produces_var,
                             substitution,
                             &mut out_binder,
@@ -155,16 +156,16 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     }
                     _ => {
                         debug!("still ambiguous: {unique_produces:?}");
-                        ambiguous_list.push((ambiguous, span));
+                        complex_list.push((complex, span));
                     }
                 }
             }
 
-            if ambiguous_list.is_empty() {
+            if complex_list.is_empty() {
                 break;
-            } else if ambiguous_list.len() == list_len {
+            } else if complex_list.len() == list_len {
                 debug!("not able to make progress");
-                for (_, span) in ambiguous_list {
+                for (_, span) in complex_list {
                     self.errors.error(CompileError::UnsolvableEquation, &span);
                 }
                 return Err(UnifierError::Unsolvable);

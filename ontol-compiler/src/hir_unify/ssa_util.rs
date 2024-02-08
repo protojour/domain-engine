@@ -21,14 +21,26 @@ pub struct ScopeTracker<'m> {
 
 #[derive(Clone, Copy)]
 pub enum ExprMode {
-    Expr(MapFlags),
-    Match { cond_var: Var, struct_level: usize },
+    Expr {
+        flags: MapFlags,
+        struct_level: Option<usize>,
+    },
+    Match {
+        cond_var: Var,
+        struct_level: usize,
+    },
 }
 
 impl ExprMode {
     pub fn any_struct(self) -> Self {
         match self {
-            Self::Expr(flags) => Self::Expr(flags),
+            Self::Expr {
+                flags,
+                struct_level,
+            } => Self::Expr {
+                flags,
+                struct_level: Some(inc_opt_struct_level(struct_level)),
+            },
             Self::Match {
                 cond_var,
                 struct_level,
@@ -41,10 +53,16 @@ impl ExprMode {
 
     pub fn match_struct(self, cond_var: Var) -> Self {
         match self {
-            Self::Expr(flags) if flags.contains(MapFlags::PURE_PARTIAL) => Self::Expr(flags),
-            Self::Expr(_) => Self::Match {
+            Self::Expr {
+                flags,
+                struct_level,
+            } if flags.contains(MapFlags::PURE_PARTIAL) => Self::Expr {
+                flags,
+                struct_level: Some(inc_opt_struct_level(struct_level)),
+            },
+            Self::Expr { struct_level, .. } => Self::Match {
                 cond_var,
-                struct_level: 0,
+                struct_level: inc_opt_struct_level(struct_level),
             },
             Self::Match {
                 cond_var,
@@ -55,6 +73,10 @@ impl ExprMode {
             },
         }
     }
+}
+
+fn inc_opt_struct_level(level: Option<usize>) -> usize {
+    level.map(|level| level + 1).unwrap_or(0)
 }
 
 #[derive(Clone, Copy)]

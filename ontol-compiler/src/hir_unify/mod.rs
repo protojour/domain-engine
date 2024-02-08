@@ -20,8 +20,11 @@ mod ssa_unifier;
 mod ssa_unifier_scope;
 mod ssa_util;
 
+/// note: Unifier errors are usually silent errors, and the compiler just moves on.
 #[derive(Debug)]
 pub enum UnifierError {
+    /// CompileErrors have been reported, so not a silent error
+    Reported,
     NonUniqueVariableDatapoints(VarSet),
     NoInputBinder,
     SequenceInputNotSupported,
