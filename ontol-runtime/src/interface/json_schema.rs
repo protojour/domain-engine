@@ -357,7 +357,7 @@ fn serialize_schema_inline<S: Serializer>(
         SerdeOperator::TextPattern(def_id) | SerdeOperator::CapturingTextPattern(def_id) => {
             let pattern = ctx.ontology.text_patterns.get(def_id).unwrap();
             map.serialize_entry("type", "string")?;
-            map.serialize_entry("pattern", pattern.regex.as_str())?;
+            map.serialize_entry("pattern", &pattern.regex.pattern)?;
             if let Some(docs) = ctx.docs {
                 map.serialize_entry("description", docs)?;
             }

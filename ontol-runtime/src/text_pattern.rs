@@ -1,8 +1,7 @@
-use std::fmt::Display;
+use std::{fmt::Display, ops::Deref};
 
 use ::serde::{Deserialize, Serialize};
 use fnv::FnvHashMap;
-use regex::Regex;
 use serde::de::{value::StrDeserializer, DeserializeSeed};
 use smartstring::alias::String;
 use tracing::{debug, error};
@@ -23,6 +22,20 @@ pub struct TextPattern {
     pub constant_parts: Vec<TextPatternConstantPart>,
 }
 
+#[derive(Debug)]
+pub struct Regex {
+    pub inner: regex_automata::meta::Regex,
+    pub pattern: String,
+}
+
+impl Deref for Regex {
+    type Target = regex_automata::meta::Regex;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
 impl TextPattern {
     pub fn try_capturing_match(
         &self,
@@ -32,16 +45,22 @@ impl TextPattern {
     ) -> Result<Value, ParseError> {
         if self.constant_parts.is_empty() {
             if let Some(match_) = self.regex.find(input) {
-                Ok(Value::Text(match_.as_str().into(), type_def_id))
+                Ok(Value::Text(input[match_.range()].into(), type_def_id))
             } else {
                 Err(ParseError(smart_format!(
                     "regular expression did not match"
                 )))
             }
         } else {
-            let captures = self.regex.captures(input).ok_or(ParseError(smart_format!(
-                "regular expression did not match"
-            )))?;
+            let mut captures = self.regex.create_captures();
+
+            self.regex.captures(input, &mut captures);
+            if !captures.is_match() {
+                return Err(ParseError(smart_format!(
+                    "regular expression did not match"
+                )));
+            }
+
             let mut attrs = FnvHashMap::default();
 
             for part in &self.constant_parts {
@@ -175,7 +194,7 @@ mod serde_regex {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_str(regex.as_str())
+        serializer.serialize_str(&regex.pattern)
     }
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Regex, D::Error>
@@ -183,6 +202,11 @@ mod serde_regex {
         D: serde::Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        Regex::new(&s).map_err(|e| ::serde::de::Error::custom(format!("{e}")))
+        let inner = regex_automata::meta::Regex::new(&s)
+            .map_err(|e| ::serde::de::Error::custom(format!("{e}")))?;
+        Ok(Regex {
+            inner,
+            pattern: s.into(),
+        })
     }
 }

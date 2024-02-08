@@ -1528,6 +1528,7 @@ dependencies = [
  "indexmap",
  "num",
  "regex",
+ "regex-automata 0.4.5",
  "serde",
  "serde-value",
  "serde_json",
