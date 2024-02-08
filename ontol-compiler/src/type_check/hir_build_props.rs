@@ -374,20 +374,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     flags.insert(PropFlags::REL_OPTIONAL);
                 }
 
-                let prop_variants: Vec<ontol_hir::PropVariant> = match match_attribute.cardinality.0
+                if matches!(match_attribute.cardinality.0, PropertyCardinality::Optional)
+                    && !bind_option
                 {
-                    PropertyCardinality::Mandatory => {
-                        vec![prop_variant]
-                    }
-                    PropertyCardinality::Optional => {
-                        if bind_option {
-                            vec![prop_variant]
-                        } else {
-                            ctx.partial = true;
-                            vec![prop_variant]
-                        }
-                    }
-                };
+                    // note: This is probably not necessary
+                    ctx.partial = true;
+                }
 
                 if flags.rel_optional()
                     && !flags.pat_optional()
@@ -402,7 +394,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         flags,
                         struct_binder_var,
                         match_attribute.property_id,
-                        prop_variants.into(),
+                        prop_variant,
                     ),
                     Meta {
                         ty: &UNIT_TYPE,
@@ -422,12 +414,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ctx,
                 );
 
-                let prop_variants: Vec<ontol_hir::PropVariant> =
+                let prop_variant: ontol_hir::PropVariant =
                     match (match_attribute.cardinality.1, operator) {
                         (ValueCardinality::One, SetBinaryOperator::ElementIn) => {
-                            vec![ontol_hir::PropVariant::Predicate(
+                            ontol_hir::PropVariant::Predicate(
                                 ontol_hir::PredicateClosure::ElementIn(set_node),
-                            )]
+                            )
                         }
                         (ValueCardinality::Many, SetBinaryOperator::ElementIn) => {
                             self.error(
@@ -437,7 +429,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             return None;
                         }
                         (ValueCardinality::Many, _) => {
-                            vec![]
+                            return None;
                         }
                         (ValueCardinality::One, _) => {
                             self.error(
@@ -453,7 +445,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         flags | PropFlags::REL_OPTIONAL, // TODO
                         struct_binder_var,
                         match_attribute.property_id,
-                        prop_variants.into(),
+                        prop_variant,
                     ),
                     Meta {
                         ty: &UNIT_TYPE,
@@ -553,11 +545,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             ontol_hir::PropFlags::empty(),
                             struct_binder_var,
                             match_attr.property_id,
-                            [ontol_hir::PropVariant::Value(ontol_hir::Attribute {
-                                rel,
-                                val,
-                            })]
-                            .into(),
+                            ontol_hir::PropVariant::Value(ontol_hir::Attribute { rel, val }),
                         ),
                         UNIT_META,
                     )

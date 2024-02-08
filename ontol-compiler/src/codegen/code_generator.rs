@@ -619,16 +619,12 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     self.scope.remove(&binder.hir().var);
                 }
             }
-            ontol_hir::Kind::Prop(_, struct_var, prop_id, variants) => {
-                if let Some(variant) = variants.into_iter().next() {
-                    match variant {
-                        PropVariant::Value(attr) => {
-                            self.gen_attribute(*struct_var, *prop_id, *attr, arena, span, block)
-                        }
-                        PropVariant::Predicate(_) => todo!(),
-                    }
+            ontol_hir::Kind::Prop(_, struct_var, prop_id, variant) => match variant {
+                PropVariant::Value(attr) => {
+                    self.gen_attribute(*struct_var, *prop_id, *attr, arena, span, block)
                 }
-            }
+                PropVariant::Predicate(_) => todo!(),
+            },
             ontol_hir::Kind::MoveRestAttrs(target, source) => {
                 let Ok(target_local) = self.var_local(*target, &span) else {
                     return;

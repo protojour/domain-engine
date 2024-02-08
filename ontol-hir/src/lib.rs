@@ -199,7 +199,7 @@ pub enum Kind<'a, L: Lang> {
     /// A struct with associated binder. The value is the struct.
     Struct(L::Data<'a, Binder>, StructFlags, Nodes),
     /// A property definition associated with a struct var in scope
-    Prop(PropFlags, Var, PropertyId, SmallVec<[PropVariant; 1]>),
+    Prop(PropFlags, Var, PropertyId, PropVariant),
     /// Move rest of attributes into the first var, from the second var
     MoveRestAttrs(Var, Var),
     /// A sequence with associated binder. The value is the sequence.

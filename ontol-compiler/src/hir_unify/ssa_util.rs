@@ -157,7 +157,7 @@ pub fn scan_immediate_free_vars<const N: usize>(
             flags: PropFlags,
             struct_var: Var,
             prop_id: PropertyId,
-            variants: &[PropVariant],
+            variant: &PropVariant,
             arena: &'h ontol_hir::arena::Arena<'m, TypedHir>,
         ) {
             // If the property is optional, don't consider its inner variables as required.
@@ -166,7 +166,7 @@ pub fn scan_immediate_free_vars<const N: usize>(
                 return;
             }
 
-            self.traverse_prop(struct_var, prop_id, variants, arena);
+            self.traverse_prop(struct_var, prop_id, variant, arena);
         }
 
         fn visit_var(&mut self, var: Var) {
@@ -184,15 +184,6 @@ pub fn scan_immediate_free_vars<const N: usize>(
 
         fn visit_binder(&mut self, var: Var) {
             self.binders.insert(var);
-        }
-
-        fn visit_prop_variant(
-            &mut self,
-            _: usize,
-            variant: &ontol_hir::PropVariant,
-            arena: &'h ontol_hir::arena::Arena<'m, TypedHir>,
-        ) {
-            self.traverse_prop_variant(variant, arena);
         }
 
         fn visit_set_entry(

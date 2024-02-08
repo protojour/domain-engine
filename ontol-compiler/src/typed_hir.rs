@@ -248,41 +248,37 @@ pub fn arena_import<'m>(
             let body = import_nodes(target, source.arena(), body);
             target.add(TypedHirData(Struct(*binder, *flags, body), *meta))
         }
-        Prop(optional, struct_var, prop_id, variants) => {
-            let variants = variants
-                .iter()
-                .map(|variant| match variant {
-                    PropVariant::Value(attr) => {
-                        PropVariant::Value(import_attr(target, source.arena(), *attr))
-                    }
-                    PropVariant::Predicate(closure) => PropVariant::Predicate(match closure {
-                        PredicateClosure::ContainsElement(attr) => {
-                            PredicateClosure::ContainsElement(import_attr(
-                                target,
-                                source.arena(),
-                                *attr,
-                            ))
-                        }
-                        PredicateClosure::ElementIn(node) => PredicateClosure::ElementIn(
-                            arena_import(target, source.arena().node_ref(*node)),
-                        ),
-                        PredicateClosure::AllInSet(node) => PredicateClosure::AllInSet(
-                            arena_import(target, source.arena().node_ref(*node)),
-                        ),
-                        PredicateClosure::SetContainsAll(node) => PredicateClosure::SetContainsAll(
-                            arena_import(target, source.arena().node_ref(*node)),
-                        ),
-                        PredicateClosure::SetIntersects(node) => PredicateClosure::SetIntersects(
-                            arena_import(target, source.arena().node_ref(*node)),
-                        ),
-                        PredicateClosure::SetEquals(node) => PredicateClosure::SetEquals(
-                            arena_import(target, source.arena().node_ref(*node)),
-                        ),
-                    }),
-                })
-                .collect();
+        Prop(optional, struct_var, prop_id, variant) => {
+            let variant = match variant {
+                PropVariant::Value(attr) => {
+                    PropVariant::Value(import_attr(target, source.arena(), *attr))
+                }
+                PropVariant::Predicate(closure) => PropVariant::Predicate(match closure {
+                    PredicateClosure::ContainsElement(attr) => PredicateClosure::ContainsElement(
+                        import_attr(target, source.arena(), *attr),
+                    ),
+                    PredicateClosure::ElementIn(node) => PredicateClosure::ElementIn(arena_import(
+                        target,
+                        source.arena().node_ref(*node),
+                    )),
+                    PredicateClosure::AllInSet(node) => PredicateClosure::AllInSet(arena_import(
+                        target,
+                        source.arena().node_ref(*node),
+                    )),
+                    PredicateClosure::SetContainsAll(node) => PredicateClosure::SetContainsAll(
+                        arena_import(target, source.arena().node_ref(*node)),
+                    ),
+                    PredicateClosure::SetIntersects(node) => PredicateClosure::SetIntersects(
+                        arena_import(target, source.arena().node_ref(*node)),
+                    ),
+                    PredicateClosure::SetEquals(node) => PredicateClosure::SetEquals(arena_import(
+                        target,
+                        source.arena().node_ref(*node),
+                    )),
+                }),
+            };
             target.add(TypedHirData(
-                Prop(*optional, *struct_var, *prop_id, variants),
+                Prop(*optional, *struct_var, *prop_id, variant),
                 *meta,
             ))
         }

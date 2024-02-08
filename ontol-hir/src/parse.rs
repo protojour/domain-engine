@@ -258,14 +258,14 @@ impl<'a, L: Lang> Parser<'a, L> {
     pub fn parse_prop<'s>(&mut self, optional: PropFlags, next: &'s str) -> ParseResult<'s, Node> {
         let (var, next) = parse_dollar_var(next)?;
         let (prop, next) = parse_symbol(next)?;
-        let (variants, next) = self.parse_many(next, Self::parse_prop_variant)?;
+        let (variant, next) = self.parse_prop_variant(next)?;
         Ok((
             self.make_node(Kind::Prop(
                 optional,
                 var,
                 prop.parse()
                     .map_err(|_| Error::Expected(Class::Property, Found(Token::Symbol(prop))))?,
-                variants.into(),
+                variant,
             )),
             next,
         ))

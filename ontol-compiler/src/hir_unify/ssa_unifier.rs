@@ -51,13 +51,7 @@ pub struct SsaUnifier<'c, 'm> {
     pub(super) scope_arena: &'c ontol_hir::arena::Arena<'m, TypedHir>,
     pub(super) expr_arena: &'c ontol_hir::arena::Arena<'m, TypedHir>,
     pub(super) out_arena: ontol_hir::arena::Arena<'m, TypedHir>,
-    #[allow(unused)]
     pub(super) map_flags: MapFlags,
-
-    #[allow(unused)]
-    condition_root: Option<Var>,
-    #[allow(unused)]
-    match_struct_depth: usize,
 
     pub(super) all_scope_vars_and_labels: VarSet,
     pub(super) iter_extended_scope_table:
@@ -85,8 +79,6 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             expr_arena,
             out_arena: Default::default(),
             map_flags,
-            condition_root: None,
-            match_struct_depth: 0,
             all_scope_vars_and_labels: Default::default(),
             iter_extended_scope_table: Default::default(),
             scope_tracker: Default::default(),
@@ -265,8 +257,8 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     }
                 }
             }
-            Kind::Prop(optional, var, prop_id, variants) => {
-                self.write_prop_expr((*optional, *var, *prop_id), variants, node_ref.meta(), mode)
+            Kind::Prop(optional, var, prop_id, variant) => {
+                self.write_prop_expr((*optional, *var, *prop_id), variant, node_ref.meta(), mode)
             }
             Kind::Regex(_seq_label, regex_def_id, capture_group_alternation) => {
                 let regex_meta = self
@@ -332,15 +324,11 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
     fn write_prop_expr(
         &mut self,
         (flags, struct_var, prop_id): (PropFlags, Var, PropertyId),
-        variants: &[ontol_hir::PropVariant],
+        variant: &PropVariant,
         meta: &Meta<'m>,
         mode: ExprMode,
     ) -> UnifierResult<ontol_hir::Nodes> {
-        if variants.len() != 1 {
-            panic!("Multi prop variants");
-        }
-
-        match (mode, variants.first().unwrap()) {
+        match (mode, variant) {
             (ExprMode::Expr { .. }, PropVariant::Value(Attribute { rel, val })) => {
                 let free_vars = scan_immediate_free_vars(self.expr_arena, [*rel, *val]);
                 self.maybe_apply_catch_block(free_vars, meta.span, &|zelf| {
@@ -352,7 +340,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                             flags,
                             struct_var,
                             prop_id,
-                            [PropVariant::Value(Attribute { rel, val })].into(),
+                            PropVariant::Value(Attribute { rel, val }),
                         ),
                         *meta,
                     )])
@@ -442,10 +430,8 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 let free_vars = scan_immediate_free_vars(self.expr_arena, [*rel, *val]);
 
                 let for_each = self.prealloc_node();
-                let ((rel_binding, val_binding), for_each_body) = self.new_loop_scope(
-                    // free_vars.clone(),
-                    seq_meta.span,
-                    move |zelf, scope_body, catcher| {
+                let ((rel_binding, val_binding), for_each_body) =
+                    self.new_loop_scope(seq_meta.span, move |zelf, scope_body, catcher| {
                         let rel_binding = zelf.define_scope_extended(
                             scope_attr.rel,
                             Scoped::Yes,
@@ -473,8 +459,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                             )];
 
                         Ok(((rel_binding, val_binding), body))
-                    },
-                )?;
+                    })?;
                 seq_body.push_node(self.write_node(
                     for_each,
                     Kind::ForEach(label.into(), (rel_binding, val_binding), for_each_body),

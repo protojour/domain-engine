@@ -305,62 +305,60 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 }
                 Ok(Binding::Binder(*binder))
             }
-            Kind::Prop(flags, var, prop_id, variants) => {
+            Kind::Prop(flags, var, prop_id, variant) => {
                 let mut sub_lets = vec![];
 
-                for variant in variants {
-                    match variant {
-                        PropVariant::Value(ontol_hir::Attribute { rel, val }) => {
-                            let prop_scoped = scoped.prop(self.map_flags);
+                match variant {
+                    PropVariant::Value(ontol_hir::Attribute { rel, val }) => {
+                        let prop_scoped = scoped.prop(self.map_flags);
 
-                            match (flags.rel_optional(), flags.pat_optional()) {
-                                (true, false) => {
-                                    // This passed type check, so there must be a way to construct a value default
-                                    let default = Attribute {
-                                        rel: self.write_default_node(
-                                            *self.scope_arena.node_ref(*rel).meta(),
-                                        ),
-                                        val: self.write_default_node(
-                                            *self.scope_arena.node_ref(*val).meta(),
-                                        ),
-                                    };
+                        match (flags.rel_optional(), flags.pat_optional()) {
+                            (true, false) => {
+                                // This passed type check, so there must be a way to construct a value default
+                                let default = Attribute {
+                                    rel: self.write_default_node(
+                                        *self.scope_arena.node_ref(*rel).meta(),
+                                    ),
+                                    val: self.write_default_node(
+                                        *self.scope_arena.node_ref(*val).meta(),
+                                    ),
+                                };
 
-                                    let rel = self.traverse(*rel, prop_scoped, &mut sub_lets)?;
-                                    let val = self.traverse(*val, prop_scoped, &mut sub_lets)?;
+                                let rel = self.traverse(*rel, prop_scoped, &mut sub_lets)?;
+                                let val = self.traverse(*val, prop_scoped, &mut sub_lets)?;
 
-                                    self.push_let(
-                                        Let::PropDefault(
-                                            Attribute { rel, val },
-                                            (*var, *prop_id),
-                                            default,
-                                        ),
-                                        node_ref.span(),
-                                        scoped,
-                                        lets,
-                                    );
-                                }
-                                (rel_optional, _) => {
-                                    let next_scoped = if rel_optional {
-                                        Scoped::MaybeVoid
-                                    } else {
-                                        prop_scoped
-                                    };
+                                self.push_let(
+                                    Let::PropDefault(
+                                        Attribute { rel, val },
+                                        (*var, *prop_id),
+                                        default,
+                                    ),
+                                    node_ref.span(),
+                                    scoped,
+                                    lets,
+                                );
+                            }
+                            (rel_optional, _) => {
+                                let next_scoped = if rel_optional {
+                                    Scoped::MaybeVoid
+                                } else {
+                                    prop_scoped
+                                };
 
-                                    let rel = self.traverse(*rel, next_scoped, &mut sub_lets)?;
-                                    let val = self.traverse(*val, next_scoped, &mut sub_lets)?;
+                                let rel = self.traverse(*rel, next_scoped, &mut sub_lets)?;
+                                let val = self.traverse(*val, next_scoped, &mut sub_lets)?;
 
-                                    self.push_let(
-                                        Let::Prop(Attribute { rel, val }, (*var, *prop_id)),
-                                        node_ref.span(),
-                                        scoped,
-                                        lets,
-                                    );
-                                }
-                            };
-                        }
-                        PropVariant::Predicate(_) => {
-                            return Err(UnifierError::TODO(smart_format!("predicate prop scope")));
-                        }
+                                self.push_let(
+                                    Let::Prop(Attribute { rel, val }, (*var, *prop_id)),
+                                    node_ref.span(),
+                                    scoped,
+                                    lets,
+                                );
+                            }
+                        };
+                    }
+                    PropVariant::Predicate(_) => {
+                        return Err(UnifierError::TODO(smart_format!("predicate prop scope")));
                     }
                 }
                 lets.extend(sub_lets);

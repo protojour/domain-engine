@@ -221,7 +221,7 @@ where
 
                 var_set
             }
-            ontol_hir::Kind::Prop(_, struct_var, prop_id, variants) => {
+            ontol_hir::Kind::Prop(_, struct_var, prop_id, variant) => {
                 self.prop_origins.insert(*prop_id, *struct_var);
                 self.prop_origins_inverted
                     .entry(*struct_var)
@@ -230,15 +230,13 @@ where
 
                 let mut var_set = VarSet::default();
 
-                for variant in variants {
-                    match variant {
-                        PropVariant::Value(ontol_hir::Attribute { rel, val }) => {
-                            var_set.union_with(&self.analyze_node(arena.node_ref(*rel), *prop_id));
-                            var_set.union_with(&self.analyze_node(arena.node_ref(*val), *prop_id));
-                        }
-                        PropVariant::Predicate(_) => {
-                            todo!()
-                        }
+                match variant {
+                    PropVariant::Value(ontol_hir::Attribute { rel, val }) => {
+                        var_set.union_with(&self.analyze_node(arena.node_ref(*rel), *prop_id));
+                        var_set.union_with(&self.analyze_node(arena.node_ref(*val), *prop_id));
+                    }
+                    PropVariant::Predicate(_) => {
+                        todo!()
                     }
                 }
 

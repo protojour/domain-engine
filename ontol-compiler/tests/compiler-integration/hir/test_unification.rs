@@ -1042,28 +1042,6 @@ fn test_unify_opt_rel_and_val_struct_merge1() {
     assert_eq!(expected, output);
 }
 
-#[test]
-// TODO: This is something that isn't yet supported in ONTOL surface syntax
-#[should_panic(expected = "Multi prop variants")]
-fn test_unify_prop_variants() {
-    let output = test_unify(
-        "
-        (struct ($e)
-            (prop!  $e S:1:0 (#u $a) (#u $b))
-            (prop? $e S:2:1 (#u $c) (#u $d))
-        )
-        ",
-        "
-        (struct ($f)
-            (prop! $f O:1:0 (#u $a) (#u $b))
-            (prop? $f O:2:1 (#u $c) (#u $d))
-        )
-        ",
-    );
-    let expected = indoc! {""};
-    assert_eq!(expected, output);
-}
-
 mod dependent_scoping {
     use super::test_unify;
     use indoc::indoc;

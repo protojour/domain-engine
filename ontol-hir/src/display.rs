@@ -212,9 +212,9 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
                 self.print_rparen(f, multi)?;
                 Ok(Multiline(true))
             }
-            Kind::Prop(flags, struct_var, prop_id, variants) => {
+            Kind::Prop(flags, struct_var, prop_id, variant) => {
                 write!(f, "{indent}(prop{flags} {struct_var} {prop_id}",)?;
-                let multi = self.print_all(f, Sep::Space, variants.iter())?;
+                let multi = self.print_all(f, Sep::Space, [variant].into_iter())?;
                 self.print_rparen(f, multi)?;
                 Ok(Multiline(true))
             }

@@ -217,24 +217,18 @@ fn autogenerate_fmt_segment_property<'m>(
 
         let rel = arena.add(TypedHirData(ontol_hir::Kind::Unit, UNIT_META));
 
-        Some(
-            arena.add(TypedHirData(
-                ontol_hir::Kind::Prop(
-                    ontol_hir::PropFlags::empty(),
-                    binder_var,
-                    *property_id,
-                    [ontol_hir::PropVariant::Value(ontol_hir::Attribute {
-                        rel,
-                        val: var_node,
-                    })]
-                    .into(),
-                ),
-                Meta {
-                    ty: object_ty,
-                    span: NO_SPAN,
-                },
-            )),
-        )
+        Some(arena.add(TypedHirData(
+            ontol_hir::Kind::Prop(
+                ontol_hir::PropFlags::empty(),
+                binder_var,
+                *property_id,
+                ontol_hir::PropVariant::Value(ontol_hir::Attribute { rel, val: var_node }),
+            ),
+            Meta {
+                ty: object_ty,
+                span: NO_SPAN,
+            },
+        )))
     } else {
         None
     }

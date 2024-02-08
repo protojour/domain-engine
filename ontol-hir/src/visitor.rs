@@ -17,14 +17,14 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
         flags: PropFlags,
         struct_var: Var,
         prop_id: PropertyId,
-        variants: &[PropVariant],
+        variant: &PropVariant,
         arena: &'h Arena<'a, L>,
     ) {
-        self.traverse_prop(struct_var, prop_id, variants, arena);
+        self.traverse_prop(struct_var, prop_id, variant, arena);
     }
 
     #[allow(unused_variables)]
-    fn visit_prop_variant(&mut self, index: usize, variant: &PropVariant, arena: &'h Arena<'a, L>) {
+    fn visit_prop_variant(&mut self, variant: &PropVariant, arena: &'h Arena<'a, L>) {
         self.traverse_prop_variant(variant, arena);
     }
 
@@ -150,8 +150,8 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                     self.visit_node(index, child);
                 }
             }
-            Kind::Prop(optional, struct_var, prop_id, variants) => {
-                self.visit_prop(*optional, *struct_var, *prop_id, variants, arena);
+            Kind::Prop(optional, struct_var, prop_id, variant) => {
+                self.visit_prop(*optional, *struct_var, *prop_id, variant, arena);
             }
             Kind::MoveRestAttrs(target, source) => {
                 self.visit_var(*target);
@@ -206,14 +206,12 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
         &mut self,
         struct_var: Var,
         prop_id: PropertyId,
-        variants: &[PropVariant],
+        variant: &PropVariant,
         arena: &'h Arena<'a, L>,
     ) {
         self.visit_var(struct_var);
         self.visit_property_id(prop_id);
-        for (index, variant) in variants.iter().enumerate() {
-            self.visit_prop_variant(index, variant, arena);
-        }
+        self.visit_prop_variant(variant, arena);
     }
 
     fn traverse_prop_variant(&mut self, variant: &PropVariant, arena: &'h Arena<'a, L>) {
