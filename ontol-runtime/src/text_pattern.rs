@@ -2,7 +2,6 @@ use std::{fmt::Display, ops::Deref};
 
 use ::serde::{Deserialize, Serialize};
 use fnv::FnvHashMap;
-use regex_automata::meta::BuildError;
 use serde::de::{value::StrDeserializer, DeserializeSeed};
 use smartstring::alias::String;
 use tracing::{debug, error};
@@ -31,13 +30,6 @@ pub struct Regex {
 }
 
 impl Regex {
-    pub fn new(pattern: String) -> Result<Self, BuildError> {
-        Ok(Self {
-            regex_impl: regex_automata::meta::Regex::new(&pattern)?,
-            pattern,
-        })
-    }
-
     pub fn as_str(&self) -> &str {
         &self.pattern
     }
@@ -221,7 +213,7 @@ mod serde_regex {
             .map_err(|e| ::serde::de::Error::custom(format!("{e}")))?;
         Ok(Regex {
             regex_impl,
-            pattern: pattern.into(),
+            pattern,
         })
     }
 }
