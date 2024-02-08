@@ -26,7 +26,7 @@ type TestKind<'a> = Kind<'a, TestLang>;
 
 #[test]
 fn assert_size() {
-    assert_eq!(72, size_of::<TestKind>());
+    assert_eq!(48, size_of::<TestKind>());
 }
 
 fn parse_print(src: &str) -> String {
@@ -106,12 +106,14 @@ fn test_set() {
 }
 
 #[test]
-fn test_multi_prop() {
+fn test_set_in_prop() {
     let src = indoc! {"
         (struct ($a)
             (prop $a S:0:0
-                (.. (@c)
-                    (iter #u $b)
+                (#u
+                    (set
+                        (.. @c #u $b)
+                    )
                 )
             )
         )"

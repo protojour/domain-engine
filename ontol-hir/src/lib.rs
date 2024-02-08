@@ -42,11 +42,9 @@ impl From<Label> for Var {
     }
 }
 
+/// A Label is an identifier for some code location.
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub struct Label(pub u32);
-
-#[derive(Clone, Copy, Debug)]
-pub struct HasDefault(pub bool);
 
 /// An attribute existing of (relation parameter, value)
 #[derive(Clone, Copy, Debug)]
@@ -78,9 +76,6 @@ impl<T> Index<usize> for Attribute<T> {
         }
     }
 }
-
-#[derive(Clone, Copy, Debug)]
-pub struct Iter(pub bool);
 
 /// A RootNode owns its own Arena
 #[derive(Clone)]
@@ -126,6 +121,10 @@ impl<'a, L: Lang> RootNode<'a, L> {
 #[derive(Clone, Copy, Debug)]
 pub struct Node(u32);
 
+/// A binder is syntactic element that introduces a variable,
+/// much like a function parameter.
+///
+/// It's usually within parentheses: `($x)`
 #[derive(Clone, Copy, Debug)]
 pub struct Binder {
     pub var: Var,
@@ -200,12 +199,7 @@ pub enum Kind<'a, L: Lang> {
     /// A struct with associated binder. The value is the struct.
     Struct(L::Data<'a, Binder>, StructFlags, Nodes),
     /// A property definition associated with a struct var in scope
-    Prop(
-        PropFlags,
-        Var,
-        PropertyId,
-        SmallVec<[PropVariant<'a, L>; 1]>,
-    ),
+    Prop(PropFlags, Var, PropertyId, SmallVec<[PropVariant; 1]>),
     /// Move rest of attributes into the first var, from the second var
     MoveRestAttrs(Var, Var),
     /// A sequence with associated binder. The value is the sequence.
@@ -230,17 +224,9 @@ pub enum Kind<'a, L: Lang> {
 }
 
 #[derive(Clone)]
-pub enum PropVariant<'a, L: Lang> {
-    Singleton(Attribute<Node>),
-    Set(SetPropertyVariant<'a, L>),
+pub enum PropVariant {
+    Value(Attribute<Node>),
     Predicate(PredicateClosure<Node>),
-}
-
-#[derive(Clone)]
-pub struct SetPropertyVariant<'a, L: Lang> {
-    pub label: L::Data<'a, Label>,
-    pub has_default: HasDefault,
-    pub elements: SmallVec<[(Iter, Attribute<Node>); 1]>,
 }
 
 #[derive(Clone, Copy)]
@@ -349,7 +335,7 @@ impl Display for PropFlags {
 
 bitflags::bitflags! {
     #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
-    pub struct StructFlags: u32 {
+    pub struct StructFlags: u8 {
         const MATCH = 0b00000001;
     }
 }

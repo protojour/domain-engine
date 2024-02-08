@@ -223,7 +223,7 @@ fn autogenerate_fmt_segment_property<'m>(
                     ontol_hir::PropFlags::empty(),
                     binder_var,
                     *property_id,
-                    [ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
+                    [ontol_hir::PropVariant::Value(ontol_hir::Attribute {
                         rel,
                         val: var_node,
                     })]

@@ -21,7 +21,7 @@ use crate::{
     relation::Property,
     repr::repr_model::ReprKind,
     type_check::{ena_inference::Strength, hir_build::NodeInfo, TypeError},
-    typed_hir::{Meta, TypedHir, TypedHirData, UNIT_META},
+    typed_hir::{Meta, TypedHirData, UNIT_META},
     types::{Type, TypeRef, UNIT_TYPE},
     CompileError, SourceSpan, NO_SPAN,
 };
@@ -301,7 +301,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             },
                             ctx,
                         );
-                        ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
+                        ontol_hir::PropVariant::Value(ontol_hir::Attribute {
                             rel: rel_node,
                             val: val_node,
                         })
@@ -338,7 +338,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 flags.insert(PropFlags::REL_OPTIONAL);
                             }
 
-                            ontol_hir::PropVariant::Singleton(Attribute {
+                            ontol_hir::PropVariant::Value(Attribute {
                                 rel: ctx.mk_node(ontol_hir::Kind::Unit, UNIT_META),
                                 val: ctx.mk_node(
                                     ontol_hir::Kind::Set(hir_set_elements),
@@ -374,20 +374,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     flags.insert(PropFlags::REL_OPTIONAL);
                 }
 
-                let prop_variants: Vec<ontol_hir::PropVariant<'_, TypedHir>> =
-                    match match_attribute.cardinality.0 {
-                        PropertyCardinality::Mandatory => {
+                let prop_variants: Vec<ontol_hir::PropVariant> = match match_attribute.cardinality.0
+                {
+                    PropertyCardinality::Mandatory => {
+                        vec![prop_variant]
+                    }
+                    PropertyCardinality::Optional => {
+                        if bind_option {
+                            vec![prop_variant]
+                        } else {
+                            ctx.partial = true;
                             vec![prop_variant]
                         }
-                        PropertyCardinality::Optional => {
-                            if bind_option {
-                                vec![prop_variant]
-                            } else {
-                                ctx.partial = true;
-                                vec![prop_variant]
-                            }
-                        }
-                    };
+                    }
+                };
 
                 if flags.rel_optional()
                     && !flags.pat_optional()
@@ -422,7 +422,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ctx,
                 );
 
-                let prop_variants: Vec<ontol_hir::PropVariant<'m, TypedHir>> =
+                let prop_variants: Vec<ontol_hir::PropVariant> =
                     match (match_attribute.cardinality.1, operator) {
                         (ValueCardinality::One, SetBinaryOperator::ElementIn) => {
                             vec![ontol_hir::PropVariant::Predicate(
@@ -553,7 +553,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             ontol_hir::PropFlags::empty(),
                             struct_binder_var,
                             match_attr.property_id,
-                            [ontol_hir::PropVariant::Singleton(ontol_hir::Attribute {
+                            [ontol_hir::PropVariant::Value(ontol_hir::Attribute {
                                 rel,
                                 val,
                             })]

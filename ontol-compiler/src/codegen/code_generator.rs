@@ -622,20 +622,8 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
             ontol_hir::Kind::Prop(_, struct_var, prop_id, variants) => {
                 if let Some(variant) = variants.into_iter().next() {
                     match variant {
-                        PropVariant::Singleton(attr) => {
+                        PropVariant::Value(attr) => {
                             self.gen_attribute(*struct_var, *prop_id, *attr, arena, span, block)
-                        }
-                        PropVariant::Set(seq_variant) => {
-                            if let Some((_iter, attr)) = seq_variant.elements.iter().next() {
-                                self.gen_attribute(
-                                    *struct_var,
-                                    *prop_id,
-                                    *attr,
-                                    arena,
-                                    span,
-                                    block,
-                                );
-                            }
                         }
                         PropVariant::Predicate(_) => todo!(),
                     }

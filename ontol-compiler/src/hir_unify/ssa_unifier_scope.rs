@@ -310,7 +310,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
 
                 for variant in variants {
                     match variant {
-                        PropVariant::Singleton(ontol_hir::Attribute { rel, val }) => {
+                        PropVariant::Value(ontol_hir::Attribute { rel, val }) => {
                             let prop_scoped = scoped.prop(self.map_flags);
 
                             match (flags.rel_optional(), flags.pat_optional()) {
@@ -357,77 +357,6 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                                     );
                                 }
                             };
-                        }
-                        PropVariant::Set(variant) => {
-                            let label = *variant.label.hir();
-
-                            for (iter, attr) in &variant.elements {
-                                if iter.0
-                                    && self
-                                        .iter_extended_scope_table
-                                        .insert(
-                                            label,
-                                            ontol_hir::Attribute {
-                                                rel: ExtendedScope::Node(attr.rel),
-                                                val: ExtendedScope::Node(attr.val),
-                                            },
-                                        )
-                                        .is_some()
-                                {
-                                    return Err(UnifierError::TODO(smart_format!(
-                                        "fix duplicate iter scope"
-                                    )));
-                                }
-                            }
-
-                            let set_var = Var(label.0);
-
-                            if matches!(scoped, Scoped::Yes) {
-                                self.scope_tracker.in_scope.insert(set_var);
-                            }
-
-                            let seq_meta = Meta::new(variant.label.ty(), node_ref.span());
-
-                            let binding = Attribute {
-                                rel: ontol_hir::Binding::Wildcard,
-                                val: ontol_hir::Binding::Binder(TypedHirData(
-                                    set_var.into(),
-                                    seq_meta,
-                                )),
-                            };
-
-                            if variant.has_default.0 {
-                                let rel = self.mk_node(
-                                    ontol_hir::Kind::Unit,
-                                    Meta::new(&UNIT_TYPE, node_ref.span()),
-                                );
-                                let dummy_binder = self.var_allocator.alloc();
-                                let val = self.mk_node(
-                                    ontol_hir::Kind::MakeSeq(
-                                        TypedHirData(dummy_binder.into(), seq_meta),
-                                        smallvec![],
-                                    ),
-                                    seq_meta,
-                                );
-
-                                self.push_let(
-                                    Let::PropDefault(
-                                        binding,
-                                        (*var, *prop_id),
-                                        ontol_hir::Attribute { rel, val },
-                                    ),
-                                    node_ref.span(),
-                                    scoped,
-                                    lets,
-                                );
-                            } else {
-                                self.push_let(
-                                    Let::Prop(binding, (*var, *prop_id)),
-                                    node_ref.span(),
-                                    scoped,
-                                    lets,
-                                );
-                            }
                         }
                         PropVariant::Predicate(_) => {
                             return Err(UnifierError::TODO(smart_format!("predicate prop scope")));

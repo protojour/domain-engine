@@ -5,8 +5,8 @@ use thin_vec::ThinVec;
 
 use crate::{
     arena::{Arena, NodeRef},
-    Attribute, Binding, CaptureGroup, EvalCondTerm, Iter, Kind, Label, Lang, Node,
-    PredicateClosure, PropVariant, RootNode, SetEntry, StructFlags,
+    Attribute, Binding, CaptureGroup, EvalCondTerm, Kind, Label, Lang, Node, PredicateClosure,
+    PropVariant, RootNode, SetEntry, StructFlags,
 };
 
 impl<'h, 'a, L: Lang> std::fmt::Display for NodeRef<'h, 'a, L> {
@@ -271,30 +271,14 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
     }
 }
 
-impl<'h, 'a, L: Lang> Print<PropVariant<'a, L>> for Printer<'h, 'a, L> {
-    fn print(
-        self,
-        f: &mut std::fmt::Formatter,
-        _sep: Sep,
-        variant: &PropVariant<'a, L>,
-    ) -> PrintResult {
+impl<'h, 'a, L: Lang> Print<PropVariant> for Printer<'h, 'a, L> {
+    fn print(self, f: &mut std::fmt::Formatter, _sep: Sep, variant: &PropVariant) -> PrintResult {
         let indent = self.indent;
         write!(f, "{indent}(")?;
 
         let multi = match variant {
-            PropVariant::Singleton(attr) => {
+            PropVariant::Value(attr) => {
                 self.print_all(f, Sep::None, self.kinds(&[attr.rel, attr.val]))?
-            }
-            PropVariant::Set(seq_variant) => {
-                if seq_variant.has_default.0 {
-                    write!(f, "..default")?;
-                } else {
-                    write!(f, "..")?;
-                }
-                write!(f, " ({})", L::as_hir(&seq_variant.label))?;
-
-                self.print_all(f, Sep::Space, seq_variant.elements.iter())?;
-                Multiline(true)
             }
             PropVariant::Predicate(closure) => match closure {
                 PredicateClosure::ContainsElement(attr) => {
@@ -323,30 +307,6 @@ impl<'h, 'a, L: Lang> Print<PropVariant<'a, L>> for Printer<'h, 'a, L> {
                 }
             },
         };
-
-        self.print_rparen(f, multi)?;
-        Ok(Multiline(true))
-    }
-}
-
-impl<'h, 'a, L: Lang> Print<(Iter, Attribute<Node>)> for Printer<'h, 'a, L> {
-    fn print(
-        self,
-        f: &mut std::fmt::Formatter,
-        _sep: Sep,
-        (iter, attr): &(Iter, Attribute<Node>),
-    ) -> PrintResult {
-        let indent = self.indent;
-        write!(f, "{indent}(")?;
-
-        let sep = if iter.0 {
-            write!(f, "iter")?;
-            Sep::Space
-        } else {
-            Sep::None
-        };
-
-        let multi = self.print_all(f, sep, self.kinds(&[attr.rel, attr.val]))?;
 
         self.print_rparen(f, multi)?;
         Ok(Multiline(true))

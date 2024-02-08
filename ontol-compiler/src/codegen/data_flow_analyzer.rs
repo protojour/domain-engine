@@ -3,7 +3,7 @@
 use std::{collections::BTreeSet, fmt::Debug};
 
 use fnv::{FnvHashMap, FnvHashSet};
-use ontol_hir::{PropVariant, SetPropertyVariant, StructFlags};
+use ontol_hir::{PropVariant, StructFlags};
 use ontol_runtime::{
     ontology::{PropertyFlow, PropertyFlowData},
     value::PropertyId,
@@ -232,17 +232,9 @@ where
 
                 for variant in variants {
                     match variant {
-                        PropVariant::Singleton(ontol_hir::Attribute { rel, val }) => {
+                        PropVariant::Value(ontol_hir::Attribute { rel, val }) => {
                             var_set.union_with(&self.analyze_node(arena.node_ref(*rel), *prop_id));
                             var_set.union_with(&self.analyze_node(arena.node_ref(*val), *prop_id));
-                        }
-                        PropVariant::Set(SetPropertyVariant { elements, .. }) => {
-                            for (_iter, ontol_hir::Attribute { rel, val }) in elements {
-                                var_set
-                                    .union_with(&self.analyze_node(arena.node_ref(*rel), *prop_id));
-                                var_set
-                                    .union_with(&self.analyze_node(arena.node_ref(*val), *prop_id));
-                            }
                         }
                         PropVariant::Predicate(_) => {
                             todo!()

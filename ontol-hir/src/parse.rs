@@ -304,20 +304,8 @@ impl<'a, L: Lang> Parser<'a, L> {
         ))
     }
 
-    fn parse_prop_variant<'s>(&mut self, next: &'s str) -> ParseResult<'s, PropVariant<'a, L>> {
+    fn parse_prop_variant<'s>(&mut self, next: &'s str) -> ParseResult<'s, PropVariant> {
         parse_paren_delimited(next, |next| match parse_symbol(next) {
-            Ok((sym @ (".." | "..default"), next)) => {
-                let (label, next) = parse_paren_delimited(next, parse_at_label)?;
-                let (elements, next) = self.parse_many(next, Self::parse_seq_property_element)?;
-                Ok((
-                    PropVariant::Set(SetPropertyVariant {
-                        label: self.make_label(label),
-                        has_default: HasDefault(sym != ".."),
-                        elements: elements.into(),
-                    }),
-                    next,
-                ))
-            }
             Ok(("element-in", next)) => {
                 let (node, next) = self.parse(next)?;
                 Ok((
@@ -330,28 +318,8 @@ impl<'a, L: Lang> Parser<'a, L> {
                 let (rel, next) = self.parse(next)?;
                 let (val, next) = self.parse(next)?;
 
-                Ok((PropVariant::Singleton(Attribute { rel, val }), next))
+                Ok((PropVariant::Value(Attribute { rel, val }), next))
             }
-        })
-    }
-
-    fn parse_seq_property_element<'s>(
-        &mut self,
-        next: &'s str,
-    ) -> ParseResult<'s, (Iter, Attribute<Node>)> {
-        parse_paren_delimited(next, |next| {
-            let (iter, next) = match parse_symbol(next) {
-                Ok(("iter", next)) => (Iter(true), next),
-                Ok((sym, _)) => {
-                    return Err(Error::Expected(Class::Symbol, Found(Token::Symbol(sym))))
-                }
-                Err(_) => (Iter(false), next),
-            };
-
-            let (rel, next) = self.parse(next)?;
-            let (val, next) = self.parse(next)?;
-
-            Ok(((iter, Attribute { rel, val }), next))
         })
     }
 
@@ -367,13 +335,12 @@ impl<'a, L: Lang> Parser<'a, L> {
                     next,
                 ))
             }
-            Ok(_) => {
+            _ => {
                 let (rel, next) = self.parse(next)?;
                 let (val, next) = self.parse(next)?;
 
                 Ok((SetEntry(None, Attribute { rel, val }), next))
             }
-            Err(e) => Err(e),
         })
     }
 

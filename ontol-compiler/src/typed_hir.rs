@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Display};
 
-use ontol_hir::{PredicateClosure, PropVariant, SetEntry, SetPropertyVariant};
+use ontol_hir::{PredicateClosure, PropVariant, SetEntry};
 use smallvec::SmallVec;
 
 use crate::{
@@ -252,20 +252,8 @@ pub fn arena_import<'m>(
             let variants = variants
                 .iter()
                 .map(|variant| match variant {
-                    PropVariant::Singleton(attr) => {
-                        PropVariant::Singleton(import_attr(target, source.arena(), *attr))
-                    }
-                    PropVariant::Set(seq_variant) => {
-                        let elements = seq_variant
-                            .elements
-                            .iter()
-                            .map(|(iter, attr)| (*iter, import_attr(target, source.arena(), *attr)))
-                            .collect();
-                        PropVariant::Set(SetPropertyVariant {
-                            label: seq_variant.label,
-                            has_default: seq_variant.has_default,
-                            elements,
-                        })
+                    PropVariant::Value(attr) => {
+                        PropVariant::Value(import_attr(target, source.arena(), *attr))
                     }
                     PropVariant::Predicate(closure) => PropVariant::Predicate(match closure {
                         PredicateClosure::ContainsElement(attr) => {

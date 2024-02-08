@@ -2,8 +2,7 @@ use ontol_runtime::value::PropertyId;
 
 use crate::{
     arena::{Arena, NodeRef},
-    Attribute, Binding, Iter, Kind, Label, Lang, Node, PredicateClosure, PropFlags, PropVariant,
-    SetEntry, Var,
+    Attribute, Binding, Kind, Label, Lang, PredicateClosure, PropFlags, PropVariant, SetEntry, Var,
 };
 
 pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
@@ -18,30 +17,15 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
         flags: PropFlags,
         struct_var: Var,
         prop_id: PropertyId,
-        variants: &[PropVariant<'a, L>],
+        variants: &[PropVariant],
         arena: &'h Arena<'a, L>,
     ) {
         self.traverse_prop(struct_var, prop_id, variants, arena);
     }
 
     #[allow(unused_variables)]
-    fn visit_prop_variant(
-        &mut self,
-        index: usize,
-        variant: &PropVariant<'a, L>,
-        arena: &'h Arena<'a, L>,
-    ) {
+    fn visit_prop_variant(&mut self, index: usize, variant: &PropVariant, arena: &'h Arena<'a, L>) {
         self.traverse_prop_variant(variant, arena);
-    }
-
-    #[allow(unused_variables)]
-    fn visit_seq_prop_element(
-        &mut self,
-        index: usize,
-        element: &(Iter, Attribute<Node>),
-        arena: &'h Arena<'a, L>,
-    ) {
-        self.traverse_seq_prop_element(index, element, arena);
     }
 
     #[allow(unused_variables)]
@@ -222,7 +206,7 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
         &mut self,
         struct_var: Var,
         prop_id: PropertyId,
-        variants: &[PropVariant<'a, L>],
+        variants: &[PropVariant],
         arena: &'h Arena<'a, L>,
     ) {
         self.visit_var(struct_var);
@@ -232,17 +216,11 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
         }
     }
 
-    fn traverse_prop_variant(&mut self, variant: &PropVariant<'a, L>, arena: &'h Arena<'a, L>) {
+    fn traverse_prop_variant(&mut self, variant: &PropVariant, arena: &'h Arena<'a, L>) {
         match variant {
-            PropVariant::Singleton(attr) => {
+            PropVariant::Value(attr) => {
                 self.visit_node(0, arena.node_ref(attr.rel));
                 self.visit_node(1, arena.node_ref(attr.val));
-            }
-            PropVariant::Set(seq_variant) => {
-                self.visit_label(*L::as_hir(&seq_variant.label));
-                for (index, element) in seq_variant.elements.iter().enumerate() {
-                    self.visit_seq_prop_element(index, element, arena);
-                }
             }
             PropVariant::Predicate(closure) => match closure {
                 PredicateClosure::ContainsElement(attr) => {
@@ -258,17 +236,6 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                 }
             },
         }
-    }
-
-    #[allow(unused_variables)]
-    fn traverse_seq_prop_element(
-        &mut self,
-        index: usize,
-        element: &(Iter, Attribute<Node>),
-        arena: &'h Arena<'a, L>,
-    ) {
-        self.visit_node(0, arena.node_ref(element.1.rel));
-        self.visit_node(1, arena.node_ref(element.1.val));
     }
 
     #[allow(unused_variables)]

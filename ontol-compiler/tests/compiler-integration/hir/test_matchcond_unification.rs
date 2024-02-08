@@ -119,10 +119,10 @@ fn test_unify_matchcond_cartesian_set() {
         "
         (struct ($c)
             (prop $c S:1:0
-                (.. (@e) (iter #u $a))
+                (#u (set (.. @e #u $a)))
             )
             (prop $c S:1:1
-                (.. (@f) (iter #u $b))
+                (#u (set (.. @f #u $b)))
             )
         )
         ",

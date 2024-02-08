@@ -320,14 +320,14 @@ fn test_unify_basic_seq_prop_no_default() {
         "
         (struct ($b)
             (prop! $b S:1:0
-                (.. (@d) (iter #u $a))
+                (#u (set (.. @d #u $a)))
             )
         )
         ",
         "
         (struct ($c)
             (prop! $c S:2:1
-                (.. (@d) (iter #u $a))
+                (#u (set (.. @d #u $a)))
             )
         )
         ",
@@ -358,14 +358,20 @@ fn test_unify_basic_seq_prop_element_iter_mix() {
         "
         (struct ($e)
             (prop! $e S:1:0 (#u $a))
-            (prop! $e S:1:1 (.. (@d) (iter #u $b)))
+            (prop! $e S:1:1 (#u (set (.. @d #u $b))))
             (prop! $e S:1:2 (#u $c))
         )
         ",
         "
         (struct ($f)
             (prop! $f S:2:1
-                (.. (@d) (#u $a) (iter #u $b) (#u $c))
+                (#u
+                    (set
+                        (#u $a)
+                        (.. @d #u $b)
+                        (#u $c)
+                    )
+                )
             )
         )
         ",
@@ -400,13 +406,13 @@ fn test_unify_seq_prop_deep() {
         "
         (struct ($b)
             (prop! $b S:1:0
-                (.. (@f)
-                    (iter
-                        #u
-                        (struct ($c)
-                            (prop! $c S:2:1
-                                (.. (@g)
-                                    (iter #u (map $a))
+                (#u
+                    (set
+                        (.. @f
+                            #u
+                            (struct ($c)
+                                (prop! $c S:2:1
+                                    (#u (set (.. @g #u (map $a))))
                                 )
                             )
                         )
@@ -417,13 +423,13 @@ fn test_unify_seq_prop_deep() {
         "
         (struct ($d)
             (prop! $d O:1:0
-                (.. (@f)
-                    (iter
-                        #u
-                        (struct ($e)
-                            (prop! $e O:2:1
-                                (.. (@g)
-                                    (iter #u (map $a))
+                (#u
+                    (set
+                        (.. @f
+                            #u
+                            (struct ($e)
+                                (prop! $e O:2:1
+                                    (#u (set (.. @g #u (map $a))))
                                 )
                             )
                         )
@@ -471,15 +477,17 @@ fn test_unify_seq_prop_merge_rel_and_val_zwizzle() {
         "
         (struct ($e)
             (prop! $e S:1:0
-                (.. (@f)
-                    (iter
-                        (struct ($g)
-                            (prop! $g S:2:0 (#u $a))
-                            (prop! $g S:2:1 (#u $b))
-                        )
-                        (struct ($h)
-                            (prop! $h S:3:0 (#u $c))
-                            (prop! $h S:3:1 (#u $d))
+                (#u
+                    (set
+                        (.. @f
+                            (struct ($g)
+                                (prop! $g S:2:0 (#u $a))
+                                (prop! $g S:2:1 (#u $b))
+                            )
+                            (struct ($h)
+                                (prop! $h S:3:0 (#u $c))
+                                (prop! $h S:3:1 (#u $d))
+                            )
                         )
                     )
                 )
@@ -488,15 +496,17 @@ fn test_unify_seq_prop_merge_rel_and_val_zwizzle() {
         "
         (struct ($i)
             (prop! $i O:1:0
-                (.. (@f)
-                    (iter
-                        (struct ($j)
-                            (prop! $j O:2:0 (#u $a))
-                            (prop! $j O:2:1 (#u $c))
-                        )
-                        (struct ($k)
-                            (prop! $k O:3:0 (#u $b))
-                            (prop! $k O:3:1 (#u $d))
+                (#u
+                    (set
+                        (.. @f
+                            (struct ($j)
+                                (prop! $j O:2:0 (#u $a))
+                                (prop! $j O:2:1 (#u $c))
+                            )
+                            (struct ($k)
+                                (prop! $k O:3:0 (#u $b))
+                                (prop! $k O:3:1 (#u $d))
+                            )
                         )
                     )
                 )
@@ -549,28 +559,28 @@ fn test_unify_basic_seq_prop_default_value() {
     let output = test_unify(
         "
         (struct ($b)
-            (prop! $b S:1:0
-                (..default (@d) (iter #u $a))
+            (prop $b S:1:0
+                (#u (set (.. @d #u $a)))
             )
         )
         ",
         "
         (struct ($c)
-            (prop! $c S:2:1
-                (.. (@d) (iter #u $a))
+            (prop $c S:2:1
+                (#u (set (.. @d #u $a)))
             )
         )
         ",
     );
     let expected = indoc! {"
         |$b| (block
-            (let-prop-default $_ $d ($b S:1:0) #u (make-seq ($e)))
+            (let-prop-default $_ $d ($b S:1:0) #u #u)
             (struct ($c)
-                (prop! $c S:2:1
+                (prop $c S:2:1
                     (#u
-                        (make-seq ($f)
+                        (make-seq ($e)
                             (for-each $d ($_ $a)
-                                (insert $f #u $a)
+                                (insert $e #u $a)
                             )
                         )
                     )
@@ -588,12 +598,14 @@ fn test_unify_flat_map1() {
         "
         (struct ($c)
             (prop! $c S:1:0
-                (.. (@d)
-                    (iter
-                        #u
-                        (struct ($e)
-                            (prop! $e S:3:2
-                                (#u $a)
+                (#u
+                    (set
+                        (.. @d
+                            #u
+                            (struct ($e)
+                                (prop! $e S:3:2
+                                    (#u $a)
+                                )
                             )
                         )
                     )
@@ -650,11 +662,14 @@ fn test_unify_flat_map2() {
         (struct ($d)
             (prop! $d S:1:2 (#u $a))
             (prop! $d S:1:5
-                (.. (@c)
-                    (iter #u
-                        (struct ($e)
-                            (prop! $e S:1:4
-                                (#u $b)
+                (#u
+                    (set
+                        (.. @c
+                            #u
+                            (struct ($e)
+                                (prop! $e S:1:4
+                                    (#u $b)
+                                )
                             )
                         )
                     )
@@ -1132,14 +1147,14 @@ mod unify_seq_scope_escape_1 {
     const ARMS: (&str, &str) = (
         "(struct ($c)
             (prop! $c S:1:0 (#u #u))
-            (prop! $c S:1:1 (.. (@a) (iter #u $b)))
+            (prop! $c S:1:1 (#u (set (.. @a #u $b))))
         )",
         "(struct ($d)
             (prop! $d O:1:0
                 (#u
                     (struct ($e)
                         (prop! $e O:2:0 (#u #u))
-                        (prop! $e O:2:1 (.. (@a) (iter #u $b)))
+                        (prop! $e O:2:1 (#u (set (.. @a #u $b))))
                     )
                 )
             )
@@ -1220,13 +1235,13 @@ mod unify_seq_scope_escape_2 {
                 (#u
                     (struct ($f)
                         (prop! $f S:2:0
-                            (.. (@a) (iter #u $b))
+                            (#u (set (.. @a #u $b)))
                         )
                     )
                 )
             )
             (prop! $e S:1:1
-                (.. (@c) (iter #u $d))
+                (#u (set (.. @c #u $d)))
             )
         )",
         // Note: The expr prop O:1:0 itself does not depend on anything in scope.
@@ -1239,13 +1254,13 @@ mod unify_seq_scope_escape_2 {
                             (#u
                                 (struct ($i)
                                     (prop! $i O:3:0
-                                        (.. (@a) (iter #u $b))
+                                        (#u (set (.. @a #u $b)))
                                     )
                                 )
                             )
                         )
                         (prop! $h O:2:1
-                            (.. (@c) (iter #u $d))
+                            (#u (set (.. @c #u $d)))
                         )
                     )
                 )
@@ -1397,8 +1412,8 @@ fn test_unify_regex_loop1() {
         ",
         "
         (struct ($d)
-            (prop! $d O:1:0 (..(@e) (iter #u $a)))
-            (prop! $d O:1:1 (..(@e) (iter #u $b)))
+            (prop! $d O:1:0 (#u (set (.. @e #u $a))))
+            (prop! $d O:1:1 (#u (set (.. @e #u $b))))
         )
         ",
     );
@@ -1452,14 +1467,17 @@ fn test_unify_regex_loop2() {
         "
         (struct ($e)
             (prop! $e S:1:0
-                (.. (@c)
-                    (iter #u
-                        (struct ($f)
-                            (prop! $f S:2:0
-                                (#u $a)
-                            )
-                            (prop! $f S:2:1
-                                (#u $b)
+                (#u
+                    (set
+                        (.. @c
+                            #u
+                            (struct ($f)
+                                (prop! $f S:2:0
+                                    (#u $a)
+                                )
+                                (prop! $f S:2:1
+                                    (#u $b)
+                                )
                             )
                         )
                     )
@@ -1515,29 +1533,34 @@ fn test_unify_regex_loop3() {
         "
         (struct ($e)
             (prop! $e S:1:6
-                (.. (@c)
-                    (iter #u
-                        (struct ($f)
-                            (prop! $f S:1:4
-                                (#u $a)
+                (#u
+                    (set
+                        (.. @c
+                            #u
+                            (struct ($f)
+                                (prop! $f S:1:4
+                                    (#u $a)
+                                )
                             )
                         )
                     )
                 )
             )
             (prop! $e S:1:7
-                (.. (@c)
-                    (iter #u
-                        (struct ($g)
-                            (prop! $g S:1:4
-                                (#u $b)
+                (#u
+                    (set
+                        (.. @c
+                            #u
+                            (struct ($g)
+                                (prop! $g S:1:4
+                                    (#u $b)
+                                )
                             )
                         )
                     )
                 )
             )
-        )
-        ",
+        )",
     );
 
     let expected = indoc! {"
