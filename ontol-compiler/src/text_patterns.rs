@@ -1,10 +1,9 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    text_pattern::{TextPattern, TextPatternConstantPart, TextPatternProperty},
+    text_pattern::{Regex, TextPattern, TextPatternConstantPart, TextPatternProperty},
     value::PropertyId,
     DefId,
 };
-use regex::Regex;
 use regex_syntax::hir::{Capture, Hir, Look};
 use smartstring::alias::String;
 use std::fmt::Write;
@@ -242,10 +241,15 @@ pub fn store_text_pattern_segment(
 }
 
 fn compile_regex(hir: Hir) -> Regex {
-    let mut expression = String::new();
-    write!(&mut expression, "{hir}").unwrap();
+    let mut pattern = String::new();
+    write!(&mut pattern, "{hir}").unwrap();
 
-    Regex::new(&expression).unwrap()
+    Regex {
+        regex_impl: regex_automata::meta::Regex::builder()
+            .build_from_hir(&hir)
+            .unwrap(),
+        pattern,
+    }
 }
 
 pub struct CaptureCursor(pub u32);

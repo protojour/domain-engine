@@ -25,7 +25,6 @@ regex-automata.workspace = true
 num = { version = "0.4", features = ["serde"] }
 serde-value = "0.7"
 time = { version = "0.3", features = ["serde-well-known"] }
-regex = "1"
 urlencoding = "2"
 bit-vec = { version = "0.6", features = ["serde"] }
 bincode = "1"

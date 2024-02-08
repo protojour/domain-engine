@@ -2,7 +2,7 @@ use std::array;
 
 use bit_vec::BitVec;
 use fnv::FnvHashMap;
-use regex::Captures;
+use regex_automata::{util::captures::Captures, Input};
 use smartstring::alias::String;
 use thin_vec::ThinVec;
 use tracing::{trace, Level};
@@ -292,24 +292,24 @@ impl<'o> Processor for OntolProcessor<'o> {
 
         let text_pattern = self.ontology.get_text_pattern(pattern_id).unwrap();
 
-        match text_pattern.regex.captures(haystack) {
-            Some(captures) => {
-                let attributes = extract_regex_captures(
-                    &captures,
-                    group_filter,
-                    self.ontology.ontol_domain_meta.text,
-                );
-                self.stack.push(Value::Sequence(
-                    Sequence {
-                        attrs: attributes,
-                        sub_seq: None,
-                    },
-                    self.ontology.ontol_domain_meta.text,
-                ));
-            }
-            None => {
-                self.push_void();
-            }
+        let mut captures = text_pattern.regex.create_captures();
+        text_pattern.regex.captures(haystack, &mut captures);
+        if captures.is_match() {
+            let attributes = extract_regex_captures(
+                haystack,
+                &captures,
+                group_filter,
+                self.ontology.ontol_domain_meta.text,
+            );
+            self.stack.push(Value::Sequence(
+                Sequence {
+                    attrs: attributes,
+                    sub_seq: None,
+                },
+                self.ontology.ontol_domain_meta.text,
+            ));
+        } else {
+            self.push_void();
         }
         Ok(())
     }
@@ -329,8 +329,13 @@ impl<'o> Processor for OntolProcessor<'o> {
         let mut attrs: Vec<Attribute> = Vec::new();
         let text_def_id = self.ontology.ontol_domain_meta.text;
 
-        for captures in text_pattern.regex.captures_iter(haystack) {
-            let value_attributes = extract_regex_captures(&captures, group_filter, text_def_id);
+        for captures in text_pattern
+            .regex
+            // Operates in non-greedy mode with `earliest(true)`
+            .captures_iter(Input::new(haystack).earliest(true))
+        {
+            let value_attributes =
+                extract_regex_captures(haystack, &captures, group_filter, text_def_id);
             attrs.push(Attribute::from(Value::Sequence(
                 Sequence {
                     attrs: value_attributes,
@@ -514,6 +519,7 @@ impl<'o> VmDebug<OntolProcessor<'o>> for Tracer {
 }
 
 fn extract_regex_captures(
+    haystack: &str,
     captures: &Captures,
     group_filter: &BitVec,
     text_def_id: DefId,
@@ -523,11 +529,11 @@ fn extract_regex_captures(
         .enumerate()
         .filter_map(|(index, value)| if value { Some(index) } else { None })
         .map(|index| {
-            Attribute::from(if let Some(capture_match) = captures.get(index) {
-                Value::Text(capture_match.as_str().into(), text_def_id)
-            } else {
-                Value::Void(DefId::unit())
-            })
+            let value = match captures.get_group(index) {
+                Some(span) => Value::Text(haystack[span.start..span.end].into(), text_def_id),
+                None => Value::Void(DefId::unit()),
+            };
+            Attribute::from(value)
         })
         .collect()
 }

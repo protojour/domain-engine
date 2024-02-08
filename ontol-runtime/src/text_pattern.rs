@@ -2,6 +2,7 @@ use std::{fmt::Display, ops::Deref};
 
 use ::serde::{Deserialize, Serialize};
 use fnv::FnvHashMap;
+use regex_automata::meta::BuildError;
 use serde::de::{value::StrDeserializer, DeserializeSeed};
 use smartstring::alias::String;
 use tracing::{debug, error};
@@ -22,30 +23,44 @@ pub struct TextPattern {
     pub constant_parts: Vec<TextPatternConstantPart>,
 }
 
+/// A wrapper around regex_automata
 #[derive(Debug)]
 pub struct Regex {
-    pub inner: regex_automata::meta::Regex,
+    pub regex_impl: regex_automata::meta::Regex,
     pub pattern: String,
+}
+
+impl Regex {
+    pub fn new(pattern: String) -> Result<Self, BuildError> {
+        Ok(Self {
+            regex_impl: regex_automata::meta::Regex::new(&pattern)?,
+            pattern,
+        })
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.pattern
+    }
 }
 
 impl Deref for Regex {
     type Target = regex_automata::meta::Regex;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.regex_impl
     }
 }
 
 impl TextPattern {
     pub fn try_capturing_match(
         &self,
-        input: &str,
+        haystack: &str,
         type_def_id: DefId,
         ontology: &Ontology,
     ) -> Result<Value, ParseError> {
         if self.constant_parts.is_empty() {
-            if let Some(match_) = self.regex.find(input) {
-                Ok(Value::Text(input[match_.range()].into(), type_def_id))
+            if let Some(match_) = self.regex.find(haystack) {
+                Ok(Value::Text(haystack[match_.range()].into(), type_def_id))
             } else {
                 Err(ParseError(smart_format!(
                     "regular expression did not match"
@@ -54,7 +69,7 @@ impl TextPattern {
         } else {
             let mut captures = self.regex.create_captures();
 
-            self.regex.captures(input, &mut captures);
+            self.regex.captures(haystack, &mut captures);
             if !captures.is_match() {
                 return Err(ParseError(smart_format!(
                     "regular expression did not match"
@@ -67,9 +82,9 @@ impl TextPattern {
                 match part {
                     TextPatternConstantPart::AllStrings { capture_group } => {
                         let text = captures
-                            .get(*capture_group)
-                            .expect("expected property match")
-                            .as_str();
+                            .get_group(*capture_group)
+                            .map(|span| &haystack[span.start..span.end])
+                            .expect("expected property match");
 
                         let text_def_id = ontology.ontol_domain_meta().text;
 
@@ -87,9 +102,9 @@ impl TextPattern {
                         debug!("fetching capture group {}", capture_group);
 
                         let text = captures
-                            .get(capture_group)
-                            .expect("expected property match")
-                            .as_str();
+                            .get_group(capture_group)
+                            .map(|span| &haystack[span.start..span.end])
+                            .expect("expected property match");
 
                         let type_info = ontology.get_type_info(property.type_def_id);
                         let processor = ontology.new_serde_processor(
@@ -201,12 +216,12 @@ mod serde_regex {
     where
         D: serde::Deserializer<'de>,
     {
-        let s = String::deserialize(deserializer)?;
-        let inner = regex_automata::meta::Regex::new(&s)
+        let pattern = String::deserialize(deserializer)?;
+        let regex_impl = regex_automata::meta::Regex::new(&pattern)
             .map_err(|e| ::serde::de::Error::custom(format!("{e}")))?;
         Ok(Regex {
-            inner,
-            pattern: s.into(),
+            regex_impl,
+            pattern: pattern.into(),
         })
     }
 }

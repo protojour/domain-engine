@@ -237,7 +237,7 @@ pub struct TextPatternMatcher<'on> {
 impl<'on> ValueMatcher for TextPatternMatcher<'on> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         expecting_custom_string(self.ontology, self.def_id, f)
-            .unwrap_or_else(|| write!(f, "string matching /{}/", self.pattern.regex))
+            .unwrap_or_else(|| write!(f, "string matching /{}/", self.pattern.regex.as_str()))
     }
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
@@ -261,7 +261,7 @@ pub struct CapturingTextPatternMatcher<'on> {
 
 impl<'on> ValueMatcher for CapturingTextPatternMatcher<'on> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "string matching /{}/", self.pattern.regex)
+        write!(f, "string matching /{}/", self.pattern.regex.as_str())
     }
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
