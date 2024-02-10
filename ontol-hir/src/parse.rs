@@ -308,10 +308,7 @@ impl<'a, L: Lang> Parser<'a, L> {
         parse_paren_delimited(next, |next| match parse_symbol(next) {
             Ok(("element-in", next)) => {
                 let (node, next) = self.parse(next)?;
-                Ok((
-                    PropVariant::Predicate(PredicateClosure::ElementIn(node)),
-                    next,
-                ))
+                Ok((PropVariant::Predicate(SetOperator::ElementIn, node), next))
             }
             Ok((sym, _)) => return Err(Error::Expected(Class::Set, Found(Token::Symbol(sym)))),
             Err(_) => {

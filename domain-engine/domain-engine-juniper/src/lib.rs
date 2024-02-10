@@ -200,7 +200,7 @@ async fn mutation(
                     .inputs
                     .attrs
                     .into_iter()
-                    .map(|attr| attr.value)
+                    .map(|attr| attr.val)
                     .collect();
 
                 batch_write_requests.push(match entity_mutation.kind {

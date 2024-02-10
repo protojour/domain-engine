@@ -83,8 +83,8 @@ impl TextPattern {
                         attrs.insert(
                             PropertyId::subject(crate::RelationshipId(text_def_id)),
                             Attribute {
-                                value: Value::Text(text.into(), text_def_id),
-                                rel_params: Value::unit(),
+                                rel: Value::unit(),
+                                val: Value::Text(text.into(), text_def_id),
                             },
                         );
                     }
@@ -155,7 +155,7 @@ impl<'d, 'o> Display for FormatPattern<'d, 'o> {
                         error!("Attribute {property_id} missing when formatting capturing text pattern");
                         return Err(std::fmt::Error);
                     };
-                    match &attribute.value {
+                    match &attribute.val {
                         Value::Text(text, _) => {
                             write!(f, "{text}")?;
                         }
@@ -178,7 +178,7 @@ impl<'d, 'o> Display for FormatPattern<'d, 'o> {
                         f,
                         "{}",
                         FormatValueAsText {
-                            value: &attribute.value,
+                            value: &attribute.val,
                             type_def_id: *type_def_id,
                             ontology: self.ontology
                         }

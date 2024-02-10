@@ -127,8 +127,8 @@ impl<'o> Processor for OntolProcessor<'o> {
                     // TODO(optimize): Figure out when clone is needed!
                     let attr = seq.attrs[i].clone();
 
-                    self.stack.push(attr.rel_params);
-                    self.stack.push(attr.value);
+                    self.stack.push(attr.rel);
+                    self.stack.push(attr.val);
 
                     *self.int_local_mut(index)? += 1;
 
@@ -166,10 +166,10 @@ impl<'o> Processor for OntolProcessor<'o> {
         match attr {
             Some(attr) => {
                 if flags.contains(GetAttrFlags::REL) {
-                    self.stack.push(attr.rel_params);
+                    self.stack.push(attr.rel);
                 }
                 if flags.contains(GetAttrFlags::VAL) {
-                    self.stack.push(attr.value);
+                    self.stack.push(attr.val);
                 }
                 Ok(())
             }
@@ -197,10 +197,10 @@ impl<'o> Processor for OntolProcessor<'o> {
 
     #[inline(always)]
     fn put_attr2(&mut self, target: Local, key: PropertyId) -> VmResult<()> {
-        let [rel_params, value]: [Value; 2] = self.pop_n();
-        if !matches!(value, Value::Unit(_)) {
+        let [rel, val]: [Value; 2] = self.pop_n();
+        if !matches!(val, Value::Unit(_)) {
             let map = self.struct_local_mut(target)?;
-            map.insert(key, Attribute { value, rel_params });
+            map.insert(key, Attribute { rel, val });
         }
         Ok(())
     }
@@ -230,9 +230,9 @@ impl<'o> Processor for OntolProcessor<'o> {
 
     #[inline(always)]
     fn append_attr2(&mut self, seq: Local) -> VmResult<()> {
-        let [rel_params, value]: [Value; 2] = self.pop_n();
+        let [rel, val]: [Value; 2] = self.pop_n();
         let seq = self.sequence_local_mut(seq)?;
-        seq.attrs.push(Attribute { value, rel_params });
+        seq.attrs.push(Attribute { rel, val });
         Ok(())
     }
 
@@ -259,8 +259,7 @@ impl<'o> Processor for OntolProcessor<'o> {
     fn move_seq_vals_to_stack(&mut self, source: Local) -> VmResult<()> {
         let sequence = std::mem::take(&mut self.sequence_local_mut(source)?.attrs);
         *self.local_mut(source) = Value::unit();
-        self.stack
-            .extend(sequence.into_iter().map(|attr| attr.value));
+        self.stack.extend(sequence.into_iter().map(|attr| attr.val));
         Ok(())
     }
 
@@ -374,6 +373,14 @@ impl<'o> Processor for OntolProcessor<'o> {
                 let rel = self.opcode_term_to_cond_term(rel);
                 let val = self.opcode_term_to_cond_term(val);
                 Clause::Attr(*var, *prop_id, (rel, val))
+            }
+            Clause::MatchProp(var, prop_id, operator, set_var) => {
+                Clause::MatchProp(*var, *prop_id, *operator, *set_var)
+            }
+            Clause::Element(set_var, (rel, val)) => {
+                let rel = self.opcode_term_to_cond_term(rel);
+                let val = self.opcode_term_to_cond_term(val);
+                Clause::Element(*set_var, (rel, val))
             }
             Clause::Eq(..) => todo!(),
             Clause::Or(_) => todo!(),
@@ -656,10 +663,10 @@ mod tests {
         let Value::Struct(mut attrs, _) = output else {
             panic!();
         };
-        let Value::I64(a, _) = attrs.remove(&"S:0:4".parse().unwrap()).unwrap().value else {
+        let Value::I64(a, _) = attrs.remove(&"S:0:4".parse().unwrap()).unwrap().val else {
             panic!();
         };
-        let Value::I64(b, _) = attrs.remove(&"S:0:5".parse().unwrap()).unwrap().value else {
+        let Value::I64(b, _) = attrs.remove(&"S:0:5".parse().unwrap()).unwrap().val else {
             panic!();
         };
         assert_eq!(666, a);
@@ -707,7 +714,7 @@ mod tests {
         let output = seq
             .attrs
             .into_iter()
-            .map(|attr| attr.value.cast_into())
+            .map(|attr| attr.val.cast_into())
             .collect::<Vec<i64>>();
 
         assert_eq!(vec![2, 4], output);

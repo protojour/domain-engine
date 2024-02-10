@@ -21,6 +21,7 @@ async-trait.workspace = true
 chrono.workspace = true
 smallvec.workspace = true
 bit-set.workspace = true
+thin-vec.workspace = true
 serde = "1"
 serde_json = "1"
 unimock = "0.5"

@@ -90,7 +90,7 @@ fn main() -> anyhow::Result<()> {
         from_type.operator_addr.expect("No deserializer found"),
         ProcessorMode::Read,
     );
-    let data = match args.format {
+    let attr = match args.format {
         Format::Json => from_processor
             .deserialize(&mut serde_json::Deserializer::from_reader(
                 args.input.into_reader()?,
@@ -102,7 +102,7 @@ fn main() -> anyhow::Result<()> {
             ))
             .expect("Deserialization failed"),
     };
-    let value = match ontology.new_vm(proc).run([data.value])? {
+    let value = match ontology.new_vm(proc).run([attr.val])? {
         VmState::Complete(value) => value,
         VmState::Yielded(_) => return Err(anyhow!("ONTOL-VM yielded!")),
     };

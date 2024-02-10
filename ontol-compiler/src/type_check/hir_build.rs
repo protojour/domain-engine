@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use ontol_hir::StructFlags;
-use ontol_runtime::smart_format;
+use ontol_runtime::{smart_format, value::Attribute};
 use smallvec::SmallVec;
 use thin_vec::{thin_vec, ThinVec};
 use tracing::debug;
@@ -342,7 +342,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ontol_hir::Kind::Set(
                         [ontol_hir::SetEntry(
                             Some(label.with_ty(seq_ty)),
-                            ontol_hir::Attribute { rel, val },
+                            Attribute { rel, val },
                         )]
                         .into(),
                     ),
@@ -624,10 +624,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 None
             };
 
-            set_entries.push(ontol_hir::SetEntry(
-                label,
-                ontol_hir::Attribute { rel, val },
-            ));
+            set_entries.push(ontol_hir::SetEntry(label, Attribute { rel, val }));
         }
 
         ctx.mk_node(

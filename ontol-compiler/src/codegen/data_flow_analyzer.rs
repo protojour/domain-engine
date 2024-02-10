@@ -6,7 +6,7 @@ use fnv::{FnvHashMap, FnvHashSet};
 use ontol_hir::{PropVariant, StructFlags};
 use ontol_runtime::{
     ontology::{PropertyFlow, PropertyFlowData},
-    value::PropertyId,
+    value::{Attribute, PropertyId},
     var::{Var, VarSet},
     DefId, RelationshipId, Role,
 };
@@ -113,17 +113,9 @@ where
                 var_set
             }
             ontol_hir::Kind::Try(..) => VarSet::default(),
-            ontol_hir::Kind::LetProp(ontol_hir::Attribute { rel, val }, (struct_var, prop_id))
-            | ontol_hir::Kind::LetPropDefault(
-                ontol_hir::Attribute { rel, val },
-                (struct_var, prop_id),
-                _,
-            )
-            | ontol_hir::Kind::TryLetProp(
-                _,
-                ontol_hir::Attribute { rel, val },
-                (struct_var, prop_id),
-            ) => {
+            ontol_hir::Kind::LetProp(Attribute { rel, val }, (struct_var, prop_id))
+            | ontol_hir::Kind::LetPropDefault(Attribute { rel, val }, (struct_var, prop_id), _)
+            | ontol_hir::Kind::TryLetProp(_, Attribute { rel, val }, (struct_var, prop_id)) => {
                 self.prop_origins.insert(*prop_id, *struct_var);
                 self.prop_origins_inverted
                     .entry(*struct_var)
@@ -231,11 +223,11 @@ where
                 let mut var_set = VarSet::default();
 
                 match variant {
-                    PropVariant::Value(ontol_hir::Attribute { rel, val }) => {
+                    PropVariant::Value(Attribute { rel, val }) => {
                         var_set.union_with(&self.analyze_node(arena.node_ref(*rel), *prop_id));
                         var_set.union_with(&self.analyze_node(arena.node_ref(*val), *prop_id));
                     }
-                    PropVariant::Predicate(_) => {
+                    PropVariant::Predicate(..) => {
                         todo!()
                     }
                 }
@@ -264,7 +256,7 @@ where
                 }
                 var_set
             }
-            ontol_hir::Kind::Insert(var, ontol_hir::Attribute { rel, val }) => {
+            ontol_hir::Kind::Insert(var, Attribute { rel, val }) => {
                 let mut var_set = self.analyze_node(arena.node_ref(*rel), parent_prop);
                 var_set.union_with(&self.analyze_node(arena.node_ref(*val), parent_prop));
 

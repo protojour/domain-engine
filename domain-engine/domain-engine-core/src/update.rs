@@ -16,7 +16,7 @@ pub fn sanitize_update(update: &mut Value) {
 }
 
 fn remove_none_attrs(attrs: &mut FnvHashMap<PropertyId, Attribute>) {
-    attrs.retain(|_, attr| exists(&attr.rel_params) && exists(&attr.value))
+    attrs.retain(|_, attr| exists(&attr.rel) && exists(&attr.val))
 }
 
 fn exists(value: &Value) -> bool {
@@ -24,11 +24,11 @@ fn exists(value: &Value) -> bool {
         Value::Void(_) => false,
         Value::Struct(attrs, _) | Value::StructUpdate(attrs, _) => attrs
             .iter()
-            .all(|(_, attr)| exists(&attr.rel_params) && exists(&attr.value)),
+            .all(|(_, attr)| exists(&attr.rel) && exists(&attr.val)),
         Value::Sequence(seq, _) => seq
             .attrs
             .iter()
-            .all(|attr| exists(&attr.rel_params) && exists(&attr.value)),
+            .all(|attr| exists(&attr.rel) && exists(&attr.val)),
         _other => true,
     }
 }

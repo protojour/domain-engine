@@ -37,7 +37,13 @@ where
 pub enum Clause<Term> {
     Root(Var),
     IsEntity(Term, DefId),
+    /// The left variable is connected via a property to the right variable.
+    /// The right variable represents a set of values for the property.
+    MatchProp(Var, PropertyId, SetOperator, Var),
+    /// An attribute having a specific value, bound to a Term
     Attr(Var, PropertyId, (Term, Term)),
+    /// An element in the set defined by the variable
+    Element(Var, (Term, Term)),
     Eq(Var, Term),
     Or(ThinVec<Term>),
 }
@@ -47,6 +53,17 @@ pub enum CondTerm {
     Wildcard,
     Var(Var),
     Value(Value),
+}
+
+/// An binary operator that takes a set as its right hand operand
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug)]
+pub enum SetOperator {
+    /// The left operand is an element of the right operand
+    ElementIn,
+    AllInSet,
+    SetContainsAll,
+    SetIntersects,
+    SetEquals,
 }
 
 impl From<Value> for CondTerm {
@@ -78,6 +95,15 @@ where
             Clause::Attr(var, prop_id, (rel, val)) => {
                 write!(f, "(attr {var} {prop_id} ({rel} {val}))")
             }
+            Clause::MatchProp(var, prop_id, operator, term) => {
+                write!(
+                    f,
+                    "(attr-set-predicate {var} {prop_id} ({operator} {term}))"
+                )
+            }
+            Clause::Element(var, (rel, val)) => {
+                write!(f, "(element {var} ({rel} {val}))")
+            }
             Clause::Eq(var, term) => write!(f, "(eq {var} {term})"),
             Clause::Or(_) => write!(f, "(or ..)"),
         }
@@ -90,6 +116,18 @@ impl Display for CondTerm {
             Self::Wildcard => write!(f, "_"),
             Self::Var(var) => write!(f, "{var}"),
             Self::Value(value) => write!(f, "{}", ValueDebug(value)),
+        }
+    }
+}
+
+impl Display for SetOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SetOperator::ElementIn => write!(f, "element-in"),
+            SetOperator::AllInSet => write!(f, "all-in-set"),
+            SetOperator::SetContainsAll => write!(f, "set-contains-all"),
+            SetOperator::SetIntersects => write!(f, "set-intersects"),
+            SetOperator::SetEquals => write!(f, "set-equals"),
         }
     }
 }

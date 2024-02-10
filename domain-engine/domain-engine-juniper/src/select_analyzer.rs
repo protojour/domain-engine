@@ -73,7 +73,7 @@ impl<'a> SelectAnalyzer<'a> {
                         input_arg,
                         (self.schema_ctx, self.service_ctx),
                     )?
-                    .value;
+                    .val;
 
                 let mut output_selects: FnvHashMap<Var, EntitySelect> = Default::default();
 

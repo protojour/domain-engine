@@ -43,14 +43,14 @@ impl<'e> ObjectGenerator<'e> {
 
                 // recurse into sub-properties
                 for attribute in struct_map.values_mut() {
-                    self.generate_objects(&mut attribute.rel_params);
-                    self.generate_objects(&mut attribute.value);
+                    self.generate_objects(&mut attribute.rel);
+                    self.generate_objects(&mut attribute.val);
                 }
             }
             Value::Sequence(seq, _) => {
                 for attribute in &mut seq.attrs {
-                    self.generate_objects(&mut attribute.rel_params);
-                    self.generate_objects(&mut attribute.value);
+                    self.generate_objects(&mut attribute.rel);
+                    self.generate_objects(&mut attribute.val);
                 }
             }
             _ => {}

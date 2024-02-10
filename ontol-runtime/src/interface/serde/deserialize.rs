@@ -192,7 +192,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                 let mut typed_attribute =
                     self.narrow(value_op.inner_addr).deserialize(deserializer)?;
 
-                *typed_attribute.value.type_def_id_mut() = value_op.def.def_id;
+                *typed_attribute.val.type_def_id_mut() = value_op.def.def_id;
 
                 Ok(typed_attribute)
             }
@@ -413,8 +413,8 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
                     .ok_or_else(|| Error::custom("missing _id attribute".to_string()))?;
 
                 Ok(Attribute {
-                    value: id,
-                    rel_params: deserialized_map.rel_params,
+                    rel: deserialized_map.rel_params,
+                    val: id,
                 })
             }
         }

@@ -1,9 +1,10 @@
 use indexmap::IndexMap;
-use ontol_hir::{Attribute, PropFlags, StructFlags};
+use ontol_hir::{PropFlags, StructFlags};
 use ontol_runtime::{
+    condition::SetOperator,
     ontology::{Cardinality, PropertyCardinality, ValueCardinality},
     smart_format,
-    value::PropertyId,
+    value::{Attribute, PropertyId},
     var::Var,
     DefId, Role,
 };
@@ -301,7 +302,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             },
                             ctx,
                         );
-                        ontol_hir::PropVariant::Value(ontol_hir::Attribute {
+                        ontol_hir::PropVariant::Value(Attribute {
                             rel: rel_node,
                             val: val_node,
                         })
@@ -327,7 +328,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     } else {
                                         None
                                     },
-                                    ontol_hir::Attribute {
+                                    Attribute {
                                         rel: rel_node,
                                         val: val_node,
                                     },
@@ -417,9 +418,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let prop_variant: ontol_hir::PropVariant =
                     match (match_attribute.cardinality.1, operator) {
                         (ValueCardinality::One, SetBinaryOperator::ElementIn) => {
-                            ontol_hir::PropVariant::Predicate(
-                                ontol_hir::PredicateClosure::ElementIn(set_node),
-                            )
+                            ontol_hir::PropVariant::Predicate(SetOperator::ElementIn, set_node)
                         }
                         (ValueCardinality::Many, SetBinaryOperator::ElementIn) => {
                             self.error(
@@ -545,7 +544,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             ontol_hir::PropFlags::empty(),
                             struct_binder_var,
                             match_attr.property_id,
-                            ontol_hir::PropVariant::Value(ontol_hir::Attribute { rel, val }),
+                            ontol_hir::PropVariant::Value(Attribute { rel, val }),
                         ),
                         UNIT_META,
                     )

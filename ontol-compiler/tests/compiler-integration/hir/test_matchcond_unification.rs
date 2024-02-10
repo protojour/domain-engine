@@ -113,7 +113,7 @@ fn test_unify_matchcond_struct_in_struct() {
 
 #[test]
 // BUG: Unfinished design work
-#[should_panic = "not yet implemented"]
+// #[should_panic = "not yet implemented"]
 fn test_unify_matchcond_cartesian_set() {
     let output = test_unify(
         "
@@ -134,10 +134,16 @@ fn test_unify_matchcond_cartesian_set() {
                     (prop $d O:1:0
                         (element-in
                             (set
-                                (.. @f
+                                (.. @e
                                     #u
                                     (struct ($q)
                                         (prop $q O:2:0 (#u $a))
+                                    )
+                                )
+                                (.. @f
+                                    #u
+                                    (struct ($r)
+                                        (prop $r O:2:0 (#u $b))
                                     )
                                 )
                             )

@@ -203,7 +203,7 @@ impl<'v> AttributeType<'v> {
                     kind: ObjectKind::Node(node_data),
                     ..
                 }) => {
-                    if node_data.def_id == self.attr.value.type_def_id() {
+                    if node_data.def_id == self.attr.val.type_def_id() {
                         return (*variant_type_addr, variant_type_data);
                     }
                 }
@@ -213,7 +213,7 @@ impl<'v> AttributeType<'v> {
 
         panic!(
             "union variant not found for ({value:?}) {variants:?}",
-            value = self.attr.value,
+            value = self.attr.val,
             variants = union_data.variants
         );
     }
@@ -232,7 +232,7 @@ impl<'v> AttributeType<'v> {
 
         // trace!("resolve object field `{field_name}`: {:?}", self.attr);
 
-        match (&self.attr.value, &field_data.kind) {
+        match (&self.attr.val, &field_data.kind) {
             (Value::Struct(..), FieldKind::Node) => resolve_schema_type_field(
                 self,
                 schema_ctx
@@ -263,8 +263,8 @@ impl<'v> AttributeType<'v> {
                     ),
                     None => {
                         let empty = Attribute {
-                            value: Value::Sequence(Sequence::new([]), DefId::unit()),
-                            rel_params: Value::unit(),
+                            rel: Value::unit(),
+                            val: Value::Sequence(Sequence::new([]), DefId::unit()),
                         };
 
                         resolve_schema_type_field(
@@ -301,7 +301,7 @@ impl<'v> AttributeType<'v> {
                         .open_data_property_id(),
                 ) {
                     Some(open_data_attr) => Ok(serialize_raw(
-                        &open_data_attr.value,
+                        &open_data_attr.val,
                         &schema_ctx.ontology,
                         ProcessorLevel::new_root_with_recursion_limit(32),
                         JuniperValueSerializer,
@@ -332,7 +332,7 @@ impl<'v> AttributeType<'v> {
                 .and_then(SubSequence::total_len)
                 .serialize(JuniperValueSerializer)?),
             (Value::Unit(_), FieldKind::Property(_)) => Ok(juniper::Value::Null),
-            (_, FieldKind::EdgeProperty(property_data)) => match &self.attr.rel_params {
+            (_, FieldKind::EdgeProperty(property_data)) => match &self.attr.rel {
                 Value::Struct(rel_attrs, _) => Self::resolve_property(
                     rel_attrs.as_ref(),
                     property_data.property_id,
@@ -375,9 +375,9 @@ impl<'v> AttributeType<'v> {
                     TypeKind::CustomScalar(scalar_data) => Ok(schema_ctx
                         .ontology
                         .new_serde_processor(scalar_data.operator_addr, ProcessorMode::Read)
-                        .serialize_value(&attribute.value, None, JuniperValueSerializer)?),
+                        .serialize_value(&attribute.val, None, JuniperValueSerializer)?),
                     TypeKind::Object(_) | TypeKind::Union(_) => {
-                        match (type_ref.modifier, &attribute.value) {
+                        match (type_ref.modifier, &attribute.val) {
                             (TypeModifier::Array { .. }, Value::Sequence(seq, _)) => {
                                 resolve_schema_type_field(
                                     SequenceType { seq },
@@ -401,7 +401,7 @@ impl<'v> AttributeType<'v> {
                     .get_serde_operator(scalar_ref.operator_addr),
             ) {
                 (TypeModifier::Array { .. }, SerdeOperator::RelationSequence(operator)) => {
-                    let attributes = attribute.value.cast_ref::<Vec<_>>();
+                    let attributes = attribute.val.cast_ref::<Vec<_>>();
                     let processor = schema_ctx
                         .ontology
                         .new_serde_processor(operator.ranges[0].addr, ProcessorMode::Read);
@@ -410,7 +410,7 @@ impl<'v> AttributeType<'v> {
                         .iter()
                         .map(|attr| -> juniper::ExecutionResult<GqlScalar> {
                             Ok(processor.serialize_value(
-                                &attr.value,
+                                &attr.val,
                                 None,
                                 JuniperValueSerializer,
                             )?)
@@ -422,7 +422,7 @@ impl<'v> AttributeType<'v> {
                 _ => Ok(schema_ctx
                     .ontology
                     .new_serde_processor(scalar_ref.operator_addr, ProcessorMode::Read)
-                    .serialize_value(&attribute.value, None, JuniperValueSerializer)?),
+                    .serialize_value(&attribute.val, None, JuniperValueSerializer)?),
             },
         }
     }

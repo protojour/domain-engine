@@ -71,12 +71,12 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                     .new_serde_processor(addr, self.processor_mode)
                     .with_level(ProcessorLevel::new_root_with_recursion_limit(32)),
             )?
-            .value)
+            .val)
     }
 
     fn fake_attribute(&mut self, processor: SerdeProcessor) -> Result<Attribute, Error> {
         debug!("fake attribute {processor:?}");
-        let value = match processor.value_operator {
+        let val = match processor.value_operator {
             SerdeOperator::Unit => Value::unit(),
             SerdeOperator::False(def_id) => Value::I64(0, *def_id),
             SerdeOperator::True(def_id) => Value::I64(1, *def_id),
@@ -205,14 +205,14 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
             }
         };
 
-        let rel_params = if let Some(rel_params_addr) = processor.ctx.rel_params_addr {
+        let rel = if let Some(rel_params_addr) = processor.ctx.rel_params_addr {
             self.fake_attribute(processor.new_child(rel_params_addr)?)?
-                .value
+                .val
         } else {
             Value::unit()
         };
 
-        Ok(Attribute { value, rel_params })
+        Ok(Attribute { rel, val })
     }
 }
 

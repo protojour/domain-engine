@@ -159,7 +159,7 @@ impl InMemoryStore {
             }
             (PlanEntry::AllAttrs(prop_id, entries), FilterVal::Struct { prop_tree: map, .. }) => {
                 let attr = map.get(prop_id).ok_or(ProofError::Disproven)?;
-                let Value::Sequence(seq, _) = &attr.value else {
+                let Value::Sequence(seq, _) = &attr.val else {
                     return Err(ProofError::Disproven);
                 };
 
@@ -279,7 +279,7 @@ impl InMemoryStore {
 
         for entry in entries {
             proof.merge(self.eval_filter_plan_entry(
-                &FilterVal::from_value(&attr.value),
+                &FilterVal::from_value(&attr.val),
                 entry,
                 join_table,
             )?);

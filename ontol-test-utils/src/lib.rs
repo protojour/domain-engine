@@ -13,6 +13,7 @@ use ontol_runtime::{
     config::{DataStoreConfig, PackageConfig},
     interface::{graphql::schema::GraphqlSchema, DomainInterface},
     ontology::Ontology,
+    value::PropertyId,
     PackageId,
 };
 use type_binding::TypeBinding;
@@ -106,6 +107,10 @@ impl OntolTest {
     /// A type without prefix is interpreted as the root domain/package.
     pub fn bind<const N: usize>(&self, type_names: [&str; N]) -> [TypeBinding; N] {
         type_names.map(|type_name| TypeBinding::new(self, type_name))
+    }
+
+    pub fn prop_ids<const N: usize>(&self, props: [(&TypeBinding, &str); N]) -> [PropertyId; N] {
+        props.map(|(binding, prop_name)| binding.find_property(prop_name).unwrap())
     }
 
     /// Get the ontol_runtime GraphQL schema

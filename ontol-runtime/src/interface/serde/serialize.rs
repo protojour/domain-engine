@@ -25,8 +25,8 @@ use super::{
 type Res<S> = Result<<S as serde::Serializer>::Ok, <S as serde::Serializer>::Error>;
 
 const UNIT_ATTR: Attribute = Attribute {
-    value: Value::unit(),
-    rel_params: Value::unit(),
+    rel: Value::unit(),
+    val: Value::unit(),
 };
 
 impl<'on, 'p> SerdeProcessor<'on, 'p> {
@@ -226,7 +226,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                         })?;
 
                         self.serialize_as_text_formatted(
-                            &attr.value,
+                            &attr.val,
                             pattern_property.type_def_id,
                             serializer,
                         )
@@ -254,16 +254,16 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                     let attribute = element_iter.next().unwrap();
 
                     seq.serialize_element(&Proxy {
-                        value: &attribute.value,
-                        rel_params: attribute.rel_params.filter_non_unit(),
+                        value: &attribute.val,
+                        rel_params: attribute.rel.filter_non_unit(),
                         processor: self.narrow(range.addr),
                     })?;
                 }
             } else {
                 for attribute in element_iter.by_ref() {
                     seq.serialize_element(&Proxy {
-                        value: &attribute.value,
-                        rel_params: attribute.rel_params.filter_non_unit(),
+                        value: &attribute.val,
+                        rel_params: attribute.rel.filter_non_unit(),
                         processor: self.narrow(range.addr),
                     })?;
                 }
@@ -281,10 +281,10 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         let mut seq = serializer.serialize_seq(Some(elements.len()))?;
 
         for attr in elements {
-            let def_id = attr.value.type_def_id();
+            let def_id = attr.val.type_def_id();
             match self.ontology.get_type_info(def_id).operator_addr {
                 Some(addr) => seq.serialize_element(&Proxy {
-                    value: &attr.value,
+                    value: &attr.val,
                     rel_params: None,
                     processor: self.narrow(addr),
                 })?,
@@ -355,8 +355,8 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
             map.serialize_entry(
                 name,
                 &Proxy {
-                    value: &attribute.value,
-                    rel_params: attribute.rel_params.filter_non_unit(),
+                    value: &attribute.val,
+                    rel_params: attribute.rel.filter_non_unit(),
                     processor: self
                         .new_child_with_context(
                             serde_prop.value_addr,
@@ -382,7 +382,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
             if let Some(open_data_attr) =
                 attributes.get(&self.ontology.ontol_domain_meta().open_data_property_id())
             {
-                let Value::Dict(dict, _) = &open_data_attr.value else {
+                let Value::Dict(dict, _) = &open_data_attr.val else {
                     panic!("Open data must be a dict");
                 };
 

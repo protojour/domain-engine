@@ -7,7 +7,7 @@ use ontol_runtime::{
     condition::Clause,
     ontology::{MapLossiness, ValueCardinality},
     smart_format,
-    value::PropertyId,
+    value::{Attribute, PropertyId},
     var::{Var, VarSet},
     vm::proc::{
         BuiltinProc, GetAttrFlags, Local, NParams, OpCode, OpCodeCondTerm, Predicate, Procedure,
@@ -245,7 +245,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     self.builder,
                 );
             }
-            ontol_hir::Kind::LetProp(ontol_hir::Attribute { rel, val }, (struct_var, prop_id)) => {
+            ontol_hir::Kind::LetProp(Attribute { rel, val }, (struct_var, prop_id)) => {
                 let Ok(struct_local) = self.var_local(*struct_var, &span) else {
                     return;
                 };
@@ -623,7 +623,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 PropVariant::Value(attr) => {
                     self.gen_attribute(*struct_var, *prop_id, *attr, arena, span, block)
                 }
-                PropVariant::Predicate(_) => todo!(),
+                PropVariant::Predicate(..) => todo!(),
             },
             ontol_hir::Kind::MoveRestAttrs(target, source) => {
                 let Ok(target_local) = self.var_local(*target, &span) else {
@@ -791,6 +791,12 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                             self.builder,
                         );
                     }
+                    Clause::MatchProp(..) => {
+                        todo!()
+                    }
+                    Clause::Element(..) => {
+                        todo!()
+                    }
                     Clause::Eq(..) => todo!(),
                     Clause::Or(_) => todo!(),
                 }
@@ -828,7 +834,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
         &mut self,
         struct_var: Var,
         prop_id: PropertyId,
-        ontol_hir::Attribute { rel, val }: ontol_hir::Attribute<ontol_hir::Node>,
+        Attribute { rel, val }: Attribute<ontol_hir::Node>,
         arena: &TypedArena<'m>,
         span: SourceSpan,
         block: &mut Block,

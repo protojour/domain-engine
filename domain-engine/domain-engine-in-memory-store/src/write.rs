@@ -96,7 +96,7 @@ impl InMemoryStore {
                             ctx,
                         )?;
                     }
-                    ValueCardinality::Many => match attribute.value {
+                    ValueCardinality::Many => match attribute.val {
                         Value::Sequence(_sequence, _) => {
                             return Err(DomainError::DataStore(anyhow!(
                                 "Multi-relation overwrite not yet implemented"
@@ -104,17 +104,17 @@ impl InMemoryStore {
                         }
                         Value::Patch(patch_attributes, _) => {
                             for attribute in patch_attributes {
-                                if matches!(attribute.rel_params, Value::DeleteRelationship(_)) {
+                                if matches!(attribute.rel, Value::DeleteRelationship(_)) {
                                     self.delete_entity_relationship(
                                         type_info.def_id,
                                         &dynamic_key,
                                         property_id,
-                                        attribute.value,
+                                        attribute.val,
                                         data_relationship,
                                         ctx,
                                     )?;
                                 } else {
-                                    let edge_write_mode = match &attribute.value {
+                                    let edge_write_mode = match &attribute.val {
                                         Value::Struct(..) => EdgeWriteMode::Insert,
                                         Value::StructUpdate(..) => EdgeWriteMode::UpdateExisting,
                                         _ => EdgeWriteMode::Overwrite,
@@ -171,12 +171,12 @@ impl InMemoryStore {
                 )?;
 
                 for attr in entity_seq.attrs {
-                    let id = find_inherent_entity_id(&attr.value, &ctx.ontology)?;
+                    let id = find_inherent_entity_id(&attr.val, &ctx.ontology)?;
                     if let Some(id) = id {
                         let dynamic_key = Self::extract_dynamic_key(&id)?;
 
                         if dynamic_key == target_dynamic_key {
-                            return Ok(attr.value);
+                            return Ok(attr.val);
                         }
                     }
                 }
@@ -256,7 +256,7 @@ impl InMemoryStore {
                             )?;
                         }
                         ValueCardinality::Many => {
-                            let Value::Sequence(seq, _) = attribute.value else {
+                            let Value::Sequence(seq, _) = attribute.val else {
                                 return Err(DomainError::DataStoreBadRequest(anyhow!(
                                     "Expected sequence for ValueCardinality::Many"
                                 )));
@@ -294,19 +294,18 @@ impl InMemoryStore {
         entity_def_id: DefId,
         entity_key: &DynamicKey,
         (property_id, write_mode): (PropertyId, EdgeWriteMode),
-        attribute: Attribute,
+        Attribute { rel, val }: Attribute,
         data_relationship: &DataRelationshipInfo,
         ctx: &DbContext,
     ) -> DomainResult<()> {
-        debug!("entity rel attribute: {attribute:?}. Data relationship: {data_relationship:?}");
-
-        let value = attribute.value;
-        let rel_params = attribute.rel_params;
+        debug!(
+            "entity rel attribute: ({rel:?}, {val:?}). Data relationship: {data_relationship:?}"
+        );
 
         let foreign_key = match &data_relationship.target {
             DataRelationshipTarget::Unambiguous(entity_def_id) => {
-                if &value.type_def_id() == entity_def_id {
-                    let foreign_id = self.write_new_entity_inner(value, ctx)?;
+                if &val.type_def_id() == entity_def_id {
+                    let foreign_id = self.write_new_entity_inner(val, ctx)?;
                     let dynamic_key = Self::extract_dynamic_key(&foreign_id)?;
 
                     EntityKey {
@@ -321,7 +320,7 @@ impl InMemoryStore {
                             .entity_info
                             .as_ref()
                             .unwrap(),
-                        value,
+                        val,
                         ctx,
                     )?
                 }
@@ -330,10 +329,10 @@ impl InMemoryStore {
                 union_def_id: _,
                 variants,
             } => {
-                if variants.contains(&value.type_def_id()) {
+                if variants.contains(&val.type_def_id()) {
                     // Explicit data struct of a given variant
-                    let entity_def_id = value.type_def_id();
-                    let foreign_id = self.write_new_entity_inner(value, ctx)?;
+                    let entity_def_id = val.type_def_id();
+                    let foreign_id = self.write_new_entity_inner(val, ctx)?;
                     let dynamic_key = Self::extract_dynamic_key(&foreign_id)?;
 
                     EntityKey {
@@ -351,7 +350,7 @@ impl InMemoryStore {
                                 .as_ref()
                                 .unwrap();
 
-                            if entity_info.id_value_def_id == value.type_def_id() {
+                            if entity_info.id_value_def_id == val.type_def_id() {
                                 Some((*variant_def_id, entity_info))
                             } else {
                                 None
@@ -359,7 +358,7 @@ impl InMemoryStore {
                         })
                         .expect("Corresponding entity def id not found for the given ID");
 
-                    self.resolve_foreign_key_for_edge(variant_def_id, entity_info, value, ctx)?
+                    self.resolve_foreign_key_for_edge(variant_def_id, entity_info, val, ctx)?
                 }
             }
         };
@@ -381,7 +380,7 @@ impl InMemoryStore {
                     edge_collection.edges.push(Edge {
                         from: local_key,
                         to: foreign_key,
-                        params: rel_params,
+                        params: rel,
                     });
                 }
                 EdgeWriteMode::Overwrite => {
@@ -390,7 +389,7 @@ impl InMemoryStore {
                     edge_collection.edges.push(Edge {
                         from: local_key,
                         to: foreign_key,
-                        params: rel_params,
+                        params: rel,
                     });
                 }
                 EdgeWriteMode::UpdateExisting => {
@@ -400,7 +399,7 @@ impl InMemoryStore {
                         .find(|edge| edge.from == local_key && edge.to == foreign_key)
                         .ok_or(DomainError::EntityNotFound)?;
 
-                    edge.params = rel_params;
+                    edge.params = rel;
                 }
             },
             Role::Object => match write_mode {
@@ -409,7 +408,7 @@ impl InMemoryStore {
                     edge_collection.edges.push(Edge {
                         from: foreign_key,
                         to: local_key,
-                        params: rel_params,
+                        params: rel,
                     });
                 }
                 EdgeWriteMode::Overwrite => {
@@ -418,7 +417,7 @@ impl InMemoryStore {
                     edge_collection.edges.push(Edge {
                         from: foreign_key,
                         to: local_key,
-                        params: rel_params,
+                        params: rel,
                     });
                 }
                 EdgeWriteMode::UpdateExisting => {
@@ -428,7 +427,7 @@ impl InMemoryStore {
                         .find(|edge| edge.from == foreign_key && edge.to == local_key)
                         .ok_or(DomainError::EntityNotFound)?;
 
-                    edge.params = rel_params;
+                    edge.params = rel;
                 }
             },
         }

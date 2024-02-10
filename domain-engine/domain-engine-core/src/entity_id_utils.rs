@@ -29,7 +29,7 @@ pub fn find_inherent_entity_id(
     };
 
     match struct_map.get(&PropertyId::subject(entity_info.id_relationship_id)) {
-        Some(attribute) => Ok(Some(attribute.value.clone())),
+        Some(attribute) => Ok(Some(attribute.val.clone())),
         None => Ok(None),
     }
 }

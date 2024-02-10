@@ -1,12 +1,15 @@
 #![forbid(unsafe_code)]
 
-use std::{
-    fmt::{Debug, Display},
-    ops::Index,
-};
+use std::fmt::{Debug, Display};
 
 use arena::{Arena, NodeRef};
-use ontol_runtime::{condition::Clause, value::PropertyId, var::Var, vm::proc::BuiltinProc, DefId};
+use ontol_runtime::{
+    condition::{Clause, SetOperator},
+    value::{Attribute, PropertyId},
+    var::Var,
+    vm::proc::BuiltinProc,
+    DefId,
+};
 use smallvec::SmallVec;
 use smartstring::alias::String;
 use thin_vec::ThinVec;
@@ -45,37 +48,6 @@ impl From<Label> for Var {
 /// A Label is an identifier for some code location.
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub struct Label(pub u32);
-
-/// An attribute existing of (relation parameter, value)
-#[derive(Clone, Copy, Debug)]
-pub struct Attribute<T> {
-    pub rel: T,
-    pub val: T,
-}
-
-impl<R, V, T> From<(R, V)> for Attribute<T>
-where
-    T: From<R> + From<V>,
-{
-    fn from((rel, val): (R, V)) -> Self {
-        Self {
-            rel: rel.into(),
-            val: val.into(),
-        }
-    }
-}
-
-impl<T> Index<usize> for Attribute<T> {
-    type Output = T;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        match index {
-            0 => &self.rel,
-            1 => &self.val,
-            _ => panic!("Out of bounds for Attribute"),
-        }
-    }
-}
 
 /// A RootNode owns its own Arena
 #[derive(Clone)]
@@ -226,7 +198,7 @@ pub enum Kind<'a, L: Lang> {
 #[derive(Clone)]
 pub enum PropVariant {
     Value(Attribute<Node>),
-    Predicate(PredicateClosure<Node>),
+    Predicate(SetOperator, Node),
 }
 
 #[derive(Clone, Copy)]
@@ -252,28 +224,8 @@ pub enum EvalCondTerm {
     Eval(Node),
 }
 
-#[derive(Clone, Debug)]
-pub enum PredicateClosure<T> {
-    ContainsElement(Attribute<T>),
-    ElementIn(T),
-    AllInSet(T),
-    SetContainsAll(T),
-    SetIntersects(T),
-    SetEquals(T),
-}
-
 #[derive(Clone)]
 pub struct SetEntry<'a, L: Lang>(pub Option<L::Data<'a, Label>>, pub Attribute<Node>);
-
-#[derive(Clone, Copy, Debug)]
-pub enum BoolBinaryOp {
-    ContainsElement,
-    ElementIn,
-    AllInSet,
-    SetContainsAll,
-    SetIntersects,
-    SetEquals,
-}
 
 #[derive(Debug)]
 pub struct VarAllocator {

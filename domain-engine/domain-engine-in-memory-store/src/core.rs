@@ -99,7 +99,7 @@ impl InMemoryStore {
                 }
 
                 let attribute = struct_map.iter().next().unwrap();
-                Self::extract_dynamic_key(&attribute.1.value)
+                Self::extract_dynamic_key(&attribute.1.val)
             }
             Value::Text(string, _) => Ok(DynamicKey::Text(string.clone())),
             Value::OctetSequence(octets, _) => {

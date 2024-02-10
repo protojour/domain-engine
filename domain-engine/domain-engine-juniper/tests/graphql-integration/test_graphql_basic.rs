@@ -797,7 +797,7 @@ async fn test_graphql_artist_and_instrument_connections() {
                 ROOT,
                 DataStoreAPIMock::execute
                     .next_call(matching!(Request::BatchWrite(..), _session))
-                    .returns(Ok(Response::one_inserted(ziggy.value)))
+                    .returns(Ok(Response::one_inserted(ziggy.val)))
             )
         )
         .await,
@@ -879,7 +879,7 @@ async fn test_unified_mutation_create() {
                 ROOT,
                 DataStoreAPIMock::execute
                     .next_call(matching!(Request::BatchWrite(..), _session))
-                    .returns(Ok(Response::one_inserted(ziggy.value)))
+                    .returns(Ok(Response::one_inserted(ziggy.val)))
             )
         )
         .await,
@@ -951,7 +951,7 @@ async fn test_create_through_mapped_domain() {
                 ARTIST_AND_INSTRUMENT.0,
                 DataStoreAPIMock::execute
                     .next_call(matching!(Request::BatchWrite(..), _session))
-                    .returns(Ok(Response::one_inserted(ziggy.value)))
+                    .returns(Ok(Response::one_inserted(ziggy.val)))
             )
         )
         .await,
@@ -1033,7 +1033,7 @@ async fn test_create_through_three_domains() {
                 ARTIST_AND_INSTRUMENT.0,
                 DataStoreAPIMock::execute
                     .next_call(matching!(Request::BatchWrite(..), _session))
-                    .returns(Ok(Response::one_inserted(ziggy.value)))
+                    .returns(Ok(Response::one_inserted(ziggy.val)))
             )
         )
         .await,

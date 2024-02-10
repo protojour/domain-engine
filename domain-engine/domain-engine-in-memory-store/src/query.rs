@@ -223,8 +223,8 @@ impl InMemoryStore {
             };
 
             out.push(Attribute {
-                value: entity,
-                rel_params: edge.params.clone(),
+                rel: edge.params.clone(),
+                val: entity,
             });
         }
 
@@ -267,7 +267,7 @@ impl InMemoryStore {
                 let id_attribute = properties
                     .get(&PropertyId::subject(entity_info.id_relationship_id))
                     .unwrap();
-                Ok(id_attribute.value.clone())
+                Ok(id_attribute.val.clone())
             }
             Select::Struct(struct_select) => {
                 self.sub_query_entity_struct(entity_key, struct_select, type_info, properties, ctx)

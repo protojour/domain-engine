@@ -139,9 +139,9 @@ impl DomainEngine {
 
             for attr in edge_seq.attrs.iter_mut() {
                 let mut vm = ontology.new_vm(procedure);
-                let param = attr.value.take();
+                let param = attr.val.take();
 
-                attr.value = match vm.run([param])? {
+                attr.val = match vm.run([param])? {
                     VmState::Complete(value) => value,
                     VmState::Yielded(_yield) => return Err(DomainError::ImpureMapping),
                 };
@@ -421,7 +421,7 @@ impl DomainEngine {
 
         match value_cardinality {
             ValueCardinality::One => match edge_seq.attrs.into_iter().next() {
-                Some(attribute) => Ok(attribute.value),
+                Some(attribute) => Ok(attribute.val),
                 None => Ok(Value::unit()),
             },
             ValueCardinality::Many => Ok(Value::Sequence(edge_seq, DefId::unit())),

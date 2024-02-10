@@ -92,13 +92,13 @@ impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
         let boxed_attrs = Box::new(deserialized_map.attributes);
 
         Ok(Attribute {
-            value: match self.processor.mode {
+            rel: deserialized_map.rel_params,
+            val: match self.processor.mode {
                 ProcessorMode::Update | ProcessorMode::GraphqlUpdate => {
                     Value::StructUpdate(boxed_attrs, type_def_id)
                 }
                 _ => Value::Struct(boxed_attrs, type_def_id),
             },
-            rel_params: deserialized_map.rel_params,
         })
     }
 }
@@ -133,19 +133,19 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
     for (serde_key, serde_value) in buffered_attrs {
         match property_set.visit_str(&serde_key)? {
             PropertyKey::RelParams(addr) => {
-                let Attribute { value, .. } = processor
+                let Attribute { val, .. } = processor
                     .new_child(addr)
                     .map_err(RecursionLimitError::to_de_error)?
                     .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
 
-                rel_params = value;
+                rel_params = val;
             }
             PropertyKey::Id(addr) => {
-                let Attribute { value, .. } = processor
+                let Attribute { val, .. } = processor
                     .new_child(addr)
                     .map_err(RecursionLimitError::to_de_error)?
                     .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
-                id = Some(value);
+                id = Some(val);
             }
             PropertyKey::Property(serde_property) => {
                 let deserializer = serde_value::ValueDeserializer::new(serde_value);
@@ -191,22 +191,22 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
     while let Some(map_key) = map.next_key_seed(property_set)? {
         match map_key {
             PropertyKey::RelParams(addr) => {
-                let Attribute { value, .. } = map.next_value_seed(
+                let Attribute { val, .. } = map.next_value_seed(
                     processor
                         .new_child(addr)
                         .map_err(RecursionLimitError::to_de_error)?,
                 )?;
 
-                rel_params = value;
+                rel_params = val;
             }
             PropertyKey::Id(addr) => {
-                let Attribute { value, .. } = map.next_value_seed(
+                let Attribute { val, .. } = map.next_value_seed(
                     processor
                         .new_child(addr)
                         .map_err(RecursionLimitError::to_de_error)?,
                 )?;
 
-                id = Some(value);
+                id = Some(val);
             }
             PropertyKey::Property(serde_property) => {
                 let property_processor = processor

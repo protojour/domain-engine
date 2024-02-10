@@ -1,6 +1,7 @@
 use std::fmt::{Debug, Display};
 
-use ontol_hir::{PredicateClosure, PropVariant, SetEntry};
+use ontol_hir::{PropVariant, SetEntry};
+use ontol_runtime::value::Attribute;
 use smallvec::SmallVec;
 
 use crate::{
@@ -147,11 +148,11 @@ pub fn arena_import<'m>(
     fn import_attr<'m>(
         target: &mut TypedArena<'m>,
         source: &TypedArena<'m>,
-        attr: ontol_hir::Attribute<ontol_hir::Node>,
-    ) -> ontol_hir::Attribute<ontol_hir::Node> {
+        attr: Attribute<ontol_hir::Node>,
+    ) -> Attribute<ontol_hir::Node> {
         let rel = arena_import(target, source.node_ref(attr.rel));
         let val = arena_import(target, source.node_ref(attr.val));
-        ontol_hir::Attribute { rel, val }
+        Attribute { rel, val }
     }
 
     fn import_entries<'m>(
@@ -198,11 +199,7 @@ pub fn arena_import<'m>(
             let rel = arena_import(target, source.arena().node_ref(default.rel));
             let val = arena_import(target, source.arena().node_ref(default.val));
             target.add(TypedHirData(
-                LetPropDefault(
-                    *binding,
-                    (*var, *prop_id),
-                    ontol_hir::Attribute { rel, val },
-                ),
+                LetPropDefault(*binding, (*var, *prop_id), Attribute { rel, val }),
                 *meta,
             ))
         }
@@ -253,29 +250,10 @@ pub fn arena_import<'m>(
                 PropVariant::Value(attr) => {
                     PropVariant::Value(import_attr(target, source.arena(), *attr))
                 }
-                PropVariant::Predicate(closure) => PropVariant::Predicate(match closure {
-                    PredicateClosure::ContainsElement(attr) => PredicateClosure::ContainsElement(
-                        import_attr(target, source.arena(), *attr),
-                    ),
-                    PredicateClosure::ElementIn(node) => PredicateClosure::ElementIn(arena_import(
-                        target,
-                        source.arena().node_ref(*node),
-                    )),
-                    PredicateClosure::AllInSet(node) => PredicateClosure::AllInSet(arena_import(
-                        target,
-                        source.arena().node_ref(*node),
-                    )),
-                    PredicateClosure::SetContainsAll(node) => PredicateClosure::SetContainsAll(
-                        arena_import(target, source.arena().node_ref(*node)),
-                    ),
-                    PredicateClosure::SetIntersects(node) => PredicateClosure::SetIntersects(
-                        arena_import(target, source.arena().node_ref(*node)),
-                    ),
-                    PredicateClosure::SetEquals(node) => PredicateClosure::SetEquals(arena_import(
-                        target,
-                        source.arena().node_ref(*node),
-                    )),
-                }),
+                PropVariant::Predicate(operator, param) => PropVariant::Predicate(
+                    *operator,
+                    arena_import(target, source.arena().node_ref(*param)),
+                ),
             };
             target.add(TypedHirData(
                 Prop(*optional, *struct_var, *prop_id, variant),

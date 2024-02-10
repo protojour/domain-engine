@@ -1,9 +1,10 @@
 use std::collections::BTreeMap;
 
 use chumsky::chain::Chain;
-use ontol_hir::{Attribute, Binder, Binding, Kind, Label, Node, Nodes, PropVariant, SetEntry};
+use ontol_hir::{Binder, Binding, Kind, Label, Node, Nodes, PropVariant, SetEntry};
 use ontol_runtime::{
     smart_format,
+    value::Attribute,
     var::{Var, VarSet},
 };
 use smallvec::smallvec;
@@ -309,7 +310,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 let mut sub_lets = vec![];
 
                 match variant {
-                    PropVariant::Value(ontol_hir::Attribute { rel, val }) => {
+                    PropVariant::Value(Attribute { rel, val }) => {
                         let prop_scoped = scoped.prop(self.map_flags);
 
                         match (flags.rel_optional(), flags.pat_optional()) {
@@ -357,7 +358,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                             }
                         };
                     }
-                    PropVariant::Predicate(_) => {
+                    PropVariant::Predicate(..) => {
                         return Err(UnifierError::TODO(smart_format!("predicate prop scope")));
                     }
                 }

@@ -49,8 +49,7 @@ impl<'on, 'p, 'de> Visitor<'de> for GraphqlPatchVisitor<'on, 'p> {
                             .map_err(RecursionLimitError::to_de_error)?,
                     );
 
-                    let Value::Sequence(mut seq, _def_id) =
-                        map.next_value_seed(sub_processor)?.value
+                    let Value::Sequence(mut seq, _def_id) = map.next_value_seed(sub_processor)?.val
                     else {
                         return Err(<A::Error as serde::de::Error>::custom("Not a sequence"));
                     };
@@ -58,9 +57,9 @@ impl<'on, 'p, 'de> Visitor<'de> for GraphqlPatchVisitor<'on, 'p> {
                     if matches!(operation, Operation::Update) {
                         // Transform into StructUpdate values:
                         for attr in seq.attrs.iter_mut() {
-                            if let Value::Struct(attrs, def_id) = &mut attr.value {
+                            if let Value::Struct(attrs, def_id) = &mut attr.val {
                                 let attrs = std::mem::take(attrs);
-                                attr.value = Value::StructUpdate(attrs, *def_id);
+                                attr.val = Value::StructUpdate(attrs, *def_id);
                             }
                         }
                     }
@@ -78,14 +77,13 @@ impl<'on, 'p, 'de> Visitor<'de> for GraphqlPatchVisitor<'on, 'p> {
                     // Go to id-only mode
                     sub_processor.mode = ProcessorMode::Delete;
 
-                    let Value::Sequence(mut seq, _def_id) =
-                        map.next_value_seed(sub_processor)?.value
+                    let Value::Sequence(mut seq, _def_id) = map.next_value_seed(sub_processor)?.val
                     else {
                         return Err(<A::Error as serde::de::Error>::custom("Not a sequence"));
                     };
 
                     for attr in seq.attrs.iter_mut() {
-                        attr.rel_params = Value::DeleteRelationship(DefId::unit());
+                        attr.rel = Value::DeleteRelationship(DefId::unit());
                     }
                     patches.extend(seq.attrs);
                 }
@@ -93,8 +91,8 @@ impl<'on, 'p, 'de> Visitor<'de> for GraphqlPatchVisitor<'on, 'p> {
         }
 
         Ok(Attribute {
-            value: Value::Patch(patches, self.type_def_id),
-            rel_params: Value::unit(),
+            rel: Value::unit(),
+            val: Value::Patch(patches, self.type_def_id),
         })
     }
 }

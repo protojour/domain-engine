@@ -1,12 +1,12 @@
 use fnv::FnvHashMap;
 use ontol_hir::{
-    arena::NodeRef, find_value_node, Attribute, Binder, Binding, EvalCondTerm, Kind, Label, Node,
-    Nodes, PropFlags, PropVariant, SetEntry, StructFlags,
+    arena::NodeRef, find_value_node, Binder, Binding, EvalCondTerm, Kind, Label, Node, Nodes,
+    PropFlags, PropVariant, SetEntry, StructFlags,
 };
 use ontol_runtime::{
-    condition::Clause,
+    condition::{Clause, SetOperator},
     smart_format,
-    value::PropertyId,
+    value::{Attribute, PropertyId},
     var::{Var, VarSet},
     MapFlags,
 };
@@ -177,7 +177,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     if let (Kind::Unit, Kind::Struct(binder, flags, struct_body)) =
                         (rel_kind, val_kind)
                     {
-                        if let ExprMode::Match {
+                        if let ExprMode::MatchStruct {
                             struct_level: 0, ..
                         } = mode.match_struct(binder.hir().var)
                         {
@@ -201,19 +201,40 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     }
                 }
 
-                debug!("HERE: non-root set");
-                Ok(smallvec![self.write_make_seq(
-                    entries,
-                    *node_ref.meta(),
-                    mode,
-                )?])
+                Ok(match mode {
+                    ExprMode::Expr { .. } | ExprMode::MatchStruct { .. } => {
+                        let make_seq = self.prealloc_node();
+                        let out_seq_var = self.var_allocator.alloc();
+                        let seq_body =
+                            self.write_seq_body(entries, *node_ref.meta(), out_seq_var, mode)?;
+                        smallvec![self.write_node(
+                            make_seq,
+                            Kind::MakeSeq(
+                                TypedHirData(out_seq_var.into(), *node_ref.meta()),
+                                seq_body
+                            ),
+                            *node_ref.meta(),
+                        )]
+                    }
+                    ExprMode::MatchSet {
+                        struct_level: _,
+                        cond_var,
+                        set_cond_var,
+                    } => self.write_match_seq_body(
+                        entries,
+                        *node_ref.meta(),
+                        cond_var,
+                        set_cond_var,
+                        mode,
+                    )?,
+                })
             }
             Kind::Struct(binder, flags, struct_body) => {
                 match (
                     flags.contains(StructFlags::MATCH),
                     mode.match_struct(binder.hir().var),
                 ) {
-                    (true, mode @ ExprMode::Match { .. }) => self.write_match_struct_expr(
+                    (true, mode @ ExprMode::MatchStruct { .. }) => self.write_match_struct_expr(
                         *binder,
                         struct_body,
                         node_ref,
@@ -346,10 +367,13 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     )])
                 })
             }
-            (ExprMode::Expr { .. }, PropVariant::Predicate(_)) => Err(UnifierError::Unimplemented(
-                smart_format!("predicate in non-matching expression"),
-            )),
-            (ExprMode::Match { cond_var, .. }, PropVariant::Value(Attribute { rel, val })) => {
+            (ExprMode::Expr { .. }, PropVariant::Predicate(..)) => Err(
+                UnifierError::Unimplemented(smart_format!("predicate in non-matching expression")),
+            ),
+            (
+                ExprMode::MatchStruct { cond_var, .. },
+                PropVariant::Value(Attribute { rel, val }),
+            ) => {
                 let (rel_term, rel_meta, rel_nodes) = self.write_cond_term(*rel, mode)?;
                 let (val_term, val_meta, val_nodes) = self.write_cond_term(*val, mode)?;
 
@@ -401,21 +425,71 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     Ok(body)
                 }
             }
-            (ExprMode::Match { .. }, PropVariant::Predicate(_)) => {
-                todo!("match predicate prop variant")
+            (ExprMode::MatchStruct { cond_var, .. }, PropVariant::Predicate(operator, node)) => {
+                match operator {
+                    SetOperator::ElementIn => {
+                        let free_vars = scan_immediate_free_vars(self.expr_arena, [*node]);
+                        self.maybe_apply_catch_block(free_vars, meta.span, &|zelf| {
+                            if true {
+                                let mut body = smallvec![];
+
+                                let set_cond_var = zelf.var_allocator.alloc();
+
+                                body.push(zelf.mk_node(
+                                    Kind::PushCondClause(
+                                        cond_var,
+                                        Clause::MatchProp(
+                                            struct_var,
+                                            prop_id,
+                                            *operator,
+                                            set_cond_var,
+                                        ),
+                                    ),
+                                    UNIT_META,
+                                ));
+
+                                body.extend(zelf.write_expr(
+                                    *node,
+                                    None,
+                                    mode.match_set(set_cond_var),
+                                )?);
+                                Ok(body)
+                            } else {
+                                //let set = zelf.write_one_expr(*node, mode.match_set())?;
+                                //let unit = zelf.mk_node(Kind::Unit, UNIT_META);
+                                //
+                                //Ok(smallvec![zelf.mk_node(
+                                //    Kind::Prop(
+                                //        flags,
+                                //        struct_var,
+                                //        prop_id,
+                                //        PropVariant::Value(Attribute {
+                                //            rel: unit,
+                                //            val: set
+                                //        }),
+                                //    ),
+                                //    *meta,
+                                //)])
+                                todo!()
+                            }
+                        })
+                    }
+                    _ => Err(UnifierError::Unimplemented(smart_format!(
+                        "unimplemented predicate function"
+                    ))),
+                }
             }
+            _ => todo!(),
         }
     }
 
-    fn write_make_seq(
+    fn write_seq_body(
         &mut self,
         entries: &[SetEntry<'m, TypedHir>],
         seq_meta: Meta<'m>,
+        out_seq_var: Var,
         mode: ExprMode,
-    ) -> UnifierResult<Node> {
-        let make_seq = self.prealloc_node();
-        let out_seq_var = self.var_allocator.alloc();
-
+    ) -> UnifierResult<Nodes> {
         let mut seq_body: Nodes = smallvec![];
 
         for SetEntry(label, Attribute { rel, val }) in entries {
@@ -425,7 +499,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 let label = *label.hir();
                 let Some(scope_attr) = self.iter_extended_scope_table.get(&label).cloned() else {
                     // panic!("set prop: no iteration source");
-                    return Ok(self.mk_node(Kind::Unit, seq_meta));
+                    return Ok(smallvec![]);
                 };
                 let free_vars = scan_immediate_free_vars(self.expr_arena, [*rel, *val]);
 
@@ -474,11 +548,80 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             }
         }
 
-        Ok(self.write_node(
-            make_seq,
-            Kind::MakeSeq(TypedHirData(out_seq_var.into(), seq_meta), seq_body),
-            seq_meta,
-        ))
+        Ok(seq_body)
+    }
+
+    fn write_match_seq_body(
+        &mut self,
+        entries: &[SetEntry<'m, TypedHir>],
+        seq_meta: Meta<'m>,
+        cond_var: Var,
+        set_cond_var: Var,
+        mode: ExprMode,
+    ) -> UnifierResult<Nodes> {
+        let mut seq_body: Nodes = smallvec![];
+
+        for SetEntry(label, Attribute { rel, val }) in entries {
+            debug!("in_scope: {:?}", self.scope_tracker.in_scope);
+
+            if let Some(label) = label {
+                let label = *label.hir();
+                let Some(scope_attr) = self.iter_extended_scope_table.get(&label).cloned() else {
+                    // panic!("set prop: no iteration source");
+                    return Ok(smallvec![]);
+                };
+                let free_vars = scan_immediate_free_vars(self.expr_arena, [*rel, *val]);
+
+                let for_each = self.prealloc_node();
+                let ((rel_binding, val_binding), for_each_body) =
+                    self.new_loop_scope(seq_meta.span, move |zelf, scope_body, catcher| {
+                        let rel_binding = zelf.define_scope_extended(
+                            scope_attr.rel,
+                            Scoped::Yes,
+                            &free_vars,
+                            scope_body,
+                            catcher,
+                        )?;
+                        let val_binding = zelf.define_scope_extended(
+                            scope_attr.val,
+                            Scoped::Yes,
+                            &free_vars,
+                            scope_body,
+                            catcher,
+                        )?;
+
+                        let (rel_term, _rel_meta, rel_nodes) = zelf.write_cond_term(*rel, mode)?;
+                        let (val_term, _val_meta, val_nodes) = zelf.write_cond_term(*val, mode)?;
+
+                        debug!("in match scope in loop: {:?}", zelf.scope_tracker.in_scope);
+
+                        let mut body = smallvec![];
+
+                        body.push(zelf.mk_node(
+                            Kind::PushCondClause(
+                                cond_var,
+                                Clause::Element(set_cond_var, (rel_term, val_term)),
+                            ),
+                            UNIT_META,
+                        ));
+
+                        body.extend(rel_nodes);
+                        body.extend(val_nodes);
+
+                        Ok(((rel_binding, val_binding), body))
+                    })?;
+                seq_body.push_node(self.write_node(
+                    for_each,
+                    Kind::ForEach(label.into(), (rel_binding, val_binding), for_each_body),
+                    UNIT_META,
+                ));
+            } else {
+                seq_body.extend(self.write_expr(*rel, None, mode)?);
+                seq_body.extend(self.write_expr(*val, None, mode)?);
+            }
+        }
+
+        Ok(seq_body)
     }
 
     fn write_match_struct_expr(
@@ -510,7 +653,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
     ) -> UnifierResult<Nodes> {
         let mut output_body: Nodes = Default::default();
 
-        let ExprMode::Match {
+        let ExprMode::MatchStruct {
             cond_var,
             struct_level,
         } = mode

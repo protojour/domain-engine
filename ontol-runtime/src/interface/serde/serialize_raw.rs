@@ -54,7 +54,7 @@ pub fn serialize_raw<S: Serializer>(
 
             for attr in &seq.attrs {
                 seq_access.serialize_element(
-                    &RawProxy::new_as_child(&attr.value, ontology, level)
+                    &RawProxy::new_as_child(&attr.val, ontology, level)
                         .map_err(RecursionLimitError::to_ser_error)?,
                 )?;
             }

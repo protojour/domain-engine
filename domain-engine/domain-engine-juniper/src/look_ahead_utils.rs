@@ -158,7 +158,7 @@ impl<'a> ArgsWrapper<'a> {
 
             let Value::Sequence(inputs, _) = serde_processor
                 .deserialize(LookAheadValueDeserializer::from(look_ahead_arg))?
-                .value
+                .val
             else {
                 panic!("Expected sequence")
             };

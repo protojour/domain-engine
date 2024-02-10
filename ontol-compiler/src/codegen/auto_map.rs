@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use ontol_hir::VarAllocator;
-use ontol_runtime::{var::Var, DefId, PackageId};
+use ontol_runtime::{value::Attribute, var::Var, DefId, PackageId};
 
 use crate::{
     def::DefKind,
@@ -222,7 +222,7 @@ fn autogenerate_fmt_segment_property<'m>(
                 ontol_hir::PropFlags::empty(),
                 binder_var,
                 *property_id,
-                ontol_hir::PropVariant::Value(ontol_hir::Attribute { rel, val: var_node }),
+                ontol_hir::PropVariant::Value(Attribute { rel, val: var_node }),
             ),
             Meta {
                 ty: object_ty,

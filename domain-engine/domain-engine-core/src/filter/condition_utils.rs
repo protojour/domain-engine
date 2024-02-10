@@ -38,8 +38,17 @@ pub fn get_clause_vars(clause: &Clause<CondTerm>, collector: &mut impl Collector
         Clause::IsEntity(term, _def_id) => {
             get_term_vars(term, collector);
         }
-        Clause::Attr(var, _, (rel, val)) => {
-            collector.collect_input_var(*var);
+        Clause::Attr(struct_var, _, (rel, val)) => {
+            collector.collect_input_var(*struct_var);
+            get_term_vars(rel, collector);
+            get_term_vars(val, collector);
+        }
+        Clause::MatchProp(struct_var, _, _, set_var) => {
+            collector.collect_input_var(*struct_var);
+            collector.collect_input_var(*set_var);
+        }
+        Clause::Element(set_var, (rel, val)) => {
+            collector.collect_input_var(*set_var);
             get_term_vars(rel, collector);
             get_term_vars(val, collector);
         }

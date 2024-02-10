@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
+    ops::Index,
     str::FromStr,
 };
 
@@ -32,11 +33,11 @@ pub enum Value {
     ChronoTime(chrono::NaiveTime, DefId),
 
     /// A collection of attributes keyed by property.
-    Struct(Box<FnvHashMap<PropertyId, Attribute>>, DefId),
+    Struct(Box<FnvHashMap<PropertyId, Attribute<Self>>>, DefId),
 
     /// A collection of attributes keyed by property, but contains
     /// only partial information, and must contain the ID of the struct (entity) to update.
-    StructUpdate(Box<FnvHashMap<PropertyId, Attribute>>, DefId),
+    StructUpdate(Box<FnvHashMap<PropertyId, Attribute<Self>>>, DefId),
 
     /// A collection of arbitrary values keyed by strings.
     Dict(Box<HashMap<String, Value>>, DefId),
@@ -57,7 +58,7 @@ pub enum Value {
     /// * `(value: Struct, rel_params)`: Write a new entity
     /// * `(value: StructUpdate, rel_params)`: Update the given entity with new rel_params
     /// * `(valud: ID, rel_params: Value::Delete)`: Delete the given ID
-    Patch(Vec<Attribute>, DefId),
+    Patch(Vec<Attribute<Self>>, DefId),
 
     /// Special rel_params used for edge deletion
     DeleteRelationship(DefId),
@@ -67,7 +68,7 @@ pub enum Value {
 
 impl Value {
     pub fn new_struct(
-        props: impl IntoIterator<Item = (PropertyId, Attribute)>,
+        props: impl IntoIterator<Item = (PropertyId, Attribute<Self>)>,
         type_id: DefId,
     ) -> Self {
         Self::Struct(Box::new(FnvHashMap::from_iter(props)), type_id)
@@ -76,14 +77,14 @@ impl Value {
     pub fn sequence_of(values: impl IntoIterator<Item = Value>) -> Self {
         let attrs: Vec<_> = values
             .into_iter()
-            .map(|value| Attribute {
-                value,
-                rel_params: Self::unit(),
+            .map(|val| Attribute {
+                rel: Self::unit(),
+                val,
             })
             .collect();
         let type_def_id = attrs
             .first()
-            .map(|attr| attr.value.type_def_id())
+            .map(|attr| attr.val.type_def_id())
             .unwrap_or(DefId::unit());
         Self::Sequence(Sequence::new(attrs), type_def_id)
     }
@@ -156,7 +157,7 @@ impl Value {
         }
     }
 
-    pub fn get_attribute(&self, property_id: PropertyId) -> Option<&Attribute> {
+    pub fn get_attribute(&self, property_id: PropertyId) -> Option<&Attribute<Self>> {
         match self {
             Self::Struct(map, _) => map.get(&property_id),
             _ => None,
@@ -164,22 +165,22 @@ impl Value {
     }
 
     pub fn get_attribute_value(&self, property_id: PropertyId) -> Option<&Value> {
-        self.get_attribute(property_id).map(|attr| &attr.value)
+        self.get_attribute(property_id).map(|attr| &attr.val)
     }
 
     #[inline]
-    pub const fn to_attr(self, rel_params: Value) -> Attribute {
+    pub const fn to_attr(self, rel_params: Value) -> Attribute<Self> {
         Attribute {
-            value: self,
-            rel_params,
+            rel: rel_params,
+            val: self,
         }
     }
 
     #[inline]
-    pub const fn to_unit_attr(self) -> Attribute {
+    pub const fn to_unit_attr(self) -> Attribute<Self> {
         Attribute {
-            value: self,
-            rel_params: Value::unit(),
+            rel: Value::unit(),
+            val: self,
         }
     }
 
@@ -223,7 +224,7 @@ impl<'d, 'o> Display for FormatValueAsText<'d, 'o> {
                     // concatenate every prop (not sure this is a good idea, since the order is not defined)
                     for attr in props.values() {
                         FormatValueAsText {
-                            value: &attr.value,
+                            value: &attr.val,
                             type_def_id: *type_def_id,
                             ontology: self.ontology,
                         }
@@ -318,17 +319,44 @@ impl PropertyId {
 /// FIXME: There is probably a flaw in the modelling of one-to-many attributes.
 /// One-to-many has many rel_params too (currently represented using Data::Seq for the value).
 /// So should Attribute be an enum instead of a struct?
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Attribute {
-    pub value: Value,
-    pub rel_params: Value,
+/// An attribute existing of (relation parameter, value)
+#[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Debug)]
+pub struct Attribute<T = Value> {
+    /// The relation parameter(s)
+    pub rel: T,
+    /// The attribute value
+    pub val: T,
 }
 
-impl From<Value> for Attribute {
+impl From<Value> for Attribute<Value> {
     fn from(value: Value) -> Self {
         Self {
-            value,
-            rel_params: Value::unit(),
+            rel: Value::unit(),
+            val: value,
+        }
+    }
+}
+
+impl<R, V, T> From<(R, V)> for Attribute<T>
+where
+    T: From<R> + From<V>,
+{
+    fn from((rel, val): (R, V)) -> Self {
+        Self {
+            rel: rel.into(),
+            val: val.into(),
+        }
+    }
+}
+
+impl<T> Index<usize> for Attribute<T> {
+    type Output = T;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        match index {
+            0 => &self.rel,
+            1 => &self.val,
+            _ => panic!("Out of bounds for Attribute"),
         }
     }
 }
@@ -405,10 +433,10 @@ struct AttrDebug<'a>(&'a Attribute);
 impl<'a> Display for AttrDebug<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let attr = &self.0;
-        write!(f, "{}", ValueDebug(&attr.value))?;
+        write!(f, "{}", ValueDebug(&attr.val))?;
 
-        if !attr.rel_params.is_unit() {
-            write!(f, "::{}", ValueDebug(&attr.rel_params))?;
+        if !attr.rel.is_unit() {
+            write!(f, "::{}", ValueDebug(&attr.rel))?;
         }
 
         Ok(())

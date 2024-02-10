@@ -1,7 +1,7 @@
-use ontol_hir::{Attribute, Binder, Binding, CaptureGroup, Kind, Node, Nodes};
+use ontol_hir::{Binder, Binding, CaptureGroup, Kind, Node, Nodes};
 use ontol_runtime::{
     smart_format,
-    value::PropertyId,
+    value::{Attribute, PropertyId},
     var::{Var, VarSet},
     vm::proc::BuiltinProc,
     DefId,

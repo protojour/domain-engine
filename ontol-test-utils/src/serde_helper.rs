@@ -81,10 +81,10 @@ impl<'b, 'on> SerdeHelper<'b, 'on> {
                 let json_schema_result = json_schema.validate(&json);
 
                 match (attribute_result, json_schema_result) {
-                    (Ok(Attribute { value, rel_params }), Ok(())) => {
-                        assert_eq!(rel_params.type_def_id(), DefId::unit());
+                    (Ok(Attribute { rel, val }), Ok(())) => {
+                        assert_eq!(rel.type_def_id(), DefId::unit());
 
-                        Ok(value)
+                        Ok(val)
                     }
                     (Err(json_error), Err(_)) => Err(json_error),
                     (Ok(_), Err(validation_errors)) => {
@@ -100,10 +100,10 @@ impl<'b, 'on> SerdeHelper<'b, 'on> {
                     }
                 }
             }
-            _ => attribute_result.map(|Attribute { value, rel_params }| {
-                assert_eq!(rel_params.type_def_id(), DefId::unit());
+            _ => attribute_result.map(|Attribute { rel, val }| {
+                assert_eq!(rel.type_def_id(), DefId::unit());
 
-                value
+                val
             }),
         }
     }

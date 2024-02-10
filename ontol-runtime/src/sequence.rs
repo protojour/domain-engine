@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use thin_vec::ThinVec;
 
-use crate::value::Attribute;
+use crate::value::{Attribute, Value};
 
 #[derive(Clone, Default, Serialize, Deserialize, Debug)]
 pub struct Sequence {
@@ -21,7 +21,10 @@ impl Sequence {
         }
     }
 
-    pub fn new_sub(attrs: impl IntoIterator<Item = Attribute>, sub_seq: SubSequence) -> Self {
+    pub fn new_sub(
+        attrs: impl IntoIterator<Item = Attribute<Value>>,
+        sub_seq: SubSequence,
+    ) -> Self {
         Self {
             attrs: attrs.into_iter().collect(),
             sub_seq: Some(Box::new(sub_seq)),

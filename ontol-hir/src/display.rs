@@ -1,12 +1,14 @@
 use std::fmt::{Debug, Display};
 
-use ontol_runtime::{condition::Clause, format_utils::AsAlpha, vm::proc::BuiltinProc};
+use ontol_runtime::{
+    condition::Clause, format_utils::AsAlpha, value::Attribute, vm::proc::BuiltinProc,
+};
 use thin_vec::ThinVec;
 
 use crate::{
     arena::{Arena, NodeRef},
-    Attribute, Binding, CaptureGroup, EvalCondTerm, Kind, Label, Lang, Node, PredicateClosure,
-    PropVariant, RootNode, SetEntry, StructFlags,
+    Binding, CaptureGroup, EvalCondTerm, Kind, Label, Lang, Node, PropVariant, RootNode, SetEntry,
+    StructFlags,
 };
 
 impl<'h, 'a, L: Lang> std::fmt::Display for NodeRef<'h, 'a, L> {
@@ -280,32 +282,10 @@ impl<'h, 'a, L: Lang> Print<PropVariant> for Printer<'h, 'a, L> {
             PropVariant::Value(attr) => {
                 self.print_all(f, Sep::None, self.kinds(&[attr.rel, attr.val]))?
             }
-            PropVariant::Predicate(closure) => match closure {
-                PredicateClosure::ContainsElement(attr) => {
-                    write!(f, "contains-element")?;
-                    self.print_all(f, Sep::Space, self.kinds(&[attr.rel, attr.val]))?
-                }
-                PredicateClosure::ElementIn(node) => {
-                    write!(f, "element-in")?;
-                    self.print(f, Sep::Space, self.kind(*node))?
-                }
-                PredicateClosure::AllInSet(node) => {
-                    write!(f, "all-in-set")?;
-                    self.print(f, Sep::Space, self.kind(*node))?
-                }
-                PredicateClosure::SetContainsAll(node) => {
-                    write!(f, "set-contains-all")?;
-                    self.print(f, Sep::Space, self.kind(*node))?
-                }
-                PredicateClosure::SetIntersects(node) => {
-                    write!(f, "set-intersects")?;
-                    self.print(f, Sep::Space, self.kind(*node))?
-                }
-                PredicateClosure::SetEquals(node) => {
-                    write!(f, "set-equals")?;
-                    self.print(f, Sep::Space, self.kind(*node))?
-                }
-            },
+            PropVariant::Predicate(operator, param) => {
+                write!(f, "{operator}")?;
+                self.print(f, Sep::Space, self.kind(*param))?
+            }
         };
 
         self.print_rparen(f, multi)?;
@@ -340,7 +320,23 @@ impl<'h, 'a, L: Lang> Print<Clause<EvalCondTerm>> for Printer<'h, 'a, L> {
                 self.print_rparen(f, multi)?;
                 Ok(Multiline(true))
             }
-            _ => todo!(),
+            Clause::MatchProp(var, prop_id, operator, set_var) => {
+                write!(
+                    f,
+                    "(attr-set-predicate '{var} {prop_id} {operator} '{set_var}"
+                )?;
+                self.print_rparen(f, Multiline(false))?;
+                Ok(Multiline(false))
+            }
+            Clause::Element(set_cond_var, (rel, val)) => {
+                write!(f, "(element '{set_cond_var} (")?;
+                let multi = self.print_all(f, Sep::None, [rel, val].into_iter())?;
+                self.print_rparen(f, multi)?;
+                self.print_rparen(f, multi)?;
+                Ok(Multiline(true))
+            }
+            Clause::Eq(_, _) => todo!(),
+            Clause::Or(_) => todo!(),
         }
     }
 }

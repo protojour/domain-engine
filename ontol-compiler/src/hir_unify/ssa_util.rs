@@ -25,9 +25,14 @@ pub enum ExprMode {
         flags: MapFlags,
         struct_level: Option<usize>,
     },
-    Match {
+    MatchStruct {
         cond_var: Var,
         struct_level: usize,
+    },
+    MatchSet {
+        cond_var: Var,
+        set_cond_var: Var,
+        struct_level: Option<usize>,
     },
 }
 
@@ -41,12 +46,20 @@ impl ExprMode {
                 flags,
                 struct_level: Some(inc_opt_struct_level(struct_level)),
             },
-            Self::Match {
+            Self::MatchStruct {
                 cond_var,
                 struct_level,
-            } => Self::Match {
+            } => Self::MatchStruct {
                 cond_var,
                 struct_level: struct_level + 1,
+            },
+            Self::MatchSet {
+                struct_level,
+                cond_var,
+                ..
+            } => Self::MatchStruct {
+                cond_var,
+                struct_level: inc_opt_struct_level(struct_level),
             },
         }
     }
@@ -60,16 +73,47 @@ impl ExprMode {
                 flags,
                 struct_level: Some(inc_opt_struct_level(struct_level)),
             },
-            Self::Expr { struct_level, .. } => Self::Match {
+            Self::Expr { struct_level, .. } => Self::MatchStruct {
                 cond_var,
                 struct_level: inc_opt_struct_level(struct_level),
             },
-            Self::Match {
+            Self::MatchStruct {
                 cond_var,
                 struct_level,
-            } => Self::Match {
+            } => Self::MatchStruct {
                 cond_var,
                 struct_level: struct_level + 1,
+            },
+            Self::MatchSet { struct_level, .. } => Self::MatchStruct {
+                cond_var,
+                struct_level: inc_opt_struct_level(struct_level),
+            },
+        }
+    }
+
+    pub fn match_set(self, set_cond_var: Var) -> Self {
+        match self {
+            Self::Expr { struct_level, .. } => Self::MatchSet {
+                struct_level,
+                cond_var: set_cond_var,
+                set_cond_var,
+            },
+            Self::MatchStruct {
+                cond_var,
+                struct_level,
+            } => Self::MatchSet {
+                cond_var,
+                struct_level: Some(struct_level),
+                set_cond_var,
+            },
+            Self::MatchSet {
+                struct_level,
+                cond_var,
+                ..
+            } => Self::MatchSet {
+                struct_level,
+                cond_var,
+                set_cond_var,
             },
         }
     }
