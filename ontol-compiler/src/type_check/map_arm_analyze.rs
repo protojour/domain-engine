@@ -56,7 +56,15 @@ impl<'c> PreAnalyzer<'c> {
                             group_set
                                 .join(self.analyze_arm(val, parent_aggr_group, ctx)?.group_set);
                         }
-                        CompoundPatternAttrKind::SetOperator { .. } => {}
+                        CompoundPatternAttrKind::SetOperator { elements, .. } => {
+                            self.analyze_set_pattern_elements(
+                                elements,
+                                &pat.span,
+                                parent_aggr_group,
+                                (&mut group_set, &mut arm_class),
+                                ctx,
+                            )?;
+                        }
                     }
                 }
 

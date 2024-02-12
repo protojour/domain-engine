@@ -808,11 +808,35 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                             self.builder,
                         );
                     }
-                    Clause::MatchProp(..) => {
-                        todo!()
+                    Clause::MatchProp(var, prop_id, set_operator, set_var) => {
+                        let Ok(struct_local) = self.var_local(*var, &span) else {
+                            return;
+                        };
+                        let Ok(set_local) = self.var_local(*set_var, &span) else {
+                            return;
+                        };
+                        block.op(
+                            OpCode::PushCondClause(
+                                cond_local,
+                                Clause::MatchProp(struct_local, *prop_id, *set_operator, set_local),
+                            ),
+                            Delta(0),
+                            span,
+                            self.builder,
+                        );
                     }
-                    Clause::Element(..) => {
-                        todo!()
+                    Clause::Member(set_var, (rel, val)) => {
+                        let Ok(local) = self.var_local(*set_var, &span) else {
+                            return;
+                        };
+                        let rel = self.gen_eval_cond_term(rel, arena, span, block);
+                        let val = self.gen_eval_cond_term(val, arena, span, block);
+                        block.op(
+                            OpCode::PushCondClause(cond_local, Clause::Member(local, (rel, val))),
+                            Delta(0),
+                            span,
+                            self.builder,
+                        );
                     }
                     Clause::Eq(..) => todo!(),
                     Clause::Or(_) => todo!(),

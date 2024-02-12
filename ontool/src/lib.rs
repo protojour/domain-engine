@@ -241,10 +241,12 @@ fn compile(
     let mut root_package = None;
 
     let topology = loop {
-        match package_graph_builder.transition().map_err(|err| {
+        let graph_state = package_graph_builder.transition().map_err(|err| {
             print_unified_compile_error(err, &ontol_sources, &sources_by_name).unwrap();
             OntoolError::Compile
-        })? {
+        })?;
+
+        match graph_state {
             GraphState::RequestPackages { builder, requests } => {
                 package_graph_builder = builder;
 

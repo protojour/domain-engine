@@ -622,7 +622,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                         body.push(zelf.mk_node(
                             Kind::PushCondClause(
                                 match_var,
-                                Clause::Element(set_cond_var, (rel_term, val_term)),
+                                Clause::Member(set_cond_var, (rel_term, val_term)),
                             ),
                             Meta::new(&UNIT_TYPE, seq_meta.span),
                         ));

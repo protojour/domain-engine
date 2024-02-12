@@ -47,7 +47,7 @@ pub fn get_clause_vars(clause: &Clause<Var, CondTerm>, collector: &mut impl Coll
             collector.collect_input_var(*struct_var);
             collector.collect_input_var(*set_var);
         }
-        Clause::Element(set_var, (rel, val)) => {
+        Clause::Member(set_var, (rel, val)) => {
             collector.collect_input_var(*set_var);
             get_term_vars(rel, collector);
             get_term_vars(val, collector);

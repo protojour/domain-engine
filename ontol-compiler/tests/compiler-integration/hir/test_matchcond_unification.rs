@@ -116,7 +116,7 @@ fn test_unify_matchcond_struct_in_struct() {
 }
 
 #[test]
-fn test_unify_matchcond_cartesian_set() {
+fn test_unify_matchcond_element_in() {
     let output = test_unify(
         "
         (struct ($c)
@@ -167,11 +167,11 @@ fn test_unify_matchcond_cartesian_set() {
                 )
                 (let-cond-var $t $s)
                 (push-cond-clause $s
-                    (attr-set-predicate '$d O:1:0 element-in '$t))
+                    (match-prop '$d O:1:0 element-in '$t))
                 (for-each $e ($_ $a)
                     (let-cond-var $q $s)
                     (push-cond-clause $s
-                        (element '$t (_ '$q))
+                        (member '$t (_ '$q))
                     )
                     (catch (@u)
                         (let? @u $v $a)
@@ -183,7 +183,7 @@ fn test_unify_matchcond_cartesian_set() {
                 (for-each $f ($_ $b)
                     (let-cond-var $r $s)
                     (push-cond-clause $s
-                        (element '$t (_ '$r))
+                        (member '$t (_ '$r))
                     )
                     (catch (@w)
                         (let? @w $x $b)

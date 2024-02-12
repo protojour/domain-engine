@@ -393,10 +393,10 @@ impl<'o> Processor for OntolProcessor<'o> {
                 *operator,
                 self.var_local(*set_local)?,
             ),
-            Clause::Element(set_local, (rel, val)) => {
+            Clause::Member(set_local, (rel, val)) => {
                 let rel = self.opcode_term_to_cond_term(rel)?;
                 let val = self.opcode_term_to_cond_term(val)?;
-                Clause::Element(self.var_local(*set_local)?, (rel, val))
+                Clause::Member(self.var_local(*set_local)?, (rel, val))
             }
             Clause::Eq(..) => todo!(),
             Clause::Or(_) => todo!(),

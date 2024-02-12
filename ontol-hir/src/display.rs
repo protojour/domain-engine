@@ -325,15 +325,12 @@ impl<'h, 'a, L: Lang> Print<Clause<Var, EvalCondTerm>> for Printer<'h, 'a, L> {
                 Ok(Multiline(true))
             }
             Clause::MatchProp(var, prop_id, operator, set_var) => {
-                write!(
-                    f,
-                    "(attr-set-predicate '{var} {prop_id} {operator} '{set_var}"
-                )?;
+                write!(f, "(match-prop '{var} {prop_id} {operator} '{set_var}")?;
                 self.print_rparen(f, Multiline(false))?;
                 Ok(Multiline(false))
             }
-            Clause::Element(set_cond_var, (rel, val)) => {
-                write!(f, "(element '{set_cond_var} (")?;
+            Clause::Member(set_cond_var, (rel, val)) => {
+                write!(f, "(member '{set_cond_var} (")?;
                 let multi = self.print_all(f, Sep::None, [rel, val].into_iter())?;
                 self.print_rparen(f, multi)?;
                 self.print_rparen(f, multi)?;

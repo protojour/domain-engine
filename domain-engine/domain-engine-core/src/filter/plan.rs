@@ -239,7 +239,7 @@ fn sub_plans(
                     }
                 }
             }
-            Clause::Element(..) => {}
+            Clause::Member(..) => {}
             Clause::Eq(var, term) => {
                 if *var != origin.binder {
                     continue;
@@ -269,7 +269,7 @@ fn prop_set_plans(
     let mut plans = thin_vec![];
 
     for clause in clauses {
-        if let Clause::Element(var, (_rel, val)) = clause {
+        if let Clause::Member(var, (_rel, val)) = clause {
             if *var == set_var {
                 let entry = term_plans(val, target, clauses, builder)?;
 
@@ -541,9 +541,9 @@ mod tests {
                     Clause::Root(var("a")),
                     Clause::IsEntity(Var(var("a")), foo.def_id()),
                     Clause::MatchProp(var("a"), bar, ElementIn, var("b")),
-                    Clause::Element(var("b"), (wild(), Var(var("c")))),
+                    Clause::Member(var("b"), (wild(), Var(var("c")))),
                     Clause::Attr(var("c"), val, (wild(), text("text1").to_term())),
-                    Clause::Element(var("b"), (wild(), Var(var("d")))),
+                    Clause::Member(var("b"), (wild(), Var(var("d")))),
                     Clause::Attr(var("d"), val, (wild(), text("text2").to_term())),
                 ]),
                 &test.ontology,
@@ -552,7 +552,17 @@ mod tests {
 
             expect_eq!(
                 actual = plan,
-                expected = vec![PlanEntry::EntitiesOf(foo.def_id(), vec![]),]
+                expected = vec![PlanEntry::EntitiesOf(
+                    foo.def_id(),
+                    vec![PlanEntry::PropMatch(
+                        bar,
+                        SetOperator::ElementIn,
+                        Set::Set(thin_vec![
+                            PlanEntry::Attr(val, vec![PlanEntry::Eq(text("text1"))]),
+                            PlanEntry::Attr(val, vec![PlanEntry::Eq(text("text2"))]),
+                        ])
+                    ),]
+                )]
             );
         });
     }

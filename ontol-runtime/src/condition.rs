@@ -68,7 +68,7 @@ pub enum Clause<V, Term> {
     /// An attribute having a specific value, bound to a Term
     Attr(V, PropertyId, (Term, Term)),
     /// An element in the set defined by the variable
-    Element(V, (Term, Term)),
+    Member(V, (Term, Term)),
     Eq(Var, Term),
     Or(ThinVec<Term>),
 }
@@ -119,13 +119,10 @@ where
                 write!(f, "(attr {var} {prop_id} ({rel} {val}))")
             }
             Clause::MatchProp(var, prop_id, operator, term) => {
-                write!(
-                    f,
-                    "(attr-set-predicate {var} {prop_id} ({operator} {term}))"
-                )
+                write!(f, "(match-prop {var} {prop_id} ({operator} {term}))")
             }
-            Clause::Element(var, (rel, val)) => {
-                write!(f, "(element {var} ({rel} {val}))")
+            Clause::Member(var, (rel, val)) => {
+                write!(f, "(member {var} ({rel} {val}))")
             }
             Clause::Eq(var, term) => write!(f, "(eq {var} {term})"),
             Clause::Or(_) => write!(f, "(or ..)"),

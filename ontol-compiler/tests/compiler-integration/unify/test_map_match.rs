@@ -284,9 +284,34 @@ fn test_map_sequence_filter_in_set() {
     map query(
         ('input': { ..x }),
         bar: {
-            ..foo match('foo': in { ..x }) // ERROR unbound variable
+            ..foo match('foo': in { ..x })
         }
     )
     "#
-    .compile_fail();
+    .compile_then(|test| {
+        let [foo] = test.bind(["foo"]);
+        test.mapper()
+            .with_mock_yielder(
+                YielderMock::yield_match
+                    .next_call(matching!(
+                        eq!(&ValueCardinality::Many),
+                        eq!(&Literal(indoc! { r#"
+                            (root $a)
+                            (is-entity $a def@1:2)
+                            (match-prop $a S:1:7 (element-in $b))
+                            (member $b (_ 'X'))
+                            (member $b (_ 'Y'))
+                        "#
+                        }))
+                    ))
+                    .returns(Value::sequence_of([foo
+                        .value_builder(json!({ "key": "key", "foo": "x!" }))
+                        .into()])),
+            )
+            .assert_named_forward_map(
+                "query",
+                json!({ "input": ["X", "Y"], }),
+                json!([{ "bar": "x!", }]),
+            );
+    });
 }
