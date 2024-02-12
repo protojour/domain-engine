@@ -2,7 +2,7 @@
 
 use domain_engine_core::{DomainEngine, Session};
 use ontol_runtime::{
-    condition::{CondTerm, Condition},
+    condition::Condition,
     interface::serde::processor::ProcessorMode,
     select::{EntitySelect, StructOrUnionSelect, StructSelect},
     value::Value,
@@ -113,7 +113,7 @@ impl Default for TestFindQuery {
 }
 
 impl domain_engine_core::FindEntitySelect for TestFindQuery {
-    fn find_select(&mut self, match_var: Var, condition: &Condition<CondTerm>) -> EntitySelect {
+    fn find_select(&mut self, match_var: Var, condition: &Condition) -> EntitySelect {
         let def_id = domain_engine_core::match_utils::find_entity_id_in_condition_for_var(
             condition, match_var,
         )

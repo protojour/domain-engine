@@ -20,8 +20,9 @@ fn test_unify_matchcond_empty() {
     );
     let expected = indoc! {"
         |$b| (block
-            (match-struct ($c)
-                (push-cond-clause $c
+            (match-struct ($d)
+                (let-cond-var $c $d)
+                (push-cond-clause $d
                     (root '$c)
                 )
             )
@@ -52,11 +53,12 @@ fn test_unify_matchcond_single_prop() {
     let expected = indoc! {"
         |$b| (block
             (let-prop $_ $a ($b S:1:0))
-            (match-struct ($c)
-                (push-cond-clause $c
+            (match-struct ($e)
+                (let-cond-var $c $e)
+                (push-cond-clause $e
                     (root '$c)
                 )
-                (push-cond-clause $c
+                (push-cond-clause $e
                     (attr '$c O:1:0 (_ $a))
                 )
             )
@@ -95,14 +97,16 @@ fn test_unify_matchcond_struct_in_struct() {
         |$c| (block
             (let-prop $_ $a ($c S:1:0))
             (let-prop $_ $b ($c S:1:1))
-            (match-struct ($d)
-                (push-cond-clause $d
+            (match-struct ($g)
+                (let-cond-var $d $g)
+                (push-cond-clause $g
                     (root '$d)
                 )
-                (push-cond-clause $d
+                (let-cond-var $e $g)
+                (push-cond-clause $g
                     (attr '$d O:1:0 (_ '$e))
                 )
-                (push-cond-clause $d
+                (push-cond-clause $g
                     (attr '$e O:2:0 ($a $b))
                 )
             )
@@ -112,8 +116,6 @@ fn test_unify_matchcond_struct_in_struct() {
 }
 
 #[test]
-// BUG: Unfinished design work
-// #[should_panic = "not yet implemented"]
 fn test_unify_matchcond_cartesian_set() {
     let output = test_unify(
         "
@@ -155,17 +157,38 @@ fn test_unify_matchcond_cartesian_set() {
         ",
     );
     let expected = indoc! {"
-        |$c| (match-struct ($d)
-            (push-cond-clause $d
-                (root '$d)
-            )
-            (match-prop $c S:1:0
-                ((.. $e)
-                    (match-prop $c S:1:1
-                        ((.. $f)
-                            (push-cond-clause $d
-                                (attr '$d O:1:0 (_ '$e))
-                            )
+        |$c| (block
+            (let-prop-default $_ $e ($c S:1:0) #u #u)
+            (let-prop-default $_ $f ($c S:1:1) #u #u)
+            (match-struct ($s)
+                (let-cond-var $d $s)
+                (push-cond-clause $s
+                    (root '$d)
+                )
+                (let-cond-var $t $s)
+                (push-cond-clause $s
+                    (attr-set-predicate '$d O:1:0 element-in '$t))
+                (for-each $e ($_ $a)
+                    (let-cond-var $q $s)
+                    (push-cond-clause $s
+                        (element '$t (_ '$q))
+                    )
+                    (catch (@u)
+                        (let? @u $v $a)
+                        (push-cond-clause $s
+                            (attr '$q O:2:0 (_ $v))
+                        )
+                    )
+                )
+                (for-each $f ($_ $b)
+                    (let-cond-var $r $s)
+                    (push-cond-clause $s
+                        (element '$t (_ '$r))
+                    )
+                    (catch (@w)
+                        (let? @w $x $b)
+                        (push-cond-clause $s
+                            (attr '$r O:2:0 (_ $x))
                         )
                     )
                 )

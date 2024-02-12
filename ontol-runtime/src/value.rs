@@ -11,11 +11,8 @@ use smartstring::alias::String;
 use thin_vec::ThinVec;
 
 use crate::{
-    cast::Cast,
-    condition::{CondTerm, Condition},
-    ontology::Ontology,
-    sequence::Sequence,
-    DefId, PackageId, RelationshipId, Role,
+    cast::Cast, condition::Condition, ontology::Ontology, sequence::Sequence, DefId, PackageId,
+    RelationshipId, Role,
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -63,7 +60,7 @@ pub enum Value {
     /// Special rel_params used for edge deletion
     DeleteRelationship(DefId),
 
-    Condition(Condition<CondTerm>, DefId),
+    Condition(Condition, DefId),
 }
 
 impl Value {

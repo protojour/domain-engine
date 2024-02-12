@@ -83,10 +83,11 @@ pub trait Processor {
         index_filter: &BitVec,
     ) -> VmResult<()>;
     fn assert_true(&mut self) -> VmResult<()>;
+    fn cond_var(&mut self, condition: Local) -> VmResult<()>;
     fn push_cond_clause(
         &mut self,
         cond_local: Local,
-        clause: &Clause<OpCodeCondTerm>,
+        clause: &Clause<Local, OpCodeCondTerm>,
     ) -> VmResult<()>;
     fn yield_match_condition(
         &mut self,
@@ -260,6 +261,10 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                 OpCode::RegexCaptureIndexes(_) => unreachable!(),
                 OpCode::PushCondClause(cond_local, clause) => {
                     processor.push_cond_clause(*cond_local, clause)?;
+                    self.program_counter += 1;
+                }
+                OpCode::CondVar(condition) => {
+                    processor.cond_var(*condition)?;
                     self.program_counter += 1;
                 }
                 OpCode::MatchCondition(var, cardinality) => {

@@ -2,8 +2,8 @@ use std::{borrow::Cow, collections::HashMap, ops::Range};
 
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    ontology::Cardinality, text_like_types::TextLikeType, vm::proc::BuiltinProc, DefId, PackageId,
-    RelationshipId, Role,
+    ontology::Cardinality, text_like_types::TextLikeType, var::VarAllocator, vm::proc::BuiltinProc,
+    DefId, PackageId, RelationshipId, Role,
 };
 use smartstring::alias::String;
 
@@ -44,7 +44,7 @@ pub enum DefKind<'m> {
     Mapping {
         ident: Option<&'m str>,
         arms: [PatId; 2],
-        var_alloc: ontol_hir::VarAllocator,
+        var_alloc: VarAllocator,
     },
     AutoMapping,
 }

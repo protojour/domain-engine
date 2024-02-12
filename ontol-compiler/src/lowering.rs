@@ -10,7 +10,7 @@ use ontol_parser::{ast, Span};
 use ontol_runtime::{
     ontology::{PropertyCardinality, ValueCardinality},
     smart_format,
-    var::Var,
+    var::{Var, VarAllocator},
     DefId, RelationshipId,
 };
 
@@ -1319,8 +1319,8 @@ impl MapVarTable {
 
     /// Create an allocator for allocating the successive variables
     /// after the explicit ones
-    fn into_allocator(self) -> ontol_hir::VarAllocator {
-        ontol_hir::VarAllocator::from(Var(self.variables.len() as u32))
+    fn into_allocator(self) -> VarAllocator {
+        VarAllocator::from(Var(self.variables.len() as u32))
     }
 }
 

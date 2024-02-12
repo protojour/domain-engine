@@ -1,13 +1,13 @@
 use fnv::FnvHashMap;
-use ontol_runtime::var::Var;
+use ontol_runtime::var::{Var, VarAllocator};
 use smartstring::alias::String;
 use tracing::debug_span;
 
 use crate::{
     pattern::PatId,
-    typed_hir::{self, TypedHir, TypedHirData, UNIT_META},
+    typed_hir::{self, Meta, TypedHir, TypedHirData},
     types::TypeRef,
-    SourceSpan,
+    SourceSpan, NO_SPAN,
 };
 
 use super::ena_inference::Inference;
@@ -33,7 +33,7 @@ pub struct HirBuildCtx<'m> {
 
     pub partial: bool,
 
-    pub var_allocator: ontol_hir::VarAllocator,
+    pub var_allocator: VarAllocator,
 
     /// Which Arm is currently processed in a map statement:
     pub current_arm: Arm,
@@ -44,7 +44,7 @@ pub struct HirBuildCtx<'m> {
 }
 
 impl<'m> HirBuildCtx<'m> {
-    pub fn new(map_kw_span: SourceSpan, var_allocator: ontol_hir::VarAllocator) -> Self {
+    pub fn new(map_kw_span: SourceSpan, var_allocator: VarAllocator) -> Self {
         Self {
             hir_arena: Default::default(),
             map_kw_span,
@@ -84,7 +84,7 @@ impl<'m> HirBuildCtx<'m> {
 
     pub fn mk_unit_node_no_span(&mut self) -> ontol_hir::Node {
         self.hir_arena
-            .add(TypedHirData(ontol_hir::Kind::Unit, UNIT_META))
+            .add(TypedHirData(ontol_hir::Kind::Unit, Meta::unit(NO_SPAN)))
     }
 }
 

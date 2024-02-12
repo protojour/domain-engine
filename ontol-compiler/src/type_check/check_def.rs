@@ -1,7 +1,6 @@
 use std::str::FromStr;
 
-use ontol_hir::VarAllocator;
-use ontol_runtime::DefId;
+use ontol_runtime::{var::VarAllocator, DefId};
 use ordered_float::NotNan;
 use tracing::debug;
 

@@ -72,7 +72,7 @@ struct PlanBuilder<'on> {
 }
 
 pub fn compute_filter_plan(
-    condition: &Condition<CondTerm>,
+    condition: &Condition,
     ontology: &Ontology,
 ) -> PlanResult<Vec<PlanEntry>> {
     let clauses = &condition.clauses;
@@ -118,7 +118,7 @@ pub fn compute_filter_plan(
 }
 
 fn compute_plan(
-    clauses: &[&Clause<CondTerm>],
+    clauses: &[&Clause<Var, CondTerm>],
     builder: &mut PlanBuilder,
 ) -> Option<PlanResult<PlanEntry>> {
     let root_var = clauses.iter().find_map(|clause| match clause {
@@ -150,7 +150,7 @@ struct Origin {
 
 fn sub_plans(
     origin: Origin,
-    clauses: &[&Clause<CondTerm>],
+    clauses: &[&Clause<Var, CondTerm>],
     builder: &mut PlanBuilder,
 ) -> PlanResult<Vec<PlanEntry>> {
     let mut plans: Vec<PlanEntry> = vec![];
@@ -263,7 +263,7 @@ fn sub_plans(
 fn prop_set_plans(
     set_var: Var,
     target: DefId,
-    mut clauses: &[&Clause<CondTerm>],
+    mut clauses: &[&Clause<Var, CondTerm>],
     builder: &mut PlanBuilder,
 ) -> PlanResult<Set<PlanEntry>> {
     let mut plans = thin_vec![];
@@ -284,7 +284,7 @@ fn prop_set_plans(
 fn attr_set_plans(
     _set_var: Var,
     target: (Option<DefId>, DefId),
-    _clauses: &[&Clause<CondTerm>],
+    _clauses: &[&Clause<Var, CondTerm>],
     _builder: &mut PlanBuilder,
 ) -> PlanResult<Set<Attribute<PlanEntry>>> {
     todo!()
@@ -293,7 +293,7 @@ fn attr_set_plans(
 fn term_plans(
     term: &CondTerm,
     target: DefId,
-    clauses: &[&Clause<CondTerm>],
+    clauses: &[&Clause<Var, CondTerm>],
     builder: &mut PlanBuilder,
 ) -> PlanResult<Vec<PlanEntry>> {
     let mut plans = vec![];
@@ -393,16 +393,14 @@ mod tests {
             use CondTerm::*;
 
             let plan = compute_filter_plan(
-                &Condition {
-                    clauses: vec![
-                        Clause::Root(var("a")),
-                        Clause::IsEntity(Var(var("a")), foo.def_id()),
-                        Clause::Attr(var("a"), x, (Wildcard, Var(var("b")))),
-                        Clause::Eq(var("b"), text("match1").to_term()),
-                        Clause::Attr(var("a"), bars, (CondTerm::Wildcard, Var(var("c")))),
-                        Clause::Attr(var("c"), y, (wild(), text("match2").to_term())),
-                    ],
-                },
+                &Condition::from(thin_vec![
+                    Clause::Root(var("a")),
+                    Clause::IsEntity(Var(var("a")), foo.def_id()),
+                    Clause::Attr(var("a"), x, (Wildcard, Var(var("b")))),
+                    Clause::Eq(var("b"), text("match1").to_term()),
+                    Clause::Attr(var("a"), bars, (CondTerm::Wildcard, Var(var("c")))),
+                    Clause::Attr(var("c"), y, (wild(), text("match2").to_term())),
+                ]),
                 &test.ontology,
             )
             .unwrap();
@@ -456,19 +454,17 @@ mod tests {
             use CondTerm::*;
 
             let plan = compute_filter_plan(
-                &Condition {
-                    clauses: vec![
-                        Clause::Root(var("a")),
-                        Clause::IsEntity(Var(var("a")), foo.def_id()),
-                        Clause::Attr(var("a"), bars_x, (wild(), Var(var("b")))),
-                        Clause::Attr(var("a"), bars_y, (wild(), Var(var("c")))),
-                        Clause::Attr(var("b"), y, (wild(), text("match1").to_term())),
-                        Clause::Attr(var("c"), y, (wild(), text("match2").to_term())),
-                        Clause::Attr(var("b"), foos, (wild(), Var(var("d")))),
-                        Clause::Attr(var("c"), foos, (wild(), Var(var("d")))),
-                        Clause::Attr(var("d"), x, (wild(), text("match3").to_term())),
-                    ],
-                },
+                &Condition::from(thin_vec![
+                    Clause::Root(var("a")),
+                    Clause::IsEntity(Var(var("a")), foo.def_id()),
+                    Clause::Attr(var("a"), bars_x, (wild(), Var(var("b")))),
+                    Clause::Attr(var("a"), bars_y, (wild(), Var(var("c")))),
+                    Clause::Attr(var("b"), y, (wild(), text("match1").to_term())),
+                    Clause::Attr(var("c"), y, (wild(), text("match2").to_term())),
+                    Clause::Attr(var("b"), foos, (wild(), Var(var("d")))),
+                    Clause::Attr(var("c"), foos, (wild(), Var(var("d")))),
+                    Clause::Attr(var("d"), x, (wild(), text("match3").to_term())),
+                ]),
                 &test.ontology,
             )
             .unwrap();
@@ -541,17 +537,15 @@ mod tests {
             use CondTerm::*;
 
             let plan = compute_filter_plan(
-                &Condition {
-                    clauses: vec![
-                        Clause::Root(var("a")),
-                        Clause::IsEntity(Var(var("a")), foo.def_id()),
-                        Clause::MatchProp(var("a"), bar, ElementIn, var("b")),
-                        Clause::Element(var("b"), (wild(), Var(var("c")))),
-                        Clause::Attr(var("c"), val, (wild(), text("text1").to_term())),
-                        Clause::Element(var("b"), (wild(), Var(var("d")))),
-                        Clause::Attr(var("d"), val, (wild(), text("text2").to_term())),
-                    ],
-                },
+                &Condition::from(thin_vec![
+                    Clause::Root(var("a")),
+                    Clause::IsEntity(Var(var("a")), foo.def_id()),
+                    Clause::MatchProp(var("a"), bar, ElementIn, var("b")),
+                    Clause::Element(var("b"), (wild(), Var(var("c")))),
+                    Clause::Attr(var("c"), val, (wild(), text("text1").to_term())),
+                    Clause::Element(var("b"), (wild(), Var(var("d")))),
+                    Clause::Attr(var("d"), val, (wild(), text("text2").to_term())),
+                ]),
                 &test.ontology,
             )
             .unwrap();

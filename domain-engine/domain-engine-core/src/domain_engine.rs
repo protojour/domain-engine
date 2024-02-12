@@ -8,7 +8,6 @@ use ontol_runtime::{
     select::{EntitySelect, Select, StructOrUnionSelect},
     sequence::Sequence,
     value::Value,
-    var::Var,
     vm::{proc::Yield, VmState},
     DefId, MapKey, PackageId,
 };
@@ -20,7 +19,6 @@ use crate::{
         DataStoreFactorySync,
     },
     domain_error::DomainResult,
-    match_utils::find_entity_id_in_condition_for_var,
     select_data_flow::{translate_entity_select, translate_select},
     system::{ArcSystemApi, SystemAPI, TestSystem},
     update::sanitize_update,
@@ -87,12 +85,7 @@ impl DomainEngine {
                     entity_select.condition = condition;
 
                     input = self
-                        .exec_map_query(
-                            match_var,
-                            value_cardinality,
-                            entity_select,
-                            session.clone(),
-                        )
+                        .exec_map_query(value_cardinality, entity_select, session.clone())
                         .await?;
                 }
             }
@@ -363,7 +356,6 @@ impl DomainEngine {
 
     async fn exec_map_query(
         &self,
-        match_var: Var,
         value_cardinality: ValueCardinality,
         mut entity_select: EntitySelect,
         session: Session,
@@ -374,9 +366,10 @@ impl DomainEngine {
 
         match &entity_select.source {
             StructOrUnionSelect::Struct(struct_select) => {
-                let inner_entity_def_id =
-                    find_entity_id_in_condition_for_var(&entity_select.condition, match_var)
-                        .expect("Root entity DefId not found in condition clauses");
+                let inner_entity_def_id = entity_select
+                    .condition
+                    .root_def_id()
+                    .expect("Root entity DefId not found in condition clauses");
 
                 // TODO: The probe algorithm here needs to work differently.
                 // The map statement (currently) knows about the data store type

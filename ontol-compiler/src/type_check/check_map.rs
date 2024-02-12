@@ -1,4 +1,5 @@
-use ontol_hir::{Label, VarAllocator};
+use ontol_hir::Label;
+use ontol_runtime::var::VarAllocator;
 
 use crate::{
     codegen::{

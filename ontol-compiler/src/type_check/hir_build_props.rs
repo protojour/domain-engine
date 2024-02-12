@@ -22,7 +22,7 @@ use crate::{
     relation::Property,
     repr::repr_model::ReprKind,
     type_check::{ena_inference::Strength, hir_build::NodeInfo, TypeError},
-    typed_hir::{Meta, TypedHirData, UNIT_META},
+    typed_hir::{Meta, TypedHirData},
     types::{Type, TypeRef, UNIT_TYPE},
     CompileError, SourceSpan, NO_SPAN,
 };
@@ -340,7 +340,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             }
 
                             ontol_hir::PropVariant::Value(Attribute {
-                                rel: ctx.mk_node(ontol_hir::Kind::Unit, UNIT_META),
+                                rel: ctx.mk_node(ontol_hir::Kind::Unit, Meta::unit(NO_SPAN)),
                                 val: ctx.mk_node(
                                     ontol_hir::Kind::Set(hir_set_elements),
                                     Meta::new(seq_ty, prop_span),
@@ -546,7 +546,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             match_attr.property_id,
                             ontol_hir::PropVariant::Value(Attribute { rel, val }),
                         ),
-                        UNIT_META,
+                        Meta::unit(NO_SPAN),
                     )
                 };
                 hir_props.push(prop_node);

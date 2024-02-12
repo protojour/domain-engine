@@ -124,3 +124,32 @@ impl<'b> Iterator for VarSetIter<'b> {
         Some(Var(next.try_into().unwrap()))
     }
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct VarAllocator {
+    next: Var,
+}
+
+impl VarAllocator {
+    pub fn alloc(&mut self) -> Var {
+        let next = self.next;
+        self.next.0 += 1;
+        next
+    }
+
+    pub fn peek_next(&self) -> &Var {
+        &self.next
+    }
+}
+
+impl Default for VarAllocator {
+    fn default() -> Self {
+        Self { next: Var(0) }
+    }
+}
+
+impl From<Var> for VarAllocator {
+    fn from(value: Var) -> Self {
+        Self { next: value }
+    }
+}

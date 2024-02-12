@@ -191,10 +191,10 @@ async fn test_conduit_db_store_entity_tree() {
         .unwrap();
 
     let new_user_id = users.attrs[1]
-        .value
+        .val
         .get_attribute(user_type.find_property("user_id").unwrap())
         .unwrap()
-        .value
+        .val
         .clone()
         .cast_into::<Uuid>();
 
@@ -210,7 +210,7 @@ async fn test_conduit_db_store_entity_tree() {
                 .await
                 .unwrap()
                 .attrs[1]
-                .value
+                .val
         ),
         expected = json!({
             "user_id": new_user_id.to_string(),
@@ -230,10 +230,10 @@ async fn test_conduit_db_store_entity_tree() {
         .unwrap();
 
     let comment_id = comments.attrs[0]
-        .value
+        .val
         .get_attribute(comment_type.find_property("id").unwrap())
         .unwrap()
-        .value
+        .val
         .clone()
         .cast_into::<i64>();
 
@@ -257,7 +257,7 @@ async fn test_conduit_db_store_entity_tree() {
                 .await
                 .unwrap()
                 .attrs[1]
-                .value
+                .val
         ),
         expected = json!({
             "user_id": new_user_id.to_string(),

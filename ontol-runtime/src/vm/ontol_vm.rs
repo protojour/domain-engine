@@ -359,28 +359,44 @@ impl<'o> Processor for OntolProcessor<'o> {
         }
     }
 
+    fn cond_var(&mut self, cond_local: Local) -> VmResult<()> {
+        let Value::Condition(condition, _) = &mut self.local_mut(cond_local) else {
+            return Err(VmError::InvalidType(cond_local));
+        };
+
+        let cond_var = condition.mk_cond_var();
+
+        self.stack_mut()
+            .push(Value::I64(cond_var.0 as i64, DefId::unit()));
+
+        Ok(())
+    }
+
     fn push_cond_clause(
         &mut self,
         cond_local: Local,
-        clause: &Clause<OpCodeCondTerm>,
+        clause: &Clause<Local, OpCodeCondTerm>,
     ) -> VmResult<()> {
-        let clause: Clause<CondTerm> = match clause {
-            Clause::Root(var) => Clause::Root(*var),
+        let clause: Clause<Var, CondTerm> = match clause {
+            Clause::Root(local) => Clause::Root(self.var_local(*local)?),
             Clause::IsEntity(term, def_id) => {
-                Clause::IsEntity(self.opcode_term_to_cond_term(term), *def_id)
+                Clause::IsEntity(self.opcode_term_to_cond_term(term)?, *def_id)
             }
-            Clause::Attr(var, prop_id, (rel, val)) => {
-                let rel = self.opcode_term_to_cond_term(rel);
-                let val = self.opcode_term_to_cond_term(val);
-                Clause::Attr(*var, *prop_id, (rel, val))
+            Clause::Attr(local, prop_id, (rel, val)) => {
+                let rel = self.opcode_term_to_cond_term(rel)?;
+                let val = self.opcode_term_to_cond_term(val)?;
+                Clause::Attr(self.var_local(*local)?, *prop_id, (rel, val))
             }
-            Clause::MatchProp(var, prop_id, operator, set_var) => {
-                Clause::MatchProp(*var, *prop_id, *operator, *set_var)
-            }
-            Clause::Element(set_var, (rel, val)) => {
-                let rel = self.opcode_term_to_cond_term(rel);
-                let val = self.opcode_term_to_cond_term(val);
-                Clause::Element(*set_var, (rel, val))
+            Clause::MatchProp(local, prop_id, operator, set_local) => Clause::MatchProp(
+                self.var_local(*local)?,
+                *prop_id,
+                *operator,
+                self.var_local(*set_local)?,
+            ),
+            Clause::Element(set_local, (rel, val)) => {
+                let rel = self.opcode_term_to_cond_term(rel)?;
+                let val = self.opcode_term_to_cond_term(val)?;
+                Clause::Element(self.var_local(*set_local)?, (rel, val))
             }
             Clause::Eq(..) => todo!(),
             Clause::Or(_) => todo!(),
@@ -455,6 +471,19 @@ impl<'o> OntolProcessor<'o> {
     }
 
     #[inline(always)]
+    fn int_local(&self, local: Local) -> VmResult<i64> {
+        match self.local(local) {
+            Value::I64(int, _) => Ok(*int),
+            _ => Err(VmError::InvalidType(local)),
+        }
+    }
+
+    fn var_local(&self, local: Local) -> VmResult<Var> {
+        let int = self.int_local(local)?;
+        Ok(Var(int.try_into().map_err(|_| VmError::Overflow)?))
+    }
+
+    #[inline(always)]
     fn string_local_mut(&mut self, local: Local) -> VmResult<&mut String> {
         match self.local_mut(local) {
             Value::Text(string, _) => Ok(string),
@@ -503,11 +532,13 @@ impl<'o> OntolProcessor<'o> {
         self.stack.push(Value::Void(DefId::unit()));
     }
 
-    fn opcode_term_to_cond_term(&mut self, term: &OpCodeCondTerm) -> CondTerm {
+    fn opcode_term_to_cond_term(&mut self, term: &OpCodeCondTerm) -> VmResult<CondTerm> {
         match term {
-            OpCodeCondTerm::Wildcard => CondTerm::Wildcard,
-            OpCodeCondTerm::Var(var) => CondTerm::Var(*var),
-            OpCodeCondTerm::Value(local) => CondTerm::Value(self.stack[local.0 as usize].take()),
+            OpCodeCondTerm::Wildcard => Ok(CondTerm::Wildcard),
+            OpCodeCondTerm::CondVar(local) => Ok(CondTerm::Var(self.var_local(*local)?)),
+            OpCodeCondTerm::Value(local) => {
+                Ok(CondTerm::Value(self.stack[local.0 as usize].take()))
+            }
         }
     }
 }

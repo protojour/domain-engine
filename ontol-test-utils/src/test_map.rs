@@ -1,5 +1,5 @@
 use ontol_runtime::{
-    condition::{CondTerm, Condition},
+    condition::Condition,
     ontology::ValueCardinality,
     value::Value,
     vm::{
@@ -74,11 +74,7 @@ impl OntolTest {
 
 #[unimock(api = YielderMock)]
 pub trait Yielder {
-    fn yield_match(
-        &self,
-        value_cardinality: ValueCardinality,
-        condition: Condition<CondTerm>,
-    ) -> Value;
+    fn yield_match(&self, value_cardinality: ValueCardinality, condition: Condition) -> Value;
 }
 
 pub struct TestMapper<'on> {

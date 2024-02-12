@@ -1,7 +1,7 @@
-use ontol_hir::{visitor::HirVisitor, Node, PropFlags, PropVariant, VarAllocator};
+use ontol_hir::{visitor::HirVisitor, Node, PropFlags, PropVariant};
 use ontol_runtime::{
     value::PropertyId,
-    var::{Var, VarSet},
+    var::{Var, VarAllocator, VarSet},
     MapFlags,
 };
 use thin_vec::ThinVec;
@@ -26,11 +26,11 @@ pub enum ExprMode {
         struct_level: Option<usize>,
     },
     MatchStruct {
-        cond_var: Var,
+        match_var: Var,
         struct_level: usize,
     },
     MatchSet {
-        cond_var: Var,
+        match_var: Var,
         set_cond_var: Var,
         struct_level: Option<usize>,
     },
@@ -47,24 +47,24 @@ impl ExprMode {
                 struct_level: Some(inc_opt_struct_level(struct_level)),
             },
             Self::MatchStruct {
-                cond_var,
+                match_var,
                 struct_level,
             } => Self::MatchStruct {
-                cond_var,
+                match_var,
                 struct_level: struct_level + 1,
             },
             Self::MatchSet {
                 struct_level,
-                cond_var,
+                match_var,
                 ..
             } => Self::MatchStruct {
-                cond_var,
+                match_var,
                 struct_level: inc_opt_struct_level(struct_level),
             },
         }
     }
 
-    pub fn match_struct(self, cond_var: Var) -> Self {
+    pub fn match_struct(self, match_var: Var) -> Self {
         match self {
             Self::Expr {
                 flags,
@@ -74,18 +74,23 @@ impl ExprMode {
                 struct_level: Some(inc_opt_struct_level(struct_level)),
             },
             Self::Expr { struct_level, .. } => Self::MatchStruct {
-                cond_var,
+                match_var,
                 struct_level: inc_opt_struct_level(struct_level),
             },
             Self::MatchStruct {
-                cond_var,
+                match_var,
                 struct_level,
+                ..
             } => Self::MatchStruct {
-                cond_var,
+                match_var,
                 struct_level: struct_level + 1,
             },
-            Self::MatchSet { struct_level, .. } => Self::MatchStruct {
-                cond_var,
+            Self::MatchSet {
+                match_var,
+                struct_level,
+                ..
+            } => Self::MatchStruct {
+                match_var,
                 struct_level: inc_opt_struct_level(struct_level),
             },
         }
@@ -95,24 +100,25 @@ impl ExprMode {
         match self {
             Self::Expr { struct_level, .. } => Self::MatchSet {
                 struct_level,
-                cond_var: set_cond_var,
+                match_var: set_cond_var,
                 set_cond_var,
             },
             Self::MatchStruct {
-                cond_var,
+                match_var,
                 struct_level,
+                ..
             } => Self::MatchSet {
-                cond_var,
+                match_var,
                 struct_level: Some(struct_level),
                 set_cond_var,
             },
             Self::MatchSet {
                 struct_level,
-                cond_var,
+                match_var,
                 ..
             } => Self::MatchSet {
                 struct_level,
-                cond_var,
+                match_var,
                 set_cond_var,
             },
         }

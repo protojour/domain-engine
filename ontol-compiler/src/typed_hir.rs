@@ -100,15 +100,25 @@ pub struct Meta<'m> {
 }
 
 impl<'m> Meta<'m> {
-    pub fn new(ty: TypeRef<'m>, span: SourceSpan) -> Self {
+    pub const fn new(ty: TypeRef<'m>, span: SourceSpan) -> Self {
         Self { ty, span }
+    }
+
+    pub fn unit(span: SourceSpan) -> Self {
+        Self {
+            ty: &UNIT_TYPE,
+            span,
+        }
+    }
+
+    pub fn error(span: SourceSpan) -> Self {
+        Self {
+            ty: &ERROR_TYPE,
+            span,
+        }
     }
 }
 
-pub static UNIT_META: Meta<'static> = Meta {
-    ty: &UNIT_TYPE,
-    span: NO_SPAN,
-};
 pub static ERROR_META: Meta<'static> = Meta {
     ty: &ERROR_TYPE,
     span: NO_SPAN,
@@ -280,6 +290,7 @@ pub fn arena_import<'m>(
             Regex(*label, *def_id, groups_list.clone()),
             *meta,
         )),
+        LetCondVar(bind_var, cond) => target.add(TypedHirData(LetCondVar(*bind_var, *cond), *meta)),
         PushCondClause(var, clause) => {
             target.add(TypedHirData(PushCondClause(*var, clause.clone()), *meta))
         }

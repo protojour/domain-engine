@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    condition::{CondTerm, Condition},
+    condition::Condition,
     ontology::{
         DataRelationshipKind, DataRelationshipTarget, PropertyCardinality, TypeInfo,
         ValueCardinality,
@@ -56,7 +56,7 @@ impl InMemoryStore {
     pub fn query_single_entity_collection(
         &self,
         struct_select: &StructSelect,
-        condition: &Condition<CondTerm>,
+        condition: &Condition,
         Limit(limit): Limit,
         after_cursor: Option<Cursor>,
         IncludeTotalLen(include_total_len): IncludeTotalLen,

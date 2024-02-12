@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
-use ontol_hir::VarAllocator;
-use ontol_runtime::{value::Attribute, var::Var, DefId, PackageId};
+use ontol_runtime::{
+    value::Attribute,
+    var::{Var, VarAllocator},
+    DefId, PackageId,
+};
 
 use crate::{
     def::DefKind,
@@ -9,9 +12,7 @@ use crate::{
     relation::Constructor,
     repr::repr_model::ReprKind,
     text_patterns::TextPatternSegment,
-    typed_hir::{
-        IntoTypedHirData, Meta, TypedArena, TypedHir, TypedHirData, TypedRootNode, UNIT_META,
-    },
+    typed_hir::{IntoTypedHirData, Meta, TypedArena, TypedHir, TypedHirData, TypedRootNode},
     Compiler, NO_SPAN,
 };
 
@@ -127,10 +128,7 @@ fn autogenerate_fmt_to_transparent<'m>(
         let mut arena: TypedArena<'m> = Default::default();
         let node = arena.add(TypedHirData(
             ontol_hir::Kind::Var(transparent_var),
-            Meta {
-                ty: compiler.def_types.table.get(&transparent_def_id)?,
-                span: NO_SPAN,
-            },
+            Meta::new(compiler.def_types.table.get(&transparent_def_id)?, NO_SPAN),
         ));
         ontol_hir::RootNode::new(node, arena)
     };
@@ -215,7 +213,7 @@ fn autogenerate_fmt_segment_property<'m>(
             }
         };
 
-        let rel = arena.add(TypedHirData(ontol_hir::Kind::Unit, UNIT_META));
+        let rel = arena.add(TypedHirData(ontol_hir::Kind::Unit, Meta::unit(NO_SPAN)));
 
         Some(arena.add(TypedHirData(
             ontol_hir::Kind::Prop(
@@ -224,10 +222,7 @@ fn autogenerate_fmt_segment_property<'m>(
                 *property_id,
                 ontol_hir::PropVariant::Value(Attribute { rel, val: var_node }),
             ),
-            Meta {
-                ty: object_ty,
-                span: NO_SPAN,
-            },
+            Meta::new(object_ty, NO_SPAN),
         )))
     } else {
         None

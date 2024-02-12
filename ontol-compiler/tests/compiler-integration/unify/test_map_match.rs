@@ -42,9 +42,9 @@ fn test_map_match_scalar_key() {
                     .next_call(matching!(
                         eq!(&ValueCardinality::One),
                         eq!(&Literal(indoc! { r#"
-                            (root $b)
-                            (is-entity $b def@1:2)
-                            (attr $b S:1:4 (_ 'input'))
+                            (root $a)
+                            (is-entity $a def@1:2)
+                            (attr $a S:1:4 (_ 'input'))
                         "#
                         }))
                     ))
@@ -84,8 +84,8 @@ fn test_map_match_parameterless_query() {
                     .next_call(matching!(
                         eq!(&ValueCardinality::Many),
                         eq!(&Literal(indoc! { "
-                            (root $c)
-                            (is-entity $c def@1:2)
+                            (root $a)
+                            (is-entity $a def@1:2)
                         "
                         }))
                     ))
@@ -134,10 +134,10 @@ fn test_map_match_query_mandatory_properties() {
                     .next_call(matching!(
                         eq!(&ValueCardinality::Many),
                         eq!(&Literal(indoc! { r#"
-                            (root $e)
-                            (is-entity $e def@1:2)
-                            (attr $e S:1:6 (_ 'A'))
-                            (attr $e S:1:7 (_ 'B'))
+                            (root $a)
+                            (is-entity $a def@1:2)
+                            (attr $a S:1:6 (_ 'A'))
+                            (attr $a S:1:7 (_ 'B'))
                         "#
                         }))
                     ))
@@ -185,9 +185,9 @@ fn test_map_match_query_optional_property() {
                     .next_call(matching!(
                         eq!(&ValueCardinality::Many),
                         eq!(&Literal(indoc! { r#"
-                            (root $e)
-                            (is-entity $e def@1:2)
-                            (attr $e S:1:6 (_ 'A'))
+                            (root $a)
+                            (is-entity $a def@1:2)
+                            (attr $a S:1:6 (_ 'A'))
                         "#
                         }))
                     ))
@@ -205,10 +205,10 @@ fn test_map_match_query_optional_property() {
                     .next_call(matching!(
                         eq!(&ValueCardinality::Many),
                         eq!(&Literal(indoc! { r#"
-                            (root $e)
-                            (is-entity $e def@1:2)
-                            (attr $e S:1:6 (_ 'A'))
-                            (attr $e S:1:7 (_ 'B'))
+                            (root $a)
+                            (is-entity $a def@1:2)
+                            (attr $a S:1:6 (_ 'A'))
+                            (attr $a S:1:7 (_ 'B'))
                         "#
                         }))
                     ))
@@ -252,9 +252,9 @@ fn test_map_match_anonymous_with_translation() {
                     .next_call(matching!(
                         eq!(&ValueCardinality::Many),
                         eq!(&Literal(indoc! { r#"
-                            (root $d)
-                            (is-entity $d def@1:2)
-                            (attr $d S:1:7 (_ 'X'))
+                            (root $a)
+                            (is-entity $a def@1:2)
+                            (attr $a S:1:7 (_ 'X'))
                         "#
                         }))
                     ))

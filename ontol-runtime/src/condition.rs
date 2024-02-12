@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Display};
 
 use serde::{Deserialize, Serialize};
-use thin_vec::ThinVec;
+use thin_vec::{thin_vec, ThinVec};
 
 use crate::{
     format_utils::Literal,
@@ -11,21 +11,46 @@ use crate::{
 };
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct Condition<Term> {
-    pub clauses: Vec<Clause<Term>>,
+pub struct Condition {
+    pub clauses: ThinVec<Clause<Var, CondTerm>>,
+    next_cond_var: Var,
 }
 
-impl<Term> Default for Condition<Term> {
+impl Condition {
+    pub fn root_def_id(&self) -> Option<DefId> {
+        self.clauses.iter().find_map(|clause| match clause {
+            Clause::IsEntity(_, def_id) => Some(*def_id),
+            _ => None,
+        })
+    }
+
+    pub fn mk_cond_var(&mut self) -> Var {
+        let var = self.next_cond_var;
+        self.next_cond_var.0 += 1;
+        var
+    }
+}
+
+impl From<ThinVec<Clause<Var, CondTerm>>> for Condition {
+    fn from(value: ThinVec<Clause<Var, CondTerm>>) -> Self {
+        Self {
+            clauses: value,
+            next_cond_var: Var(0),
+        }
+    }
+}
+
+impl Default for Condition {
     fn default() -> Self {
-        Self { clauses: vec![] }
+        Self {
+            clauses: thin_vec![],
+            next_cond_var: Var(0),
+        }
     }
 }
 
 /// The PartialEq implementation is only meant for debugging purposes
-impl<'a, Term> PartialEq<Literal<'a>> for Condition<Term>
-where
-    Term: Display,
-{
+impl<'a> PartialEq<Literal<'a>> for Condition {
     fn eq(&self, other: &Literal<'a>) -> bool {
         let a = format!("{self}");
         let b = format!("{other}");
@@ -34,16 +59,16 @@ where
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-pub enum Clause<Term> {
-    Root(Var),
+pub enum Clause<V, Term> {
+    Root(V),
     IsEntity(Term, DefId),
     /// The left variable is connected via a property to the right variable.
     /// The right variable represents a set of values for the property.
-    MatchProp(Var, PropertyId, SetOperator, Var),
+    MatchProp(V, PropertyId, SetOperator, V),
     /// An attribute having a specific value, bound to a Term
-    Attr(Var, PropertyId, (Term, Term)),
+    Attr(V, PropertyId, (Term, Term)),
     /// An element in the set defined by the variable
-    Element(Var, (Term, Term)),
+    Element(V, (Term, Term)),
     Eq(Var, Term),
     Or(ThinVec<Term>),
 }
@@ -72,10 +97,7 @@ impl From<Value> for CondTerm {
     }
 }
 
-impl<Term> Display for Condition<Term>
-where
-    Term: Display,
-{
+impl Display for Condition {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for clause in &self.clauses {
             writeln!(f, "{clause}")?;
@@ -84,8 +106,9 @@ where
     }
 }
 
-impl<Term> Display for Clause<Term>
+impl<V, Term> Display for Clause<V, Term>
 where
+    V: Display,
     Term: Display,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -132,17 +155,15 @@ impl Display for SetOperator {
     }
 }
 
-impl<Term> Debug for Condition<Term>
-where
-    Term: Display,
-{
+impl Debug for Condition {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{self}")
     }
 }
 
-impl<Term> Debug for Clause<Term>
+impl<V, Term> Debug for Clause<V, Term>
 where
+    V: Display,
     Term: Display,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

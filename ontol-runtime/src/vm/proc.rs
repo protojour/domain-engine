@@ -5,7 +5,7 @@ use bit_vec::BitVec;
 use smartstring::alias::String;
 
 use crate::{
-    condition::{Clause, CondTerm, Condition},
+    condition::{Clause, Condition},
     ontology::ValueCardinality,
     value::PropertyId,
     var::Var,
@@ -115,8 +115,10 @@ pub enum OpCode {
     RegexCaptureIter(Local, DefId),
     /// Required parameter to RegexCapture and RegexCaptureIter
     RegexCaptureIndexes(BitVec),
+    /// Push a new condition variable derived from the condition to the stack
+    CondVar(Local),
     /// Push a condition clause into the condition at local
-    PushCondClause(Local, Clause<OpCodeCondTerm>),
+    PushCondClause(Local, Clause<Local, OpCodeCondTerm>),
     /// Execute a match on a datastore, using the condition at top of stack
     MatchCondition(Var, ValueCardinality),
     Panic(String),
@@ -127,6 +129,12 @@ pub enum OpCode {
 pub struct Local(pub u16);
 
 impl Debug for Local {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "L{}", self.0)
+    }
+}
+
+impl Display for Local {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "L{}", self.0)
     }
@@ -174,13 +182,13 @@ impl GetAttrFlags {
 }
 
 pub enum Yield {
-    Match(Var, ValueCardinality, Condition<CondTerm>),
+    Match(Var, ValueCardinality, Condition),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum OpCodeCondTerm {
     Wildcard,
-    Var(Var),
+    CondVar(Local),
     Value(Local),
 }
 

@@ -1,11 +1,7 @@
 use fnv::FnvHashMap;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    condition::{CondTerm, Condition},
-    value::PropertyId,
-    DefId,
-};
+use crate::{condition::Condition, value::PropertyId, DefId};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Select {
@@ -19,7 +15,7 @@ pub enum Select {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EntitySelect {
     pub source: StructOrUnionSelect,
-    pub condition: Condition<CondTerm>,
+    pub condition: Condition,
     pub limit: usize,
     pub after_cursor: Option<Box<[u8]>>,
     pub include_total_len: bool,

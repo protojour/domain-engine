@@ -15,9 +15,9 @@ use crate::{
     hir_unify::{ssa_util::scan_all_vars_and_labels, UnifierError},
     mem::Intern,
     primitive::PrimitiveKind,
-    typed_hir::{Meta, TypedHir, TypedHirData, UNIT_META},
+    typed_hir::{Meta, TypedHir, TypedHirData},
     types::{Type, UNIT_TYPE},
-    CompileError, SourceSpan,
+    CompileError, SourceSpan, NO_SPAN,
 };
 
 use super::{
@@ -65,10 +65,13 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
 
                 body.push(self.mk_node(
                     Kind::TryLetTup(catch_label, new_bindings, var_node),
-                    UNIT_META,
+                    Meta::unit(NO_SPAN),
                 ));
 
-                Ok(Binding::Binder(TypedHirData(Binder { var }, UNIT_META)))
+                Ok(Binding::Binder(TypedHirData(
+                    Binder { var },
+                    Meta::unit(NO_SPAN),
+                )))
             }
         }
     }
@@ -464,7 +467,8 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             | Kind::TryLetProp(..)
             | Kind::TryLetTup(..)
             | Kind::LetRegex(..)
-            | Kind::LetRegexIter(..) => Err(UnifierError::TODO(smart_format!(
+            | Kind::LetRegexIter(..)
+            | Kind::LetCondVar(..) => Err(UnifierError::TODO(smart_format!(
                 "Not a scope node: {node_ref}"
             ))),
         }

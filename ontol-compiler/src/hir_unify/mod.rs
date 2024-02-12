@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use ontol_hir::visitor::HirVisitor;
 use ontol_runtime::{
-    var::{Var, VarSet},
+    var::{Var, VarAllocator, VarSet},
     MapFlags,
 };
 use smartstring::alias::String;
@@ -82,9 +82,9 @@ fn unify_ssa<'m>(
     scope: &ontol_hir::RootNode<'m, TypedHir>,
     expr: &ontol_hir::RootNode<'m, TypedHir>,
     map_flags: MapFlags,
-    var_allocator: ontol_hir::VarAllocator,
+    var_allocator: VarAllocator,
     compiler: &mut Compiler<'m>,
-) -> UnifierResult<(UnifiedRootNode<'m>, ontol_hir::VarAllocator)> {
+) -> UnifierResult<(UnifiedRootNode<'m>, VarAllocator)> {
     let mut unifier = SsaUnifier::new(
         scope.arena(),
         expr.arena(),
@@ -158,7 +158,7 @@ impl VariableTracker {
         }
     }
 
-    fn var_allocator(&self) -> ontol_hir::VarAllocator {
+    fn var_allocator(&self) -> VarAllocator {
         let idx = self.largest.0 + 1;
         Var(idx).into()
     }

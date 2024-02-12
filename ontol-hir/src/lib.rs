@@ -192,7 +192,8 @@ pub enum Kind<'a, L: Lang> {
         DefId,
         ThinVec<ThinVec<CaptureGroup<'a, L>>>,
     ),
-    PushCondClause(Var, Clause<EvalCondTerm>),
+    LetCondVar(Var, Var),
+    PushCondClause(Var, Clause<Var, EvalCondTerm>),
 }
 
 #[derive(Clone)]
@@ -226,35 +227,6 @@ pub enum EvalCondTerm {
 
 #[derive(Clone)]
 pub struct SetEntry<'a, L: Lang>(pub Option<L::Data<'a, Label>>, pub Attribute<Node>);
-
-#[derive(Debug)]
-pub struct VarAllocator {
-    next: Var,
-}
-
-impl VarAllocator {
-    pub fn alloc(&mut self) -> Var {
-        let next = self.next;
-        self.next.0 += 1;
-        next
-    }
-
-    pub fn peek_next(&self) -> &Var {
-        &self.next
-    }
-}
-
-impl Default for VarAllocator {
-    fn default() -> Self {
-        Self { next: Var(0) }
-    }
-}
-
-impl From<Var> for VarAllocator {
-    fn from(value: Var) -> Self {
-        Self { next: value }
-    }
-}
 
 bitflags::bitflags! {
     #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]

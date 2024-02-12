@@ -29,6 +29,8 @@ pub enum VmError {
     AttributeNotPresent,
     #[error("assert failed")]
     AssertionFailed,
+    #[error("overflow")]
+    Overflow,
 }
 
 pub type VmResult<T> = Result<T, VmError>;

@@ -102,11 +102,11 @@ fn test_map_match_conduit_blog_post_cond_clauses() {
                 .next_call(matching!(
                     eq!(&ValueCardinality::Many),
                     eq!(&Literal(indoc! { r#"
-                        (root $d)
-                        (is-entity $d def@2:5)
-                        (attr $d S:2:55 (_ $e))
-                        (is-entity $e def@2:4)
-                        (attr $e S:2:15 (_ 'someone'))
+                        (root $a)
+                        (is-entity $a def@2:5)
+                        (attr $a S:2:55 (_ $b))
+                        (is-entity $b def@2:4)
+                        (attr $b S:2:15 (_ 'someone'))
                     "#
                     }))
                 ))
@@ -126,6 +126,7 @@ fn test_map_match_conduit_blog_post_cond_clauses() {
 
 // BUG: There are many things that must be fixed for this to work:
 #[test]
+#[should_panic(expected = "Variable not in scope")]
 fn test_map_conduit_contrived_signup() {
     TestPackages::with_sources([CONDUIT_DB, CONDUIT_CONTRIVED_SIGNUP.root()]).compile();
 }

@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Display};
 
 use ontol_runtime::{
-    condition::Clause, format_utils::AsAlpha, value::Attribute, vm::proc::BuiltinProc,
+    condition::Clause, format_utils::AsAlpha, value::Attribute, var::Var, vm::proc::BuiltinProc,
 };
 use thin_vec::ThinVec;
 
@@ -263,6 +263,10 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
                 self.print_rparen(f, multi)?;
                 Ok(sep.multiline())
             }
+            Kind::LetCondVar(binder_var, cond) => {
+                write!(f, "{indent}(let-cond-var {binder_var} {cond})")?;
+                Ok(Multiline(false))
+            }
             Kind::PushCondClause(var, clause) => {
                 write!(f, "{indent}(push-cond-clause {var}")?;
                 let multi = self.print_all(f, self.indent.indent(), [clause].into_iter())?;
@@ -293,12 +297,12 @@ impl<'h, 'a, L: Lang> Print<PropVariant> for Printer<'h, 'a, L> {
     }
 }
 
-impl<'h, 'a, L: Lang> Print<Clause<EvalCondTerm>> for Printer<'h, 'a, L> {
+impl<'h, 'a, L: Lang> Print<Clause<Var, EvalCondTerm>> for Printer<'h, 'a, L> {
     fn print(
         self,
         f: &mut std::fmt::Formatter,
         sep: Sep,
-        clause: &Clause<EvalCondTerm>,
+        clause: &Clause<Var, EvalCondTerm>,
     ) -> PrintResult {
         write!(f, "{sep}")?;
         match clause {

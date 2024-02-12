@@ -591,7 +591,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     for node_ref in arena.node_refs(nodes) {
                         self.gen_node(node_ref, block);
 
-                        block.pop_until(condition_local, span, self.builder);
+                        // block.pop_until(condition_local, span, self.builder);
                     }
                     self.scope.remove(&binder.hir().var);
                     block.pop_until(condition_local, span, self.builder);
@@ -753,6 +753,15 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 );
                 block.pop_until(before, span, self.builder);
             }
+            ontol_hir::Kind::LetCondVar(bind_var, cond) => {
+                let Ok(cond_local) = self.var_local(*cond, &span) else {
+                    return;
+                };
+
+                block.op(OpCode::CondVar(cond_local), Delta(1), span, self.builder);
+
+                self.scope_insert(*bind_var, self.builder.top(), &span);
+            }
             ontol_hir::Kind::PushCondClause(cond_var, clause) => {
                 let Ok(cond_local) = self.var_local(*cond_var, &span) else {
                     return;
@@ -762,15 +771,19 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
                 match clause {
                     Clause::Root(var) => {
+                        let Ok(local) = self.var_local(*var, &span) else {
+                            return;
+                        };
+
                         block.op(
-                            OpCode::PushCondClause(cond_local, Clause::Root(*var)),
+                            OpCode::PushCondClause(cond_local, Clause::Root(local)),
                             Delta(0),
                             span,
                             self.builder,
                         );
                     }
                     Clause::IsEntity(term, def_id) => {
-                        let term = self.gen_eval_cond_term(term, arena, block);
+                        let term = self.gen_eval_cond_term(term, arena, span, block);
                         block.op(
                             OpCode::PushCondClause(cond_local, Clause::IsEntity(term, *def_id)),
                             Delta(0),
@@ -779,12 +792,16 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                         );
                     }
                     Clause::Attr(var, prop_id, (rel, val)) => {
-                        let rel = self.gen_eval_cond_term(rel, arena, block);
-                        let val = self.gen_eval_cond_term(val, arena, block);
+                        let Ok(local) = self.var_local(*var, &span) else {
+                            return;
+                        };
+
+                        let rel = self.gen_eval_cond_term(rel, arena, span, block);
+                        let val = self.gen_eval_cond_term(val, arena, span, block);
                         block.op(
                             OpCode::PushCondClause(
                                 cond_local,
-                                Clause::Attr(*var, *prop_id, (rel, val)),
+                                Clause::Attr(local, *prop_id, (rel, val)),
                             ),
                             Delta(0),
                             span,
@@ -816,11 +833,15 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
         &mut self,
         term: &EvalCondTerm,
         arena: &TypedArena<'m>,
+        span: SourceSpan,
         block: &mut Block,
     ) -> OpCodeCondTerm {
         match term {
             EvalCondTerm::Wildcard => OpCodeCondTerm::Wildcard,
-            EvalCondTerm::QuoteVar(var) => OpCodeCondTerm::Var(*var),
+            EvalCondTerm::QuoteVar(var) => match self.var_local(*var, &span) {
+                Ok(local) => OpCodeCondTerm::CondVar(local),
+                Err(_) => OpCodeCondTerm::Wildcard,
+            },
             EvalCondTerm::Eval(node) => {
                 self.gen_node(arena.node_ref(*node), block);
                 let top = self.builder.top();
@@ -944,7 +965,10 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
         match self.scope.get(&var) {
             Some(local) => Ok(*local),
             None => {
-                assert!(!span.is_native());
+                assert!(
+                    !span.is_native(),
+                    "var {var} was not in scope, but span is native."
+                );
                 self.errors.error(
                     CompileError::BUG(smart_format!("Variable not in scope")),
                     span,
