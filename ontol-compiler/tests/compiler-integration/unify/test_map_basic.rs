@@ -919,24 +919,32 @@ fn test_map_open_data_on_root_struct() {
 }
 
 #[test]
-// BUG: should work. Sequence label model is wrong.
-// https://gitlab.com/protojour/memoriam/domain-engine/-/issues/63
 fn test_map_spread_concat() {
     "
     def foo (rel .'p0': {text} rel .'p1': {text})
     def bar (rel .'p2': {text})
 
     map(
-        bar match('p0': {..p0}, 'p1': {..p1}),
+        foo match(
+            'p0': { ..p0 },
+            'p1': { ..p1 }
+        ),
         bar(
-            'p2': { // ERROR TODO: Incompatible aggregation group
-                ..p1,
-                ..p0
-            }
+            'p2': { ..p0, ..p1 }
         ),
     )
     "
-    .compile_fail();
+    .compile_then(|test| {
+        let mapper = test
+            .mapper()
+            .with_serde_helper(|type_binding| serde_raw(type_binding).enable_open_data());
+
+        mapper.assert_map_eq(
+            ("foo", "bar"),
+            json!({ "p0": ["a", "b"], "p1": ["c"] }),
+            json!({ "p2": ["a", "b", "c"] }),
+        );
+    });
 }
 
 #[test]

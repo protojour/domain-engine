@@ -79,11 +79,11 @@ map article(
 
 // endpoint '/api/articles'
 map articles(
-    ArticleFilter: filter,
+    ArticleFilter: filter, // ERROR expected named property
     MultipleArticles(
         // The idea is that ArticleFilter can map to many db.Articles,
         // and each db.Article maps to one public.Article.
-        'articles': {..filter}, // ERROR TODO: Incompatible aggregation group
+        'articles': {..filter}, // ERROR TODO: Incompatible aggregation group// ERROR TODO: unable to loop
         'articlesCount': 0 // e.g. `length filter`
     )
 )

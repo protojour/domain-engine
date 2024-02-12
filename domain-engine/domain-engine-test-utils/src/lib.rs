@@ -113,11 +113,10 @@ impl Default for TestFindQuery {
 }
 
 impl domain_engine_core::FindEntitySelect for TestFindQuery {
-    fn find_select(&mut self, match_var: Var, condition: &Condition) -> EntitySelect {
-        let def_id = domain_engine_core::match_utils::find_entity_id_in_condition_for_var(
-            condition, match_var,
-        )
-        .expect("Unable to detect an entity being queried");
+    fn find_select(&mut self, _match_var: Var, condition: &Condition) -> EntitySelect {
+        let def_id = condition
+            .root_def_id()
+            .expect("Unable to detect an entity being queried");
 
         EntitySelect {
             source: StructOrUnionSelect::Struct(StructSelect {

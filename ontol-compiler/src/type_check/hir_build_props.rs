@@ -310,7 +310,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ValueCardinality::Many => match &val.kind {
                         PatternKind::Set { elements, .. } => {
                             let mut hir_set_elements = smallvec![];
-                            let label = *ctx.label_map.get(&val.id).unwrap();
                             let seq_ty = self.types.intern(Type::Seq(rel_params_ty, value_ty));
 
                             for element in elements.iter() {
@@ -324,7 +323,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 );
                                 hir_set_elements.push(ontol_hir::SetEntry(
                                     if element.is_iter {
-                                        Some(TypedHirData(label, Meta::new(seq_ty, prop_span)))
+                                        let Some(label) = ctx.label_map.get(&element.id) else {
+                                            self.error(
+                                                CompileError::TODO(smart_format!("unable to loop")),
+                                                &prop_span,
+                                            );
+                                            return None;
+                                        };
+                                        Some(TypedHirData(*label, Meta::new(seq_ty, prop_span)))
                                     } else {
                                         None
                                     },

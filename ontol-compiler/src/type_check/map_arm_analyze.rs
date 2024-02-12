@@ -7,7 +7,7 @@ use tracing::debug;
 
 use crate::{
     pattern::{
-        CompoundPatternAttrKind, CompoundPatternModifier, PatId, Pattern, PatternKind,
+        CompoundPatternAttrKind, CompoundPatternModifier, Pattern, PatternKind,
         RegexPatternCaptureNode, SetPatternElement,
     },
     types::{TypeRef, ERROR_TYPE},
@@ -35,7 +35,6 @@ impl<'c> PreAnalyzer<'c> {
         parent_aggr_group: Option<SetElementGroup>,
         ctx: &mut HirBuildCtx<'_>,
     ) -> Result<ArmAnalysis, CheckMapError> {
-        let pat_id = pat.id;
         let mut group_set = AggrGroupSet::new();
         let mut arm_class = MapOutputClass::Data;
 
@@ -67,9 +66,6 @@ impl<'c> PreAnalyzer<'c> {
             }
             PatternKind::Set { elements, .. } => {
                 self.analyze_set_pattern_elements(
-                    // TODO: Using the _parent_ pattern pat_id here for registering labels.
-                    // But each element also has a pat_id
-                    pat_id,
                     elements,
                     &pat.span,
                     parent_aggr_group,
@@ -99,108 +95,94 @@ impl<'c> PreAnalyzer<'c> {
 
     fn analyze_set_pattern_elements(
         &mut self,
-        pat_id: PatId,
         elements: &[SetPatternElement],
         pat_span: &SourceSpan,
         parent_aggr_group: Option<SetElementGroup>,
         (group_set, arm_class): (&mut AggrGroupSet, &mut MapOutputClass),
         ctx: &mut HirBuildCtx<'_>,
     ) -> Result<(), CheckMapError> {
-        let contains_iter_element = elements.iter().any(|element| element.is_iter);
-
         if ctx.current_arm.is_first() {
             group_set.add(parent_aggr_group);
 
-            // Register aggregation body
-            let label = Label(ctx.var_allocator.alloc().0);
-            debug!("first arm set: pat_id={pat_id:?}");
-            ctx.ctrl_flow_forest
-                .insert(label, parent_aggr_group.map(|parent| parent.label));
-            ctx.label_map.insert(pat_id, label);
+            for element in elements.iter() {
+                let result = if element.is_iter {
+                    // Register aggregation body
+                    let label = Label(ctx.var_allocator.alloc().0);
+                    debug!("first arm set: pat_id={:?}", element.id);
+                    ctx.ctrl_flow_forest
+                        .insert(label, parent_aggr_group.map(|parent| parent.label));
+                    ctx.label_map.insert(element.id, label);
 
-            ctx.enter_ctrl(|ctx| {
-                for element in elements.iter() {
-                    // TODO: Skip non-iter?
-                    let result = self.analyze_arm(
-                        &element.val,
-                        Some(SetElementGroup {
-                            label,
-                            iterated: element.is_iter,
-                            bind_depth: ctx.current_ctrl_flow_depth(),
-                        }),
-                        ctx,
-                    );
+                    ctx.enter_ctrl(|ctx| {
+                        self.analyze_arm(
+                            &element.val,
+                            Some(SetElementGroup {
+                                label,
+                                iterated: element.is_iter,
+                                bind_depth: ctx.current_ctrl_flow_depth(),
+                            }),
+                            ctx,
+                        )
+                    })
+                } else {
+                    self.analyze_arm(&element.val, parent_aggr_group, ctx)
+                };
 
-                    assert!(result.is_ok());
-                }
-            });
+                // TODO: Skip non-iter?
+
+                assert!(result.is_ok());
+            }
         } else {
             let outer_bind_depth = ctx.current_ctrl_flow_depth();
 
-            let mut inner_aggr_group = AggrGroupSet::new();
-            let mut iter_element_count = 0;
-            let mut iter_match_element_count = 0;
-
             for element in elements.iter() {
+                let mut inner_aggr_group = AggrGroupSet::new();
+
                 if element.is_iter {
-                    iter_element_count += 1;
-                } else if contains_iter_element {
-                    continue;
-                }
+                    ctx.enter_ctrl(|ctx| {
+                        let analysis = self.analyze_arm(&element.val, None, ctx).unwrap();
+                        inner_aggr_group.join(analysis.group_set);
 
-                ctx.enter_ctrl(|ctx| {
-                    let analysis = self.analyze_arm(&element.val, None, ctx).unwrap();
-                    inner_aggr_group.join(analysis.group_set);
-
-                    if !matches!(analysis.class, MapOutputClass::Data) {
-                        // A match directly in an iterated element does not require
-                        // finding an exact aggregation group
-                        iter_match_element_count += 1;
-
-                        *arm_class = MapOutputClass::FilterMatch;
-                    }
-                });
-            }
-
-            ctx.enter_ctrl::<Result<(), CheckMapError>>(|ctx| {
-                match inner_aggr_group.disambiguate(ctx.current_ctrl_flow_depth(), ctx) {
-                    Ok(label) => {
-                        ctx.label_map.insert(pat_id, label);
-
-                        group_set.add(ctx.ctrl_flow_forest.find_parent(label).map(|label| {
-                            SetElementGroup {
-                                label,
-                                iterated: true,
-                                bind_depth: outer_bind_depth,
-                            }
-                        }));
-                        Ok(())
-                    }
-                    Err(error) => {
-                        if iter_element_count > 0 && iter_element_count > iter_match_element_count {
-                            debug!("Failure: {error:?}");
-
-                            self.error(
-                                CompileError::TODO(smart_format!("Incompatible aggregation group")),
-                                pat_span,
-                            );
-                            Err(error)
-                        } else {
-                            // Since there's no iteration (or all the iterations are `match`) this is considered OK.
-                            // FIXME: But a `match` can still iterate on variables.
-                            // So the logic here has to be improved.
-
-                            let label = Label(ctx.var_allocator.alloc().0);
-                            debug!("first arm set: pat_id={pat_id:?}");
-                            ctx.ctrl_flow_forest
-                                .insert(label, parent_aggr_group.map(|parent| parent.label));
-                            ctx.label_map.insert(pat_id, label);
-
-                            Ok(())
+                        if !matches!(analysis.class, MapOutputClass::Data) {
+                            *arm_class = MapOutputClass::FilterMatch;
                         }
-                    }
+
+                        match inner_aggr_group.disambiguate(ctx.current_ctrl_flow_depth(), ctx) {
+                            Ok(label) => {
+                                ctx.label_map.insert(element.id, label);
+
+                                group_set.add(ctx.ctrl_flow_forest.find_parent(label).map(
+                                    |label| SetElementGroup {
+                                        label,
+                                        iterated: true,
+                                        bind_depth: outer_bind_depth,
+                                    },
+                                ));
+                            }
+                            Err(_) => {
+                                if matches!(*arm_class, MapOutputClass::FilterMatch) {
+                                    let label = Label(ctx.var_allocator.alloc().0);
+                                    debug!("FALLBACK first arm set: pat_id={:?}", element.id);
+                                    ctx.ctrl_flow_forest.insert(
+                                        label,
+                                        parent_aggr_group.map(|parent| parent.label),
+                                    );
+                                    ctx.label_map.insert(element.id, label);
+                                } else {
+                                    self.error(
+                                        CompileError::TODO(smart_format!(
+                                            "Incompatible aggregation group"
+                                        )),
+                                        pat_span,
+                                    );
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    self.analyze_arm(&element.val, None, ctx).unwrap();
                 }
-            })?
+            }
         }
 
         Ok(())

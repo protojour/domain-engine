@@ -263,7 +263,7 @@ fn sub_plans(
 fn prop_set_plans(
     set_var: Var,
     target: DefId,
-    mut clauses: &[&Clause<Var, CondTerm>],
+    clauses: &[&Clause<Var, CondTerm>],
     builder: &mut PlanBuilder,
 ) -> PlanResult<Set<PlanEntry>> {
     let mut plans = thin_vec![];
@@ -283,7 +283,7 @@ fn prop_set_plans(
 
 fn attr_set_plans(
     _set_var: Var,
-    target: (Option<DefId>, DefId),
+    _target: (Option<DefId>, DefId),
     _clauses: &[&Clause<Var, CondTerm>],
     _builder: &mut PlanBuilder,
 ) -> PlanResult<Set<Attribute<PlanEntry>>> {

@@ -26,7 +26,7 @@ use crate::{
     type_check::seal::SealCtx,
     typed_hir::{arena_import, Meta, TypedHir, TypedHirData, TypedNodeRef},
     types::{Type, Types, UNIT_TYPE},
-    CompileErrors, Compiler, NO_SPAN,
+    CompileError, CompileErrors, Compiler, NO_SPAN,
 };
 
 use super::{
@@ -515,7 +515,10 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             if let Some(label) = label {
                 let label = *label.hir();
                 let Some(scope_attr) = self.iter_extended_scope_table.get(&label).cloned() else {
-                    // panic!("set prop: no iteration source");
+                    self.errors.error(
+                        CompileError::TODO(smart_format!("no iteration source")),
+                        &seq_meta.span,
+                    );
                     return Ok(smallvec![]);
                 };
                 let free_vars = scan_immediate_free_vars(self.expr_arena, [*rel, *val]);
@@ -864,7 +867,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     };
 
                     let target_seq_var = self.var_allocator.alloc();
-                    let push = {
+                    let insert = {
                         self.mk_node(
                             Kind::Insert(
                                 target_seq_var,
@@ -890,7 +893,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                                     Meta::new(rel_from, span),
                                 )),
                             ),
-                            [push].into_iter().collect(),
+                            [insert].into_iter().collect(),
                         ),
                         Meta::new(&UNIT_TYPE, span),
                     );

@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use ontol_hir::StructFlags;
+use ontol_hir::{Label, StructFlags};
 use ontol_runtime::{smart_format, value::Attribute};
 use smallvec::SmallVec;
 use thin_vec::{thin_vec, ThinVec};
@@ -260,7 +260,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 let pat_element = elements.iter().next().unwrap();
                                 if let PatternKind::Regex(regex_pattern) = &pat_element.val.kind {
                                     if pat_element.is_iter {
-                                        let label = *ctx.label_map.get(&pattern.id).unwrap();
+                                        let label = *ctx.label_map.get(&pat_element.id).unwrap();
 
                                         let capture_groups_list = self
                                             .build_regex_capture_alternations(
@@ -273,7 +273,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         return ctx.mk_node(
                                             ontol_hir::Kind::Regex(
                                                 Some(TypedHirData(
-                                                    label,
+                                                    Label(label.0),
                                                     Meta {
                                                         ty: other_ty,
                                                         span: NO_SPAN,
@@ -326,22 +326,29 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     );
                 }
 
+                let first_element = elements.iter().next().unwrap();
+
                 let rel = ctx.mk_unit_node_no_span();
                 let val = self.build_node(
-                    &elements.iter().next().unwrap().val,
+                    &first_element.val,
                     NodeInfo {
                         expected_ty: Some((val_ty, Strength::Strong)),
                         parent_struct_flags: node_info.parent_struct_flags,
                     },
                     ctx,
                 );
-                let label = *ctx.label_map.get(&pattern.id).unwrap();
+                let Some(label) = ctx.label_map.get(&first_element.id) else {
+                    panic!("No label for pattern element");
+                };
                 let seq_ty = self.types.intern(Type::Seq(rel_ty, val_ty));
 
                 ctx.mk_node(
                     ontol_hir::Kind::Set(
                         [ontol_hir::SetEntry(
-                            Some(label.with_ty(seq_ty)),
+                            Some(TypedHirData(
+                                Label(label.0),
+                                Meta::new(seq_ty, pattern.span),
+                            )),
                             Attribute { rel, val },
                         )]
                         .into(),
@@ -612,7 +619,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             );
 
             let label = if element.is_iter {
-                let label = ctx.label_map.get(&element.id).expect("No label found");
+                let Some(label) = ctx.label_map.get(&element.id) else {
+                    panic!("No label found for element id {:?}", element.id);
+                };
                 Some(TypedHirData(
                     *label,
                     Meta {

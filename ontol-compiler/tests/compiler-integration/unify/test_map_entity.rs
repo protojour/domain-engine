@@ -280,7 +280,7 @@ fn test_map_invert() {
                 dev.language(
                     'id': tech_id,
                     'name': tech_name,
-                    'developers': {..dev.developer( // ERROR TODO: Incompatible aggregation group
+                    'developers': {..dev.developer( // ERROR TODO: Incompatible aggregation group// ERROR TODO: unable to loop
                         'id': p_id,
                         'name': p_name,
                     )}

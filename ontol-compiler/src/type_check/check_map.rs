@@ -64,7 +64,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             let _entered = arm.tracing_debug_span().entered();
 
             ctx.current_arm = arm;
-            analyzer.analyze_arm(self.patterns.table.get(pat_id).unwrap(), None, &mut ctx)?;
+
+            let pattern = self.patterns.table.get(pat_id).unwrap();
+            analyzer.analyze_arm(pattern, None, &mut ctx)?;
         }
 
         self.build_typed_ontol_hir_arms(
