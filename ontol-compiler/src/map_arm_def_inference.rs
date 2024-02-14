@@ -114,6 +114,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
             PatternKind::Variable(_) => todo!(),
             PatternKind::ConstI64(_) => todo!(),
             PatternKind::ConstText(_) => todo!(),
+            PatternKind::ConstBool(_) => todo!(),
             PatternKind::Regex(_) => todo!(),
         }
     }
@@ -196,6 +197,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
             PatternKind::ConstI64(_) => todo!(),
             PatternKind::Regex(_) => todo!(),
             PatternKind::ConstText(_) => todo!(),
+            PatternKind::ConstBool(_) => todo!(),
         }
     }
 
@@ -323,6 +325,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
             PatternKind::ConstI64(_) => {}
             PatternKind::Regex(_) => {}
             PatternKind::ConstText(_) => {}
+            PatternKind::ConstBool(_) => {}
         }
     }
 

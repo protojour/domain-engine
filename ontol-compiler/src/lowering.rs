@@ -1051,6 +1051,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                 Ok(self.mk_pattern(PatternKind::Call(def_id, Box::new([left, right])), &span))
             }
+            ast::ExprPattern::BooleanLiteral(bool) => {
+                Ok(self.mk_pattern(PatternKind::ConstBool(bool), &span))
+            }
             ast::ExprPattern::Variable(var_ident) => {
                 self.lower_map_variable(var_ident, span, var_table)
             }

@@ -285,6 +285,20 @@ fn test_integer_default() {
 }
 
 #[test]
+fn test_boolean_default() {
+    "
+    def foo (
+        rel .'active'[rel .default := true]: boolean
+    )
+    "
+    .compile_then(|test| {
+        let [foo] = test.bind(["foo"]);
+        assert_json_io_matches!(serde_create(&foo), { "active": false } == { "active": false });
+        assert_json_io_matches!(serde_create(&foo), {} == { "active": true });
+    });
+}
+
+#[test]
 fn test_i64_range_constrained() {
     "
     def percentage (

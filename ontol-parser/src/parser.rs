@@ -390,14 +390,14 @@ fn set_pattern(
 
 fn expr_pattern() -> impl AstParser<Spanned<ExprPattern>> {
     recursive(|expr_pattern| {
-        let variable = variable().map(ExprPattern::Variable);
+        let symbol_pattern = symbol_pattern();
         let number_literal = number_literal().map(ExprPattern::NumberLiteral);
         let text_literal = text_literal().map(ExprPattern::TextLiteral);
         let regex_literal =
             select! { Token::Regex(string) => string }.map(ExprPattern::RegexLiteral);
         let group = expr_pattern.delimited_by(open('('), close(')'));
 
-        let atom = spanned(variable)
+        let atom = spanned(symbol_pattern)
             .or(spanned(number_literal))
             .or(spanned(text_literal))
             .or(spanned(regex_literal))
@@ -620,8 +620,12 @@ fn ident() -> impl AstParser<String> {
     select! { Token::Sym(ident) => ident }.labelled("identifier")
 }
 
-fn variable() -> impl AstParser<String> {
-    select! { Token::Sym(ident) => ident }.labelled("variable")
+fn symbol_pattern() -> impl AstParser<ExprPattern> {
+    select! {
+    Token::Sym(ident) if ident == "true" => ExprPattern::BooleanLiteral(true),
+    Token::Sym(ident) if ident == "false" => ExprPattern::BooleanLiteral(false),
+    Token::Sym(ident) => ExprPattern::Variable(ident) }
+    .labelled("symbol")
 }
 
 fn number_literal() -> impl AstParser<String> {

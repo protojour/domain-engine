@@ -384,6 +384,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
                 _ => self.error_node(CompileError::IncompatibleLiteral, &pattern.span, ctx),
             },
+            (PatternKind::ConstBool(bool), Some(expected_ty)) => match expected_ty {
+                (Type::Primitive(PrimitiveKind::Boolean, _), _strengt) => ctx.mk_node(
+                    ontol_hir::Kind::I64(if *bool { 1 } else { 0 }),
+                    Meta {
+                        ty: expected_ty.0,
+                        span: pattern.span,
+                    },
+                ),
+                _ => self.error_node(CompileError::IncompatibleLiteral, &pattern.span, ctx),
+            },
             (PatternKind::ConstText(literal), Some(expected_ty)) => match expected_ty {
                 (Type::Primitive(PrimitiveKind::Text, _), _strength) => ctx.mk_node(
                     ontol_hir::Kind::Text(literal.clone()),

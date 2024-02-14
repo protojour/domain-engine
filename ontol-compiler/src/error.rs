@@ -36,6 +36,7 @@ pub enum CompileError {
     NamespaceNotFound,
     InvalidType,
     InvalidInteger,
+    InvalidBoolean,
     DomainTypeExpected,
     InvalidRelationType,
     DuplicateAnonymousRelationship,
@@ -121,6 +122,7 @@ impl std::fmt::Display for CompileError {
             Self::NamespaceNotFound => write!(f, "namespace not found"),
             Self::InvalidType => write!(f, "invalid type"),
             Self::InvalidInteger => write!(f, "invalid integer"),
+            Self::InvalidBoolean => write!(f, "invalid boolean"),
             Self::DomainTypeExpected => write!(f, "expected domain type"),
             Self::InvalidRelationType => write!(f, "invalid relation type"),
             Self::DuplicateAnonymousRelationship => {

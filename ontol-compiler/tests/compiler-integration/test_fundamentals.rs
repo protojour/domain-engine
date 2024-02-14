@@ -100,18 +100,6 @@ fn can_refer_to_future_definitions() {
 }
 
 #[test]
-// BUG: .default expected to work for booleans
-#[should_panic = "variable not found"]
-fn default_for_boolean() {
-    "
-    def foo (
-        rel .'active'[rel .default := true]: boolean
-    )
-    "
-    .compile_fail();
-}
-
-#[test]
 // BUG: a doc comment expects a def, rel, fmt or map to follow,
 // but having a commented-out section at the end can occur during deveopment.
 // This can get very confusing, as the compiler doesn't know where to put the error,

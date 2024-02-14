@@ -180,6 +180,7 @@ pub struct SetPatternElement {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum ExprPattern {
     Variable(String),
+    BooleanLiteral(bool),
     NumberLiteral(String),
     TextLiteral(String),
     RegexLiteral(String),

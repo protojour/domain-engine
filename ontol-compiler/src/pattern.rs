@@ -41,6 +41,7 @@ pub enum PatternKind {
     Variable(Var),
     ConstI64(i64),
     ConstText(String),
+    ConstBool(bool),
     Regex(RegexPattern),
 }
 
