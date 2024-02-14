@@ -527,6 +527,44 @@ fn test_serde_with_raw_id_overridde_profile() {
 }
 
 #[test]
+fn test_serde_with_raw_prefix_text_id_overridde_profile() {
+    let processor_profile = ProcessorProfile {
+        overridden_id_property_key: Some("__ID"),
+        ignored_property_keys: &[],
+        id_format: ScalarFormat::RawText,
+        flags: ProcessorProfileFlags::empty(),
+    };
+
+    "
+    def baz (
+        rel .'prefix_id'|id: (
+            fmt '' => 'prefix/' => text => .
+        )
+    )
+    "
+    .compile_then(|test| {
+        let [baz] = test.bind(["baz"]);
+
+        let baz_value = serde_create(&baz)
+            .with_profile(processor_profile.clone())
+            .to_value_raw(json!({ "__ID": "mytext" }))
+            .unwrap();
+
+        expect_eq!(
+            actual = ontol_test_utils::serde_helper::serde_create(&baz)
+                .with_profile(processor_profile.clone())
+                .as_json(&baz_value),
+            expected = json!({ "__ID": "mytext" })
+        );
+
+        expect_eq!(
+            actual = serde_create(&baz).as_json(&baz_value),
+            expected = json!({ "prefix_id": "prefix/mytext" }),
+        );
+    });
+}
+
+#[test]
 fn test_serde_open_properties() {
     "
     def(open) foo (

@@ -10,8 +10,8 @@ use crate::{
     ontology::Ontology,
     text_like_types::ParseError,
     text_pattern::{TextPattern, TextPatternConstantPart},
-    value::Value,
-    DefId,
+    value::{Attribute, PropertyId, Value},
+    DefId, RelationshipId, Role,
 };
 
 use super::{
@@ -275,25 +275,43 @@ impl<'on> ValueMatcher for CapturingTextPatternMatcher<'on> {
                 let mut attrs = FnvHashMap::default();
 
                 for part in &self.pattern.constant_parts {
-                    if let TextPatternConstantPart::Property(property) = part {
-                        if !attrs.is_empty() {
-                            error!("A value was already read");
-                            return Err(());
+                    match part {
+                        TextPatternConstantPart::Property(property) => {
+                            if !attrs.is_empty() {
+                                error!("A value was already read");
+                                return Err(());
+                            }
+
+                            let type_info = self.ontology.get_type_info(property.type_def_id);
+                            let processor = self.ontology.new_serde_processor(
+                                type_info
+                                    .operator_addr
+                                    .expect("No operator addr for pattern constant part"),
+                                ProcessorMode::Create,
+                            );
+
+                            let attribute = processor
+                                .deserialize(StrDeserializer::<serde_json::Error>::new(str))
+                                .map_err(|_| ())?;
+
+                            attrs.insert(property.property_id, attribute);
                         }
+                        TextPatternConstantPart::AllStrings { .. } => {
+                            let text_def_id = self.ontology.ontol_domain_meta.text;
+                            let property_id = PropertyId {
+                                role: Role::Subject,
+                                relationship_id: RelationshipId(text_def_id),
+                            };
 
-                        let type_info = self.ontology.get_type_info(property.type_def_id);
-                        let processor = self.ontology.new_serde_processor(
-                            type_info
-                                .operator_addr
-                                .expect("No operator addr for pattern constant part"),
-                            ProcessorMode::Create,
-                        );
-
-                        let attribute = processor
-                            .deserialize(StrDeserializer::<serde_json::Error>::new(str))
-                            .map_err(|_| ())?;
-
-                        attrs.insert(property.property_id, attribute);
+                            attrs.insert(
+                                property_id,
+                                Attribute {
+                                    rel: Value::unit(),
+                                    val: Value::Text(str.into(), text_def_id),
+                                },
+                            );
+                        }
+                        TextPatternConstantPart::Literal(_) => {}
                     }
                 }
 
