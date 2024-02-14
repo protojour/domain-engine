@@ -190,11 +190,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         match variant_ty {
             Type::Primitive(PrimitiveKind::Unit, def_id) => builder.unit = Some(*def_id),
             Type::Primitive(PrimitiveKind::I64, _) => {
-                // builder.number = Some(VariantKeyed {
-                //     key,
-                //     value: IntDiscriminator(variant_def),
-                // });
-                builder.number2 = IntDiscriminator2::Any(variant_def);
+                builder.number = IntDiscriminator::Any(variant_def);
             }
             Type::Primitive(PrimitiveKind::Text, _) => {
                 builder.string = TextDiscriminator::Any(variant_def);
@@ -207,9 +203,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let string_literal = self.defs.get_string_representation(*def_id);
                 builder.add_text_literal(key, string_literal, *def_id);
             }
-            Type::IntConstant(int) => match &mut builder.number2 {
-                IntDiscriminator2::None => {
-                    builder.number2 = IntDiscriminator2::Literals(
+            Type::IntConstant(int) => match &mut builder.number {
+                IntDiscriminator::None => {
+                    builder.number = IntDiscriminator::Literals(
                         [VariantKeyed {
                             key: VariantKey::Instance,
                             value: (*int, variant_def),
@@ -217,8 +213,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         .into(),
                     )
                 }
-                IntDiscriminator2::Any(_) => {}
-                IntDiscriminator2::Literals(ints) => {
+                IntDiscriminator::Any(_) => {}
+                IntDiscriminator::Literals(ints) => {
                     ints.insert(VariantKeyed {
                         key: VariantKey::Instance,
                         value: (*int, variant_def),
@@ -501,25 +497,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             })
         }
 
-        // if let Some(number) = builder.number {
-        //     union_discriminator.variants.push(VariantDiscriminator {
-        //         discriminant: Discriminant::MatchesLeaf(LeafDiscriminant::IsInt),
-        //         // BUG: Should not be DefId::unit:
-        //         purpose: discriminator_type.into_purpose(&VariantKey::Instance),
-        //         serde_def: SerdeDef::new(number.value.0, SerdeModifier::NONE),
-        //     })
-        // }
-
-        match builder.number2 {
-            IntDiscriminator2::None => {}
-            IntDiscriminator2::Any(def_id) => {
+        match builder.number {
+            IntDiscriminator::None => {}
+            IntDiscriminator::Any(def_id) => {
                 union_discriminator.variants.push(VariantDiscriminator {
                     discriminant: Discriminant::MatchesLeaf(LeafDiscriminant::IsInt),
                     purpose: discriminator_type.into_purpose(&VariantKey::Instance),
                     serde_def: SerdeDef::new(def_id, SerdeModifier::NONE),
                 });
             }
-            IntDiscriminator2::Literals(literals) => {
+            IntDiscriminator::Literals(literals) => {
                 for keyed in literals {
                     let (literal, def_id) = keyed.value;
                     union_discriminator.variants.push(VariantDiscriminator {
@@ -634,8 +621,7 @@ enum DomainTypeMatchData<'a> {
 #[derive(Default, Debug)]
 struct DiscriminatorBuilder<'a> {
     unit: Option<DefId>,
-    // number: Option<VariantKeyed<IntDiscriminator>>,
-    number2: IntDiscriminator2,
+    number: IntDiscriminator,
     any_string: Vec<VariantKeyed<DefId>>,
     string: TextDiscriminator,
     sequence: Option<VariantKeyed<DefId>>,
@@ -717,11 +703,8 @@ struct VariantKeyed<T> {
     value: T,
 }
 
-#[derive(Debug)]
-struct IntDiscriminator(DefId);
-
 #[derive(Default, Debug)]
-enum IntDiscriminator2 {
+enum IntDiscriminator {
     #[default]
     None,
     Any(DefId),
