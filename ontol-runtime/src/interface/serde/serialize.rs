@@ -306,6 +306,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
     ) -> Res<S> {
         let attributes = match value {
             Value::Struct(attributes, _) => attributes,
+            Value::StructUpdate(attributes, _) => attributes,
             // Support for empty structs that are Unit encoded:
             Value::Unit(_) => return serializer.serialize_map(Some(0))?.end(),
             other => panic!("BUG: Serialize expected map attributes, got {other:?}"),
