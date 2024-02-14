@@ -21,6 +21,7 @@ use tracing::debug;
 use crate::core::{DynamicKey, EdgeCollection, EntityTable, InMemoryStore};
 
 mod core;
+// mod filter;
 mod filter;
 mod query;
 mod write;

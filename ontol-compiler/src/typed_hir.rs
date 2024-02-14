@@ -291,8 +291,8 @@ pub fn arena_import<'m>(
             *meta,
         )),
         LetCondVar(bind_var, cond) => target.add(TypedHirData(LetCondVar(*bind_var, *cond), *meta)),
-        PushCondClause(var, clause) => {
-            target.add(TypedHirData(PushCondClause(*var, clause.clone()), *meta))
+        PushCondClauses(var, clauses) => {
+            target.add(TypedHirData(PushCondClauses(*var, clauses.clone()), *meta))
         }
     }
 }

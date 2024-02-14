@@ -270,7 +270,7 @@ where
                 var_set
             }
             ontol_hir::Kind::Regex(..)
-            | ontol_hir::Kind::PushCondClause(..)
+            | ontol_hir::Kind::PushCondClauses(..)
             | ontol_hir::Kind::MoveRestAttrs(..)
             | ontol_hir::Kind::CopySubSeq(..)
             | ontol_hir::Kind::LetCondVar(..) => VarSet::default(),

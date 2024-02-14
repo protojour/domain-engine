@@ -4,7 +4,7 @@ use bit_set::BitSet;
 use fnv::FnvHashMap;
 use ontol_hir::{EvalCondTerm, PropVariant, StructFlags};
 use ontol_runtime::{
-    condition::Clause,
+    condition::{Clause, ClausePair},
     ontology::{MapLossiness, ValueCardinality},
     smart_format,
     value::{Attribute, PropertyId},
@@ -762,84 +762,40 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
                 self.scope_insert(*bind_var, self.builder.top(), &span);
             }
-            ontol_hir::Kind::PushCondClause(cond_var, clause) => {
+            ontol_hir::Kind::PushCondClauses(cond_var, clauses) => {
                 let Ok(cond_local) = self.var_local(*cond_var, &span) else {
                     return;
                 };
 
                 let before = self.builder.top();
 
-                match clause {
-                    Clause::Root(var) => {
-                        let Ok(local) = self.var_local(*var, &span) else {
-                            return;
-                        };
+                for ClausePair(var, clause_op) in clauses {
+                    let vm_clause_op = match clause_op {
+                        Clause::Root => Clause::Root,
+                        Clause::IsEntity(def_id) => Clause::IsEntity(*def_id),
+                        Clause::MatchProp(prop_id, set_operator, set_var) => {
+                            let Ok(set_local) = self.var_local(*set_var, &span) else {
+                                return;
+                            };
+                            Clause::MatchProp(*prop_id, *set_operator, set_local)
+                        }
+                        Clause::Member(rel, val) => {
+                            let rel = self.gen_eval_cond_term(rel, arena, span, block);
+                            let val = self.gen_eval_cond_term(val, arena, span, block);
+                            Clause::Member(rel, val)
+                        }
+                    };
 
-                        block.op(
-                            OpCode::PushCondClause(cond_local, Clause::Root(local)),
-                            Delta(0),
-                            span,
-                            self.builder,
-                        );
-                    }
-                    Clause::IsEntity(term, def_id) => {
-                        let term = self.gen_eval_cond_term(term, arena, span, block);
-                        block.op(
-                            OpCode::PushCondClause(cond_local, Clause::IsEntity(term, *def_id)),
-                            Delta(0),
-                            span,
-                            self.builder,
-                        );
-                    }
-                    Clause::Attr(var, prop_id, (rel, val)) => {
-                        let Ok(local) = self.var_local(*var, &span) else {
-                            return;
-                        };
+                    let Ok(clause_local) = self.var_local(*var, &span) else {
+                        return;
+                    };
 
-                        let rel = self.gen_eval_cond_term(rel, arena, span, block);
-                        let val = self.gen_eval_cond_term(val, arena, span, block);
-                        block.op(
-                            OpCode::PushCondClause(
-                                cond_local,
-                                Clause::Attr(local, *prop_id, (rel, val)),
-                            ),
-                            Delta(0),
-                            span,
-                            self.builder,
-                        );
-                    }
-                    Clause::MatchProp(var, prop_id, set_operator, set_var) => {
-                        let Ok(struct_local) = self.var_local(*var, &span) else {
-                            return;
-                        };
-                        let Ok(set_local) = self.var_local(*set_var, &span) else {
-                            return;
-                        };
-                        block.op(
-                            OpCode::PushCondClause(
-                                cond_local,
-                                Clause::MatchProp(struct_local, *prop_id, *set_operator, set_local),
-                            ),
-                            Delta(0),
-                            span,
-                            self.builder,
-                        );
-                    }
-                    Clause::Member(set_var, (rel, val)) => {
-                        let Ok(local) = self.var_local(*set_var, &span) else {
-                            return;
-                        };
-                        let rel = self.gen_eval_cond_term(rel, arena, span, block);
-                        let val = self.gen_eval_cond_term(val, arena, span, block);
-                        block.op(
-                            OpCode::PushCondClause(cond_local, Clause::Member(local, (rel, val))),
-                            Delta(0),
-                            span,
-                            self.builder,
-                        );
-                    }
-                    Clause::Eq(..) => todo!(),
-                    Clause::Or(_) => todo!(),
+                    block.op(
+                        OpCode::PushCondClause(cond_local, ClausePair(clause_local, vm_clause_op)),
+                        Delta(0),
+                        span,
+                        self.builder,
+                    );
                 }
 
                 block.pop_until(before, span, self.builder);

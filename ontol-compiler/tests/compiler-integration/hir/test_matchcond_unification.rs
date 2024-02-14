@@ -22,7 +22,7 @@ fn test_unify_matchcond_empty() {
         |$b| (block
             (match-struct ($d)
                 (let-cond-var $c $d)
-                (push-cond-clause $d
+                (push-cond-clauses $d
                     (root '$c)
                 )
             )
@@ -55,11 +55,13 @@ fn test_unify_matchcond_single_prop() {
             (let-prop $_ $a ($b S:1:0))
             (match-struct ($e)
                 (let-cond-var $c $e)
-                (push-cond-clause $e
+                (push-cond-clauses $e
                     (root '$c)
                 )
-                (push-cond-clause $e
-                    (attr '$c O:1:0 (_ $a))
+                (let-cond-var $f $e)
+                (push-cond-clauses $e
+                    (match-prop '$c O:1:0 element-in '$f)
+                    (member '$f (_ $a))
                 )
             )
         )"
@@ -99,15 +101,19 @@ fn test_unify_matchcond_struct_in_struct() {
             (let-prop $_ $b ($c S:1:1))
             (match-struct ($g)
                 (let-cond-var $d $g)
-                (push-cond-clause $g
+                (push-cond-clauses $g
                     (root '$d)
                 )
                 (let-cond-var $e $g)
-                (push-cond-clause $g
-                    (attr '$d O:1:0 (_ '$e))
+                (let-cond-var $i $g)
+                (push-cond-clauses $g
+                    (match-prop '$d O:1:0 element-in '$i)
+                    (member '$i (_ '$e))
                 )
-                (push-cond-clause $g
-                    (attr '$e O:2:0 ($a $b))
+                (let-cond-var $h $g)
+                (push-cond-clauses $g
+                    (match-prop '$e O:2:0 element-in '$h)
+                    (member '$h ($a $b))
                 )
             )
         )"
@@ -162,33 +168,38 @@ fn test_unify_matchcond_element_in() {
             (let-prop-default $_ $f ($c S:1:1) #u #u)
             (match-struct ($s)
                 (let-cond-var $d $s)
-                (push-cond-clause $s
+                (push-cond-clauses $s
                     (root '$d)
                 )
                 (let-cond-var $t $s)
-                (push-cond-clause $s
-                    (match-prop '$d O:1:0 element-in '$t))
+                (push-cond-clauses $s
+                    (match-prop '$d O:1:0 element-in '$t)
+                )
                 (for-each $e ($_ $a)
                     (let-cond-var $q $s)
-                    (push-cond-clause $s
+                    (push-cond-clauses $s
                         (member '$t (_ '$q))
                     )
-                    (catch (@u)
-                        (let? @u $v $a)
-                        (push-cond-clause $s
-                            (attr '$q O:2:0 (_ $v))
+                    (catch (@v)
+                        (let? @v $w $a)
+                        (let-cond-var $u $s)
+                        (push-cond-clauses $s
+                            (match-prop '$q O:2:0 element-in '$u)
+                            (member '$u (_ $w))
                         )
                     )
                 )
                 (for-each $f ($_ $b)
                     (let-cond-var $r $s)
-                    (push-cond-clause $s
+                    (push-cond-clauses $s
                         (member '$t (_ '$r))
                     )
-                    (catch (@w)
-                        (let? @w $x $b)
-                        (push-cond-clause $s
-                            (attr '$r O:2:0 (_ $x))
+                    (catch (@y)
+                        (let? @y $z $b)
+                        (let-cond-var $x $s)
+                        (push-cond-clauses $s
+                            (match-prop '$r O:2:0 element-in '$x)
+                            (member '$x (_ $z))
                         )
                     )
                 )

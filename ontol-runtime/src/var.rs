@@ -11,6 +11,18 @@ use crate::format_utils::{try_alpha_to_u32, AsAlpha, DebugViaDisplay};
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct Var(pub u32);
 
+impl Var {
+    /// Construct a sequence of vars, starting with `$a`
+    pub fn sequence<const N: usize>() -> [Var; N] {
+        let mut counter: u32 = 0;
+        [(); N].map(|_| {
+            let var = Var(counter);
+            counter += 1;
+            var
+        })
+    }
+}
+
 impl From<u32> for Var {
     fn from(value: u32) -> Self {
         Self(value)

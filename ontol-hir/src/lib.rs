@@ -4,7 +4,7 @@ use std::fmt::{Debug, Display};
 
 use arena::{Arena, NodeRef};
 use ontol_runtime::{
-    condition::{Clause, SetOperator},
+    condition::{ClausePair, SetOperator},
     value::{Attribute, PropertyId},
     var::Var,
     vm::proc::BuiltinProc,
@@ -193,7 +193,7 @@ pub enum Kind<'a, L: Lang> {
         ThinVec<ThinVec<CaptureGroup<'a, L>>>,
     ),
     LetCondVar(Var, Var),
-    PushCondClause(Var, Clause<Var, EvalCondTerm>),
+    PushCondClauses(Var, ThinVec<ClausePair<Var, EvalCondTerm>>),
 }
 
 #[derive(Clone)]

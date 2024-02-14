@@ -199,7 +199,7 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                 self.visit_binder(*bind_var);
                 self.visit_var(*cond);
             }
-            Kind::PushCondClause(var, _) => {
+            Kind::PushCondClauses(var, _clauses) => {
                 self.visit_var(*var);
             }
         }

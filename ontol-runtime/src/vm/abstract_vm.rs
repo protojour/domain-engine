@@ -6,7 +6,7 @@ use super::{
     VmResult,
 };
 use crate::{
-    condition::Clause,
+    condition::ClausePair,
     ontology::{Ontology, ValueCardinality},
     value::PropertyId,
     var::Var,
@@ -87,7 +87,7 @@ pub trait Processor {
     fn push_cond_clause(
         &mut self,
         cond_local: Local,
-        clause: &Clause<Local, OpCodeCondTerm>,
+        clause: &ClausePair<Local, OpCodeCondTerm>,
     ) -> VmResult<()>;
     fn yield_match_condition(
         &mut self,

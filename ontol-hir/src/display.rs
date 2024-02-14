@@ -1,7 +1,11 @@
 use std::fmt::{Debug, Display};
 
 use ontol_runtime::{
-    condition::Clause, format_utils::AsAlpha, value::Attribute, var::Var, vm::proc::BuiltinProc,
+    condition::{Clause, ClausePair},
+    format_utils::AsAlpha,
+    value::Attribute,
+    var::Var,
+    vm::proc::BuiltinProc,
 };
 use thin_vec::ThinVec;
 
@@ -267,10 +271,10 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
                 write!(f, "{indent}(let-cond-var {binder_var} {cond})")?;
                 Ok(Multiline(false))
             }
-            Kind::PushCondClause(var, clause) => {
-                write!(f, "{indent}(push-cond-clause {var}")?;
-                let multi = self.print_all(f, self.indent.indent(), [clause].into_iter())?;
-                self.print_rparen(f, multi)?;
+            Kind::PushCondClauses(var, clauses) => {
+                write!(f, "{indent}(push-cond-clauses {var}")?;
+                self.print_all(f, Sep::Space, clauses.iter())?;
+                self.print_rparen(f, Multiline(true))?;
                 Ok(Multiline(true))
             }
         }
@@ -297,47 +301,38 @@ impl<'h, 'a, L: Lang> Print<PropVariant> for Printer<'h, 'a, L> {
     }
 }
 
-impl<'h, 'a, L: Lang> Print<Clause<Var, EvalCondTerm>> for Printer<'h, 'a, L> {
+impl<'h, 'a, L: Lang> Print<ClausePair<Var, EvalCondTerm>> for Printer<'h, 'a, L> {
     fn print(
         self,
         f: &mut std::fmt::Formatter,
-        sep: Sep,
-        clause: &Clause<Var, EvalCondTerm>,
+        _sep: Sep,
+        clause: &ClausePair<Var, EvalCondTerm>,
     ) -> PrintResult {
-        write!(f, "{sep}")?;
-        match clause {
-            Clause::Root(var) => {
+        let indent = self.indent;
+        write!(f, "{indent}")?;
+
+        let var = clause.0;
+        match &clause.1 {
+            Clause::Root => {
                 write!(f, "(root '{var})")?;
                 Ok(Multiline(true))
             }
-            Clause::IsEntity(term, def_id) => {
-                write!(f, "(is-entity")?;
-                self.print(f, Sep::Space, term)?;
-                write!(f, " {def_id:?})")?;
-
-                Ok(Multiline(false))
-            }
-            Clause::Attr(var, prop_id, (rel, val)) => {
-                write!(f, "(attr '{var} {prop_id} (")?;
-                let multi = self.print_all(f, Sep::None, [rel, val].into_iter())?;
-                self.print_rparen(f, multi)?;
-                self.print_rparen(f, multi)?;
+            Clause::IsEntity(def_id) => {
+                write!(f, "(is-entity {var} {def_id:?})")?;
                 Ok(Multiline(true))
             }
-            Clause::MatchProp(var, prop_id, operator, set_var) => {
+            Clause::MatchProp(prop_id, operator, set_var) => {
                 write!(f, "(match-prop '{var} {prop_id} {operator} '{set_var}")?;
                 self.print_rparen(f, Multiline(false))?;
-                Ok(Multiline(false))
+                Ok(Multiline(true))
             }
-            Clause::Member(set_cond_var, (rel, val)) => {
-                write!(f, "(member '{set_cond_var} (")?;
+            Clause::Member(rel, val) => {
+                write!(f, "(member '{var} (")?;
                 let multi = self.print_all(f, Sep::None, [rel, val].into_iter())?;
                 self.print_rparen(f, multi)?;
                 self.print_rparen(f, multi)?;
                 Ok(Multiline(true))
             }
-            Clause::Eq(_, _) => todo!(),
-            Clause::Or(_) => todo!(),
         }
     }
 }

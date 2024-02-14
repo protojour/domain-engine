@@ -458,7 +458,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             | Kind::ForEach(_, _, _)
             | Kind::Insert(_, _)
             | Kind::StringPush(_, _)
-            | Kind::PushCondClause(_, _)
+            | Kind::PushCondClauses(_, _)
             | Kind::Try(..)
             | Kind::Let(..)
             | Kind::TryLet(..)

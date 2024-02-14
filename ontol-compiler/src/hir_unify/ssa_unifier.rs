@@ -4,13 +4,14 @@ use ontol_hir::{
     PropFlags, PropVariant, SetEntry, StructFlags,
 };
 use ontol_runtime::{
-    condition::{Clause, SetOperator},
+    condition::{Clause, ClausePair, SetOperator},
     smart_format,
     value::{Attribute, PropertyId},
     var::{Var, VarAllocator, VarSet},
     MapFlags,
 };
 use smallvec::{smallvec, SmallVec};
+use thin_vec::thin_vec;
 use tracing::debug;
 
 use crate::{
@@ -182,7 +183,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                         } = mode.match_struct(Var(0))
                         {
                             if flags.contains(StructFlags::MATCH) {
-                                let match_var = self.var_allocator.alloc();
+                                let match_var = self.alloc_var();
                                 let inner_set_ty =
                                     self.types.intern(Type::Seq(&UNIT_TYPE, binder.meta().ty));
 
@@ -205,7 +206,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 Ok(match mode {
                     ExprMode::Expr { .. } => {
                         let make_seq = self.prealloc_node();
-                        let out_seq_var = self.var_allocator.alloc();
+                        let out_seq_var = self.alloc_var();
                         let seq_body =
                             self.write_seq_body(entries, *node_ref.meta(), out_seq_var, mode)?;
                         smallvec![self.write_node(
@@ -240,7 +241,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     mode.match_struct(Var(0)),
                 ) {
                     (true, ExprMode::MatchStruct { .. }) => {
-                        let match_var = self.var_allocator.alloc();
+                        let match_var = self.alloc_var();
                         self.write_match_struct_expr(
                             *binder,
                             struct_body,
@@ -311,7 +312,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     self.mk_node(ontol_hir::Kind::Text("".into()), *node_ref.meta());
                 let with_node = self.prealloc_node();
 
-                let string_binder = self.var_allocator.alloc();
+                let string_binder = self.alloc_var();
                 let mut body = ontol_hir::Nodes::default();
 
                 for component in components {
@@ -383,14 +384,17 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 ExprMode::MatchStruct { match_var, .. },
                 PropVariant::Value(Attribute { rel, val }),
             ) => {
+                let unit_meta = Meta::new(&UNIT_TYPE, meta.span);
                 let mut body = Nodes::default();
                 let (rel_term, rel_meta, rel_nodes) =
                     self.write_cond_term(*rel, match_var, mode, &mut body)?;
                 let (val_term, val_meta, val_nodes) =
                     self.write_cond_term(*val, match_var, mode, &mut body)?;
 
+                let set_var = self.alloc_var();
+
                 if flags.rel_optional() {
-                    let catch_label = Label(self.var_allocator.alloc().0);
+                    let catch_label = Label(self.alloc_var().0);
                     let catch_block = self.prealloc_node();
                     let mut catch_body = smallvec![];
 
@@ -407,13 +411,22 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                         &mut catch_body,
                     );
 
-                    catch_body.push(self.mk_node(
-                        Kind::PushCondClause(
-                            match_var,
-                            Clause::Attr(struct_var, prop_id, (rel, val)),
+                    catch_body.extend([
+                        self.mk_node(Kind::LetCondVar(set_var, match_var), unit_meta),
+                        self.mk_node(
+                            Kind::PushCondClauses(
+                                match_var,
+                                thin_vec![
+                                    ClausePair(
+                                        struct_var,
+                                        Clause::MatchProp(prop_id, SetOperator::ElementIn, set_var,)
+                                    ),
+                                    ClausePair(set_var, Clause::Member(rel, val))
+                                ],
+                            ),
+                            unit_meta,
                         ),
-                        Meta::new(&UNIT_TYPE, meta.span),
-                    ));
+                    ]);
 
                     catch_body.extend(rel_nodes);
                     catch_body.extend(val_nodes);
@@ -421,16 +434,26 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     body.push(self.write_node(
                         catch_block,
                         Kind::Catch(catch_label, catch_body),
-                        Meta::new(&UNIT_TYPE, meta.span),
+                        unit_meta,
                     ));
                 } else {
-                    body.push(self.mk_node(
-                        Kind::PushCondClause(
-                            match_var,
-                            Clause::Attr(struct_var, prop_id, (rel_term, val_term)),
+                    body.extend([
+                        self.mk_node(Kind::LetCondVar(set_var, match_var), unit_meta),
+                        self.mk_node(
+                            Kind::PushCondClauses(
+                                match_var,
+                                thin_vec![
+                                    ClausePair(
+                                        struct_var,
+                                        Clause::MatchProp(prop_id, SetOperator::ElementIn, set_var,)
+                                    ),
+                                    ClausePair(set_var, Clause::Member(rel_term, val_term))
+                                ],
+                            ),
+                            unit_meta,
                         ),
-                        Meta::new(&UNIT_TYPE, meta.span),
-                    ));
+                    ]);
+
                     body.extend(rel_nodes);
                     body.extend(val_nodes);
                 }
@@ -445,7 +468,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                             if true {
                                 let mut body = smallvec![];
 
-                                let set_cond_var = zelf.var_allocator.alloc();
+                                let set_cond_var = zelf.alloc_var();
 
                                 body.push(zelf.mk_node(
                                     Kind::LetCondVar(set_cond_var, match_var),
@@ -453,14 +476,12 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                                 ));
 
                                 body.push(zelf.mk_node(
-                                    Kind::PushCondClause(
+                                    Kind::PushCondClauses(
                                         match_var,
-                                        Clause::MatchProp(
+                                        thin_vec![ClausePair(
                                             struct_var,
-                                            prop_id,
-                                            *operator,
-                                            set_cond_var,
-                                        ),
+                                            Clause::MatchProp(prop_id, *operator, set_cond_var)
+                                        )],
                                     ),
                                     Meta::new(&UNIT_TYPE, meta.span),
                                 ));
@@ -620,9 +641,12 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                         debug!("in match scope in loop: {:?}", zelf.scope_tracker.in_scope);
 
                         body.push(zelf.mk_node(
-                            Kind::PushCondClause(
+                            Kind::PushCondClauses(
                                 match_var,
-                                Clause::Member(set_cond_var, (rel_term, val_term)),
+                                thin_vec![ClausePair(
+                                    set_cond_var,
+                                    Clause::Member(rel_term, val_term)
+                                ),],
                             ),
                             Meta::new(&UNIT_TYPE, seq_meta.span),
                         ));
@@ -697,6 +721,8 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             other => other,
         };
 
+        let mut base_clauses = thin_vec![];
+
         if struct_level == 0 {
             output_body.push(self.mk_node(
                 Kind::LetCondVar(binder.hir().var, match_var),
@@ -713,24 +739,22 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     .ok_or(UnifierError::NonEntityQuery)?;
             }
 
-            output_body.push(self.mk_node(
-                Kind::PushCondClause(match_var, Clause::Root(binder.hir().var)),
-                Meta::new(&UNIT_TYPE, binder.meta().span),
-            ));
+            base_clauses.push(ClausePair(binder.hir().var, Clause::Root));
         }
 
         if let Some(type_def_id) = def_ty.get_single_def_id() {
             if let Some(properties) = self.relations.properties_by_def_id(type_def_id) {
                 if properties.identified_by.is_some() {
-                    output_body.push(self.mk_node(
-                        Kind::PushCondClause(
-                            match_var,
-                            Clause::IsEntity(EvalCondTerm::QuoteVar(binder.hir().var), type_def_id),
-                        ),
-                        Meta::new(&UNIT_TYPE, binder.meta().span),
-                    ));
+                    base_clauses.push(ClausePair(binder.hir().var, Clause::IsEntity(type_def_id)));
                 }
             }
+        }
+
+        if !base_clauses.is_empty() {
+            output_body.push(self.mk_node(
+                Kind::PushCondClauses(match_var, base_clauses),
+                Meta::new(&UNIT_TYPE, binder.meta().span),
+            ));
         }
 
         for node in input_body {
@@ -798,7 +822,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         match input {
             EvalCondTerm::Wildcard => EvalCondTerm::Wildcard,
             EvalCondTerm::QuoteVar(var) => {
-                let redef_var = self.var_allocator.alloc();
+                let redef_var = self.alloc_var();
                 let source_node = self.mk_node(Kind::Var(var), meta);
                 catch_body.push(self.mk_node(
                     Kind::TryLet(
@@ -812,7 +836,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 EvalCondTerm::QuoteVar(redef_var)
             }
             EvalCondTerm::Eval(node) => {
-                let redef_var = self.var_allocator.alloc();
+                let redef_var = self.alloc_var();
                 catch_body.push(self.mk_node(
                     Kind::TryLet(catch_label, TypedHirData(redef_var.into(), meta), node),
                     Meta::new(&UNIT_TYPE, meta.span),
@@ -833,7 +857,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 Ok(smallvec![input])
             }
             (Type::Seq(rel_from, val_from), Type::Seq(rel_to, val_to)) => {
-                let inner_set_var = self.var_allocator.alloc();
+                let inner_set_var = self.alloc_var();
                 let mut nodes = smallvec![self.mk_node(
                     Kind::Let(
                         TypedHirData(inner_set_var.into(), *self.out_arena.node_ref(input).meta()),
@@ -843,8 +867,8 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 )];
 
                 let seq_map = {
-                    let rel_var = self.var_allocator.alloc();
-                    let val_var = self.var_allocator.alloc();
+                    let rel_var = self.alloc_var();
+                    let val_var = self.alloc_var();
                     let mapped_rel = {
                         let input = self.mk_node(Kind::Var(rel_var), Meta::new(rel_from, span));
                         self.write_type_map_if_necessary(
@@ -866,7 +890,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                         )?
                     };
 
-                    let target_seq_var = self.var_allocator.alloc();
+                    let target_seq_var = self.alloc_var();
                     let insert = {
                         self.mk_node(
                             Kind::Insert(
@@ -932,7 +956,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         let Some(def_id) = meta.ty.get_single_def_id() else {
             return match meta.ty {
                 Type::Seq(..) => {
-                    let var = self.var_allocator.alloc();
+                    let var = self.alloc_var();
                     self.mk_node(
                         Kind::MakeSeq(TypedHirData(Binder { var }, meta), smallvec![]),
                         meta,
@@ -944,7 +968,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
 
         match self.seal_ctx.get_repr_kind(&def_id) {
             Some(ReprKind::Struct | ReprKind::StructIntersection(_)) => {
-                let var = self.var_allocator.alloc();
+                let var = self.alloc_var();
                 self.mk_node(
                     Kind::Struct(
                         TypedHirData(Binder { var }, meta),
@@ -957,6 +981,10 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             Some(ReprKind::Unit) => self.mk_node(Kind::Unit, Meta::new(&UNIT_TYPE, meta.span)),
             other => todo!("{other:?}"),
         }
+    }
+
+    pub(super) fn alloc_var(&mut self) -> Var {
+        self.var_allocator.alloc()
     }
 
     #[inline]

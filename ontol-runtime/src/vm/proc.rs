@@ -5,7 +5,7 @@ use bit_vec::BitVec;
 use smartstring::alias::String;
 
 use crate::{
-    condition::{Clause, Condition},
+    condition::{ClausePair, Condition},
     ontology::ValueCardinality,
     value::PropertyId,
     var::Var,
@@ -118,7 +118,7 @@ pub enum OpCode {
     /// Push a new condition variable derived from the condition to the stack
     CondVar(Local),
     /// Push a condition clause into the condition at local
-    PushCondClause(Local, Clause<Local, OpCodeCondTerm>),
+    PushCondClause(Local, ClausePair<Local, OpCodeCondTerm>),
     /// Execute a match on a datastore, using the condition at top of stack
     MatchCondition(Var, ValueCardinality),
     Panic(String),

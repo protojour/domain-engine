@@ -60,7 +60,7 @@ pub enum Value {
     /// Special rel_params used for edge deletion
     DeleteRelationship(DefId),
 
-    Condition(Condition, DefId),
+    Condition(Box<Condition>, DefId),
 }
 
 impl Value {
@@ -193,6 +193,23 @@ impl Value {
         Self: Cast<T>,
     {
         <Self as Cast<T>>::cast_into(self)
+    }
+}
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Unit(_), Self::Unit(_)) => true,
+            (Self::I64(a, _), Self::I64(b, _)) => a == b,
+            (Self::F64(a, _), Self::F64(b, _)) => a == b,
+            (Self::Rational(a, _), Self::Rational(b, _)) => a == b,
+            (Self::Text(a, _), Self::Text(b, _)) => a == b,
+            (Self::OctetSequence(a, _), Self::OctetSequence(b, _)) => a == b,
+            (Self::ChronoDateTime(a, _), Self::ChronoDateTime(b, _)) => a == b,
+            (Self::ChronoDate(a, _), Self::ChronoDate(b, _)) => a == b,
+            (Self::ChronoTime(a, _), Self::ChronoTime(b, _)) => a == b,
+            _ => false,
+        }
     }
 }
 

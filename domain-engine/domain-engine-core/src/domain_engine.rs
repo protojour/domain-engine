@@ -81,7 +81,7 @@ impl DomainEngine {
                     let mut entity_select = selects.find_select(match_var, &condition);
 
                     // Merge the condition into the select
-                    assert!(entity_select.condition.clauses.is_empty());
+                    assert!(entity_select.condition.expansions().is_empty());
                     entity_select.condition = condition;
 
                     input = self

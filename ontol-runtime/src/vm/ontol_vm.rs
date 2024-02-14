@@ -9,7 +9,7 @@ use tracing::{trace, Level};
 
 use crate::{
     cast::Cast,
-    condition::{Clause, CondTerm, Condition},
+    condition::{Clause, ClausePair, CondTerm},
     ontology::{Ontology, ValueCardinality},
     sequence::Sequence,
     value::{Attribute, PropertyId, Value, ValueDebug},
@@ -375,37 +375,26 @@ impl<'o> Processor for OntolProcessor<'o> {
     fn push_cond_clause(
         &mut self,
         cond_local: Local,
-        clause: &Clause<Local, OpCodeCondTerm>,
+        input: &ClausePair<Local, OpCodeCondTerm>,
     ) -> VmResult<()> {
-        let clause: Clause<Var, CondTerm> = match clause {
-            Clause::Root(local) => Clause::Root(self.var_local(*local)?),
-            Clause::IsEntity(term, def_id) => {
-                Clause::IsEntity(self.opcode_term_to_cond_term(term)?, *def_id)
+        let var = self.var_local(input.0)?;
+        let evaluated_clause: Clause<Var, CondTerm> = match &input.1 {
+            Clause::Root => Clause::Root,
+            Clause::IsEntity(def_id) => Clause::IsEntity(*def_id),
+            Clause::MatchProp(prop_id, operator, set_local) => {
+                Clause::MatchProp(*prop_id, *operator, self.var_local(*set_local)?)
             }
-            Clause::Attr(local, prop_id, (rel, val)) => {
+            Clause::Member(rel, val) => {
                 let rel = self.opcode_term_to_cond_term(rel)?;
                 let val = self.opcode_term_to_cond_term(val)?;
-                Clause::Attr(self.var_local(*local)?, *prop_id, (rel, val))
+                Clause::Member(rel, val)
             }
-            Clause::MatchProp(local, prop_id, operator, set_local) => Clause::MatchProp(
-                self.var_local(*local)?,
-                *prop_id,
-                *operator,
-                self.var_local(*set_local)?,
-            ),
-            Clause::Member(set_local, (rel, val)) => {
-                let rel = self.opcode_term_to_cond_term(rel)?;
-                let val = self.opcode_term_to_cond_term(val)?;
-                Clause::Member(self.var_local(*set_local)?, (rel, val))
-            }
-            Clause::Eq(..) => todo!(),
-            Clause::Or(_) => todo!(),
         };
 
         let Value::Condition(condition, _) = &mut self.local_mut(cond_local) else {
             panic!();
         };
-        condition.clauses.push(clause);
+        condition.add_clause(var, evaluated_clause);
         Ok(())
     }
 
@@ -415,7 +404,7 @@ impl<'o> Processor for OntolProcessor<'o> {
         value_cardinality: ValueCardinality,
     ) -> VmResult<Self::Yield> {
         match self.stack.pop().unwrap() {
-            Value::Condition(condition, _) => Ok(Yield::Match(var, value_cardinality, condition)),
+            Value::Condition(condition, _) => Ok(Yield::Match(var, value_cardinality, *condition)),
             _ => Err(VmError::InvalidType(Local(self.stack.len() as u16))),
         }
     }
@@ -447,7 +436,7 @@ impl<'o> OntolProcessor<'o> {
             BuiltinProc::NewStruct => Value::Struct(Default::default(), result_type),
             BuiltinProc::NewSeq => Value::Sequence(Sequence::new(vec![]), result_type),
             BuiltinProc::NewUnit => Value::Unit(result_type),
-            BuiltinProc::NewCondition => Value::Condition(Condition::default(), result_type),
+            BuiltinProc::NewCondition => Value::Condition(Default::default(), result_type),
             BuiltinProc::NewVoid => Value::Void(result_type),
         }
     }
@@ -535,7 +524,7 @@ impl<'o> OntolProcessor<'o> {
     fn opcode_term_to_cond_term(&mut self, term: &OpCodeCondTerm) -> VmResult<CondTerm> {
         match term {
             OpCodeCondTerm::Wildcard => Ok(CondTerm::Wildcard),
-            OpCodeCondTerm::CondVar(local) => Ok(CondTerm::Var(self.var_local(*local)?)),
+            OpCodeCondTerm::CondVar(local) => Ok(CondTerm::Variable(self.var_local(*local)?)),
             OpCodeCondTerm::Value(local) => {
                 Ok(CondTerm::Value(self.stack[local.0 as usize].take()))
             }

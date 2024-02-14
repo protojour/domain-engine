@@ -13,7 +13,7 @@ use ontol_runtime::{
 };
 use tracing::{debug, error};
 
-use domain_engine_core::{filter::plan::compute_filter_plan, DomainError, DomainResult};
+use domain_engine_core::{DomainError, DomainResult};
 
 use crate::{
     core::{find_data_relationship, DbContext},
@@ -74,8 +74,8 @@ impl InMemoryStore {
             .as_ref()
             .ok_or(DomainError::NotAnEntity(struct_select.def_id))?;
 
-        let filter_plan = compute_filter_plan(condition, &ctx.ontology).unwrap();
-        debug!("eval filter plan: {filter_plan:#?}");
+        // let filter_plan = compute_filter_plan(condition, &ctx.ontology).unwrap();
+        debug!("eval condition: {condition}");
 
         let mut raw_props_vec = {
             let mut vec = vec![];
@@ -86,7 +86,7 @@ impl InMemoryStore {
                     dynamic_key: Some(key),
                     prop_tree: props,
                 };
-                if self.eval_filter_plan(&filter_val, &filter_plan)? {
+                if self.eval_condition(filter_val, condition, ctx)? {
                     vec.push((key.clone(), props.clone()));
                 }
             }
