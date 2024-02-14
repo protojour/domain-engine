@@ -39,7 +39,7 @@ fn test_relations_are_distinct_for_different_domains() {
             .unwrap();
         expect_eq!(actual = other_domain.unique_name, expected = "other");
 
-        fn extract_prop_rel_id<'o>(binding: &TypeBinding, test: &'o OntolTest) -> RelationshipId {
+        fn extract_prop_rel_id(binding: &TypeBinding, test: &OntolTest) -> RelationshipId {
             let operator = test
                 .ontology
                 .get_serde_operator(binding.serde_operator_addr());

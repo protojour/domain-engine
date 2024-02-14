@@ -794,8 +794,8 @@ mod tests {
                     (
                         prop_b,
                         Value::sequence_of([
-                            Value::Text("b0".into(), def_id(0)).into(),
-                            Value::Text("b1".into(), def_id(0)).into(),
+                            Value::Text("b0".into(), def_id(0)),
+                            Value::Text("b1".into(), def_id(0)),
                         ])
                         .into(),
                     ),
