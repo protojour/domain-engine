@@ -365,10 +365,16 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 )),
                 PrimitiveKind::OpenDataRelationship => None,
             },
-            // TODO: Fix me!
-            Type::IntConstant(_) | Type::FloatConstant(_) => Some(OperatorAllocation::Allocated(
+            Type::IntConstant(int) => Some(OperatorAllocation::Allocated(
                 self.alloc_addr(&def),
-                SerdeOperator::Unit,
+                SerdeOperator::I64(def.def_id, Some(RangeInclusive::new(*int, *int))),
+            )),
+            Type::FloatConstant(float) => Some(OperatorAllocation::Allocated(
+                self.alloc_addr(&def),
+                SerdeOperator::F64(
+                    def.def_id,
+                    Some(RangeInclusive::new((*float).into(), (*float).into())),
+                ),
             )),
             Type::TextConstant(def_id) => {
                 assert_eq!(def.def_id, *def_id);

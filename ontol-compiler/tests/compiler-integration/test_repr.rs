@@ -1,6 +1,5 @@
 use ontol_test_utils::{SourceName, TestCompile, TestPackages};
 use test_log::test;
-use tracing::info;
 
 #[test]
 fn test_repr_abstract_error1() {

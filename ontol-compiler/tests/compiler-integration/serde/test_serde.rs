@@ -409,14 +409,18 @@ fn test_prop_union() {
 fn union_integers() {
     "
     def level (
-        rel .is?: 1 // ERROR cannot discriminate type
-        rel .is?: 2 // ERROR cannot discriminate type
-        rel .is?: 3 // ERROR cannot discriminate type
+        rel .is?: 1
+        rel .is?: 2
+        rel .is?: 3
     )
     "
     .compile_then(|test| {
         let [level] = test.bind(["level"]);
         assert_json_io_matches!(serde_create(&level), 1);
+        assert_error_msg!(
+            serde_create(&level).to_value_variant(json!(42)),
+            r#"invalid type: integer `42`, expected `level` (one of 1, 2, 3) at line 1 column 2"#
+        );
     });
 }
 
