@@ -10,12 +10,12 @@ Starting from an empty string `''`, the `fmt` statement builds a string matching
 fmt '' => 'prefix/' => uuid
 ```
 
-## from an empty sequence
+## from an empty set
 
-Starting from an empty sequence `[]`, the `fmt` statement builds a sequence matching pattern. The pattern below describes a sequence of three consecutive strings.
+Starting from an empty set `{}`, the `fmt` statement builds a set matching pattern. The pattern below describes a set of three consecutive strings.
 
 ```ontol
-fmt [] => text => text => text
+fmt {} => text => text => text
 ```
 
 ## usage
