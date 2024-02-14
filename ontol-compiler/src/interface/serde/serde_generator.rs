@@ -365,7 +365,11 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 )),
                 PrimitiveKind::OpenDataRelationship => None,
             },
-            Type::IntConstant(_) | Type::FloatConstant(_) => todo!(),
+            // TODO: Fix me!
+            Type::IntConstant(_) | Type::FloatConstant(_) => Some(OperatorAllocation::Allocated(
+                self.alloc_addr(&def),
+                SerdeOperator::Unit,
+            )),
             Type::TextConstant(def_id) => {
                 assert_eq!(def.def_id, *def_id);
 

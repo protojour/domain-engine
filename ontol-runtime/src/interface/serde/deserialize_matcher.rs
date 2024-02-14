@@ -439,8 +439,20 @@ impl<'on> ValueMatcher for UnionMatcher<'on> {
     }
 
     fn match_i64(&self, value: i64) -> Result<Value, ()> {
-        self.match_leaf_discriminant(LeafDiscriminant::IsInt)
-            .map(|def_id| Value::I64(value, def_id))
+        for variant in self.variants {
+            let Discriminant::MatchesLeaf(leaf_discriminant) = &variant.discriminator.discriminant
+            else {
+                continue;
+            };
+
+            match leaf_discriminant {
+                LeafDiscriminant::IsIntLiteral(literal) if value == *literal => {}
+                LeafDiscriminant::IsInt => {}
+                _ => continue,
+            }
+            return Ok(Value::I64(value, variant.discriminator.serde_def.def_id));
+        }
+        Err(())
     }
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {

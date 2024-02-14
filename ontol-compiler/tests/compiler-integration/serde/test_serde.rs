@@ -405,6 +405,22 @@ fn test_prop_union() {
 }
 
 #[test]
+// BUG: this mirrors how enums are constucted for text, should work
+fn union_integers() {
+    "
+    def level (
+        rel .is?: 1 // ERROR cannot discriminate type
+        rel .is?: 2 // ERROR cannot discriminate type
+        rel .is?: 3 // ERROR cannot discriminate type
+    )
+    "
+    .compile_then(|test| {
+        let [level] = test.bind(["level"]);
+        assert_json_io_matches!(serde_create(&level), 1);
+    });
+}
+
+#[test]
 fn test_jsonml() {
     "
     def tag ()

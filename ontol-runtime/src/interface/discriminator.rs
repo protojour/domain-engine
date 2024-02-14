@@ -34,6 +34,7 @@ pub enum LeafDiscriminant {
     IsAny,
     IsUnit,
     IsInt,
+    IsIntLiteral(i64),
     IsText,
     IsTextLiteral(String),
     IsSequence,
