@@ -134,12 +134,12 @@ fn map_sequence_mismatch() {
 
     map(
         foo(
-            'a': x, // ERROR [text] variable must be enclosed in []
-            'b': y, // ERROR [text] variable must be enclosed in []
+            'a': x, // ERROR {text} variable must be enclosed in {}
+            'b': y, // ERROR {text} variable must be enclosed in {}
         ),
         bar(
             'a': x,
-            'b': y, // ERROR [i64] variable must be enclosed in []
+            'b': y, // ERROR {i64} variable must be enclosed in {}
         ),
     )
     "
@@ -147,17 +147,17 @@ fn map_sequence_mismatch() {
 }
 
 #[test]
-fn array_map_without_brackets() {
+fn array_map_without_braces() {
     "
     def foo (rel .'a': {text})
     def bar (rel .'b': {text})
 
     map(
         foo(
-            'a': x // ERROR [text] variable must be enclosed in []
+            'a': x // ERROR {text} variable must be enclosed in {}
         ),
         bar(
-            'b': x // ERROR [text] variable must be enclosed in []
+            'b': x // ERROR {text} variable must be enclosed in {}
         ),
     )
     "

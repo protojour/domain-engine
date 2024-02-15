@@ -1,8 +1,10 @@
 use fnv::{FnvHashMap, FnvHashSet};
-use ontol_runtime::{DefId, PackageId};
-use tracing::debug_span;
+use ontol_runtime::value::PropertyId;
+use ontol_runtime::{DefId, PackageId, Role};
+use tracing::{debug, debug_span};
 
-use crate::def::DefKind;
+use crate::def::{DefKind, LookupRelationshipMeta};
+use crate::relation::Property;
 use crate::repr::repr_model::{Repr, ReprKind};
 
 use super::TypeCheck;
@@ -68,6 +70,63 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         {
             for error in self.check_union(def_id) {
                 self.errors.push(error);
+            }
+        }
+
+        // BUG: This is not implemented correctly yet.
+        if false {
+            self.inherit_union_defs(def_id);
+        }
+    }
+
+    /// Types can be part of unions, and some relations are declared using the _union_.
+    /// In that case the relations should be mirrored onto every type _part_ of that union.
+    fn inherit_union_defs(&mut self, def_id: DefId) {
+        // Also seal every union/etc which contains this def_id
+        let Some(memberships) = self.relations.reverse_ontology_mesh.get(&def_id) else {
+            return;
+        };
+
+        let memberships: Vec<_> = memberships.iter().copied().collect();
+
+        // Also seal all the unions that has the type in question as a member
+        for foreign_def_id in &memberships {
+            self.seal_def(*foreign_def_id);
+        }
+
+        for foreign_def_id in memberships {
+            if let Some(ReprKind::StructUnion(_)) = self.seal_ctx.get_repr_kind(&foreign_def_id) {
+                let mut transfer_meta = vec![];
+
+                if let Some(union_prop_table) =
+                    self.relations.properties_table_by_def_id(foreign_def_id)
+                {
+                    for prop_id in union_prop_table.keys() {
+                        if matches!(prop_id.role, Role::Object) {
+                            let meta = self.defs.relationship_meta(prop_id.relationship_id);
+                            transfer_meta.push(meta);
+                        }
+                    }
+                }
+
+                for meta in transfer_meta {
+                    let properties = self.relations.properties_by_def_id_mut(def_id);
+                    let table = properties.table_mut();
+
+                    let prop_id = PropertyId::object(meta.relationship_id);
+
+                    debug!(
+                        "transfer {prop_id:?} from union to member {def_id:?}: {:?}",
+                        meta.relationship
+                    );
+                    table.insert(
+                        prop_id,
+                        Property {
+                            cardinality: meta.relationship.object_cardinality,
+                            is_entity_id: false,
+                        },
+                    );
+                }
             }
         }
     }

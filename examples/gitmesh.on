@@ -27,11 +27,13 @@ def OrganizationMember (
 
 map users(
     (
-        'ids'?: { ..id }
+        'ids'?: { ..id },
     ),
     User: {
         ..User match(
-            'id'?: in { ..id }
+            'id'?: in { ..id },
+            // TODO: We want to test a filter that uses 'repositories',
+            // but it's a bit complicated since it involves a union.
         ),
     }
 )

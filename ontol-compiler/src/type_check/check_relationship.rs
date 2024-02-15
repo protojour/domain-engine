@@ -160,6 +160,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 match prev_entry {
                     Entry::Vacant(vacant) => {
                         vacant.insert(*span);
+
+                        self.relations
+                            .reverse_ontology_mesh
+                            .entry(object.0)
+                            .or_default()
+                            .insert(subject.0);
                     }
                     Entry::Occupied(_) => {
                         self.error(CompileError::DuplicateAnonymousRelationship, span);

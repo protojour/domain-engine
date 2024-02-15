@@ -16,7 +16,7 @@ use ontol_runtime::{
 };
 use patricia_tree::PatriciaMap;
 use smartstring::alias::String;
-use tracing::{debug, info};
+use tracing::debug;
 
 use crate::{
     def::{Def, DefKind, LookupRelationshipMeta},
@@ -335,9 +335,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         },
                     );
                 }
-                _ => {
-                    info!("en greie");
-                }
+                _ => {}
             }
         }
 

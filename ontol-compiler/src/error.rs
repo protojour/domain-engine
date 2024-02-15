@@ -167,7 +167,7 @@ impl std::fmt::Display for CompileError {
             }
             Self::UnboundVariable => write!(f, "unbound variable"),
             Self::VariableMustBeSequenceEnclosed(var) => {
-                write!(f, "[{var}] variable must be enclosed in []")
+                write!(f, "{{{var}}} variable must be enclosed in {{}}")
             }
             Self::CannotDiscriminateType => write!(f, "cannot discriminate type"),
             Self::UnitTypePartOfUnion(name) => {

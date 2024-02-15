@@ -274,7 +274,7 @@ fn test_map_match_anonymous_with_translation() {
 }
 
 #[test]
-fn test_map_sequence_filter_in_set() {
+fn test_map_match_sequence_filter_in_set() {
     r#"
     def key (rel .is: text)
     def foo (
@@ -321,4 +321,71 @@ fn test_map_sequence_filter_in_set() {
                 json!([{ "bar": "x!", }]),
             );
     });
+}
+
+#[test]
+fn test_map_match_contains_all() {
+    r#"
+    def foo (
+        rel .'key'|id: (rel .is: text)
+        rel .'tags': {text}
+    )
+    map foos(
+        ('tags'?: { ..tags }),
+        foo: {
+            ..foo match(
+                'tags'?: contains all { ..tags }
+            )
+        }
+    )
+    "#
+    .compile_then(|test| {
+        let [foo] = test.bind(["foo"]);
+        test.mapper()
+            .with_mock_yielder(
+                YielderMock::yield_match
+                    .next_call(matching!(
+                        eq!(&ValueCardinality::Many),
+                        eq!(&Literal(indoc! { r#"
+                            (root $a)
+                            (is-entity $a def@1:1)
+                        "#
+                        }))
+                    ))
+                    .returns(Value::sequence_of([foo
+                        .value_builder(json!({ "key": "key", "tags": ["x!", "y!", "z!"] }))
+                        .into()])),
+            )
+            .assert_named_forward_map(
+                "foos",
+                json!({ "tags": ["x!", "y!"], }),
+                json!([{ "key": "key", "tags": ["x!", "y!", "z!"] }]),
+            );
+    });
+}
+
+#[test]
+// BUG: Should be able to filter inside edge->bar like this
+fn test_map_match_in_sub_multi_edge() {
+    r#"
+    def foo (
+        rel .'key'|id: (rel .is: text)
+        rel .'bars': {bar}
+    )
+    def bar (
+        rel .'key'|id: (rel .is: text)
+        rel .'tags': {text}
+    )
+    map foos(
+        ('bar_tags'?: { ..tags }),
+        foo: {
+            ..foo match(
+                'bars'?: bar match( // ERROR {bar} variable must be enclosed in {}
+                    'tags': contains all { ..tags }
+                )
+            )
+        }
+    )
+    "#
+    .compile_fail(); // BUG
 }

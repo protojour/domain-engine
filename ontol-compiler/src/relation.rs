@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
@@ -27,6 +27,7 @@ pub struct Relations {
 
     /// `is` relations
     pub ontology_mesh: FnvHashMap<DefId, IndexMap<Is, SourceSpan>>,
+    pub reverse_ontology_mesh: FnvHashMap<DefId, HashSet<DefId>>,
 
     /// `rel type` parameters (instantiated) for various types
     pub type_params: FnvHashMap<DefId, IndexMap<DefId, TypeParam>>,
