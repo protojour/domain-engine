@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
 use ontol_hir::{
-    arena::NodeRef, find_value_node, Binder, Binding, EvalCondTerm, Kind, Label, Node, Nodes,
-    PropFlags, PropVariant, SetEntry, StructFlags,
+    arena::NodeRef, find_value_node, Binder, Binding, EvalCondTerm, Kind, Node, Nodes, PropFlags,
+    PropVariant, SetEntry, StructFlags,
 };
 use ontol_runtime::{
     condition::{Clause, ClausePair, SetOperator},
@@ -27,7 +27,7 @@ use crate::{
     type_check::seal::SealCtx,
     typed_hir::{arena_import, Meta, TypedHir, TypedHirData, TypedNodeRef},
     types::{Type, Types, UNIT_TYPE},
-    CompileError, CompileErrors, Compiler, NO_SPAN,
+    CompileError, CompileErrors, Compiler, SourceSpan, NO_SPAN,
 };
 
 use super::{
@@ -386,59 +386,51 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             ) => {
                 let unit_meta = Meta::new(&UNIT_TYPE, meta.span);
                 let mut body = Nodes::default();
-                let (rel_term, rel_meta, rel_nodes) =
+                let (rel_term, _rel_meta, rel_nodes) =
                     self.write_cond_term(*rel, match_var, mode, &mut body)?;
-                let (val_term, val_meta, val_nodes) =
+                let (val_term, _val_meta, val_nodes) =
                     self.write_cond_term(*val, match_var, mode, &mut body)?;
 
                 let set_var = self.alloc_var();
+                let let_cond_var = self.mk_let_cond_var(set_var, match_var, meta.span);
 
                 if flags.rel_optional() {
-                    let catch_label = Label(self.alloc_var().0);
-                    let catch_block = self.prealloc_node();
-                    let mut catch_body = smallvec![];
+                    let mut free_vars = scan_immediate_free_vars(self.expr_arena, [*rel, *val]);
+                    free_vars.insert(struct_var);
+                    free_vars.insert(set_var);
 
-                    let rel = self.try_let_redef_cond_term(
-                        rel_term,
-                        rel_meta,
-                        catch_label,
-                        &mut catch_body,
-                    );
-                    let val = self.try_let_redef_cond_term(
-                        val_term,
-                        val_meta,
-                        catch_label,
-                        &mut catch_body,
-                    );
+                    body.extend(self.maybe_apply_catch_block(free_vars, meta.span, &|zelf| {
+                        let mut body = Nodes::default();
 
-                    catch_body.extend([
-                        self.mk_node(Kind::LetCondVar(set_var, match_var), unit_meta),
-                        self.mk_node(
-                            Kind::PushCondClauses(
-                                match_var,
-                                thin_vec![
-                                    ClausePair(
-                                        struct_var,
-                                        Clause::MatchProp(prop_id, SetOperator::ElementIn, set_var,)
-                                    ),
-                                    ClausePair(set_var, Clause::Member(rel, val))
-                                ],
+                        body.extend([
+                            let_cond_var,
+                            zelf.mk_node(
+                                Kind::PushCondClauses(
+                                    match_var,
+                                    thin_vec![
+                                        ClausePair(
+                                            struct_var,
+                                            Clause::MatchProp(
+                                                prop_id,
+                                                SetOperator::ElementIn,
+                                                set_var,
+                                            )
+                                        ),
+                                        ClausePair(set_var, Clause::Member(rel_term, val_term))
+                                    ],
+                                ),
+                                unit_meta,
                             ),
-                            unit_meta,
-                        ),
-                    ]);
+                        ]);
 
-                    catch_body.extend(rel_nodes);
-                    catch_body.extend(val_nodes);
+                        body.extend(rel_nodes.clone());
+                        body.extend(val_nodes.clone());
 
-                    body.push(self.write_node(
-                        catch_block,
-                        Kind::Catch(catch_label, catch_body),
-                        unit_meta,
-                    ));
+                        Ok(body)
+                    })?);
                 } else {
                     body.extend([
-                        self.mk_node(Kind::LetCondVar(set_var, match_var), unit_meta),
+                        let_cond_var,
                         self.mk_node(
                             Kind::PushCondClauses(
                                 match_var,
@@ -461,17 +453,12 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 Ok(body)
             }
             (ExprMode::MatchStruct { match_var, .. }, PropVariant::Predicate(operator, node)) => {
+                let set_cond_var = self.alloc_var();
+                let let_cond_var = self.mk_let_cond_var(set_cond_var, match_var, meta.span);
                 let free_vars = scan_immediate_free_vars(self.expr_arena, [*node]);
+
                 self.maybe_apply_catch_block(free_vars, meta.span, &|zelf| {
-                    let mut body = smallvec![];
-
-                    let set_cond_var = zelf.alloc_var();
-
-                    body.push(zelf.mk_node(
-                        Kind::LetCondVar(set_cond_var, match_var),
-                        Meta::new(&UNIT_TYPE, meta.span),
-                    ));
-
+                    let mut body = smallvec![let_cond_var];
                     body.push(zelf.mk_node(
                         Kind::PushCondClauses(
                             match_var,
@@ -632,8 +619,21 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     Meta::new(&UNIT_TYPE, seq_meta.span),
                 ));
             } else {
-                seq_body.extend(self.write_expr(*rel, None, mode)?);
-                seq_body.extend(self.write_expr(*val, None, mode)?);
+                let (rel_term, _rel_meta, rel_nodes) =
+                    self.write_cond_term(*rel, match_var, mode, &mut seq_body)?;
+                let (val_term, _val_meta, val_nodes) =
+                    self.write_cond_term(*val, match_var, mode, &mut seq_body)?;
+
+                seq_body.push(self.mk_node(
+                    Kind::PushCondClauses(
+                        match_var,
+                        thin_vec![ClausePair(set_cond_var, Clause::Member(rel_term, val_term)),],
+                    ),
+                    Meta::new(&UNIT_TYPE, seq_meta.span),
+                ));
+
+                seq_body.extend(rel_nodes);
+                seq_body.extend(val_nodes);
             }
         }
 
@@ -694,10 +694,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         let mut base_clauses = thin_vec![];
 
         if struct_level == 0 {
-            output_body.push(self.mk_node(
-                Kind::LetCondVar(binder.hir().var, match_var),
-                Meta::new(&UNIT_TYPE, binder.meta().span),
-            ));
+            output_body.push(self.mk_let_cond_var(binder.hir().var, match_var, binder.meta().span));
 
             if !matches!(type_mapping.from, Type::Error) && !matches!(def_ty, Type::Error) {
                 let def_id = def_ty
@@ -750,9 +747,10 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 smallvec![],
             )),
             Kind::Struct(binder, _, input_body) => {
-                output.push(self.mk_node(
-                    Kind::LetCondVar(binder.hir().var, match_var),
-                    Meta::new(&UNIT_TYPE, node_ref.meta().span),
+                output.push(self.mk_let_cond_var(
+                    binder.hir().var,
+                    match_var,
+                    node_ref.meta().span,
                 ));
 
                 let inner_body = self.write_match_struct_body(
@@ -778,40 +776,6 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     *self.out_arena.node_ref(node).meta(),
                     smallvec![],
                 ))
-            }
-        }
-    }
-
-    fn try_let_redef_cond_term(
-        &mut self,
-        input: EvalCondTerm,
-        meta: Meta<'m>,
-        catch_label: Label,
-        catch_body: &mut Nodes,
-    ) -> EvalCondTerm {
-        match input {
-            EvalCondTerm::Wildcard => EvalCondTerm::Wildcard,
-            EvalCondTerm::QuoteVar(var) => {
-                let redef_var = self.alloc_var();
-                let source_node = self.mk_node(Kind::Var(var), meta);
-                catch_body.push(self.mk_node(
-                    Kind::TryLet(
-                        catch_label,
-                        TypedHirData(redef_var.into(), meta),
-                        source_node,
-                    ),
-                    Meta::new(&UNIT_TYPE, meta.span),
-                ));
-
-                EvalCondTerm::QuoteVar(redef_var)
-            }
-            EvalCondTerm::Eval(node) => {
-                let redef_var = self.alloc_var();
-                catch_body.push(self.mk_node(
-                    Kind::TryLet(catch_label, TypedHirData(redef_var.into(), meta), node),
-                    Meta::new(&UNIT_TYPE, meta.span),
-                ));
-                EvalCondTerm::Eval(self.mk_node(Kind::Var(redef_var), meta))
             }
         }
     }
@@ -960,6 +924,20 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
     #[inline]
     pub(super) fn mk_node(&mut self, kind: Kind<'m, TypedHir>, meta: Meta<'m>) -> Node {
         self.out_arena.add(TypedHirData(kind, meta))
+    }
+
+    pub(super) fn mk_let_cond_var(
+        &mut self,
+        cond_var: Var,
+        match_var: Var,
+        span: SourceSpan,
+    ) -> Node {
+        // debug!("mk let cond var {cond_var:?}");
+        self.scope_tracker.in_scope.insert(cond_var);
+        self.mk_node(
+            Kind::LetCondVar(cond_var, match_var),
+            Meta::new(&UNIT_TYPE, span),
+        )
     }
 
     #[inline]

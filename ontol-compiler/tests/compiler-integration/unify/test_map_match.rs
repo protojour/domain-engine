@@ -323,9 +323,11 @@ fn test_map_match_sequence_filter_in_set() {
     });
 }
 
-#[test]
-fn test_map_match_contains_all() {
-    r#"
+mod match_contains_all {
+    use super::*;
+    use test_log::test;
+
+    const TEST_DOMAIN: &str = r#"
     def foo (
         rel .'key'|id: (rel .is: text)
         rel .'tags': {text}
@@ -348,8 +350,42 @@ fn test_map_match_contains_all() {
             )
         }
     )
-    "#
-    .compile_then(|test| {
+    "#;
+
+    fn foo_json() -> serde_json::Value {
+        json!({ "key": "key", "tags": [], "sub": { "tags": [] } })
+    }
+
+    #[test]
+    fn foo_tags() {
+        let test = TEST_DOMAIN.compile();
+        let [foo] = test.bind(["foo"]);
+        test.mapper()
+            .with_mock_yielder(
+                YielderMock::yield_match
+                    .next_call(matching!(
+                        eq!(&ValueCardinality::Many),
+                        eq!(&Literal(indoc! { r#"
+                                (root $a)
+                                (is-entity $a def@1:1)
+                                (match-prop $a S:1:7 (superset-of $b))
+                                (member $b (_ 'x!'))
+                                (member $b (_ 'y!'))
+                            "#
+                        }))
+                    ))
+                    .returns(Value::sequence_of([foo.value_builder(foo_json()).into()])),
+            )
+            .assert_named_forward_map(
+                "foos",
+                json!({ "foo_tags": ["x!", "y!"] }),
+                json!([foo_json()]),
+            );
+    }
+
+    #[test]
+    fn sub_tag() {
+        let test = TEST_DOMAIN.compile();
         let [foo] = test.bind(["foo"]);
         test.mapper()
             .with_mock_yielder(
@@ -359,24 +395,17 @@ fn test_map_match_contains_all() {
                         eq!(&Literal(indoc! { r#"
                             (root $a)
                             (is-entity $a def@1:1)
-                            (match-prop $a S:1:7 (superset-of $b))
-                            (match-prop $a S:1:8 (element-in $d))
-                            (member $b (_ 'x!'))
-                            (member $b (_ 'y!'))
-                            (member $d (_ $c))
+                            (match-prop $a S:1:8 (element-in $c))
+                            (match-prop $b S:1:9 (superset-of $d))
+                            (member $c (_ $b))
+                            (member $d (_ 'x!'))
                         "#
                         }))
                     ))
-                    .returns(Value::sequence_of([foo
-                        .value_builder(json!({ "key": "key", "tags": ["x!", "y!", "z!"], "sub": { "tags": [] } }))
-                        .into()])),
+                    .returns(Value::sequence_of([foo.value_builder(foo_json()).into()])),
             )
-            .assert_named_forward_map(
-                "foos",
-                json!({ "foo_tags": ["x!", "y!"], }),
-                json!([{ "key": "key", "tags": ["x!", "y!", "z!"], "sub": { "tags": [] } }]),
-            );
-    });
+            .assert_named_forward_map("foos", json!({ "sub_tag": "x!", }), json!([foo_json()]));
+    }
 }
 
 #[test]

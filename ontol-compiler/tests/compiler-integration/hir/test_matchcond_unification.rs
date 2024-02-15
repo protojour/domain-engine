@@ -171,13 +171,10 @@ fn test_unify_matchcond_element_in() {
                     (push-cond-clauses $s
                         (member '$t (_ '$q))
                     )
-                    (catch (@v)
-                        (let? @v $w $a)
-                        (let-cond-var $u $s)
-                        (push-cond-clauses $s
-                            (match-prop '$q O:2:0 element-in '$u)
-                            (member '$u (_ $w))
-                        )
+                    (let-cond-var $u $s)
+                    (push-cond-clauses $s
+                        (match-prop '$q O:2:0 element-in '$u)
+                        (member '$u (_ $a))
                     )
                 )
                 (for-each $f ($_ $b)
@@ -185,13 +182,10 @@ fn test_unify_matchcond_element_in() {
                     (push-cond-clauses $s
                         (member '$t (_ '$r))
                     )
-                    (catch (@y)
-                        (let? @y $z $b)
-                        (let-cond-var $x $s)
-                        (push-cond-clauses $s
-                            (match-prop '$r O:2:0 element-in '$x)
-                            (member '$x (_ $z))
-                        )
+                    (let-cond-var $v $s)
+                    (push-cond-clauses $s
+                        (match-prop '$r O:2:0 element-in '$v)
+                        (member '$v (_ $b))
                     )
                 )
             )
@@ -228,15 +222,15 @@ fn test_unify_optional_element_in() {
                 (push-cond-clauses $f
                     (root '$e)
                 )
-                (catch (@g)
-                    (try? @g $b)
-                    (let-cond-var $h $f)
+                (catch (@h)
+                    (try? @h $b)
+                    (let-cond-var $g $f)
                     (push-cond-clauses $f
-                        (match-prop '$e O:1:0 element-in '$h)
+                        (match-prop '$e O:1:0 element-in '$g)
                     )
                     (for-each $b ($_ $c)
                         (push-cond-clauses $f
-                            (member '$h (_ $c))
+                            (member '$g (_ $c))
                         )
                     )
                 )
