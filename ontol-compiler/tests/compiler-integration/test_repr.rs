@@ -147,7 +147,6 @@ fn test_repr_valid_mesh1() {
 }
 
 #[test]
-// BUG: Intersection of ints should be possible
 fn union_integers_no_question() {
     "
     def level ( // ERROR Intersection of disjoint types
