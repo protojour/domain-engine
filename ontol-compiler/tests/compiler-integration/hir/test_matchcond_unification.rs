@@ -10,12 +10,10 @@ fn test_unify_matchcond_empty() {
         (struct ($b))
         ",
         "
-        (set
-            (.. @a
-                #u
-                (match-struct ($c))
-            )
-        )
+        (set (.. @a
+            #u
+            (match-struct ($c))
+        ))
         ",
     );
     let expected = indoc! {"
@@ -40,14 +38,12 @@ fn test_unify_matchcond_single_prop() {
         )
         ",
         "
-        (set
-            (.. @d
-                #u
-                (match-struct ($c)
-                    (prop! $c O:1:0 (#u $a))
-                )
+        (set (.. @d
+            #u
+            (match-struct ($c)
+                (prop! $c O:1:0 (#u $a))
             )
-        )
+        ))
         ",
     );
     let expected = indoc! {"
@@ -79,20 +75,18 @@ fn test_unify_matchcond_struct_in_struct() {
         )
         ",
         "
-        (set
-            (.. @f
-                #u
-                (match-struct ($d)
-                    (prop! $d O:1:0
-                        (#u
-                            (struct ($e)
-                                (prop! $e O:2:0 ($a $b))
-                            )
+        (set (.. @f
+            #u
+            (match-struct ($d)
+                (prop! $d O:1:0
+                    (#u
+                        (struct ($e)
+                            (prop! $e O:2:0 ($a $b))
                         )
                     )
                 )
             )
-        )
+        ))
         ",
     );
     let expected = indoc! {"
@@ -135,31 +129,28 @@ fn test_unify_matchcond_element_in() {
         )
         ",
         "
-        (set
-            (.. @g
-                #u
-                (match-struct ($d)
-                    (prop $d O:1:0
-                        (element-in
-                            (set
-                                (.. @e
-                                    #u
-                                    (struct ($q)
-                                        (prop $q O:2:0 (#u $a))
-                                    )
+        (set (.. @g #u
+            (match-struct ($d)
+                (prop $d O:1:0
+                    (element-in
+                        (set
+                            (.. @e
+                                #u
+                                (struct ($q)
+                                    (prop $q O:2:0 (#u $a))
                                 )
-                                (.. @f
-                                    #u
-                                    (struct ($r)
-                                        (prop $r O:2:0 (#u $b))
-                                    )
+                            )
+                            (.. @f
+                                #u
+                                (struct ($r)
+                                    (prop $r O:2:0 (#u $b))
                                 )
                             )
                         )
                     )
                 )
             )
-        )
+        ))
         ",
     );
     let expected = indoc! {"
@@ -200,6 +191,52 @@ fn test_unify_matchcond_element_in() {
                         (push-cond-clauses $s
                             (match-prop '$r O:2:0 element-in '$x)
                             (member '$x (_ $z))
+                        )
+                    )
+                )
+            )
+        )"
+    };
+    assert_eq!(expected, output);
+}
+
+#[test]
+fn test_unify_optional_element_in() {
+    let output = test_unify(
+        "
+        (struct ($a)
+            (prop? $a S:0:0
+                (#u (set (.. @b #u $c)))
+            )
+        )
+        ",
+        "
+        (set (.. @d #u
+            (match-struct ($e)
+                (prop? $e O:1:0
+                    (element-in (set (.. @b #u $c)))
+                )
+            )
+        ))
+        ",
+    );
+    let expected = indoc! {"
+        |$a| (block
+            (let-prop $_ $b ($a S:0:0))
+            (match-struct ($f)
+                (let-cond-var $e $f)
+                (push-cond-clauses $f
+                    (root '$e)
+                )
+                (catch (@g)
+                    (try? @g $b)
+                    (let-cond-var $h $f)
+                    (push-cond-clauses $f
+                        (match-prop '$e O:1:0 element-in '$h)
+                    )
+                    (for-each $b ($_ $c)
+                        (push-cond-clauses $f
+                            (member '$h (_ $c))
                         )
                     )
                 )

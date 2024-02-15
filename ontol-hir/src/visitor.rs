@@ -237,6 +237,9 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
         entry: &SetEntry<'a, L>,
         arena: &'h Arena<'a, L>,
     ) {
+        if let Some(label_data) = &entry.0 {
+            self.visit_label(*L::as_hir(label_data));
+        }
         self.visit_node(0, arena.node_ref(entry.1.rel));
         self.visit_node(1, arena.node_ref(entry.1.val));
     }

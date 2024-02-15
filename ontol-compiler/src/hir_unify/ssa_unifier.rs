@@ -465,51 +465,32 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     SetOperator::ElementIn => {
                         let free_vars = scan_immediate_free_vars(self.expr_arena, [*node]);
                         self.maybe_apply_catch_block(free_vars, meta.span, &|zelf| {
-                            if true {
-                                let mut body = smallvec![];
+                            let mut body = smallvec![];
 
-                                let set_cond_var = zelf.alloc_var();
+                            let set_cond_var = zelf.alloc_var();
 
-                                body.push(zelf.mk_node(
-                                    Kind::LetCondVar(set_cond_var, match_var),
-                                    Meta::new(&UNIT_TYPE, meta.span),
-                                ));
+                            body.push(zelf.mk_node(
+                                Kind::LetCondVar(set_cond_var, match_var),
+                                Meta::new(&UNIT_TYPE, meta.span),
+                            ));
 
-                                body.push(zelf.mk_node(
-                                    Kind::PushCondClauses(
-                                        match_var,
-                                        thin_vec![ClausePair(
-                                            struct_var,
-                                            Clause::MatchProp(prop_id, *operator, set_cond_var)
-                                        )],
-                                    ),
-                                    Meta::new(&UNIT_TYPE, meta.span),
-                                ));
+                            body.push(zelf.mk_node(
+                                Kind::PushCondClauses(
+                                    match_var,
+                                    thin_vec![ClausePair(
+                                        struct_var,
+                                        Clause::MatchProp(prop_id, *operator, set_cond_var)
+                                    )],
+                                ),
+                                Meta::new(&UNIT_TYPE, meta.span),
+                            ));
 
-                                body.extend(zelf.write_expr(
-                                    *node,
-                                    None,
-                                    mode.match_set(set_cond_var),
-                                )?);
-                                Ok(body)
-                            } else {
-                                //let set = zelf.write_one_expr(*node, mode.match_set())?;
-                                //let unit = zelf.mk_node(Kind::Unit, UNIT_META);
-                                //
-                                //Ok(smallvec![zelf.mk_node(
-                                //    Kind::Prop(
-                                //        flags,
-                                //        struct_var,
-                                //        prop_id,
-                                //        PropVariant::Value(Attribute {
-                                //            rel: unit,
-                                //            val: set
-                                //        }),
-                                //    ),
-                                //    *meta,
-                                //)])
-                                todo!()
-                            }
+                            body.extend(zelf.write_expr(
+                                *node,
+                                None,
+                                mode.match_set(set_cond_var),
+                            )?);
+                            Ok(body)
                         })
                     }
                     _ => Err(UnifierError::Unimplemented(smart_format!(
