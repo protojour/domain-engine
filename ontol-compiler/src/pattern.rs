@@ -63,10 +63,6 @@ pub enum CompoundPatternAttrKind {
         rel: Option<Pattern>,
         val: Pattern,
     },
-    ContainsElement {
-        rel: Option<Pattern>,
-        val: Pattern,
-    },
     SetOperator {
         operator: SetBinaryOperator,
         elements: Box<[SetPatternElement]>,

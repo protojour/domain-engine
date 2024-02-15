@@ -409,7 +409,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     },
                 ))
             }
-            CompoundPatternAttrKind::ContainsElement { .. } => todo!(),
             CompoundPatternAttrKind::SetOperator { operator, elements } => {
                 let value_ty = self.check_def_sealed(match_attribute.value_def);
                 let set_node = self.build_hir_set_of(
@@ -433,9 +432,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             );
                             return None;
                         }
-                        (ValueCardinality::Many, _) => {
-                            return None;
-                        }
+                        (ValueCardinality::Many, operator) => ontol_hir::PropVariant::Predicate(
+                            match operator {
+                                SetBinaryOperator::ElementIn => unreachable!(),
+                                SetBinaryOperator::AllIn => SetOperator::SubsetOf,
+                                SetBinaryOperator::ContainsAll => SetOperator::SupersetOf,
+                                SetBinaryOperator::Intersects => SetOperator::SetIntersects,
+                                SetBinaryOperator::SetEquals => SetOperator::SetEquals,
+                            },
+                            set_node,
+                        ),
                         (ValueCardinality::One, _) => {
                             self.error(
                                 CompileError::TODO("property must be a set".into()),

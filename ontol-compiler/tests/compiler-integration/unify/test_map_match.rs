@@ -329,12 +329,22 @@ fn test_map_match_contains_all() {
     def foo (
         rel .'key'|id: (rel .is: text)
         rel .'tags': {text}
+        rel .'sub': sub
+    )
+    def sub (
+        rel .'tags': {text}
     )
     map foos(
-        ('tags'?: { ..tags }),
+        (
+            'foo_tags'?: { ..tags },
+            'sub_tag'?: sub_tag
+        ),
         foo: {
             ..foo match(
-                'tags'?: contains all { ..tags }
+                'tags'?: contains all { ..tags },
+                'sub'?: sub(
+                    'tags': contains all { sub_tag }
+                )
             )
         }
     )
@@ -349,17 +359,22 @@ fn test_map_match_contains_all() {
                         eq!(&Literal(indoc! { r#"
                             (root $a)
                             (is-entity $a def@1:1)
+                            (match-prop $a S:1:7 (superset-of $b))
+                            (match-prop $a S:1:8 (element-in $d))
+                            (member $b (_ 'x!'))
+                            (member $b (_ 'y!'))
+                            (member $d (_ $c))
                         "#
                         }))
                     ))
                     .returns(Value::sequence_of([foo
-                        .value_builder(json!({ "key": "key", "tags": ["x!", "y!", "z!"] }))
+                        .value_builder(json!({ "key": "key", "tags": ["x!", "y!", "z!"], "sub": { "tags": [] } }))
                         .into()])),
             )
             .assert_named_forward_map(
                 "foos",
-                json!({ "tags": ["x!", "y!"], }),
-                json!([{ "key": "key", "tags": ["x!", "y!", "z!"] }]),
+                json!({ "foo_tags": ["x!", "y!"], }),
+                json!([{ "key": "key", "tags": ["x!", "y!", "z!"], "sub": { "tags": [] } }]),
             );
     });
 }

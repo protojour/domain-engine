@@ -7,7 +7,7 @@ use ontol_runtime::{
     var::Var,
     DefId,
 };
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::{
     def::{Def, DefKind, Defs, LookupRelationshipMeta, RelParams, Relationship},
@@ -33,7 +33,7 @@ struct VarRelationship {
 #[derive(Default, Clone, Copy, PartialEq, Debug)]
 struct VarFlags {
     is_option: bool,
-    is_set: bool,
+    is_iter: bool,
 }
 
 pub struct MapArmDefInferencer<'c, 'm> {
@@ -91,13 +91,12 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
 
                 for pattern_attr in attributes.iter() {
                     match &pattern_attr.kind {
-                        CompoundPatternAttrKind::Value { rel: _, val }
-                        | CompoundPatternAttrKind::ContainsElement { rel: _, val } => {
+                        CompoundPatternAttrKind::Value { rel: _, val } => {
                             self.infer_attr_sub_pat(
                                 val,
                                 VarFlags {
                                     is_option: pattern_attr.bind_option,
-                                    is_set: false,
+                                    is_iter: false,
                                 },
                                 pattern_attr.key.0,
                                 target_def_id,
@@ -137,10 +136,11 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                     self.find_source_var_relationship(source_vars, *var, &pattern.span)
                 {
                     if flags != var_relationship.flags {
+                        debug!("flags: {flags:?} var_rel: {:?}", var_relationship.flags);
                         self.error(CompileError::InferenceCardinalityMismatch, &pattern.span);
                     }
 
-                    let value_cardinality = if flags.is_set {
+                    let value_cardinality = if flags.is_iter {
                         ValueCardinality::Many
                     } else {
                         ValueCardinality::One
@@ -185,7 +185,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                     self.infer_attr_sub_pat(
                         &element.val,
                         VarFlags {
-                            is_set: true,
+                            is_iter: element.is_iter,
                             ..flags
                         },
                         relation_def_id,
@@ -258,8 +258,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                 };
                 for attr in attributes.iter() {
                     match &attr.kind {
-                        CompoundPatternAttrKind::Value { rel, val }
-                        | CompoundPatternAttrKind::ContainsElement { rel, val } => {
+                        CompoundPatternAttrKind::Value { rel, val } => {
                             if let Some(rel) = rel {
                                 self.scan_source_variables(rel, VarFlags::default(), output);
                             }
@@ -269,7 +268,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                                 attr.key.0,
                                 VarFlags {
                                     is_option: attr.bind_option,
-                                    is_set: false,
+                                    is_iter: false,
                                 },
                                 table,
                                 output,
@@ -279,11 +278,11 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                             operator: _,
                             elements,
                         } => {
-                            let sub_flags = VarFlags {
-                                is_option: flags.is_option || attr.bind_option,
-                                is_set: true,
-                            };
                             for element in elements.iter() {
+                                let sub_flags = VarFlags {
+                                    is_option: flags.is_option || attr.bind_option,
+                                    is_iter: element.is_iter,
+                                };
                                 if let Some(rel) = &element.rel {
                                     self.scan_source_variables(rel, sub_flags, output);
                                 }
@@ -305,7 +304,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                         self.scan_source_variables(
                             rel,
                             VarFlags {
-                                is_set: true,
+                                is_iter: true,
                                 ..flags
                             },
                             output,
@@ -315,7 +314,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                     self.scan_source_variables(
                         &element.val,
                         VarFlags {
-                            is_set: true,
+                            is_iter: true,
                             ..flags
                         },
                         output,

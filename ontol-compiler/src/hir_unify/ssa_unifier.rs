@@ -461,42 +461,31 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 Ok(body)
             }
             (ExprMode::MatchStruct { match_var, .. }, PropVariant::Predicate(operator, node)) => {
-                match operator {
-                    SetOperator::ElementIn => {
-                        let free_vars = scan_immediate_free_vars(self.expr_arena, [*node]);
-                        self.maybe_apply_catch_block(free_vars, meta.span, &|zelf| {
-                            let mut body = smallvec![];
+                let free_vars = scan_immediate_free_vars(self.expr_arena, [*node]);
+                self.maybe_apply_catch_block(free_vars, meta.span, &|zelf| {
+                    let mut body = smallvec![];
 
-                            let set_cond_var = zelf.alloc_var();
+                    let set_cond_var = zelf.alloc_var();
 
-                            body.push(zelf.mk_node(
-                                Kind::LetCondVar(set_cond_var, match_var),
-                                Meta::new(&UNIT_TYPE, meta.span),
-                            ));
+                    body.push(zelf.mk_node(
+                        Kind::LetCondVar(set_cond_var, match_var),
+                        Meta::new(&UNIT_TYPE, meta.span),
+                    ));
 
-                            body.push(zelf.mk_node(
-                                Kind::PushCondClauses(
-                                    match_var,
-                                    thin_vec![ClausePair(
-                                        struct_var,
-                                        Clause::MatchProp(prop_id, *operator, set_cond_var)
-                                    )],
-                                ),
-                                Meta::new(&UNIT_TYPE, meta.span),
-                            ));
+                    body.push(zelf.mk_node(
+                        Kind::PushCondClauses(
+                            match_var,
+                            thin_vec![ClausePair(
+                                struct_var,
+                                Clause::MatchProp(prop_id, *operator, set_cond_var)
+                            )],
+                        ),
+                        Meta::new(&UNIT_TYPE, meta.span),
+                    ));
 
-                            body.extend(zelf.write_expr(
-                                *node,
-                                None,
-                                mode.match_set(set_cond_var),
-                            )?);
-                            Ok(body)
-                        })
-                    }
-                    _ => Err(UnifierError::Unimplemented(smart_format!(
-                        "unimplemented predicate function"
-                    ))),
-                }
+                    body.extend(zelf.write_expr(*node, None, mode.match_set(set_cond_var))?);
+                    Ok(body)
+                })
             }
             _ => todo!(),
         }

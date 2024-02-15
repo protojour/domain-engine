@@ -956,19 +956,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
 
         Ok(match alg_pattern.operator.0 {
-            ast::SetAlgebraicOperator::Contains => {
-                if elements.len() > 1 {
-                    return Err((
-                        CompileError::TODO(smart_format!("can only contain one sub pattern")),
-                        span.clone(),
-                    ));
-                }
-                let sub_pattern = elements.into_iter().next().unwrap();
-                CompoundPatternAttrKind::ContainsElement {
-                    rel: sub_pattern.rel,
-                    val: sub_pattern.val,
-                }
-            }
             ast::SetAlgebraicOperator::In => CompoundPatternAttrKind::SetOperator {
                 operator: SetBinaryOperator::ElementIn,
                 elements: self.lower_set_pattern_elements(elements),

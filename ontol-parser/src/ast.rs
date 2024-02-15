@@ -160,8 +160,6 @@ pub struct SetAlgebraPattern {
 pub enum SetAlgebraicOperator {
     /// element: IN set
     In,
-    /// set: CONTAINS element
-    Contains,
     /// set: ALL IN set
     AllIn,
     /// set: CONTAINS ALL set

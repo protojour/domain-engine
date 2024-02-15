@@ -51,8 +51,7 @@ impl<'c> PreAnalyzer<'c> {
             } => {
                 for attr in attrs.iter() {
                     match &attr.kind {
-                        CompoundPatternAttrKind::Value { val, .. }
-                        | CompoundPatternAttrKind::ContainsElement { val, .. } => {
+                        CompoundPatternAttrKind::Value { val, .. } => {
                             group_set
                                 .join(self.analyze_arm(val, parent_aggr_group, ctx)?.group_set);
                         }

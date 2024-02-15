@@ -450,7 +450,7 @@ fn set_algebra_pattern(
 ) -> impl AstParser<Spanned<SetAlgebraPattern>> {
     spanned(
         set_algebraic_operator()
-            .then(set_pattern(any_pattern))
+            .then(set_pattern(any_pattern.clone()))
             .map(|(operator, elements)| SetAlgebraPattern { operator, elements }),
     )
 }
@@ -462,7 +462,6 @@ fn set_algebraic_operator() -> impl AstParser<Spanned<SetAlgebraicOperator>> {
             .or(kw_contains()
                 .then_ignore(kw_all())
                 .map(|_| SetAlgebraicOperator::ContainsAll))
-            .or(kw_contains().map(|_| SetAlgebraicOperator::Contains))
             .or(kw_all()
                 .then_ignore(kw_in())
                 .map(|_| SetAlgebraicOperator::AllIn))
