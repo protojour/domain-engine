@@ -470,72 +470,85 @@ impl<'m> Compiler<'m> {
     ) -> Option<DataRelationshipInfo> {
         let meta = self.defs.relationship_meta(property_id.relationship_id);
 
+        let (source_def_id, _, _) = meta.relationship.by(property_id.role);
         let (target_def_id, _, _) = meta.relationship.by(property_id.role.opposite());
 
         let DefKind::TextLiteral(subject_name) = meta.relation_def_kind.value else {
             return None;
         };
+        let Some(target_properties) = self.relations.properties_by_def_id(target_def_id) else {
+            return None;
+        };
+        let Some(repr_kind) = self.seal_ctx.get_repr_kind(&target_def_id) else {
+            return None;
+        };
 
-        if let Some(target_properties) = self.relations.properties_by_def_id(target_def_id) {
-            let graph_rel_params = match meta.relationship.rel_params {
-                RelParams::Type(def_id) => Some(def_id),
-                RelParams::Unit | RelParams::IndexRange(_) => None,
-            };
+        let graph_rel_params = match meta.relationship.rel_params {
+            RelParams::Type(def_id) => Some(def_id),
+            RelParams::Unit | RelParams::IndexRange(_) => None,
+        };
 
-            if let Some(repr_kind) = self.seal_ctx.get_repr_kind(&target_def_id) {
-                let (data_relationship_kind, target) = match repr_kind {
-                    ReprKind::StructUnion(members) => {
-                        let target = DataRelationshipTarget::Union {
-                            union_def_id: target_def_id,
-                            variants: members.iter().map(|(def_id, _)| *def_id).collect(),
-                        };
-
-                        if members.iter().all(|(member_def_id, _)| {
-                            self.relations
-                                .properties_by_def_id(*member_def_id)
-                                .map(|properties| properties.identified_by.is_some())
-                                .unwrap_or(false)
-                        }) {
-                            (
-                                DataRelationshipKind::EntityGraph {
-                                    rel_params: graph_rel_params,
-                                },
-                                target,
-                            )
-                        } else {
-                            (DataRelationshipKind::Tree, target)
-                        }
-                    }
-                    _ => {
-                        let target = DataRelationshipTarget::Unambiguous(target_def_id);
-                        if target_properties.identified_by.is_some() {
-                            (
-                                DataRelationshipKind::EntityGraph {
-                                    rel_params: graph_rel_params,
-                                },
-                                target,
-                            )
-                        } else {
-                            (DataRelationshipKind::Tree, target)
-                        }
-                    }
+        let (data_relationship_kind, target) = match repr_kind {
+            ReprKind::StructUnion(members) => {
+                let target = DataRelationshipTarget::Union {
+                    union_def_id: target_def_id,
+                    variants: members.iter().map(|(def_id, _)| *def_id).collect(),
                 };
 
-                Some(DataRelationshipInfo {
-                    kind: data_relationship_kind,
-                    subject_cardinality: meta.relationship.subject_cardinality,
-                    object_cardinality: meta.relationship.object_cardinality,
-                    subject_name: (*subject_name).into(),
-                    object_name: meta.relationship.object_prop.map(|prop| prop.into()),
-                    source,
-                    target,
-                })
-            } else {
-                None
+                if members.iter().all(|(member_def_id, _)| {
+                    self.relations
+                        .properties_by_def_id(*member_def_id)
+                        .map(|properties| properties.identified_by.is_some())
+                        .unwrap_or(false)
+                }) {
+                    (
+                        DataRelationshipKind::EntityGraph {
+                            rel_params: graph_rel_params,
+                        },
+                        target,
+                    )
+                } else {
+                    (DataRelationshipKind::Tree, target)
+                }
             }
-        } else {
-            None
-        }
+            _ => {
+                let target = DataRelationshipTarget::Unambiguous(target_def_id);
+                if target_properties.identified_by.is_some() {
+                    (
+                        DataRelationshipKind::EntityGraph {
+                            rel_params: graph_rel_params,
+                        },
+                        target,
+                    )
+                } else {
+                    let source_properties = self.relations.properties_by_def_id(source_def_id);
+                    let is_entity_id = source_properties
+                        .map(|properties| {
+                            properties.identified_by == Some(property_id.relationship_id)
+                        })
+                        .unwrap_or(false);
+
+                    (
+                        if is_entity_id {
+                            DataRelationshipKind::Id
+                        } else {
+                            DataRelationshipKind::Tree
+                        },
+                        target,
+                    )
+                }
+            }
+        };
+
+        Some(DataRelationshipInfo {
+            kind: data_relationship_kind,
+            subject_cardinality: meta.relationship.subject_cardinality,
+            object_cardinality: meta.relationship.object_cardinality,
+            subject_name: (*subject_name).into(),
+            object_name: meta.relationship.object_prop.map(|prop| prop.into()),
+            source,
+            target,
+        })
     }
 
     fn entity_info(

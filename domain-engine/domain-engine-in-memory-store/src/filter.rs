@@ -20,7 +20,7 @@ use crate::core::DbContext;
 
 use super::core::{DynamicKey, EntityKey, InMemoryStore};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub(super) enum FilterVal<'d> {
     Struct {
         type_def_id: DefId,
@@ -139,7 +139,7 @@ impl InMemoryStore {
                     };
 
                     match &data_relationship.kind {
-                        DataRelationshipKind::Tree => {
+                        DataRelationshipKind::Id | DataRelationshipKind::Tree => {
                             let attr = prop_tree.get(prop_id).ok_or(ProofError::Disproven)?;
                             proof.merge(self.eval_match_prop(
                                 (
@@ -363,6 +363,17 @@ impl InMemoryStore {
                 FilterVal::Scalar(scalar) => {
                     if scalar == term_val {
                         Ok(Proof::Proven)
+                    } else {
+                        Err(ProofError::Disproven)
+                    }
+                }
+                FilterVal::Struct { prop_tree, .. } => {
+                    if let Value::Struct(term_props, _) = term_val {
+                        if term_props.as_ref() == prop_tree {
+                            Ok(Proof::Proven)
+                        } else {
+                            Err(ProofError::Disproven)
+                        }
                     } else {
                         Err(ProofError::Disproven)
                     }

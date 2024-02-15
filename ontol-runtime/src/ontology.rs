@@ -346,6 +346,8 @@ impl DataRelationshipInfo {
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum DataRelationshipKind {
+    /// The relationship is between an entity and its identifier
+    Id,
     /// A Tree data relationship that can never be circular.
     /// It expresses a simple composition of a composite (the parent) and the component (the child).
     Tree,

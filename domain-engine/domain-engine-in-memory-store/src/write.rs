@@ -17,7 +17,7 @@ use ontol_runtime::{
     DefId, Role,
 };
 use smartstring::alias::String;
-use tracing::debug;
+use tracing::{debug, warn};
 
 use domain_engine_core::{
     entity_id_utils::{find_inherent_entity_id, try_generate_entity_id, GeneratedId},
@@ -79,6 +79,9 @@ impl InMemoryStore {
             let data_relationship = find_data_relationship(type_info, &property_id)?;
 
             match data_relationship.kind {
+                DataRelationshipKind::Id => {
+                    warn!("ID should not be updated");
+                }
                 DataRelationshipKind::Tree => {
                     raw_props_update.insert(property_id, attribute);
                 }
@@ -240,6 +243,7 @@ impl InMemoryStore {
             let data_relationship = find_data_relationship(type_info, &property_id)?;
 
             match data_relationship.kind {
+                DataRelationshipKind::Id => {}
                 DataRelationshipKind::Tree => {
                     raw_props.insert(property_id, attribute);
                 }

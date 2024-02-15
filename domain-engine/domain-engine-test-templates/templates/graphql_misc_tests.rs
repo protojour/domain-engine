@@ -408,6 +408,46 @@ async fn test_gitmesh_misc() {
 }
 
 #[test(tokio::test)]
+async fn test_gitmesh_fancy_filters() {
+    let (test, [schema]) = TestPackages::with_sources([(ROOT, GITMESH.1)])
+        .with_data_store(ROOT, DataStoreConfig::Default)
+        .compile_schemas([SourceName::root()]);
+    let ctx: ServiceCtx = make_domain_engine(test.ontology.clone()).await.into();
+
+    r#"mutation {
+        User(
+            create: [
+                { id: "user/bob" email: "b@ob.com" }
+                { id: "user/alice" email: "ali@ce.com" }
+                { id: "user/tracy" email: "tr@acy.com" }
+                { id: "user/alf" email: "al@f.com" }
+            ]
+        ) { node { id } }
+    }"#
+    .exec([], &schema, &ctx)
+    .await
+    .unwrap();
+
+    expect_eq!(
+        actual = r#"{
+            users(input: {ids: ["user/bob", "user/tracy"]}) {
+                nodes { id }
+            }
+        }"#
+        .exec([], &schema, &ctx)
+        .await,
+        expected = Ok(graphql_value!({
+            "users": {
+                "nodes": [
+                    { "id": "user/bob" },
+                    { "id": "user/tracy" },
+                ]
+            }
+        })),
+    );
+}
+
+#[test(tokio::test)]
 async fn test_gitmesh_update_owner_relation() {
     let (test, [schema]) = TestPackages::with_sources([(ROOT, GITMESH.1)])
         .with_data_store(ROOT, DataStoreConfig::Default)

@@ -26,9 +26,13 @@ def OrganizationMember (
 )
 
 map users(
-    (),
+    (
+        'ids'?: { ..id }
+    ),
     User: {
-        ..User match(),
+        ..User match(
+            'id'?: in { ..id }
+        ),
     }
 )
 
