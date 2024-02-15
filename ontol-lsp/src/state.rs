@@ -748,9 +748,14 @@ fn get_struct_pattern_path(s: &StructPattern, cursor: &usize) -> Option<Path> {
     if in_range(range, cursor) {
         return Some(path.0.to_owned());
     }
-    for (attr, range) in &s.attributes {
-        if in_range(range, cursor) {
-            return get_pattern_path(&attr.object.0, cursor);
+    for (arg, range) in &s.args {
+        match arg {
+            ontol_parser::ast::StructPatternArgument::Attr(attr) => {
+                if in_range(range, cursor) {
+                    return get_pattern_path(&attr.object.0, cursor);
+                }
+            }
+            ontol_parser::ast::StructPatternArgument::Spread(_) => (),
         }
     }
     None

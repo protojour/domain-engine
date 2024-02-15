@@ -6,8 +6,8 @@ use smartstring::alias::String;
 
 use crate::ast::{
     AnyPattern, Dot, ExprPattern, FmtStatement, MapArm, Path, RootBindingPattern,
-    SetAlgebraPattern, SetAlgebraicOperator, SetPatternElement, StructPattern, StructPatternAttr,
-    StructPatternModifier, TypeOrPattern, UseStatement,
+    SetAlgebraPattern, SetAlgebraicOperator, SetPatternElement, StructPattern,
+    StructPatternArgument, StructPatternAttr, StructPatternModifier, TypeOrPattern, UseStatement,
 };
 
 use super::{
@@ -325,15 +325,15 @@ fn parenthesized_struct_pattern(
         .or_not()
         .then(struct_pattern_modifier().or_not())
         .then(
-            spanned(struct_pattern_attr(any_pattern))
+            spanned(struct_pattern_attr(any_pattern).or(struct_pattern_spread()))
                 .separated_by(sigil(','))
                 .allow_trailing()
                 .delimited_by(open('('), close(')')),
         )
-        .map(|((path, modifier), attributes)| StructPattern {
+        .map(|((path, modifier), args)| StructPattern {
             path,
             modifier,
-            attributes,
+            args,
         })
         .labelled("struct pattern")
 }
@@ -344,7 +344,7 @@ fn struct_pattern_modifier() -> impl AstParser<Spanned<StructPatternModifier>> {
 
 fn struct_pattern_attr(
     pattern: impl AstParser<AnyPattern> + Clone + 'static,
-) -> impl AstParser<StructPatternAttr> {
+) -> impl AstParser<StructPatternArgument> {
     recursive(|struct_pattern_attr| {
         spanned(named_type())
             .then(
@@ -358,15 +358,21 @@ fn struct_pattern_attr(
             .then(spanned(sigil('?')).or_not())
             .then_ignore(colon())
             .then(spanned(pattern))
-            .map_with_span(|(((relation, relation_attrs), option), object), _span| {
-                StructPatternAttr {
+            .map_with_span(|(((relation, relation_args), option), object), _span| {
+                StructPatternArgument::Attr(StructPatternAttr {
                     relation,
-                    relation_attrs,
+                    relation_args,
                     option: option.map(|(_, span)| ((), span)),
                     object,
-                }
+                })
             })
     })
+}
+
+fn struct_pattern_spread() -> impl AstParser<StructPatternArgument> {
+    dot_dot()
+        .ignore_then(ident())
+        .map(StructPatternArgument::Spread)
 }
 
 fn set_pattern(
@@ -770,6 +776,19 @@ mod tests {
             bar(
                 'foo': /Hello (?<name>\w+)!/
             )
+        )
+        ";
+
+        let stmts = parse(source).unwrap();
+        assert_matches!(stmts.as_slice(), [Statement::Map(_)]);
+    }
+
+    #[test]
+    fn parse_spread_in_map() {
+        let source = r"
+        map(
+            foo: x,
+            bar('a': b, ..rest)
         )
         ";
 

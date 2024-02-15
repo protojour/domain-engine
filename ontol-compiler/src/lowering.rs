@@ -747,7 +747,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 TypePath::Inferred { def_id }
             }
         };
-        let attrs = self.lower_struct_pattern_attrs(ast.attributes, var_table)?;
+        let attrs = self.lower_struct_pattern_args(ast.args, var_table)?;
 
         Ok(self.mk_pattern(
             PatternKind::Compound {
@@ -782,6 +782,22 @@ impl<'s, 'm> Lowering<'s, 'm> {
         }
     }
 
+    fn lower_struct_pattern_args(
+        &mut self,
+        attributes: Vec<(ast::StructPatternArgument, Range<usize>)>,
+        var_table: &mut MapVarTable,
+    ) -> Res<Box<[CompoundPatternAttr]>> {
+        attributes
+            .into_iter()
+            .map(|(struct_arg, span)| match struct_arg {
+                ast::StructPatternArgument::Attr(attr) => {
+                    self.lower_compound_pattern_attr((attr, span), var_table)
+                }
+                ast::StructPatternArgument::Spread(_) => todo!(),
+            })
+            .collect()
+    }
+
     fn lower_struct_pattern_attrs(
         &mut self,
         attributes: Vec<(ast::StructPatternAttr, Range<usize>)>,
@@ -802,7 +818,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
     ) -> Res<CompoundPatternAttr> {
         let ast::StructPatternAttr {
             relation,
-            relation_attrs,
+            relation_args: relation_attrs,
             option,
             object: (object, object_span),
         } = ast_struct_attr;
@@ -837,7 +853,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                             _ => None,
                         };
 
-                        let attrs = self.lower_struct_pattern_attrs(attrs, var_table)?;
+                        let attrs = self.lower_struct_pattern_args(attrs, var_table)?;
                         Some(self.mk_pattern(
                             PatternKind::Compound {
                                 type_path: TypePath::RelContextual,

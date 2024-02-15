@@ -127,7 +127,7 @@ pub enum RootBindingPattern {
 pub struct StructPattern {
     pub path: Option<Spanned<Path>>,
     pub modifier: Option<Spanned<StructPatternModifier>>,
-    pub attributes: Vec<Spanned<StructPatternAttr>>,
+    pub args: Vec<Spanned<StructPatternArgument>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -135,11 +135,17 @@ pub enum StructPatternModifier {
     Match,
 }
 
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub enum StructPatternArgument {
+    Attr(StructPatternAttr),
+    Spread(String),
+}
+
 /// relation attribute within `struct { .. }`
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct StructPatternAttr {
     pub relation: Spanned<Type>,
-    pub relation_attrs: Option<Spanned<Vec<Spanned<StructPatternAttr>>>>,
+    pub relation_args: Option<Spanned<Vec<Spanned<StructPatternArgument>>>>,
     pub option: Option<Spanned<()>>,
     pub object: Spanned<AnyPattern>,
 }
