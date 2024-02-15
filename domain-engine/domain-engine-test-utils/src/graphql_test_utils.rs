@@ -1,4 +1,5 @@
 use std::{
+    collections::{BTreeMap, BTreeSet},
     fmt::{Debug, Display},
     sync::Arc,
 };
@@ -14,6 +15,7 @@ use domain_engine_juniper::{
 use juniper::ScalarValue;
 use ontol_runtime::{config::DataStoreConfig, sequence::Sequence};
 use ontol_test_utils::{OntolTest, SourceName, TestCompile, TestPackages};
+use ordered_float::NotNan;
 use unimock::*;
 
 pub trait TestCompileSchema {
@@ -184,32 +186,87 @@ impl<T: Debug> GraphqlTestResultExt for Result<T, TestError> {
     }
 }
 
-pub trait ValueExt<S> {
-    fn field(&self, name: &str) -> &juniper::Value<S>;
-    fn opt_field(&self, name: &str) -> Option<&juniper::Value<S>>;
-    fn element(&self, index: usize) -> &juniper::Value<S>;
-    fn scalar(&self) -> &S;
+pub trait GraphqlValueResultExt {
+    fn unordered(self) -> Result<UnorderedValue, TestError>;
 }
 
-impl<S> ValueExt<S> for juniper::Value<S> {
-    fn field(&self, name: &str) -> &juniper::Value<S> {
+impl GraphqlValueResultExt for Result<juniper::Value<GqlScalar>, TestError> {
+    fn unordered(self) -> Result<UnorderedValue, TestError> {
+        self.map(|value| value.unordered())
+    }
+}
+
+pub trait ValueExt {
+    fn field(&self, name: &str) -> &juniper::Value<GqlScalar>;
+    fn opt_field(&self, name: &str) -> Option<&juniper::Value<GqlScalar>>;
+    fn element(&self, index: usize) -> &juniper::Value<GqlScalar>;
+    fn scalar(&self) -> &GqlScalar;
+    fn unordered(&self) -> UnorderedValue;
+}
+
+impl ValueExt for juniper::Value<GqlScalar> {
+    fn field(&self, name: &str) -> &juniper::Value<GqlScalar> {
         self.opt_field(name)
             .unwrap_or_else(|| panic!("field `{name}` was not present"))
     }
 
-    fn opt_field(&self, name: &str) -> Option<&juniper::Value<S>> {
+    fn opt_field(&self, name: &str) -> Option<&juniper::Value<GqlScalar>> {
         self.as_object_value()
             .expect("not an object")
             .get_field_value(name)
     }
 
-    fn element(&self, index: usize) -> &juniper::Value<S> {
+    fn element(&self, index: usize) -> &juniper::Value<GqlScalar> {
         &self.as_list_value().expect("not a list")[index]
     }
 
-    fn scalar(&self) -> &S {
+    fn scalar(&self) -> &GqlScalar {
         self.as_scalar_value().unwrap()
     }
+
+    fn unordered(&self) -> UnorderedValue {
+        match self {
+            juniper::Value::Null => UnorderedValue::Null,
+            juniper::Value::Scalar(GqlScalar::Boolean(bool)) => UnorderedValue::Boolean(*bool),
+            juniper::Value::Scalar(GqlScalar::I32(int)) => UnorderedValue::Int((*int).into()),
+            juniper::Value::Scalar(GqlScalar::I64(int)) => UnorderedValue::Int(*int),
+            juniper::Value::Scalar(GqlScalar::F64(float)) => {
+                UnorderedValue::Float(NotNan::new(*float).unwrap())
+            }
+            juniper::Value::Scalar(GqlScalar::String(string)) => {
+                UnorderedValue::String(string.to_string())
+            }
+            juniper::Value::List(elements) => {
+                UnorderedValue::Set(elements.iter().map(Self::unordered).collect())
+            }
+            juniper::Value::Object(object) => UnorderedValue::Object(
+                object
+                    .iter()
+                    .map(|(key, val)| (key.clone(), val.unordered()))
+                    .collect(),
+            ),
+        }
+    }
+}
+
+/// A macro for creating an UnorderedValue
+#[macro_export]
+macro_rules! graphql_value_unordered {
+    ($($input:tt)*) => {
+        $crate::graphql_test_utils::ValueExt::unordered(&juniper::graphql_value!($($input)*))
+    }
+}
+
+/// Version of juniper::Value that does not care about ordering of arrays
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+pub enum UnorderedValue {
+    Null,
+    Boolean(bool),
+    Int(i64),
+    Float(NotNan<f64>),
+    String(String),
+    Set(BTreeSet<UnorderedValue>),
+    Object(BTreeMap<String, UnorderedValue>),
 }
 
 pub struct GraphQLPageDebug {

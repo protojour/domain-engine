@@ -5,8 +5,11 @@ use domain_engine_juniper::{
     context::ServiceCtx,
     juniper::{graphql_value, InputValue},
 };
-use domain_engine_test_utils::graphql_test_utils::{
-    Exec, GraphqlTestResultExt, TestCompileSchema, ValueExt,
+use domain_engine_test_utils::{
+    graphql_test_utils::{
+        Exec, GraphqlTestResultExt, GraphqlValueResultExt, TestCompileSchema, ValueExt,
+    },
+    graphql_value_unordered,
 };
 use ontol_runtime::{config::DataStoreConfig, ontology::Ontology};
 use ontol_test_utils::{
@@ -435,8 +438,9 @@ async fn test_gitmesh_fancy_filters() {
             }
         }"#
         .exec([], &schema, &ctx)
-        .await,
-        expected = Ok(graphql_value!({
+        .await
+        .unordered(),
+        expected = Ok(graphql_value_unordered!({
             "users": {
                 "nodes": [
                     { "id": "user/bob" },

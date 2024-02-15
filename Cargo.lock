@@ -641,6 +641,7 @@ dependencies = [
  "juniper",
  "ontol-runtime",
  "ontol-test-utils",
+ "ordered-float 4.2.0",
  "serde",
  "serde_json",
  "tracing",
