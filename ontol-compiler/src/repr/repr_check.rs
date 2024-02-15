@@ -482,6 +482,9 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                         (def_id, data.rel_span),
                     ]));
                 }
+                ReprKind::Intersection(items) => {
+                    builder.kind = Some(ReprKind::Intersection(items.to_vec()));
+                }
                 _ => {
                     todo!("{repr:?}");
                 }

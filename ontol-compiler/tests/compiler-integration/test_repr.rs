@@ -147,14 +147,13 @@ fn test_repr_valid_mesh1() {
 }
 
 #[test]
-// BUG: todo causes panic in LSP
-#[should_panic = "not yet implemented: Intersection"]
+// BUG: Intersection of ints should be possible
 fn union_integers_no_question() {
     "
-    def level (
-        rel .is: 1
-        rel .is: 2
-        rel .is: 3
+    def level ( // ERROR Intersection of disjoint types
+        rel .is: 1 // NOTE Base type is int(1)
+        rel .is: 2 // NOTE Base type is int(2)
+        rel .is: 3 // NOTE Base type is int(3)
     )
     "
     .compile_fail();
