@@ -41,8 +41,8 @@ The compiler goes through a number of transformation steps before producing
 executable code:
 
 1. `ontol-parser`: Parse ONTOL source code.
-2. `lowering`: Lower these statements into various maps for representing
-   relationships and `Expr` for representing expressions (used in map/unify).
+2. `lowering`: Lower these statements into various hashmaps for representing
+   relationships and `Pattern` which are the things `map` statements consist of.
 3. `type_check`: Type check the expressions and output typed `ontol-hir`.
 4. `repr_check`: Check that every entity consists only of concrete types.
 5. `hir_unify`: Unify map arms to produce `ontol-hir` functions.
