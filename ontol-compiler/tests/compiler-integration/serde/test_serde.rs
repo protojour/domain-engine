@@ -545,6 +545,8 @@ fn test_serde_with_raw_prefix_text_id_overridde_profile() {
     .compile_then(|test| {
         let [baz] = test.bind(["baz"]);
 
+        assert_json_io_matches!(serde_create(&baz), { "prefix_id": "prefix/mytext" });
+
         let baz_value = serde_create(&baz)
             .with_profile(processor_profile.clone())
             .to_value_raw(json!({ "__ID": "mytext" }))
@@ -560,6 +562,50 @@ fn test_serde_with_raw_prefix_text_id_overridde_profile() {
         expect_eq!(
             actual = serde_create(&baz).as_json(&baz_value),
             expected = json!({ "prefix_id": "prefix/mytext" }),
+        );
+    });
+}
+
+#[test]
+fn test_serde_with_raw_prefix_int_id_overridde_profile() {
+    let processor_profile = ProcessorProfile {
+        overridden_id_property_key: Some("__ID"),
+        ignored_property_keys: &[],
+        id_format: ScalarFormat::RawText,
+        flags: ProcessorProfileFlags::empty(),
+    };
+
+    "
+    def baz (
+        rel .'prefix_id'|id: (
+            fmt '' => 'prefix/' => i64 => .
+        )
+    )
+    "
+    .compile_then(|test| {
+        let [baz] = test.bind(["baz"]);
+
+        assert_json_io_matches!(serde_create(&baz), { "prefix_id": "prefix/1337" });
+        assert_error_msg!(
+            serde_create(&baz).to_value_variant(json!({ "prefix_id": "prefix/deadbeef"})),
+            r#"invalid type: string "prefix/deadbeef", expected string matching /(?:\A(?:prefix/)(([0-9]+?))\z)/ at line 1 column 30"#
+        );
+
+        let baz_value = serde_create(&baz)
+            .with_profile(processor_profile.clone())
+            .to_value_raw(json!({ "__ID": "1337" }))
+            .unwrap();
+
+        expect_eq!(
+            actual = ontol_test_utils::serde_helper::serde_create(&baz)
+                .with_profile(processor_profile.clone())
+                .as_json(&baz_value),
+            expected = json!({ "__ID": "1337" })
+        );
+
+        expect_eq!(
+            actual = serde_create(&baz).as_json(&baz_value),
+            expected = json!({ "prefix_id": "prefix/1337" }),
         );
     });
 }

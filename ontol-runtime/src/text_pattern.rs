@@ -72,7 +72,7 @@ impl TextPattern {
 
             for part in &self.constant_parts {
                 match part {
-                    TextPatternConstantPart::AllStrings { capture_group } => {
+                    TextPatternConstantPart::AnyString { capture_group } => {
                         let text = captures
                             .get_group(*capture_group)
                             .map(|span| &haystack[span.start..span.end])
@@ -126,7 +126,7 @@ impl TextPattern {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum TextPatternConstantPart {
-    AllStrings { capture_group: usize },
+    AnyString { capture_group: usize },
     Literal(String),
     Property(TextPatternProperty),
 }
@@ -148,7 +148,7 @@ impl<'d, 'o> Display for FormatPattern<'d, 'o> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for constant_part in &self.pattern.constant_parts {
             match (constant_part, self.value) {
-                (TextPatternConstantPart::AllStrings { .. }, Value::Struct(attrs, _)) => {
+                (TextPatternConstantPart::AnyString { .. }, Value::Struct(attrs, _)) => {
                     let property_id =
                         PropertyId::subject(RelationshipId(self.ontology.ontol_domain_meta().text));
                     let Some(attribute) = attrs.get(&property_id) else {

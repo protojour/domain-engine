@@ -105,10 +105,20 @@ fn id_and_inherent_property_inline_type() {
 }
 
 #[test]
-fn entity_id_inline_fmt() {
+fn entity_id_inline_fmt_uuid() {
     "
     def foo (
         rel .'key'|id: ( fmt '' => 'foo/' => uuid => . )
+    )
+    "
+    .compile();
+}
+
+#[test]
+fn entity_id_inline_fmt_i64() {
+    "
+    def foo (
+        rel .'key'|id: ( fmt '' => 'foo/' => i64 => . )
     )
     "
     .compile();

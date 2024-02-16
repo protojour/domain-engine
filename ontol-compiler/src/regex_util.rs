@@ -63,6 +63,36 @@ pub fn set_of_all_strings() -> Hir {
     Parser::new().parse(r#".*"#).unwrap()
 }
 
+pub fn integer_with_radix(radix: u8) -> Hir {
+    Hir::repetition(Repetition {
+        min: 1,
+        max: None,
+        greedy: false,
+        sub: Box::new(digit_with_radix(radix)),
+    })
+}
+
+fn digit_with_radix(radix: u8) -> Hir {
+    let mut ranges: Vec<ClassUnicodeRange> = vec![];
+    assert!(radix > 0);
+
+    {
+        let decimal_offset = u8::min(radix, 10) - 1;
+        let end: char = ('0' as u32 + (decimal_offset as u32)).try_into().unwrap();
+
+        ranges.push(ClassUnicodeRange::new('0', end));
+    }
+
+    if radix > 10 {
+        let alpha_offset = radix - 11;
+        let end: char = ('a' as u32 + (alpha_offset as u32)).try_into().unwrap();
+
+        ranges.push(ClassUnicodeRange::new('a', end));
+    }
+
+    Hir::class(Class::Unicode(ClassUnicode::new(ranges)))
+}
+
 pub fn collect_hir_constant_parts(hir: &Hir, parts: &mut String) {
     match hir.kind() {
         HirKind::Literal(Literal(bytes)) => parts.push_str(std::str::from_utf8(bytes).unwrap()),
@@ -404,4 +434,32 @@ fn project_regex_span(
     let end = scanner.advance_to_regex_pos(&mut chars, ast_span.end.offset);
 
     Span { start, end }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn digit_radix() {
+        assert_eq!(
+            digit_with_radix(2),
+            Hir::class(Class::Unicode(ClassUnicode::new([ClassUnicodeRange::new(
+                '0', '1'
+            )])))
+        );
+        assert_eq!(
+            digit_with_radix(10),
+            Hir::class(Class::Unicode(ClassUnicode::new([ClassUnicodeRange::new(
+                '0', '9'
+            )])))
+        );
+        assert_eq!(
+            digit_with_radix(16),
+            Hir::class(Class::Unicode(ClassUnicode::new([
+                ClassUnicodeRange::new('0', '9'),
+                ClassUnicodeRange::new('a', 'f')
+            ])))
+        );
+    }
 }

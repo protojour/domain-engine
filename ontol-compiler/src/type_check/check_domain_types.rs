@@ -340,7 +340,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         segment: &TextPatternSegment,
     ) -> Result<ValueGenerator, ()> {
         match segment {
-            TextPatternSegment::AllStrings => Ok(ValueGenerator::Uuid),
+            TextPatternSegment::AnyString => Ok(ValueGenerator::Uuid),
             TextPatternSegment::Concat(segments) => {
                 let mut output_generator = None;
                 for concat_segment in segments {

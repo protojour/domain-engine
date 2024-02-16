@@ -10,7 +10,7 @@ use std::fmt::Write;
 use tracing::debug;
 
 use crate::{
-    regex_util::{self, set_of_all_strings},
+    regex_util::{self, integer_with_radix, set_of_all_strings},
     relation::Constructor,
     Compiler,
 };
@@ -25,8 +25,11 @@ pub enum TextPatternSegment {
     /// Matches only the empty string:
     #[default]
     EmptyString,
-    AllStrings,
+    AnyString,
     Literal(String),
+    Integer {
+        radix: u8,
+    },
     Regex(Hir),
     Property {
         property_id: PropertyId,
@@ -89,8 +92,9 @@ impl TextPatternSegment {
     pub fn constant_prefix(&self) -> Option<String> {
         match self {
             Self::EmptyString => None,
-            Self::AllStrings => None,
+            Self::AnyString => None,
             Self::Literal(string) => Some(string.clone()),
+            Self::Integer { .. } => None,
             Self::Regex(hir) => regex_util::constant_prefix(hir),
             Self::Property { .. } => None,
             Self::Concat(segments) => segments.iter().next().and_then(Self::constant_prefix),
@@ -101,7 +105,7 @@ impl TextPatternSegment {
     fn to_regex_hir(&self, capture_cursor: &mut CaptureCursor) -> Hir {
         match self {
             Self::EmptyString => regex_util::empty_string(),
-            Self::AllStrings => {
+            Self::AnyString => {
                 let index = capture_cursor.increment();
                 Hir::capture(Capture {
                     index,
@@ -110,6 +114,14 @@ impl TextPatternSegment {
                 })
             }
             Self::Literal(string) => Hir::literal(string.as_bytes()),
+            Self::Integer { radix } => {
+                let index = capture_cursor.increment();
+                Hir::capture(Capture {
+                    index,
+                    name: None,
+                    sub: Box::new(integer_with_radix(*radix)),
+                })
+            }
             Self::Regex(hir) => hir.clone(),
             Self::Property { segment, .. } => {
                 let index = capture_cursor.increment();
@@ -142,14 +154,15 @@ impl TextPatternSegment {
     ) {
         match self {
             Self::EmptyString => {}
-            Self::AllStrings => {
-                parts.push(TextPatternConstantPart::AllStrings {
+            Self::AnyString => {
+                parts.push(TextPatternConstantPart::AnyString {
                     capture_group: capture_cursor.increment() as usize,
                 });
             }
             Self::Literal(string) => {
                 parts.push(TextPatternConstantPart::Literal(string.clone()));
             }
+            Self::Integer { .. } => {}
             Self::Regex(hir) => {
                 let mut string = String::new();
                 regex_util::collect_hir_constant_parts(hir, &mut string);

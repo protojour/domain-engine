@@ -777,7 +777,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         assert!(self.patterns.text_patterns.contains_key(&def.def_id));
 
         let operator = match segment {
-            TextPatternSegment::AllStrings => SerdeOperator::String(def.def_id),
+            TextPatternSegment::AnyString => SerdeOperator::String(def.def_id),
             _ => SerdeOperator::CapturingTextPattern(def.def_id),
         };
 

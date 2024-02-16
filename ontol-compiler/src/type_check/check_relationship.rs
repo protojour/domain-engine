@@ -486,7 +486,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         span: &SourceSpan,
     ) -> Result<(), TypeRef<'m>> {
         let appendee = match self.defs.def_kind(relation_def_id) {
-            DefKind::Primitive(PrimitiveKind::Text, _) => TextPatternSegment::AllStrings,
+            DefKind::Primitive(PrimitiveKind::Text, _) => TextPatternSegment::AnyString,
             DefKind::TextLiteral(str) => TextPatternSegment::new_literal(str),
             DefKind::Regex(_) => TextPatternSegment::Regex(
                 self.defs
@@ -496,19 +496,24 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .hir
                     .clone(),
             ),
+            DefKind::Primitive(PrimitiveKind::I64, _) => TextPatternSegment::Property {
+                property_id: PropertyId::subject(relationship.0),
+                type_def_id: relation_def_id,
+                segment: Box::new(TextPatternSegment::Integer { radix: 10 }),
+            },
             _ => {
-                let Some(Constructor::TextFmt(rel_segment)) = self
+                let constructor = self
                     .relations
                     .properties_by_def_id(relation_def_id)
-                    .map(Properties::constructor)
-                else {
-                    return Err(self.error(CompileError::CannotConcatenateStringPattern, span));
-                };
+                    .map(Properties::constructor);
 
-                TextPatternSegment::Property {
-                    property_id: PropertyId::subject(relationship.0),
-                    type_def_id: relation_def_id,
-                    segment: Box::new(rel_segment.clone()),
+                match constructor {
+                    Some(Constructor::TextFmt(rel_segment)) => TextPatternSegment::Property {
+                        property_id: PropertyId::subject(relationship.0),
+                        type_def_id: relation_def_id,
+                        segment: Box::new(rel_segment.clone()),
+                    },
+                    _ => return Err(self.error(CompileError::CannotConcatenateStringPattern, span)),
                 }
             }
         };

@@ -296,7 +296,7 @@ impl<'on> ValueMatcher for CapturingTextPatternMatcher<'on> {
 
                             attrs.insert(property.property_id, attribute);
                         }
-                        TextPatternConstantPart::AllStrings { .. } => {
+                        TextPatternConstantPart::AnyString { .. } => {
                             let text_def_id = self.ontology.ontol_domain_meta.text;
                             let property_id = PropertyId {
                                 role: Role::Subject,
