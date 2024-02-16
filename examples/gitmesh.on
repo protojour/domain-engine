@@ -28,12 +28,14 @@ def OrganizationMember (
 map users(
     (
         'ids'?: { ..id },
+        'member_of'?: { ..member_of }
     ),
     User: {
         ..User match(
             'id'?: in { ..id },
-            // TODO: We want to test a filter that uses 'repositories',
-            // but it's a bit complicated since it involves a union.
+            'member_of'?: Organization (
+                'id': in { ..member_of }
+            ),
         ),
     }
 )

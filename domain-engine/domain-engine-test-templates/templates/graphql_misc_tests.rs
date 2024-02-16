@@ -426,6 +426,17 @@ async fn test_gitmesh_fancy_filters() {
                 { id: "user/alf" email: "al@f.com" }
             ]
         ) { node { id } }
+        Organization(
+            create: [
+                {
+                    id: "org/lolsoft"
+                    members: [
+                        { id: "user/alice" _edge: { role: "janitor" } }
+                        { id: "user/alf" _edge: { role: "president" } }
+                    ]
+                }
+            ]
+        ) { node { id } }
     }"#
     .exec([], &schema, &ctx)
     .await
@@ -445,6 +456,25 @@ async fn test_gitmesh_fancy_filters() {
                 "nodes": [
                     { "id": "user/bob" },
                     { "id": "user/tracy" },
+                ]
+            }
+        })),
+    );
+
+    expect_eq!(
+        actual = r#"{
+            users(input: {member_of: ["org/lolsoft"]}) {
+                nodes { id }
+            }
+        }"#
+        .exec([], &schema, &ctx)
+        .await
+        .unordered(),
+        expected = Ok(graphql_value_unordered!({
+            "users": {
+                "nodes": [
+                    { "id": "user/alice" },
+                    { "id": "user/alf" },
                 ]
             }
         })),

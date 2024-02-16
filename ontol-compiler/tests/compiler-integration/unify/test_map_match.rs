@@ -409,7 +409,6 @@ mod match_contains_all {
 }
 
 #[test]
-// BUG: Should be able to filter inside edge->bar like this
 fn test_map_match_in_sub_multi_edge() {
     r#"
     def foo (
@@ -424,12 +423,41 @@ fn test_map_match_in_sub_multi_edge() {
         ('bar_tags'?: { ..tags }),
         foo: {
             ..foo match(
-                'bars'?: bar match( // ERROR {bar} variable must be enclosed in {}
+                'bars'?: bar match(
                     'tags': contains all { ..tags }
                 )
             )
         }
     )
     "#
-    .compile_fail(); // BUG
+    .compile_then(|test| {
+        let [foo] = test.bind(["foo"]);
+        let foo_json = json!({ "key": "f", "bars": []});
+        test.mapper()
+            .with_mock_yielder(
+                YielderMock::yield_match
+                    .next_call(matching!(
+                        eq!(&ValueCardinality::Many),
+                        eq!(&Literal(indoc! { r#"
+                            (root $a)
+                            (is-entity $a def@1:1)
+                            (match-prop $a S:1:7 (element-in $c))
+                            (is-entity $b def@1:2)
+                            (match-prop $b S:1:12 (superset-of $d))
+                            (member $c (_ $b))
+                            (member $d (_ 'x'))
+                            (member $d (_ 'y'))
+                        "#
+                        }))
+                    ))
+                    .returns(Value::sequence_of([foo
+                        .value_builder(foo_json.clone())
+                        .into()])),
+            )
+            .assert_named_forward_map(
+                "foos",
+                json!({ "bar_tags": ["x", "y"], }),
+                json!([foo_json]),
+            );
+    });
 }

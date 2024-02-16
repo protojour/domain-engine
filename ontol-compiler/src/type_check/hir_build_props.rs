@@ -74,6 +74,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 Some(property_set) => {
                     let mut match_attributes = IndexMap::new();
                     self.collect_match_attributes(property_set, &mut match_attributes);
+                    self.collect_membership_match_attributes(type_def_id, &mut match_attributes);
 
                     self.build_struct_node(
                         pattern_attrs,
@@ -105,6 +106,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         self.collect_match_attributes(property_set, &mut match_attributes);
                     }
                 }
+
+                self.collect_membership_match_attributes(type_def_id, &mut match_attributes);
 
                 self.build_struct_node(
                     pattern_attrs,
@@ -161,33 +164,57 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         property_set: &IndexMap<PropertyId, Property>,
         match_attributes: &mut IndexMap<&'m str, MatchAttribute>,
     ) {
-        for (property_id, _property) in property_set {
-            let meta = self.defs.relationship_meta(property_id.relationship_id);
-            let property_name = match property_id.role {
-                Role::Subject => match meta.relation_def_kind.value {
-                    DefKind::TextLiteral(lit) => Some(*lit),
-                    _ => panic!("BUG: Expected named subject property"),
-                },
-                Role::Object => meta.relationship.object_prop,
-            };
-            let (_, owner_cardinality, _) = meta.relationship.by(property_id.role);
-            let (value_def_id, _, _) = meta.relationship.by(property_id.role.opposite());
+        for (prop_id, _property) in property_set {
+            self.collect_match_attribute(*prop_id, match_attributes);
+        }
+    }
 
-            if let Some(property_name) = property_name {
-                match_attributes.insert(
-                    property_name,
-                    MatchAttribute {
-                        property_id: *property_id,
-                        cardinality: owner_cardinality,
-                        rel_params_def: match &meta.relationship.rel_params {
-                            RelParams::Type(def_id) => Some(*def_id),
-                            _ => None,
-                        },
-                        value_def: value_def_id,
-                        mentioned: false,
-                    },
-                );
+    fn collect_membership_match_attributes(
+        &self,
+        def_id: DefId,
+        match_attributes: &mut IndexMap<&'m str, MatchAttribute>,
+    ) {
+        let Some(memberships) = self.relations.reverse_ontology_mesh.get(&def_id) else {
+            return;
+        };
+
+        for def_id in memberships {
+            if let Some(property_set) = self.relations.properties_table_by_def_id(*def_id) {
+                self.collect_match_attributes(property_set, match_attributes);
             }
+        }
+    }
+
+    fn collect_match_attribute(
+        &self,
+        prop_id: PropertyId,
+        match_attributes: &mut IndexMap<&'m str, MatchAttribute>,
+    ) {
+        let meta = self.defs.relationship_meta(prop_id.relationship_id);
+        let property_name = match prop_id.role {
+            Role::Subject => match meta.relation_def_kind.value {
+                DefKind::TextLiteral(lit) => Some(*lit),
+                _ => panic!("BUG: Expected named subject property"),
+            },
+            Role::Object => meta.relationship.object_prop,
+        };
+        let (_, owner_cardinality, _) = meta.relationship.by(prop_id.role);
+        let (value_def_id, _, _) = meta.relationship.by(prop_id.role.opposite());
+
+        if let Some(property_name) = property_name {
+            match_attributes.insert(
+                property_name,
+                MatchAttribute {
+                    property_id: prop_id,
+                    cardinality: owner_cardinality,
+                    rel_params_def: match &meta.relationship.rel_params {
+                        RelParams::Type(def_id) => Some(*def_id),
+                        _ => None,
+                    },
+                    value_def: value_def_id,
+                    mentioned: false,
+                },
+            );
         }
     }
 
@@ -354,11 +381,27 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             })
                         }
                         _ => {
-                            self.type_error(
-                                TypeError::VariableMustBeSequenceEnclosed(value_ty),
-                                &val.span,
-                            );
-                            return None;
+                            if actual_struct_flags.contains(StructFlags::MATCH) {
+                                // It's allowed to disregard the cardinality if a Match.
+                                let val_node = self.build_node(
+                                    val,
+                                    NodeInfo {
+                                        expected_ty: Some((value_ty, Strength::Strong)),
+                                        parent_struct_flags: actual_struct_flags,
+                                    },
+                                    ctx,
+                                );
+                                ontol_hir::PropVariant::Value(Attribute {
+                                    rel: rel_node,
+                                    val: val_node,
+                                })
+                            } else {
+                                self.type_error(
+                                    TypeError::VariableMustBeSequenceEnclosed(value_ty),
+                                    &val.span,
+                                );
+                                return None;
+                            }
                         }
                     },
                 };
@@ -497,7 +540,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             ),
             (ty @ Type::Anonymous(def_id), None) => {
                 match self.relations.properties_by_def_id(*def_id) {
-                    Some(_) => self.build_implicit_rel_node(ty, val, prop_span, ctx),
+                    Some(_) => {
+                        if actual_struct_flags.contains(StructFlags::MATCH) {
+                            ctx.mk_node(
+                                ontol_hir::Kind::Unit,
+                                Meta {
+                                    ty,
+                                    span: prop_span,
+                                },
+                            )
+                        } else {
+                            // need to produce something
+                            self.build_implicit_rel_node(ty, val, prop_span, ctx)
+                        }
+                    }
                     // An anonymous type without properties, i.e. just "meta relationships" about the relationship itself:
                     None => ctx.mk_node(
                         ontol_hir::Kind::Unit,

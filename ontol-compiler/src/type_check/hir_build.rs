@@ -587,8 +587,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ctx,
                 )
             }
-            _ => self.error_node(
-                CompileError::TODO(smart_format!("Unexpected pattern kind")),
+            _pat => self.error_node(
+                CompileError::TODO(smart_format!(
+                    "Explicit mapping of relation parameters needed"
+                )),
                 &prop_span,
                 ctx,
             ),
