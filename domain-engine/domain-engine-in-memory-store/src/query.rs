@@ -2,14 +2,11 @@ use anyhow::anyhow;
 use fnv::FnvHashMap;
 use ontol_runtime::{
     condition::Condition,
-    ontology::{
-        DataRelationshipKind, DataRelationshipTarget, PropertyCardinality, TypeInfo,
-        ValueCardinality,
-    },
+    ontology::{DataRelationshipKind, DataRelationshipTarget, TypeInfo, ValueCardinality},
     select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
     sequence::{Sequence, SubSequence},
     value::{Attribute, PropertyId, Value},
-    Role,
+    DefId, Role,
 };
 use tracing::{debug, error};
 
@@ -133,8 +130,14 @@ impl InMemoryStore {
         }));
 
         for (entity_key, properties) in raw_props_vec {
-            let value =
-                self.apply_struct_select(type_info, &entity_key, properties, struct_select, ctx)?;
+            let value = self.apply_struct_select(
+                type_info,
+                &entity_key,
+                properties,
+                struct_select.def_id,
+                &struct_select.properties,
+                ctx,
+            )?;
 
             entity_sequence.attrs.push(value.into());
         }
@@ -147,10 +150,11 @@ impl InMemoryStore {
         type_info: &TypeInfo,
         entity_key: &DynamicKey,
         mut properties: FnvHashMap<PropertyId, Attribute>,
-        struct_select: &StructSelect,
+        struct_def_id: DefId,
+        select_properties: &FnvHashMap<PropertyId, Select>,
         ctx: &DbContext,
     ) -> DomainResult<Value> {
-        for (property_id, subselect) in &struct_select.properties {
+        for (property_id, subselect) in select_properties {
             if properties.contains_key(property_id) {
                 continue;
             }
@@ -188,7 +192,7 @@ impl InMemoryStore {
             }
         }
 
-        Ok(Value::Struct(Box::new(properties), struct_select.def_id))
+        Ok(Value::Struct(Box::new(properties), struct_def_id))
     }
 
     fn sub_query_attributes(
@@ -269,17 +273,23 @@ impl InMemoryStore {
                     .unwrap();
                 Ok(id_attribute.val.clone())
             }
-            Select::Struct(struct_select) => {
-                self.sub_query_entity_struct(entity_key, struct_select, type_info, properties, ctx)
-            }
+            Select::Struct(struct_select) => self.apply_struct_select(
+                type_info,
+                &entity_key.dynamic_key,
+                properties.clone(),
+                entity_key.type_def_id,
+                &struct_select.properties,
+                ctx,
+            ),
             Select::StructUnion(_, variant_selects) => {
                 for variant_select in variant_selects {
                     if variant_select.def_id == type_info.def_id {
-                        return self.sub_query_entity_struct(
-                            entity_key,
-                            variant_select,
+                        return self.apply_struct_select(
                             type_info,
-                            properties,
+                            &entity_key.dynamic_key,
+                            properties.clone(),
+                            entity_key.type_def_id,
+                            &variant_select.properties,
                             ctx,
                         );
                     }
@@ -296,7 +306,8 @@ impl InMemoryStore {
                     type_info,
                     &entity_key.dynamic_key,
                     properties.clone(),
-                    struct_select,
+                    struct_select.def_id,
+                    &struct_select.properties,
                     ctx,
                 ),
                 StructOrUnionSelect::Union(_, candidates) => {
@@ -309,44 +320,12 @@ impl InMemoryStore {
                         type_info,
                         &entity_key.dynamic_key,
                         properties.clone(),
-                        struct_select,
+                        struct_select.def_id,
+                        &struct_select.properties,
                         ctx,
                     )
                 }
             },
         }
-    }
-
-    fn sub_query_entity_struct(
-        &self,
-        entity_key: &EntityKey,
-        struct_select: &StructSelect,
-        type_info: &TypeInfo,
-        properties: &FnvHashMap<PropertyId, Attribute>,
-        ctx: &DbContext,
-    ) -> DomainResult<Value> {
-        let mut select_properties = struct_select.properties.clone();
-
-        // Need to "infer" mandatory entity properties, because JSON serializer expects that
-        for (property_id, data_relationship) in type_info.entity_relationships() {
-            if matches!(
-                data_relationship.cardinality_by_role(property_id.role).0,
-                PropertyCardinality::Mandatory
-            ) && !select_properties.contains_key(property_id)
-            {
-                select_properties.insert(*property_id, Select::Leaf);
-            }
-        }
-
-        self.apply_struct_select(
-            type_info,
-            &entity_key.dynamic_key,
-            properties.clone(),
-            &StructSelect {
-                def_id: entity_key.type_def_id,
-                properties: select_properties,
-            },
-            ctx,
-        )
     }
 }

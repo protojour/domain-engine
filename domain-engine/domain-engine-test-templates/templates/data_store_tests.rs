@@ -1,6 +1,11 @@
 use domain_engine_core::{DomainEngine, Session};
 use domain_engine_test_utils::{DomainEngineTestExt, TestFindQuery};
-use ontol_runtime::{config::DataStoreConfig, ontology::Ontology, select::Select};
+use ontol_runtime::{
+    config::DataStoreConfig,
+    interface::serde::processor::{ProcessorProfile, ProcessorProfileFlags},
+    ontology::Ontology,
+    select::Select,
+};
 use ontol_test_utils::{
     assert_error_msg,
     examples::{conduit::CONDUIT_DB, Root, ARTIST_AND_INSTRUMENT},
@@ -238,27 +243,33 @@ async fn test_conduit_db_store_entity_tree() {
         .cast_into::<i64>();
 
     expect_eq!(
-        actual = serde_read(&user_type).as_json(
-            &engine
-                .query_entities(
-                    user_type
-                        .struct_select([(
-                            "authored_articles",
-                            article_type
-                                .struct_select([(
-                                    "comments",
-                                    comment_type.struct_select([]).into()
-                                )])
-                                .into()
-                        )])
-                        .into(),
-                    Session::default(),
-                )
-                .await
-                .unwrap()
-                .attrs[1]
-                .val
-        ),
+        actual = serde_read(&user_type)
+            // This query intentionally violates the domain's JSON schema:
+            .with_profile(ProcessorProfile {
+                flags: ProcessorProfileFlags::ALL_PROPS_OPTIONAL,
+                ..Default::default()
+            })
+            .as_json(
+                &engine
+                    .query_entities(
+                        user_type
+                            .struct_select([(
+                                "authored_articles",
+                                article_type
+                                    .struct_select([(
+                                        "comments",
+                                        comment_type.struct_select([]).into()
+                                    )])
+                                    .into()
+                            )])
+                            .into(),
+                        Session::default(),
+                    )
+                    .await
+                    .unwrap()
+                    .attrs[1]
+                    .val
+            ),
         expected = json!({
             "user_id": new_user_id.to_string(),
             "username": "new_user",
@@ -272,17 +283,12 @@ async fn test_conduit_db_store_entity_tree() {
                     "title": "Foo",
                     "description": "An article",
                     "body": "The body",
-                    "favorited_by": [],
-                    "tags": [],
                     "created_at": "1971-01-01T00:00:00+00:00",
                     "updated_at": "1971-01-01T00:00:00+00:00",
                     "comments": [
                         {
                             "id": comment_id,
                             "body": "First post!",
-                            "author": {
-                                "user_id": pre_existing_user_id.to_string(),
-                            },
                             "created_at": "1971-01-01T00:00:00+00:00",
                             "updated_at": "1971-01-01T00:00:00+00:00",
                         }
