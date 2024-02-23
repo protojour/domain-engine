@@ -23,8 +23,8 @@ use crate::{
     namespace::Space,
     package::{PackageReference, ONTOL_PKG},
     pattern::{
-        CompoundPatternAttr, CompoundPatternAttrKind, CompoundPatternModifier, PatId, Pattern,
-        PatternKind, SetBinaryOperator, SetPatternElement, TypePath,
+        CompoundPatternAttr, CompoundPatternAttrKind, CompoundPatternModifier, OptionSpreadLabel,
+        PatId, Pattern, PatternKind, SetBinaryOperator, SetPatternElement, SpreadLabel, TypePath,
     },
     regex_util::RegexToPatternLowerer,
     Compiler, Src,
@@ -727,6 +727,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     },
                 }]
                 .into(),
+                spread_label: None,
             },
             &span,
         ))
@@ -760,7 +761,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 TypePath::Inferred { def_id }
             }
         };
-        let attrs = self.lower_struct_pattern_args(ast.args, var_table)?;
+        let (attrs, rest_label) = self.lower_struct_pattern_args(ast.args, var_table)?;
 
         Ok(self.mk_pattern(
             PatternKind::Compound {
@@ -770,6 +771,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 }),
                 is_unit_binding: false,
                 attributes: attrs,
+                spread_label: rest_label,
             },
             &span,
         ))
@@ -797,18 +799,28 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
     fn lower_struct_pattern_args(
         &mut self,
-        attributes: Vec<(ast::StructPatternArgument, Range<usize>)>,
+        args: Vec<(ast::StructPatternArgument, Range<usize>)>,
         var_table: &mut MapVarTable,
-    ) -> Res<Box<[CompoundPatternAttr]>> {
-        attributes
-            .into_iter()
-            .map(|(struct_arg, span)| match struct_arg {
+    ) -> Res<(Box<[CompoundPatternAttr]>, OptionSpreadLabel)> {
+        let mut attrs: Vec<CompoundPatternAttr> = Vec::with_capacity(args.len());
+        let mut rest_label: Option<Box<SpreadLabel>> = None;
+
+        for (struct_arg, span) in args {
+            if rest_label.is_some() {
+                return Err((CompileError::SpreadLabelMustBeLastArgument, span.clone()));
+            }
+
+            match struct_arg {
                 ast::StructPatternArgument::Attr(attr) => {
-                    self.lower_compound_pattern_attr((attr, span), var_table)
+                    attrs.push(self.lower_compound_pattern_attr((attr, span), var_table)?);
                 }
-                ast::StructPatternArgument::Spread(_) => todo!(),
-            })
-            .collect()
+                ast::StructPatternArgument::Spread(label) => {
+                    rest_label = Some(Box::new(SpreadLabel(label, self.src.span(&span))))
+                }
+            }
+        }
+
+        Ok((attrs.into(), rest_label))
     }
 
     fn lower_struct_pattern_attrs(
@@ -866,13 +878,15 @@ impl<'s, 'm> Lowering<'s, 'm> {
                             _ => None,
                         };
 
-                        let attrs = self.lower_struct_pattern_args(attrs, var_table)?;
+                        let (attrs, rest_label) =
+                            self.lower_struct_pattern_args(attrs, var_table)?;
                         Some(self.mk_pattern(
                             PatternKind::Compound {
                                 type_path: TypePath::RelContextual,
                                 modifier,
                                 is_unit_binding: false,
                                 attributes: attrs,
+                                spread_label: rest_label,
                             },
                             &span,
                         ))
@@ -958,6 +972,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                                 modifier: None,
                                 is_unit_binding: false,
                                 attributes: attrs,
+                                spread_label: None,
                             },
                             &span,
                         ))

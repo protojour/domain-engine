@@ -136,6 +136,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     modifier,
                     is_unit_binding,
                     attributes,
+                    spread_label: _,
                 },
                 Some((expected_struct_ty @ Type::Anonymous(def_id), _)),
             ) => {
@@ -170,6 +171,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     mut modifier,
                     is_unit_binding,
                     attributes,
+                    spread_label: _,
                 },
                 expected_ty,
             ) => {

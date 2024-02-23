@@ -406,3 +406,18 @@ fn map_error_duplicate_in_equation() {
     "
     .compile_fail();
 }
+
+#[test]
+fn attributes_cannot_follow_spread() {
+    "
+    def foo (rel .'a': i64)
+    def bar (rel .'a': i64)
+    map(
+        foo(..rest,
+            'a': x // ERROR spread label must be the last argument
+        ),
+        bar('a': x, ..rest)
+    )
+    "
+    .compile_fail();
+}
