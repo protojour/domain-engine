@@ -107,8 +107,9 @@ async fn test_guitar_synth_union_mutation_and_query() {
             }
         }"#
         .exec([], &schema, &ctx)
-        .await,
-        expected = Ok(graphql_value!({
+        .await
+        .unordered(),
+        expected = Ok(graphql_value_unordered!({
             "artist": [{
                 "node": {
                     "name": "Bowie",
@@ -153,8 +154,9 @@ async fn test_guitar_synth_union_mutation_and_query() {
             }
         }"#
         .exec([], &schema, &ctx)
-        .await,
-        expected = Ok(graphql_value!({
+        .await
+        .unordered(),
+        expected = Ok(graphql_value_unordered!({
             "artists": {
                 "nodes": [{
                     "name": "Bowie",

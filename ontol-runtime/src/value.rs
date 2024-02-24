@@ -54,7 +54,7 @@ pub enum Value {
     ///
     /// * `(value: Struct, rel_params)`: Write a new entity
     /// * `(value: StructUpdate, rel_params)`: Update the given entity with new rel_params
-    /// * `(valud: ID, rel_params: Value::Delete)`: Delete the given ID
+    /// * `(value: ID, rel_params: Value::Delete)`: Delete the given ID
     Patch(Vec<Attribute<Self>>, DefId),
 
     /// Special rel_params used for edge deletion
