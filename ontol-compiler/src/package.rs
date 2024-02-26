@@ -95,6 +95,7 @@ impl ParsedPackage {
 }
 
 /// Topological sort of the built package graph
+#[derive(Default)]
 pub struct PackageTopology {
     pub packages: Vec<ParsedPackage>,
 }

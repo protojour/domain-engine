@@ -8,6 +8,7 @@ use std::{
 use codegen::task::{execute_codegen_tasks, CodegenTasks};
 use def::{DefKind, DefVisibility, Defs, LookupRelationshipMeta, RelationshipMeta, TypeDef};
 
+use documented::DocumentedFields;
 pub use error::*;
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
@@ -43,7 +44,7 @@ use tracing::debug;
 use type_check::seal::SealCtx;
 use types::{DefTypes, Types};
 
-use crate::{def::RelParams, repr::repr_model::ReprKind};
+use crate::{def::RelParams, primitive::PrimitiveKind, repr::repr_model::ReprKind};
 
 pub mod error;
 pub mod hir_unify;
@@ -228,7 +229,19 @@ impl<'m> Compiler<'m> {
 
         let mut namespaces = std::mem::take(&mut self.namespaces.namespaces);
         let mut package_config_table = std::mem::take(&mut self.package_config_table);
-        let docs = std::mem::take(&mut self.namespaces.docs);
+        let mut docs = std::mem::take(&mut self.namespaces.docs);
+
+        for def_id in self.defs.iter_package_def_ids(ONTOL_PKG) {
+            #[allow(clippy::single_match)]
+            match self.defs.def_kind(def_id) {
+                DefKind::Primitive(kind, _ident) => {
+                    let name = kind.as_ref();
+                    let field_docs = PrimitiveKind::get_field_docs(name).unwrap();
+                    docs.insert(def_id, vec![field_docs.into()]);
+                }
+                _ => {}
+            }
+        }
 
         let union_member_cache = {
             let mut cache: FnvHashMap<DefId, BTreeSet<DefId>> = Default::default();

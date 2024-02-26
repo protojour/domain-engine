@@ -1,4 +1,6 @@
+use documented::DocumentedFields;
 use ontol_runtime::DefId;
+use strum::AsRefStr;
 
 use crate::{
     def::{BuiltinRelationKind, DefKind, Defs},
@@ -6,7 +8,7 @@ use crate::{
     NO_SPAN,
 };
 
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug, DocumentedFields, AsRefStr)]
 pub enum PrimitiveKind {
     /// The unit data type which contains no information
     Unit,

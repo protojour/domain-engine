@@ -1,3 +1,4 @@
+use ontol_compiler::package::ONTOL_PKG;
 use ontol_runtime::{interface::serde::operator::SerdeOperator, RelationshipId};
 use ontol_test_utils::{
     assert_json_io_matches, expect_eq, serde_helper::serde_create, type_binding::TypeBinding,
@@ -112,4 +113,13 @@ fn trailing_comment_confusion() {
     // def bar ()
     "
     .compile_fail();
+}
+
+#[test]
+fn ontol_domain_is_documented() {
+    "".compile_then(|test| {
+        let ontol_domain = test.ontology.find_domain(ONTOL_PKG).unwrap();
+        let text = ontol_domain.type_info_by_identifier("text").unwrap();
+        assert!(test.ontology.get_docs(text.def_id).is_some());
+    });
 }

@@ -30,6 +30,9 @@ regex-syntax = "0.8"
 patricia_tree = "0.8"
 ordered-float = "4"
 convert_case = "0.6"
+documented = "0.3.0"
+strum = { version = "0.26.1", features = ["derive"] }
+strum_macros = "0.26.1"
 
 [dev-dependencies]
 ontol-test-utils.path = "../ontol-test-utils"
