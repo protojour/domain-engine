@@ -1,7 +1,7 @@
 use smartstring::alias::String;
 use uuid::Uuid;
 
-use crate::value::{Attribute, Value};
+use crate::value::{Attribute, Serial, Value};
 
 /// Cast, or panic at runtime
 pub trait Cast<T> {
@@ -98,6 +98,24 @@ impl Cast<i64> for Value {
         match self {
             Value::I64(n, _) => n,
             _ => panic!("not an integer"),
+        }
+    }
+}
+
+impl Cast<Serial> for Value {
+    type Ref = Serial;
+
+    fn cast_into(self) -> Serial {
+        match self {
+            Value::Serial(s, _) => s,
+            _ => panic!("not a serial"),
+        }
+    }
+
+    fn cast_ref(&self) -> &Self::Ref {
+        match self {
+            Value::Serial(s, _) => s,
+            _ => panic!("not a serial"),
         }
     }
 }

@@ -271,7 +271,8 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                             | PrimitiveKind::False
                             | PrimitiveKind::True
                             | PrimitiveKind::Text
-                            | PrimitiveKind::Number => {
+                            | PrimitiveKind::Number
+                            | PrimitiveKind::Serial => {
                                 self.merge_repr(
                                     &mut builder,
                                     ReprKind::Scalar(def_id, ReprScalarKind::Other, data.rel_span),

@@ -68,10 +68,14 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                 Value::F64(f, _) => serializer.serialize_f64(*f),
                 other => panic!("BUG: Serialize expected number, got {other:?}"),
             },
+            (SerdeOperator::Serial(def_id), ScalarFormat::DomainTransparent) => {
+                self.serialize_as_text_formatted(value, *def_id, serializer)
+            }
             (
                 SerdeOperator::I32(def_id, ..)
                 | SerdeOperator::I64(def_id, ..)
-                | SerdeOperator::F64(def_id, ..),
+                | SerdeOperator::F64(def_id, ..)
+                | SerdeOperator::Serial(def_id, ..),
                 ScalarFormat::RawText,
             ) => self.serialize_as_text_formatted(value, *def_id, serializer),
             (

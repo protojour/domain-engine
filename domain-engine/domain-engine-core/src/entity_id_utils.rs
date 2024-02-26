@@ -36,7 +36,7 @@ pub fn find_inherent_entity_id(
 
 pub enum GeneratedId {
     Generated(Value),
-    AutoIncrementI64(DefId),
+    AutoIncrementSerial(DefId),
 }
 
 pub fn try_generate_entity_id(
@@ -78,7 +78,7 @@ pub fn try_generate_entity_id(
                         Box::new(FnvHashMap::from_iter([(property.property_id, id.into())])),
                         *def_id,
                     ))),
-                    GeneratedId::AutoIncrementI64(_) => {
+                    GeneratedId::AutoIncrementSerial(_) => {
                         Err(DomainError::TypeCannotBeUsedForIdGeneration)
                     }
                 }
@@ -86,8 +86,8 @@ pub fn try_generate_entity_id(
                 Err(DomainError::TypeCannotBeUsedForIdGeneration)
             }
         }
-        (SerdeOperator::I64(def_id, _), ValueGenerator::Autoincrement) => {
-            Ok(GeneratedId::AutoIncrementI64(*def_id))
+        (SerdeOperator::Serial(def_id), ValueGenerator::Autoincrement) => {
+            Ok(GeneratedId::AutoIncrementSerial(*def_id))
         }
         (
             SerdeOperator::Alias(AliasOperator {

@@ -10,7 +10,7 @@ use crate::{
     ontology::Ontology,
     text_like_types::ParseError,
     text_pattern::{TextPattern, TextPatternConstantPart},
-    value::{Attribute, PropertyId, Value},
+    value::{Attribute, PropertyId, Serial, Value},
     DefId, RelationshipId, Role,
 };
 
@@ -188,6 +188,24 @@ impl ValueMatcher for NumberMatcher<f64> {
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
         self.match_f64(str.parse().map_err(|_| ())?)
+    }
+}
+
+impl ValueMatcher for NumberMatcher<Serial> {
+    fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "serial")
+    }
+
+    fn match_u64(&self, value: u64) -> Result<Value, ()> {
+        Ok(Value::Serial(Serial(value), self.def_id))
+    }
+
+    fn match_i64(&self, value: i64) -> Result<Value, ()> {
+        self.match_u64(value as u64)
+    }
+
+    fn match_str(&self, str: &str) -> Result<Value, ()> {
+        self.match_u64(str.parse().map_err(|_| ())?)
     }
 }
 

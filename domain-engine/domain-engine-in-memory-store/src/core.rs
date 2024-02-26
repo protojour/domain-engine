@@ -5,7 +5,7 @@ use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
     ontology::{Cardinality, DataRelationshipInfo, Ontology, TypeInfo},
-    value::{Attribute, PropertyId, Value},
+    value::{Attribute, PropertyId, Serial, Value},
     DefId, RelationshipId,
 };
 use smallvec::SmallVec;
@@ -17,7 +17,7 @@ use domain_engine_core::{system::ArcSystemApi, DomainError, DomainResult};
 pub(super) struct InMemoryStore {
     pub collections: FnvHashMap<DefId, EntityTable<DynamicKey>>,
     pub edge_collections: FnvHashMap<RelationshipId, EdgeCollection>,
-    pub int_id_counter: i64,
+    pub serial_counter: u64,
 }
 
 pub(super) struct DbContext {
@@ -29,7 +29,7 @@ pub(super) struct DbContext {
 pub(super) enum DynamicKey {
     Text(String),
     Octets(SmallVec<[u8; 16]>),
-    Int(i64),
+    Serial(u64),
 }
 
 pub type EntityTable<K> = IndexMap<K, FnvHashMap<PropertyId, Attribute>>;
@@ -105,7 +105,7 @@ impl InMemoryStore {
             Value::OctetSequence(octets, _) => {
                 Ok(DynamicKey::Octets(octets.iter().cloned().collect()))
             }
-            Value::I64(int, _) => Ok(DynamicKey::Int(*int)),
+            Value::Serial(Serial(value), _) => Ok(DynamicKey::Serial(*value)),
             other => {
                 warn!("inherent id from {other:?}");
                 Err(DomainError::InherentIdNotFound)

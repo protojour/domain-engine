@@ -81,7 +81,7 @@ impl InMemoryDb {
             store: RwLock::new(InMemoryStore {
                 collections,
                 edge_collections,
-                int_id_counter: 0,
+                serial_counter: 0,
             }),
             context: DbContext { ontology, system },
         }

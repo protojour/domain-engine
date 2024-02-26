@@ -157,6 +157,7 @@ impl<'e> ObjectGenerator<'e> {
             | SerdeOperator::I64(def_id, _)
             | SerdeOperator::I32(def_id, _)
             | SerdeOperator::F64(def_id, _)
+            | SerdeOperator::Serial(def_id)
             | SerdeOperator::String(def_id)
             | SerdeOperator::StringConstant(_, def_id)
             | SerdeOperator::TextPattern(def_id)

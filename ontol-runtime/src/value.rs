@@ -22,6 +22,7 @@ pub enum Value {
     Void(DefId),
     I64(i64, DefId),
     F64(f64, DefId),
+    Serial(Serial, DefId),
     Rational(Box<num::rational::BigRational>, DefId),
     Text(String, DefId),
     OctetSequence(ThinVec<u8>, DefId),
@@ -97,6 +98,7 @@ impl Value {
             Value::Void(def_id) => *def_id,
             Value::I64(_, def_id) => *def_id,
             Value::F64(_, def_id) => *def_id,
+            Value::Serial(_, def_id) => *def_id,
             Value::Rational(_, def_id) => *def_id,
             Value::Text(_, def_id) => *def_id,
             Value::OctetSequence(_, def_id) => *def_id,
@@ -119,6 +121,7 @@ impl Value {
             Value::Void(def_id) => def_id,
             Value::I64(_, def_id) => def_id,
             Value::F64(_, def_id) => def_id,
+            Value::Serial(_, def_id) => def_id,
             Value::Rational(_, def_id) => def_id,
             Value::Text(_, def_id) => def_id,
             Value::OctetSequence(_, def_id) => def_id,
@@ -213,6 +216,9 @@ impl PartialEq for Value {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Serial(pub u64);
+
 pub struct FormatValueAsText<'d, 'o> {
     pub value: &'d Value,
     pub type_def_id: DefId,
@@ -228,6 +234,7 @@ impl<'d, 'o> Display for FormatValueAsText<'d, 'o> {
                 Value::Text(s, _) => write!(f, "{s}"),
                 Value::I64(int, _) => write!(f, "{int}"),
                 Value::F64(float, _) => write!(f, "{float}"),
+                Value::Serial(Serial(int), _) => write!(f, "{int}"),
                 Value::OctetSequence(vec, _) => write!(f, "b'{vec:x?}'"),
                 Value::ChronoDateTime(datetime, _) => {
                     // FIXME: A way to not do this via String
@@ -386,6 +393,7 @@ impl<'v> Display for ValueDebug<'v> {
             Value::I64(i, _) => write!(f, "int({i})"),
             Value::F64(n, _) => write!(f, "flt({n})"),
             Value::Rational(r, _) => write!(f, "rat({r})"),
+            Value::Serial(Serial(int), _) => write!(f, "serial({int})"),
             Value::Text(s, _) => write!(f, "'{s}'"),
             Value::OctetSequence(vec, _) => write!(f, "b'{vec:x?}'"),
             Value::ChronoDateTime(dt, _) => write!(f, "datetime({dt})"),

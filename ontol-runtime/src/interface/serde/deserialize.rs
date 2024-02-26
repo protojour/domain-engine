@@ -14,7 +14,7 @@ use crate::{
         operator::SerdeStructFlags,
     },
     sequence::Sequence,
-    value::{Attribute, Value},
+    value::{Attribute, Serial, Value},
 };
 
 use super::{
@@ -133,6 +133,13 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                     }
                     .into_visitor_no_params(self),
                 ),
+            (SerdeOperator::Serial(def_id), _) => deserializer.deserialize_str(
+                NumberMatcher::<Serial> {
+                    def_id: *def_id,
+                    range: None,
+                }
+                .into_visitor_no_params(self),
+            ),
             (SerdeOperator::String(def_id), _) => deserializer.deserialize_str(
                 StringMatcher {
                     def_id: *def_id,

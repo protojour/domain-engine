@@ -63,7 +63,7 @@ pub fn set_of_all_strings() -> Hir {
     Parser::new().parse(r#".*"#).unwrap()
 }
 
-pub fn integer_with_radix(radix: u8) -> Hir {
+pub fn unsigned_integer_with_radix(radix: u8) -> Hir {
     Hir::repetition(Repetition {
         min: 1,
         max: None,

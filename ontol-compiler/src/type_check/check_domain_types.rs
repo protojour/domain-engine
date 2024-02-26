@@ -302,7 +302,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         match generator_def_id {
             _ if generator_def_id == generators.auto => {
                 match self.def_types.table.get(&scalar_def_id) {
-                    Some(Type::Primitive(PrimitiveKind::I64, _)) => {
+                    Some(Type::Primitive(PrimitiveKind::Serial, _)) => {
                         Ok(ValueGenerator::Autoincrement)
                     }
                     Some(Type::Primitive(PrimitiveKind::Text, _)) => Ok(ValueGenerator::Uuid),

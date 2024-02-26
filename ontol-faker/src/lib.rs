@@ -12,7 +12,7 @@ use ontol_runtime::{
     sequence::Sequence,
     text_like_types::TextLikeType,
     text_pattern::TextPattern,
-    value::{Attribute, Value},
+    value::{Attribute, Serial, Value},
     DefId,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -117,6 +117,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                     *def_id,
                 )
             }
+            SerdeOperator::Serial(def_id) => Value::Serial(Serial(self.rng.gen()), *def_id),
             SerdeOperator::String(def_id) => {
                 let mut string: std::string::String =
                     fake::faker::lorem::en::Sentence(3..6).fake_with_rng(self.rng);

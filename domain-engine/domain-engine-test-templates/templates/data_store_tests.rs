@@ -5,6 +5,7 @@ use ontol_runtime::{
     interface::serde::processor::{ProcessorProfile, ProcessorProfileFlags},
     ontology::Ontology,
     select::Select,
+    value::Serial,
 };
 use ontol_test_utils::{
     assert_error_msg,
@@ -240,7 +241,8 @@ async fn test_conduit_db_store_entity_tree() {
         .unwrap()
         .val
         .clone()
-        .cast_into::<i64>();
+        .cast_into::<Serial>();
+    let comment_id = format!("{}", comment_id.0);
 
     expect_eq!(
         actual = serde_read(&user_type)

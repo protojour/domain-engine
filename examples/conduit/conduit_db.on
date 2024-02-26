@@ -32,7 +32,7 @@ def Article (
 )
 
 def Comment (
-    rel .'id'[rel .gen: auto]|id: (rel .is: i64)
+    rel .'id'[rel .gen: auto]|id: (rel .is: serial)
     rel .'body': text
     rel .'created_at'[rel .gen: create_time]: datetime
     rel .'updated_at'[rel .gen: update_time]: datetime

@@ -359,6 +359,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     self.alloc_addr(&def),
                     SerdeOperator::F64(def.def_id, None),
                 )),
+                PrimitiveKind::Serial => Some(OperatorAllocation::Allocated(
+                    self.alloc_addr(&def),
+                    SerdeOperator::Serial(def.def_id),
+                )),
                 PrimitiveKind::Text => Some(OperatorAllocation::Allocated(
                     self.alloc_addr(&def),
                     SerdeOperator::String(def.def_id),

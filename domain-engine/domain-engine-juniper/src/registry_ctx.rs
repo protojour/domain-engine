@@ -289,7 +289,9 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 self.modified_arg::<InputType>(name, modifier, &i64_schema_type)
             }
             SerdeOperator::F64(_, _) => return self.modified_arg::<f64>(name, modifier, &()),
-            SerdeOperator::String(_) => return self.modified_arg::<String>(name, modifier, &()),
+            SerdeOperator::String(_) | SerdeOperator::Serial(_) => {
+                return self.modified_arg::<String>(name, modifier, &())
+            }
             SerdeOperator::StringConstant(_, _) => self.modified_arg::<String>(name, modifier, &()),
             SerdeOperator::TextPattern(_) => self.modified_arg::<String>(name, modifier, &()),
             SerdeOperator::CapturingTextPattern(_) => {

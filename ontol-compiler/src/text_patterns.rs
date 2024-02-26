@@ -10,7 +10,7 @@ use std::fmt::Write;
 use tracing::debug;
 
 use crate::{
-    regex_util::{self, integer_with_radix, set_of_all_strings},
+    regex_util::{self, set_of_all_strings, unsigned_integer_with_radix},
     relation::Constructor,
     Compiler,
 };
@@ -27,7 +27,7 @@ pub enum TextPatternSegment {
     EmptyString,
     AnyString,
     Literal(String),
-    Integer {
+    Serial {
         radix: u8,
     },
     Regex(Hir),
@@ -94,7 +94,7 @@ impl TextPatternSegment {
             Self::EmptyString => None,
             Self::AnyString => None,
             Self::Literal(string) => Some(string.clone()),
-            Self::Integer { .. } => None,
+            Self::Serial { .. } => None,
             Self::Regex(hir) => regex_util::constant_prefix(hir),
             Self::Property { .. } => None,
             Self::Concat(segments) => segments.iter().next().and_then(Self::constant_prefix),
@@ -114,12 +114,12 @@ impl TextPatternSegment {
                 })
             }
             Self::Literal(string) => Hir::literal(string.as_bytes()),
-            Self::Integer { radix } => {
+            Self::Serial { radix } => {
                 let index = capture_cursor.increment();
                 Hir::capture(Capture {
                     index,
                     name: None,
-                    sub: Box::new(integer_with_radix(*radix)),
+                    sub: Box::new(unsigned_integer_with_radix(*radix)),
                 })
             }
             Self::Regex(hir) => hir.clone(),
@@ -162,7 +162,7 @@ impl TextPatternSegment {
             Self::Literal(string) => {
                 parts.push(TextPatternConstantPart::Literal(string.clone()));
             }
-            Self::Integer { .. } => {}
+            Self::Serial { .. } => {}
             Self::Regex(hir) => {
                 let mut string = String::new();
                 regex_util::collect_hir_constant_parts(hir, &mut string);

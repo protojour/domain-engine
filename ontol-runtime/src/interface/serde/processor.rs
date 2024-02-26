@@ -331,6 +331,7 @@ impl<'on, 'p> Display for SerdeProcessor<'on, 'p> {
                 }
                 None => write!(f, "`float`"),
             },
+            SerdeOperator::Serial(_) => write!(f, "`serial`"),
             SerdeOperator::String(_) => write!(f, "`string`"),
             SerdeOperator::StringConstant(lit, _) => DoubleQuote(lit).fmt(f),
             SerdeOperator::TextPattern(_) | SerdeOperator::CapturingTextPattern(_) => {

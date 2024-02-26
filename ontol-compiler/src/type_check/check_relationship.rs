@@ -496,10 +496,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .hir
                     .clone(),
             ),
-            DefKind::Primitive(PrimitiveKind::I64, _) => TextPatternSegment::Property {
+            DefKind::Primitive(PrimitiveKind::Serial, _) => TextPatternSegment::Property {
                 property_id: PropertyId::subject(relationship.0),
                 type_def_id: relation_def_id,
-                segment: Box::new(TextPatternSegment::Integer { radix: 10 }),
+                segment: Box::new(TextPatternSegment::Serial { radix: 10 }),
             },
             _ => {
                 let constructor = self

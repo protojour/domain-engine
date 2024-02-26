@@ -30,6 +30,8 @@ pub enum PrimitiveKind {
     F32,
     /// 64-bit floating point
     F64,
+    /// Unsigned 64-bit integer that can be used as a numeric identifier in data stores.
+    Serial,
     /// Set of all possible texts
     Text,
     /// Open relationship to domainless data
@@ -83,6 +85,9 @@ pub struct Primitives {
 
     /// 64 bit floating point
     pub f64: DefId,
+
+    /// 64 bit unsigned
+    pub serial: DefId,
 
     /// The definition of the ontol domain
     pub ontol_domain: DefId,
@@ -158,6 +163,7 @@ impl Primitives {
             float: defs.add_primitive(PrimitiveKind::Float, Some("float")),
             f32: defs.add_primitive(PrimitiveKind::F32, Some("f32")),
             f64: defs.add_primitive(PrimitiveKind::F64, Some("f64")),
+            serial: defs.add_primitive(PrimitiveKind::Serial, Some("serial")),
             text: defs.add_primitive(PrimitiveKind::Text, Some("text")),
             ontol_domain: defs.alloc_def_id(ONTOL_PKG),
             open_data_relationship: defs.add_primitive(PrimitiveKind::OpenDataRelationship, None),

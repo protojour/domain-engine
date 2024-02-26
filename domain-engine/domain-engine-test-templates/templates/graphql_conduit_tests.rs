@@ -666,7 +666,7 @@ async fn test_graphql_conduit_db_user_deletion() {
 }
 
 #[test(tokio::test)]
-async fn test_graphql_blog_post_conduit_update_body() {
+async fn test_graphql_blog_post_conduit_update_body_create_comment() {
     let test = BlogPostConduit::new().await;
     let article_id = test.create_db_article().await;
 
@@ -691,6 +691,45 @@ async fn test_graphql_blog_post_conduit_update_body() {
             } }]
         })),
     );
+
+    let comment_response = format!(
+        "mutation {{
+            Comment(create: [
+                {{
+                    comment_on: {{
+                        article_id: \"{article_id}\"
+                    }}
+                    author: {{
+                        username: \"troll\",
+                        email: \"troll@troll.no\",
+                        password_hash: \"s3cr3t\"
+                    }}
+                    body: \"this sucks\"
+                }}
+            ]) {{
+                node {{ body, id }}
+            }}
+        }}"
+    )
+    .exec([], &test.db_schema, &test.ctx())
+    .await
+    .unwrap();
+
+    let comment_node = comment_response
+        .field("Comment")
+        .element(0)
+        .field("node")
+        .clone();
+
+    expect_eq!(
+        actual = comment_node.field("body").clone(),
+        expected = graphql_value!("this sucks")
+    );
+
+    // Comment ID uses ontol `serial`, which should be string-encoded:
+    let Value::Scalar(GqlScalar::String(_id)) = comment_node.field("id") else {
+        panic!("Comment ID was not a string");
+    };
 }
 
 #[test(tokio::test)]

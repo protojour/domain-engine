@@ -115,10 +115,10 @@ fn entity_id_inline_fmt_uuid() {
 }
 
 #[test]
-fn entity_id_inline_fmt_i64() {
+fn entity_id_inline_fmt_serial() {
     "
     def foo (
-        rel .'key'|id: ( fmt '' => 'foo/' => i64 => . )
+        rel .'key'|id: ( fmt '' => 'foo/' => serial => . )
     )
     "
     .compile();
@@ -461,4 +461,14 @@ fn recursive_entity_union() {
             ]
         });
     });
+}
+
+#[test]
+fn serial_gen_auto() {
+    "
+    def foo (
+        rel .'id'[rel .gen: auto]|id: (fmt '' => 'prefix/' => serial => .)
+    )
+    "
+    .compile();
 }

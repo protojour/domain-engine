@@ -578,7 +578,7 @@ fn test_serde_with_raw_prefix_int_id_overridde_profile() {
     "
     def baz (
         rel .'prefix_id'|id: (
-            fmt '' => 'prefix/' => i64 => .
+            fmt '' => 'prefix/' => serial => .
         )
     )
     "

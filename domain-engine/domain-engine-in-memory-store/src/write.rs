@@ -12,7 +12,7 @@ use ontol_runtime::{
     },
     select::Select,
     smart_format,
-    value::{Attribute, PropertyId, Value, ValueDebug},
+    value::{Attribute, PropertyId, Serial, Value, ValueDebug},
     value_generator::ValueGenerator,
     DefId, Role,
 };
@@ -578,10 +578,10 @@ impl InMemoryStore {
             ctx.system.as_ref(),
         )? {
             GeneratedId::Generated(value) => Ok(value),
-            GeneratedId::AutoIncrementI64(def_id) => {
-                let id_value = self.int_id_counter;
-                self.int_id_counter += 1;
-                Ok(Value::I64(id_value, def_id))
+            GeneratedId::AutoIncrementSerial(def_id) => {
+                let serial_value = self.serial_counter;
+                self.serial_counter += 1;
+                Ok(Value::Serial(Serial(serial_value), def_id))
             }
         }
     }
