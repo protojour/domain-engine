@@ -50,6 +50,7 @@ pub mod hir_unify;
 pub mod mem;
 pub mod ontology_graph;
 pub mod package;
+pub mod primitive;
 pub mod source;
 
 mod codegen;
@@ -62,7 +63,6 @@ mod map_arm_def_inference;
 mod namespace;
 mod ontol_domain;
 mod pattern;
-mod primitive;
 mod regex_util;
 mod relation;
 mod repr;
