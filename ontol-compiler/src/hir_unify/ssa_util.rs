@@ -23,16 +23,18 @@ pub struct ScopeTracker<'m> {
 pub enum ExprMode {
     Expr {
         flags: MapFlags,
-        struct_level: Option<usize>,
+        struct_level: Option<u16>,
     },
     MatchStruct {
         match_var: Var,
-        struct_level: usize,
+        struct_level: u16,
+        match_level: u16,
     },
     MatchSet {
         match_var: Var,
         set_cond_var: Var,
-        struct_level: Option<usize>,
+        match_level: u16,
+        struct_level: Option<u16>,
     },
 }
 
@@ -49,17 +51,21 @@ impl ExprMode {
             Self::MatchStruct {
                 match_var,
                 struct_level,
+                match_level,
             } => Self::MatchStruct {
                 match_var,
                 struct_level: struct_level + 1,
+                match_level: match_level + 1,
             },
             Self::MatchSet {
                 struct_level,
                 match_var,
+                match_level,
                 ..
             } => Self::MatchStruct {
                 match_var,
                 struct_level: inc_opt_struct_level(struct_level),
+                match_level: match_level + 1,
             },
         }
     }
@@ -76,22 +82,27 @@ impl ExprMode {
             Self::Expr { struct_level, .. } => Self::MatchStruct {
                 match_var,
                 struct_level: inc_opt_struct_level(struct_level),
+                match_level: 0,
             },
             Self::MatchStruct {
                 match_var,
                 struct_level,
+                match_level,
                 ..
             } => Self::MatchStruct {
                 match_var,
                 struct_level: struct_level + 1,
+                match_level: match_level + 1,
             },
             Self::MatchSet {
                 match_var,
                 struct_level,
+                match_level,
                 ..
             } => Self::MatchStruct {
                 match_var,
                 struct_level: inc_opt_struct_level(struct_level),
+                match_level: match_level + 1,
             },
         }
     }
@@ -100,24 +111,29 @@ impl ExprMode {
         match self {
             Self::Expr { struct_level, .. } => Self::MatchSet {
                 struct_level,
+                match_level: 0,
                 match_var: set_cond_var,
                 set_cond_var,
             },
             Self::MatchStruct {
                 match_var,
                 struct_level,
+                match_level,
                 ..
             } => Self::MatchSet {
                 match_var,
                 struct_level: Some(struct_level),
+                match_level: match_level + 1,
                 set_cond_var,
             },
             Self::MatchSet {
                 struct_level,
+                match_level,
                 match_var,
                 ..
             } => Self::MatchSet {
                 struct_level,
+                match_level: match_level + 1,
                 match_var,
                 set_cond_var,
             },
@@ -125,7 +141,7 @@ impl ExprMode {
     }
 }
 
-fn inc_opt_struct_level(level: Option<usize>) -> usize {
+fn inc_opt_struct_level(level: Option<u16>) -> u16 {
     level.map(|level| level + 1).unwrap_or(0)
 }
 

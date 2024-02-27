@@ -178,9 +178,8 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     if let (Kind::Unit, Kind::Struct(binder, flags, struct_body)) =
                         (rel_kind, val_kind)
                     {
-                        if let ExprMode::MatchStruct {
-                            struct_level: 0, ..
-                        } = mode.match_struct(Var(0))
+                        if let ExprMode::MatchStruct { match_level: 0, .. } =
+                            mode.match_struct(Var(0))
                         {
                             if flags.contains(StructFlags::MATCH) {
                                 let match_var = self.alloc_var();
@@ -224,6 +223,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     }
                     ExprMode::MatchSet {
                         struct_level: _,
+                        match_level: _,
                         match_var,
                         set_cond_var,
                     } => self.write_match_seq_body(
@@ -679,7 +679,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
 
         let ExprMode::MatchStruct {
             match_var,
-            struct_level,
+            match_level,
             ..
         } = mode
         else {
@@ -693,7 +693,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
 
         let mut base_clauses = thin_vec![];
 
-        if struct_level == 0 {
+        if match_level == 0 {
             output_body.push(self.mk_let_cond_var(binder.hir().var, match_var, binder.meta().span));
 
             if !matches!(type_mapping.from, Type::Error) && !matches!(def_ty, Type::Error) {

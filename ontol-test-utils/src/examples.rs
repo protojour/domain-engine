@@ -54,6 +54,11 @@ pub mod conduit {
         SourceName("blog_post_public"),
         include_str!("../../examples/conduit/blog_post_public.on"),
     );
+
+    pub const FEED_PUBLIC: Example = (
+        SourceName("feed_public"),
+        include_str!("../../examples/conduit/feed_public.on"),
+    );
 }
 
 pub const ARTIST_AND_INSTRUMENT: Example = (

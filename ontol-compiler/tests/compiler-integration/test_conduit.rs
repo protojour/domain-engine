@@ -2,7 +2,9 @@ use indoc::indoc;
 use ontol_runtime::{format_utils::Literal, ontology::ValueCardinality, value::Value};
 use ontol_test_utils::{
     examples::{
-        conduit::{BLOG_POST_PUBLIC, CONDUIT_CONTRIVED_SIGNUP, CONDUIT_DB, CONDUIT_PUBLIC},
+        conduit::{
+            BLOG_POST_PUBLIC, CONDUIT_CONTRIVED_SIGNUP, CONDUIT_DB, CONDUIT_PUBLIC, FEED_PUBLIC,
+        },
         Root,
     },
     test_map::YielderMock,
@@ -126,9 +128,55 @@ fn test_map_match_conduit_blog_post_cond_clauses() {
         );
 }
 
+#[test]
+fn test_conduit_feed_public() {
+    let test = TestPackages::with_sources([CONDUIT_DB, FEED_PUBLIC.root()]).compile();
+    let [article] = test.bind(["conduit_db.Article"]);
+    let return_value = Value::sequence_of([article
+        .entity_builder(
+            json!("11111111-1111-1111-1111-111111111111"),
+            json!({
+                "slug": "s", "title": "t", "description": "d", "body": "b",
+                "author": { "username": "u", "email": "e", "password_hash": "h" }
+            }),
+        )
+        .into()]);
+
+    test.mapper()
+        .with_mock_yielder(
+            YielderMock::yield_match
+                .next_call(matching!(
+                    eq!(&ValueCardinality::Many),
+                    eq!(&Literal(indoc! { r#"
+                        (root $a)
+                        (is-entity $a def@2:5)
+                        (match-prop $a S:2:55 (element-in $c))
+                        (is-entity $b def@2:4)
+                        (match-prop $b S:2:15 (element-in $d))
+                        (member $c (_ $b))
+                        (member $d (_ 'u'))
+                    "#
+                    }))
+                ))
+                .returns(return_value.clone()),
+        )
+        .assert_named_forward_map(
+            "feed",
+            json!({ "username": "u", }),
+            json!({
+                "title": "Conduit RSS channel",
+                "username": "u",
+                "items": [{
+                    "guid": "11111111-1111-1111-1111-111111111111",
+                    "title": "t",
+                }]
+            }),
+        );
+}
+
 // BUG: There are many things that must be fixed for this to work:
 #[test]
-#[should_panic(expected = "Variable not in scope")]
+#[should_panic(expected = "unbound variable")]
 fn test_map_conduit_contrived_signup() {
     TestPackages::with_sources([CONDUIT_DB, CONDUIT_CONTRIVED_SIGNUP.root()]).compile();
 }

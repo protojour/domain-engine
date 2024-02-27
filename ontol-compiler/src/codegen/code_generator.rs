@@ -929,6 +929,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
     fn scope_insert(&mut self, var: Var, local: Local, span: &SourceSpan) {
         if self.scope.insert(var, local).is_some() {
+            debug!("Error: {var} already in scope");
             assert!(
                 !span.is_native(),
                 "var {var} was already in scope, but span is native. scope={:?}",
@@ -945,6 +946,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
         match self.scope.get(&var) {
             Some(local) => Ok(*local),
             None => {
+                debug!("Error: {var} not in scope");
                 assert!(
                     !span.is_native(),
                     "var {var} was not in scope, but span is native."
