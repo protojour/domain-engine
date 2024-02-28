@@ -667,17 +667,26 @@ impl<'s, 'm> Lowering<'s, 'm> {
         var_table: &mut MapVarTable,
     ) -> Res<PatId> {
         let pattern = match ast {
+            ast::MapArm::Binding {
+                path,
+                pattern: (pattern, pat_span),
+            } => match pattern {
+                ast @ (ast::AnyPattern::Expr(_) | ast::AnyPattern::Struct(_)) => {
+                    self.lower_map_root_binding_pattern(path, ast, span, var_table)?
+                }
+                ast::AnyPattern::Set(ast_elements) => {
+                    self.lower_set_pattern(Some(path), ast_elements, pat_span, var_table)?
+                }
+                ast::AnyPattern::SetAlgebra(_) => Err((
+                    CompileError::TODO(smart_format!(
+                        "top-level set-algebraic operators not supported"
+                    )),
+                    pat_span,
+                ))?,
+            },
             ast::MapArm::Struct(ast) => {
                 self.lower_struct_pattern((ast, span.clone()), var_table)?
             }
-            ast::MapArm::Binding { path, pattern } => match pattern {
-                ast::RootBindingPattern::Expr(ast) => {
-                    self.lower_map_expr_binding(path, ast, span.clone(), var_table)?
-                }
-                ast::RootBindingPattern::Set(ast_elements) => {
-                    self.lower_set_pattern(Some(path), ast_elements, span, var_table)?
-                }
-            },
         };
 
         let pat_id = self.compiler.patterns.alloc_pat_id();
@@ -686,16 +695,20 @@ impl<'s, 'm> Lowering<'s, 'm> {
         Ok(pat_id)
     }
 
-    fn lower_map_expr_binding(
+    fn lower_map_root_binding_pattern(
         &mut self,
         type_path: (ast::Path, Span),
-        (ast, expr_span): (ast::ExprPattern, Span),
+        ast: ast::AnyPattern,
         span: Span,
         var_table: &mut MapVarTable,
     ) -> Res<Pattern> {
         let type_def_id = self.lookup_path(&type_path.0, &type_path.1)?;
         let key = (DefId::unit(), self.src.span(&span));
-        let pattern = self.lower_expr_pattern((ast, expr_span), var_table)?;
+        let pattern = match ast {
+            ast::AnyPattern::Expr(ast) => self.lower_expr_pattern(ast, var_table)?,
+            ast::AnyPattern::Struct(ast) => self.lower_struct_pattern(ast, var_table)?,
+            ast::AnyPattern::Set(_) | ast::AnyPattern::SetAlgebra(_) => unreachable!(),
+        };
 
         Ok(self.mk_pattern(
             PatternKind::Compound {

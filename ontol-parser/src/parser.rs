@@ -5,9 +5,9 @@ use either::Either;
 use smartstring::alias::String;
 
 use crate::ast::{
-    AnyPattern, Dot, ExprPattern, FmtStatement, MapArm, Path, RootBindingPattern,
-    SetAlgebraPattern, SetAlgebraicOperator, SetPatternElement, StructPattern,
-    StructPatternArgument, StructPatternAttr, StructPatternModifier, TypeOrPattern, UseStatement,
+    AnyPattern, Dot, ExprPattern, FmtStatement, MapArm, Path, SetAlgebraPattern,
+    SetAlgebraicOperator, SetPatternElement, StructPattern, StructPatternArgument,
+    StructPatternAttr, StructPatternModifier, TypeOrPattern, UseStatement,
 };
 
 use super::{
@@ -298,11 +298,7 @@ fn map_arm() -> impl AstParser<MapArm> {
     let struct_arm = parenthesized_struct_pattern(any_pattern()).map(MapArm::Struct);
     let binding_arm = spanned(path())
         .then_ignore(colon())
-        .then(
-            expr_pattern()
-                .map(RootBindingPattern::Expr)
-                .or(set_pattern(any_pattern()).map(RootBindingPattern::Set)),
-        )
+        .then(spanned(any_pattern()))
         .map(|(path, pattern)| MapArm::Binding { path, pattern });
 
     struct_arm.or(binding_arm)

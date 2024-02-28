@@ -167,6 +167,16 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         // debug!("write expr {node_ref}");
 
         match node_ref.kind() {
+            Kind::Map(argument) => {
+                let map_node = self.prealloc_node();
+                let arg = self.write_one_expr(*argument, mode)?;
+
+                Ok(smallvec![self.write_node(
+                    map_node,
+                    ontol_hir::Kind::Map(arg),
+                    *node_ref.meta()
+                )])
+            }
             Kind::Set(entries) => {
                 if entries.len() == 1 {
                     let ontol_hir::SetEntry(_, Attribute { rel, val }) = entries.first().unwrap();

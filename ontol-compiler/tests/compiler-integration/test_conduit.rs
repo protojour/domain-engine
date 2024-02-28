@@ -137,7 +137,7 @@ fn test_conduit_feed_public() {
             json!("11111111-1111-1111-1111-111111111111"),
             json!({
                 "slug": "s", "title": "t", "description": "d", "body": "b",
-                "author": { "username": "u", "email": "e", "password_hash": "h" }
+                "author": { "username": "foobar", "email": "e", "password_hash": "h" }
             }),
         )
         .into()]);
@@ -154,7 +154,7 @@ fn test_conduit_feed_public() {
                         (is-entity $b def@2:4)
                         (match-prop $b S:2:15 (element-in $d))
                         (member $c (_ $b))
-                        (member $d (_ 'u'))
+                        (member $d (_ 'foobar'))
                     "#
                     }))
                 ))
@@ -162,10 +162,11 @@ fn test_conduit_feed_public() {
         )
         .assert_named_forward_map(
             "feed",
-            json!({ "username": "u", }),
+            json!({ "username": "foobar", }),
             json!({
                 "title": "Conduit RSS channel",
-                "username": "u",
+                "username": "foobar",
+                "link": "http://blogs.com/foobar/feed",
                 "items": [{
                     "guid": "11111111-1111-1111-1111-111111111111",
                     "title": "t",

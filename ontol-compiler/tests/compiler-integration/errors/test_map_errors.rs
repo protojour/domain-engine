@@ -39,8 +39,7 @@ fn map_attribute_mismatch() {
     rel foo 'prop2': bar
     rel bar is: i64
     map (
-        foo: // ERROR expected named property// ERROR missing properties `prop0`, `prop1`, `prop2`// NOTE Consider using `match {}`
-            x,
+        foo: x,
         bar () // ERROR expected attribute
     )
     "

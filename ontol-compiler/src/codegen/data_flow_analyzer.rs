@@ -195,8 +195,17 @@ where
                 var_set
             }
             ontol_hir::Kind::Map(node) => self.analyze_node(arena.node_ref(*node), parent_prop),
-            ontol_hir::Kind::Set(_entries) => {
-                todo!()
+            ontol_hir::Kind::Set(entries) => {
+                let mut var_set = VarSet::default();
+                for set_entry in entries {
+                    var_set.union_with(
+                        &self.analyze_node(arena.node_ref(set_entry.1.rel), parent_prop),
+                    );
+                    var_set.union_with(
+                        &self.analyze_node(arena.node_ref(set_entry.1.val), parent_prop),
+                    );
+                }
+                var_set
             }
             ontol_hir::Kind::Struct(binder, flags, body) => {
                 let mut var_set = VarSet::default();

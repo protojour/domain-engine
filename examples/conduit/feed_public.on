@@ -3,6 +3,7 @@ use 'conduit_db' as db
 /// An RRS-like channel
 def channel (
     rel .'title': text
+    rel .'link': text
     rel .'username': text
     rel .'items': {item}
 )
@@ -26,13 +27,36 @@ map(
     )
 )
 
-map feed(
-    (
-        'username': username
+/// A transitional type representing a channel
+def(private) tmp_channel (
+    rel .'username': text
+    rel .'link': text
+    rel .'items': {item}
+)
+
+/// Map the tmp_channel to the exposed channel.
+/// TODO: Use an external mapping "hook" for this.
+map(
+    tmp_channel match(
+        'username': username,
+        'link': link,
+        'items': {..items},
     ),
     channel(
         'title': 'Conduit RSS channel',
         'username': username,
+        'link': link,
+        'items': {..items},
+    )
+)
+
+map feed(
+    (
+        'username': username
+    ),
+    channel: tmp_channel(
+        'username': username,
+        'link': /http:\/\/blogs\.com\/(?<username>\w+)\/feed/,
         'items': {
             ..db.Article match (
                 'author': db.User (
