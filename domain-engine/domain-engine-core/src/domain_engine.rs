@@ -77,7 +77,7 @@ impl DomainEngine {
         loop {
             match vm.run([input])? {
                 VmState::Complete(value) => return Ok(value),
-                VmState::Yielded(Yield::Match(match_var, value_cardinality, condition)) => {
+                VmState::Yield(Yield::Match(match_var, value_cardinality, condition)) => {
                     let mut entity_select = selects.find_select(match_var, &condition);
 
                     // Merge the condition into the select
@@ -88,6 +88,7 @@ impl DomainEngine {
                         .exec_map_query(value_cardinality, entity_select, session.clone())
                         .await?;
                 }
+                VmState::Yield(Yield::CallExtern(..)) => todo!(),
             }
         }
     }
@@ -136,7 +137,7 @@ impl DomainEngine {
 
                 attr.val = match vm.run([param])? {
                     VmState::Complete(value) => value,
-                    VmState::Yielded(_yield) => return Err(DomainError::ImpureMapping),
+                    VmState::Yield(_yield) => return Err(DomainError::ImpureMapping),
                 };
             }
         }
@@ -181,7 +182,7 @@ impl DomainEngine {
 
                             *value = match vm.run([param])? {
                                 VmState::Complete(value) => value,
-                                VmState::Yielded(_yield) => {
+                                VmState::Yield(_yield) => {
                                     return Err(DomainError::ImpureMapping);
                                 }
                             };
@@ -230,7 +231,7 @@ impl DomainEngine {
 
                             *value = match vm.run([param])? {
                                 VmState::Complete(value) => value,
-                                VmState::Yielded(_yield) => {
+                                VmState::Yield(_yield) => {
                                     return Err(DomainError::ImpureMapping);
                                 }
                             };
@@ -309,7 +310,7 @@ impl DomainEngine {
 
                                 *value = match vm.run([param])? {
                                     VmState::Complete(value) => value,
-                                    VmState::Yielded(_yield) => {
+                                    VmState::Yield(_yield) => {
                                         return Err(DomainError::ImpureMapping);
                                     }
                                 };

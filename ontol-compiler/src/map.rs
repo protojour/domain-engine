@@ -16,6 +16,14 @@ impl UndirectedMapKey {
             Self([b, a])
         }
     }
+
+    pub fn first(&self) -> MapDef {
+        self.0[0]
+    }
+
+    pub fn second(&self) -> MapDef {
+        self.0[1]
+    }
 }
 
 impl std::ops::Deref for UndirectedMapKey {

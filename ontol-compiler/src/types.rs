@@ -1,7 +1,7 @@
 use std::{collections::HashSet, fmt::Display};
 
 use fnv::{FnvHashMap, FnvHashSet};
-use ontol_runtime::{text_like_types::TextLikeType, DefId};
+use ontol_runtime::{ontology::Extern, text_like_types::TextLikeType, DefId};
 use ordered_float::NotNan;
 
 use crate::{
@@ -41,6 +41,7 @@ pub enum Type<'m> {
     ValueGenerator(DefId),
     Package,
     BuiltinRelation,
+    Extern(DefId),
     Infer(TypeVar<'m>),
     Error,
 }
@@ -66,6 +67,7 @@ impl<'m> Type<'m> {
             Self::ValueGenerator(def_id) => Some(*def_id),
             Self::Package => None,
             Self::BuiltinRelation => None,
+            Self::Extern(def_id) => Some(*def_id),
             Self::Infer(_) => None,
             Self::Error => None,
         }
@@ -145,6 +147,7 @@ impl<'m> Intern<Vec<TypeRef<'m>>> for Types<'m> {
 #[derive(Default, Debug)]
 pub struct DefTypes<'m> {
     pub table: FnvHashMap<DefId, TypeRef<'m>>,
+    pub ontology_externs: FnvHashMap<DefId, Extern>,
 }
 
 pub struct FormatType<'m, 'c>(pub TypeRef<'m>, pub &'c Defs<'m>, pub &'c Primitives);
@@ -206,6 +209,10 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
             Type::ValueGenerator(_) => write!(f, "value_generator"),
             Type::Package => write!(f, "package"),
             Type::BuiltinRelation => write!(f, "relation"),
+            Type::Extern(def_id) => {
+                let ident = defs.def_kind(*def_id).opt_identifier().unwrap();
+                write!(f, "extern({ident})")
+            }
             Type::Infer(_) => write!(f, "?infer"),
             Type::Error => write!(f, "error!"),
         }

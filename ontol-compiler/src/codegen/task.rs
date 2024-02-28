@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use fnv::FnvHashMap;
+use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::{map::Entry, IndexMap};
 use ontol_hir::StructFlags;
 use ontol_runtime::{
@@ -8,28 +8,34 @@ use ontol_runtime::{
     ontology::{MapLossiness, PropertyFlow},
     smart_format,
     text::TextConstant,
-    vm::proc::{Address, Lib, Procedure},
-    DefId, MapFlags, MapKey, PackageId,
+    vm::proc::{Address, Lib, NParams, OpCode, Procedure},
+    DefId, MapDef, MapFlags, MapKey, PackageId,
 };
-use tracing::{debug, debug_span};
+use tracing::{debug, debug_span, warn};
 
 use crate::{
-    codegen::code_generator::map_codegen, def::DefKind, hir_unify::unify_to_function,
-    map::UndirectedMapKey, typed_hir::TypedRootNode, types::Type, CompileError, Compiler,
-    SourceSpan, SpannedCompileError,
+    codegen::code_generator::map_codegen,
+    def::{DefKind, Defs},
+    hir_unify::unify_to_function,
+    map::UndirectedMapKey,
+    typed_hir::TypedRootNode,
+    types::Type,
+    CompileError, CompileErrors, Compiler, SourceSpan, SpannedCompileError,
 };
 
 use super::{
     auto_map::autogenerate_mapping,
     code_generator::const_codegen,
+    ir::Terminator,
     link::{link, LinkResult},
-    proc_builder::ProcBuilder,
+    proc_builder::{Delta, ProcBuilder},
 };
 
 #[derive(Default)]
 pub struct CodegenTasks<'m> {
     const_tasks: Vec<ConstCodegenTask<'m>>,
-    pub map_tasks: IndexMap<UndirectedMapKey, MapCodegenTask<'m>>,
+    map_tasks: IndexMap<UndirectedMapKey, MapCodegenTask<'m>>,
+
     pub result_lib: Lib,
     pub result_const_procs: FnvHashMap<DefId, Procedure>,
     pub result_map_proc_table: FnvHashMap<MapKey, Procedure>,
@@ -47,18 +53,69 @@ impl<'m> Debug for CodegenTasks<'m> {
 }
 
 impl<'m> CodegenTasks<'m> {
-    pub fn add_map_task(&mut self, pair: UndirectedMapKey, task: MapCodegenTask<'m>) {
+    pub fn add_map_task(
+        &mut self,
+        pair: UndirectedMapKey,
+        request: MapCodegenRequest<'m>,
+        _defs: &Defs,
+        _errors: &mut CompileErrors,
+    ) {
         match self.map_tasks.entry(pair) {
             Entry::Occupied(mut occupied) => {
-                if let (MapCodegenTask::Auto(_), MapCodegenTask::Explicit(_)) =
-                    (occupied.get(), &task)
-                {
-                    // Explicit maps may overwrite auto-generated maps
-                    occupied.insert(task);
+                match (occupied.get_mut(), request) {
+                    (MapCodegenTask::Auto(_), MapCodegenRequest::ExplicitOntol(ontol_map)) => {
+                        // Explicit maps may overwrite auto-generated maps
+                        occupied.insert(MapCodegenTask::Explicit(ExplicitMapCodegenTask {
+                            ontol_map: Some(ontol_map),
+                            forward_extern: None,
+                            backward_extern: None,
+                        }));
+                    }
+                    (
+                        MapCodegenTask::Explicit(expl),
+                        MapCodegenRequest::ExplicitOntol(ontol_map),
+                    ) => {
+                        expl.ontol_map = Some(ontol_map);
+                    }
+                    (MapCodegenTask::Explicit(expl), MapCodegenRequest::ExternForward(extern_)) => {
+                        expl.forward_extern = Some(extern_);
+                    }
+                    (
+                        MapCodegenTask::Explicit(expl),
+                        MapCodegenRequest::ExternBackward(extern_),
+                    ) => {
+                        expl.backward_extern = Some(extern_);
+                    }
+                    _ => {
+                        warn!("TODO: Invalid mix of map strategies");
+                    }
                 }
             }
             Entry::Vacant(vacant) => {
-                vacant.insert(task);
+                vacant.insert(match request {
+                    MapCodegenRequest::Auto(auto) => MapCodegenTask::Auto(auto),
+                    MapCodegenRequest::ExplicitOntol(ontol_map) => {
+                        MapCodegenTask::Explicit(ExplicitMapCodegenTask {
+                            ontol_map: Some(ontol_map),
+                            forward_extern: None,
+                            backward_extern: None,
+                        })
+                    }
+                    MapCodegenRequest::ExternForward(extern_id) => {
+                        MapCodegenTask::Explicit(ExplicitMapCodegenTask {
+                            ontol_map: None,
+                            forward_extern: Some(extern_id),
+                            backward_extern: None,
+                        })
+                    }
+                    MapCodegenRequest::ExternBackward(extern_id) => {
+                        MapCodegenTask::Explicit(ExplicitMapCodegenTask {
+                            ontol_map: None,
+                            forward_extern: None,
+                            backward_extern: Some(extern_id),
+                        })
+                    }
+                });
             }
         }
     }
@@ -73,15 +130,37 @@ pub struct ConstCodegenTask<'m> {
     pub node: TypedRootNode<'m>,
 }
 
-pub enum MapCodegenTask<'m> {
+/// A request for code generation.
+/// It goes together with a key.
+pub enum MapCodegenRequest<'m> {
+    /// Autogenerate
+    Auto(PackageId),
+    ExplicitOntol(OntolMap<'m>),
+    ExternForward(DefId),
+    ExternBackward(DefId),
+}
+
+/// A native ontol `map` with full body expressed in ontol-hir
+pub struct OntolMap<'m> {
+    pub def_id: DefId,
+    pub arms: [TypedRootNode<'m>; 2],
+    pub span: SourceSpan,
+}
+
+pub(super) enum MapCodegenTask<'m> {
     Auto(PackageId),
     Explicit(ExplicitMapCodegenTask<'m>),
 }
 
-pub struct ExplicitMapCodegenTask<'m> {
-    pub def_id: DefId,
-    pub arms: [TypedRootNode<'m>; 2],
-    pub span: SourceSpan,
+pub(super) struct ExplicitMapCodegenTask<'m> {
+    /// The native ONTOL mapping, if any
+    pub ontol_map: Option<OntolMap<'m>>,
+    /// extern forward override of the ontol mapping.
+    /// note: The direction is relative to [UndirectedMapKey].
+    pub forward_extern: Option<DefId>,
+    /// extern forward override of the ontol mapping.
+    /// note: The direction is relative to [UndirectedMapKey].
+    pub backward_extern: Option<DefId>,
 }
 
 impl<'m> Debug for ConstCodegenTask<'m> {
@@ -94,10 +173,12 @@ impl<'m> Debug for ConstCodegenTask<'m> {
 
 impl<'m> Debug for ExplicitMapCodegenTask<'m> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("MapCodegenTask")
-            .field("first", &DebugViaDisplay(&self.arms[0]))
-            .field("second", &DebugViaDisplay(&self.arms[1]))
-            .finish()
+        let mut dbg = f.debug_struct("MapCodegenTask");
+        if let Some(ontol) = &self.ontol_map {
+            dbg.field("first", &DebugViaDisplay(&ontol.arms[0]));
+            dbg.field("second", &DebugViaDisplay(&ontol.arms[1]));
+        }
+        dbg.finish()
     }
 }
 
@@ -140,29 +221,28 @@ pub(super) enum ProcedureCall {
 /// Perform all codegen tasks
 pub fn execute_codegen_tasks(compiler: &mut Compiler) {
     let mut explicit_map_tasks = Vec::with_capacity(compiler.codegen_tasks.map_tasks.len());
+    let mut proc_table = ProcTable::default();
 
-    for (def_pair, map_task) in std::mem::take(&mut compiler.codegen_tasks.map_tasks) {
+    for (key, map_task) in std::mem::take(&mut compiler.codegen_tasks.map_tasks) {
         match map_task {
             MapCodegenTask::Auto(package_id) => {
-                if let Some(task) = autogenerate_mapping(def_pair, package_id, compiler) {
-                    explicit_map_tasks.push(task);
+                if let Some(task) = autogenerate_mapping(key, package_id, compiler) {
+                    explicit_map_tasks.push((key, task));
                 }
             }
             MapCodegenTask::Explicit(explicit) => {
-                explicit_map_tasks.push(explicit);
+                explicit_map_tasks.push((key, explicit));
             }
         }
     }
-
-    let mut proc_table = ProcTable::default();
 
     for ConstCodegenTask { def_id, node } in std::mem::take(&mut compiler.codegen_tasks.const_tasks)
     {
         const_codegen(node, def_id, &mut proc_table, compiler);
     }
 
-    for task in explicit_map_tasks {
-        generate_explicit_map(task, &mut proc_table, compiler);
+    for (key, task) in explicit_map_tasks {
+        generate_explicit_map(key, task, &mut proc_table, compiler);
     }
 
     let LinkResult {
@@ -180,44 +260,76 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
 }
 
 fn generate_explicit_map<'m>(
-    ExplicitMapCodegenTask { def_id, arms, span }: ExplicitMapCodegenTask<'m>,
+    undirected_key: UndirectedMapKey,
+    ExplicitMapCodegenTask {
+        ontol_map,
+        forward_extern,
+        backward_extern,
+    }: ExplicitMapCodegenTask<'m>,
     proc_table: &mut ProcTable,
     compiler: &mut Compiler<'m>,
 ) {
-    debug!("1st (ty={:?}):\n{}", arms[0].data().ty(), arms[0]);
-    debug!("2nd (ty={:?}):\n{}", arms[1].data().ty(), arms[1]);
+    let mut externed_outputs = FnvHashSet::default();
 
-    let forward_key = {
-        let _entered = debug_span!("fwd").entered();
-        generate_map_procs(&arms[0], &arms[1], proc_table, compiler)
-    };
-
-    {
-        let _entered = debug_span!("backwd").entered();
-        generate_map_procs(&arms[1], &arms[0], proc_table, compiler);
+    // the extern directions are in relation to the _undirected key_, not the ontol map arms!
+    if let Some(extern_def_id) = forward_extern {
+        generate_extern_map(
+            undirected_key.first(),
+            undirected_key.second(),
+            extern_def_id,
+            proc_table,
+            compiler,
+        );
+        externed_outputs.insert(undirected_key.second().def_id);
+    }
+    if let Some(extern_def_id) = backward_extern {
+        generate_extern_map(
+            undirected_key.second(),
+            undirected_key.first(),
+            extern_def_id,
+            proc_table,
+            compiler,
+        );
+        externed_outputs.insert(undirected_key.first().def_id);
     }
 
-    match (compiler.map_ident(def_id), forward_key) {
-        (Some(ident), Some(forward_key)) => {
-            let ident_constant = compiler.strings.intern_constant(ident);
-            proc_table
-                .named_forward_maps
-                .insert((def_id.package_id(), ident_constant), forward_key);
+    if let Some(OntolMap { def_id, arms, span }) = ontol_map {
+        debug!("1st (ty={:?}):\n{}", arms[0].data().ty(), arms[0]);
+        debug!("2nd (ty={:?}):\n{}", arms[1].data().ty(), arms[1]);
+
+        let forward_key = {
+            let _entered = debug_span!("fwd").entered();
+            generate_ontol_map_procs(&arms[0], &arms[1], &externed_outputs, proc_table, compiler)
+        };
+
+        {
+            let _entered = debug_span!("backwd").entered();
+            generate_ontol_map_procs(&arms[1], &arms[0], &externed_outputs, proc_table, compiler);
         }
-        (Some(_), None) => {
-            compiler.errors.push(SpannedCompileError {
-                error: CompileError::BUG(smart_format!("Failed to generate forward mapping")),
-                span,
-                notes: vec![],
-            });
+
+        match (compiler.map_ident(def_id), forward_key) {
+            (Some(ident), Some(forward_key)) => {
+                let ident_constant = compiler.strings.intern_constant(ident);
+                proc_table
+                    .named_forward_maps
+                    .insert((def_id.package_id(), ident_constant), forward_key);
+            }
+            (Some(_), None) => {
+                compiler.errors.push(SpannedCompileError {
+                    error: CompileError::BUG(smart_format!("Failed to generate forward mapping")),
+                    span,
+                    notes: vec![],
+                });
+            }
+            _ => {}
         }
-        _ => {}
     }
 }
 
-fn generate_map_procs<'m>(
+fn generate_ontol_map_procs<'m>(
     scope: &TypedRootNode<'m>,
     expr: &TypedRootNode<'m>,
+    externed_outputs: &FnvHashSet<DefId>,
     proc_table: &mut ProcTable,
     compiler: &mut Compiler<'m>,
 ) -> Option<MapKey> {
@@ -233,11 +345,25 @@ fn generate_map_procs<'m>(
         _ => false,
     };
 
-    let key = generate_map_proc(scope, expr, MapFlags::empty(), proc_table, compiler);
+    let key = generate_map_proc(
+        scope,
+        expr,
+        MapFlags::empty(),
+        externed_outputs,
+        proc_table,
+        compiler,
+    );
 
     if needs_pure_partial {
         let _entered = debug_span!("pure").entered();
-        generate_map_proc(scope, expr, MapFlags::PURE_PARTIAL, proc_table, compiler);
+        generate_map_proc(
+            scope,
+            expr,
+            MapFlags::PURE_PARTIAL,
+            externed_outputs,
+            proc_table,
+            compiler,
+        );
     }
 
     key
@@ -247,6 +373,7 @@ fn generate_map_proc<'m>(
     scope: &TypedRootNode<'m>,
     expr: &TypedRootNode<'m>,
     map_flags: MapFlags,
+    externed_outputs: &FnvHashSet<DefId>,
     proc_table: &mut ProcTable,
     compiler: &mut Compiler<'m>,
 ) -> Option<MapKey> {
@@ -266,6 +393,12 @@ fn generate_map_proc<'m>(
     }
     if !matches!(expr.data().ty(), Type::Error) {
         assert_eq!(func.body.data().ty(), expr.data().ty());
+        if let Some(output_def_id) = expr.data().ty().get_single_def_id() {
+            if externed_outputs.contains(&output_def_id) {
+                debug!("Direction is covered by extern; skipping codegen");
+                return None;
+            }
+        }
     }
 
     debug!("body type: {:?}", func.body.data().ty());
@@ -273,6 +406,34 @@ fn generate_map_proc<'m>(
     let key = map_codegen(proc_table, &func, map_flags, compiler);
 
     Some(key)
+}
+
+fn generate_extern_map(
+    input: MapDef,
+    output: MapDef,
+    extern_def_id: DefId,
+    proc_table: &mut ProcTable,
+    compiler: &mut Compiler,
+) {
+    let key = MapKey {
+        input,
+        output,
+        flags: MapFlags::empty(),
+    };
+
+    let span = compiler.defs.def_span(extern_def_id);
+
+    let mut builder = ProcBuilder::new(NParams(0));
+    let mut root_block = builder.new_block(Delta(1), span);
+    root_block.op(
+        OpCode::CallExtern(extern_def_id, output.def_id),
+        Delta(0),
+        span,
+        &mut builder,
+    );
+    root_block.commit(Terminator::Return, &mut builder);
+
+    proc_table.map_procedures.insert(key, builder);
 }
 
 impl<'m> Compiler<'m> {

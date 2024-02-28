@@ -48,8 +48,10 @@ pub enum DefKind<'m> {
         ident: Option<&'m str>,
         arms: [PatId; 2],
         var_alloc: VarAllocator,
+        extern_def_id: Option<DefId>,
     },
     AutoMapping,
+    Extern(&'m str),
 }
 
 impl<'m> DefKind<'m> {
@@ -69,6 +71,7 @@ impl<'m> DefKind<'m> {
             Self::Constant(_) => None,
             Self::Mapping { ident, .. } => ident.map(|ident| ident.into()),
             Self::AutoMapping => None,
+            Self::Extern(ident) => Some((*ident).into()),
         }
     }
 

@@ -22,7 +22,9 @@ pub struct Scope {
 pub struct ProcBuilder {
     pub n_params: NParams,
     pub blocks: Vec<Block>,
-    pub stack_size: i32,
+
+    stack_size: i32,
+    stack_watermark: i32,
 }
 
 impl ProcBuilder {
@@ -31,6 +33,7 @@ impl ProcBuilder {
             n_params,
             blocks: Default::default(),
             stack_size: 0,
+            stack_watermark: 0,
         }
     }
 
@@ -216,6 +219,9 @@ impl Block {
     ) -> Local {
         let local = Local(builder.stack_size as u16);
         builder.stack_size += stack_delta.0;
+        if builder.stack_size > builder.stack_watermark {
+            builder.stack_watermark = builder.stack_size;
+        }
         self.ir.push((ir, span));
         local
     }

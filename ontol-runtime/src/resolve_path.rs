@@ -69,7 +69,7 @@ impl ResolverGraph {
         Self::new(
             ontology
                 .iter_map_meta()
-                .map(|(keys, meta)| (keys, meta.lossiness)),
+                .map(|(key, meta)| (key, meta.lossiness)),
         )
     }
 

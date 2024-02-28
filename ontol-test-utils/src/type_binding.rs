@@ -185,6 +185,12 @@ pub struct ValueBuilder<'t, 'on> {
     value: Value,
 }
 
+impl<'t, 'on> ValueBuilder<'t, 'on> {
+    pub fn to_value(self) -> Value {
+        self.value
+    }
+}
+
 impl<'t, 'on> From<ValueBuilder<'t, 'on>> for Value {
     fn from(b: ValueBuilder<'t, 'on>) -> Self {
         b.value

@@ -427,6 +427,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     ),
                 })
             }
+            ReprKind::Extern => panic!(),
         }
     }
 

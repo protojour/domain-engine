@@ -95,6 +95,11 @@ pub trait Processor {
         var: Var,
         value_cardinality: ValueCardinality,
     ) -> VmResult<Self::Yield>;
+    fn yield_call_extern(
+        &mut self,
+        extern_def_id: DefId,
+        output_def_id: DefId,
+    ) -> VmResult<Self::Yield>;
 }
 
 impl<'o, P: Processor> AbstractVm<'o, P> {
@@ -182,6 +187,12 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                 OpCode::CallBuiltin(builtin_proc, result_type) => {
                     processor.call_builtin(*builtin_proc, *result_type)?;
                     self.program_counter += 1;
+                }
+                OpCode::CallExtern(extern_def_id, output_def_id) => {
+                    self.program_counter += 1;
+                    return Ok(Some(
+                        processor.yield_call_extern(*extern_def_id, *output_def_id)?,
+                    ));
                 }
                 OpCode::GetAttr(local, property_id, flags) => {
                     processor.get_attr(*local, *property_id, *flags)?;

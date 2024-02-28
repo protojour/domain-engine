@@ -1,6 +1,7 @@
 use ontol_runtime::{
     condition::Condition,
-    ontology::ValueCardinality,
+    interface::serde::processor::ProcessorMode,
+    ontology::{Extern, ValueCardinality},
     value::Value,
     vm::{
         proc::{Procedure, Yield},
@@ -8,6 +9,7 @@ use ontol_runtime::{
     },
     MapDef, MapDefFlags, MapFlags, MapKey,
 };
+use serde::de::DeserializeSeed;
 use unimock::{unimock, Unimock};
 
 use crate::{
@@ -75,6 +77,7 @@ impl OntolTest {
 #[unimock(api = YielderMock)]
 pub trait Yielder {
     fn yield_match(&self, value_cardinality: ValueCardinality, condition: Condition) -> Value;
+    fn yield_call_extern_http_json(&self, url: &str, body: serde_json::Value) -> serde_json::Value;
 }
 
 pub struct TestMapper<'on, 'p> {
@@ -216,8 +219,48 @@ impl<'on, 'p> TestMapper<'on, 'p> {
         loop {
             match vm.run([param])? {
                 VmState::Complete(value) => return Ok(value),
-                VmState::Yielded(Yield::Match(_var, cardinality, condition)) => {
+                VmState::Yield(Yield::Match(_var, cardinality, condition)) => {
                     param = self.yielder.yield_match(cardinality, condition);
+                }
+                VmState::Yield(Yield::CallExtern(extern_def_id, extern_param, output_def_id)) => {
+                    let ontology = &self.test.ontology;
+                    let input_type_info = ontology.get_type_info(extern_param.type_def_id());
+                    let output_type_info = ontology.get_type_info(output_def_id);
+
+                    let param_json: serde_json::Value = {
+                        let mut buf: Vec<u8> = vec![];
+                        ontology
+                            .new_serde_processor(
+                                input_type_info.operator_addr.unwrap(),
+                                ProcessorMode::Read,
+                            )
+                            .serialize_value(
+                                &extern_param,
+                                None,
+                                &mut serde_json::Serializer::new(&mut buf),
+                            )
+                            .unwrap();
+                        serde_json::from_slice(&buf).unwrap()
+                    };
+
+                    match ontology.get_extern(extern_def_id) {
+                        Some(Extern::HttpJson { url }) => {
+                            let output_json = self
+                                .yielder
+                                .yield_call_extern_http_json(&self.test.ontology[*url], param_json);
+
+                            let attr = ontology
+                                .new_serde_processor(
+                                    output_type_info.operator_addr.unwrap(),
+                                    ProcessorMode::Read,
+                                )
+                                .deserialize(output_json)
+                                .unwrap();
+
+                            param = attr.val;
+                        }
+                        _ => panic!("unhandled"),
+                    }
                 }
             }
         }

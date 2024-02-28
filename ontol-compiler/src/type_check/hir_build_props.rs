@@ -19,7 +19,7 @@ use crate::{
         PatternKind, SetBinaryOperator,
     },
     primitive::PrimitiveKind,
-    relation::Property,
+    relation::{Property, TypeRelation},
     repr::repr_model::ReprKind,
     type_check::{ena_inference::Strength, hir_build::NodeInfo, TypeError},
     typed_hir::{Meta, TypedHirData},
@@ -203,9 +203,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             return;
         };
 
-        for def_id in memberships {
-            if let Some(property_set) = self.relations.properties_table_by_def_id(*def_id) {
-                self.collect_match_attributes(property_set, match_attributes);
+        for mem_def_id in memberships {
+            let mesh = self.relations.ontology_mesh.get(mem_def_id).unwrap();
+            let Some(is) = mesh.keys().find(|is| is.def_id == def_id) else {
+                continue;
+            };
+
+            if matches!(is.rel, TypeRelation::SubVariant) {
+                if let Some(property_set) = self.relations.properties_table_by_def_id(*mem_def_id) {
+                    self.collect_match_attributes(property_set, match_attributes);
+                }
             }
         }
     }
