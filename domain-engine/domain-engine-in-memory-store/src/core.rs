@@ -67,7 +67,7 @@ impl InMemoryStore {
         for id in ids {
             let dynamic_key = Self::extract_dynamic_key(&id)?;
 
-            let status = if collection.remove(&dynamic_key).is_some() {
+            let status = if collection.swap_remove(&dynamic_key).is_some() {
                 deleted_set.insert(EntityKey {
                     type_def_id: def_id,
                     dynamic_key,
