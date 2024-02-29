@@ -29,6 +29,9 @@ urlencoding = "2"
 bit-vec = { version = "0.6", features = ["serde"] }
 bincode = "1"
 thiserror = "1"
+documented = "0.3.0"
+strum = { version = "0.26.1", features = ["derive"] }
+strum_macros = "0.26.1"
 
 [dev-dependencies]
 tracing-subscriber.workspace = true

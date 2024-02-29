@@ -1,11 +1,16 @@
 use std::{borrow::Cow, collections::HashMap, ops::Range};
 
+use documented::DocumentedFields;
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    ontology::Cardinality, text_like_types::TextLikeType, var::VarAllocator, vm::proc::BuiltinProc,
+    ontology::{Cardinality, TypeKind},
+    text_like_types::TextLikeType,
+    var::VarAllocator,
+    vm::proc::BuiltinProc,
     DefId, PackageId, RelationshipId, Role,
 };
 use smartstring::alias::String;
+use strum::AsRefStr;
 
 use crate::{
     mem::Intern, namespace::Space, package::ONTOL_PKG, pattern::PatId, primitive::PrimitiveKind,
@@ -68,6 +73,15 @@ impl<'m> DefKind<'m> {
             Self::AutoMapping => None,
         }
     }
+    pub fn as_type_kind(&self) -> TypeKind {
+        match self {
+            DefKind::BuiltinRelType(..) => TypeKind::Relationship,
+            DefKind::Fn(_) => TypeKind::Function,
+            DefKind::EmptySequence => TypeKind::Generator,
+            DefKind::Package(_) => TypeKind::Domain,
+            _ => TypeKind::Data,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -91,18 +105,29 @@ pub enum DefVisibility {
 #[derive(Clone, Copy, Debug)]
 pub struct FmtFinalState(pub bool);
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, AsRefStr, DocumentedFields)]
 pub enum BuiltinRelationKind {
+    /// doc comment for Is
     Is,
+    /// doc comment for Identifies
     Identifies,
+    /// doc comment for Id
     Id,
+    /// doc comment for Indexed
     Indexed,
+    /// doc comment for Min
     Min,
+    /// doc comment for Max
     Max,
+    /// doc comment for Default
     Default,
+    /// doc comment for Gen
     Gen,
+    /// doc comment for Route
     Route,
+    /// doc comment for Doc
     Doc,
+    /// doc comment for Example
     Example,
 }
 

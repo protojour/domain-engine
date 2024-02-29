@@ -278,6 +278,7 @@ impl Domain {
         let new_size = std::cmp::max(self.info.len(), index + 1);
         self.info.resize_with(new_size, || TypeInfo {
             def_id: DefId(type_info.def_id.0, 0),
+            kind: TypeKind::Data,
             public: false,
             name: None,
             entity_info: None,
@@ -289,9 +290,19 @@ impl Domain {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub enum TypeKind {
+    Data,
+    Relationship,
+    Function,
+    Domain,
+    Generator,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TypeInfo {
     pub def_id: DefId,
+    pub kind: TypeKind,
     pub public: bool,
     pub name: Option<String>,
     /// Some if this type is an entity

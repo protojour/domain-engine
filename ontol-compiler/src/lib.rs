@@ -6,7 +6,10 @@ use std::{
 };
 
 use codegen::task::{execute_codegen_tasks, CodegenTasks};
-use def::{DefKind, DefVisibility, Defs, LookupRelationshipMeta, RelationshipMeta, TypeDef};
+use def::{
+    BuiltinRelationKind, DefKind, DefVisibility, Defs, LookupRelationshipMeta, RelationshipMeta,
+    TypeDef,
+};
 
 use documented::DocumentedFields;
 pub use error::*;
@@ -29,6 +32,7 @@ use ontol_runtime::{
         DataRelationshipInfo, DataRelationshipKind, DataRelationshipSource, DataRelationshipTarget,
         Domain, EntityInfo, MapLossiness, MapMeta, OntolDomainMeta, Ontology, TypeInfo,
     },
+    text_like_types::TextLikeType,
     value::PropertyId,
     DefId, PackageId,
 };
@@ -236,8 +240,22 @@ impl<'m> Compiler<'m> {
             match self.defs.def_kind(def_id) {
                 DefKind::Primitive(kind, _ident) => {
                     let name = kind.as_ref();
-                    let field_docs = PrimitiveKind::get_field_docs(name).unwrap();
-                    docs.insert(def_id, vec![field_docs.into()]);
+                    if let Ok(field_docs) = PrimitiveKind::get_field_docs(name) {
+                        docs.insert(def_id, vec![field_docs.into()]);
+                    }
+                }
+                DefKind::BuiltinRelType(kind, _ident) => {
+                    let name = kind.as_ref();
+                    if let Ok(field_docs) = BuiltinRelationKind::get_field_docs(name) {
+                        docs.insert(def_id, vec![field_docs.into()]);
+                    }
+                }
+                DefKind::Type(_) => {
+                    let tlt = self.defs.string_like_types.get(&def_id).unwrap();
+                    let name = tlt.as_ref();
+                    if let Ok(field_docs) = TextLikeType::get_field_docs(name) {
+                        docs.insert(def_id, vec![field_docs.into()]);
+                    }
                 }
                 _ => {}
             }
@@ -296,6 +314,7 @@ impl<'m> Compiler<'m> {
 
                 domain.add_type(TypeInfo {
                     def_id: type_def_id,
+                    kind: self.defs.def_kind(type_def_id).as_type_kind(),
                     public: match self.defs.def_kind(type_def_id) {
                         DefKind::Type(TypeDef { visibility, .. }) => {
                             matches!(visibility, DefVisibility::Public)
@@ -319,6 +338,7 @@ impl<'m> Compiler<'m> {
             for type_def_id in namespace.anonymous {
                 domain.add_type(TypeInfo {
                     def_id: type_def_id,
+                    kind: self.defs.def_kind(type_def_id).as_type_kind(),
                     public: false,
                     name: None,
                     entity_info: None,
