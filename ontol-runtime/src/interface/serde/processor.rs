@@ -4,6 +4,7 @@ use crate::{
     format_utils::{Backticks, CommaSeparated, DoubleQuote},
     ontology::Ontology,
     value::PropertyId,
+    DefId,
 };
 
 use super::operator::{FilteredVariants, SerdeOperator, SerdeOperatorAddr, SerdePropertyFlags};
@@ -21,7 +22,7 @@ pub struct SerdeProcessor<'on, 'p> {
     /// The ontology, via which new SerdeOperators can be created.
     pub(crate) ontology: &'on Ontology,
 
-    pub(crate) profile: &'p ProcessorProfile,
+    pub(crate) profile: &'p ProcessorProfile<'p>,
 
     pub(crate) mode: ProcessorMode,
     pub(crate) level: ProcessorLevel,
@@ -34,7 +35,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
     }
 
     /// Set the processor profile to be used with this processor
-    pub fn with_profile(self, profile: &'p ProcessorProfile) -> Self {
+    pub fn with_profile(self, profile: &'p ProcessorProfile<'p>) -> Self {
         Self { profile, ..self }
     }
 
@@ -166,18 +167,60 @@ pub struct ProcessorLevel {
     local_level: u8,
 }
 
-#[derive(Clone, Default)]
-pub struct ProcessorProfile {
-    pub overridden_id_property_key: Option<&'static str>,
-    pub ignored_property_keys: &'static [&'static str],
+#[derive(Clone)]
+pub struct ProcessorProfile<'p> {
     pub id_format: ScalarFormat,
     pub flags: ProcessorProfileFlags,
+    pub api: &'p (dyn ProcessorProfileApi + Send + Sync),
 }
 
-impl ProcessorProfile {
+impl<'p> Default for ProcessorProfile<'p> {
+    fn default() -> Self {
+        DOMAIN_PROFILE.clone()
+    }
+}
+
+impl<'p> ProcessorProfile<'p> {
     pub fn with_flags(self, flags: ProcessorProfileFlags) -> Self {
         Self { flags, ..self }
     }
+}
+
+/// The standard profile for domain serialization/deserialization
+pub(crate) static DOMAIN_PROFILE: ProcessorProfile = ProcessorProfile {
+    id_format: ScalarFormat::DomainTransparent,
+    flags: ProcessorProfileFlags::empty(),
+    api: &(),
+};
+
+pub trait ProcessorProfileApi {
+    fn lookup_special_property(&self, key: &str) -> Option<SpecialProperty>;
+    fn find_special_property_name(&self, prop: SpecialProperty) -> Option<&str>;
+    fn annotate_type(&self, input: &serde_value::Value) -> Option<DefId>;
+}
+
+impl ProcessorProfileApi for () {
+    fn lookup_special_property(&self, _key: &str) -> Option<SpecialProperty> {
+        None
+    }
+
+    fn find_special_property_name(&self, _prop: SpecialProperty) -> Option<&str> {
+        None
+    }
+
+    fn annotate_type(&self, _input: &serde_value::Value) -> Option<DefId> {
+        None
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum SpecialProperty {
+    /// A special hard-coded property name that always represents an entity ID
+    IdOverride,
+    /// A special hard-coded property that acts like a type annotation
+    TypeAnnotation,
+    /// A special property name that's always ignored by ONTOL
+    Ignored,
 }
 
 #[derive(Clone, Copy, Default, Debug)]
@@ -206,14 +249,6 @@ bitflags::bitflags! {
         const ALLOW_STRUCTURALLY_CIRCULAR_PROPS = 0b00001000;
     }
 }
-
-/// The standard profile for domain serialization/deserialization
-pub(crate) static DOMAIN_PROFILE: ProcessorProfile = ProcessorProfile {
-    overridden_id_property_key: None,
-    ignored_property_keys: &[],
-    id_format: ScalarFormat::DomainTransparent,
-    flags: ProcessorProfileFlags::empty(),
-};
 
 /// Maximum number of nested/recursive operators.
 const DEFAULT_RECURSION_LIMIT: u16 = 64;

@@ -17,7 +17,7 @@ use crate::{
 
 use super::{
     operator::{FilteredVariants, SequenceRange, SerdeOperator, SerdeStructFlags},
-    processor::{ProcessorProfileFlags, SerdeProcessor, SubProcessorContext},
+    processor::{ProcessorProfileFlags, SerdeProcessor, SpecialProperty, SubProcessorContext},
     serialize_raw::RawProxy,
     StructOperator, EDGE_PROPERTY,
 };
@@ -318,6 +318,11 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 
         let mut map = serializer.serialize_map(Some(attributes.len() + option_len(&rel_params)))?;
 
+        let overridden_id_property_key = self
+            .profile
+            .api
+            .find_special_property_name(SpecialProperty::IdOverride);
+
         for (name, serde_prop) in
             struct_op.filter_properties(self.mode, self.ctx.parent_property_id, self.profile.flags)
         {
@@ -352,7 +357,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 
             let is_entity_id = serde_prop.is_entity_id();
 
-            let name = match (is_entity_id, self.profile.overridden_id_property_key) {
+            let name = match (is_entity_id, overridden_id_property_key) {
                 (true, Some(id_key)) => id_key,
                 _ => name.as_str(),
             };

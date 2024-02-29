@@ -1,7 +1,8 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
     interface::serde::processor::{
-        ProcessorLevel, ProcessorMode, ProcessorProfile, ProcessorProfileFlags,
+        ProcessorLevel, ProcessorMode, ProcessorProfile, ProcessorProfileApi,
+        ProcessorProfileFlags, SpecialProperty,
     },
     value::{Attribute, PropertyId, Value},
     DefId,
@@ -11,15 +12,15 @@ use tracing::error;
 
 use crate::type_binding::{TypeBinding, TEST_JSON_SCHEMA_VALIDATION};
 
-pub struct SerdeHelper<'b, 'on> {
+pub struct SerdeHelper<'b, 'on, 'p> {
     binding: &'b TypeBinding<'on>,
     mode: ProcessorMode,
     level: ProcessorLevel,
-    profile: ProcessorProfile,
+    profile: ProcessorProfile<'p>,
 }
 
-impl<'b, 'on> SerdeHelper<'b, 'on> {
-    pub fn with_profile(self, profile: ProcessorProfile) -> Self {
+impl<'b, 'on, 'p> SerdeHelper<'b, 'on, 'p> {
+    pub fn with_profile(self, profile: ProcessorProfile<'p>) -> Self {
         Self { profile, ..self }
     }
 
@@ -37,7 +38,7 @@ impl<'b, 'on> SerdeHelper<'b, 'on> {
 
     #[track_caller]
     pub fn to_value(&self, json: serde_json::Value) -> Result<Value, serde_json::Error> {
-        let value = self.to_value_raw(json)?;
+        let value = self.to_value_nocheck(json)?;
         assert_eq!(value.type_def_id(), self.binding.type_info.def_id);
         Ok(value)
     }
@@ -47,7 +48,7 @@ impl<'b, 'on> SerdeHelper<'b, 'on> {
         &self,
         json: serde_json::Value,
     ) -> Result<FnvHashMap<PropertyId, Attribute>, serde_json::Error> {
-        let value = self.to_value_raw(json)?;
+        let value = self.to_value_nocheck(json)?;
         assert_eq!(value.type_def_id(), self.binding.type_info.def_id);
         match value {
             Value::Struct(attrs, _) => Ok(*attrs),
@@ -60,12 +61,13 @@ impl<'b, 'on> SerdeHelper<'b, 'on> {
     /// (i.e. it should deserialize to a _variant_ of the type)
     #[track_caller]
     pub fn to_value_variant(&self, json: serde_json::Value) -> Result<Value, serde_json::Error> {
-        let value = self.to_value_raw(json)?;
+        let value = self.to_value_nocheck(json)?;
         assert_ne!(value.type_def_id(), self.binding.type_info.def_id);
         Ok(value)
     }
 
-    pub fn to_value_raw(&self, json: serde_json::Value) -> Result<Value, serde_json::Error> {
+    /// Deserialize to value, do not run type_def_id assert checks
+    pub fn to_value_nocheck(&self, json: serde_json::Value) -> Result<Value, serde_json::Error> {
         let json_string = serde_json::to_string(&json).unwrap();
 
         let attribute_result = self
@@ -137,7 +139,7 @@ impl<'b, 'on> SerdeHelper<'b, 'on> {
 }
 
 /// Make a helper for the data creation processor mode
-pub fn serde_create<'b, 'on>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 'on> {
+pub fn serde_create<'b, 'on, 'p>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 'on, 'p> {
     SerdeHelper {
         binding,
         mode: ProcessorMode::Create,
@@ -147,7 +149,7 @@ pub fn serde_create<'b, 'on>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, '
 }
 
 /// Make a helper for the `Read` processor mode
-pub fn serde_read<'b, 'on>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 'on> {
+pub fn serde_read<'b, 'on, 'p>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 'on, 'p> {
     SerdeHelper {
         binding,
         mode: ProcessorMode::Read,
@@ -157,7 +159,7 @@ pub fn serde_read<'b, 'on>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 'on
 }
 
 /// Make a helper for the `Raw` processor mode
-pub fn serde_raw<'b, 'on>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 'on> {
+pub fn serde_raw<'b, 'on, 'p>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 'on, 'p> {
     SerdeHelper {
         binding,
         mode: ProcessorMode::Raw,
@@ -166,11 +168,36 @@ pub fn serde_raw<'b, 'on>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 'on>
     }
 }
 
-pub fn serde_raw_tree_only<'b, 'on>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 'on> {
+pub fn serde_raw_tree_only<'b, 'on, 'p>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 'on, 'p> {
     SerdeHelper {
         binding,
         mode: ProcessorMode::RawTreeOnly,
         level: ProcessorLevel::new_root(),
         profile: ProcessorProfile::default(),
+    }
+}
+
+pub struct ProcessorProfileTestPlugin {
+    pub prop_overrides: FnvHashMap<&'static str, SpecialProperty>,
+    pub annotations: FnvHashMap<serde_value::Value, DefId>,
+}
+
+impl ProcessorProfileApi for ProcessorProfileTestPlugin {
+    fn lookup_special_property(&self, key: &str) -> Option<SpecialProperty> {
+        self.prop_overrides.get(key).cloned()
+    }
+
+    fn find_special_property_name(&self, prop: SpecialProperty) -> Option<&str> {
+        for (key, candidate) in &self.prop_overrides {
+            if *candidate == prop {
+                return Some(key);
+            }
+        }
+
+        None
+    }
+
+    fn annotate_type(&self, input: &serde_value::Value) -> Option<DefId> {
+        self.annotations.get(input).cloned()
     }
 }

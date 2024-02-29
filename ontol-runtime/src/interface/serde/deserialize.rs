@@ -219,6 +219,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                             variants,
                             ontology: self.ontology,
                             ctx: self.ctx,
+                            profile: self.profile,
                             mode: self.mode,
                             level: self.level,
                         }
@@ -417,7 +418,7 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
                 )?;
                 let id = deserialized_map
                     .id
-                    .ok_or_else(|| Error::custom("missing _id attribute".to_string()))?;
+                    .ok_or_else(|| Error::custom("missing identifier attribute".to_string()))?;
 
                 Ok(Attribute {
                     rel: deserialized_map.rel_params,

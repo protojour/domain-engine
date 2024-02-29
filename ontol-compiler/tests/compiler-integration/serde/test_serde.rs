@@ -1,7 +1,9 @@
 use assert_matches::assert_matches;
+use fnv::FnvHashMap;
 use ontol_runtime::{
     interface::serde::processor::{
         ProcessorLevel, ProcessorMode, ProcessorProfile, ProcessorProfileFlags, ScalarFormat,
+        SpecialProperty,
     },
     value::Value,
 };
@@ -465,11 +467,18 @@ fn test_jsonml() {
 
 #[test]
 fn test_serde_with_raw_id_overridde_profile() {
+    let plugin = ProcessorProfileTestPlugin {
+        prop_overrides: FnvHashMap::from_iter([
+            ("__ID", SpecialProperty::IdOverride),
+            ("IGNORE1", SpecialProperty::Ignored),
+            ("IGNORE2", SpecialProperty::Ignored),
+        ]),
+        annotations: FnvHashMap::default(),
+    };
     let processor_profile = ProcessorProfile {
-        overridden_id_property_key: Some("__ID"),
-        ignored_property_keys: &["IGNORE1", "IGNORE2"],
         id_format: ScalarFormat::RawText,
         flags: ProcessorProfileFlags::empty(),
+        api: &plugin,
     };
 
     "
@@ -488,7 +497,7 @@ fn test_serde_with_raw_id_overridde_profile() {
 
         let foo_value = serde_create(&foo)
             .with_profile(processor_profile.clone())
-            .to_value_raw(json!({
+            .to_value_nocheck(json!({
                 "IGNORE1": 1,
                 "__ID": "a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8",
                 "IGNORE2": 2
@@ -509,7 +518,7 @@ fn test_serde_with_raw_id_overridde_profile() {
 
         let bar_value = serde_create(&bar)
             .with_profile(processor_profile.clone())
-            .to_value_raw(json!({ "__ID": "1337" }))
+            .to_value_nocheck(json!({ "__ID": "1337" }))
             .unwrap();
 
         expect_eq!(
@@ -528,11 +537,14 @@ fn test_serde_with_raw_id_overridde_profile() {
 
 #[test]
 fn test_serde_with_raw_prefix_text_id_overridde_profile() {
+    let plugin = ProcessorProfileTestPlugin {
+        prop_overrides: FnvHashMap::from_iter([("__ID", SpecialProperty::IdOverride)]),
+        annotations: FnvHashMap::default(),
+    };
     let processor_profile = ProcessorProfile {
-        overridden_id_property_key: Some("__ID"),
-        ignored_property_keys: &[],
         id_format: ScalarFormat::RawText,
         flags: ProcessorProfileFlags::empty(),
+        api: &plugin,
     };
 
     "
@@ -549,7 +561,7 @@ fn test_serde_with_raw_prefix_text_id_overridde_profile() {
 
         let baz_value = serde_create(&baz)
             .with_profile(processor_profile.clone())
-            .to_value_raw(json!({ "__ID": "mytext" }))
+            .to_value_nocheck(json!({ "__ID": "mytext" }))
             .unwrap();
 
         expect_eq!(
@@ -568,11 +580,14 @@ fn test_serde_with_raw_prefix_text_id_overridde_profile() {
 
 #[test]
 fn test_serde_with_raw_prefix_int_id_overridde_profile() {
+    let plugin = ProcessorProfileTestPlugin {
+        prop_overrides: FnvHashMap::from_iter([("__ID", SpecialProperty::IdOverride)]),
+        annotations: FnvHashMap::default(),
+    };
     let processor_profile = ProcessorProfile {
-        overridden_id_property_key: Some("__ID"),
-        ignored_property_keys: &[],
         id_format: ScalarFormat::RawText,
         flags: ProcessorProfileFlags::empty(),
+        api: &plugin,
     };
 
     "
@@ -593,7 +608,7 @@ fn test_serde_with_raw_prefix_int_id_overridde_profile() {
 
         let baz_value = serde_create(&baz)
             .with_profile(processor_profile.clone())
-            .to_value_raw(json!({ "__ID": "1337" }))
+            .to_value_nocheck(json!({ "__ID": "1337" }))
             .unwrap();
 
         expect_eq!(
@@ -608,6 +623,65 @@ fn test_serde_with_raw_prefix_int_id_overridde_profile() {
             expected = json!({ "prefix_id": "prefix/1337" }),
         );
     });
+}
+
+mod serde_raw_id_based_union_discriminator {
+    use super::*;
+    use test_log::test;
+
+    /// This tests an entity union without data-based discriminators (only id-based)
+    const ONTOL: &str = "
+    def foo (
+        rel .'id'|id: (fmt '' => 'foo/' => text => .)
+        rel .'data': text
+    )
+    def bar (
+        rel .'id'|id: (fmt '' => 'bar/' => text => .)
+        rel .'data': text
+    )
+    def baz (
+        rel .is?: foo
+        rel .is?: bar
+    )
+    ";
+
+    #[test]
+    fn plain() {
+        let test = ONTOL.compile();
+        serde_raw(&test.bind(["baz"])[0])
+            .to_value_nocheck(json!({ "id": "bar/42", "data": "yo" }))
+            .unwrap();
+    }
+
+    #[test]
+    fn overridden() {
+        let test = ONTOL.compile();
+        let [foo, bar, baz] = test.bind(["foo", "bar", "baz"]);
+        let plugin = ProcessorProfileTestPlugin {
+            prop_overrides: FnvHashMap::from_iter([
+                ("__id", SpecialProperty::IdOverride),
+                ("__type", SpecialProperty::TypeAnnotation),
+            ]),
+            annotations: FnvHashMap::from_iter([
+                (serde_value::Value::String("foo".into()), foo.def_id()),
+                (serde_value::Value::String("bar".into()), bar.def_id()),
+            ]),
+        };
+        let processor_profile = ProcessorProfile {
+            id_format: ScalarFormat::RawText,
+            flags: ProcessorProfileFlags::empty(),
+            api: &plugin,
+        };
+
+        serde_raw(&baz)
+            .to_value_nocheck(json!({ "id": "bar/42", "data": "yo" }))
+            .unwrap();
+
+        serde_raw(&baz)
+            .with_profile(processor_profile.clone())
+            .to_value_nocheck(json!({ "__type": "bar", "__id": "bar_id" }))
+            .unwrap();
+    }
 }
 
 #[test]
@@ -681,7 +755,7 @@ fn test_serialize_raw_tree_only() {
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         let entity = serde_raw(&foo)
-            .to_value_raw(json!({
+            .to_value_nocheck(json!({
                 "key": "a",
                 "foo_field": "1",
                 "bar": {
@@ -705,7 +779,7 @@ fn test_serialize_raw_tree_only_artist_and_instrument() {
     ARTIST_AND_INSTRUMENT.1.compile_then(|test| {
         let [artist] = test.bind(["artist"]);
         let entity = serde_raw(&artist)
-            .to_value_raw(json!({
+            .to_value_nocheck(json!({
                 "ID": "artist/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8",
                 "name": "Jimi",
                 "plays": [

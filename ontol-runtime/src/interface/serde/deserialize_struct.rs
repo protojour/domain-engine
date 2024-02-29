@@ -22,7 +22,7 @@ use super::{
     operator::{SerdeOperatorAddr, SerdeProperty, SerdeStructFlags, StructOperator},
     processor::{
         ProcessorMode, ProcessorProfile, ProcessorProfileFlags, RecursionLimitError,
-        SerdeProcessor, SubProcessorContext,
+        SerdeProcessor, SpecialProperty, SubProcessorContext,
     },
 };
 
@@ -58,7 +58,7 @@ struct PropertySet<'a> {
     properties: &'a IndexMap<String, SerdeProperty>,
     special_addrs: SpecialAddrs<'a>,
     processor_mode: ProcessorMode,
-    processor_profile: &'a ProcessorProfile,
+    processor_profile: &'a ProcessorProfile<'a>,
     parent_property_id: Option<PropertyId>,
     flags: SerdeStructFlags,
 }
@@ -385,21 +385,24 @@ impl<'a, 'de> Visitor<'de> for PropertySet<'a> {
                     }
                 }
 
-                if Some(v) == self.processor_profile.overridden_id_property_key {
-                    for (_, prop) in self.properties {
-                        if prop.is_entity_id() {
-                            return Ok(PropertyKey::Property(*prop));
+                let Some(serde_property) = self.properties.get(v) else {
+                    match self.processor_profile.api.lookup_special_property(v) {
+                        Some(SpecialProperty::IdOverride) => {
+                            for (_, prop) in self.properties {
+                                if prop.is_entity_id() {
+                                    return Ok(PropertyKey::Property(*prop));
+                                }
+                            }
+
+                            return Err(Error::custom(format!("unknown property `{v}`")));
                         }
+                        Some(SpecialProperty::Ignored) => {
+                            return Ok(PropertyKey::Ignored);
+                        }
+                        Some(SpecialProperty::TypeAnnotation) => {}
+                        _ => {}
                     }
 
-                    return Err(Error::custom(format!("unknown property `{v}`")));
-                }
-
-                if self.processor_profile.ignored_property_keys.contains(&v) {
-                    return Ok(PropertyKey::Ignored);
-                }
-
-                let Some(serde_property) = self.properties.get(v) else {
                     return if self.flags.contains(SerdeStructFlags::OPEN_DATA)
                         && self
                             .processor_profile

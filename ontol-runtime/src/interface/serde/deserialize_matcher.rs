@@ -6,7 +6,10 @@ use tracing::{error, trace};
 
 use crate::{
     format_utils::{Backticks, LogicOp, Missing},
-    interface::discriminator::{Discriminant, LeafDiscriminant},
+    interface::{
+        discriminator::{Discriminant, LeafDiscriminant, VariantPurpose},
+        serde::processor::SpecialProperty,
+    },
     ontology::Ontology,
     text_like_types::ParseError,
     text_pattern::{TextPattern, TextPatternConstantPart},
@@ -16,7 +19,9 @@ use crate::{
 
 use super::{
     operator::{FilteredVariants, SequenceRange, SerdeOperator, SerdeUnionVariant},
-    processor::{ProcessorLevel, ProcessorMode, ScalarFormat, SubProcessorContext},
+    processor::{
+        ProcessorLevel, ProcessorMode, ProcessorProfile, ScalarFormat, SubProcessorContext,
+    },
     SerdeOperatorAddr, StructOperator,
 };
 
@@ -437,16 +442,17 @@ impl<'on> SequenceMatcher<'on> {
     }
 }
 
-pub struct UnionMatcher<'on> {
+pub struct UnionMatcher<'on, 'p> {
     pub typename: &'on str,
     pub variants: &'on [SerdeUnionVariant],
     pub ctx: SubProcessorContext,
     pub ontology: &'on Ontology,
+    pub profile: &'p ProcessorProfile<'p>,
     pub mode: ProcessorMode,
     pub level: ProcessorLevel,
 }
 
-impl<'on> ValueMatcher for UnionMatcher<'on> {
+impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
@@ -578,13 +584,14 @@ impl<'on> ValueMatcher for UnionMatcher<'on> {
             variants: self.variants,
             ctx: self.ctx,
             ontology: self.ontology,
+            profile: self.profile,
             mode: self.mode,
             level: self.level,
         })
     }
 }
 
-impl<'on> UnionMatcher<'on> {
+impl<'on, 'p> UnionMatcher<'on, 'p> {
     fn match_leaf_discriminant(&self, discriminant: LeafDiscriminant) -> Result<DefId, ()> {
         for variant in self.variants {
             let Discriminant::MatchesLeaf(leaf_discriminant) = &variant.discriminator.discriminant
@@ -602,17 +609,18 @@ impl<'on> UnionMatcher<'on> {
 }
 
 #[derive(Clone)]
-pub struct MapMatcher<'on> {
+pub struct MapMatcher<'on, 'p> {
     variants: &'on [SerdeUnionVariant],
     ontology: &'on Ontology,
     pub ctx: SubProcessorContext,
+    profile: &'p ProcessorProfile<'p>,
     mode: ProcessorMode,
     level: ProcessorLevel,
 }
 
-pub enum MapMatchResult<'on> {
+pub enum MapMatchResult<'on, 'p> {
     Match(MapMatch<'on>),
-    Indecisive(MapMatcher<'on>),
+    Indecisive(MapMatcher<'on, 'p>),
 }
 
 #[derive(Debug)]
@@ -627,12 +635,12 @@ pub enum MapMatchKind<'on> {
     IdType(&'on str, SerdeOperatorAddr),
 }
 
-impl<'on> MapMatcher<'on> {
+impl<'on, 'p> MapMatcher<'on, 'p> {
     pub fn match_attribute(
         self,
         property: &str,
         value: &serde_value::Value,
-    ) -> MapMatchResult<'on> {
+    ) -> MapMatchResult<'on, 'p> {
         trace!("match_attribute '{property}': {:#?}", self.variants);
 
         let match_fn = |discriminant: &Discriminant| -> bool {
@@ -670,11 +678,40 @@ impl<'on> MapMatcher<'on> {
             }
         };
 
-        let result = self
+        let mut found_variant = self
             .variants
             .iter()
-            .find(|variant| match_fn(&variant.discriminator.discriminant))
-            .map(
+            .find(|variant| match_fn(&variant.discriminator.discriminant));
+
+        if found_variant.is_none() {
+            let profile_api = self.profile.api;
+            if let Some(type_annotation_property) =
+                profile_api.find_special_property_name(SpecialProperty::TypeAnnotation)
+            {
+                if property == type_annotation_property {
+                    if let Some(def_id) = profile_api.annotate_type(value) {
+                        for variant in self.variants {
+                            let discriminator = &variant.discriminator;
+
+                            if discriminator.serde_def.def_id == def_id {
+                                found_variant = Some(variant);
+                                break;
+                            } else if let VariantPurpose::Identification { entity_id } =
+                                discriminator.purpose
+                            {
+                                if entity_id == def_id {
+                                    found_variant = Some(variant);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let result =
+            found_variant.map(
                 |variant| match self.ontology.get_serde_operator(variant.addr) {
                     SerdeOperator::Struct(struct_op) => {
                         MapMatchResult::Match(self.new_match(MapMatchKind::StructType(struct_op)))
@@ -689,6 +726,7 @@ impl<'on> MapMatcher<'on> {
                                 variants,
                                 ctx: self.ctx,
                                 ontology: self.ontology,
+                                profile: self.profile,
                                 mode: self.mode,
                                 level: self.level,
                             }
@@ -705,7 +743,7 @@ impl<'on> MapMatcher<'on> {
         }
     }
 
-    pub fn match_fallback(self) -> MapMatchResult<'on> {
+    pub fn match_fallback(self) -> MapMatchResult<'on, 'p> {
         // debug!("match_fallback");
 
         for variant in self.variants {
