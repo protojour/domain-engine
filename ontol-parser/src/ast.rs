@@ -101,7 +101,7 @@ pub enum MapArm {
     // `x: y` syntax
     Binding {
         path: Spanned<Path>,
-        pattern: RootBindingPattern,
+        pattern: Spanned<AnyPattern>,
     },
     // `x {}` syntax
     Struct(StructPattern),
@@ -115,12 +115,6 @@ pub enum AnyPattern {
     Struct(Spanned<StructPattern>),
     Set(Vec<Spanned<SetPatternElement>>),
     SetAlgebra(Spanned<SetAlgebraPattern>),
-}
-
-#[derive(Clone, Eq, PartialEq, Debug)]
-pub enum RootBindingPattern {
-    Expr(Spanned<ExprPattern>),
-    Set(Vec<Spanned<SetPatternElement>>),
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]

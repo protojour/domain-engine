@@ -39,8 +39,7 @@ fn map_attribute_mismatch() {
     rel foo 'prop2': bar
     rel bar is: i64
     map (
-        foo: // ERROR expected named property// ERROR missing properties `prop0`, `prop1`, `prop2`// NOTE Consider using `match {}`
-            x,
+        foo: x,
         bar () // ERROR expected attribute
     )
     "
@@ -403,6 +402,21 @@ fn map_error_duplicate_in_equation() {
         bar(
             'a': x
         )
+    )
+    "
+    .compile_fail();
+}
+
+#[test]
+fn attributes_cannot_follow_spread() {
+    "
+    def foo (rel .'a': i64)
+    def bar (rel .'a': i64)
+    map(
+        foo(..rest,
+            'a': x // ERROR spread label must be the last argument
+        ),
+        bar('a': x, ..rest)
     )
     "
     .compile_fail();

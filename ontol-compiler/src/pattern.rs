@@ -32,6 +32,7 @@ pub enum PatternKind {
         // The single attribute is a unit binding. I.e. `path: x` syntax
         is_unit_binding: bool,
         attributes: Box<[CompoundPatternAttr]>,
+        spread_label: OptionSpreadLabel,
     },
     /// Expression enclosed in set-notation braces: `{expr..}`
     Set {
@@ -45,6 +46,8 @@ pub enum PatternKind {
     Regex(RegexPattern),
 }
 
+pub type OptionSpreadLabel = Option<Box<SpreadLabel>>;
+
 #[derive(Clone, Copy, Debug)]
 pub enum CompoundPatternModifier {
     Match,
@@ -56,6 +59,9 @@ pub struct CompoundPatternAttr {
     pub bind_option: bool,
     pub kind: CompoundPatternAttrKind,
 }
+
+#[derive(Debug)]
+pub struct SpreadLabel(pub String, pub SourceSpan);
 
 #[derive(Debug)]
 pub enum CompoundPatternAttrKind {

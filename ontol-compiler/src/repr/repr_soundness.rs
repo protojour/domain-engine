@@ -301,7 +301,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 .iter()
                 .any(|res| res.is_sub_resolution_of(*resolution))
             {
-                builder.number_resolutions.remove(resolution);
+                builder.number_resolutions.swap_remove(resolution);
             }
         }
 

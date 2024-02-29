@@ -1,0 +1,68 @@
+use 'conduit_db' as db
+
+/// An RRS-like channel
+def channel (
+    rel .'title': text
+    rel .'link': text
+    rel .'username': text
+    rel .'items': {item}
+)
+
+/// An item in the channel
+def item (
+    rel .'guid'?: uuid
+    rel .'title': text
+)
+
+map(
+    db.Article match(
+        // BUG: Don't want this to be optional.
+        // it's clearly a mapping from top to bottom, and then it will come from the data store
+        'article_id'?: id,
+        'title': t,
+    ),
+    item(
+        'guid'?: id,
+        'title': t,
+    )
+)
+
+/// A transitional type representing a channel
+def(private) tmp_channel (
+    rel .'username': text
+    rel .'link': text
+    rel .'items': {item}
+)
+
+/// Map the tmp_channel to the exposed channel.
+/// TODO: Use an external mapping "hook" for this.
+map(
+    tmp_channel match(
+        'username': username,
+        'link': link,
+        'items': {..items},
+    ),
+    channel(
+        'title': 'Conduit RSS channel',
+        'username': username,
+        'link': link,
+        'items': {..items},
+    )
+)
+
+map feed(
+    (
+        'username': username
+    ),
+    channel: tmp_channel(
+        'username': username,
+        'link': /http:\/\/blogs\.com\/(?<username>\w+)\/feed/,
+        'items': {
+            ..db.Article match (
+                'author': db.User (
+                    'username': username,
+                )
+            )
+        }
+    )
+)

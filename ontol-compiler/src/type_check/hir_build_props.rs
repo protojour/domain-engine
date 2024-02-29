@@ -70,6 +70,31 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let hir_meta = Meta { ty, span };
 
         match self.seal_ctx.get_repr_kind(&type_def_id).unwrap() {
+            ReprKind::Struct | ReprKind::Unit | ReprKind::StructIntersection(_)
+                if is_unit_binding =>
+            {
+                let attr = pattern_attrs
+                    .iter()
+                    .next()
+                    .expect("there must be one pattern for unit binding");
+                let CompoundPatternAttrKind::Value { val, .. } = &attr.kind else {
+                    panic!("Must pass a value for unit binding");
+                };
+
+                let inner_node = self.build_node(
+                    val,
+                    NodeInfo {
+                        // There is a potential mapping involved, send the known
+                        // type as weak. If the argument attribute knows its own type,
+                        // the weak type should be ignored:
+                        expected_ty: Some((hir_meta.ty, Strength::Weak)),
+                        parent_struct_flags: StructFlags::default(),
+                    },
+                    ctx,
+                );
+
+                ctx.mk_node(ontol_hir::Kind::Map(inner_node), hir_meta)
+            }
             ReprKind::Struct | ReprKind::Unit => match property_set {
                 Some(property_set) => {
                     let mut match_attributes = IndexMap::new();

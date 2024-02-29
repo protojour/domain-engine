@@ -60,6 +60,11 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         }
     }
 
+    /// Set the sub-processor context explicitly, given that the full context in which the processor operates is known.
+    pub fn with_known_context(&self, ctx: SubProcessorContext) -> Self {
+        Self { ctx, ..*self }
+    }
+
     /// Return a processor that processes a new value that is a child value (i.e. increases the recursion level) of this processor.
     pub fn new_child(&self, addr: SerdeOperatorAddr) -> Result<Self, RecursionLimitError> {
         Ok(Self {

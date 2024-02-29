@@ -93,6 +93,7 @@ pub enum CompileError {
     DuplicateMapIdentifier,
     UnsolvableEquation,
     UnsupportedVariableDuplication,
+    SpreadLabelMustBeLastArgument,
     BUG(String),
     TODO(String),
 }
@@ -238,6 +239,9 @@ impl std::fmt::Display for CompileError {
                 f,
                 "unsupported variable duplication. Try to simplify the expression"
             ),
+            Self::SpreadLabelMustBeLastArgument => {
+                write!(f, "spread label must be the last argument")
+            }
             Self::BUG(msg) => write!(f, "BUG: {msg}"),
             Self::TODO(msg) => write!(f, "TODO: {msg}"),
         }
