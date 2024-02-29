@@ -75,6 +75,22 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         })
     }
 
+    /// Make a child for the rel_params attribute
+    pub fn new_rel_params_child(
+        &self,
+        addr: SerdeOperatorAddr,
+    ) -> Result<Self, RecursionLimitError> {
+        Ok(Self {
+            value_operator: self.ontology.get_serde_operator(addr),
+            ctx: SubProcessorContext {
+                is_update: self.ctx.is_update,
+                ..Default::default()
+            },
+            level: self.level.child()?,
+            ..*self
+        })
+    }
+
     pub fn new_child_with_context(
         &self,
         addr: SerdeOperatorAddr,
@@ -276,6 +292,7 @@ impl RecursionLimitError {
 
 #[derive(Clone, Copy, Default, Debug)]
 pub struct SubProcessorContext {
+    pub is_update: bool,
     pub parent_property_id: Option<PropertyId>,
     pub parent_property_flags: SerdePropertyFlags,
 

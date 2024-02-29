@@ -366,6 +366,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                         .new_child_with_context(
                             serde_prop.value_addr,
                             SubProcessorContext {
+                                is_update: false,
                                 parent_property_id: Some(serde_prop.property_id),
                                 parent_property_flags: serde_prop.flags,
                                 rel_params_addr: serde_prop.rel_params_addr,

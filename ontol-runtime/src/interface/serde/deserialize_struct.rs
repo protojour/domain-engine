@@ -93,11 +93,10 @@ impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
 
         Ok(Attribute {
             rel: deserialized_map.rel_params,
-            val: match self.processor.mode {
-                ProcessorMode::Update | ProcessorMode::GraphqlUpdate => {
-                    Value::StructUpdate(boxed_attrs, type_def_id)
-                }
-                _ => Value::Struct(boxed_attrs, type_def_id),
+            val: if self.ctx.is_update {
+                Value::StructUpdate(boxed_attrs, type_def_id)
+            } else {
+                Value::Struct(boxed_attrs, type_def_id)
             },
         })
     }
@@ -134,7 +133,7 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
         match property_set.visit_str(&serde_key)? {
             PropertyKey::RelParams(addr) => {
                 let Attribute { val, .. } = processor
-                    .new_child(addr)
+                    .new_rel_params_child(addr)
                     .map_err(RecursionLimitError::to_de_error)?
                     .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
 
@@ -153,6 +152,7 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
                     .new_child_with_context(
                         serde_property.value_addr,
                         SubProcessorContext {
+                            is_update: false,
                             parent_property_id: Some(serde_property.property_id),
                             parent_property_flags: serde_property.flags,
                             rel_params_addr: serde_property.rel_params_addr,
@@ -193,7 +193,7 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
             PropertyKey::RelParams(addr) => {
                 let Attribute { val, .. } = map.next_value_seed(
                     processor
-                        .new_child(addr)
+                        .new_rel_params_child(addr)
                         .map_err(RecursionLimitError::to_de_error)?,
                 )?;
 
@@ -213,6 +213,7 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
                     .new_child_with_context(
                         serde_property.value_addr,
                         SubProcessorContext {
+                            is_update: false,
                             parent_property_id: Some(serde_property.property_id),
                             parent_property_flags: serde_property.flags,
                             rel_params_addr: serde_property.rel_params_addr,
