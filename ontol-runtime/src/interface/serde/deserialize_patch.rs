@@ -41,7 +41,7 @@ impl<'on, 'p, 'de> Visitor<'de> for GraphqlPatchVisitor<'on, 'p> {
         while let Some(operation) = map.next_key::<Operation>()? {
             match operation {
                 Operation::Add | Operation::Update => {
-                    let sub_processor = self.entity_sequence_processor.with_level(
+                    let mut sub_processor = self.entity_sequence_processor.with_level(
                         self.entity_sequence_processor
                             .level
                             // prevent recursing into GraphqlPatchVisitor again:
@@ -49,20 +49,14 @@ impl<'on, 'p, 'de> Visitor<'de> for GraphqlPatchVisitor<'on, 'p> {
                             .map_err(RecursionLimitError::to_de_error)?,
                     );
 
-                    let Value::Sequence(mut seq, _def_id) = map.next_value_seed(sub_processor)?.val
+                    if matches!(operation, Operation::Update) {
+                        sub_processor.ctx.is_update = true;
+                    }
+
+                    let Value::Sequence(seq, _def_id) = map.next_value_seed(sub_processor)?.val
                     else {
                         return Err(<A::Error as serde::de::Error>::custom("Not a sequence"));
                     };
-
-                    if matches!(operation, Operation::Update) {
-                        // Transform into StructUpdate values:
-                        for attr in seq.attrs.iter_mut() {
-                            if let Value::Struct(attrs, def_id) = &mut attr.val {
-                                let attrs = std::mem::take(attrs);
-                                attr.val = Value::StructUpdate(attrs, *def_id);
-                            }
-                        }
-                    }
 
                     patches.extend(seq.attrs);
                 }
