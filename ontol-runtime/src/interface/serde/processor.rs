@@ -126,8 +126,8 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
             SerdeOperator::Union(union_op) => {
                 match union_op.applied_variants(self.mode, self.level) {
                     AppliedVariants::Unambiguous(addr) => self.narrow(addr).find_property(prop),
-                    AppliedVariants::OneOf(variants) => {
-                        for variant in variants.iter() {
+                    AppliedVariants::OneOf(possible_variants) => {
+                        for variant in possible_variants {
                             if let Some(property_id) = self.narrow(variant.addr).find_property(prop)
                             {
                                 return Some(property_id);

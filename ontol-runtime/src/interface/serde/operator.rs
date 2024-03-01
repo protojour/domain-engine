@@ -162,21 +162,21 @@ impl UnionOperator {
         self.union_def
     }
 
+    /// Get the variant(s) that applies in the given context
     pub fn applied_variants(
         &self,
         mode: ProcessorMode,
         level: ProcessorLevel,
     ) -> AppliedVariants<'_> {
-        if let Some(certain_addr) =
-            PossibleVariantsIter::new(&self.variants, mode, level).find_unambiguous_addr()
-        {
+        let possible_variants = PossibleVariants {
+            all_variants: &self.variants,
+            mode,
+            level,
+        };
+        if let Some(certain_addr) = possible_variants.into_iter().find_unambiguous_addr() {
             AppliedVariants::Unambiguous(certain_addr)
         } else {
-            AppliedVariants::OneOf(PossibleVariants {
-                variants: &self.variants,
-                mode,
-                level,
-            })
+            AppliedVariants::OneOf(possible_variants)
         }
     }
 
@@ -192,14 +192,21 @@ pub enum AppliedVariants<'on> {
 
 #[derive(Clone, Copy)]
 pub struct PossibleVariants<'on> {
-    variants: &'on [SerdeUnionVariant],
+    all_variants: &'on [SerdeUnionVariant],
     mode: ProcessorMode,
     level: ProcessorLevel,
 }
 
-impl<'on> PossibleVariants<'on> {
-    pub fn iter(&self) -> PossibleVariantsIter<'on> {
-        PossibleVariantsIter::new(self.variants, self.mode, self.level)
+impl<'on> IntoIterator for PossibleVariants<'on> {
+    type IntoIter = PossibleVariantsIter<'on>;
+    type Item = PossibleVariant<'on>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        PossibleVariantsIter {
+            inner_iter: self.all_variants.iter(),
+            mode: self.mode,
+            level: self.level,
+        }
     }
 }
 
@@ -209,15 +216,22 @@ pub struct PossibleVariantsIter<'on> {
     level: ProcessorLevel,
 }
 
-impl<'on> PossibleVariantsIter<'on> {
-    fn new(variants: &'on [SerdeUnionVariant], mode: ProcessorMode, level: ProcessorLevel) -> Self {
-        Self {
-            inner_iter: variants.iter(),
-            mode,
-            level,
-        }
-    }
+impl<'on> Iterator for PossibleVariantsIter<'on> {
+    type Item = PossibleVariant<'on>;
 
+    fn next(&mut self) -> Option<Self::Item> {
+        // note: this continues iteration where the previous next() call left off
+        for variant in self.inner_iter.by_ref() {
+            if let Some(possible) = Self::filter_possible(variant, self.mode, self.level) {
+                return Some(possible);
+            }
+        }
+
+        None
+    }
+}
+
+impl<'on> PossibleVariantsIter<'on> {
     fn find_unambiguous_addr(&mut self) -> Option<SerdeOperatorAddr> {
         let addr = self.next().map(|variant| variant.addr)?;
         if self.next().is_some() {
@@ -227,14 +241,21 @@ impl<'on> PossibleVariantsIter<'on> {
         }
     }
 
-    fn apply_variant(
+    fn filter_possible(
         variant: &'on SerdeUnionVariant,
         mode: ProcessorMode,
         level: ProcessorLevel,
     ) -> Option<PossibleVariant<'on>> {
         match (mode, variant.discriminator.purpose) {
-            (ProcessorMode::Delete, VariantPurpose::Data) => None,
+            (ProcessorMode::Raw, VariantPurpose::RawDynamicEntity) => Some(PossibleVariant {
+                discriminant: &variant.discriminator.discriminant,
+                purpose: variant.discriminator.purpose,
+                addr: variant.addr,
+                serde_def: variant.discriminator.serde_def,
+            }),
             (ProcessorMode::Raw, VariantPurpose::Identification { .. }) => None,
+            (ProcessorMode::Delete, VariantPurpose::Data) => None,
+            (_, VariantPurpose::RawDynamicEntity) => None,
             (_, VariantPurpose::Identification { .. }) if level.is_global_root() => None,
             _ => Some(PossibleVariant {
                 discriminant: &variant.discriminator.discriminant,
@@ -243,20 +264,6 @@ impl<'on> PossibleVariantsIter<'on> {
                 serde_def: variant.discriminator.serde_def,
             }),
         }
-    }
-}
-
-impl<'on> Iterator for PossibleVariantsIter<'on> {
-    type Item = PossibleVariant<'on>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        while let Some(variant) = self.inner_iter.next() {
-            if let Some(next) = Self::apply_variant(variant, self.mode, self.level) {
-                return Some(next);
-            }
-        }
-
-        None
     }
 }
 

@@ -115,9 +115,9 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                     AppliedVariants::Unambiguous(addr) => self
                         .narrow(addr)
                         .serialize_value(value, rel_params, serializer),
-                    AppliedVariants::OneOf(variants) => {
-                        let variant = variants
-                            .iter()
+                    AppliedVariants::OneOf(possible_variants) => {
+                        let variant = possible_variants
+                            .into_iter()
                             .find(|variant| value.type_def_id() == variant.serde_def.def_id);
 
                         if let Some(variant) = variant {
@@ -132,7 +132,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                             panic!(
                                 "Discriminator not found while serializing union type {:?}: {:#?}",
                                 value.type_def_id(),
-                                variants.iter().collect::<Vec<_>>()
+                                possible_variants.into_iter().collect::<Vec<_>>()
                             );
                         }
                     }

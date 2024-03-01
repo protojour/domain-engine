@@ -639,24 +639,41 @@ mod serde_raw_id_based_union_discriminator {
         rel .'id'|id: (fmt '' => 'bar/' => text => .)
         rel .'data': text
     )
-    def baz (
+    def foobar (
         rel .is?: foo
         rel .is?: bar
     )
     ";
 
+    /// The raw mode should accept the entity id only as an "id singleton"
     #[test]
-    fn plain() {
+    fn plain_entity_id() {
         let test = ONTOL.compile();
-        serde_raw(&test.bind(["baz"])[0])
-            .to_value_nocheck(json!({ "id": "bar/42", "data": "yo" }))
+        let [foo, foobar] = test.bind(["foo", "foobar"]);
+        let id = serde_raw(&foobar)
+            .to_value_nocheck(json!({ "id": "foo/42" }))
             .unwrap();
+        assert_ne!(id.type_def_id(), foo.def_id(), "should be the entity ID");
     }
 
     #[test]
-    fn overridden() {
+    fn plain_full_entity() {
         let test = ONTOL.compile();
-        let [foo, bar, baz] = test.bind(["foo", "bar", "baz"]);
+        let [foo, foobar] = test.bind(["foo", "foobar"]);
+        let data = serde_raw(&foobar)
+            .to_value_nocheck(json!({ "id": "foo/42", "data": "yo" }))
+            .unwrap();
+        assert_eq!(
+            data.type_def_id(),
+            foo.def_id(),
+            "should be the entity itself"
+        );
+    }
+
+    #[test]
+    fn overridden_entity_id() {
+        let test = ONTOL.compile();
+        let [foo, bar, foobar] = test.bind(["foo", "bar", "foobar"]);
         let plugin = ProcessorProfileTestPlugin {
             prop_overrides: FnvHashMap::from_iter([
                 ("__id", SpecialProperty::IdOverride),
@@ -673,13 +690,13 @@ mod serde_raw_id_based_union_discriminator {
             api: &plugin,
         };
 
-        serde_raw(&baz)
-            .to_value_nocheck(json!({ "id": "bar/42", "data": "yo" }))
+        serde_raw(&foobar)
+            .to_value_nocheck(json!({ "id": "foo/42", "data": "yo" }))
             .unwrap();
 
-        serde_raw(&baz)
+        serde_raw(&foobar)
             .with_profile(processor_profile.clone())
-            .to_value_nocheck(json!({ "__type": "bar", "__id": "bar_id" }))
+            .to_value_nocheck(json!({ "__type": "foo", "__id": "foo_id" }))
             .unwrap();
     }
 }

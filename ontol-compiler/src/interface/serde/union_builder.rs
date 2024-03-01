@@ -116,6 +116,7 @@ impl UnionBuilder {
                 inner_def.modifier |= cross_def_flags;
                 inner_def
             }
+            VariantPurpose::RawDynamicEntity => unreachable!(),
         };
 
         let addr = match generator.gen_addr_lazy(SerdeKey::Def(inner_def)) {

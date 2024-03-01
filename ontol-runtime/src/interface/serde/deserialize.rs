@@ -10,7 +10,9 @@ use crate::{
     interface::serde::{
         deserialize_id::IdSingletonStructVisitor,
         deserialize_matcher::MapMatchResult,
-        deserialize_struct::{deserialize_struct, SpecialAddrs, StructVisitor},
+        deserialize_struct::{
+            deserialize_struct, DeserializeStructParams, SpecialAddrs, StructVisitor,
+        },
         operator::SerdeStructFlags,
     },
     sequence::Sequence,
@@ -20,7 +22,7 @@ use crate::{
 use super::{
     deserialize_matcher::{
         BooleanMatcher, CapturingTextPatternMatcher, ConstantStringMatcher, ExpectingMatching,
-        MapMatchKind, NumberMatcher, SequenceMatcher, StringMatcher, TextPatternMatcher,
+        MapMatchMode, NumberMatcher, SequenceMatcher, StringMatcher, TextPatternMatcher,
         UnionMatcher, UnitMatcher, ValueMatcher,
     },
     deserialize_patch::GraphqlPatchVisitor,
@@ -211,7 +213,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                     AppliedVariants::OneOf(variants) => deserializer.deserialize_any(
                         UnionMatcher {
                             typename: union_op.typename(),
-                            variants,
+                            possible_variants: variants,
                             ontology: self.ontology,
                             ctx: self.ctx,
                             profile: self.profile,
@@ -234,6 +236,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                 buffered_attrs: Default::default(),
                 struct_op,
                 ctx: self.ctx,
+                raw_dynamic_entity: false,
             }),
         }
     }
@@ -390,25 +393,37 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
         trace!("matched map: {map_match:?} buffered attrs: {buffered_attrs:?}");
 
         // delegate to the real struct visitor
-        match map_match.kind {
-            MapMatchKind::StructType(struct_op) => StructVisitor {
+        match map_match.mode {
+            MapMatchMode::Struct(struct_op) => StructVisitor {
                 processor: self.processor,
                 buffered_attrs,
                 struct_op,
                 ctx: map_match.ctx,
+                raw_dynamic_entity: false,
             }
             .visit_map(map),
-            MapMatchKind::IdType(name, addr) => {
+            MapMatchMode::RawDynamicEntity(struct_op) => StructVisitor {
+                processor: self.processor,
+                buffered_attrs,
+                struct_op,
+                ctx: map_match.ctx,
+                raw_dynamic_entity: true,
+            }
+            .visit_map(map),
+            MapMatchMode::Id(name, addr) => {
                 let deserialized_map = deserialize_struct(
                     map,
                     buffered_attrs,
                     self.processor,
                     &IndexMap::default(),
-                    SerdeStructFlags::empty(),
-                    0,
-                    SpecialAddrs {
-                        rel_params: map_match.ctx.rel_params_addr,
-                        id: Some((name, addr)),
+                    DeserializeStructParams {
+                        flags: SerdeStructFlags::empty(),
+                        expected_required_count: 0,
+                        special_addrs: SpecialAddrs {
+                            rel_params: map_match.ctx.rel_params_addr,
+                            id: Some((name, addr)),
+                        },
+                        raw_dynamic_entity: None,
                     },
                 )?;
                 let id = deserialized_map

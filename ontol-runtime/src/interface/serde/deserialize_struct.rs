@@ -31,6 +31,7 @@ pub struct StructVisitor<'on, 'p> {
     pub buffered_attrs: Vec<(String, serde_value::Value)>,
     pub struct_op: &'on StructOperator,
     pub ctx: SubProcessorContext,
+    pub raw_dynamic_entity: bool,
 }
 
 pub enum PropertyKey {
@@ -42,9 +43,9 @@ pub enum PropertyKey {
 }
 
 #[derive(Clone, Copy)]
-pub struct SpecialAddrs<'s> {
+pub struct SpecialAddrs<'on> {
     pub rel_params: Option<SerdeOperatorAddr>,
-    pub id: Option<(&'s str, SerdeOperatorAddr)>,
+    pub id: Option<(&'on str, SerdeOperatorAddr)>,
 }
 
 pub struct DeserializedStruct {
@@ -72,27 +73,51 @@ impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
 
     fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {
         let type_def_id = self.struct_op.def.def_id;
-        let deserialized_map = deserialize_struct(
-            map,
-            self.buffered_attrs,
-            self.processor,
-            &self.struct_op.properties,
-            self.struct_op.flags,
-            self.struct_op.required_count(
+        let mut params = DeserializeStructParams {
+            flags: self.struct_op.flags,
+            expected_required_count: self.struct_op.required_count(
                 self.processor.mode,
                 self.processor.ctx.parent_property_id,
                 self.processor.profile.flags,
             ),
-            SpecialAddrs {
+            special_addrs: SpecialAddrs {
                 rel_params: self.ctx.rel_params_addr,
                 id: None,
             },
-        )?;
+            raw_dynamic_entity: None,
+        };
 
-        let boxed_attrs = Box::new(deserialized_map.attributes);
+        let deserialized_struct = if self.raw_dynamic_entity {
+            params.raw_dynamic_entity = Some(type_def_id);
+            let deserialized_struct = deserialize_struct(
+                map,
+                self.buffered_attrs,
+                self.processor,
+                &self.struct_op.properties,
+                params,
+            )?;
 
+            if deserialized_struct.id.is_some() {
+                return Ok(Attribute {
+                    rel: deserialized_struct.rel_params,
+                    val: deserialized_struct.id.unwrap(),
+                });
+            } else {
+                deserialized_struct
+            }
+        } else {
+            deserialize_struct(
+                map,
+                self.buffered_attrs,
+                self.processor,
+                &self.struct_op.properties,
+                params,
+            )?
+        };
+
+        let boxed_attrs = Box::new(deserialized_struct.attributes);
         Ok(Attribute {
-            rel: deserialized_map.rel_params,
+            rel: deserialized_struct.rel_params,
             val: if self.ctx.is_update {
                 Value::StructUpdate(boxed_attrs, type_def_id)
             } else {
@@ -102,14 +127,19 @@ impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
     }
 }
 
+pub struct DeserializeStructParams<'on> {
+    pub flags: SerdeStructFlags,
+    pub expected_required_count: usize,
+    pub special_addrs: SpecialAddrs<'on>,
+    pub raw_dynamic_entity: Option<DefId>,
+}
+
 pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
     mut map: A,
     buffered_attrs: Vec<(String, serde_value::Value)>,
     processor: SerdeProcessor<'on, 'p>,
     properties: &IndexMap<String, SerdeProperty>,
-    flags: SerdeStructFlags,
-    expected_required_count: usize,
-    special_addrs: SpecialAddrs,
+    params: DeserializeStructParams<'on>,
 ) -> Result<DeserializedStruct, A::Error> {
     let mut attributes = FnvHashMap::default();
     let mut rel_params = Value::unit();
@@ -119,11 +149,11 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
 
     let property_set = PropertySet {
         properties,
-        special_addrs,
+        special_addrs: params.special_addrs,
         processor_mode: processor.mode,
         processor_profile: processor.profile,
         parent_property_id: processor.ctx.parent_property_id,
-        flags,
+        flags: params.flags,
     };
 
     let mut open_dict: HashMap<String, Value> = Default::default();
@@ -250,7 +280,24 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
         }
     }
 
-    if observed_required_count < expected_required_count {
+    // Handle raw_dynamic_entity "id singleton struct"
+    if let Some(entity_def_id) = params.raw_dynamic_entity {
+        if attributes.len() == 1 {
+            let (prop_id, _) = attributes.iter().next().unwrap();
+            let type_info = processor.ontology.get_type_info(entity_def_id);
+            if let Some(entity_info) = &type_info.entity_info {
+                if prop_id.relationship_id == entity_info.id_relationship_id {
+                    return Ok(DeserializedStruct {
+                        attributes: Default::default(),
+                        id: Some(attributes.into_iter().next().unwrap().1.val),
+                        rel_params,
+                    });
+                }
+            }
+        }
+    }
+
+    if observed_required_count < params.expected_required_count {
         // Generate default values if missing
         for (_, property) in properties {
             // Only _default values_ are handled in the deserializer:
@@ -277,16 +324,16 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
         }
     }
 
-    if observed_required_count < expected_required_count
-        || (rel_params.is_unit() != special_addrs.rel_params.is_none())
+    if observed_required_count < params.expected_required_count
+        || (rel_params.is_unit() != params.special_addrs.rel_params.is_none())
     {
         debug!(
             "Missing attributes(mode={:?}). Rel params match: {}, special_rel: {} parent_relationship: {:?} expected_required_count: {}",
             processor.mode,
             rel_params.is_unit(),
-            special_addrs.rel_params.is_none(),
+            params.special_addrs.rel_params.is_none(),
             processor.ctx.parent_property_id,
-            expected_required_count
+            params.expected_required_count
         );
         for attr in &attributes {
             debug!("    attr {:?}", attr.0);
@@ -324,7 +371,7 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
             .map(|(key, _)| DoubleQuote(key.clone()))
             .collect();
 
-        if special_addrs.rel_params.is_some() && rel_params.type_def_id() == DefId::unit() {
+        if params.special_addrs.rel_params.is_some() && rel_params.type_def_id() == DefId::unit() {
             items.push(DoubleQuote(EDGE_PROPERTY.into()));
         }
 

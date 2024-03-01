@@ -184,14 +184,14 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                             filter,
                         )?;
                     }
-                    AppliedVariants::OneOf(variants) => {
+                    AppliedVariants::OneOf(possible_variants) => {
                         debug!("UNION ARGUMENTS for {:?}", union_op.unfiltered_variants());
 
                         // FIXME: Instead of just deduplicating the properties,
                         // the documentation for each of them should be combined in some way.
                         // When a union is used as an InputValue, the GraphQL functions purely
                         // as a documentation layer anyway.
-                        for variant in variants.iter() {
+                        for variant in possible_variants {
                             self.collect_operator_arguments(
                                 variant.addr,
                                 output,
@@ -204,9 +204,9 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                             )?;
                         }
 
-                        for variant in variants.iter() {
+                        for variant in possible_variants {
                             match variant.purpose {
-                                VariantPurpose::Data => {
+                                VariantPurpose::Data | VariantPurpose::RawDynamicEntity => {
                                     self.collect_operator_arguments(
                                         variant.addr,
                                         output,

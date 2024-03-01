@@ -186,8 +186,8 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                     AppliedVariants::Unambiguous(addr) => {
                         self.fake_attribute(processor.narrow(addr))
                     }
-                    AppliedVariants::OneOf(variants) => {
-                        let variants = variants.iter().collect::<Vec<_>>();
+                    AppliedVariants::OneOf(possible_variants) => {
+                        let variants = possible_variants.into_iter().collect::<Vec<_>>();
 
                         let index: usize = self.rng.gen_range(0..variants.len());
                         let variant = &variants[index];

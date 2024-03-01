@@ -4,11 +4,11 @@ use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
     interface::{
-        discriminator::VariantPurpose,
+        discriminator::{VariantDiscriminator, VariantPurpose},
         serde::{
             operator::{
                 SerdeOperator, SerdeOperatorAddr, SerdeProperty, SerdePropertyFlags,
-                StructOperator, UnionOperator,
+                SerdeUnionVariant, StructOperator, UnionOperator,
             },
             SerdeDef, SerdeModifier,
         },
@@ -358,8 +358,11 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             .or_default()
                             .has_data = true;
                     }
+                    VariantPurpose::RawDynamicEntity => {}
                 }
             }
+
+            let mut extensions = vec![];
 
             for variant in &mut variants {
                 let discriminator = &mut variant.discriminator;
@@ -368,10 +371,32 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     let coverage = cov_table.get(&entity_id).unwrap();
 
                     if !coverage.has_data {
-                        // panic!("{entity_id:?} has identification but no data");
+                        let mut struct_modifier =
+                            def.modifier.cross_def_flags() | SerdeModifier::json_default();
+                        struct_modifier.remove(SerdeModifier::UNION | SerdeModifier::PRIMARY_ID);
+
+                        let struct_def = SerdeDef {
+                            def_id: entity_id,
+                            modifier: struct_modifier,
+                        };
+
+                        let struct_properties_addr = self
+                            .gen_addr_lazy(SerdeKey::Def(struct_def))
+                            .expect("No property struct operator");
+
+                        extensions.push(SerdeUnionVariant {
+                            discriminator: VariantDiscriminator {
+                                discriminant: discriminator.discriminant.clone(),
+                                purpose: VariantPurpose::RawDynamicEntity,
+                                serde_def: struct_def,
+                            },
+                            addr: struct_properties_addr,
+                        });
                     }
                 }
             }
+
+            variants.extend(extensions);
         }
 
         self.operators_by_addr[addr.0 as usize] =

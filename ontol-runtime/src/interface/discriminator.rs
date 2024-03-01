@@ -17,8 +17,13 @@ pub struct VariantDiscriminator {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub enum VariantPurpose {
+    /// The purpose is explusively for identifying some entity
     Identification { entity_id: DefId },
+    /// The purpose is providing _data_ for the data type, NOT entity identification
     Data,
+    /// A combination of the two above, used in Raw deserialization:
+    /// Must dynamically support both the full data AND IdSingletonStruct if only the primary id is given.
+    RawDynamicEntity,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
