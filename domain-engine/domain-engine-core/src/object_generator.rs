@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
     interface::serde::{
-        operator::{FilteredVariants, SerdeOperator, SerdeOperatorAddr, SerdeProperty},
+        operator::{AppliedVariants, SerdeOperator, SerdeOperatorAddr, SerdeProperty},
         processor::{ProcessorLevel, ProcessorMode},
     },
     ontology::{Ontology, TypeInfo},
@@ -132,11 +132,11 @@ impl<'e> ObjectGenerator<'e> {
                 }
             }
             SerdeOperator::Union(union_op) => {
-                match union_op.variants(ProcessorMode::Create, ProcessorLevel::new_root()) {
-                    FilteredVariants::Single(child_addr) => {
+                match union_op.applied_variants(ProcessorMode::Create, ProcessorLevel::new_root()) {
+                    AppliedVariants::Unambiguous(child_addr) => {
                         self.generate_struct_relationships(struct_map, type_info, child_addr);
                     }
-                    FilteredVariants::Union(_) => panic!("BUG"),
+                    AppliedVariants::OneOf(_) => panic!("BUG"),
                 }
             }
             _ => {}

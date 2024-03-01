@@ -12,7 +12,7 @@ use ontol_runtime::{
     smart_format,
 };
 use smartstring::alias::String;
-use tracing::info;
+use tracing::trace;
 
 use super::{
     serde_generator::{operator_to_leaf_discriminant, SerdeGenerator},
@@ -140,7 +140,7 @@ impl UnionBuilder {
         match operator {
             SerdeOperator::Union(union_op) => {
                 for variant in union_op.unfiltered_variants() {
-                    info!("push UNION variant discriminator for {variant:?} {discriminator:?}");
+                    trace!("push UNION variant discriminator for {variant:?} {discriminator:?}");
 
                     let mut child_scope: Vec<&VariantDiscriminator> = vec![];
                     child_scope.extend(scope.iter());
@@ -156,7 +156,7 @@ impl UnionBuilder {
                 Ok(())
             }
             _other => {
-                // debug!("PUSH DISCR scope={scope:#?} discriminator={discriminator:#?} {other:?}");
+                // info!("PUSH DISCR scope={scope:#?} discriminator={discriminator:#?} {other:?}");
                 match discriminator.discriminant {
                     Discriminant::StructFallback => {
                         if let Some(scoping) = scope.last() {

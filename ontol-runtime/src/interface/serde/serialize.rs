@@ -8,7 +8,10 @@ use tracing::{trace, warn};
 
 use crate::{
     cast::Cast,
-    interface::serde::processor::{RecursionLimitError, ScalarFormat},
+    interface::serde::{
+        operator::AppliedVariants,
+        processor::{RecursionLimitError, ScalarFormat},
+    },
     smart_format,
     text_pattern::{FormatPattern, TextPatternConstantPart},
     value::{Attribute, FormatValueAsText, Value},
@@ -16,7 +19,7 @@ use crate::{
 };
 
 use super::{
-    operator::{FilteredVariants, SequenceRange, SerdeOperator, SerdeStructFlags},
+    operator::{SequenceRange, SerdeOperator, SerdeStructFlags},
     processor::{ProcessorProfileFlags, SerdeProcessor, SpecialProperty, SubProcessorContext},
     serialize_raw::RawProxy,
     StructOperator, EDGE_PROPERTY,
@@ -107,32 +110,34 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
             (SerdeOperator::Alias(value_op), _) => self
                 .narrow(value_op.inner_addr)
                 .serialize_value(value, rel_params, serializer),
-            (SerdeOperator::Union(union_op), _) => match union_op.variants(self.mode, self.level) {
-                FilteredVariants::Single(id) => self
-                    .narrow(id)
-                    .serialize_value(value, rel_params, serializer),
-                FilteredVariants::Union(variants) => {
-                    let variant = variants.iter().find(|variant| {
-                        value.type_def_id() == variant.discriminator.serde_def.def_id
-                    });
+            (SerdeOperator::Union(union_op), _) => {
+                match union_op.applied_variants(self.mode, self.level) {
+                    AppliedVariants::Unambiguous(addr) => self
+                        .narrow(addr)
+                        .serialize_value(value, rel_params, serializer),
+                    AppliedVariants::OneOf(variants) => {
+                        let variant = variants
+                            .iter()
+                            .find(|variant| value.type_def_id() == variant.serde_def.def_id);
 
-                    if let Some(variant) = variant {
-                        let processor = self.narrow(variant.addr);
-                        trace!(
-                            "serializing union variant with {:?} {processor:}",
-                            variant.addr
-                        );
+                        if let Some(variant) = variant {
+                            let processor = self.narrow(variant.addr);
+                            trace!(
+                                "serializing union variant with {:?} {processor:}",
+                                variant.addr
+                            );
 
-                        processor.serialize_value(value, rel_params, serializer)
-                    } else {
-                        panic!(
-                            "Discriminator not found while serializing union type {:?}: {:#?}",
-                            value.type_def_id(),
-                            variants
-                        );
+                            processor.serialize_value(value, rel_params, serializer)
+                        } else {
+                            panic!(
+                                "Discriminator not found while serializing union type {:?}: {:#?}",
+                                value.type_def_id(),
+                                variants.iter().collect::<Vec<_>>()
+                            );
+                        }
                     }
                 }
-            },
+            }
             (SerdeOperator::IdSingletonStruct(name, inner_addr), _) => {
                 let mut map = serializer.serialize_map(Some(1 + option_len(&rel_params)))?;
                 map.serialize_entry(

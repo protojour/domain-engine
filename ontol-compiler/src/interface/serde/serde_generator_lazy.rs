@@ -1,14 +1,17 @@
 use std::collections::HashSet;
 
-use fnv::FnvHashSet;
+use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
-    interface::serde::{
-        operator::{
-            SerdeOperator, SerdeOperatorAddr, SerdeProperty, SerdePropertyFlags, StructOperator,
-            UnionOperator,
+    interface::{
+        discriminator::VariantPurpose,
+        serde::{
+            operator::{
+                SerdeOperator, SerdeOperatorAddr, SerdeProperty, SerdePropertyFlags,
+                StructOperator, UnionOperator,
+            },
+            SerdeDef, SerdeModifier,
         },
-        SerdeDef, SerdeModifier,
     },
     value::PropertyId,
     value_generator::ValueGenerator,
@@ -299,7 +302,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             root_types.insert(root_discriminator.serde_def.def_id);
         }
 
-        let variants: Vec<_> = if properties.table.is_some() {
+        let mut variants: Vec<_> = if properties.table.is_some() {
             // Need to do an intersection of the union type's _inherent_
             // properties and each variant's properties
             let inherent_properties_def = SerdeDef::new(
@@ -338,7 +341,46 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             );
         }
 
+        // Data coverage check.
+        // If there's no designated ::Data variant purpose, we want to use the ::Identification for both purposes.
+        {
+            let mut cov_table: FnvHashMap<DefId, UnionDefVariantCoverage> = Default::default();
+
+            for variant in &variants {
+                let discriminator = &variant.discriminator;
+                match discriminator.purpose {
+                    VariantPurpose::Identification { entity_id } => {
+                        cov_table.entry(entity_id).or_default().has_id = true;
+                    }
+                    VariantPurpose::Data => {
+                        cov_table
+                            .entry(discriminator.serde_def.def_id)
+                            .or_default()
+                            .has_data = true;
+                    }
+                }
+            }
+
+            for variant in &mut variants {
+                let discriminator = &mut variant.discriminator;
+
+                if let VariantPurpose::Identification { entity_id } = discriminator.purpose {
+                    let coverage = cov_table.get(&entity_id).unwrap();
+
+                    if !coverage.has_data {
+                        // panic!("{entity_id:?} has identification but no data");
+                    }
+                }
+            }
+        }
+
         self.operators_by_addr[addr.0 as usize] =
             SerdeOperator::Union(UnionOperator::new(typename.into(), def, variants));
     }
+}
+
+#[derive(Default)]
+struct UnionDefVariantCoverage {
+    has_id: bool,
+    has_data: bool,
 }

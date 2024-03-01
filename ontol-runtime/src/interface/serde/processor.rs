@@ -7,7 +7,7 @@ use crate::{
     DefId,
 };
 
-use super::operator::{FilteredVariants, SerdeOperator, SerdeOperatorAddr, SerdePropertyFlags};
+use super::operator::{AppliedVariants, SerdeOperator, SerdeOperatorAddr, SerdePropertyFlags};
 
 /// SerdeProcessor handles serializing and deserializing domain types in an optimized way.
 /// Each serde-enabled type has its own operator, which is cached
@@ -123,18 +123,21 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 
     fn search_property(&self, prop: &str, operator: &'on SerdeOperator) -> Option<PropertyId> {
         match operator {
-            SerdeOperator::Union(union_op) => match union_op.variants(self.mode, self.level) {
-                FilteredVariants::Single(addr) => self.narrow(addr).find_property(prop),
-                FilteredVariants::Union(variants) => {
-                    for variant in variants {
-                        if let Some(property_id) = self.narrow(variant.addr).find_property(prop) {
-                            return Some(property_id);
+            SerdeOperator::Union(union_op) => {
+                match union_op.applied_variants(self.mode, self.level) {
+                    AppliedVariants::Unambiguous(addr) => self.narrow(addr).find_property(prop),
+                    AppliedVariants::OneOf(variants) => {
+                        for variant in variants.iter() {
+                            if let Some(property_id) = self.narrow(variant.addr).find_property(prop)
+                            {
+                                return Some(property_id);
+                            }
                         }
-                    }
 
-                    None
+                        None
+                    }
                 }
-            },
+            }
             SerdeOperator::Struct(struct_op) => struct_op
                 .properties
                 .get(prop)

@@ -24,7 +24,7 @@ use super::{
         UnionMatcher, UnitMatcher, ValueMatcher,
     },
     deserialize_patch::GraphqlPatchVisitor,
-    operator::{FilteredVariants, SerdeOperator},
+    operator::{AppliedVariants, SerdeOperator},
     processor::{ProcessorMode, ScalarFormat, SerdeProcessor},
 };
 
@@ -203,17 +203,12 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
 
                 Ok(typed_attribute)
             }
-            (SerdeOperator::Union(union_op), _) => match union_op.variants(self.mode, self.level) {
-                FilteredVariants::Single(addr) => self.narrow(addr).deserialize(deserializer),
-                FilteredVariants::Union(variants) => {
-                    assert!(
-                        !variants.is_empty(),
-                        "no variants ({:?}, {:?})",
-                        self.mode,
-                        self.level
-                    );
-
-                    deserializer.deserialize_any(
+            (SerdeOperator::Union(union_op), _) => {
+                match union_op.applied_variants(self.mode, self.level) {
+                    AppliedVariants::Unambiguous(addr) => {
+                        self.narrow(addr).deserialize(deserializer)
+                    }
+                    AppliedVariants::OneOf(variants) => deserializer.deserialize_any(
                         UnionMatcher {
                             typename: union_op.typename(),
                             variants,
@@ -224,9 +219,9 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                             level: self.level,
                         }
                         .into_visitor(self),
-                    )
+                    ),
                 }
-            },
+            }
             (SerdeOperator::IdSingletonStruct(name, inner_addr), _) => deserializer
                 .deserialize_map(IdSingletonStructVisitor {
                     processor: self,

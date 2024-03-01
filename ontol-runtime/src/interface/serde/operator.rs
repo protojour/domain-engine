@@ -9,7 +9,7 @@ use smallvec::SmallVec;
 use smartstring::alias::String;
 
 use crate::{
-    interface::discriminator::{VariantDiscriminator, VariantPurpose},
+    interface::discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
     value::PropertyId,
     value_generator::ValueGenerator,
     DefId,
@@ -162,44 +162,21 @@ impl UnionOperator {
         self.union_def
     }
 
-    pub fn variants(&self, mode: ProcessorMode, level: ProcessorLevel) -> FilteredVariants<'_> {
-        if matches!(mode, ProcessorMode::Delete) {
-            // Use only VariantPurpose::Identification
-            let skip_data = self
-                .variants
-                .iter()
-                .enumerate()
-                .find(|(_, variant)| variant.discriminator.purpose >= VariantPurpose::Data);
-
-            if let Some((skip_data, _)) = skip_data {
-                Self::filtered_variants(&self.variants[..skip_data])
-            } else {
-                Self::filtered_variants(&self.variants)
-            }
-        } else if matches!(mode, ProcessorMode::Raw) || level.is_global_root() {
-            let skip_id = self
-                .variants
-                .iter()
-                .enumerate()
-                .find(|(_, variant)| variant.discriminator.purpose >= VariantPurpose::Data);
-
-            if let Some((skip_index, _)) = skip_id {
-                Self::filtered_variants(&self.variants[skip_index..])
-            } else {
-                Self::filtered_variants(&self.variants)
-            }
+    pub fn applied_variants(
+        &self,
+        mode: ProcessorMode,
+        level: ProcessorLevel,
+    ) -> AppliedVariants<'_> {
+        if let Some(certain_addr) =
+            PossibleVariantsIter::new(&self.variants, mode, level).find_unambiguous_addr()
+        {
+            AppliedVariants::Unambiguous(certain_addr)
         } else {
-            Self::filtered_variants(&self.variants)
-        }
-    }
-
-    fn filtered_variants(variants: &[SerdeUnionVariant]) -> FilteredVariants<'_> {
-        if variants.len() == 1 {
-            FilteredVariants::Single(variants[0].addr)
-        } else if variants.is_empty() {
-            panic!("All variants got filtered");
-        } else {
-            FilteredVariants::Union(variants)
+            AppliedVariants::OneOf(PossibleVariants {
+                variants: &self.variants,
+                mode,
+                level,
+            })
         }
     }
 
@@ -208,11 +185,87 @@ impl UnionOperator {
     }
 }
 
+pub enum AppliedVariants<'on> {
+    Unambiguous(SerdeOperatorAddr),
+    OneOf(PossibleVariants<'on>),
+}
+
+#[derive(Clone, Copy)]
+pub struct PossibleVariants<'on> {
+    variants: &'on [SerdeUnionVariant],
+    mode: ProcessorMode,
+    level: ProcessorLevel,
+}
+
+impl<'on> PossibleVariants<'on> {
+    pub fn iter(&self) -> PossibleVariantsIter<'on> {
+        PossibleVariantsIter::new(self.variants, self.mode, self.level)
+    }
+}
+
+pub struct PossibleVariantsIter<'on> {
+    inner_iter: std::slice::Iter<'on, SerdeUnionVariant>,
+    mode: ProcessorMode,
+    level: ProcessorLevel,
+}
+
+impl<'on> PossibleVariantsIter<'on> {
+    fn new(variants: &'on [SerdeUnionVariant], mode: ProcessorMode, level: ProcessorLevel) -> Self {
+        Self {
+            inner_iter: variants.iter(),
+            mode,
+            level,
+        }
+    }
+
+    fn find_unambiguous_addr(&mut self) -> Option<SerdeOperatorAddr> {
+        let addr = self.next().map(|variant| variant.addr)?;
+        if self.next().is_some() {
+            None
+        } else {
+            Some(addr)
+        }
+    }
+
+    fn apply_variant(
+        variant: &'on SerdeUnionVariant,
+        mode: ProcessorMode,
+        level: ProcessorLevel,
+    ) -> Option<PossibleVariant<'on>> {
+        match (mode, variant.discriminator.purpose) {
+            (ProcessorMode::Delete, VariantPurpose::Data) => None,
+            (ProcessorMode::Raw, VariantPurpose::Identification { .. }) => None,
+            (_, VariantPurpose::Identification { .. }) if level.is_global_root() => None,
+            _ => Some(PossibleVariant {
+                discriminant: &variant.discriminator.discriminant,
+                purpose: variant.discriminator.purpose,
+                addr: variant.addr,
+                serde_def: variant.discriminator.serde_def,
+            }),
+        }
+    }
+}
+
+impl<'on> Iterator for PossibleVariantsIter<'on> {
+    type Item = PossibleVariant<'on>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(variant) = self.inner_iter.next() {
+            if let Some(next) = Self::apply_variant(variant, self.mode, self.level) {
+                return Some(next);
+            }
+        }
+
+        None
+    }
+}
+
 #[derive(Debug)]
-pub enum FilteredVariants<'e> {
-    Single(SerdeOperatorAddr),
-    /// Should serialize one of the union members
-    Union(&'e [SerdeUnionVariant]),
+pub struct PossibleVariant<'on> {
+    pub discriminant: &'on Discriminant,
+    pub purpose: VariantPurpose,
+    pub addr: SerdeOperatorAddr,
+    pub serde_def: SerdeDef,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -14,7 +14,7 @@ use ontol_runtime::{
         discriminator::VariantPurpose,
         graphql::argument::DefaultArg,
         serde::{
-            operator::{FilteredVariants, SerdeOperator, SerdeOperatorAddr, SerdePropertyFlags},
+            operator::{AppliedVariants, SerdeOperator, SerdeOperatorAddr, SerdePropertyFlags},
             processor::ProcessorProfileFlags,
         },
     },
@@ -175,8 +175,8 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             }
             SerdeOperator::Union(union_op) => {
                 let (mode, level) = typing_purpose.mode_and_level();
-                match union_op.variants(mode, level) {
-                    FilteredVariants::Single(operator_addr) => {
+                match union_op.applied_variants(mode, level) {
+                    AppliedVariants::Unambiguous(operator_addr) => {
                         self.collect_operator_arguments(
                             operator_addr,
                             output,
@@ -184,14 +184,14 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                             filter,
                         )?;
                     }
-                    FilteredVariants::Union(variants) => {
+                    AppliedVariants::OneOf(variants) => {
                         debug!("UNION ARGUMENTS for {:?}", union_op.unfiltered_variants());
 
                         // FIXME: Instead of just deduplicating the properties,
                         // the documentation for each of them should be combined in some way.
                         // When a union is used as an InputValue, the GraphQL functions purely
                         // as a documentation layer anyway.
-                        for variant in variants {
+                        for variant in variants.iter() {
                             self.collect_operator_arguments(
                                 variant.addr,
                                 output,
@@ -204,8 +204,8 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                             )?;
                         }
 
-                        for variant in variants {
-                            match variant.discriminator.purpose {
+                        for variant in variants.iter() {
+                            match variant.purpose {
                                 VariantPurpose::Data => {
                                     self.collect_operator_arguments(
                                         variant.addr,
@@ -382,8 +382,8 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
 
                 let (mode, level) = typing_purpose.mode_and_level();
 
-                match union_op.variants(mode, level) {
-                    FilteredVariants::Single(single_addr) => self.get_operator_argument(
+                match union_op.applied_variants(mode, level) {
+                    AppliedVariants::Unambiguous(single_addr) => self.get_operator_argument(
                         name,
                         single_addr,
                         rel_params,
@@ -391,7 +391,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         modifier,
                         typing_purpose,
                     ),
-                    FilteredVariants::Union(_variants) => {
+                    AppliedVariants::OneOf(_variants) => {
                         let type_addr = self
                             .schema_ctx
                             .type_addr_by_def(def_id, query_level)

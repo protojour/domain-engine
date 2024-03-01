@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use fake::{Fake, Faker};
 use ontol_runtime::{
     interface::serde::{
-        operator::{FilteredVariants, SerdeOperator},
+        operator::{AppliedVariants, SerdeOperator},
         processor::{ProcessorLevel, ProcessorMode, SerdeProcessor},
     },
     ontology::Ontology,
@@ -182,9 +182,13 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                 return self.fake_attribute(processor.narrow(alias_op.inner_addr));
             }
             SerdeOperator::Union(union_op) => {
-                return match union_op.variants(self.processor_mode, processor.level()) {
-                    FilteredVariants::Single(id) => self.fake_attribute(processor.narrow(id)),
-                    FilteredVariants::Union(variants) => {
+                return match union_op.applied_variants(self.processor_mode, processor.level()) {
+                    AppliedVariants::Unambiguous(addr) => {
+                        self.fake_attribute(processor.narrow(addr))
+                    }
+                    AppliedVariants::OneOf(variants) => {
+                        let variants = variants.iter().collect::<Vec<_>>();
+
                         let index: usize = self.rng.gen_range(0..variants.len());
                         let variant = &variants[index];
 
