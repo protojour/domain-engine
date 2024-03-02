@@ -18,7 +18,7 @@ use crate::{
 };
 
 use super::{
-    operator::{AppliedVariants, PossibleVariants, SequenceRange, SerdeOperator},
+    operator::{AppliedVariants, PossibleVariant, PossibleVariants, SequenceRange, SerdeOperator},
     processor::{
         ProcessorLevel, ProcessorMode, ProcessorProfile, ScalarFormat, SubProcessorContext,
     },
@@ -639,13 +639,27 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
     ) -> MapMatchResult<'on, 'p> {
         // trace!("match_attribute '{property}': {:#?}", self.variants);
 
-        let match_fn = |discriminant: &Discriminant| -> bool {
+        let match_fn = |variant: &PossibleVariant| -> bool {
+            let discriminant = variant.discriminant;
+            // debug!("match_fn property `{property}` variant: {variant:?}");
+
             let Discriminant::HasAttribute(_, match_attr_name, scalar_discriminant) = discriminant
             else {
                 return false;
             };
 
             if property != match_attr_name {
+                return false;
+            }
+
+            // Prevent ID pattern "injection":
+            // When the id_format is RawText, it cannot not be used for disambiguation,
+            // instead we have to fall back to relying on explicit type annotation.
+            if matches!(
+                variant.purpose,
+                VariantPurpose::Identification { .. } | VariantPurpose::RawDynamicEntity
+            ) && matches!(self.profile.id_format, ScalarFormat::RawText)
+            {
                 return false;
             }
 
@@ -674,10 +688,7 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
             }
         };
 
-        let mut found_variant = self
-            .possible_variants
-            .into_iter()
-            .find(|variant| match_fn(variant.discriminant));
+        let mut found_variant = self.possible_variants.into_iter().find(match_fn);
 
         if found_variant.is_none() {
             let profile_api = self.profile.api;

@@ -679,7 +679,7 @@ mod serde_raw_dynamic_entity_in_union {
     #[test]
     fn type_annotated_id() {
         let test = ONTOL.compile();
-        let plugin = make_plugin(&test);
+        let plugin = make_plugin(&test, "__id", "__type");
         let processor_profile = ProcessorProfile {
             id_format: ScalarFormat::RawText,
             flags: ProcessorProfileFlags::empty(),
@@ -689,7 +689,7 @@ mod serde_raw_dynamic_entity_in_union {
 
         let id = serde_raw(&foobar)
             .with_profile(processor_profile.clone())
-            .to_value_nocheck(json!({ "__type": "foo", "__id": "42" }))
+            .to_value_nocheck(r#"{ "__type": "foo", "__id": "42" }"#)
             .unwrap();
         assert_eq!(
             id.type_def_id(),
@@ -704,14 +704,15 @@ mod serde_raw_dynamic_entity_in_union {
 
         serde_raw(&foobar)
             .with_profile(processor_profile.clone())
-            .to_value_nocheck(json!({ "__id": "42", "__type": "foo" }))
+            .to_value_nocheck(r#"{ "__id": "42", "__type": "foo" }"#)
             .unwrap();
     }
 
     #[test]
-    fn type_annotated_data() {
+    fn raw_id_injection_not_possible() {
         let test = ONTOL.compile();
-        let plugin = make_plugin(&test);
+        // note: "id" shadows the domain property name:
+        let plugin = make_plugin(&test, "id", "__type");
         let processor_profile = ProcessorProfile {
             id_format: ScalarFormat::RawText,
             flags: ProcessorProfileFlags::empty(),
@@ -721,7 +722,34 @@ mod serde_raw_dynamic_entity_in_union {
 
         let data = serde_raw(&foobar)
             .with_profile(processor_profile.clone())
-            .to_value_nocheck(json!({ "data": "yo", "__id": "42", "__type": "foo" }))
+            // Will read the `id` property first, note that it's _raw text_ according to the profile,
+            // thus its prefix should not be considered
+            .to_value_nocheck(r#"{ "id": "bar/42", "__type": "foo", "data": "yo" }"#)
+            .unwrap();
+
+        expect_eq!(
+            actual = ontol_test_utils::serde_helper::serde_create(&foo).as_json(&data),
+            expected = json!({
+                "id": "foo/bar/42",
+                "data": "yo",
+            })
+        );
+    }
+
+    #[test]
+    fn type_annotated_data() {
+        let test = ONTOL.compile();
+        let plugin = make_plugin(&test, "__id", "__type");
+        let processor_profile = ProcessorProfile {
+            id_format: ScalarFormat::RawText,
+            flags: ProcessorProfileFlags::empty(),
+            api: &plugin,
+        };
+        let [foo, foobar] = test.bind(["foo", "foobar"]);
+
+        let data = serde_raw(&foobar)
+            .with_profile(processor_profile.clone())
+            .to_value_nocheck(r#"{ "data": "yo", "__id": "42", "__type": "foo" }"#)
             .unwrap();
         assert_eq!(
             data.type_def_id(),
@@ -730,12 +758,16 @@ mod serde_raw_dynamic_entity_in_union {
         );
     }
 
-    fn make_plugin(test: &OntolTest) -> ProcessorProfileTestPlugin {
+    fn make_plugin(
+        test: &OntolTest,
+        id_override: &'static str,
+        type_annotation: &'static str,
+    ) -> ProcessorProfileTestPlugin {
         let [foo, bar] = test.bind(["foo", "bar"]);
         ProcessorProfileTestPlugin {
             prop_overrides: FnvHashMap::from_iter([
-                ("__id", SpecialProperty::IdOverride),
-                ("__type", SpecialProperty::TypeAnnotation),
+                (id_override, SpecialProperty::IdOverride),
+                (type_annotation, SpecialProperty::TypeAnnotation),
             ]),
             annotations: FnvHashMap::from_iter([
                 (serde_value::Value::String("foo".into()), foo.def_id()),
