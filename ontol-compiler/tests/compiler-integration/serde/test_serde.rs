@@ -625,8 +625,9 @@ fn test_serde_with_raw_prefix_int_id_overridde_profile() {
     });
 }
 
-mod serde_raw_id_based_union_discriminator {
+mod serde_raw_dynamic_entity_in_union {
     use super::*;
+    use ontol_test_utils::OntolTest;
     use test_log::test;
 
     /// This tests an entity union without data-based discriminators (only id-based)
@@ -671,10 +672,30 @@ mod serde_raw_id_based_union_discriminator {
     }
 
     #[test]
-    fn overridden_entity_id() {
+    fn type_annotated_id() {
         let test = ONTOL.compile();
-        let [foo, bar, foobar] = test.bind(["foo", "bar", "foobar"]);
-        let plugin = ProcessorProfileTestPlugin {
+        let plugin = make_plugin(&test);
+        let processor_profile = ProcessorProfile {
+            id_format: ScalarFormat::RawText,
+            flags: ProcessorProfileFlags::empty(),
+            api: &plugin,
+        };
+        let [foobar] = test.bind(["foobar"]);
+
+        serde_raw(&foobar)
+            .with_profile(processor_profile.clone())
+            .to_value_nocheck(json!({ "__type": "foo", "__id": "42" }))
+            .unwrap();
+
+        serde_raw(&foobar)
+            .with_profile(processor_profile.clone())
+            .to_value_nocheck(json!({ "__id": "42", "__type": "foo" }))
+            .unwrap();
+    }
+
+    fn make_plugin(test: &OntolTest) -> ProcessorProfileTestPlugin {
+        let [foo, bar] = test.bind(["foo", "bar"]);
+        ProcessorProfileTestPlugin {
             prop_overrides: FnvHashMap::from_iter([
                 ("__id", SpecialProperty::IdOverride),
                 ("__type", SpecialProperty::TypeAnnotation),
@@ -683,21 +704,7 @@ mod serde_raw_id_based_union_discriminator {
                 (serde_value::Value::String("foo".into()), foo.def_id()),
                 (serde_value::Value::String("bar".into()), bar.def_id()),
             ]),
-        };
-        let processor_profile = ProcessorProfile {
-            id_format: ScalarFormat::RawText,
-            flags: ProcessorProfileFlags::empty(),
-            api: &plugin,
-        };
-
-        serde_raw(&foobar)
-            .to_value_nocheck(json!({ "id": "foo/42", "data": "yo" }))
-            .unwrap();
-
-        serde_raw(&foobar)
-            .with_profile(processor_profile.clone())
-            .to_value_nocheck(json!({ "__type": "foo", "__id": "foo_id" }))
-            .unwrap();
+        }
     }
 }
 

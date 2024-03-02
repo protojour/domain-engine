@@ -21,11 +21,23 @@ use crate::{
 use super::{
     operator::{SerdeOperatorAddr, SerdeProperty, SerdeStructFlags, StructOperator},
     processor::{
-        ProcessorMode, ProcessorProfile, ProcessorProfileFlags, RecursionLimitError,
-        SerdeProcessor, SpecialProperty, SubProcessorContext,
+        ProcessorMode, ProcessorProfileFlags, RecursionLimitError, SerdeProcessor, SpecialProperty,
+        SubProcessorContext,
     },
+    utils::BufferedAttrsReader,
 };
 
+/// The output of the struct deserializer.
+/// Requires some post-processing before it can become an Attribute.
+pub struct Struct {
+    pub attributes: FnvHashMap<PropertyId, Attribute>,
+    pub id: Option<Value>,
+    pub rel_params: Value,
+    open_dict: HashMap<String, Value>,
+    observed_required_count: usize,
+}
+
+/// A serde visitor for maps (i.e. JSON objects) that uses the [StructDeserializer] internally.
 pub struct StructVisitor<'on, 'p> {
     pub processor: SerdeProcessor<'on, 'p>,
     pub buffered_attrs: Vec<(String, serde_value::Value)>,
@@ -34,34 +46,46 @@ pub struct StructVisitor<'on, 'p> {
     pub raw_dynamic_entity: bool,
 }
 
-pub enum PropertyKey {
+/// The struct deserializer itself.
+pub struct StructDeserializer<'on, 'p> {
+    processor: SerdeProcessor<'on, 'p>,
+    properties: &'on IndexMap<String, SerdeProperty>,
+    flags: SerdeStructFlags,
+
+    /// The number of expected properties
+    expected_required_count: usize,
+
+    /// The operator address for rel_params/edge
+    rel_params_addr: Option<SerdeOperatorAddr>,
+
+    /// A hard-coded property name for ID
+    id_prop_addr: Option<(&'on str, SerdeOperatorAddr)>,
+
+    /// Whether to handle "raw dynamic entity" deserialization
+    /// (i.e. dynamic ID/data detection)
+    raw_dynamic_entity: Option<DefId>,
+}
+
+/// The types of properties the deserializer understands.
+enum PropKind {
     Property(SerdeProperty),
     RelParams(SerdeOperatorAddr),
     Id(SerdeOperatorAddr),
     Open(String),
+    TypeAnnotation,
     Ignored,
 }
 
-#[derive(Clone, Copy)]
-pub struct SpecialAddrs<'on> {
-    pub rel_params: Option<SerdeOperatorAddr>,
-    pub id: Option<(&'on str, SerdeOperatorAddr)>,
-}
-
-pub struct DeserializedStruct {
-    pub attributes: FnvHashMap<PropertyId, Attribute>,
-    pub id: Option<Value>,
-    pub rel_params: Value,
-}
-
-#[derive(Clone, Copy)]
-struct PropertySet<'a> {
-    properties: &'a IndexMap<String, SerdeProperty>,
-    special_addrs: SpecialAddrs<'a>,
-    processor_mode: ProcessorMode,
-    processor_profile: &'a ProcessorProfile<'a>,
-    parent_property_id: Option<PropertyId>,
-    flags: SerdeStructFlags,
+impl Default for Struct {
+    fn default() -> Self {
+        Self {
+            attributes: FnvHashMap::default(),
+            id: None,
+            rel_params: Value::unit(),
+            open_dict: HashMap::default(),
+            observed_required_count: 0,
+        }
+    }
 }
 
 impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
@@ -73,51 +97,35 @@ impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
 
     fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {
         let type_def_id = self.struct_op.def.def_id;
-        let mut params = DeserializeStructParams {
-            flags: self.struct_op.flags,
-            expected_required_count: self.struct_op.required_count(
-                self.processor.mode,
-                self.processor.ctx.parent_property_id,
-                self.processor.profile.flags,
-            ),
-            special_addrs: SpecialAddrs {
-                rel_params: self.ctx.rel_params_addr,
-                id: None,
-            },
-            raw_dynamic_entity: None,
-        };
+        let mut struct_deserializer =
+            StructDeserializer::new(self.processor, &self.struct_op.properties)
+                .with_struct_flags(self.struct_op.flags)
+                .with_expected_required_count(self.struct_op.required_count(
+                    self.processor.mode,
+                    self.processor.ctx.parent_property_id,
+                    self.processor.profile.flags,
+                ))
+                .with_rel_params_addr(self.ctx.rel_params_addr);
 
-        let deserialized_struct = if self.raw_dynamic_entity {
-            params.raw_dynamic_entity = Some(type_def_id);
-            let deserialized_struct = deserialize_struct(
-                map,
-                self.buffered_attrs,
-                self.processor,
-                &self.struct_op.properties,
-                params,
-            )?;
+        let output = if self.raw_dynamic_entity {
+            struct_deserializer.raw_dynamic_entity = Some(type_def_id);
+            let output = struct_deserializer.deserialize_struct(self.buffered_attrs, map)?;
 
-            if deserialized_struct.id.is_some() {
+            if output.id.is_some() {
                 return Ok(Attribute {
-                    rel: deserialized_struct.rel_params,
-                    val: deserialized_struct.id.unwrap(),
+                    rel: output.rel_params,
+                    val: output.id.unwrap(),
                 });
             } else {
-                deserialized_struct
+                output
             }
         } else {
-            deserialize_struct(
-                map,
-                self.buffered_attrs,
-                self.processor,
-                &self.struct_op.properties,
-                params,
-            )?
+            struct_deserializer.deserialize_struct(self.buffered_attrs, map)?
         };
 
-        let boxed_attrs = Box::new(deserialized_struct.attributes);
+        let boxed_attrs = Box::new(output.attributes);
         Ok(Attribute {
-            rel: deserialized_struct.rel_params,
+            rel: output.rel_params,
             val: if self.ctx.is_update {
                 Value::StructUpdate(boxed_attrs, type_def_id)
             } else {
@@ -127,218 +135,220 @@ impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
     }
 }
 
-pub struct DeserializeStructParams<'on> {
-    pub flags: SerdeStructFlags,
-    pub expected_required_count: usize,
-    pub special_addrs: SpecialAddrs<'on>,
-    pub raw_dynamic_entity: Option<DefId>,
-}
+impl<'on, 'p> StructDeserializer<'on, 'p> {
+    pub fn new(
+        processor: SerdeProcessor<'on, 'p>,
+        properties: &'on IndexMap<String, SerdeProperty>,
+    ) -> Self {
+        Self {
+            processor,
+            properties,
+            flags: SerdeStructFlags::empty(),
+            expected_required_count: 0,
+            rel_params_addr: None,
+            id_prop_addr: None,
+            raw_dynamic_entity: None,
+        }
+    }
 
-pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
-    mut map: A,
-    buffered_attrs: Vec<(String, serde_value::Value)>,
-    processor: SerdeProcessor<'on, 'p>,
-    properties: &IndexMap<String, SerdeProperty>,
-    params: DeserializeStructParams<'on>,
-) -> Result<DeserializedStruct, A::Error> {
-    let mut attributes = FnvHashMap::default();
-    let mut rel_params = Value::unit();
-    let mut id = None;
+    fn with_struct_flags(mut self, flags: SerdeStructFlags) -> Self {
+        self.flags = flags;
+        self
+    }
 
-    let mut observed_required_count = 0;
+    pub fn with_expected_required_count(mut self, count: usize) -> Self {
+        self.expected_required_count = count;
+        self
+    }
 
-    let property_set = PropertySet {
-        properties,
-        special_addrs: params.special_addrs,
-        processor_mode: processor.mode,
-        processor_profile: processor.profile,
-        parent_property_id: processor.ctx.parent_property_id,
-        flags: params.flags,
-    };
+    pub fn with_rel_params_addr(mut self, rel_params_addr: Option<SerdeOperatorAddr>) -> Self {
+        self.rel_params_addr = rel_params_addr;
+        self
+    }
 
-    let mut open_dict: HashMap<String, Value> = Default::default();
+    pub fn with_id_property_addr(mut self, name: &'on str, addr: SerdeOperatorAddr) -> Self {
+        self.id_prop_addr = Some((name, addr));
+        self
+    }
 
-    // first parse buffered attributes, if any
-    for (serde_key, serde_value) in buffered_attrs {
-        match property_set.visit_str(&serde_key)? {
-            PropertyKey::RelParams(addr) => {
-                let Attribute { val, .. } = processor
-                    .new_rel_params_child(addr)
-                    .map_err(RecursionLimitError::to_de_error)?
-                    .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
+    /// Perform the struct deserialization
+    pub fn deserialize_struct<'de, A: MapAccess<'de>>(
+        self,
+        buffered_attrs: Vec<(String, serde_value::Value)>,
+        map: A,
+    ) -> Result<Struct, A::Error> {
+        let mut output = Struct::default();
 
-                rel_params = val;
+        self.consume(BufferedAttrsReader::new(buffered_attrs), &mut output)?;
+        self.consume(map, &mut output)?;
+
+        match self.try_convert_to_raw_dynamic_id(output) {
+            Ok(id_struct) => Ok(id_struct),
+            Err(mut output) => {
+                self.generate_missing_attributes(&mut output)
+                    .map_err(serde::de::Error::custom)?;
+
+                self.report_missing_attributes(&output)
+                    .map_err(serde::de::Error::custom)?;
+
+                self.finalize_output(&mut output);
+                Ok(output)
             }
-            PropertyKey::Id(addr) => {
-                let Attribute { val, .. } = processor
-                    .new_child(addr)
-                    .map_err(RecursionLimitError::to_de_error)?
-                    .deserialize(serde_value::ValueDeserializer::new(serde_value))?;
-                id = Some(val);
-            }
-            PropertyKey::Property(serde_property) => {
-                let deserializer = serde_value::ValueDeserializer::new(serde_value);
-                let property_processor = processor
-                    .new_child_with_context(
-                        serde_property.value_addr,
-                        SubProcessorContext {
-                            is_update: false,
-                            parent_property_id: Some(serde_property.property_id),
-                            parent_property_flags: serde_property.flags,
-                            rel_params_addr: serde_property.rel_params_addr,
-                        },
-                    )
-                    .map_err(RecursionLimitError::to_de_error)?;
+        }
+    }
 
-                if serde_property.is_optional_for(processor.mode, &processor.profile.flags) {
-                    if let Some(attr) =
-                        deserializer.deserialize_option(property_processor.to_option_processor())?
-                    {
-                        attributes.insert(serde_property.property_id, attr);
-                    }
-                } else {
-                    attributes.insert(
-                        serde_property.property_id,
-                        property_processor.deserialize(deserializer)?,
-                    );
-                    observed_required_count += 1;
-                }
-            }
-            PropertyKey::Open(key) => {
-                open_dict.insert(
-                    key,
-                    serde_value::ValueDeserializer::new(serde_value).deserialize_any(
-                        RawVisitor::new(processor.ontology, processor.level)
+    /// Read from a serde MapAccess and copy resulting attributes into output
+    fn consume<'de, A: MapAccess<'de>>(
+        &self,
+        mut map: A,
+        output: &mut Struct,
+    ) -> Result<(), A::Error> {
+        while let Some(prop_kind) = map.next_key_seed(PropertyVisitor(self))? {
+            match prop_kind {
+                PropKind::RelParams(addr) => {
+                    let Attribute { val, .. } = map.next_value_seed(
+                        self.processor
+                            .new_rel_params_child(addr)
                             .map_err(RecursionLimitError::to_de_error)?,
-                    )?,
-                );
-            }
-            PropertyKey::Ignored => {}
-        }
-    }
+                    )?;
 
-    // parse rest of struct
-    while let Some(map_key) = map.next_key_seed(property_set)? {
-        match map_key {
-            PropertyKey::RelParams(addr) => {
-                let Attribute { val, .. } = map.next_value_seed(
-                    processor
-                        .new_rel_params_child(addr)
-                        .map_err(RecursionLimitError::to_de_error)?,
-                )?;
-
-                rel_params = val;
-            }
-            PropertyKey::Id(addr) => {
-                let Attribute { val, .. } = map.next_value_seed(
-                    processor
-                        .new_child(addr)
-                        .map_err(RecursionLimitError::to_de_error)?,
-                )?;
-
-                id = Some(val);
-            }
-            PropertyKey::Property(serde_property) => {
-                let property_processor = processor
-                    .new_child_with_context(
-                        serde_property.value_addr,
-                        SubProcessorContext {
-                            is_update: false,
-                            parent_property_id: Some(serde_property.property_id),
-                            parent_property_flags: serde_property.flags,
-                            rel_params_addr: serde_property.rel_params_addr,
-                        },
-                    )
-                    .map_err(RecursionLimitError::to_de_error)?;
-
-                if serde_property.is_optional_for(processor.mode, &processor.profile.flags) {
-                    if let Some(attr) =
-                        map.next_value_seed(property_processor.to_option_processor())?
-                    {
-                        attributes.insert(serde_property.property_id, attr);
-                    }
-                } else {
-                    attributes.insert(
-                        serde_property.property_id,
-                        map.next_value_seed(property_processor)?,
-                    );
-                    observed_required_count += 1;
+                    output.rel_params = val;
                 }
-            }
-            PropertyKey::Open(key) => {
-                open_dict.insert(
-                    key,
-                    map.next_value_seed(
-                        RawVisitor::new(processor.ontology, processor.level)
+                PropKind::Id(addr) => {
+                    let Attribute { val, .. } = map.next_value_seed(
+                        self.processor
+                            .new_child(addr)
                             .map_err(RecursionLimitError::to_de_error)?,
-                    )?,
-                );
-            }
-            PropertyKey::Ignored => {
-                let _value: serde_value::Value = map.next_value()?;
-            }
-        }
-    }
+                    )?;
 
-    // Handle raw_dynamic_entity "id singleton struct"
-    if let Some(entity_def_id) = params.raw_dynamic_entity {
-        if attributes.len() == 1 {
-            let (prop_id, _) = attributes.iter().next().unwrap();
-            let type_info = processor.ontology.get_type_info(entity_def_id);
-            if let Some(entity_info) = &type_info.entity_info {
-                if prop_id.relationship_id == entity_info.id_relationship_id {
-                    return Ok(DeserializedStruct {
-                        attributes: Default::default(),
-                        id: Some(attributes.into_iter().next().unwrap().1.val),
-                        rel_params,
-                    });
+                    output.id = Some(val);
+                }
+                PropKind::Property(serde_property) => {
+                    let property_processor = self
+                        .processor
+                        .new_child_with_context(
+                            serde_property.value_addr,
+                            SubProcessorContext {
+                                is_update: false,
+                                parent_property_id: Some(serde_property.property_id),
+                                parent_property_flags: serde_property.flags,
+                                rel_params_addr: serde_property.rel_params_addr,
+                            },
+                        )
+                        .map_err(RecursionLimitError::to_de_error)?;
+
+                    if serde_property
+                        .is_optional_for(self.processor.mode, &self.processor.profile.flags)
+                    {
+                        if let Some(attr) =
+                            map.next_value_seed(property_processor.to_option_processor())?
+                        {
+                            output.attributes.insert(serde_property.property_id, attr);
+                        }
+                    } else {
+                        output.attributes.insert(
+                            serde_property.property_id,
+                            map.next_value_seed(property_processor)?,
+                        );
+                        output.observed_required_count += 1;
+                    }
+                }
+                PropKind::Open(key) => {
+                    output.open_dict.insert(
+                        key,
+                        map.next_value_seed(
+                            RawVisitor::new(self.processor.ontology, self.processor.level)
+                                .map_err(RecursionLimitError::to_de_error)?,
+                        )?,
+                    );
+                }
+                PropKind::TypeAnnotation => {}
+                PropKind::Ignored => {
+                    let _value: serde_value::Value = map.next_value()?;
                 }
             }
         }
+
+        Ok(())
     }
 
-    if observed_required_count < params.expected_required_count {
-        // Generate default values if missing
-        for (_, property) in properties {
+    /// If in dynamic raw entity mode, try to convert to a singleton ID struct
+    fn try_convert_to_raw_dynamic_id(&self, mut output: Struct) -> Result<Struct, Struct> {
+        let Some(entity_def_id) = self.raw_dynamic_entity else {
+            return Err(output);
+        };
+        if output.attributes.len() != 1 {
+            return Err(output);
+        }
+
+        let (prop_id, _) = output.attributes.iter().next().unwrap();
+        let type_info = self.processor.ontology.get_type_info(entity_def_id);
+
+        let Some(entity_info) = &type_info.entity_info else {
+            return Err(output);
+        };
+        if prop_id.relationship_id != entity_info.id_relationship_id {
+            return Err(output);
+        }
+
+        let attributes = std::mem::take(&mut output.attributes);
+        output.id = Some(attributes.into_iter().next().unwrap().1.val);
+        Ok(output)
+    }
+
+    /// Generate default values if missing
+    fn generate_missing_attributes(&self, output: &mut Struct) -> Result<(), std::string::String> {
+        if output.observed_required_count >= self.expected_required_count {
+            return Ok(());
+        }
+
+        for (_, property) in self.properties {
             // Only _default values_ are handled in the deserializer:
             if let Some(ValueGenerator::DefaultProc(address)) = property.value_generator {
-                if !property.is_optional_for(processor.mode, &processor.profile.flags)
-                    && !attributes.contains_key(&property.property_id)
+                if !property.is_optional_for(self.processor.mode, &self.processor.profile.flags)
+                    && !output.attributes.contains_key(&property.property_id)
                 {
                     let procedure = Procedure {
                         address,
                         n_params: NParams(0),
                     };
-                    let value = processor
+                    let value = self
+                        .processor
                         .ontology
                         .new_vm(procedure)
                         .run([])
-                        .map_err(|vm_error| serde::de::Error::custom(format!("{vm_error}")))?
+                        .map_err(|vm_error| format!("{vm_error}"))?
                         .unwrap();
 
                     // BUG: No support for rel_params:
-                    attributes.insert(property.property_id, value.into());
-                    observed_required_count += 1;
+                    output.attributes.insert(property.property_id, value.into());
+                    output.observed_required_count += 1;
                 }
             }
         }
+
+        Ok(())
     }
 
-    if observed_required_count < params.expected_required_count
-        || (rel_params.is_unit() != params.special_addrs.rel_params.is_none())
-    {
+    fn report_missing_attributes(&self, output: &Struct) -> Result<(), std::string::String> {
+        if output.observed_required_count >= self.expected_required_count
+            && (output.rel_params.is_unit() == self.rel_params_addr.is_none())
+        {
+            return Ok(());
+        }
+
         debug!(
             "Missing attributes(mode={:?}). Rel params match: {}, special_rel: {} parent_relationship: {:?} expected_required_count: {}",
-            processor.mode,
-            rel_params.is_unit(),
-            params.special_addrs.rel_params.is_none(),
-            processor.ctx.parent_property_id,
-            params.expected_required_count
+            self.processor.mode,
+            output.rel_params.is_unit(),
+            self.rel_params_addr.is_none(),
+            self.processor.ctx.parent_property_id,
+            self.expected_required_count
         );
-        for attr in &attributes {
+        for attr in &output.attributes {
             debug!("    attr {:?}", attr.0);
         }
-        for prop in properties {
+        for prop in self.properties {
             debug!(
                 "    prop {:?}('{}') {:?} visible={} optional={}",
                 prop.1.property_id,
@@ -346,32 +356,33 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
                 prop.1.flags,
                 prop.1
                     .filter(
-                        processor.mode,
-                        processor.ctx.parent_property_id,
-                        processor.profile.flags
+                        self.processor.mode,
+                        self.processor.ctx.parent_property_id,
+                        self.processor.profile.flags
                     )
                     .is_some(),
                 prop.1.is_optional()
             );
         }
 
-        let mut items: Vec<DoubleQuote<String>> = properties
+        let mut items: Vec<DoubleQuote<String>> = self
+            .properties
             .iter()
             .filter(|(_, property)| {
                 property
                     .filter(
-                        processor.mode,
-                        processor.ctx.parent_property_id,
-                        processor.profile.flags,
+                        self.processor.mode,
+                        self.processor.ctx.parent_property_id,
+                        self.processor.profile.flags,
                     )
                     .is_some()
                     && !property.is_optional()
-                    && !attributes.contains_key(&property.property_id)
+                    && !output.attributes.contains_key(&property.property_id)
             })
             .map(|(key, _)| DoubleQuote(key.clone()))
             .collect();
 
-        if params.special_addrs.rel_params.is_some() && rel_params.type_def_id() == DefId::unit() {
+        if self.rel_params_addr.is_some() && output.rel_params.type_def_id() == DefId::unit() {
             items.push(DoubleQuote(EDGE_PROPERTY.into()));
         }
 
@@ -382,81 +393,89 @@ pub(super) fn deserialize_struct<'on, 'p, 'de, A: MapAccess<'de>>(
             logic_op: LogicOp::And,
         };
 
-        return Err(serde::de::Error::custom(format!(
-            "missing properties, expected {missing_keys}"
-        )));
+        Err(format!("missing properties, expected {missing_keys}"))
     }
 
-    if !open_dict.is_empty() {
-        attributes.insert(
-            processor.ontology.ontol_domain_meta.open_data_property_id(),
-            Value::Dict(Box::new(open_dict), DefId::unit()).into(),
-        );
-    }
+    fn finalize_output(&self, output: &mut Struct) {
+        if !output.open_dict.is_empty() {
+            let open_dict = std::mem::take(&mut output.open_dict);
 
-    Ok(DeserializedStruct {
-        attributes,
-        id,
-        rel_params,
-    })
+            output.attributes.insert(
+                self.processor
+                    .ontology
+                    .ontol_domain_meta
+                    .open_data_property_id(),
+                Value::Dict(Box::new(open_dict), DefId::unit()).into(),
+            );
+        }
+    }
 }
 
-impl<'a, 'de> DeserializeSeed<'de> for PropertySet<'a> {
-    type Value = PropertyKey;
+/// A visitor for properties (i.e. _keys, not their values, which are the attributes).
+/// It determines the semantics of each property, or whether it's accepted or not.
+#[derive(Clone, Copy)]
+struct PropertyVisitor<'d>(&'d StructDeserializer<'d, 'd>);
+
+impl<'a, 'de> DeserializeSeed<'de> for PropertyVisitor<'a> {
+    type Value = PropKind;
 
     fn deserialize<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
         deserializer.deserialize_str(self)
     }
 }
 
-impl<'a, 'de> Visitor<'de> for PropertySet<'a> {
-    type Value = PropertyKey;
+impl<'a, 'de> Visitor<'de> for PropertyVisitor<'a> {
+    type Value = PropKind;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "property identifier")
     }
 
-    fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
+    fn visit_str<E: Error>(self, v: &str) -> Result<PropKind, E> {
         match v {
             EDGE_PROPERTY => {
-                if let Some(addr) = self.special_addrs.rel_params {
-                    Ok(PropertyKey::RelParams(addr))
+                if let Some(addr) = self.0.rel_params_addr {
+                    Ok(PropKind::RelParams(addr))
                 } else {
                     Err(Error::custom("`_edge` property not accepted here"))
                 }
             }
             _ => {
-                if let Some((property_name, addr)) = self.special_addrs.id {
+                if let Some((property_name, addr)) = self.0.id_prop_addr {
                     if v == property_name {
-                        return Ok(PropertyKey::Id(addr));
+                        return Ok(PropKind::Id(addr));
                     }
                 }
 
-                let Some(serde_property) = self.properties.get(v) else {
-                    match self.processor_profile.api.lookup_special_property(v) {
+                let Some(serde_property) = self.0.properties.get(v) else {
+                    match self.0.processor.profile.api.lookup_special_property(v) {
                         Some(SpecialProperty::IdOverride) => {
-                            for (_, prop) in self.properties {
+                            for (_, prop) in self.0.properties {
                                 if prop.is_entity_id() {
-                                    return Ok(PropertyKey::Property(*prop));
+                                    return Ok(PropKind::Property(*prop));
                                 }
                             }
 
                             return Err(Error::custom(format!("unknown property `{v}`")));
                         }
                         Some(SpecialProperty::Ignored) => {
-                            return Ok(PropertyKey::Ignored);
+                            return Ok(PropKind::Ignored);
                         }
-                        Some(SpecialProperty::TypeAnnotation) => {}
+                        Some(SpecialProperty::TypeAnnotation) => {
+                            return Ok(PropKind::TypeAnnotation);
+                        }
                         _ => {}
                     }
 
-                    return if self.flags.contains(SerdeStructFlags::OPEN_DATA)
+                    return if self.0.flags.contains(SerdeStructFlags::OPEN_DATA)
                         && self
-                            .processor_profile
+                            .0
+                            .processor
+                            .profile
                             .flags
                             .contains(ProcessorProfileFlags::DESERIALIZE_OPEN_DATA)
                     {
-                        Ok(PropertyKey::Open(v.into()))
+                        Ok(PropKind::Open(v.into()))
                     } else {
                         // TODO: This error message could be improved to suggest valid fields.
                         // see OneOf in serde (this is a private struct)
@@ -466,15 +485,15 @@ impl<'a, 'de> Visitor<'de> for PropertySet<'a> {
 
                 if serde_property
                     .filter(
-                        self.processor_mode,
-                        self.parent_property_id,
-                        self.processor_profile.flags,
+                        self.0.processor.mode,
+                        self.0.processor.ctx.parent_property_id,
+                        self.0.processor.profile.flags,
                     )
                     .is_some()
                 {
-                    Ok(PropertyKey::Property(*serde_property))
+                    Ok(PropKind::Property(*serde_property))
                 } else if serde_property.is_read_only()
-                    && !matches!(self.processor_mode, ProcessorMode::Read)
+                    && !matches!(self.0.processor.mode, ProcessorMode::Read)
                 {
                     Err(Error::custom(format!("property `{v}` is read-only")))
                 } else {

@@ -10,10 +10,7 @@ use crate::{
     interface::serde::{
         deserialize_id::IdSingletonStructVisitor,
         deserialize_matcher::MapMatchResult,
-        deserialize_struct::{
-            deserialize_struct, DeserializeStructParams, SpecialAddrs, StructVisitor,
-        },
-        operator::SerdeStructFlags,
+        deserialize_struct::{StructDeserializer, StructVisitor},
     },
     sequence::Sequence,
     value::{Attribute, Serial, Value},
@@ -411,27 +408,16 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
             }
             .visit_map(map),
             MapMatchMode::Id(name, addr) => {
-                let deserialized_map = deserialize_struct(
-                    map,
-                    buffered_attrs,
-                    self.processor,
-                    &IndexMap::default(),
-                    DeserializeStructParams {
-                        flags: SerdeStructFlags::empty(),
-                        expected_required_count: 0,
-                        special_addrs: SpecialAddrs {
-                            rel_params: map_match.ctx.rel_params_addr,
-                            id: Some((name, addr)),
-                        },
-                        raw_dynamic_entity: None,
-                    },
-                )?;
-                let id = deserialized_map
+                let output = StructDeserializer::new(self.processor, &IndexMap::default())
+                    .with_rel_params_addr(map_match.ctx.rel_params_addr)
+                    .with_id_property_addr(name, addr)
+                    .deserialize_struct(buffered_attrs, map)?;
+                let id = output
                     .id
                     .ok_or_else(|| Error::custom("missing identifier attribute".to_string()))?;
 
                 Ok(Attribute {
-                    rel: deserialized_map.rel_params,
+                    rel: output.rel_params,
                     val: id,
                 })
             }

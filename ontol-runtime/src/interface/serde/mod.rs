@@ -15,6 +15,7 @@ mod deserialize_raw;
 mod deserialize_struct;
 mod serialize;
 mod serialize_raw;
+mod utils;
 
 pub mod operator;
 pub mod processor;
