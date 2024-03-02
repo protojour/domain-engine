@@ -114,6 +114,15 @@ impl<'on> TypeBinding<'on> {
         self.type_info.def_id
     }
 
+    #[track_caller]
+    pub fn entity_id_def_id(&self) -> DefId {
+        self.type_info
+            .entity_info
+            .as_ref()
+            .expect("not an entity")
+            .id_value_def_id
+    }
+
     pub fn struct_select(
         &self,
         properties: impl IntoIterator<Item = (&'static str, Select)>,

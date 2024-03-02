@@ -236,7 +236,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
 
                 Ok(())
             }
-            SerdeOperator::IdSingletonStruct(property_name, id_operator_addr) => {
+            SerdeOperator::IdSingletonStruct(_entity_id, property_name, id_operator_addr) => {
                 if filter.filter_property(property_name, None, output) {
                     output.push(self.get_operator_argument(
                         property_name,

@@ -8,7 +8,7 @@ use ontol_runtime::{
         serde::{
             operator::{
                 SerdeOperator, SerdeOperatorAddr, SerdeProperty, SerdePropertyFlags,
-                SerdeUnionVariant, StructOperator, UnionOperator,
+                SerdeStructFlags, SerdeUnionVariant, StructOperator, UnionOperator,
             },
             SerdeDef, SerdeModifier,
         },
@@ -40,12 +40,15 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     ) {
         let mut serde_properties = Default::default();
 
+        let mut struct_flags = SerdeStructFlags::default();
+
         if let Some(table) = &properties.table {
             for (property_id, property) in table {
                 self.add_struct_op_property(
                     *property_id,
                     property,
                     def.modifier,
+                    &mut struct_flags,
                     &mut serde_properties,
                 );
             }
@@ -68,6 +71,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             *property_id,
                             property,
                             def.modifier,
+                            &mut struct_flags,
                             &mut serde_properties,
                         );
                     }
@@ -79,6 +83,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             panic!();
         };
         struct_op.properties = serde_properties;
+        struct_op.flags.extend(struct_flags);
     }
 
     pub(super) fn add_struct_op_property(
@@ -86,6 +91,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         property_id: PropertyId,
         property: &Property,
         modifier: SerdeModifier,
+        struct_flags: &mut SerdeStructFlags,
         output: &mut IndexMap<String, SerdeProperty>,
     ) {
         let meta = self.defs.relationship_meta(property_id.relationship_id);
@@ -153,6 +159,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         if property.is_entity_id {
             flags |= SerdePropertyFlags::ENTITY_ID;
+        }
+
+        if flags.contains(SerdePropertyFlags::OPTIONAL | SerdePropertyFlags::ENTITY_ID) {
+            struct_flags.insert(SerdeStructFlags::ENTITY_ID_OPTIONAL);
         }
 
         if let Some(target_properties) = self.relations.properties_by_def_id(value_type_def_id) {

@@ -632,8 +632,9 @@ mod serde_raw_dynamic_entity_in_union {
 
     /// This tests an entity union without data-based discriminators (only id-based)
     const ONTOL: &str = "
+    def foo_id (fmt '' => 'foo/' => text => .)
     def foo (
-        rel .'id'|id: (fmt '' => 'foo/' => text => .)
+        rel .'id'|id: foo_id
         rel .'data': text
     )
     def bar (
@@ -654,7 +655,11 @@ mod serde_raw_dynamic_entity_in_union {
         let id = serde_raw(&foobar)
             .to_value_nocheck(json!({ "id": "foo/42" }))
             .unwrap();
-        assert_ne!(id.type_def_id(), foo.def_id(), "should be the entity ID");
+        assert_eq!(
+            id.type_def_id(),
+            foo.entity_id_def_id(),
+            "should be the entity ID"
+        );
     }
 
     #[test]
@@ -680,17 +685,49 @@ mod serde_raw_dynamic_entity_in_union {
             flags: ProcessorProfileFlags::empty(),
             api: &plugin,
         };
-        let [foobar] = test.bind(["foobar"]);
+        let [foo, foo_id, foobar] = test.bind(["foo", "foo_id", "foobar"]);
 
-        serde_raw(&foobar)
+        let id = serde_raw(&foobar)
             .with_profile(processor_profile.clone())
             .to_value_nocheck(json!({ "__type": "foo", "__id": "42" }))
             .unwrap();
+        assert_eq!(
+            id.type_def_id(),
+            foo.entity_id_def_id(),
+            "should be the entity ID"
+        );
+
+        expect_eq!(
+            actual = ontol_test_utils::serde_helper::serde_create(&foo_id).as_json(&id),
+            expected = json!("foo/42")
+        );
 
         serde_raw(&foobar)
             .with_profile(processor_profile.clone())
             .to_value_nocheck(json!({ "__id": "42", "__type": "foo" }))
             .unwrap();
+    }
+
+    #[test]
+    fn type_annotated_data() {
+        let test = ONTOL.compile();
+        let plugin = make_plugin(&test);
+        let processor_profile = ProcessorProfile {
+            id_format: ScalarFormat::RawText,
+            flags: ProcessorProfileFlags::empty(),
+            api: &plugin,
+        };
+        let [foo, foobar] = test.bind(["foo", "foobar"]);
+
+        let data = serde_raw(&foobar)
+            .with_profile(processor_profile.clone())
+            .to_value_nocheck(json!({ "data": "yo", "__id": "42", "__type": "foo" }))
+            .unwrap();
+        assert_eq!(
+            data.type_def_id(),
+            foo.def_id(),
+            "should be the entity itself"
+        );
     }
 
     fn make_plugin(test: &OntolTest) -> ProcessorProfileTestPlugin {

@@ -343,6 +343,17 @@ pub struct SubProcessorContext {
     pub rel_params_addr: Option<SerdeOperatorAddr>,
 }
 
+impl SubProcessorContext {
+    pub const fn entity_id() -> Self {
+        Self {
+            is_update: false,
+            parent_property_id: None,
+            parent_property_flags: SerdePropertyFlags::ENTITY_ID,
+            rel_params_addr: None,
+        }
+    }
+}
+
 impl<'on, 'p> Debug for SerdeProcessor<'on, 'p> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // This structure might contain cycles (through operator addr),

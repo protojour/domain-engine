@@ -168,7 +168,7 @@ impl<'e> ObjectGenerator<'e> {
             SerdeOperator::Alias(alias_op) => alias_op.def.def_id,
             SerdeOperator::Union(union_op) => union_op.union_def().def_id,
             SerdeOperator::Struct(struct_op) => struct_op.def.def_id,
-            SerdeOperator::IdSingletonStruct(_, addr) => {
+            SerdeOperator::IdSingletonStruct(.., addr) => {
                 self.operator_def_id(self.ontology.get_serde_operator(*addr))
             }
         }

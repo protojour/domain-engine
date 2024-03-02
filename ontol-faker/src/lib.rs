@@ -205,7 +205,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
 
                 Value::Struct(Box::new(attrs), struct_op.def.def_id)
             }
-            SerdeOperator::IdSingletonStruct(_name, inner_addr) => {
+            SerdeOperator::IdSingletonStruct(_entity_id, _name, inner_addr) => {
                 return self.fake_attribute(processor.narrow(*inner_addr))
             }
         };

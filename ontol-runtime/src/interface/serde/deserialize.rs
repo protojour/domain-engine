@@ -221,7 +221,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                     ),
                 }
             }
-            (SerdeOperator::IdSingletonStruct(name, inner_addr), _) => deserializer
+            (SerdeOperator::IdSingletonStruct(_, name, inner_addr), _) => deserializer
                 .deserialize_map(IdSingletonStructVisitor {
                     processor: self,
                     property_name: name,
@@ -407,11 +407,12 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
                 raw_dynamic_entity: true,
             }
             .visit_map(map),
-            MapMatchMode::Id(name, addr) => {
-                let output = StructDeserializer::new(self.processor, &IndexMap::default())
-                    .with_rel_params_addr(map_match.ctx.rel_params_addr)
-                    .with_id_property_addr(name, addr)
-                    .deserialize_struct(buffered_attrs, map)?;
+            MapMatchMode::EntityId(entity_id, name, addr) => {
+                let output =
+                    StructDeserializer::new(entity_id, self.processor, &IndexMap::default())
+                        .with_rel_params_addr(map_match.ctx.rel_params_addr)
+                        .with_id_property_addr(name, addr)
+                        .deserialize_struct(buffered_attrs, map)?;
                 let id = output
                     .id
                     .ok_or_else(|| Error::custom("missing identifier attribute".to_string()))?;

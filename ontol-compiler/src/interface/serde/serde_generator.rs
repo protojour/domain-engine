@@ -271,7 +271,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 } else {
                     Some(OperatorAllocation::Allocated(
                         self.alloc_addr_for_key(&key),
-                        SerdeOperator::IdSingletonStruct(ident, object_addr),
+                        SerdeOperator::IdSingletonStruct(def.def_id, ident, object_addr),
                     ))
                 }
             }
@@ -647,7 +647,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         let (id_property_name, id_leaf_discriminant) =
             match self.operators_by_addr.get(id_addr.0 as usize).unwrap() {
-                SerdeOperator::IdSingletonStruct(id_property_name, inner_addr) => (
+                SerdeOperator::IdSingletonStruct(_entity_id, id_property_name, inner_addr) => (
                     id_property_name.clone(),
                     if false {
                         operator_to_leaf_discriminant(self.get_operator(*inner_addr))

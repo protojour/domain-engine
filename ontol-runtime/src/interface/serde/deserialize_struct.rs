@@ -15,7 +15,7 @@ use crate::{
     value::{Attribute, PropertyId, Value},
     value_generator::ValueGenerator,
     vm::proc::{NParams, Procedure},
-    DefId,
+    DefId, RelationshipId,
 };
 
 use super::{
@@ -48,6 +48,7 @@ pub struct StructVisitor<'on, 'p> {
 
 /// The struct deserializer itself.
 pub struct StructDeserializer<'on, 'p> {
+    type_def_id: DefId,
     processor: SerdeProcessor<'on, 'p>,
     properties: &'on IndexMap<String, SerdeProperty>,
     flags: SerdeStructFlags,
@@ -70,9 +71,9 @@ pub struct StructDeserializer<'on, 'p> {
 enum PropKind {
     Property(SerdeProperty),
     RelParams(SerdeOperatorAddr),
-    Id(SerdeOperatorAddr),
+    SingletonId(SerdeOperatorAddr),
+    OverriddenId(RelationshipId, SerdeOperatorAddr),
     Open(String),
-    TypeAnnotation,
     Ignored,
 }
 
@@ -97,15 +98,18 @@ impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
 
     fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {
         let type_def_id = self.struct_op.def.def_id;
-        let mut struct_deserializer =
-            StructDeserializer::new(self.processor, &self.struct_op.properties)
-                .with_struct_flags(self.struct_op.flags)
-                .with_expected_required_count(self.struct_op.required_count(
-                    self.processor.mode,
-                    self.processor.ctx.parent_property_id,
-                    self.processor.profile.flags,
-                ))
-                .with_rel_params_addr(self.ctx.rel_params_addr);
+        let mut struct_deserializer = StructDeserializer::new(
+            self.struct_op.def.def_id,
+            self.processor,
+            &self.struct_op.properties,
+        )
+        .with_struct_flags(self.struct_op.flags)
+        .with_expected_required_count(self.struct_op.required_count(
+            self.processor.mode,
+            self.processor.ctx.parent_property_id,
+            self.processor.profile.flags,
+        ))
+        .with_rel_params_addr(self.ctx.rel_params_addr);
 
         let output = if self.raw_dynamic_entity {
             struct_deserializer.raw_dynamic_entity = Some(type_def_id);
@@ -137,10 +141,12 @@ impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
 
 impl<'on, 'p> StructDeserializer<'on, 'p> {
     pub fn new(
+        type_def_id: DefId,
         processor: SerdeProcessor<'on, 'p>,
         properties: &'on IndexMap<String, SerdeProperty>,
     ) -> Self {
         Self {
+            type_def_id,
             processor,
             properties,
             flags: SerdeStructFlags::empty(),
@@ -214,14 +220,29 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
 
                     output.rel_params = val;
                 }
-                PropKind::Id(addr) => {
+                PropKind::SingletonId(addr) => {
                     let Attribute { val, .. } = map.next_value_seed(
                         self.processor
-                            .new_child(addr)
+                            .new_child_with_context(addr, SubProcessorContext::entity_id())
                             .map_err(RecursionLimitError::to_de_error)?,
                     )?;
 
                     output.id = Some(val);
+                }
+                PropKind::OverriddenId(relationship_id, addr) => {
+                    let attr = map.next_value_seed(
+                        self.processor
+                            .new_child_with_context(addr, SubProcessorContext::entity_id())
+                            .map_err(RecursionLimitError::to_de_error)?,
+                    )?;
+
+                    output
+                        .attributes
+                        .insert(PropertyId::subject(relationship_id), attr);
+
+                    if !self.flags.contains(SerdeStructFlags::ENTITY_ID_OPTIONAL) {
+                        output.observed_required_count += 1;
+                    }
                 }
                 PropKind::Property(serde_property) => {
                     let property_processor = self
@@ -262,7 +283,6 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                         )?,
                     );
                 }
-                PropKind::TypeAnnotation => {}
                 PropKind::Ignored => {
                     let _value: serde_value::Value = map.next_value()?;
                 }
@@ -443,26 +463,27 @@ impl<'a, 'de> Visitor<'de> for PropertyVisitor<'a> {
             _ => {
                 if let Some((property_name, addr)) = self.0.id_prop_addr {
                     if v == property_name {
-                        return Ok(PropKind::Id(addr));
+                        return Ok(PropKind::SingletonId(addr));
                     }
                 }
 
                 let Some(serde_property) = self.0.properties.get(v) else {
                     match self.0.processor.profile.api.lookup_special_property(v) {
                         Some(SpecialProperty::IdOverride) => {
-                            for (_, prop) in self.0.properties {
-                                if prop.is_entity_id() {
-                                    return Ok(PropKind::Property(*prop));
-                                }
-                            }
+                            let type_info =
+                                self.0.processor.ontology.get_type_info(self.0.type_def_id);
+                            let entity_info = type_info
+                                .entity_info
+                                .as_ref()
+                                .ok_or_else(|| Error::custom("not an entity"))?;
 
-                            return Err(Error::custom(format!("unknown property `{v}`")));
+                            return Ok(PropKind::OverriddenId(
+                                entity_info.id_relationship_id,
+                                entity_info.id_operator_addr,
+                            ));
                         }
-                        Some(SpecialProperty::Ignored) => {
+                        Some(SpecialProperty::Ignored | SpecialProperty::TypeAnnotation) => {
                             return Ok(PropKind::Ignored);
-                        }
-                        Some(SpecialProperty::TypeAnnotation) => {
-                            return Ok(PropKind::TypeAnnotation);
                         }
                         _ => {}
                     }

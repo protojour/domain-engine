@@ -71,7 +71,7 @@ pub enum SerdeOperator {
     Struct(StructOperator),
 
     /// A map with one property: The ID of an entity.
-    IdSingletonStruct(String, SerdeOperatorAddr),
+    IdSingletonStruct(DefId, String, SerdeOperatorAddr),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -423,6 +423,7 @@ bitflags::bitflags! {
     #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug, Serialize, Deserialize)]
     pub struct SerdeStructFlags: u32 {
         /// This struct operator supports open/domainless properties
-        const OPEN_DATA       = 0b00000001;
+        const OPEN_DATA          = 0b00000001;
+        const ENTITY_ID_OPTIONAL = 0b00000010;
     }
 }

@@ -627,7 +627,7 @@ pub struct MapMatch<'on> {
 #[derive(Debug)]
 pub enum MapMatchMode<'on> {
     Struct(&'on StructOperator),
-    Id(&'on str, SerdeOperatorAddr),
+    EntityId(DefId, &'on str, SerdeOperatorAddr),
     RawDynamicEntity(&'on StructOperator),
 }
 
@@ -715,8 +715,8 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
                 (SerdeOperator::Struct(struct_op), _) => {
                     self.map_match(MapMatchMode::Struct(struct_op))
                 }
-                (SerdeOperator::IdSingletonStruct(name, addr), _) => {
-                    self.map_match(MapMatchMode::Id(name.as_str(), *addr))
+                (SerdeOperator::IdSingletonStruct(entity_id, name, addr), _) => {
+                    self.map_match(MapMatchMode::EntityId(*entity_id, name.as_str(), *addr))
                 }
                 (SerdeOperator::Union(union_op), _) => {
                     match union_op.applied_variants(self.mode, self.level) {
@@ -751,8 +751,12 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
                     SerdeOperator::Struct(struct_op) => {
                         return self.map_match(MapMatchMode::Struct(struct_op))
                     }
-                    SerdeOperator::IdSingletonStruct(name, addr) => {
-                        return self.map_match(MapMatchMode::Id(name.as_str(), *addr))
+                    SerdeOperator::IdSingletonStruct(entity_id, name, addr) => {
+                        return self.map_match(MapMatchMode::EntityId(
+                            *entity_id,
+                            name.as_str(),
+                            *addr,
+                        ))
                     }
                     other => panic!("Matched discriminator is not a map type: {other:?}"),
                 }
