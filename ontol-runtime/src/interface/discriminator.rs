@@ -1,4 +1,5 @@
 use ::serde::{Deserialize, Serialize};
+use ontol_macros::OntolDebug;
 use smartstring::alias::String;
 
 use crate::{interface::serde::SerdeDef, DefId, RelationshipId};
@@ -8,14 +9,16 @@ pub struct UnionDiscriminator {
     pub variants: Vec<VariantDiscriminator>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, OntolDebug, Debug)]
 pub struct VariantDiscriminator {
     pub discriminant: Discriminant,
     pub purpose: VariantPurpose,
     pub serde_def: SerdeDef,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, OntolDebug, Debug,
+)]
 pub enum VariantPurpose {
     /// The purpose is explusively for identifying some entity
     Identification { entity_id: DefId },
@@ -26,7 +29,7 @@ pub enum VariantPurpose {
     RawDynamicEntity,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, OntolDebug, Debug)]
 pub enum Discriminant {
     MatchesLeaf(LeafDiscriminant),
     HasAttribute(RelationshipId, String, LeafDiscriminant),
@@ -34,7 +37,7 @@ pub enum Discriminant {
     StructFallback,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, OntolDebug, Debug)]
 pub enum LeafDiscriminant {
     IsAny,
     IsUnit,

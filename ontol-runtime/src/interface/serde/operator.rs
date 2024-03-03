@@ -5,10 +5,12 @@ use std::{
 
 use ::serde::{Deserialize, Serialize};
 use indexmap::IndexMap;
+use ontol_macros::OntolDebug;
 use smallvec::SmallVec;
 use smartstring::alias::String;
 
 use crate::{
+    impl_ontol_debug,
     interface::discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
     value::PropertyId,
     value_generator::ValueGenerator,
@@ -30,7 +32,9 @@ impl ::std::fmt::Debug for SerdeOperatorAddr {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+impl_ontol_debug!(SerdeOperatorAddr);
+
+#[derive(Serialize, Deserialize, OntolDebug, Debug)]
 pub enum SerdeOperator {
     Unit,
     True(DefId),
@@ -74,7 +78,7 @@ pub enum SerdeOperator {
     IdSingletonStruct(DefId, String, SerdeOperatorAddr),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, OntolDebug, Debug)]
 pub struct RelationSequenceOperator {
     // note: This is constant size array so that it can produce a dynamic slice
     pub ranges: [SequenceRange; 1],
@@ -82,7 +86,7 @@ pub struct RelationSequenceOperator {
     pub to_entity: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, OntolDebug, Debug)]
 pub struct ConstructorSequenceOperator {
     pub ranges: SmallVec<[SequenceRange; 3]>,
     pub def: SerdeDef,
@@ -108,7 +112,7 @@ impl ConstructorSequenceOperator {
 }
 
 /// A matcher for a range within a sequence
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, OntolDebug, Debug)]
 pub struct SequenceRange {
     /// Operator to use for this range
     pub addr: SerdeOperatorAddr,
@@ -118,14 +122,14 @@ pub struct SequenceRange {
     pub finite_repetition: Option<u16>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, OntolDebug, Debug)]
 pub struct AliasOperator {
     pub typename: String,
     pub def: SerdeDef,
     pub inner_addr: SerdeOperatorAddr,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, OntolDebug, Debug)]
 pub struct UnionOperator {
     typename: String,
     union_def: SerdeDef,
@@ -141,7 +145,7 @@ impl UnionOperator {
             },
             |last_purpose, variant| {
                 if variant.discriminator.purpose < last_purpose {
-                    panic!("variants are not sorted: {variants:#?}");
+                    panic!("variants are not sorted");
                 }
                 variant.discriminator.purpose
             },
@@ -275,13 +279,13 @@ pub struct PossibleVariant<'on> {
     pub serde_def: SerdeDef,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, OntolDebug, Debug)]
 pub struct SerdeUnionVariant {
     pub discriminator: VariantDiscriminator,
     pub addr: SerdeOperatorAddr,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, OntolDebug, Debug)]
 pub struct StructOperator {
     pub typename: String,
     pub def: SerdeDef,
@@ -319,7 +323,7 @@ impl StructOperator {
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Serialize, Deserialize, OntolDebug, Debug)]
 pub struct SerdeProperty {
     /// The ID of this property
     pub property_id: PropertyId,
@@ -409,7 +413,7 @@ impl SerdeProperty {
 }
 
 bitflags::bitflags! {
-    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug, Serialize, Deserialize)]
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Serialize, Deserialize, Debug)]
     pub struct SerdePropertyFlags: u32 {
         const OPTIONAL        = 0b00000001;
         const READ_ONLY       = 0b00000010;
@@ -420,10 +424,13 @@ bitflags::bitflags! {
 }
 
 bitflags::bitflags! {
-    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug, Serialize, Deserialize)]
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Serialize, Deserialize, Debug)]
     pub struct SerdeStructFlags: u32 {
         /// This struct operator supports open/domainless properties
         const OPEN_DATA          = 0b00000001;
         const ENTITY_ID_OPTIONAL = 0b00000010;
     }
 }
+
+impl_ontol_debug!(SerdePropertyFlags);
+impl_ontol_debug!(SerdeStructFlags);

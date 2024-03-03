@@ -1,5 +1,7 @@
 use std::fmt::{Debug, Display};
 
+use ontol_macros::OntolDebug;
+
 use crate::{
     format_utils::{Backticks, CommaSeparated, DoubleQuote},
     ontology::Ontology,
@@ -328,7 +330,7 @@ impl RecursionLimitError {
     }
 }
 
-#[derive(Clone, Copy, Default, Debug)]
+#[derive(Clone, Copy, Default, OntolDebug)]
 pub struct SubProcessorContext {
     pub is_update: bool,
     pub parent_property_id: Option<PropertyId>,
@@ -359,7 +361,7 @@ impl<'on, 'p> Debug for SerdeProcessor<'on, 'p> {
         // This structure might contain cycles (through operator addr),
         // so just print the topmost level.
         f.debug_struct("SerdeProcessor")
-            .field("operator", self.value_operator)
+            .field("operator", &self.ontology.debug(self.value_operator))
             .field("rel_params_addr", &self.ctx.rel_params_addr)
             .finish()
     }

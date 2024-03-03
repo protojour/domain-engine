@@ -40,7 +40,10 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         rel_params: Option<&Value>,
         serializer: S,
     ) -> Res<S> {
-        trace!("serializing op={:?}", self.value_operator);
+        trace!(
+            "serializing op={:?}",
+            self.ontology.debug(self.value_operator)
+        );
 
         match (self.value_operator, self.scalar_format()) {
             (SerdeOperator::Unit, _) => {

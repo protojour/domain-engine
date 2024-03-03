@@ -296,7 +296,8 @@ impl InMemoryStore {
         ctx: &DbContext,
     ) -> DomainResult<()> {
         debug!(
-            "entity rel attribute: ({rel:?}, {val:?}). Data relationship: {data_relationship:?}"
+            "entity rel attribute: ({rel:?}, {val:?}). Data relationship: {data_relationship:?}",
+            data_relationship = ctx.ontology.debug(data_relationship)
         );
 
         fn write_mode_from_value(value: &Value) -> EdgeWriteMode {

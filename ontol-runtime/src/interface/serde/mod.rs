@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use ::serde::{Deserialize, Serialize};
 
-use crate::DefId;
+use crate::{impl_ontol_debug, DefId};
 
 use self::operator::{SerdeOperatorAddr, StructOperator};
 
@@ -56,6 +56,8 @@ impl Debug for SerdeDef {
         write!(f, "SerdeDef({:?}, {:?})", self.def_id, self.modifier)
     }
 }
+
+impl_ontol_debug!(SerdeDef);
 
 bitflags::bitflags! {
     /// Modifier for (de)serializers.

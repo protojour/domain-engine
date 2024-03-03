@@ -9,6 +9,7 @@ edition = "2021"
 doctest = false
 
 [dependencies]
+ontol-macros.path = "../ontol-macros"
 smartstring = { workspace = true, features = ["serde"] }
 smallvec = { workspace = true, features = ["serde"] }
 indexmap = { workspace = true, features = ["serde"] }

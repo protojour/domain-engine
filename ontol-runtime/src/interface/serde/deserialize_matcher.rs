@@ -1,6 +1,7 @@
 use std::{fmt::Display, ops::RangeInclusive};
 
 use fnv::FnvHashMap;
+use ontol_macros::OntolDebug;
 use serde::de::{value::StrDeserializer, DeserializeSeed};
 use tracing::error;
 
@@ -618,13 +619,13 @@ pub enum MapMatchResult<'on, 'p> {
     Indecisive(MapMatcher<'on, 'p>),
 }
 
-#[derive(Debug)]
+#[derive(OntolDebug)]
 pub struct MapMatch<'on> {
     pub mode: MapMatchMode<'on>,
     pub ctx: SubProcessorContext,
 }
 
-#[derive(Debug)]
+#[derive(OntolDebug)]
 pub enum MapMatchMode<'on> {
     Struct(&'on StructOperator),
     EntityId(DefId, &'on str, SerdeOperatorAddr),
@@ -743,7 +744,10 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
                         .match_attribute(property, value),
                     }
                 }
-                other => panic!("Matched discriminator is not a map type: {other:?}"),
+                other => panic!(
+                    "Matched discriminator is not a map type: {other:?}",
+                    other = self.ontology.debug(&other)
+                ),
             }
         });
 
@@ -769,7 +773,10 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
                             *addr,
                         ))
                     }
-                    other => panic!("Matched discriminator is not a map type: {other:?}"),
+                    other => panic!(
+                        "Matched discriminator is not a map type: {other:?}",
+                        other = self.ontology.debug(&other)
+                    ),
                 }
             }
         }

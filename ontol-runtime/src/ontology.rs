@@ -3,11 +3,13 @@ use std::{collections::HashMap, fmt::Debug, ops::Range};
 use ::serde::{Deserialize, Serialize};
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
+use ontol_macros::OntolDebug;
 use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
     config::PackageConfig,
+    debug::{self, OntolDebugCtx},
     interface::{
         serde::{
             operator::{SerdeOperator, SerdeOperatorAddr},
@@ -81,6 +83,10 @@ impl Ontology {
         writer: impl std::io::Write,
     ) -> Result<(), bincode::Error> {
         bincode::serialize_into(writer, self)
+    }
+
+    pub fn debug<'a, T: ?Sized>(&'a self, value: &'a T) -> debug::Debug<'a, &'a T> {
+        debug::Debug(self, value)
     }
 
     pub fn new_vm(&self, proc: Procedure) -> OntolVm<'_> {
@@ -200,6 +206,8 @@ impl Ontology {
     }
 }
 
+impl OntolDebugCtx for Ontology {}
+
 #[derive(Serialize, Deserialize)]
 pub struct OntolDomainMeta {
     pub bool: DefId,
@@ -289,7 +297,7 @@ impl Domain {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct TypeInfo {
     pub def_id: DefId,
     pub public: bool,
@@ -313,7 +321,7 @@ impl TypeInfo {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct EntityInfo {
     pub id_relationship_id: RelationshipId,
     pub id_value_def_id: DefId,
@@ -324,7 +332,7 @@ pub struct EntityInfo {
     pub id_value_generator: Option<ValueGenerator>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, OntolDebug)]
 pub struct DataRelationshipInfo {
     pub kind: DataRelationshipKind,
     pub subject_cardinality: Cardinality,
@@ -344,7 +352,7 @@ impl DataRelationshipInfo {
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Serialize, Deserialize, OntolDebug)]
 pub enum DataRelationshipKind {
     /// The relationship is between an entity and its identifier
     Id,
@@ -360,13 +368,13 @@ pub enum DataRelationshipKind {
     },
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, OntolDebug)]
 pub enum DataRelationshipSource {
     Inherent,
     ByUnionProxy,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, OntolDebug)]
 pub enum DataRelationshipTarget {
     Unambiguous(DefId),
     Union {
@@ -375,26 +383,26 @@ pub enum DataRelationshipTarget {
     },
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, OntolDebug)]
 pub struct MapMeta {
     pub procedure: Procedure,
     pub propflow_range: Range<u32>,
     pub lossiness: MapLossiness,
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, OntolDebug)]
 pub enum MapLossiness {
     Complete,
     Lossy,
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, OntolDebug, Debug)]
 pub struct PropertyFlow {
     pub id: PropertyId,
     pub data: PropertyFlowData,
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, OntolDebug, Debug)]
 pub enum PropertyFlowData {
     Type(DefId),
     Match(Var),
@@ -504,7 +512,9 @@ impl OntologyBuilder {
 
 pub type Cardinality = (PropertyCardinality, ValueCardinality);
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug, OntolDebug,
+)]
 pub enum PropertyCardinality {
     Optional,
     Mandatory,
@@ -520,7 +530,9 @@ impl PropertyCardinality {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, Debug, OntolDebug,
+)]
 pub enum ValueCardinality {
     One,
     Many,

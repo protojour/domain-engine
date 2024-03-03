@@ -2,6 +2,7 @@ use std::fmt::{Debug, Display};
 
 use ::serde::{Deserialize, Serialize};
 use bit_vec::BitVec;
+use ontol_macros::OntolDebug;
 use smartstring::alias::String;
 
 use crate::{
@@ -33,7 +34,7 @@ impl Lib {
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, OntolDebug)]
 pub struct Address(pub u32);
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -43,7 +44,7 @@ pub struct AddressOffset(pub u32);
 ///
 /// The VM is a stack machine, the arguments to the called procedure
 /// must be top of the stack when it's called.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, OntolDebug)]
 pub struct Procedure {
     /// 'Pointer' to the first OpCode
     pub address: Address,
@@ -52,7 +53,7 @@ pub struct Procedure {
 }
 
 /// The number of parameters to a procedure.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, OntolDebug)]
 pub struct NParams(pub u8);
 
 /// ONTOL opcode.

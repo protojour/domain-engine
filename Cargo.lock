@@ -1517,6 +1517,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ontol-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "ontol-parser"
 version = "0.1.0"
 dependencies = [
@@ -1540,6 +1549,7 @@ dependencies = [
  "fnv",
  "indexmap",
  "num",
+ "ontol-macros",
  "regex-automata 0.4.5",
  "serde",
  "serde-value",

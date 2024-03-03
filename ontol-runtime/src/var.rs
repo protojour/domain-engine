@@ -6,7 +6,10 @@ use std::{
 use bit_set::BitSet;
 use serde::{Deserialize, Serialize};
 
-use crate::format_utils::{try_alpha_to_u32, AsAlpha, DebugViaDisplay};
+use crate::{
+    format_utils::{try_alpha_to_u32, AsAlpha, DebugViaDisplay},
+    impl_ontol_debug,
+};
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct Var(pub u32);
@@ -38,17 +41,19 @@ impl FromStr for Var {
     }
 }
 
+impl Display for Var {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "${}", AsAlpha(self.0))
+    }
+}
+
 impl Debug for Var {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "${}", AsAlpha(self.0))
     }
 }
 
-impl Display for Var {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "${}", AsAlpha(self.0))
-    }
-}
+impl_ontol_debug!(Var);
 
 #[derive(Clone, Default, Eq, PartialEq)]
 pub struct VarSet(pub BitSet);

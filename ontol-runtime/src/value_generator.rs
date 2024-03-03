@@ -1,8 +1,8 @@
 use ::serde::{Deserialize, Serialize};
 
-use crate::vm::proc::Address;
+use crate::{impl_ontol_debug, vm::proc::Address};
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub enum ValueGenerator {
     DefaultProc(Address),
     Uuid,
@@ -10,3 +10,5 @@ pub enum ValueGenerator {
     CreatedAtTime,
     UpdatedAtTime,
 }
+
+impl_ontol_debug!(ValueGenerator);

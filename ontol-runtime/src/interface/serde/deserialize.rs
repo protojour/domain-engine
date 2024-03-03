@@ -37,7 +37,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         assert!(
             self.ctx.rel_params_addr.is_none(),
             "rel_params_addr should be None for {:?}",
-            self.value_operator
+            self.ontology.debug(self.value_operator)
         );
     }
 }
@@ -387,7 +387,10 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
             buffered_attrs.push((property, value));
         };
 
-        trace!("matched map: {map_match:?} buffered attrs: {buffered_attrs:?}");
+        trace!(
+            "matched map: {map_match:?} buffered attrs: {buffered_attrs:?}",
+            map_match = self.processor.ontology.debug(&map_match)
+        );
 
         // delegate to the real struct visitor
         match map_match.mode {
