@@ -7,6 +7,8 @@ use ontol_runtime::{
 };
 use smartstring::alias::String;
 
+use crate::strings::Strings;
+
 #[derive(Default)]
 pub struct GraphqlNamespace<'o> {
     rewrites: HashMap<String, String>,
@@ -34,55 +36,79 @@ impl<'o> GraphqlNamespace<'o> {
         self.rewrite(&string).into()
     }
 
-    pub fn typename(&mut self, type_info: &TypeInfo) -> String {
-        self.concat(&[&Typename(type_info)])
+    pub fn typename(&mut self, type_info: &TypeInfo, strings: &mut Strings) -> String {
+        self.concat(&[&Typename(type_info)], strings)
     }
 
-    pub fn connection(&mut self, rel_type_info: Option<&TypeInfo>, type_info: &TypeInfo) -> String {
+    pub fn connection(
+        &mut self,
+        rel_type_info: Option<&TypeInfo>,
+        type_info: &TypeInfo,
+        strings: &mut Strings,
+    ) -> String {
         if let Some(rel_type_info) = rel_type_info {
-            self.concat(&[
-                &Typename(rel_type_info),
-                &Typename(type_info),
-                &"Connection",
-            ])
+            self.concat(
+                &[
+                    &Typename(rel_type_info),
+                    &Typename(type_info),
+                    &"Connection",
+                ],
+                strings,
+            )
         } else {
-            self.concat(&[&Typename(type_info), &"Connection"])
+            self.concat(&[&Typename(type_info), &"Connection"], strings)
         }
     }
 
-    pub fn mutation_result(&mut self, type_info: &TypeInfo) -> String {
-        self.concat(&[&Typename(type_info), &"Mutation"])
+    pub fn mutation_result(&mut self, type_info: &TypeInfo, strings: &mut Strings) -> String {
+        self.concat(&[&Typename(type_info), &"Mutation"], strings)
     }
 
-    pub fn edge(&mut self, rel_type_info: Option<&TypeInfo>, type_info: &TypeInfo) -> String {
+    pub fn edge(
+        &mut self,
+        rel_type_info: Option<&TypeInfo>,
+        type_info: &TypeInfo,
+        strings: &mut Strings,
+    ) -> String {
         if let Some(rel_type_info) = rel_type_info {
-            self.concat(&[&Typename(rel_type_info), &Typename(type_info), &"Edge"])
+            self.concat(
+                &[&Typename(rel_type_info), &Typename(type_info), &"Edge"],
+                strings,
+            )
         } else {
-            self.concat(&[&Typename(type_info), &"Edge"])
+            self.concat(&[&Typename(type_info), &"Edge"], strings)
         }
     }
 
-    pub fn input(&mut self, type_info: &TypeInfo) -> String {
-        self.concat(&[&Typename(type_info), &"Input"])
+    pub fn input(&mut self, type_info: &TypeInfo, strings: &mut Strings) -> String {
+        self.concat(&[&Typename(type_info), &"Input"], strings)
     }
 
-    pub fn partial_input(&mut self, type_info: &TypeInfo) -> String {
-        self.concat(&[&Typename(type_info), &"PartialInput"])
+    pub fn partial_input(&mut self, type_info: &TypeInfo, strings: &mut Strings) -> String {
+        self.concat(&[&Typename(type_info), &"PartialInput"], strings)
     }
 
-    pub fn union_input(&mut self, type_info: &TypeInfo) -> String {
-        self.concat(&[&Typename(type_info), &"UnionInput"])
+    pub fn union_input(&mut self, type_info: &TypeInfo, strings: &mut Strings) -> String {
+        self.concat(&[&Typename(type_info), &"UnionInput"], strings)
     }
 
-    pub fn union_partial_input(&mut self, type_info: &TypeInfo) -> String {
-        self.concat(&[&Typename(type_info), &"UnionPartialInput"])
+    pub fn union_partial_input(&mut self, type_info: &TypeInfo, strings: &mut Strings) -> String {
+        self.concat(&[&Typename(type_info), &"UnionPartialInput"], strings)
     }
 
-    pub fn edge_input(&mut self, rel_type_info: Option<&TypeInfo>, type_info: &TypeInfo) -> String {
+    pub fn edge_input(
+        &mut self,
+        rel_type_info: Option<&TypeInfo>,
+        type_info: &TypeInfo,
+        strings: &mut Strings,
+    ) -> String {
         if let Some(rel_type_info) = rel_type_info {
-            self.concat(&[&Typename(rel_type_info), &Typename(type_info), &"EdgeInput"])
+            self.concat(
+                &[&Typename(rel_type_info), &Typename(type_info), &"EdgeInput"],
+                strings,
+            )
         } else {
-            self.concat(&[&Typename(type_info), &"EdgeInput"])
+            self.concat(&[&Typename(type_info), &"EdgeInput"], strings)
         }
     }
 
@@ -90,19 +116,23 @@ impl<'o> GraphqlNamespace<'o> {
         &mut self,
         rel_type_info: Option<&TypeInfo>,
         type_info: &TypeInfo,
+        strings: &mut Strings,
     ) -> String {
         if let Some(rel_type_info) = rel_type_info {
-            self.concat(&[
-                &Typename(rel_type_info),
-                &Typename(type_info),
-                &"PatchEdgesInput",
-            ])
+            self.concat(
+                &[
+                    &Typename(rel_type_info),
+                    &Typename(type_info),
+                    &"PatchEdgesInput",
+                ],
+                strings,
+            )
         } else {
-            self.concat(&[&Typename(type_info), &"PatchEdgesInput"])
+            self.concat(&[&Typename(type_info), &"PatchEdgesInput"], strings)
         }
     }
 
-    fn concat(&mut self, elements: &[&dyn ProcessName]) -> String {
+    fn concat(&mut self, elements: &[&dyn ProcessName], strings: &mut Strings) -> String {
         let mut output: String = "".into();
 
         if let Some(domain_disambiguation) = &self.domain_disambiguation {
@@ -112,7 +142,7 @@ impl<'o> GraphqlNamespace<'o> {
                     output.push('_');
                     if let Some(domain) = domain_disambiguation.ontology.find_domain(package_id) {
                         let domain_name =
-                            adapt_graphql_identifier(&domain.unique_name).into_adapted();
+                            adapt_graphql_identifier(&strings[domain.unique_name]).into_adapted();
                         output.push_str(&domain_name);
                     } else {
                         output.push_str(&format!("domain{}", package_id.0));

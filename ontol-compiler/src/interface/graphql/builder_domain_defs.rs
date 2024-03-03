@@ -55,7 +55,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 .into();
 
                 let node_operator_addr = self
-                    .serde_generator
+                    .serde_gen
                     .gen_addr_lazy(gql_serde_key(type_info.def_id))
                     .unwrap();
 
@@ -63,7 +63,11 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     let rel_type_info = self.partial_ontology.get_type_info(rel_def_id);
                     let rel_edge_ref = self.get_def_type_ref(rel_def_id, QLevel::Node);
 
-                    let typename = self.type_namespace.edge(Some(rel_type_info), type_info);
+                    let typename = self.type_namespace.edge(
+                        Some(rel_type_info),
+                        type_info,
+                        self.serde_gen.strings,
+                    );
 
                     self.lazy_tasks.push(LazyTask::HarvestFields {
                         type_addr: edge_addr,
@@ -75,10 +79,11 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         edge_addr,
                         TypeData {
                             typename,
-                            input_typename: Some(
-                                self.type_namespace
-                                    .edge_input(Some(rel_type_info), type_info),
-                            ),
+                            input_typename: Some(self.type_namespace.edge_input(
+                                Some(rel_type_info),
+                                type_info,
+                                self.serde_gen.strings,
+                            )),
                             partial_input_typename: None,
                             kind: TypeKind::Object(ObjectData {
                                 fields,
@@ -94,8 +99,16 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     NewType::Addr(
                         edge_addr,
                         TypeData {
-                            typename: self.type_namespace.edge(None, type_info),
-                            input_typename: Some(self.type_namespace.edge_input(None, type_info)),
+                            typename: self.type_namespace.edge(
+                                None,
+                                type_info,
+                                self.serde_gen.strings,
+                            ),
+                            input_typename: Some(self.type_namespace.edge_input(
+                                None,
+                                type_info,
+                                self.serde_gen.strings,
+                            )),
                             partial_input_typename: None,
                             kind: TypeKind::Object(ObjectData {
                                 fields,
@@ -123,11 +136,16 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 NewType::Addr(
                     connection_addr,
                     TypeData {
-                        typename: self.type_namespace.connection(rel_type_info, type_info),
-                        input_typename: Some(
-                            self.type_namespace
-                                .patch_edges_input(rel_type_info, type_info),
+                        typename: self.type_namespace.connection(
+                            rel_type_info,
+                            type_info,
+                            self.serde_gen.strings,
                         ),
+                        input_typename: Some(self.type_namespace.patch_edges_input(
+                            rel_type_info,
+                            type_info,
+                            self.serde_gen.strings,
+                        )),
                         partial_input_typename: None,
                         kind: TypeKind::Object(ObjectData {
                             fields: [
@@ -164,7 +182,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                                             modifier: TypeModifier::Unit(Optionality::Mandatory),
                                             unit: UnitTypeRef::NativeScalar(NativeScalarRef {
                                                 operator_addr: self
-                                                    .serde_generator
+                                                    .serde_gen
                                                     .gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
                                                         self.primitives.i64,
                                                         SerdeModifier::NONE,
@@ -190,7 +208,9 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 NewType::Addr(
                     addr,
                     TypeData {
-                        typename: self.type_namespace.mutation_result(type_info),
+                        typename: self
+                            .type_namespace
+                            .mutation_result(type_info, self.serde_gen.strings),
                         input_typename: None,
                         partial_input_typename: None,
                         kind: TypeKind::Object(ObjectData {
@@ -209,7 +229,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                                         field_type: TypeRef {
                                             unit: UnitTypeRef::NativeScalar(NativeScalarRef {
                                                 operator_addr: self
-                                                    .serde_generator
+                                                    .serde_gen
                                                     .gen_addr_lazy(gql_serde_key(
                                                         self.primitives.bool,
                                                     ))
@@ -234,7 +254,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         if self.relations.properties_by_def_id(def_id).is_none() {
             return NewType::NativeScalar(NativeScalarRef {
                 operator_addr: self
-                    .serde_generator
+                    .serde_gen
                     .gen_addr_lazy(gql_serde_key(DefId::unit()))
                     .unwrap(),
                 kind: NativeScalarKind::Unit,
@@ -248,10 +268,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 let type_info = self.partial_ontology.get_type_info(def_id);
                 let type_addr = self.alloc_def_type_addr(def_id, QLevel::Node);
 
-                let operator_addr = self
-                    .serde_generator
-                    .gen_addr_lazy(gql_serde_key(def_id))
-                    .unwrap();
+                let operator_addr = self.serde_gen.gen_addr_lazy(gql_serde_key(def_id)).unwrap();
 
                 self.lazy_tasks.push(LazyTask::HarvestFields {
                     type_addr,
@@ -274,9 +291,16 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 NewType::Addr(
                     type_addr,
                     TypeData {
-                        typename: self.type_namespace.typename(type_info),
-                        input_typename: Some(self.type_namespace.input(type_info)),
-                        partial_input_typename: Some(self.type_namespace.partial_input(type_info)),
+                        typename: self
+                            .type_namespace
+                            .typename(type_info, self.serde_gen.strings),
+                        input_typename: Some(
+                            self.type_namespace.input(type_info, self.serde_gen.strings),
+                        ),
+                        partial_input_typename: Some(
+                            self.type_namespace
+                                .partial_input(type_info, self.serde_gen.strings),
+                        ),
                         kind: type_kind,
                     },
                 )
@@ -306,18 +330,21 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     }
                 }
 
-                let operator_addr = self
-                    .serde_generator
-                    .gen_addr_lazy(gql_serde_key(def_id))
-                    .unwrap();
+                let operator_addr = self.serde_gen.gen_addr_lazy(gql_serde_key(def_id)).unwrap();
 
                 NewType::Addr(
                     node_index,
                     TypeData {
-                        typename: self.type_namespace.typename(type_info),
-                        input_typename: Some(self.type_namespace.union_input(type_info)),
+                        typename: self
+                            .type_namespace
+                            .typename(type_info, self.serde_gen.strings),
+                        input_typename: Some(
+                            self.type_namespace
+                                .union_input(type_info, self.serde_gen.strings),
+                        ),
                         partial_input_typename: Some(
-                            self.type_namespace.union_partial_input(type_info),
+                            self.type_namespace
+                                .union_partial_input(type_info, self.serde_gen.strings),
                         ),
                         kind: if needs_scalar {
                             TypeKind::CustomScalar(ScalarData { operator_addr })
@@ -333,18 +360,22 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             }
             ReprKind::Seq | ReprKind::Intersection(_) => {
                 let type_info = self.partial_ontology.get_type_info(def_id);
-                let operator_addr = self
-                    .serde_generator
-                    .gen_addr_lazy(gql_serde_key(def_id))
-                    .unwrap();
+                let operator_addr = self.serde_gen.gen_addr_lazy(gql_serde_key(def_id)).unwrap();
                 let type_addr = self.alloc_def_type_addr(def_id, QLevel::Node);
 
                 NewType::Addr(
                     type_addr,
                     TypeData {
-                        typename: self.type_namespace.typename(type_info),
-                        input_typename: Some(self.type_namespace.input(type_info)),
-                        partial_input_typename: Some(self.type_namespace.partial_input(type_info)),
+                        typename: self
+                            .type_namespace
+                            .typename(type_info, self.serde_gen.strings),
+                        input_typename: Some(
+                            self.type_namespace.input(type_info, self.serde_gen.strings),
+                        ),
+                        partial_input_typename: Some(
+                            self.type_namespace
+                                .partial_input(type_info, self.serde_gen.strings),
+                        ),
                         kind: TypeKind::CustomScalar(ScalarData { operator_addr }),
                     },
                 )
@@ -352,10 +383,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             ReprKind::Scalar(scalar_def_id, ReprScalarKind::I64(range), _) => {
                 if range.start() >= &i32::MIN.into() && range.end() <= &i32::MAX.into() {
                     NewType::NativeScalar(NativeScalarRef {
-                        operator_addr: self
-                            .serde_generator
-                            .gen_addr_lazy(gql_serde_key(def_id))
-                            .unwrap(),
+                        operator_addr: self.serde_gen.gen_addr_lazy(gql_serde_key(def_id)).unwrap(),
                         kind: NativeScalarKind::Int(*scalar_def_id),
                     })
                 } else {
@@ -371,7 +399,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                             partial_input_typename: None,
                             kind: TypeKind::CustomScalar(ScalarData {
                                 operator_addr: self
-                                    .serde_generator
+                                    .serde_gen
                                     .gen_addr_lazy(gql_serde_key(def_id))
                                     .unwrap(),
                             }),
@@ -382,23 +410,20 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             ReprKind::Scalar(def_id, ReprScalarKind::F64(_), _) => {
                 NewType::NativeScalar(NativeScalarRef {
                     operator_addr: self
-                        .serde_generator
+                        .serde_gen
                         .gen_addr_lazy(gql_serde_key(*def_id))
                         .unwrap(),
                     kind: NativeScalarKind::Number(*def_id),
                 })
             }
             ReprKind::Scalar(..) => {
-                let operator_addr = self
-                    .serde_generator
-                    .gen_addr_lazy(gql_serde_key(def_id))
-                    .unwrap();
+                let operator_addr = self.serde_gen.gen_addr_lazy(gql_serde_key(def_id)).unwrap();
 
                 NewType::NativeScalar(NativeScalarRef {
                     operator_addr,
                     kind: get_native_scalar_kind(
-                        self.serde_generator,
-                        self.serde_generator.get_operator(operator_addr),
+                        self.serde_gen,
+                        self.serde_gen.get_operator(operator_addr),
                     ),
                 })
             }
@@ -586,7 +611,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             )));
 
             let value_operator_addr = self
-                .serde_generator
+                .serde_gen
                 .gen_addr_lazy(gql_serde_key(value_def_id))
                 .unwrap();
 
@@ -603,7 +628,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     RelParams::Unit => QLevel::Node,
                     RelParams::Type(rel_def_id) => {
                         let operator_addr = self
-                            .serde_generator
+                            .serde_gen
                             .gen_addr_lazy(gql_serde_key(rel_def_id))
                             .unwrap();
 
@@ -632,7 +657,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     RelParams::Unit => None,
                     RelParams::Type(rel_def_id) => Some((
                         rel_def_id,
-                        self.serde_generator
+                        self.serde_gen
                             .gen_addr_lazy(gql_serde_key(rel_def_id))
                             .unwrap(),
                     )),
@@ -656,7 +681,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             let mut unit = self.get_def_type_ref(value_def_id, QLevel::Node);
 
             let value_operator_addr = self
-                .serde_generator
+                .serde_gen
                 .gen_addr_lazy(gql_array_serde_key(value_def_id))
                 .unwrap();
 

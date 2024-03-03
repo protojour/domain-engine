@@ -45,7 +45,7 @@ pub(super) struct SchemaBuilder<'a, 's, 'c, 'm> {
     /// The partial ontology containing TypeInfo (does not yet have SerdeOperators)
     pub partial_ontology: &'a Ontology,
     /// Serde generator for generating new serialization operators
-    pub serde_generator: &'a mut SerdeGenerator<'c, 'm>,
+    pub serde_gen: &'a mut SerdeGenerator<'c, 'm>,
     /// The compiler's relations
     pub relations: &'c Relations,
     /// The compiler's defs
@@ -180,7 +180,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         modifier: TypeModifier::Unit(Optionality::Optional),
                         unit: UnitTypeRef::NativeScalar(NativeScalarRef {
                             operator_addr: self
-                                .serde_generator
+                                .serde_gen
                                 .gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
                                     self.primitives.text,
                                     SerdeModifier::NONE,
@@ -199,7 +199,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         modifier: TypeModifier::Unit(Optionality::Mandatory),
                         unit: UnitTypeRef::NativeScalar(NativeScalarRef {
                             operator_addr: self
-                                .serde_generator
+                                .serde_gen
                                 .gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
                                     self.primitives.bool,
                                     SerdeModifier::NONE,
@@ -234,7 +234,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     modifier: TypeModifier::Unit(Optionality::Mandatory),
                     unit: UnitTypeRef::NativeScalar(NativeScalarRef {
                         operator_addr: self
-                            .serde_generator
+                            .serde_gen
                             .gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
                                 self.primitives.text,
                                 SerdeModifier::NONE,
@@ -297,10 +297,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             SerdeKey::Def(SerdeDef::new(map_key.input.def_id, serde_modifier))
         };
 
-        let input_operator_addr = self
-            .serde_generator
-            .gen_addr_greedy(input_serde_key)
-            .unwrap();
+        let input_operator_addr = self.serde_gen.gen_addr_greedy(input_serde_key).unwrap();
 
         let queries: FnvHashMap<PropertyId, Var> = prop_flow
             .iter()
@@ -313,14 +310,10 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             })
             .collect();
 
-        let input_arg = match self
-            .serde_generator
-            .seal_ctx
-            .get_repr_kind(&map_key.input.def_id)
-        {
+        let input_arg = match self.serde_gen.seal_ctx.get_repr_kind(&map_key.input.def_id) {
             Some(ReprKind::Scalar(..)) => {
                 let scalar_input_name: String =
-                    match self.serde_generator.defs.def_kind(map_key.input.def_id) {
+                    match self.serde_gen.defs.def_kind(map_key.input.def_id) {
                         DefKind::Type(type_def) => match type_def.ident {
                             Some(ident) => ident.into(),
                             None => return,
@@ -339,7 +332,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 let _unit_type_ref = self.get_def_type_ref(map_key.input.def_id, QLevel::Node);
                 let mut hidden = false;
 
-                let default_arg = match self.serde_generator.get_operator(input_operator_addr) {
+                let default_arg = match self.serde_gen.get_operator(input_operator_addr) {
                     SerdeOperator::Struct(struct_op) => {
                         hidden = struct_op.properties.is_empty();
 
@@ -420,7 +413,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         let _id_unit_type_ref = self.get_def_type_ref(entity_data.id_def_id, QLevel::Node);
 
         let entity_array_operator_addr = self
-            .serde_generator
+            .serde_gen
             .gen_addr_lazy(gql_array_serde_key(entity_data.node_def_id))
             .unwrap();
 
@@ -454,7 +447,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         object_data_mut(self.schema.mutation, self.schema)
             .fields
             .insert(
-                mutation_namespace.typename(type_info),
+                mutation_namespace.typename(type_info, self.serde_gen.strings),
                 FieldData {
                     kind: FieldKind::EntityMutation {
                         def_id: type_info.def_id,
@@ -476,7 +469,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                             argument::EntityDeleteInputsArg {
                                 def_id: entity_data.id_def_id,
                                 operator_addr: self
-                                    .serde_generator
+                                    .serde_gen
                                     .gen_addr_lazy(gql_array_serde_key(entity_data.id_def_id))
                                     .unwrap(),
                             },

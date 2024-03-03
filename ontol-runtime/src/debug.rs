@@ -6,11 +6,15 @@ use std::{
 use indexmap::IndexMap;
 use smallvec::SmallVec;
 
+use crate::text::TextConstant;
+
 pub trait OntolDebug {
-    fn fmt(&self, c: &dyn OntolDebugCtx, f: &mut Formatter<'_>) -> Result;
+    fn fmt(&self, ctx: &dyn OntolDebugCtx, f: &mut Formatter<'_>) -> Result;
 }
 
-pub trait OntolDebugCtx {}
+pub trait OntolDebugCtx {
+    fn debug_text_constant(&self, constant: TextConstant, f: &mut Formatter<'_>) -> Result;
+}
 
 pub struct Debug<'on, T>(pub &'on dyn OntolDebugCtx, pub T);
 

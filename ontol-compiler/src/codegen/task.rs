@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Debug};
+use std::fmt::Debug;
 
 use fnv::FnvHashMap;
 use indexmap::{map::Entry, IndexMap};
@@ -7,10 +7,10 @@ use ontol_runtime::{
     format_utils::DebugViaDisplay,
     ontology::{MapLossiness, PropertyFlow},
     smart_format,
+    text::TextConstant,
     vm::proc::{Address, Lib, Procedure},
     DefId, MapFlags, MapKey, PackageId,
 };
-use smartstring::alias::String;
 use tracing::{debug, debug_span};
 
 use crate::{
@@ -33,7 +33,7 @@ pub struct CodegenTasks<'m> {
     pub result_lib: Lib,
     pub result_const_procs: FnvHashMap<DefId, Procedure>,
     pub result_map_proc_table: FnvHashMap<MapKey, Procedure>,
-    pub result_named_forward_maps: HashMap<(PackageId, String), MapKey>,
+    pub result_named_forward_maps: FnvHashMap<(PackageId, TextConstant), MapKey>,
     pub result_propflow_table: FnvHashMap<MapKey, Vec<PropertyFlow>>,
     pub result_metadata_table: FnvHashMap<MapKey, MapOutputMeta>,
 }
@@ -108,7 +108,7 @@ pub(super) struct ProcTable {
     pub procedure_calls: Vec<ProcedureCall>,
     pub propflow_table: FnvHashMap<MapKey, Vec<PropertyFlow>>,
     pub metadata_table: FnvHashMap<MapKey, MapOutputMeta>,
-    pub named_forward_maps: HashMap<(PackageId, String), MapKey>,
+    pub named_forward_maps: FnvHashMap<(PackageId, TextConstant), MapKey>,
 }
 
 pub struct MapOutputMeta {
@@ -201,9 +201,10 @@ fn generate_explicit_map<'m>(
 
     match (compiler.map_ident(def_id), forward_key) {
         (Some(ident), Some(forward_key)) => {
+            let ident_constant = compiler.strings.intern_constant(ident);
             proc_table
                 .named_forward_maps
-                .insert((def_id.package_id(), ident.into()), forward_key);
+                .insert((def_id.package_id(), ident_constant), forward_key);
         }
         (Some(_), None) => {
             compiler.errors.push(SpannedCompileError {

@@ -14,6 +14,7 @@ pub mod ontology;
 pub mod resolve_path;
 pub mod select;
 pub mod sequence;
+pub mod text;
 pub mod text_like_types;
 pub mod text_pattern;
 pub mod value;

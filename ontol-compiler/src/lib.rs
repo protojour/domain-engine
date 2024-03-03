@@ -2,6 +2,7 @@
 
 use std::{
     collections::{BTreeSet, HashMap},
+    ops::Index,
     sync::Arc,
 };
 
@@ -29,6 +30,7 @@ use ontol_runtime::{
         DataRelationshipInfo, DataRelationshipKind, DataRelationshipSource, DataRelationshipTarget,
         Domain, EntityInfo, MapLossiness, MapMeta, OntolDomainMeta, Ontology, TypeInfo,
     },
+    text::TextConstant,
     value::PropertyId,
     DefId, PackageId,
 };
@@ -79,7 +81,7 @@ pub struct Compiler<'m> {
     pub sources: Sources,
 
     pub(crate) packages: Packages,
-    pub(crate) package_names: Vec<(PackageId, Arc<String>)>,
+    pub(crate) package_names: Vec<(PackageId, TextConstant)>,
 
     pub(crate) namespaces: Namespaces<'m>,
     pub(crate) defs: Defs<'m>,
@@ -212,7 +214,7 @@ impl<'m> Compiler<'m> {
         self.seal_domain(package.package_id);
 
         self.package_names
-            .push((package.package_id, src.name.clone()));
+            .push((package.package_id, self.strings.intern_constant(&src.name)));
 
         self.check_error()
     }
@@ -264,7 +266,8 @@ impl<'m> Compiler<'m> {
             UnionMemberCache { cache }
         };
 
-        let mut serde_generator = self.serde_generator(&union_member_cache);
+        let mut strings = self.strings.detach();
+        let mut serde_generator = self.serde_generator(&mut strings, &union_member_cache);
         let mut builder = Ontology::builder();
 
         let dynamic_sequence_operator_addr = serde_generator.make_dynamic_sequence_addr();
@@ -278,10 +281,10 @@ impl<'m> Compiler<'m> {
 
         // For now, create serde operators for every domain
         for package_id in package_ids.iter().cloned() {
-            let domain_name = unique_domain_names
+            let domain_name = *unique_domain_names
                 .get(&package_id)
                 .expect("Anonymous domain");
-            let mut domain = Domain::new(domain_name.into());
+            let mut domain = Domain::new(domain_name);
 
             let namespace = namespaces.remove(&package_id).unwrap();
             let type_namespace = namespace.types;
@@ -396,6 +399,7 @@ impl<'m> Compiler<'m> {
             .collect();
 
         builder
+            .text_constants(strings.make_text_constants())
             .ontol_domain_meta(OntolDomainMeta {
                 bool: self.primitives.bool,
                 i64: self.primitives.i64,
@@ -670,16 +674,19 @@ impl<'m> Compiler<'m> {
         }
     }
 
-    fn unique_domain_names(&self) -> FnvHashMap<PackageId, String> {
-        let mut map: HashMap<String, PackageId> = HashMap::new();
-        map.insert("ontol".into(), ONTOL_PKG);
+    fn unique_domain_names(&self) -> FnvHashMap<PackageId, TextConstant> {
+        let mut map: HashMap<TextConstant, PackageId> = HashMap::new();
+        map.insert(self.strings.get_constant("ontol").unwrap(), ONTOL_PKG);
 
-        for (package_id, name) in &self.package_names {
-            if map.contains_key(name.as_ref()) {
-                todo!("Two distinct domains are called `{name}`. This is not handled yet");
+        for (package_id, name) in self.package_names.iter().cloned() {
+            if map.contains_key(&name) {
+                todo!(
+                    "Two distinct domains are called `{name}`. This is not handled yet",
+                    name = &self[name]
+                );
             }
 
-            map.insert(name.as_ref().clone(), *package_id);
+            map.insert(name, package_id);
         }
 
         // invert
@@ -719,5 +726,13 @@ impl<'m> AsRef<DefTypes<'m>> for Compiler<'m> {
 impl<'m> AsRef<Relations> for Compiler<'m> {
     fn as_ref(&self) -> &Relations {
         &self.relations
+    }
+}
+
+impl<'m> Index<TextConstant> for Compiler<'m> {
+    type Output = str;
+
+    fn index(&self, index: TextConstant) -> &Self::Output {
+        &self.strings[index]
     }
 }

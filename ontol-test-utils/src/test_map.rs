@@ -135,7 +135,7 @@ impl<'on, 'p> TestMapper<'on, 'p> {
         let key = self
             .test
             .ontology
-            .get_named_forward_map_meta(package_id, name)
+            .find_named_forward_map_meta(package_id, name)
             .unwrap();
 
         let input_binding = TypeBinding::from_def_id(key.input.def_id, &self.test.ontology);

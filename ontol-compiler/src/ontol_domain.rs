@@ -18,6 +18,7 @@ use crate::{
 
 impl<'m> Compiler<'m> {
     pub fn with_ontol(mut self) -> Self {
+        self.strings.intern_constant("ontol");
         self.define_package(self.primitives.ontol_domain);
 
         // fundamental types

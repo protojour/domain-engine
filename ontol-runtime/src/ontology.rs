@@ -1,4 +1,7 @@
-use std::{collections::HashMap, fmt::Debug, ops::Range};
+use std::{
+    fmt::Debug,
+    ops::{Index, Range},
+};
 
 use ::serde::{Deserialize, Serialize};
 use fnv::FnvHashMap;
@@ -17,6 +20,7 @@ use crate::{
         },
         DomainInterface,
     },
+    text::TextConstant,
     text_like_types::TextLikeType,
     text_pattern::TextPattern,
     value::PropertyId,
@@ -33,9 +37,10 @@ use crate::{
 ///
 #[derive(Serialize, Deserialize)]
 pub struct Ontology {
+    pub(crate) text_constants: Vec<std::string::String>,
     pub(crate) const_proc_table: FnvHashMap<DefId, Procedure>,
     pub(crate) map_meta_table: FnvHashMap<MapKey, MapMeta>,
-    pub(crate) named_forward_maps: HashMap<(PackageId, String), MapKey>,
+    pub(crate) named_forward_maps: FnvHashMap<(PackageId, TextConstant), MapKey>,
     pub(crate) text_like_types: FnvHashMap<DefId, TextLikeType>,
     pub(crate) text_patterns: FnvHashMap<DefId, TextPattern>,
     pub(crate) lib: Lib,
@@ -55,6 +60,7 @@ impl Ontology {
     pub fn builder() -> OntologyBuilder {
         OntologyBuilder {
             ontology: Self {
+                text_constants: vec![],
                 const_proc_table: Default::default(),
                 map_meta_table: Default::default(),
                 named_forward_maps: Default::default(),
@@ -154,14 +160,6 @@ impl Ontology {
         self.map_meta_table.get(key)
     }
 
-    /// This primarily exists for testing only.
-    /// TODO: Find some solution for avoiding having this in ontology
-    pub fn get_named_forward_map_meta(&self, package_id: PackageId, name: &str) -> Option<MapKey> {
-        self.named_forward_maps
-            .get(&(package_id, name.into()))
-            .cloned()
-    }
-
     pub fn get_prop_flow_slice(&self, map_meta: &MapMeta) -> &[PropertyFlow] {
         let range = &map_meta.propflow_range;
         &self.property_flows[range.start as usize..range.end as usize]
@@ -204,9 +202,44 @@ impl Ontology {
     pub fn get_value_generator(&self, relationship_id: RelationshipId) -> Option<&ValueGenerator> {
         self.value_generators.get(&relationship_id)
     }
+
+    /// Find a text constant given its string representation.
+    /// NOTE: This intentionally has linear search complexity.
+    /// It's only use case should be testing.
+    pub fn find_text_constant(&self, str: &str) -> Option<TextConstant> {
+        self.text_constants
+            .iter()
+            .enumerate()
+            .find(|(_, string)| *string == str)
+            .map(|(index, _)| TextConstant(index as u32))
+    }
+
+    /// This primarily exists for testing only.
+    pub fn find_named_forward_map_meta(&self, package_id: PackageId, name: &str) -> Option<MapKey> {
+        let text_constant = self.find_text_constant(name)?;
+        self.named_forward_maps
+            .get(&(package_id, text_constant))
+            .cloned()
+    }
 }
 
-impl OntolDebugCtx for Ontology {}
+impl Index<TextConstant> for Ontology {
+    type Output = str;
+
+    fn index(&self, index: TextConstant) -> &Self::Output {
+        &self.text_constants[index.0 as usize]
+    }
+}
+
+impl OntolDebugCtx for Ontology {
+    fn debug_text_constant(
+        &self,
+        constant: crate::text::TextConstant,
+        f: &mut std::fmt::Formatter<'_>,
+    ) -> std::fmt::Result {
+        write!(f, "{constant:?}")
+    }
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct OntolDomainMeta {
@@ -240,7 +273,7 @@ impl Default for OntolDomainMeta {
 
 #[derive(Serialize, Deserialize)]
 pub struct Domain {
-    pub unique_name: String,
+    pub unique_name: TextConstant,
 
     /// Map that stores types in insertion/definition order
     pub type_names: IndexMap<String, DefId>,
@@ -250,7 +283,7 @@ pub struct Domain {
 }
 
 impl Domain {
-    pub fn new(unique_name: String) -> Self {
+    pub fn new(unique_name: TextConstant) -> Self {
         Self {
             unique_name,
             type_names: Default::default(),
@@ -431,6 +464,11 @@ impl OntologyBuilder {
             .insert(package_id, config);
     }
 
+    pub fn text_constants(mut self, text_constants: Vec<std::string::String>) -> Self {
+        self.ontology.text_constants = text_constants;
+        self
+    }
+
     pub fn ontol_domain_meta(mut self, meta: OntolDomainMeta) -> Self {
         self.ontology.ontol_domain_meta = meta;
         self
@@ -466,7 +504,7 @@ impl OntologyBuilder {
 
     pub fn named_forward_maps(
         mut self,
-        named_forward_maps: HashMap<(PackageId, String), MapKey>,
+        named_forward_maps: FnvHashMap<(PackageId, TextConstant), MapKey>,
     ) -> Self {
         self.ontology.named_forward_maps = named_forward_maps;
         self

@@ -31,6 +31,7 @@ use crate::{
     primitive::{PrimitiveKind, Primitives},
     relation::{Constructor, Properties, Relations, UnionMemberCache},
     repr::repr_model::{ReprKind, ReprScalarKind},
+    strings::Strings,
     text_patterns::{TextPatternSegment, TextPatterns},
     type_check::seal::SealCtx,
     types::{DefTypes, Type, TypeRef},
@@ -38,6 +39,7 @@ use crate::{
 };
 
 pub struct SerdeGenerator<'c, 'm> {
+    pub strings: &'c mut Strings<'m>,
     pub defs: &'c Defs<'m>,
     pub primitives: &'c Primitives,
     pub def_types: &'c DefTypes<'m>,

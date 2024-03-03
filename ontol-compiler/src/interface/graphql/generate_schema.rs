@@ -67,7 +67,7 @@ pub fn generate_graphql_schema<'c>(
             schema: &mut schema,
             type_namespace: &mut namespace,
             partial_ontology,
-            serde_generator,
+            serde_gen: serde_generator,
             relations,
             defs,
             primitives,
@@ -111,9 +111,11 @@ pub fn generate_graphql_schema<'c>(
     if let Some(map_namespace) = map_namespace {
         // Register named maps in the user-specified order (using the IndexMap from the namespace)
         for name in map_namespace.keys() {
+            let name_constant = builder.serde_gen.strings.intern_constant(name);
+
             if let Some(map_key) = codegen_tasks
                 .result_named_forward_maps
-                .get(&(package_id, (*name).into()))
+                .get(&(package_id, name_constant))
             {
                 let prop_flow = codegen_tasks.result_propflow_table.get(map_key).unwrap();
 
