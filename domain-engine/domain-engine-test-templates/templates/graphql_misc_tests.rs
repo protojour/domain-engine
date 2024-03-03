@@ -377,8 +377,9 @@ async fn test_gitmesh_misc() {
             }
         }"#
         .exec([], &schema, &ctx)
-        .await,
-        expected = Ok(graphql_value!({
+        .await
+        .unordered(),
+        expected = Ok(graphql_value_unordered!({
             "repositories": {
                 "nodes": [
                     {
