@@ -35,6 +35,7 @@ use ontol_runtime::{
         Ontology, TypeInfo, TypeKind,
     },
     text::TextConstant,
+    text_like_types::TextLikeType,
     value::PropertyId,
     DefId, PackageId,
 };
@@ -350,7 +351,6 @@ impl<'m> Compiler<'m> {
             for type_def_id in namespace.anonymous {
                 domain.add_type(TypeInfo {
                     def_id: type_def_id,
-                    kind: self.defs.def_kind(type_def_id).as_type_kind(),
                     public: false,
                     kind: self
                         .defs

@@ -328,7 +328,6 @@ impl Domain {
         let new_size = std::cmp::max(self.info.len(), index + 1);
         self.info.resize_with(new_size, || TypeInfo {
             def_id: DefId(type_info.def_id.0, 0),
-            kind: TypeKind::Data,
             public: false,
             kind: TypeKind::Data(BasicTypeInfo { name: None }),
             operator_addr: None,
@@ -350,7 +349,6 @@ pub struct TypeInfo {
     pub def_id: DefId,
     pub kind: TypeKind,
     pub public: bool,
-    pub kind: TypeKind,
     /// The SerdeOperatorAddr used for JSON.
     /// FIXME: This should really be connected to a DomainInterface.
     pub operator_addr: Option<SerdeOperatorAddr>,
