@@ -1,9 +1,14 @@
 use std::{collections::HashMap, fmt::Debug, ops::Index};
 
+use arcstr::ArcStr;
 use ontol_runtime::text::TextConstant;
 
 use crate::mem::Mem;
 
+/// TODO: Might not need to use the bump allocator,
+/// could use owned ArcStr values instead.
+///
+/// Many compiler types should switch to storing TextConstant (index) anyway
 pub struct Strings<'m> {
     mem: &'m Mem,
     table: HashMap<&'m str, Option<TextConstant>>,
@@ -33,10 +38,10 @@ impl<'m> Strings<'m> {
         }
     }
 
-    pub fn make_text_constants(self) -> Vec<std::string::String> {
+    pub fn make_text_constants(self) -> Vec<ArcStr> {
         self.constants
             .iter()
-            .map(|str| std::string::String::from(*str))
+            .map(|str| ArcStr::from(*str))
             .collect()
     }
 

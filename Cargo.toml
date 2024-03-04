@@ -44,6 +44,7 @@ either = "1"
 bit-set = "0.5"
 thin-vec = { version = "0.2", features = ["serde"] }
 regex-automata = "0.4"
+arcstr = { version = "1", features = ["serde"] }
 
 [profile.release]
 strip = true

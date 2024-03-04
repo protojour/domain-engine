@@ -4,6 +4,7 @@ use std::{
 };
 
 use ::serde::{Deserialize, Serialize};
+use arcstr::ArcStr;
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_macros::OntolDebug;
@@ -12,7 +13,7 @@ use tracing::debug;
 
 use crate::{
     config::PackageConfig,
-    debug::{self, OntolDebugCtx},
+    debug::{self, OntolFormatter},
     interface::{
         serde::{
             operator::{SerdeOperator, SerdeOperatorAddr},
@@ -37,7 +38,6 @@ use crate::{
 ///
 #[derive(Serialize, Deserialize)]
 pub struct Ontology {
-    pub(crate) text_constants: Vec<std::string::String>,
     pub(crate) const_proc_table: FnvHashMap<DefId, Procedure>,
     pub(crate) map_meta_table: FnvHashMap<MapKey, MapMeta>,
     pub(crate) named_forward_maps: FnvHashMap<(PackageId, TextConstant), MapKey>,
@@ -45,6 +45,10 @@ pub struct Ontology {
     pub(crate) text_patterns: FnvHashMap<DefId, TextPattern>,
     pub(crate) lib: Lib,
     pub(crate) ontol_domain_meta: OntolDomainMeta,
+
+    /// The text constants are stored using ArcStr because it's only one word wide,
+    /// (length is stored on the heap) and which makes the vector as dense as possible:
+    text_constants: Vec<ArcStr>,
 
     domain_table: FnvHashMap<PackageId, Domain>,
     domain_interfaces: FnvHashMap<PackageId, Vec<DomainInterface>>,
@@ -91,8 +95,8 @@ impl Ontology {
         bincode::serialize_into(writer, self)
     }
 
-    pub fn debug<'a, T: ?Sized>(&'a self, value: &'a T) -> debug::Debug<'a, &'a T> {
-        debug::Debug(self, value)
+    pub fn debug<'a, T: ?Sized>(&'a self, value: &'a T) -> debug::Fmt<'a, &'a T> {
+        debug::Fmt(self, value)
     }
 
     pub fn new_vm(&self, proc: Procedure) -> OntolVm<'_> {
@@ -170,7 +174,7 @@ impl Ontology {
             debug!(
                 "get_mapper_proc ({:?}) => {:?}",
                 key.def_ids(),
-                map_info.procedure
+                self.debug(&map_info.procedure)
             );
             map_info.procedure
         })
@@ -210,7 +214,7 @@ impl Ontology {
         self.text_constants
             .iter()
             .enumerate()
-            .find(|(_, string)| *string == str)
+            .find(|(_, arcstr)| arcstr.as_str() == str)
             .map(|(index, _)| TextConstant(index as u32))
     }
 
@@ -231,13 +235,13 @@ impl Index<TextConstant> for Ontology {
     }
 }
 
-impl OntolDebugCtx for Ontology {
-    fn debug_text_constant(
+impl OntolFormatter for Ontology {
+    fn fmt_text_constant(
         &self,
         constant: crate::text::TextConstant,
         f: &mut std::fmt::Formatter<'_>,
     ) -> std::fmt::Result {
-        write!(f, "{constant:?}")
+        write!(f, "{str:?}", str = &self[constant])
     }
 }
 
@@ -494,7 +498,7 @@ impl OntologyBuilder {
             .insert(package_id, config);
     }
 
-    pub fn text_constants(mut self, text_constants: Vec<std::string::String>) -> Self {
+    pub fn text_constants(mut self, text_constants: Vec<ArcStr>) -> Self {
         self.ontology.text_constants = text_constants;
         self
     }

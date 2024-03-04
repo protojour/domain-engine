@@ -9,9 +9,9 @@ pub struct TextConstant(pub u32);
 impl OntolDebug for TextConstant {
     fn fmt(
         &self,
-        ctx: &dyn crate::debug::OntolDebugCtx,
+        ontol_fmt: &dyn crate::debug::OntolFormatter,
         f: &mut std::fmt::Formatter<'_>,
     ) -> std::fmt::Result {
-        ctx.debug_text_constant(*self, f)
+        ontol_fmt.fmt_text_constant(*self, f)
     }
 }

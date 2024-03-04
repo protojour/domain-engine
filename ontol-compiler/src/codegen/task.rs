@@ -15,8 +15,8 @@ use tracing::{debug, debug_span};
 
 use crate::{
     codegen::code_generator::map_codegen, def::DefKind, hir_unify::unify_to_function,
-    map::UndirectedMapKey, typed_hir::TypedRootNode, types::Type, CompileError, CompileErrors,
-    Compiler, SourceSpan, SpannedCompileError,
+    map::UndirectedMapKey, typed_hir::TypedRootNode, types::Type, CompileError, Compiler,
+    SourceSpan, SpannedCompileError,
 };
 
 use super::{
@@ -158,9 +158,7 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
 
     for ConstCodegenTask { def_id, node } in std::mem::take(&mut compiler.codegen_tasks.const_tasks)
     {
-        let mut errors = CompileErrors::default();
-        const_codegen(node, def_id, &mut proc_table, compiler, &mut errors);
-        compiler.errors.extend(errors);
+        const_codegen(node, def_id, &mut proc_table, compiler);
     }
 
     for task in explicit_map_tasks {
@@ -272,9 +270,7 @@ fn generate_map_proc<'m>(
 
     debug!("body type: {:?}", func.body.data().ty());
 
-    let mut errors = CompileErrors::default();
-    let key = map_codegen(proc_table, &func, map_flags, compiler, &mut errors);
-    compiler.errors.extend(errors);
+    let key = map_codegen(proc_table, &func, map_flags, compiler);
 
     Some(key)
 }

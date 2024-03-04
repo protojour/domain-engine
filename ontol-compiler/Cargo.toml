@@ -9,6 +9,7 @@ edition = "2021"
 doctest = false
 
 [dependencies]
+ontol-macros.path = "../ontol-macros"
 ontol-hir.path = "../ontol-hir"
 ontol-runtime.path = "../ontol-runtime"
 ontol-parser.path = "../ontol-parser"
@@ -24,6 +25,7 @@ either.workspace = true
 bit-set.workspace = true
 thin-vec.workspace = true
 regex-automata.workspace = true
+arcstr.workspace = true
 ena = "0.14"
 bumpalo = "3"
 regex-syntax = "0.8"

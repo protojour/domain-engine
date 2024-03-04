@@ -12,6 +12,7 @@ use crate::{
     condition::{Clause, ClausePair, CondTerm},
     ontology::{Ontology, ValueCardinality},
     sequence::Sequence,
+    text::TextConstant,
     value::{Attribute, PropertyId, Value, ValueDebug},
     var::Var,
     vm::proc::{BuiltinProc, Local, Procedure},
@@ -51,7 +52,9 @@ impl<'o> OntolVm<'o> {
         self.processor.stack.extend(params);
 
         let result = if tracing::enabled!(Level::TRACE) {
-            self.abstract_vm.run(&mut self.processor, &mut Tracer)?
+            let ontology = self.processor.ontology;
+            self.abstract_vm
+                .run(&mut self.processor, &mut Tracer { ontology })?
         } else {
             self.abstract_vm.run(&mut self.processor, &mut ())?
         };
@@ -224,8 +227,9 @@ impl<'o> Processor for OntolProcessor<'o> {
     }
 
     #[inline(always)]
-    fn push_string(&mut self, k: &str, result_type: DefId) {
-        self.stack.push(Value::Text(k.into(), result_type));
+    fn push_string(&mut self, k: TextConstant, result_type: DefId) {
+        let str = &self.ontology[k];
+        self.stack.push(Value::Text(str.into(), result_type));
     }
 
     #[inline(always)]
@@ -532,16 +536,18 @@ impl<'o> OntolProcessor<'o> {
     }
 }
 
-struct Tracer;
+struct Tracer<'on> {
+    ontology: &'on Ontology,
+}
 
-impl<'o> VmDebug<OntolProcessor<'o>> for Tracer {
+impl<'on> VmDebug<OntolProcessor<'on>> for Tracer<'on> {
     fn tick(&mut self, vm: &AbstractVm<OntolProcessor>, stack: &OntolProcessor) {
         if tracing::enabled!(Level::TRACE) {
             for (index, value) in stack.stack.iter().enumerate() {
                 trace!("    L{index}: {}", ValueDebug(value));
             }
         }
-        trace!("{:?}", vm.pending_opcode());
+        trace!("{:?}", self.ontology.debug(&vm.pending_opcode()));
     }
 }
 

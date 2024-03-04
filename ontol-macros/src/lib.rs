@@ -42,7 +42,7 @@ pub fn derive_ontol_debug(input: TokenStream) -> TokenStream {
 
     let output = quote! {
         impl #impl_generics ontol_runtime::debug::OntolDebug for #ident #ty_generics #where_clause {
-            fn fmt(&self, __ctx: &dyn ontol_runtime::debug::OntolDebugCtx, __fmt: &mut core::fmt::Formatter) -> core::fmt::Result {
+            fn fmt(&self, __ofmt: &dyn ontol_runtime::debug::OntolFormatter, __fmt: &mut core::fmt::Formatter) -> core::fmt::Result {
                 #body
             }
         }
@@ -93,7 +93,7 @@ mod ontol_debug {
                     let ident = named.ident.as_ref().unwrap();
                     let lit = ident_lit(ident);
                     quote! {
-                        .field(#lit, &ontol_runtime::debug::Debug(__ctx, #ident))
+                        .field(#lit, &ontol_runtime::debug::Fmt(__ofmt, #ident))
                     }
                 });
 
@@ -105,7 +105,7 @@ mod ontol_debug {
                 let fields = unnamed.unnamed.iter().enumerate().map(|(index, _)| {
                     let ident = quote::format_ident!("f{index}");
                     quote! {
-                        .field(&ontol_runtime::debug::Debug(__ctx, #ident))
+                        .field(&ontol_runtime::debug::Fmt(__ofmt, #ident))
                     }
                 });
 

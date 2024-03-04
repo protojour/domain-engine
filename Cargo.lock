@@ -116,6 +116,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5ad32ce52e4161730f7098c077cd2ed6229b5804ccf99e5366be1ab72a98b4e1"
 
 [[package]]
+name = "arcstr"
+version = "1.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f907281554a3d0312bb7aab855a8e0ef6cbf1614d06de54105039ca8b34460e"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "ariadne"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1432,6 +1441,7 @@ dependencies = [
 name = "ontol-compiler"
 version = "0.1.0"
 dependencies = [
+ "arcstr",
  "assert_matches",
  "bit-set",
  "bumpalo",
@@ -1444,6 +1454,7 @@ dependencies = [
  "indexmap",
  "indoc",
  "ontol-hir",
+ "ontol-macros",
  "ontol-parser",
  "ontol-runtime",
  "ontol-test-utils",
@@ -1541,6 +1552,7 @@ dependencies = [
 name = "ontol-runtime"
 version = "0.1.0"
 dependencies = [
+ "arcstr",
  "bincode",
  "bit-set",
  "bit-vec",

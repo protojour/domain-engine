@@ -8,17 +8,35 @@ use smallvec::SmallVec;
 
 use crate::text::TextConstant;
 
+/// A debug trait that has access to a [OntolFormatter]
+///
+/// This trait can be derived using [ontol_macros].
 pub trait OntolDebug {
-    fn fmt(&self, ctx: &dyn OntolDebugCtx, f: &mut Formatter<'_>) -> Result;
+    fn fmt(&self, ctx: &dyn OntolFormatter, f: &mut Formatter<'_>) -> Result;
 }
 
-pub trait OntolDebugCtx {
-    fn debug_text_constant(&self, constant: TextConstant, f: &mut Formatter<'_>) -> Result;
+/// A debugging context for [OntolDebug].
+///
+/// Its purpose is to debug various deduplicated types that uses some kind of lookup index that can be resolved using the context.
+pub trait OntolFormatter {
+    fn fmt_text_constant(&self, constant: TextConstant, f: &mut Formatter<'_>) -> Result;
 }
 
-pub struct Debug<'on, T>(pub &'on dyn OntolDebugCtx, pub T);
+/// A type that combines type T with an [OntolFormatter].
+///
+/// This type implements [Debug], and can use the ontol formatter.
+pub struct Fmt<'on, T>(pub &'on dyn OntolFormatter, pub T);
 
-impl<'on, T: ?Sized> std::fmt::Debug for Debug<'on, &'on T>
+/// A type that provides [Debug] for [OntolDebug] T's, but uses a dummy [OntolFormatter].
+pub struct NoFmt<T>(pub T);
+
+impl OntolFormatter for () {
+    fn fmt_text_constant(&self, constant: TextConstant, f: &mut Formatter<'_>) -> Result {
+        write!(f, "{constant:?}")
+    }
+}
+
+impl<'on, T: ?Sized> std::fmt::Debug for Fmt<'on, &'on T>
 where
     T: OntolDebug,
 {
@@ -27,16 +45,23 @@ where
     }
 }
 
+impl<T: OntolDebug> std::fmt::Debug for NoFmt<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        <T as OntolDebug>::fmt(&self.0, &(), f)
+    }
+}
+
+/// Shorthand macro for implementing [OntolDebug] for a type that already implements [Debug].
 #[macro_export]
 macro_rules! impl_ontol_debug {
     ($t:path) => {
         impl $crate::debug::OntolDebug for $t {
             fn fmt(
                 &self,
-                _: &dyn $crate::debug::OntolDebugCtx,
+                _: &dyn $crate::debug::OntolFormatter,
                 f: &mut std::fmt::Formatter<'_>,
             ) -> std::fmt::Result {
-                write!(f, "{self:?}")
+                <Self as std::fmt::Debug>::fmt(self, f)
             }
         }
     };
@@ -56,91 +81,92 @@ impl_ontol_debug!(f64);
 impl_ontol_debug!(usize);
 impl_ontol_debug!(std::string::String);
 impl_ontol_debug!(smartstring::alias::String);
+impl_ontol_debug!(bit_vec::BitVec);
 
 impl<'a, T: OntolDebug> OntolDebug for &'a T {
-    fn fmt(&self, ctx: &dyn OntolDebugCtx, f: &mut Formatter<'_>) -> Result {
-        (*self).fmt(ctx, f)
+    fn fmt(&self, ofmt: &dyn OntolFormatter, f: &mut Formatter<'_>) -> Result {
+        (*self).fmt(ofmt, f)
     }
 }
 
 impl<'a> OntolDebug for &'a str {
-    fn fmt(&self, _: &dyn OntolDebugCtx, f: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, _: &dyn OntolFormatter, f: &mut Formatter<'_>) -> Result {
         write!(f, "{self:?}")
     }
 }
 
 impl<T: OntolDebug> OntolDebug for Option<T> {
-    fn fmt(&self, ctx: &dyn OntolDebugCtx, f: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, ofmt: &dyn OntolFormatter, f: &mut Formatter<'_>) -> Result {
         match self {
-            Some(value) => f.debug_tuple("Some").field(&Debug(ctx, value)).finish(),
+            Some(value) => f.debug_tuple("Some").field(&Fmt(ofmt, value)).finish(),
             None => f.debug_tuple("None").finish(),
         }
     }
 }
 
 impl<T: OntolDebug> OntolDebug for Vec<T> {
-    fn fmt(&self, ctx: &dyn OntolDebugCtx, f: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, ofmt: &dyn OntolFormatter, f: &mut Formatter<'_>) -> Result {
         f.debug_list()
-            .entries(self.iter().map(|el| Debug(ctx, el)))
+            .entries(self.iter().map(|el| Fmt(ofmt, el)))
             .finish()
     }
 }
 
 impl<T: OntolDebug> OntolDebug for SmallVec<[T; 3]> {
-    fn fmt(&self, ctx: &dyn OntolDebugCtx, f: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, ofmt: &dyn OntolFormatter, f: &mut Formatter<'_>) -> Result {
         f.debug_list()
-            .entries(self.iter().map(|el| Debug(ctx, el)))
+            .entries(self.iter().map(|el| Fmt(ofmt, el)))
             .finish()
     }
 }
 
 impl<const N: usize, T: OntolDebug> OntolDebug for [T; N] {
-    fn fmt(&self, ctx: &dyn OntolDebugCtx, f: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, ofmt: &dyn OntolFormatter, f: &mut Formatter<'_>) -> Result {
         f.debug_list()
-            .entries(self.iter().map(|el| Debug(ctx, el)))
+            .entries(self.iter().map(|el| Fmt(ofmt, el)))
             .finish()
     }
 }
 
 impl<T: OntolDebug> OntolDebug for [T] {
-    fn fmt(&self, ctx: &dyn OntolDebugCtx, f: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, ofmt: &dyn OntolFormatter, f: &mut Formatter<'_>) -> Result {
         f.debug_list()
-            .entries(self.iter().map(|el| Debug(ctx, el)))
+            .entries(self.iter().map(|el| Fmt(ofmt, el)))
             .finish()
     }
 }
 
 impl<T: OntolDebug> OntolDebug for Range<T> {
-    fn fmt(&self, ctx: &dyn OntolDebugCtx, f: &mut Formatter<'_>) -> Result {
-        self.start.fmt(ctx, f)?;
+    fn fmt(&self, ofmt: &dyn OntolFormatter, f: &mut Formatter<'_>) -> Result {
+        self.start.fmt(ofmt, f)?;
         write!(f, "..")?;
-        self.end.fmt(ctx, f)?;
+        self.end.fmt(ofmt, f)?;
         Ok(())
     }
 }
 
 impl<T: OntolDebug> OntolDebug for RangeInclusive<T> {
-    fn fmt(&self, ctx: &dyn OntolDebugCtx, f: &mut Formatter<'_>) -> Result {
-        self.start().fmt(ctx, f)?;
+    fn fmt(&self, ofmt: &dyn OntolFormatter, f: &mut Formatter<'_>) -> Result {
+        self.start().fmt(ofmt, f)?;
         write!(f, "..=")?;
-        self.end().fmt(ctx, f)?;
+        self.end().fmt(ofmt, f)?;
         Ok(())
     }
 }
 
 impl<A: OntolDebug, B: OntolDebug> OntolDebug for (A, B) {
-    fn fmt(&self, ctx: &dyn OntolDebugCtx, f: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, ofmt: &dyn OntolFormatter, f: &mut Formatter<'_>) -> Result {
         f.debug_tuple("")
-            .field(&Debug(ctx, &self.0))
-            .field(&Debug(ctx, &self.1))
+            .field(&Fmt(ofmt, &self.0))
+            .field(&Fmt(ofmt, &self.1))
             .finish()
     }
 }
 
 impl<K: OntolDebug, V: OntolDebug, S> OntolDebug for IndexMap<K, V, S> {
-    fn fmt(&self, ctx: &dyn OntolDebugCtx, f: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, ofmt: &dyn OntolFormatter, f: &mut Formatter<'_>) -> Result {
         f.debug_map()
-            .entries(self.iter().map(|(k, v)| (Debug(ctx, k), Debug(ctx, v))))
+            .entries(self.iter().map(|(k, v)| (Fmt(ofmt, k), Fmt(ofmt, v))))
             .finish()
     }
 }
@@ -158,7 +184,7 @@ mod tests {
     impl OntolDebug for Custom {
         fn fmt(
             &self,
-            _ctx: &dyn OntolDebugCtx,
+            _of: &dyn OntolFormatter,
             f: &mut std::fmt::Formatter<'_>,
         ) -> std::fmt::Result {
             write!(f, "Custom!")
@@ -193,7 +219,7 @@ mod tests {
             },
         };
         let ontology = Ontology::builder().build();
-        let str = format!("{:?}", Debug(&ontology, &value));
+        let str = format!("{:?}", Fmt(&ontology, &value));
 
         assert_eq!(
             str,

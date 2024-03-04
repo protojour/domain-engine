@@ -3,11 +3,13 @@ use std::fmt::{Debug, Display};
 use ::serde::{Deserialize, Serialize};
 use bit_vec::BitVec;
 use ontol_macros::OntolDebug;
-use smartstring::alias::String;
 
 use crate::{
     condition::{ClausePair, Condition},
+    debug::NoFmt,
+    impl_ontol_debug,
     ontology::ValueCardinality,
+    text::TextConstant,
     value::PropertyId,
     var::Var,
     DefId,
@@ -37,14 +39,14 @@ impl Lib {
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, OntolDebug)]
 pub struct Address(pub u32);
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Serialize, Deserialize, OntolDebug)]
 pub struct AddressOffset(pub u32);
 
 /// Handle to an ONTOL procedure.
 ///
 /// The VM is a stack machine, the arguments to the called procedure
 /// must be top of the stack when it's called.
-#[derive(Clone, Copy, Serialize, Deserialize, Debug, OntolDebug)]
+#[derive(Clone, Copy, Serialize, Deserialize, OntolDebug)]
 pub struct Procedure {
     /// 'Pointer' to the first OpCode
     pub address: Address,
@@ -53,13 +55,13 @@ pub struct Procedure {
 }
 
 /// The number of parameters to a procedure.
-#[derive(Clone, Copy, Serialize, Deserialize, Debug, OntolDebug)]
+#[derive(Clone, Copy, Serialize, Deserialize, OntolDebug)]
 pub struct NParams(pub u8);
 
 /// ONTOL opcode.
 ///
 /// When the documentation mentions the stack, the _leftmost_ value is the top of the stack.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, OntolDebug)]
 pub enum OpCode {
     /// Take the top of stack, and push that value onto the previous frame's stack,
     /// and continue executing at the previous frame's program counter, or exit VM with popped value
@@ -97,7 +99,7 @@ pub enum OpCode {
     /// Push a constant f64 to the stack.
     F64(f64, DefId),
     /// Push a constant string to the stack.
-    String(String, DefId),
+    String(TextConstant, DefId),
     /// Evaluate a predicate. If true, jumps to AddressOffset.
     Cond(Predicate, AddressOffset),
     /// Take the sequence stored at Local, replace it with unit, and push all its values onto the stack.
@@ -122,12 +124,14 @@ pub enum OpCode {
     PushCondClause(Local, ClausePair<Local, OpCodeCondTerm>),
     /// Execute a match on a datastore, using the condition at top of stack
     MatchCondition(Var, ValueCardinality),
-    Panic(String),
+    Panic(TextConstant),
 }
 
 /// A reference to a local on the value stack during procedure execution.
 #[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Local(pub u16);
+
+impl_ontol_debug!(Local);
 
 impl Debug for Local {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -142,7 +146,7 @@ impl Display for Local {
 }
 
 /// Builtin procedures.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Debug)]
 pub enum BuiltinProc {
     Add,
     Sub,
@@ -156,7 +160,9 @@ pub enum BuiltinProc {
     NewVoid,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+impl_ontol_debug!(BuiltinProc);
+
+#[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize, OntolDebug)]
 pub enum Predicate {
     MatchesDiscriminant(Local, DefId),
     IsVoid(Local),
@@ -176,6 +182,8 @@ bitflags::bitflags! {
     }
 }
 
+impl_ontol_debug!(GetAttrFlags);
+
 impl GetAttrFlags {
     pub fn take2() -> Self {
         Self::TAKE | Self::REL | Self::VAL
@@ -186,7 +194,7 @@ pub enum Yield {
     Match(Var, ValueCardinality, Condition),
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, OntolDebug)]
 pub enum OpCodeCondTerm {
     Wildcard,
     CondVar(Local),
@@ -195,6 +203,6 @@ pub enum OpCodeCondTerm {
 
 impl Display for OpCodeCondTerm {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self:?}")
+        write!(f, "{:?}", NoFmt(self))
     }
 }
