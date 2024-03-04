@@ -256,9 +256,10 @@ impl<'a> SelectAnalyzer<'a> {
         let args_wrapper = ArgsWrapper::new(look_ahead);
 
         let limit = args_wrapper
-            .deserialize_optional::<usize>(first_arg.name())?
+            .deserialize_optional::<usize>(first_arg.name(&self.schema_ctx.ontology))?
             .unwrap_or(self.default_query_limit());
-        let after_cursor = args_wrapper.deserialize_optional::<GraphQLCursor>(after_arg.name())?;
+        let after_cursor = args_wrapper
+            .deserialize_optional::<GraphQLCursor>(after_arg.name(&self.schema_ctx.ontology))?;
 
         let mut inner_select = Select::Leaf;
         let mut include_total_len = false;
@@ -316,7 +317,7 @@ impl<'a> SelectAnalyzer<'a> {
                             .find_map(|type_addr| {
                                 let type_data = self.schema_ctx.type_data(*type_addr);
 
-                                if type_data.typename == applies_for {
+                                if &self.schema_ctx.ontology[type_data.typename] == applies_for {
                                     Some(type_data)
                                 } else {
                                     None

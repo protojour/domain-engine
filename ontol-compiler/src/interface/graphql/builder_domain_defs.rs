@@ -22,6 +22,7 @@ use ontol_runtime::{
     DefId, Role,
 };
 use smartstring::alias::String;
+use thin_vec::thin_vec;
 use tracing::{trace, trace_span};
 
 use crate::{
@@ -64,11 +65,9 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     let rel_type_info = self.partial_ontology.get_type_info(rel_def_id);
                     let rel_edge_ref = self.get_def_type_ref(rel_def_id, QLevel::Node);
 
-                    let typename = self.type_namespace.edge(
-                        Some(rel_type_info),
-                        type_info,
-                        self.serde_gen.strings,
-                    );
+                    let typename = self.mk_typename_constant(|namespace, strings| {
+                        namespace.edge(Some(rel_type_info), type_info, strings)
+                    });
 
                     self.lazy_tasks.push(LazyTask::HarvestFields {
                         type_addr: edge_addr,
@@ -80,10 +79,10 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         edge_addr,
                         TypeData {
                             typename,
-                            input_typename: Some(self.type_namespace.edge_input(
-                                Some(rel_type_info),
-                                type_info,
-                                self.serde_gen.strings,
+                            input_typename: Some(self.mk_typename_constant(
+                                |namespace, strings| {
+                                    namespace.edge_input(Some(rel_type_info), type_info, strings)
+                                },
                             )),
                             partial_input_typename: None,
                             kind: TypeKind::Object(ObjectData {
@@ -100,15 +99,11 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     NewType::Addr(
                         edge_addr,
                         TypeData {
-                            typename: self.type_namespace.edge(
-                                None,
-                                type_info,
-                                self.serde_gen.strings,
-                            ),
-                            input_typename: Some(self.type_namespace.edge_input(
-                                None,
-                                type_info,
-                                self.serde_gen.strings,
+                            typename: self.mk_typename_constant(|namespace, strings| {
+                                namespace.edge(None, type_info, strings)
+                            }),
+                            input_typename: Some(self.mk_typename_constant(
+                                |namespace, strings| namespace.edge_input(None, type_info, strings),
                             )),
                             partial_input_typename: None,
                             kind: TypeKind::Object(ObjectData {
@@ -137,16 +132,12 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 NewType::Addr(
                     connection_addr,
                     TypeData {
-                        typename: self.type_namespace.connection(
-                            rel_type_info,
-                            type_info,
-                            self.serde_gen.strings,
-                        ),
-                        input_typename: Some(self.type_namespace.patch_edges_input(
-                            rel_type_info,
-                            type_info,
-                            self.serde_gen.strings,
-                        )),
+                        typename: self.mk_typename_constant(|namespace, strings| {
+                            namespace.connection(rel_type_info, type_info, strings)
+                        }),
+                        input_typename: Some(self.mk_typename_constant(|namespace, strings| {
+                            namespace.patch_edges_input(rel_type_info, type_info, strings)
+                        })),
                         partial_input_typename: None,
                         kind: TypeKind::Object(ObjectData {
                             fields: [
@@ -209,9 +200,9 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 NewType::Addr(
                     addr,
                     TypeData {
-                        typename: self
-                            .type_namespace
-                            .mutation_result(type_info, self.serde_gen.strings),
+                        typename: self.mk_typename_constant(|namespace, strings| {
+                            namespace.mutation_result(type_info, strings)
+                        }),
                         input_typename: None,
                         partial_input_typename: None,
                         kind: TypeKind::Object(ObjectData {
@@ -291,16 +282,15 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 NewType::Addr(
                     type_addr,
                     TypeData {
-                        typename: self
-                            .type_namespace
-                            .typename(type_info, self.serde_gen.strings),
-                        input_typename: Some(
-                            self.type_namespace.input(type_info, self.serde_gen.strings),
-                        ),
-                        partial_input_typename: Some(
-                            self.type_namespace
-                                .partial_input(type_info, self.serde_gen.strings),
-                        ),
+                        typename: self.mk_typename_constant(|namespace, strings| {
+                            namespace.typename(type_info, strings)
+                        }),
+                        input_typename: Some(self.mk_typename_constant(|namespace, strings| {
+                            namespace.input(type_info, strings)
+                        })),
+                        partial_input_typename: Some(self.mk_typename_constant(
+                            |namespace, strings| namespace.partial_input(type_info, strings),
+                        )),
                         kind: type_kind,
                     },
                 )
@@ -310,7 +300,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 let node_index = self.alloc_def_type_addr(def_id, QLevel::Node);
 
                 let mut needs_scalar = false;
-                let mut type_variants = vec![];
+                let mut type_variants = thin_vec![];
 
                 for (variant_def_id, _) in variants {
                     match self.seal_ctx.get_repr_kind(variant_def_id) {
@@ -335,17 +325,15 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 NewType::Addr(
                     node_index,
                     TypeData {
-                        typename: self
-                            .type_namespace
-                            .typename(type_info, self.serde_gen.strings),
-                        input_typename: Some(
-                            self.type_namespace
-                                .union_input(type_info, self.serde_gen.strings),
-                        ),
-                        partial_input_typename: Some(
-                            self.type_namespace
-                                .union_partial_input(type_info, self.serde_gen.strings),
-                        ),
+                        typename: self.mk_typename_constant(|namespace, strings| {
+                            namespace.typename(type_info, strings)
+                        }),
+                        input_typename: Some(self.mk_typename_constant(|namespace, strings| {
+                            namespace.union_input(type_info, strings)
+                        })),
+                        partial_input_typename: Some(self.mk_typename_constant(
+                            |namespace, strings| namespace.union_partial_input(type_info, strings),
+                        )),
                         kind: if needs_scalar {
                             TypeKind::CustomScalar(ScalarData { operator_addr })
                         } else {
@@ -366,16 +354,15 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 NewType::Addr(
                     type_addr,
                     TypeData {
-                        typename: self
-                            .type_namespace
-                            .typename(type_info, self.serde_gen.strings),
-                        input_typename: Some(
-                            self.type_namespace.input(type_info, self.serde_gen.strings),
-                        ),
-                        partial_input_typename: Some(
-                            self.type_namespace
-                                .partial_input(type_info, self.serde_gen.strings),
-                        ),
+                        typename: self.mk_typename_constant(|namespace, strings| {
+                            namespace.typename(type_info, strings)
+                        }),
+                        input_typename: Some(self.mk_typename_constant(|namespace, strings| {
+                            namespace.input(type_info, strings)
+                        })),
+                        partial_input_typename: Some(self.mk_typename_constant(
+                            |namespace, strings| namespace.partial_input(type_info, strings),
+                        )),
                         kind: TypeKind::CustomScalar(ScalarData { operator_addr }),
                     },
                 )
@@ -394,7 +381,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         type_addr,
                         TypeData {
                             // FIXME: Must make sure that domain typenames take precedence over generated ones
-                            typename: smart_format!("_ontol_i64"),
+                            typename: self.serde_gen.strings.intern_constant("_ontol_i64"),
                             input_typename: None,
                             partial_input_typename: None,
                             kind: TypeKind::CustomScalar(ScalarData {

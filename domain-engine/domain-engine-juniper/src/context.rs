@@ -149,18 +149,23 @@ impl SchemaType {
     }
 
     pub(crate) fn typename(&self) -> &str {
+        let ontology = &self.schema_ctx.ontology;
         let type_data = &self.type_data();
         match (&type_data.kind, self.typing_purpose) {
-            (TypeKind::CustomScalar(_), _) => &type_data.typename,
-            (_, TypingPurpose::Selection) => &type_data.typename,
-            (_, TypingPurpose::Input | TypingPurpose::InputOrReference) => {
-                type_data.input_typename.as_deref().unwrap_or_else(|| {
-                    panic!("No input typename available for `{}`", type_data.typename)
-                })
-            }
+            (TypeKind::CustomScalar(_), _) => &ontology[type_data.typename],
+            (_, TypingPurpose::Selection) => &ontology[type_data.typename],
+            (_, TypingPurpose::Input | TypingPurpose::InputOrReference) => type_data
+                .input_typename
+                .map(|constant| &ontology[constant])
+                .unwrap_or_else(|| {
+                    panic!(
+                        "No input typename available for `{}`",
+                        &ontology[type_data.typename]
+                    )
+                }),
             (_, TypingPurpose::PartialInput) => type_data
                 .partial_input_typename
-                .as_deref()
+                .map(|constant| &ontology[constant])
                 .expect("No partial input typename available"),
         }
     }

@@ -67,7 +67,7 @@ impl<'a> ArgsWrapper<'a> {
         field_arg: &dyn argument::DomainFieldArg,
         (schema_ctx, service_ctx): (&SchemaCtx, &ServiceCtx),
     ) -> Result<ontol_runtime::value::Attribute, juniper::FieldError<GqlScalar>> {
-        let arg_name = field_arg.name();
+        let arg_name = field_arg.name(&schema_ctx.ontology);
         let (mode, level) = field_arg.typing_purpose().mode_and_level();
 
         let processor_profile =
@@ -140,7 +140,7 @@ impl<'a> ArgsWrapper<'a> {
 
             let Some((matched_arg, kind)) = arg_matchers
                 .iter()
-                .find(|(matching_arg, _)| matching_arg.name() == name)
+                .find(|(matching_arg, _)| matching_arg.name(&schema_ctx.ontology) == name)
                 .cloned()
             else {
                 // The GraphQL engine should have complained before reaching this point
