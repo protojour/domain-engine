@@ -38,6 +38,12 @@ impl<'m> Strings<'m> {
         }
     }
 
+    pub fn attach(&mut self, other: Strings<'m>) {
+        self.table = other.table;
+        self.constants = other.constants;
+        self.detached = false;
+    }
+
     pub fn make_text_constants(self) -> Vec<ArcStr> {
         self.constants
             .iter()

@@ -94,7 +94,11 @@ impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
     type Value = Attribute;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "type `{}`", self.struct_op.typename)
+        write!(
+            f,
+            "type `{}`",
+            &self.processor.ontology[self.struct_op.typename]
+        )
     }
 
     fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<Self::Value, A::Error> {

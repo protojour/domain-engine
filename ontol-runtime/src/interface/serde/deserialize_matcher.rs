@@ -12,6 +12,7 @@ use crate::{
         serde::processor::SpecialProperty,
     },
     ontology::Ontology,
+    text::TextConstant,
     text_like_types::ParseError,
     text_pattern::{TextPattern, TextPatternConstantPart},
     value::{Attribute, PropertyId, Serial, Value},
@@ -234,17 +235,17 @@ impl<'on> ValueMatcher for StringMatcher<'on> {
 
 /// match a constant text
 pub struct ConstantStringMatcher<'on> {
-    pub literal: &'on str,
+    pub constant: &'on str,
     pub def_id: DefId,
 }
 
 impl<'on> ValueMatcher for ConstantStringMatcher<'on> {
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "\"{}\"", self.literal)
+        write!(f, "\"{}\"", self.constant)
     }
 
     fn match_str(&self, str: &str) -> Result<Value, ()> {
-        if str == self.literal {
+        if str == self.constant {
             Ok(Value::Text(str.into(), self.def_id))
         } else {
             Err(())
@@ -444,7 +445,7 @@ impl<'on> SequenceMatcher<'on> {
 }
 
 pub struct UnionMatcher<'on, 'p> {
-    pub typename: &'on str,
+    pub typename: TextConstant,
     pub possible_variants: PossibleVariants<'on>,
     pub ctx: SubProcessorContext,
     pub ontology: &'on Ontology,
@@ -458,7 +459,7 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
         write!(
             f,
             "{} ({})",
-            Backticks(self.typename),
+            Backticks(&self.ontology[self.typename]),
             Missing {
                 items: self
                     .possible_variants
@@ -512,13 +513,15 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
                     )
                     .map_err(|_| ())
                 }
-                LeafDiscriminant::IsTextLiteral(lit) if lit == str => {
-                    return try_deserialize_custom_string(
-                        self.ontology,
-                        variant.serde_def.def_id,
-                        str,
-                    )
-                    .map_err(|_| ())
+                LeafDiscriminant::IsTextLiteral(constant) => {
+                    if str == &self.ontology[*constant] {
+                        return try_deserialize_custom_string(
+                            self.ontology,
+                            variant.serde_def.def_id,
+                            str,
+                        )
+                        .map_err(|_| ());
+                    }
                 }
                 LeafDiscriminant::MatchesCapturingTextPattern(def_id) => {
                     let result_type = variant.serde_def.def_id;
@@ -543,7 +546,7 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
             };
 
             if leaf_discriminant == &LeafDiscriminant::IsSequence {
-                match self.ontology.get_serde_operator(variant.addr) {
+                match &self.ontology[variant.addr] {
                     SerdeOperator::RelationSequence(seq_op) => {
                         return Ok(SequenceMatcher::new(
                             &seq_op.ranges,
@@ -628,7 +631,7 @@ pub struct MapMatch<'on> {
 #[derive(OntolDebug)]
 pub enum MapMatchMode<'on> {
     Struct(&'on StructOperator),
-    EntityId(DefId, &'on str, SerdeOperatorAddr),
+    EntityId(DefId, TextConstant, SerdeOperatorAddr),
     RawDynamicEntity(&'on StructOperator),
 }
 
@@ -644,12 +647,13 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
             let discriminant = variant.discriminant;
             // debug!("match_fn property `{property}` variant: {variant:?}");
 
-            let Discriminant::HasAttribute(_, match_attr_name, scalar_discriminant) = discriminant
+            let Discriminant::HasAttribute(_, match_attr_constant, scalar_discriminant) =
+                discriminant
             else {
                 return false;
             };
 
-            if property != match_attr_name {
+            if property != &self.ontology[*match_attr_constant] {
                 return false;
             }
 
@@ -675,8 +679,8 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
                     | serde_value::Value::I64(_),
                 ) => true,
                 (LeafDiscriminant::IsSequence, serde_value::Value::Seq(_)) => true,
-                (LeafDiscriminant::IsTextLiteral(lit), serde_value::Value::String(value)) => {
-                    value == lit
+                (LeafDiscriminant::IsTextLiteral(constant), serde_value::Value::String(value)) => {
+                    value == &self.ontology[*constant]
                 }
                 (
                     LeafDiscriminant::MatchesCapturingTextPattern(def_id),
@@ -716,40 +720,38 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
             }
         }
 
-        let result = found_variant.map(|variant| {
-            match (
-                self.ontology.get_serde_operator(variant.addr),
-                variant.purpose,
-            ) {
-                (SerdeOperator::Struct(struct_op), VariantPurpose::RawDynamicEntity) => {
-                    self.map_match(MapMatchMode::RawDynamicEntity(struct_op))
-                }
-                (SerdeOperator::Struct(struct_op), _) => {
-                    self.map_match(MapMatchMode::Struct(struct_op))
-                }
-                (SerdeOperator::IdSingletonStruct(entity_id, name, addr), _) => {
-                    self.map_match(MapMatchMode::EntityId(*entity_id, name.as_str(), *addr))
-                }
-                (SerdeOperator::Union(union_op), _) => {
-                    match union_op.applied_variants(self.mode, self.level) {
-                        AppliedVariants::Unambiguous(_) => todo!(),
-                        AppliedVariants::OneOf(variants) => MapMatcher {
-                            possible_variants: variants,
-                            ctx: self.ctx,
-                            ontology: self.ontology,
-                            profile: self.profile,
-                            mode: self.mode,
-                            level: self.level,
-                        }
-                        .match_attribute(property, value),
+        let result =
+            found_variant.map(
+                |variant| match (&self.ontology[variant.addr], variant.purpose) {
+                    (SerdeOperator::Struct(struct_op), VariantPurpose::RawDynamicEntity) => {
+                        self.map_match(MapMatchMode::RawDynamicEntity(struct_op))
                     }
-                }
-                other => panic!(
-                    "Matched discriminator is not a map type: {other:?}",
-                    other = self.ontology.debug(&other)
-                ),
-            }
-        });
+                    (SerdeOperator::Struct(struct_op), _) => {
+                        self.map_match(MapMatchMode::Struct(struct_op))
+                    }
+                    (SerdeOperator::IdSingletonStruct(entity_id, name_constant, addr), _) => {
+                        self.map_match(MapMatchMode::EntityId(*entity_id, *name_constant, *addr))
+                    }
+                    (SerdeOperator::Union(union_op), _) => {
+                        match union_op.applied_variants(self.mode, self.level) {
+                            AppliedVariants::Unambiguous(_) => todo!(),
+                            AppliedVariants::OneOf(variants) => MapMatcher {
+                                possible_variants: variants,
+                                ctx: self.ctx,
+                                ontology: self.ontology,
+                                profile: self.profile,
+                                mode: self.mode,
+                                level: self.level,
+                            }
+                            .match_attribute(property, value),
+                        }
+                    }
+                    other => panic!(
+                        "Matched discriminator is not a map type: {other:?}",
+                        other = self.ontology.debug(&other)
+                    ),
+                },
+            );
 
         match result {
             None => MapMatchResult::Indecisive(self),
@@ -762,14 +764,14 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
 
         for variant in self.possible_variants {
             if matches!(variant.discriminant, Discriminant::StructFallback) {
-                match self.ontology.get_serde_operator(variant.addr) {
+                match &self.ontology[variant.addr] {
                     SerdeOperator::Struct(struct_op) => {
                         return self.map_match(MapMatchMode::Struct(struct_op))
                     }
-                    SerdeOperator::IdSingletonStruct(entity_id, name, addr) => {
+                    SerdeOperator::IdSingletonStruct(entity_id, name_constant, addr) => {
                         return self.map_match(MapMatchMode::EntityId(
                             *entity_id,
-                            name.as_str(),
+                            *name_constant,
                             *addr,
                         ))
                     }

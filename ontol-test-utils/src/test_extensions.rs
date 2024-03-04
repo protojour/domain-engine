@@ -1,6 +1,7 @@
 //! Extension traits for testing purposes
 
 pub mod serde {
+    use ontol_runtime::debug::NoFmt;
     use ontol_runtime::interface::serde::operator::{SerdeOperator, StructOperator};
 
     pub trait SerdeOperatorExt {
@@ -10,7 +11,7 @@ pub mod serde {
     impl SerdeOperatorExt for SerdeOperator {
         fn struct_op(&self) -> &StructOperator {
             let Self::Struct(struct_op) = &self else {
-                panic!("Not a struct operator: {self:?}");
+                panic!("Not a struct operator: {:?}", NoFmt(self));
             };
             struct_op
         }

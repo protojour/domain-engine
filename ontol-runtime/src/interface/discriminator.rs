@@ -1,8 +1,7 @@
 use ::serde::{Deserialize, Serialize};
 use ontol_macros::OntolDebug;
-use smartstring::alias::String;
 
-use crate::{interface::serde::SerdeDef, DefId, RelationshipId};
+use crate::{interface::serde::SerdeDef, text::TextConstant, DefId, RelationshipId};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UnionDiscriminator {
@@ -32,7 +31,7 @@ pub enum VariantPurpose {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, OntolDebug, Debug)]
 pub enum Discriminant {
     MatchesLeaf(LeafDiscriminant),
-    HasAttribute(RelationshipId, String, LeafDiscriminant),
+    HasAttribute(RelationshipId, TextConstant, LeafDiscriminant),
     /// Matches any struct
     StructFallback,
 }
@@ -44,7 +43,7 @@ pub enum LeafDiscriminant {
     IsInt,
     IsIntLiteral(i64),
     IsText,
-    IsTextLiteral(String),
+    IsTextLiteral(TextConstant),
     IsSequence,
     MatchesCapturingTextPattern(DefId),
 }

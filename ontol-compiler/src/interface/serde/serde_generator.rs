@@ -5,6 +5,7 @@ use std::{
 
 use indexmap::IndexMap;
 use ontol_runtime::{
+    debug::NoFmt,
     interface::discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
     interface::serde::operator::{
         AliasOperator, ConstructorSequenceOperator, RelationSequenceOperator, SequenceRange,
@@ -16,7 +17,9 @@ use ontol_runtime::{
         serde::{operator::SerdeStructFlags, SerdeDef, SerdeModifier},
     },
     ontology::{Cardinality, PropertyCardinality, ValueCardinality},
-    smart_format, DefId,
+    smart_format,
+    text::TextConstant,
+    DefId,
 };
 use smartstring::alias::String;
 use tracing::{debug, debug_span, error, trace, warn};
@@ -52,7 +55,7 @@ pub struct SerdeGenerator<'c, 'm> {
     pub(super) lazy_struct_op_tasks: VecDeque<(SerdeOperatorAddr, SerdeDef, &'c Properties)>,
     pub(super) lazy_struct_intersection_tasks: VecDeque<(SerdeOperatorAddr, SerdeIntersection)>,
     pub(super) lazy_union_repr_tasks:
-        VecDeque<(SerdeOperatorAddr, SerdeDef, &'c str, &'c Properties)>,
+        VecDeque<(SerdeOperatorAddr, SerdeDef, TextConstant, &'c Properties)>,
     pub(super) task_state: DebugTaskState,
 
     pub(super) operators_by_addr: Vec<SerdeOperator>,
@@ -136,7 +139,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
             match self.alloc_serde_operator_from_key(key.clone()) {
                 Some(OperatorAllocation::Allocated(addr, operator)) => {
-                    trace!("CREATED {addr:?} {key:?} {operator:?}");
+                    trace!(
+                        "CREATED {addr:?} {key:?} {operator:?}",
+                        operator = NoFmt(&operator)
+                    );
                     self.operators_by_addr[addr.0 as usize] = operator;
 
                     self.operators_by_key.insert(key, addr);
@@ -273,7 +279,11 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 } else {
                     Some(OperatorAllocation::Allocated(
                         self.alloc_addr_for_key(&key),
-                        SerdeOperator::IdSingletonStruct(def.def_id, ident, object_addr),
+                        SerdeOperator::IdSingletonStruct(
+                            def.def_id,
+                            self.strings.intern_constant(&ident),
+                            object_addr,
+                        ),
                     ))
                 }
             }
@@ -308,7 +318,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         match self.get_def_type(def.def_id) {
             Some(Type::Domain(def_id) | Type::Anonymous(def_id)) => {
                 let properties = self.relations.properties_by_def_id.get(def_id);
-                let typename = self.get_typename(*def_id);
+                let typename = self.strings.intern_constant(self.get_typename(*def_id));
                 self.alloc_domain_type_serde_operator(def.with_def(*def_id), typename, properties)
             }
             Some(type_ref) => match def.modifier {
@@ -386,10 +396,11 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 assert_eq!(def.def_id, *def_id);
 
                 let literal = self.defs.get_string_representation(*def_id);
+                let constant = self.strings.intern_constant(literal);
 
                 Some(OperatorAllocation::Allocated(
                     self.alloc_addr(&def),
-                    SerdeOperator::StringConstant(literal.into(), def.def_id),
+                    SerdeOperator::StringConstant(constant, def.def_id),
                 ))
             }
             Type::Regex(def_id) => {
@@ -429,7 +440,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     fn alloc_domain_type_serde_operator(
         &mut self,
         def: SerdeDef,
-        typename: &'c str,
+        typename: TextConstant,
         properties: Option<&'c Properties>,
     ) -> Option<OperatorAllocation> {
         let repr = self.seal_ctx.repr_table.get(&def.def_id)?;
@@ -442,7 +453,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 Some(OperatorAllocation::Allocated(
                     self.alloc_addr(&def),
                     SerdeOperator::Struct(StructOperator {
-                        typename: typename.into(),
+                        typename,
                         def,
                         flags: self.struct_flags_from_def_id(def.def_id),
                         properties: Default::default(),
@@ -521,7 +532,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     Some(OperatorAllocation::Allocated(
                         addr,
                         SerdeOperator::Alias(AliasOperator {
-                            typename: typename.into(),
+                            typename,
                             def,
                             inner_addr,
                         }),
@@ -594,7 +605,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     }
 
                     let ranges = sequence_range_builder.build();
-                    trace!("sequence ranges: {:#?}", ranges);
+                    trace!("sequence ranges: {:#?}", NoFmt(&ranges));
 
                     let addr = self.alloc_addr(&def);
                     Some(OperatorAllocation::Allocated(
@@ -615,7 +626,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     fn alloc_struct_constructor_operator(
         &mut self,
         def: SerdeDef,
-        typename: &'c str,
+        typename: TextConstant,
         properties: &'c Properties,
     ) -> Option<OperatorAllocation> {
         let union_mod = SerdeModifier::UNION | SerdeModifier::PRIMARY_ID;
@@ -650,7 +661,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         let (id_property_name, id_leaf_discriminant) =
             match self.operators_by_addr.get(id_addr.0 as usize).unwrap() {
                 SerdeOperator::IdSingletonStruct(_entity_id, id_property_name, inner_addr) => (
-                    id_property_name.clone(),
+                    *id_property_name,
                     if false {
                         operator_to_leaf_discriminant(self.get_operator(*inner_addr))
                     } else {
@@ -661,13 +672,13 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         LeafDiscriminant::IsAny
                     },
                 ),
-                other => panic!("id operator was not an Id: {other:?}"),
+                other => panic!("id operator was not an Id: {:?}", NoFmt(other)),
             };
 
         Some(OperatorAllocation::Allocated(
             new_addr,
             SerdeOperator::Union(UnionOperator::new(
-                typename.into(),
+                typename,
                 def,
                 vec![
                     SerdeUnionVariant {
@@ -703,7 +714,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     fn alloc_struct_intersection_operator(
         &mut self,
         def: SerdeDef,
-        typename: &'c str,
+        typename: TextConstant,
         properties: &'c Properties,
         members: &[(DefId, SourceSpan)],
     ) -> Option<OperatorAllocation> {
@@ -767,7 +778,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             Some(OperatorAllocation::Allocated(
                 addr,
                 SerdeOperator::Alias(AliasOperator {
-                    typename: typename.into(),
+                    typename,
                     def,
                     inner_addr,
                 }),
@@ -796,7 +807,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     fn alloc_union_repr_operator(
         &mut self,
         def: SerdeDef,
-        typename: &'c str,
+        typename: TextConstant,
         properties: &'c Properties,
     ) -> OperatorAllocation {
         let addr = self.alloc_addr(&def);
@@ -843,7 +854,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     fn alloc_struct_operator(
         &mut self,
         def: SerdeDef,
-        typename: &str,
+        typename: TextConstant,
         properties: &'c Properties,
         flags: SerdeStructFlags,
     ) -> OperatorAllocation {
@@ -854,7 +865,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         OperatorAllocation::Allocated(
             addr,
             SerdeOperator::Struct(StructOperator {
-                typename: typename.into(),
+                typename,
                 def,
                 flags,
                 properties: Default::default(),
@@ -938,7 +949,7 @@ pub(super) fn operator_to_leaf_discriminant(operator: &SerdeOperator) -> LeafDis
             LeafDiscriminant::IsSequence
         }
         other => {
-            warn!("Unable to match {other:?} yet");
+            warn!("Unable to match {:?} yet", NoFmt(&other));
             LeafDiscriminant::IsAny
         }
     }

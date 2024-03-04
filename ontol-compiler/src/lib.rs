@@ -27,9 +27,9 @@ use ontol_runtime::{
         DomainInterface,
     },
     ontology::{
-        DataRelationshipInfo, DataRelationshipKind, DataRelationshipSource, DataRelationshipTarget,
-        DataTypeInfo, Domain, EntityInfo, MapLossiness, MapMeta, OntolDomainMeta, Ontology,
-        TypeInfo, TypeKind,
+        BasicTypeInfo, DataRelationshipInfo, DataRelationshipKind, DataRelationshipSource,
+        DataRelationshipTarget, Domain, EntityInfo, MapLossiness, MapMeta, OntolDomainMeta,
+        Ontology, TypeInfo, TypeKind,
     },
     text::TextConstant,
     value::PropertyId,
@@ -296,12 +296,16 @@ impl<'m> Compiler<'m> {
 
             for (type_name, type_def_id) in type_namespace {
                 let type_name_constant = serde_gen.strings.intern_constant(type_name);
-                let data_relationships =
-                    self.find_data_relationships(type_def_id, &union_member_cache);
+                let data_relationships = self.find_data_relationships(
+                    type_def_id,
+                    &union_member_cache,
+                    serde_gen.strings,
+                );
+                let def_kind = self.defs.def_kind(type_def_id);
 
                 domain.add_type(TypeInfo {
                     def_id: type_def_id,
-                    public: match self.defs.def_kind(type_def_id) {
+                    public: match def_kind {
                         DefKind::Type(TypeDef { visibility, .. }) => {
                             matches!(visibility, DefVisibility::Public)
                         }
@@ -314,7 +318,7 @@ impl<'m> Compiler<'m> {
                         &data_relationships,
                     ) {
                         Some(entity_info) => TypeKind::Entity(entity_info),
-                        None => TypeKind::Data(DataTypeInfo {
+                        None => def_kind.as_ontology_type_kind(BasicTypeInfo {
                             name: Some(type_name_constant),
                         }),
                     },
@@ -330,13 +334,19 @@ impl<'m> Compiler<'m> {
                 domain.add_type(TypeInfo {
                     def_id: type_def_id,
                     public: false,
-                    kind: TypeKind::Data(DataTypeInfo { name: None }),
+                    kind: self
+                        .defs
+                        .def_kind(type_def_id)
+                        .as_ontology_type_kind(BasicTypeInfo { name: None }),
                     operator_addr: serde_gen.gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
                         type_def_id,
                         SerdeModifier::json_default(),
                     ))),
-                    data_relationships: self
-                        .find_data_relationships(type_def_id, &union_member_cache),
+                    data_relationships: self.find_data_relationships(
+                        type_def_id,
+                        &union_member_cache,
+                        serde_gen.strings,
+                    ),
                 });
             }
 
@@ -432,15 +442,20 @@ impl<'m> Compiler<'m> {
         &self,
         type_def_id: DefId,
         union_member_cache: &UnionMemberCache,
+        strings: &mut Strings<'m>,
     ) -> IndexMap<PropertyId, DataRelationshipInfo> {
         let mut data_relationships = IndexMap::default();
-        self.add_inherent_data_relationships(type_def_id, &mut data_relationships);
+        self.add_inherent_data_relationships(type_def_id, &mut data_relationships, strings);
 
         if let Some(ReprKind::StructIntersection(members)) =
             self.seal_ctx.get_repr_kind(&type_def_id)
         {
             for (member_def_id, _) in members {
-                self.add_inherent_data_relationships(*member_def_id, &mut data_relationships);
+                self.add_inherent_data_relationships(
+                    *member_def_id,
+                    &mut data_relationships,
+                    strings,
+                );
             }
         }
 
@@ -457,6 +472,7 @@ impl<'m> Compiler<'m> {
                     if let Some(data_relationship) = self.generate_data_relationship_info(
                         *property_id,
                         DataRelationshipSource::ByUnionProxy,
+                        strings,
                     ) {
                         data_relationships.insert(*property_id, data_relationship);
                     }
@@ -471,15 +487,18 @@ impl<'m> Compiler<'m> {
         &self,
         type_def_id: DefId,
         output: &mut IndexMap<PropertyId, DataRelationshipInfo>,
+        strings: &mut Strings<'m>,
     ) {
         let Some(properties) = self.relations.properties_by_def_id(type_def_id) else {
             return;
         };
         if let Some(table) = &properties.table {
             for property_id in table.keys() {
-                if let Some(data_relationship) = self
-                    .generate_data_relationship_info(*property_id, DataRelationshipSource::Inherent)
-                {
+                if let Some(data_relationship) = self.generate_data_relationship_info(
+                    *property_id,
+                    DataRelationshipSource::Inherent,
+                    strings,
+                ) {
                     output.insert(*property_id, data_relationship);
                 }
             }
@@ -490,6 +509,7 @@ impl<'m> Compiler<'m> {
         &self,
         property_id: PropertyId,
         source: DataRelationshipSource,
+        strings: &mut Strings<'m>,
     ) -> Option<DataRelationshipInfo> {
         let meta = self.defs.relationship_meta(property_id.relationship_id);
 
@@ -567,8 +587,11 @@ impl<'m> Compiler<'m> {
             kind: data_relationship_kind,
             subject_cardinality: meta.relationship.subject_cardinality,
             object_cardinality: meta.relationship.object_cardinality,
-            subject_name: (*subject_name).into(),
-            object_name: meta.relationship.object_prop.map(|prop| prop.into()),
+            subject_name: strings.intern_constant(subject_name),
+            object_name: meta
+                .relationship
+                .object_prop
+                .map(|prop| strings.intern_constant(prop)),
             source,
             target,
         })

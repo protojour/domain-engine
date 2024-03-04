@@ -195,10 +195,6 @@ impl Ontology {
         }
     }
 
-    pub fn get_serde_operator(&self, addr: SerdeOperatorAddr) -> &SerdeOperator {
-        &self.serde_operators[addr.0 as usize]
-    }
-
     pub fn dynamic_sequence_operator_addr(&self) -> SerdeOperatorAddr {
         self.dynamic_sequence_operator_addr
     }
@@ -232,6 +228,14 @@ impl Index<TextConstant> for Ontology {
 
     fn index(&self, index: TextConstant) -> &Self::Output {
         &self.text_constants[index.0 as usize]
+    }
+}
+
+impl Index<SerdeOperatorAddr> for Ontology {
+    type Output = SerdeOperator;
+
+    fn index(&self, index: SerdeOperatorAddr) -> &Self::Output {
+        &self.serde_operators[index.0 as usize]
     }
 }
 
@@ -325,7 +329,7 @@ impl Domain {
         self.info.resize_with(new_size, || TypeInfo {
             def_id: DefId(type_info.def_id.0, 0),
             public: false,
-            kind: TypeKind::Data(DataTypeInfo { name: None }),
+            kind: TypeKind::Data(BasicTypeInfo { name: None }),
             operator_addr: None,
             data_relationships: Default::default(),
         });
@@ -355,15 +359,19 @@ pub struct TypeInfo {
 impl TypeInfo {
     pub fn name(&self) -> Option<TextConstant> {
         match &self.kind {
-            TypeKind::Data(info) => info.name,
             TypeKind::Entity(info) => Some(info.name),
+            TypeKind::Data(info)
+            | TypeKind::Relationship(info)
+            | TypeKind::Function(info)
+            | TypeKind::Domain(info)
+            | TypeKind::Generator(info) => info.name,
         }
     }
 
     pub fn entity_info(&self) -> Option<&EntityInfo> {
         match &self.kind {
             TypeKind::Entity(entity_info) => Some(entity_info),
-            TypeKind::Data(_) => None,
+            _ => None,
         }
     }
 
@@ -378,12 +386,16 @@ impl TypeInfo {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum TypeKind {
-    Data(DataTypeInfo),
     Entity(EntityInfo),
+    Data(BasicTypeInfo),
+    Relationship(BasicTypeInfo),
+    Function(BasicTypeInfo),
+    Domain(BasicTypeInfo),
+    Generator(BasicTypeInfo),
 }
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct DataTypeInfo {
+#[derive(Clone, Copy, Serialize, Deserialize)]
+pub struct BasicTypeInfo {
     pub name: Option<TextConstant>,
 }
 
@@ -404,8 +416,8 @@ pub struct DataRelationshipInfo {
     pub kind: DataRelationshipKind,
     pub subject_cardinality: Cardinality,
     pub object_cardinality: Cardinality,
-    pub subject_name: String,
-    pub object_name: Option<String>,
+    pub subject_name: TextConstant,
+    pub object_name: Option<TextConstant>,
     pub source: DataRelationshipSource,
     pub target: DataRelationshipTarget,
 }
@@ -446,7 +458,9 @@ pub enum DataRelationshipTarget {
     Unambiguous(DefId),
     Union {
         union_def_id: DefId,
-        variants: Vec<DefId>,
+        // TODO: Move to one place in the ontology.
+        // It's a lookup from the union DefId to its members.
+        variants: Box<[DefId]>,
     },
 }
 

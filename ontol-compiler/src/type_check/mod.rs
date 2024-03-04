@@ -10,6 +10,7 @@ use crate::{
     primitive::Primitives,
     relation::Relations,
     repr::repr_check::ReprCheck,
+    strings::Strings,
     types::{DefTypes, FormatType, Type, TypeRef, Types, ERROR_TYPE},
     CompileErrors, Compiler, SourceSpan, SpannedNote,
 };
@@ -66,6 +67,7 @@ pub struct TypeCheck<'c, 'm> {
     pub codegen_tasks: &'c mut CodegenTasks<'m>,
     pub patterns: &'c mut Patterns,
     pub seal_ctx: &'c mut SealCtx,
+    pub strings: &'c mut Strings<'m>,
     pub defs: &'c Defs<'m>,
     pub primitives: &'c Primitives,
 }
@@ -172,6 +174,7 @@ impl<'m> Compiler<'m> {
             codegen_tasks: &mut self.codegen_tasks,
             patterns: &mut self.patterns,
             seal_ctx: &mut self.seal_ctx,
+            strings: &mut self.strings,
             defs: &self.defs,
             primitives: &self.primitives,
         }

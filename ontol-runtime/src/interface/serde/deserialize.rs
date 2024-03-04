@@ -146,9 +146,9 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                 }
                 .into_visitor_no_params(self),
             ),
-            (SerdeOperator::StringConstant(literal, def_id), _) => deserializer.deserialize_str(
+            (SerdeOperator::StringConstant(constant, def_id), _) => deserializer.deserialize_str(
                 ConstantStringMatcher {
-                    literal,
+                    constant: &self.ontology[*constant],
                     def_id: *def_id,
                 }
                 .into_visitor_no_params(self),
@@ -224,7 +224,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
             (SerdeOperator::IdSingletonStruct(_, name, inner_addr), _) => deserializer
                 .deserialize_map(IdSingletonStructVisitor {
                     processor: self,
-                    property_name: name,
+                    property_name: &self.ontology[*name],
                     inner_addr: *inner_addr,
                     ontology: self.ontology,
                 }),
@@ -410,11 +410,11 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
                 raw_dynamic_entity: true,
             }
             .visit_map(map),
-            MapMatchMode::EntityId(entity_id, name, addr) => {
+            MapMatchMode::EntityId(entity_id, name_constant, addr) => {
                 let output =
                     StructDeserializer::new(entity_id, self.processor, &IndexMap::default())
                         .with_rel_params_addr(map_match.ctx.rel_params_addr)
-                        .with_id_property_addr(name, addr)
+                        .with_id_property_addr(&self.processor.ontology[name_constant], addr)
                         .deserialize_struct(buffered_attrs, map)?;
                 let id = output
                     .id

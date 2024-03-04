@@ -149,7 +149,7 @@ impl<'e> SchemaCtx<'e> {
     fn definition(self, operator_addr: SerdeOperatorAddr) -> SchemaDefinition<'e> {
         SchemaDefinition {
             ctx: self,
-            value_operator: self.ontology.get_serde_operator(operator_addr),
+            value_operator: &self.ontology[operator_addr],
         }
     }
 
@@ -414,12 +414,7 @@ fn serialize_schema_inline<S: Serializer>(
             }
         }
         SerdeOperator::Alias(value_op) => {
-            serialize_schema_inline::<S>(
-                ctx,
-                ctx.ontology.get_serde_operator(value_op.inner_addr),
-                None,
-                map,
-            )?;
+            serialize_schema_inline::<S>(ctx, &ctx.ontology[value_op.inner_addr], None, map)?;
         }
         SerdeOperator::Union(union_op) => {
             map.serialize_entry(
@@ -475,7 +470,7 @@ struct SchemaReference<'d, 'e> {
 
 impl<'d, 'e> Serialize for SchemaReference<'d, 'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let value_operator = self.ctx.ontology.get_serde_operator(self.operator_addr);
+        let value_operator = &self.ctx.ontology[self.operator_addr];
 
         match value_operator {
             SerdeOperator::Unit
@@ -511,7 +506,10 @@ impl<'d, 'e> Serialize for SchemaReference<'d, 'e> {
                 .compose(self.ctx.ref_link(union_op.union_def()))
                 .serialize(serializer),
             SerdeOperator::IdSingletonStruct(_entity_id, name, id_operator_addr) => self
-                .compose(self.ctx.singleton_object(name.as_str(), *id_operator_addr))
+                .compose(
+                    self.ctx
+                        .singleton_object(&self.ctx.ontology[*name], *id_operator_addr),
+                )
                 .serialize(serializer),
             SerdeOperator::Struct(struct_op) => self
                 .compose(self.ctx.ref_link(struct_op.def))
@@ -758,7 +756,7 @@ impl SchemaGraphBuilder {
             return;
         }
 
-        let operator = ontology.get_serde_operator(addr);
+        let operator = &ontology[addr];
 
         match operator {
             SerdeOperator::Unit

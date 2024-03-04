@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
+    debug::NoFmt,
     interface::{
         discriminator::{VariantDiscriminator, VariantPurpose},
         serde::{
@@ -13,6 +14,7 @@ use ontol_runtime::{
             SerdeDef, SerdeModifier,
         },
     },
+    text::TextConstant,
     value::PropertyId,
     value_generator::ValueGenerator,
     DefId, Role,
@@ -265,7 +267,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         map_count += 1;
                     } else {
                         let operator = &self.operators_by_addr[discriminator.addr.0 as usize];
-                        debug!("SKIPPED SOMETHING: {operator:?}\n\n");
+                        debug!(
+                            "SKIPPED SOMETHING: {operator:?}\n\n",
+                            operator = NoFmt(operator)
+                        );
                     }
                 }
 
@@ -286,7 +291,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         &mut self,
         addr: SerdeOperatorAddr,
         def: SerdeDef,
-        typename: &'c str,
+        typename: TextConstant,
         properties: &'c Properties,
     ) {
         let _entered = debug_span!("lazy_union", def=?def.def_id).entered();
@@ -410,7 +415,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         }
 
         self.operators_by_addr[addr.0 as usize] =
-            SerdeOperator::Union(UnionOperator::new(typename.into(), def, variants));
+            SerdeOperator::Union(UnionOperator::new(typename, def, variants));
     }
 }
 

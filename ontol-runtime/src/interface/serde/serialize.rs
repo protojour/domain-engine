@@ -141,10 +141,10 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                     }
                 }
             }
-            (SerdeOperator::IdSingletonStruct(_, name, inner_addr), _) => {
+            (SerdeOperator::IdSingletonStruct(_, name_constant, inner_addr), _) => {
                 let mut map = serializer.serialize_map(Some(1 + option_len(&rel_params)))?;
                 map.serialize_entry(
-                    name,
+                    &self.ontology[*name_constant],
                     &Proxy {
                         value,
                         rel_params: None,
@@ -341,21 +341,21 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                     if serde_prop.is_optional_for(self.mode, &self.profile.flags) {
                         continue;
                     } else {
-                        match self.ontology.get_serde_operator(serde_prop.value_addr) {
+                        match &self.ontology[serde_prop.value_addr] {
                             SerdeOperator::Struct(struct_op) => {
                                 if struct_op.properties.is_empty() {
                                     &unit_attr
                                 } else {
                                     panic!(
                                         "While serializing value {:?} with `{}`, the expected value was a non-empty struct, but found unit",
-                                        value, struct_op.typename
+                                        value, &self.ontology[struct_op.typename]
                                     )
                                 }
                             }
                             _ => {
                                 panic!(
                                     "While serializing value {:?} with `{}`, property `{}` was not found.",
-                                    value, struct_op.typename, name
+                                    value, &self.ontology[struct_op.typename], name
                                 )
                             }
                         }

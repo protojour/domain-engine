@@ -1,5 +1,6 @@
 use indexmap::IndexMap;
 use ontol_runtime::{
+    debug::NoFmt,
     interface::serde::SerdeDef,
     interface::{
         graphql::{
@@ -731,6 +732,6 @@ pub(super) fn get_native_scalar_kind(
         | SerdeOperator::Struct(_)
         | SerdeOperator::DynamicSequence
         | SerdeOperator::RelationSequence(_)
-        | SerdeOperator::ConstructorSequence(_)) => panic!("not a native scalar: {op:?}"),
+        | SerdeOperator::ConstructorSequence(_)) => panic!("not a native scalar: {:?}", NoFmt(op)),
     }
 }

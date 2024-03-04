@@ -125,7 +125,9 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                 string.pop();
                 Value::Text(string.into(), *def_id)
             }
-            SerdeOperator::StringConstant(s, def_id) => Value::Text(s.clone(), *def_id),
+            SerdeOperator::StringConstant(constant, def_id) => {
+                Value::Text(self.ontology[*constant].into(), *def_id)
+            }
             SerdeOperator::TextPattern(def_id) => {
                 if let Some(string_like_type) = self.ontology.get_text_like_type(*def_id) {
                     match string_like_type {

@@ -63,7 +63,7 @@ impl<'e> ObjectGenerator<'e> {
         type_info: &TypeInfo,
         addr: SerdeOperatorAddr,
     ) {
-        let operator = self.ontology.get_serde_operator(addr);
+        let operator = &self.ontology[addr];
         let id_relationship = type_info
             .entity_info()
             .map(|entity_info| entity_info.id_relationship_id);
@@ -143,7 +143,7 @@ impl<'e> ObjectGenerator<'e> {
     }
 
     fn property_def_id(&self, property: &SerdeProperty) -> DefId {
-        let operator = self.ontology.get_serde_operator(property.value_addr);
+        let operator = &self.ontology[property.value_addr];
         self.operator_def_id(operator)
     }
 
@@ -168,7 +168,7 @@ impl<'e> ObjectGenerator<'e> {
             SerdeOperator::Union(union_op) => union_op.union_def().def_id,
             SerdeOperator::Struct(struct_op) => struct_op.def.def_id,
             SerdeOperator::IdSingletonStruct(.., addr) => {
-                self.operator_def_id(self.ontology.get_serde_operator(*addr))
+                self.operator_def_id(&self.ontology[*addr])
             }
         }
     }

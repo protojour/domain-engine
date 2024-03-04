@@ -12,6 +12,7 @@ use smartstring::alias::String;
 use crate::{
     impl_ontol_debug,
     interface::discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
+    text::TextConstant,
     value::PropertyId,
     value_generator::ValueGenerator,
     DefId,
@@ -34,7 +35,7 @@ impl ::std::fmt::Debug for SerdeOperatorAddr {
 
 impl_ontol_debug!(SerdeOperatorAddr);
 
-#[derive(Serialize, Deserialize, OntolDebug, Debug)]
+#[derive(Serialize, Deserialize, OntolDebug)]
 pub enum SerdeOperator {
     Unit,
     True(DefId),
@@ -45,7 +46,7 @@ pub enum SerdeOperator {
     F64(DefId, Option<RangeInclusive<f64>>),
     Serial(DefId),
     String(DefId),
-    StringConstant(String, DefId),
+    StringConstant(TextConstant, DefId),
 
     /// Always deserializes into text, ignores capture groups:
     TextPattern(DefId),
@@ -75,10 +76,10 @@ pub enum SerdeOperator {
     Struct(StructOperator),
 
     /// A map with one property: The ID of an entity.
-    IdSingletonStruct(DefId, String, SerdeOperatorAddr),
+    IdSingletonStruct(DefId, TextConstant, SerdeOperatorAddr),
 }
 
-#[derive(Serialize, Deserialize, OntolDebug, Debug)]
+#[derive(Serialize, Deserialize, OntolDebug)]
 pub struct RelationSequenceOperator {
     // note: This is constant size array so that it can produce a dynamic slice
     pub ranges: [SequenceRange; 1],
@@ -86,7 +87,7 @@ pub struct RelationSequenceOperator {
     pub to_entity: bool,
 }
 
-#[derive(Serialize, Deserialize, OntolDebug, Debug)]
+#[derive(Serialize, Deserialize, OntolDebug)]
 pub struct ConstructorSequenceOperator {
     pub ranges: SmallVec<[SequenceRange; 3]>,
     pub def: SerdeDef,
@@ -112,7 +113,7 @@ impl ConstructorSequenceOperator {
 }
 
 /// A matcher for a range within a sequence
-#[derive(Clone, Serialize, Deserialize, OntolDebug, Debug)]
+#[derive(Clone, Serialize, Deserialize, OntolDebug)]
 pub struct SequenceRange {
     /// Operator to use for this range
     pub addr: SerdeOperatorAddr,
@@ -122,23 +123,27 @@ pub struct SequenceRange {
     pub finite_repetition: Option<u16>,
 }
 
-#[derive(Serialize, Deserialize, OntolDebug, Debug)]
+#[derive(Serialize, Deserialize, OntolDebug)]
 pub struct AliasOperator {
-    pub typename: String,
+    pub typename: TextConstant,
     pub def: SerdeDef,
     pub inner_addr: SerdeOperatorAddr,
 }
 
-#[derive(Serialize, Deserialize, OntolDebug, Debug)]
+#[derive(Serialize, Deserialize, OntolDebug)]
 pub struct UnionOperator {
-    typename: String,
+    typename: TextConstant,
     union_def: SerdeDef,
     variants: Vec<SerdeUnionVariant>,
 }
 
 impl UnionOperator {
     /// Note: variants must be sorted according to their purpose (VariantPurpose)
-    pub fn new(typename: String, union_def: SerdeDef, variants: Vec<SerdeUnionVariant>) -> Self {
+    pub fn new(
+        typename: TextConstant,
+        union_def: SerdeDef,
+        variants: Vec<SerdeUnionVariant>,
+    ) -> Self {
         variants.iter().fold(
             VariantPurpose::Identification {
                 entity_id: DefId::unit(),
@@ -158,8 +163,8 @@ impl UnionOperator {
         }
     }
 
-    pub fn typename(&self) -> &String {
-        &self.typename
+    pub fn typename(&self) -> TextConstant {
+        self.typename
     }
 
     pub fn union_def(&self) -> SerdeDef {
@@ -279,15 +284,15 @@ pub struct PossibleVariant<'on> {
     pub serde_def: SerdeDef,
 }
 
-#[derive(Clone, Serialize, Deserialize, OntolDebug, Debug)]
+#[derive(Clone, Serialize, Deserialize, OntolDebug)]
 pub struct SerdeUnionVariant {
     pub discriminator: VariantDiscriminator,
     pub addr: SerdeOperatorAddr,
 }
 
-#[derive(Clone, Serialize, Deserialize, OntolDebug, Debug)]
+#[derive(Clone, Serialize, Deserialize, OntolDebug)]
 pub struct StructOperator {
-    pub typename: String,
+    pub typename: TextConstant,
     pub def: SerdeDef,
     pub flags: SerdeStructFlags,
     pub properties: IndexMap<String, SerdeProperty>,
@@ -323,7 +328,7 @@ impl StructOperator {
     }
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, OntolDebug, Debug)]
+#[derive(Clone, Copy, Serialize, Deserialize, OntolDebug)]
 pub struct SerdeProperty {
     /// The ID of this property
     pub property_id: PropertyId,
@@ -414,7 +419,7 @@ impl SerdeProperty {
 
 bitflags::bitflags! {
     #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Serialize, Deserialize, Debug)]
-    pub struct SerdePropertyFlags: u32 {
+    pub struct SerdePropertyFlags: u8 {
         const OPTIONAL        = 0b00000001;
         const READ_ONLY       = 0b00000010;
         const ENTITY_ID       = 0b00000100;
@@ -425,7 +430,7 @@ bitflags::bitflags! {
 
 bitflags::bitflags! {
     #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Serialize, Deserialize, Debug)]
-    pub struct SerdeStructFlags: u32 {
+    pub struct SerdeStructFlags: u8 {
         /// This struct operator supports open/domainless properties
         const OPEN_DATA          = 0b00000001;
         const ENTITY_ID_OPTIONAL = 0b00000010;

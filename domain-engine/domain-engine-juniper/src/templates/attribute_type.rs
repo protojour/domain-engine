@@ -396,9 +396,7 @@ impl<'v> AttributeType<'v> {
             }
             Err(scalar_ref) => match (
                 type_ref.modifier,
-                schema_ctx
-                    .ontology
-                    .get_serde_operator(scalar_ref.operator_addr),
+                &schema_ctx.ontology[scalar_ref.operator_addr],
             ) {
                 (TypeModifier::Array { .. }, SerdeOperator::RelationSequence(operator)) => {
                     let attributes = attribute.val.cast_ref::<Vec<_>>();

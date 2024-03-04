@@ -12,7 +12,7 @@ use crate::text::TextConstant;
 ///
 /// This trait can be derived using [ontol_macros].
 pub trait OntolDebug {
-    fn fmt(&self, ctx: &dyn OntolFormatter, f: &mut Formatter<'_>) -> Result;
+    fn fmt(&self, ontol_fmt: &dyn OntolFormatter, f: &mut Formatter<'_>) -> Result;
 }
 
 /// A debugging context for [OntolDebug].
@@ -28,7 +28,7 @@ pub trait OntolFormatter {
 pub struct Fmt<'on, T>(pub &'on dyn OntolFormatter, pub T);
 
 /// A type that provides [Debug] for [OntolDebug] T's, but uses a dummy [OntolFormatter].
-pub struct NoFmt<T>(pub T);
+pub struct NoFmt<T: ?Sized>(pub T);
 
 impl OntolFormatter for () {
     fn fmt_text_constant(&self, constant: TextConstant, f: &mut Formatter<'_>) -> Result {
@@ -36,16 +36,19 @@ impl OntolFormatter for () {
     }
 }
 
-impl<'on, T: ?Sized> std::fmt::Debug for Fmt<'on, &'on T>
+impl<'on, T> std::fmt::Debug for Fmt<'on, &'on T>
 where
-    T: OntolDebug,
+    T: ?Sized + OntolDebug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         <T as OntolDebug>::fmt(self.1, self.0, f)
     }
 }
 
-impl<T: OntolDebug> std::fmt::Debug for NoFmt<T> {
+impl<T> std::fmt::Debug for NoFmt<T>
+where
+    T: ?Sized + OntolDebug,
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         <T as OntolDebug>::fmt(&self.0, &(), f)
     }
@@ -83,7 +86,7 @@ impl_ontol_debug!(std::string::String);
 impl_ontol_debug!(smartstring::alias::String);
 impl_ontol_debug!(bit_vec::BitVec);
 
-impl<'a, T: OntolDebug> OntolDebug for &'a T {
+impl<'a, T: ?Sized + OntolDebug> OntolDebug for &'a T {
     fn fmt(&self, ofmt: &dyn OntolFormatter, f: &mut Formatter<'_>) -> Result {
         (*self).fmt(ofmt, f)
     }
@@ -133,6 +136,12 @@ impl<T: OntolDebug> OntolDebug for [T] {
         f.debug_list()
             .entries(self.iter().map(|el| Fmt(ofmt, el)))
             .finish()
+    }
+}
+
+impl<T: ?Sized + OntolDebug> OntolDebug for Box<T> {
+    fn fmt(&self, ofmt: &dyn OntolFormatter, f: &mut Formatter<'_>) -> Result {
+        <T as OntolDebug>::fmt(self.as_ref(), ofmt, f)
     }
 }
 

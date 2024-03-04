@@ -2,7 +2,10 @@ use std::{borrow::Cow, collections::HashMap, ops::Range};
 
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    ontology::Cardinality, text_like_types::TextLikeType, var::VarAllocator, vm::proc::BuiltinProc,
+    ontology::{BasicTypeInfo, Cardinality, TypeKind},
+    text_like_types::TextLikeType,
+    var::VarAllocator,
+    vm::proc::BuiltinProc,
     DefId, PackageId, RelationshipId, Role,
 };
 use smartstring::alias::String;
@@ -66,6 +69,16 @@ impl<'m> DefKind<'m> {
             Self::Constant(_) => None,
             Self::Mapping { ident, .. } => ident.map(|ident| ident.into()),
             Self::AutoMapping => None,
+        }
+    }
+
+    pub fn as_ontology_type_kind(&self, info: BasicTypeInfo) -> TypeKind {
+        match self {
+            DefKind::BuiltinRelType(..) => TypeKind::Relationship(info),
+            DefKind::Fn(_) => TypeKind::Function(info),
+            DefKind::EmptySequence => TypeKind::Generator(info),
+            DefKind::Package(_) => TypeKind::Domain(info),
+            _ => TypeKind::Data(info),
         }
     }
 }
