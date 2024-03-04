@@ -12,6 +12,7 @@ use tracing::debug;
 use crate::{
     regex_util::{self, set_of_all_strings, unsigned_integer_with_radix},
     relation::Constructor,
+    strings::Strings,
     Compiler,
 };
 
@@ -151,6 +152,7 @@ impl TextPatternSegment {
         &self,
         parts: &mut Vec<TextPatternConstantPart>,
         capture_cursor: &mut CaptureCursor,
+        strings: &mut Strings,
     ) {
         match self {
             Self::EmptyString => {}
@@ -160,14 +162,16 @@ impl TextPatternSegment {
                 });
             }
             Self::Literal(string) => {
-                parts.push(TextPatternConstantPart::Literal(string.clone()));
+                let constant = strings.intern_constant(string);
+                parts.push(TextPatternConstantPart::Literal(constant));
             }
             Self::Serial { .. } => {}
             Self::Regex(hir) => {
                 let mut string = String::new();
                 regex_util::collect_hir_constant_parts(hir, &mut string);
                 if !string.is_empty() {
-                    parts.push(TextPatternConstantPart::Literal(string));
+                    let constant = strings.intern_constant(&string);
+                    parts.push(TextPatternConstantPart::Literal(constant));
                 }
             }
             Self::Property {
@@ -184,7 +188,7 @@ impl TextPatternSegment {
             }
             Self::Concat(segments) => {
                 for segment in segments {
-                    segment.collect_constant_parts(parts, capture_cursor);
+                    segment.collect_constant_parts(parts, capture_cursor, strings);
                 }
             }
             Self::Alternation(_) => {}
@@ -226,14 +230,20 @@ fn compile_text_pattern_constructors(compiler: &mut Compiler) {
             _ => panic!("{def_id:?} does not have a string pattern constructor"),
         };
 
-        store_text_pattern_segment(&mut compiler.text_patterns, def_id, segment);
+        store_text_pattern_segment(
+            def_id,
+            segment,
+            &mut compiler.text_patterns,
+            &mut compiler.strings,
+        );
     }
 }
 
 pub fn store_text_pattern_segment(
-    patterns: &mut TextPatterns,
     def_id: DefId,
     segment: &TextPatternSegment,
+    patterns: &mut TextPatterns,
+    strings: &mut Strings,
 ) {
     let anchored_hir = Hir::concat(vec![
         Hir::look(Look::Start),
@@ -242,7 +252,7 @@ pub fn store_text_pattern_segment(
     ]);
 
     let mut constant_parts = vec![];
-    segment.collect_constant_parts(&mut constant_parts, &mut CaptureCursor(1));
+    segment.collect_constant_parts(&mut constant_parts, &mut CaptureCursor(1), strings);
 
     patterns.text_patterns.insert(
         def_id,

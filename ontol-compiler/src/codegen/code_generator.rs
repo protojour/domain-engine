@@ -25,6 +25,7 @@ use crate::{
     },
     error::CompileError,
     primitive::Primitives,
+    strings::Strings,
     typed_hir::{HirFunc, TypedArena, TypedHir, TypedNodeRef},
     types::{Type, UNIT_TYPE},
     CompileErrors, Compiler, SourceSpan,
@@ -41,8 +42,7 @@ pub(super) fn const_codegen<'m>(
     expr: ontol_hir::RootNode<'m, TypedHir>,
     def_id: DefId,
     proc_table: &mut ProcTable,
-    compiler: &Compiler<'m>,
-    errors: &mut CompileErrors,
+    compiler: &mut Compiler<'m>,
 ) {
     let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs, &compiler.seal_ctx);
 
@@ -55,7 +55,8 @@ pub(super) fn const_codegen<'m>(
     let mut generator = CodeGenerator {
         proc_table,
         builder: &mut builder,
-        errors,
+        errors: &mut compiler.errors,
+        strings: &mut compiler.strings,
         primitives: &compiler.primitives,
         type_mapper,
         scope: Default::default(),
@@ -74,8 +75,7 @@ pub(super) fn map_codegen<'m>(
     proc_table: &mut ProcTable,
     func: &HirFunc<'m>,
     map_flags: MapFlags,
-    compiler: &Compiler<'m>,
-    errors: &mut CompileErrors,
+    compiler: &mut Compiler<'m>,
 ) -> MapKey {
     let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs, &compiler.seal_ctx);
 
@@ -105,7 +105,8 @@ pub(super) fn map_codegen<'m>(
     let mut generator = CodeGenerator {
         proc_table,
         builder: &mut builder,
-        errors,
+        errors: &mut compiler.errors,
+        strings: &mut compiler.strings,
         primitives: &compiler.primitives,
         type_mapper,
         scope: Default::default(),
@@ -151,6 +152,7 @@ pub(super) struct CodeGenerator<'a, 'm> {
     proc_table: &'a mut ProcTable,
     pub builder: &'a mut ProcBuilder,
     pub errors: &'a mut CompileErrors,
+    pub strings: &'a mut Strings<'m>,
     #[allow(unused)]
     pub primitives: &'a Primitives,
     pub type_mapper: TypeMapper<'a, 'm>,
@@ -480,8 +482,9 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 );
             }
             ontol_hir::Kind::Text(string) => {
+                let constant = self.strings.intern_constant(string);
                 block.op(
-                    OpCode::String(string.clone(), ty.get_single_def_id().unwrap()),
+                    OpCode::String(constant, ty.get_single_def_id().unwrap()),
                     Delta(1),
                     span,
                     self.builder,

@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use juniper::{GraphQLValue, ID};
 use ontol_runtime::{
+    debug::NoFmt,
     interface::graphql::{
         argument::{ArgKind, DomainFieldArg, FieldArg},
         data::{
@@ -14,7 +15,7 @@ use ontol_runtime::{
         discriminator::VariantPurpose,
         graphql::argument::DefaultArg,
         serde::{
-            operator::{FilteredVariants, SerdeOperator, SerdeOperatorAddr, SerdePropertyFlags},
+            operator::{AppliedVariants, SerdeOperator, SerdeOperatorAddr, SerdePropertyFlags},
             processor::ProcessorProfileFlags,
         },
     },
@@ -120,7 +121,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         typing_purpose: TypingPurpose,
         filter: ArgumentFilter,
     ) -> Result<(), CollectOperatorError> {
-        let serde_operator = self.schema_ctx.ontology.get_serde_operator(operator_addr);
+        let serde_operator = &self.schema_ctx.ontology[operator_addr];
 
         match serde_operator {
             SerdeOperator::Struct(struct_op) => {
@@ -175,8 +176,8 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             }
             SerdeOperator::Union(union_op) => {
                 let (mode, level) = typing_purpose.mode_and_level();
-                match union_op.variants(mode, level) {
-                    FilteredVariants::Single(operator_addr) => {
+                match union_op.applied_variants(mode, level) {
+                    AppliedVariants::Unambiguous(operator_addr) => {
                         self.collect_operator_arguments(
                             operator_addr,
                             output,
@@ -184,14 +185,17 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                             filter,
                         )?;
                     }
-                    FilteredVariants::Union(variants) => {
-                        debug!("UNION ARGUMENTS for {:?}", union_op.unfiltered_variants());
+                    AppliedVariants::OneOf(possible_variants) => {
+                        debug!(
+                            "UNION ARGUMENTS for {:?}",
+                            NoFmt(union_op.unfiltered_variants())
+                        );
 
                         // FIXME: Instead of just deduplicating the properties,
                         // the documentation for each of them should be combined in some way.
                         // When a union is used as an InputValue, the GraphQL functions purely
                         // as a documentation layer anyway.
-                        for variant in variants {
+                        for variant in possible_variants {
                             self.collect_operator_arguments(
                                 variant.addr,
                                 output,
@@ -204,9 +208,9 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                             )?;
                         }
 
-                        for variant in variants {
-                            match variant.discriminator.purpose {
-                                VariantPurpose::Data => {
+                        for variant in possible_variants {
+                            match variant.purpose {
+                                VariantPurpose::Data | VariantPurpose::RawDynamicEntity => {
                                     self.collect_operator_arguments(
                                         variant.addr,
                                         output,
@@ -236,7 +240,8 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
 
                 Ok(())
             }
-            SerdeOperator::IdSingletonStruct(property_name, id_operator_addr) => {
+            SerdeOperator::IdSingletonStruct(_entity_id, property_name, id_operator_addr) => {
+                let property_name = &self.schema_ctx.ontology[*property_name];
                 if filter.filter_property(property_name, None, output) {
                     output.push(self.get_operator_argument(
                         property_name,
@@ -263,10 +268,13 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         modifier: TypeModifier,
         typing_purpose: TypingPurpose,
     ) -> juniper::meta::Argument<'r, GqlScalar> {
-        let operator = self.schema_ctx.ontology.get_serde_operator(operator_addr);
+        let operator = &self.schema_ctx.ontology[operator_addr];
 
         let _entered = trace_span!("arg", name = ?name).entered();
-        trace!("register argument: {operator:?}");
+        trace!(
+            "register argument: {:?}",
+            self.schema_ctx.ontology.debug(operator)
+        );
 
         if property_flags.contains(SerdePropertyFlags::ENTITY_ID) {
             return self.modified_arg::<ID>(name, modifier, &());
@@ -371,7 +379,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 // If this is an entity, use Edge + ReferenceInput
                 // to get the option of just specifying an ID.
                 // TODO: Ensure this for create mutations only
-                let (query_level, typing_purpose) = if type_info.entity_info.is_some() {
+                let (query_level, typing_purpose) = if type_info.entity_info().is_some() {
                     (
                         QueryLevel::Edge { rel_params: None },
                         TypingPurpose::InputOrReference,
@@ -382,8 +390,8 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
 
                 let (mode, level) = typing_purpose.mode_and_level();
 
-                match union_op.variants(mode, level) {
-                    FilteredVariants::Single(single_addr) => self.get_operator_argument(
+                match union_op.applied_variants(mode, level) {
+                    AppliedVariants::Unambiguous(single_addr) => self.get_operator_argument(
                         name,
                         single_addr,
                         rel_params,
@@ -391,12 +399,15 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         modifier,
                         typing_purpose,
                     ),
-                    FilteredVariants::Union(_variants) => {
+                    AppliedVariants::OneOf(_variants) => {
                         let type_addr = self
                             .schema_ctx
                             .type_addr_by_def(def_id, query_level)
                             .unwrap_or_else(|| {
-                                panic!("no union found: {def_id:?}. union_op={union_op:#?}")
+                                panic!(
+                                    "no union found: {def_id:?}. union_op={union_op:#?}",
+                                    union_op = NoFmt(union_op)
+                                )
                             });
 
                         let info = self.schema_ctx.get_schema_type(type_addr, typing_purpose);
@@ -419,7 +430,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         let type_info = self.schema_ctx.ontology.get_type_info(def_id);
                         panic!(
                             "struct not found for {def_id:?} {name:?}",
-                            name = type_info.name
+                            name = self.schema_ctx.ontology.debug(&type_info.name())
                         );
                     });
 

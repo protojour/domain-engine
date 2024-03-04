@@ -11,8 +11,8 @@ use smartstring::alias::String;
 use thin_vec::ThinVec;
 
 use crate::{
-    cast::Cast, condition::Condition, ontology::Ontology, sequence::Sequence, DefId, PackageId,
-    RelationshipId, Role,
+    cast::Cast, condition::Condition, impl_ontol_debug, ontology::Ontology, sequence::Sequence,
+    DefId, PackageId, RelationshipId, Role,
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -310,6 +310,8 @@ impl Debug for PropertyId {
         write!(f, "{self}")
     }
 }
+
+impl_ontol_debug!(PropertyId);
 
 impl PropertyId {
     pub const fn subject(relationship_id: RelationshipId) -> Self {

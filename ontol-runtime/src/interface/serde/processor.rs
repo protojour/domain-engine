@@ -1,12 +1,15 @@
 use std::fmt::{Debug, Display};
 
+use ontol_macros::OntolDebug;
+
 use crate::{
     format_utils::{Backticks, CommaSeparated, DoubleQuote},
     ontology::Ontology,
     value::PropertyId,
+    DefId,
 };
 
-use super::operator::{FilteredVariants, SerdeOperator, SerdeOperatorAddr, SerdePropertyFlags};
+use super::operator::{AppliedVariants, SerdeOperator, SerdeOperatorAddr, SerdePropertyFlags};
 
 /// SerdeProcessor handles serializing and deserializing domain types in an optimized way.
 /// Each serde-enabled type has its own operator, which is cached
@@ -21,7 +24,7 @@ pub struct SerdeProcessor<'on, 'p> {
     /// The ontology, via which new SerdeOperators can be created.
     pub(crate) ontology: &'on Ontology,
 
-    pub(crate) profile: &'p ProcessorProfile,
+    pub(crate) profile: &'p ProcessorProfile<'p>,
 
     pub(crate) mode: ProcessorMode,
     pub(crate) level: ProcessorLevel,
@@ -34,7 +37,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
     }
 
     /// Set the processor profile to be used with this processor
-    pub fn with_profile(self, profile: &'p ProcessorProfile) -> Self {
+    pub fn with_profile(self, profile: &'p ProcessorProfile<'p>) -> Self {
         Self { profile, ..self }
     }
 
@@ -46,7 +49,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
     /// Return a processor that helps to _narrow the value_ that this processor represents.
     pub fn narrow(&self, addr: SerdeOperatorAddr) -> Self {
         Self {
-            value_operator: self.ontology.get_serde_operator(addr),
+            value_operator: &self.ontology[addr],
             ..*self
         }
     }
@@ -54,7 +57,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
     /// Return a processor that helps to _narrow the value_ that this processor represents.
     pub fn narrow_with_context(&self, addr: SerdeOperatorAddr, ctx: SubProcessorContext) -> Self {
         Self {
-            value_operator: self.ontology.get_serde_operator(addr),
+            value_operator: &self.ontology[addr],
             ctx,
             ..*self
         }
@@ -68,7 +71,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
     /// Return a processor that processes a new value that is a child value (i.e. increases the recursion level) of this processor.
     pub fn new_child(&self, addr: SerdeOperatorAddr) -> Result<Self, RecursionLimitError> {
         Ok(Self {
-            value_operator: self.ontology.get_serde_operator(addr),
+            value_operator: &self.ontology[addr],
             ctx: Default::default(),
             level: self.level.child()?,
             ..*self
@@ -81,7 +84,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         addr: SerdeOperatorAddr,
     ) -> Result<Self, RecursionLimitError> {
         Ok(Self {
-            value_operator: self.ontology.get_serde_operator(addr),
+            value_operator: &self.ontology[addr],
             ctx: SubProcessorContext {
                 is_update: self.ctx.is_update,
                 ..Default::default()
@@ -97,7 +100,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         ctx: SubProcessorContext,
     ) -> Result<Self, RecursionLimitError> {
         Ok(Self {
-            value_operator: self.ontology.get_serde_operator(addr),
+            value_operator: &self.ontology[addr],
             ctx,
             level: self.level.child()?,
             ..*self
@@ -122,18 +125,21 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 
     fn search_property(&self, prop: &str, operator: &'on SerdeOperator) -> Option<PropertyId> {
         match operator {
-            SerdeOperator::Union(union_op) => match union_op.variants(self.mode, self.level) {
-                FilteredVariants::Single(addr) => self.narrow(addr).find_property(prop),
-                FilteredVariants::Union(variants) => {
-                    for variant in variants {
-                        if let Some(property_id) = self.narrow(variant.addr).find_property(prop) {
-                            return Some(property_id);
+            SerdeOperator::Union(union_op) => {
+                match union_op.applied_variants(self.mode, self.level) {
+                    AppliedVariants::Unambiguous(addr) => self.narrow(addr).find_property(prop),
+                    AppliedVariants::OneOf(possible_variants) => {
+                        for variant in possible_variants {
+                            if let Some(property_id) = self.narrow(variant.addr).find_property(prop)
+                            {
+                                return Some(property_id);
+                            }
                         }
-                    }
 
-                    None
+                        None
+                    }
                 }
-            },
+            }
             SerdeOperator::Struct(struct_op) => struct_op
                 .properties
                 .get(prop)
@@ -166,18 +172,60 @@ pub struct ProcessorLevel {
     local_level: u8,
 }
 
-#[derive(Clone, Default)]
-pub struct ProcessorProfile {
-    pub overridden_id_property_key: Option<&'static str>,
-    pub ignored_property_keys: &'static [&'static str],
+#[derive(Clone)]
+pub struct ProcessorProfile<'p> {
     pub id_format: ScalarFormat,
     pub flags: ProcessorProfileFlags,
+    pub api: &'p (dyn ProcessorProfileApi + Send + Sync),
 }
 
-impl ProcessorProfile {
+impl<'p> Default for ProcessorProfile<'p> {
+    fn default() -> Self {
+        DOMAIN_PROFILE.clone()
+    }
+}
+
+impl<'p> ProcessorProfile<'p> {
     pub fn with_flags(self, flags: ProcessorProfileFlags) -> Self {
         Self { flags, ..self }
     }
+}
+
+/// The standard profile for domain serialization/deserialization
+pub(crate) static DOMAIN_PROFILE: ProcessorProfile = ProcessorProfile {
+    id_format: ScalarFormat::DomainTransparent,
+    flags: ProcessorProfileFlags::empty(),
+    api: &(),
+};
+
+pub trait ProcessorProfileApi {
+    fn lookup_special_property(&self, key: &str) -> Option<SpecialProperty>;
+    fn find_special_property_name(&self, prop: SpecialProperty) -> Option<&str>;
+    fn annotate_type(&self, input: &serde_value::Value) -> Option<DefId>;
+}
+
+impl ProcessorProfileApi for () {
+    fn lookup_special_property(&self, _key: &str) -> Option<SpecialProperty> {
+        None
+    }
+
+    fn find_special_property_name(&self, _prop: SpecialProperty) -> Option<&str> {
+        None
+    }
+
+    fn annotate_type(&self, _input: &serde_value::Value) -> Option<DefId> {
+        None
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum SpecialProperty {
+    /// A special hard-coded property name that always represents an entity ID
+    IdOverride,
+    /// A special hard-coded property that acts like a type annotation
+    TypeAnnotation,
+    /// A special property name that's always ignored by ONTOL
+    Ignored,
 }
 
 #[derive(Clone, Copy, Default, Debug)]
@@ -206,14 +254,6 @@ bitflags::bitflags! {
         const ALLOW_STRUCTURALLY_CIRCULAR_PROPS = 0b00001000;
     }
 }
-
-/// The standard profile for domain serialization/deserialization
-pub(crate) static DOMAIN_PROFILE: ProcessorProfile = ProcessorProfile {
-    overridden_id_property_key: None,
-    ignored_property_keys: &[],
-    id_format: ScalarFormat::DomainTransparent,
-    flags: ProcessorProfileFlags::empty(),
-};
 
 /// Maximum number of nested/recursive operators.
 const DEFAULT_RECURSION_LIMIT: u16 = 64;
@@ -290,7 +330,7 @@ impl RecursionLimitError {
     }
 }
 
-#[derive(Clone, Copy, Default, Debug)]
+#[derive(Clone, Copy, Default, OntolDebug)]
 pub struct SubProcessorContext {
     pub is_update: bool,
     pub parent_property_id: Option<PropertyId>,
@@ -305,12 +345,23 @@ pub struct SubProcessorContext {
     pub rel_params_addr: Option<SerdeOperatorAddr>,
 }
 
+impl SubProcessorContext {
+    pub const fn entity_id() -> Self {
+        Self {
+            is_update: false,
+            parent_property_id: None,
+            parent_property_flags: SerdePropertyFlags::ENTITY_ID,
+            rel_params_addr: None,
+        }
+    }
+}
+
 impl<'on, 'p> Debug for SerdeProcessor<'on, 'p> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // This structure might contain cycles (through operator addr),
         // so just print the topmost level.
         f.debug_struct("SerdeProcessor")
-            .field("operator", self.value_operator)
+            .field("operator", &self.ontology.debug(self.value_operator))
             .field("rel_params_addr", &self.ctx.rel_params_addr)
             .finish()
     }
@@ -355,7 +406,9 @@ impl<'on, 'p> Display for SerdeProcessor<'on, 'p> {
             },
             SerdeOperator::Serial(_) => write!(f, "`serial`"),
             SerdeOperator::String(_) => write!(f, "`string`"),
-            SerdeOperator::StringConstant(lit, _) => DoubleQuote(lit).fmt(f),
+            SerdeOperator::StringConstant(constant, _) => {
+                DoubleQuote(&self.ontology[*constant]).fmt(f)
+            }
             SerdeOperator::TextPattern(_) | SerdeOperator::CapturingTextPattern(_) => {
                 write!(f, "`text_pattern`")
             }
@@ -388,10 +441,12 @@ impl<'on, 'p> Display for SerdeProcessor<'on, 'p> {
                     processors = CommaSeparated(&processors)
                 )
             }
-            SerdeOperator::Alias(alias_op) => Backticks(&alias_op.typename).fmt(f),
+            SerdeOperator::Alias(alias_op) => Backticks(&self.ontology[alias_op.typename]).fmt(f),
             SerdeOperator::Union(_) => write!(f, "union"),
             SerdeOperator::IdSingletonStruct(..) => write!(f, "id"),
-            SerdeOperator::Struct(struct_op) => Backticks(&struct_op.typename).fmt(f),
+            SerdeOperator::Struct(struct_op) => {
+                Backticks(&self.ontology[struct_op.typename]).fmt(f)
+            }
         }
     }
 }

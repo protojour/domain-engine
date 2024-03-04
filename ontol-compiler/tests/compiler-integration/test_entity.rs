@@ -191,7 +191,7 @@ fn artist_and_instrument_id_as_relation_object() {
     });
 
     let john = serde_create(&artist)
-        .to_value_raw(json!({
+        .to_value_nocheck(json!({
                 "name": "John McLaughlin",
                 "plays": [
                     {
@@ -325,6 +325,14 @@ fn entity_union_simple() {
             "polyphony": 8,
         }
     );
+    assert_json_io_matches!(
+        serde_read(&instrument),
+        {
+            "instrument-id": "synth/a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8",
+            "type": "synth",
+            "polyphony": 8,
+        }
+    );
 }
 
 #[test]
@@ -367,8 +375,8 @@ fn entity_union_in_relation_with_ids() {
     let [artist, guitar_id, synth_id] = test.bind(["artist", "guitar_id", "synth_id"]);
     let plays = artist.find_property("plays").unwrap();
 
-    assert!(artist.type_info.entity_info.is_some());
-    assert!(guitar_id.type_info.entity_info.is_none());
+    assert!(artist.type_info.entity_info().is_some());
+    assert!(guitar_id.type_info.entity_info().is_none());
 
     let json = json!({
         "name": "Someone",
@@ -386,7 +394,9 @@ fn entity_union_in_relation_with_ids() {
         ]
     });
 
-    let artist_value = serde_create(&artist).to_value_raw(json.clone()).unwrap();
+    let artist_value = serde_create(&artist)
+        .to_value_nocheck(json.clone())
+        .unwrap();
 
     let plays_attributes = artist_value
         .get_attribute_value(plays)

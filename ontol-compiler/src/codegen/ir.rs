@@ -1,18 +1,19 @@
+use ontol_macros::OntolDebug;
 use ontol_runtime::{
     var::Var,
     vm::proc::{Local, OpCode, Predicate},
 };
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug, OntolDebug)]
 pub struct BlockLabel(pub Var);
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, OntolDebug)]
 pub struct BlockOffset(pub u32);
 
 /// "Intermediate representation" of opcodes.
 /// Some opcodes that involve branching use addresses,
 /// but these are not computed until the whole procedure is computed.
-#[derive(Debug)]
+#[derive(OntolDebug)]
 #[allow(unused)]
 pub enum Ir {
     /// Raw OpCode.
@@ -25,7 +26,7 @@ pub enum Ir {
     Iter(Local, Local, BlockLabel),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, OntolDebug)]
 pub enum Terminator {
     /// Return the top of the stack
     Return,

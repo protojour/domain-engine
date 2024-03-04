@@ -11,6 +11,7 @@ use ontol_runtime::{
         serde::{SerdeDef, SerdeModifier},
     },
     smart_format,
+    text::TextConstant,
     value::PropertyId,
     DefId, RelationshipId,
 };
@@ -25,6 +26,7 @@ use crate::{
     relation::{Constructor, Property},
     repr::repr_model::ReprKind,
     sequence::Sequence,
+    strings::Strings,
     text_patterns::TextPatternSegment,
     types::{FormatType, Type},
     SourceSpan, SpannedCompileError,
@@ -34,6 +36,8 @@ use super::TypeCheck;
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
     pub fn check_union(&mut self, value_union_def_id: DefId) -> Vec<SpannedCompileError> {
+        let mut strings = self.strings.detach();
+
         // An error set to avoid reporting the same error more than once
         let mut error_set = ErrorSet::default();
 
@@ -64,6 +68,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 variant_def_id,
                 &mut error_set,
                 span,
+                &mut strings,
             );
 
             if let Some(properties) = self.relations.properties_by_def_id(variant_def_id) {
@@ -76,6 +81,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         _ => String::from("id"),
                     };
 
+                    let name = strings.intern_constant(&name);
+
                     self.add_variant_to_builder(
                         &mut entity_id_builder,
                         VariantKey::IdProperty {
@@ -86,6 +93,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         identifies_meta.relationship.subject.0,
                         &mut error_set,
                         span,
+                        &mut strings,
                     );
                     entity_detector.entity_count += 1;
                 } else {
@@ -134,8 +142,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             &mut error_set,
         );
 
-        let mut union_discriminator =
-            self.make_union_discriminator(inherent_builder, DiscriminatorType::Data, &error_set);
+        let mut union_discriminator = self.make_union_discriminator(
+            inherent_builder,
+            DiscriminatorType::Data,
+            &error_set,
+            &mut strings,
+        );
 
         if let Some(EntitiesOnly(true)) = entities_only {
             for (_, errors) in error_set.errors.iter_mut() {
@@ -151,6 +163,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     entity_id_builder,
                     DiscriminatorType::Identification,
                     &error_set,
+                    &mut strings,
                 );
             }
         }
@@ -167,6 +180,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 .map(|(union_error, span)| self.make_compile_error(union_error).spanned(&span)),
         );
 
+        self.strings.attach(strings);
+
         errors
     }
 
@@ -177,6 +192,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         variant_def: DefId,
         error_set: &mut ErrorSet,
         span: &SourceSpan,
+        strings: &mut Strings<'m>,
     ) where
         't: 'b,
     {
@@ -230,6 +246,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             property_set,
                             span,
                             error_set,
+                            strings,
                         );
                     }
                     Ok(DomainTypeMatchData::Sequence(_)) => {
@@ -291,6 +308,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         property_set: &IndexMap<PropertyId, Property>,
         span: &SourceSpan,
         error_set: &mut ErrorSet,
+        strings: &mut Strings<'m>,
     ) {
         let mut map_discriminator_candidate = MapDiscriminatorCandidate {
             result_type: variant_def,
@@ -329,8 +347,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             relation_def_id: meta.relationship.relation_def_id,
                             discriminant: Discriminant::HasAttribute(
                                 property_id.relationship_id,
-                                property_name.into(),
-                                LeafDiscriminant::IsTextLiteral(string_literal.into()),
+                                strings.intern_constant(property_name),
+                                LeafDiscriminant::IsTextLiteral(
+                                    strings.intern_constant(string_literal),
+                                ),
                             ),
                         },
                     );
@@ -484,6 +504,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         builder: DiscriminatorBuilder,
         discriminator_type: DiscriminatorType,
         error_set: &ErrorSet,
+        strings: &mut Strings<'m>,
     ) -> UnionDiscriminator {
         let mut union_discriminator = UnionDiscriminator { variants: vec![] };
 
@@ -553,7 +574,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     union_discriminator.variants.push(VariantDiscriminator {
                         purpose: discriminator_type.into_purpose(&keyed.key),
                         discriminant: Discriminant::MatchesLeaf(LeafDiscriminant::IsTextLiteral(
-                            literal,
+                            strings.intern_constant(&literal),
                         )),
                         serde_def: SerdeDef::new(def_id, SerdeModifier::NONE),
                     });
@@ -690,7 +711,7 @@ enum VariantKey {
     Instance,
     IdProperty {
         entity_id: DefId,
-        name: String,
+        name: TextConstant,
         rel_id: RelationshipId,
     },
 }

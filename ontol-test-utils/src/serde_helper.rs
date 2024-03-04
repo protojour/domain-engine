@@ -1,7 +1,8 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
     interface::serde::processor::{
-        ProcessorLevel, ProcessorMode, ProcessorProfile, ProcessorProfileFlags,
+        ProcessorLevel, ProcessorMode, ProcessorProfile, ProcessorProfileApi,
+        ProcessorProfileFlags, SpecialProperty,
     },
     value::{Attribute, PropertyId, Value},
     DefId,
@@ -11,15 +12,47 @@ use tracing::error;
 
 use crate::type_binding::{TypeBinding, TEST_JSON_SCHEMA_VALIDATION};
 
-pub struct SerdeHelper<'b, 'on> {
+/// A trait used in JSON tests.
+/// using this trait one can pass a serde_json::Value or a static JSON str.
+///
+/// The advantage of passing a static str is that then the order of object properties is strictly defined.
+///
+/// The deserializers under test could be sensitive to the order of JSON properties due to subtle bugs,
+/// which is what we want to test.
+pub trait JsonConvert {
+    fn to_json_string(&self) -> String;
+    fn to_json_value(&self) -> serde_json::Value;
+}
+
+impl JsonConvert for serde_json::Value {
+    fn to_json_string(&self) -> String {
+        serde_json::to_string(self).unwrap()
+    }
+
+    fn to_json_value(&self) -> serde_json::Value {
+        self.clone()
+    }
+}
+
+impl<'a> JsonConvert for &'a str {
+    fn to_json_string(&self) -> String {
+        self.to_string()
+    }
+
+    fn to_json_value(&self) -> serde_json::Value {
+        serde_json::from_str(self).unwrap()
+    }
+}
+
+pub struct SerdeHelper<'b, 'on, 'p> {
     binding: &'b TypeBinding<'on>,
     mode: ProcessorMode,
     level: ProcessorLevel,
-    profile: ProcessorProfile,
+    profile: ProcessorProfile<'p>,
 }
 
-impl<'b, 'on> SerdeHelper<'b, 'on> {
-    pub fn with_profile(self, profile: ProcessorProfile) -> Self {
+impl<'b, 'on, 'p> SerdeHelper<'b, 'on, 'p> {
+    pub fn with_profile(self, profile: ProcessorProfile<'p>) -> Self {
         Self { profile, ..self }
     }
 
@@ -37,7 +70,7 @@ impl<'b, 'on> SerdeHelper<'b, 'on> {
 
     #[track_caller]
     pub fn to_value(&self, json: serde_json::Value) -> Result<Value, serde_json::Error> {
-        let value = self.to_value_raw(json)?;
+        let value = self.to_value_nocheck(json)?;
         assert_eq!(value.type_def_id(), self.binding.type_info.def_id);
         Ok(value)
     }
@@ -47,7 +80,7 @@ impl<'b, 'on> SerdeHelper<'b, 'on> {
         &self,
         json: serde_json::Value,
     ) -> Result<FnvHashMap<PropertyId, Attribute>, serde_json::Error> {
-        let value = self.to_value_raw(json)?;
+        let value = self.to_value_nocheck(json)?;
         assert_eq!(value.type_def_id(), self.binding.type_info.def_id);
         match value {
             Value::Struct(attrs, _) => Ok(*attrs),
@@ -59,14 +92,15 @@ impl<'b, 'on> SerdeHelper<'b, 'on> {
     /// is not the same as the nominal one for the TypeBinding.
     /// (i.e. it should deserialize to a _variant_ of the type)
     #[track_caller]
-    pub fn to_value_variant(&self, json: serde_json::Value) -> Result<Value, serde_json::Error> {
-        let value = self.to_value_raw(json)?;
+    pub fn to_value_variant(&self, json: impl JsonConvert) -> Result<Value, serde_json::Error> {
+        let value = self.to_value_nocheck(json)?;
         assert_ne!(value.type_def_id(), self.binding.type_info.def_id);
         Ok(value)
     }
 
-    pub fn to_value_raw(&self, json: serde_json::Value) -> Result<Value, serde_json::Error> {
-        let json_string = serde_json::to_string(&json).unwrap();
+    /// Deserialize to value, do not run type_def_id assert checks
+    pub fn to_value_nocheck(&self, json: impl JsonConvert) -> Result<Value, serde_json::Error> {
+        let json_string = json.to_json_string();
 
         let attribute_result = self
             .binding
@@ -78,7 +112,14 @@ impl<'b, 'on> SerdeHelper<'b, 'on> {
 
         match self.binding.json_schema() {
             Some(json_schema) if TEST_JSON_SCHEMA_VALIDATION => {
-                let json_schema_result = json_schema.validate(&json);
+                let json_schema_result =
+                    json_schema
+                        .validate(&json.to_json_value())
+                        .map_err(|validation_errors| {
+                            for error in validation_errors {
+                                error!("JSON schema error: {error}");
+                            }
+                        });
 
                 match (attribute_result, json_schema_result) {
                     (Ok(Attribute { rel, val }), Ok(())) => {
@@ -87,10 +128,7 @@ impl<'b, 'on> SerdeHelper<'b, 'on> {
                         Ok(val)
                     }
                     (Err(json_error), Err(_)) => Err(json_error),
-                    (Ok(_), Err(validation_errors)) => {
-                        for error in validation_errors {
-                            error!("JSON schema error: {error}");
-                        }
+                    (Ok(_), Err(_schema_error)) => {
                         panic!("BUG: JSON schema did not accept input {json_string}");
                     }
                     (Err(json_error), Ok(())) => {
@@ -137,7 +175,7 @@ impl<'b, 'on> SerdeHelper<'b, 'on> {
 }
 
 /// Make a helper for the data creation processor mode
-pub fn serde_create<'b, 'on>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 'on> {
+pub fn serde_create<'b, 'on, 'p>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 'on, 'p> {
     SerdeHelper {
         binding,
         mode: ProcessorMode::Create,
@@ -147,7 +185,7 @@ pub fn serde_create<'b, 'on>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, '
 }
 
 /// Make a helper for the `Read` processor mode
-pub fn serde_read<'b, 'on>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 'on> {
+pub fn serde_read<'b, 'on, 'p>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 'on, 'p> {
     SerdeHelper {
         binding,
         mode: ProcessorMode::Read,
@@ -157,7 +195,7 @@ pub fn serde_read<'b, 'on>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 'on
 }
 
 /// Make a helper for the `Raw` processor mode
-pub fn serde_raw<'b, 'on>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 'on> {
+pub fn serde_raw<'b, 'on, 'p>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 'on, 'p> {
     SerdeHelper {
         binding,
         mode: ProcessorMode::Raw,
@@ -166,11 +204,36 @@ pub fn serde_raw<'b, 'on>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 'on>
     }
 }
 
-pub fn serde_raw_tree_only<'b, 'on>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 'on> {
+pub fn serde_raw_tree_only<'b, 'on, 'p>(binding: &'b TypeBinding<'on>) -> SerdeHelper<'b, 'on, 'p> {
     SerdeHelper {
         binding,
         mode: ProcessorMode::RawTreeOnly,
         level: ProcessorLevel::new_root(),
         profile: ProcessorProfile::default(),
+    }
+}
+
+pub struct ProcessorProfileTestPlugin {
+    pub prop_overrides: FnvHashMap<&'static str, SpecialProperty>,
+    pub annotations: FnvHashMap<serde_value::Value, DefId>,
+}
+
+impl ProcessorProfileApi for ProcessorProfileTestPlugin {
+    fn lookup_special_property(&self, key: &str) -> Option<SpecialProperty> {
+        self.prop_overrides.get(key).cloned()
+    }
+
+    fn find_special_property_name(&self, prop: SpecialProperty) -> Option<&str> {
+        for (key, candidate) in &self.prop_overrides {
+            if *candidate == prop {
+                return Some(key);
+            }
+        }
+
+        None
+    }
+
+    fn annotate_type(&self, input: &serde_value::Value) -> Option<DefId> {
+        self.annotations.get(input).cloned()
     }
 }

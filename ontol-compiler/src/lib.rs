@@ -2,6 +2,7 @@
 
 use std::{
     collections::{BTreeSet, HashMap},
+    ops::Index,
     sync::Arc,
 };
 
@@ -29,10 +30,11 @@ use ontol_runtime::{
         DomainInterface,
     },
     ontology::{
-        DataRelationshipInfo, DataRelationshipKind, DataRelationshipSource, DataRelationshipTarget,
-        Domain, EntityInfo, MapLossiness, MapMeta, OntolDomainMeta, Ontology, TypeInfo,
+        BasicTypeInfo, DataRelationshipInfo, DataRelationshipKind, DataRelationshipSource,
+        DataRelationshipTarget, Domain, EntityInfo, MapLossiness, MapMeta, OntolDomainMeta,
+        Ontology, TypeInfo, TypeKind,
     },
-    text_like_types::TextLikeType,
+    text::TextConstant,
     value::PropertyId,
     DefId, PackageId,
 };
@@ -83,7 +85,7 @@ pub struct Compiler<'m> {
     pub sources: Sources,
 
     pub(crate) packages: Packages,
-    pub(crate) package_names: Vec<(PackageId, Arc<String>)>,
+    pub(crate) package_names: Vec<(PackageId, TextConstant)>,
 
     pub(crate) namespaces: Namespaces<'m>,
     pub(crate) defs: Defs<'m>,
@@ -216,7 +218,7 @@ impl<'m> Compiler<'m> {
         self.seal_domain(package.package_id);
 
         self.package_names
-            .push((package.package_id, src.name.clone()));
+            .push((package.package_id, self.strings.intern_constant(&src.name)));
 
         self.check_error()
     }
@@ -282,10 +284,11 @@ impl<'m> Compiler<'m> {
             UnionMemberCache { cache }
         };
 
-        let mut serde_generator = self.serde_generator(&union_member_cache);
+        let mut strings = self.strings.detach();
+        let mut serde_gen = self.serde_generator(&mut strings, &union_member_cache);
         let mut builder = Ontology::builder();
 
-        let dynamic_sequence_operator_addr = serde_generator.make_dynamic_sequence_addr();
+        let dynamic_sequence_operator_addr = serde_gen.make_dynamic_sequence_addr();
 
         let map_namespaces: FnvHashMap<_, _> = namespaces
             .iter_mut()
@@ -296,10 +299,10 @@ impl<'m> Compiler<'m> {
 
         // For now, create serde operators for every domain
         for package_id in package_ids.iter().cloned() {
-            let domain_name = unique_domain_names
+            let domain_name = *unique_domain_names
                 .get(&package_id)
                 .expect("Anonymous domain");
-            let mut domain = Domain::new(domain_name.into());
+            let mut domain = Domain::new(domain_name);
 
             let namespace = namespaces.remove(&package_id).unwrap();
             let type_namespace = namespace.types;
@@ -309,25 +312,34 @@ impl<'m> Compiler<'m> {
             }
 
             for (type_name, type_def_id) in type_namespace {
-                let data_relationships =
-                    self.find_data_relationships(type_def_id, &union_member_cache);
+                let type_name_constant = serde_gen.strings.intern_constant(type_name);
+                let data_relationships = self.find_data_relationships(
+                    type_def_id,
+                    &union_member_cache,
+                    serde_gen.strings,
+                );
+                let def_kind = self.defs.def_kind(type_def_id);
 
                 domain.add_type(TypeInfo {
                     def_id: type_def_id,
-                    kind: self.defs.def_kind(type_def_id).as_type_kind(),
-                    public: match self.defs.def_kind(type_def_id) {
+                    public: match def_kind {
                         DefKind::Type(TypeDef { visibility, .. }) => {
                             matches!(visibility, DefVisibility::Public)
                         }
                         _ => true,
                     },
-                    name: Some(type_name.into()),
-                    entity_info: self.entity_info(
+                    kind: match self.entity_info(
                         type_def_id,
-                        &mut serde_generator,
+                        type_name_constant,
+                        &mut serde_gen,
                         &data_relationships,
-                    ),
-                    operator_addr: serde_generator.gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
+                    ) {
+                        Some(entity_info) => TypeKind::Entity(entity_info),
+                        None => def_kind.as_ontology_type_kind(BasicTypeInfo {
+                            name: Some(type_name_constant),
+                        }),
+                    },
+                    operator_addr: serde_gen.gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
                         type_def_id,
                         SerdeModifier::json_default(),
                     ))),
@@ -340,14 +352,19 @@ impl<'m> Compiler<'m> {
                     def_id: type_def_id,
                     kind: self.defs.def_kind(type_def_id).as_type_kind(),
                     public: false,
-                    name: None,
-                    entity_info: None,
-                    operator_addr: serde_generator.gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
+                    kind: self
+                        .defs
+                        .def_kind(type_def_id)
+                        .as_ontology_type_kind(BasicTypeInfo { name: None }),
+                    operator_addr: serde_gen.gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
                         type_def_id,
                         SerdeModifier::json_default(),
                     ))),
-                    data_relationships: self
-                        .find_data_relationships(type_def_id, &union_member_cache),
+                    data_relationships: self.find_data_relationships(
+                        type_def_id,
+                        &union_member_cache,
+                        serde_gen.strings,
+                    ),
                 });
             }
 
@@ -369,7 +386,7 @@ impl<'m> Compiler<'m> {
                     map_namespaces.get(&package_id),
                     &self.codegen_tasks,
                     &union_member_cache,
-                    &mut serde_generator,
+                    &mut serde_gen,
                 ) {
                     interfaces
                         .entry(package_id)
@@ -380,7 +397,7 @@ impl<'m> Compiler<'m> {
             interfaces
         };
 
-        let (serde_operators, _) = serde_generator.finish();
+        let (serde_operators, _) = serde_gen.finish();
 
         let mut property_flows = vec![];
 
@@ -416,6 +433,7 @@ impl<'m> Compiler<'m> {
             .collect();
 
         builder
+            .text_constants(strings.make_text_constants())
             .ontol_domain_meta(OntolDomainMeta {
                 bool: self.primitives.bool,
                 i64: self.primitives.i64,
@@ -442,15 +460,20 @@ impl<'m> Compiler<'m> {
         &self,
         type_def_id: DefId,
         union_member_cache: &UnionMemberCache,
+        strings: &mut Strings<'m>,
     ) -> IndexMap<PropertyId, DataRelationshipInfo> {
         let mut data_relationships = IndexMap::default();
-        self.add_inherent_data_relationships(type_def_id, &mut data_relationships);
+        self.add_inherent_data_relationships(type_def_id, &mut data_relationships, strings);
 
         if let Some(ReprKind::StructIntersection(members)) =
             self.seal_ctx.get_repr_kind(&type_def_id)
         {
             for (member_def_id, _) in members {
-                self.add_inherent_data_relationships(*member_def_id, &mut data_relationships);
+                self.add_inherent_data_relationships(
+                    *member_def_id,
+                    &mut data_relationships,
+                    strings,
+                );
             }
         }
 
@@ -467,6 +490,7 @@ impl<'m> Compiler<'m> {
                     if let Some(data_relationship) = self.generate_data_relationship_info(
                         *property_id,
                         DataRelationshipSource::ByUnionProxy,
+                        strings,
                     ) {
                         data_relationships.insert(*property_id, data_relationship);
                     }
@@ -481,15 +505,18 @@ impl<'m> Compiler<'m> {
         &self,
         type_def_id: DefId,
         output: &mut IndexMap<PropertyId, DataRelationshipInfo>,
+        strings: &mut Strings<'m>,
     ) {
         let Some(properties) = self.relations.properties_by_def_id(type_def_id) else {
             return;
         };
         if let Some(table) = &properties.table {
             for property_id in table.keys() {
-                if let Some(data_relationship) = self
-                    .generate_data_relationship_info(*property_id, DataRelationshipSource::Inherent)
-                {
+                if let Some(data_relationship) = self.generate_data_relationship_info(
+                    *property_id,
+                    DataRelationshipSource::Inherent,
+                    strings,
+                ) {
                     output.insert(*property_id, data_relationship);
                 }
             }
@@ -500,6 +527,7 @@ impl<'m> Compiler<'m> {
         &self,
         property_id: PropertyId,
         source: DataRelationshipSource,
+        strings: &mut Strings<'m>,
     ) -> Option<DataRelationshipInfo> {
         let meta = self.defs.relationship_meta(property_id.relationship_id);
 
@@ -577,8 +605,11 @@ impl<'m> Compiler<'m> {
             kind: data_relationship_kind,
             subject_cardinality: meta.relationship.subject_cardinality,
             object_cardinality: meta.relationship.object_cardinality,
-            subject_name: (*subject_name).into(),
-            object_name: meta.relationship.object_prop.map(|prop| prop.into()),
+            subject_name: strings.intern_constant(subject_name),
+            object_name: meta
+                .relationship
+                .object_prop
+                .map(|prop| strings.intern_constant(prop)),
             source,
             target,
         })
@@ -587,6 +618,7 @@ impl<'m> Compiler<'m> {
     fn entity_info(
         &self,
         type_def_id: DefId,
+        name: TextConstant,
         serde_generator: &mut SerdeGenerator,
         data_relationships: &IndexMap<PropertyId, DataRelationshipInfo>,
     ) -> Option<EntityInfo> {
@@ -616,6 +648,7 @@ impl<'m> Compiler<'m> {
         };
 
         Some(EntityInfo {
+            name,
             // The entity is self-identifying if it has an inherent primary_id and that is its only inherent property.
             // TODO: Is the entity still self-identifying if it has only an external primary id (i.e. it is a unit type)?
             is_self_identifying: inherent_primary_id_meta.is_some() && inherent_property_count <= 1,
@@ -690,16 +723,19 @@ impl<'m> Compiler<'m> {
         }
     }
 
-    fn unique_domain_names(&self) -> FnvHashMap<PackageId, String> {
-        let mut map: HashMap<String, PackageId> = HashMap::new();
-        map.insert("ontol".into(), ONTOL_PKG);
+    fn unique_domain_names(&self) -> FnvHashMap<PackageId, TextConstant> {
+        let mut map: HashMap<TextConstant, PackageId> = HashMap::new();
+        map.insert(self.strings.get_constant("ontol").unwrap(), ONTOL_PKG);
 
-        for (package_id, name) in &self.package_names {
-            if map.contains_key(name.as_ref()) {
-                todo!("Two distinct domains are called `{name}`. This is not handled yet");
+        for (package_id, name) in self.package_names.iter().cloned() {
+            if map.contains_key(&name) {
+                todo!(
+                    "Two distinct domains are called `{name}`. This is not handled yet",
+                    name = &self[name]
+                );
             }
 
-            map.insert(name.as_ref().clone(), *package_id);
+            map.insert(name, package_id);
         }
 
         // invert
@@ -739,5 +775,13 @@ impl<'m> AsRef<DefTypes<'m>> for Compiler<'m> {
 impl<'m> AsRef<Relations> for Compiler<'m> {
     fn as_ref(&self) -> &Relations {
         &self.relations
+    }
+}
+
+impl<'m> Index<TextConstant> for Compiler<'m> {
+    type Output = str;
+
+    fn index(&self, index: TextConstant) -> &Self::Output {
+        &self.strings[index]
     }
 }

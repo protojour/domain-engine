@@ -3,7 +3,7 @@ use std::{borrow::Cow, collections::HashMap, ops::Range};
 use documented::DocumentedFields;
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    ontology::{Cardinality, TypeKind},
+    ontology::{BasicTypeInfo, Cardinality, TypeKind},
     text_like_types::TextLikeType,
     var::VarAllocator,
     vm::proc::BuiltinProc,
@@ -73,13 +73,14 @@ impl<'m> DefKind<'m> {
             Self::AutoMapping => None,
         }
     }
-    pub fn as_type_kind(&self) -> TypeKind {
+
+    pub fn as_ontology_type_kind(&self, info: BasicTypeInfo) -> TypeKind {
         match self {
-            DefKind::BuiltinRelType(..) => TypeKind::Relationship,
-            DefKind::Fn(_) => TypeKind::Function,
-            DefKind::EmptySequence => TypeKind::Generator,
-            DefKind::Package(_) => TypeKind::Domain,
-            _ => TypeKind::Data,
+            DefKind::BuiltinRelType(..) => TypeKind::Relationship(info),
+            DefKind::Fn(_) => TypeKind::Function(info),
+            DefKind::EmptySequence => TypeKind::Generator(info),
+            DefKind::Package(_) => TypeKind::Domain(info),
+            _ => TypeKind::Data(info),
         }
     }
 }

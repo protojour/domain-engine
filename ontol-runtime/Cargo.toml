@@ -9,6 +9,7 @@ edition = "2021"
 doctest = false
 
 [dependencies]
+ontol-macros.path = "../ontol-macros"
 smartstring = { workspace = true, features = ["serde"] }
 smallvec = { workspace = true, features = ["serde"] }
 indexmap = { workspace = true, features = ["serde"] }
@@ -22,6 +23,7 @@ bitflags.workspace = true
 bit-set.workspace = true
 thin-vec.workspace = true
 regex-automata.workspace = true
+arcstr.workspace = true
 num = { version = "0.4", features = ["serde"] }
 serde-value = "0.7"
 time = { version = "0.3", features = ["serde-well-known"] }

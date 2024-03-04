@@ -1,15 +1,20 @@
 use std::collections::HashSet;
 
-use fnv::FnvHashSet;
+use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
-    interface::serde::{
-        operator::{
-            SerdeOperator, SerdeOperatorAddr, SerdeProperty, SerdePropertyFlags, StructOperator,
-            UnionOperator,
+    debug::NoFmt,
+    interface::{
+        discriminator::{VariantDiscriminator, VariantPurpose},
+        serde::{
+            operator::{
+                SerdeOperator, SerdeOperatorAddr, SerdeProperty, SerdePropertyFlags,
+                SerdeStructFlags, SerdeUnionVariant, StructOperator, UnionOperator,
+            },
+            SerdeDef, SerdeModifier,
         },
-        SerdeDef, SerdeModifier,
     },
+    text::TextConstant,
     value::PropertyId,
     value_generator::ValueGenerator,
     DefId, Role,
@@ -37,12 +42,15 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     ) {
         let mut serde_properties = Default::default();
 
+        let mut struct_flags = SerdeStructFlags::default();
+
         if let Some(table) = &properties.table {
             for (property_id, property) in table {
                 self.add_struct_op_property(
                     *property_id,
                     property,
                     def.modifier,
+                    &mut struct_flags,
                     &mut serde_properties,
                 );
             }
@@ -65,6 +73,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             *property_id,
                             property,
                             def.modifier,
+                            &mut struct_flags,
                             &mut serde_properties,
                         );
                     }
@@ -76,6 +85,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             panic!();
         };
         struct_op.properties = serde_properties;
+        struct_op.flags.extend(struct_flags);
     }
 
     pub(super) fn add_struct_op_property(
@@ -83,6 +93,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         property_id: PropertyId,
         property: &Property,
         modifier: SerdeModifier,
+        struct_flags: &mut SerdeStructFlags,
         output: &mut IndexMap<String, SerdeProperty>,
     ) {
         let meta = self.defs.relationship_meta(property_id.relationship_id);
@@ -150,6 +161,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         if property.is_entity_id {
             flags |= SerdePropertyFlags::ENTITY_ID;
+        }
+
+        if flags.contains(SerdePropertyFlags::OPTIONAL | SerdePropertyFlags::ENTITY_ID) {
+            struct_flags.insert(SerdeStructFlags::ENTITY_ID_OPTIONAL);
         }
 
         if let Some(target_properties) = self.relations.properties_by_def_id(value_type_def_id) {
@@ -252,7 +267,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         map_count += 1;
                     } else {
                         let operator = &self.operators_by_addr[discriminator.addr.0 as usize];
-                        debug!("SKIPPED SOMETHING: {operator:?}\n\n");
+                        debug!(
+                            "SKIPPED SOMETHING: {operator:?}\n\n",
+                            operator = NoFmt(operator)
+                        );
                     }
                 }
 
@@ -273,7 +291,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         &mut self,
         addr: SerdeOperatorAddr,
         def: SerdeDef,
-        typename: &'c str,
+        typename: TextConstant,
         properties: &'c Properties,
     ) {
         let _entered = debug_span!("lazy_union", def=?def.def_id).entered();
@@ -299,7 +317,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             root_types.insert(root_discriminator.serde_def.def_id);
         }
 
-        let variants: Vec<_> = if properties.table.is_some() {
+        let mut variants: Vec<_> = if properties.table.is_some() {
             // Need to do an intersection of the union type's _inherent_
             // properties and each variant's properties
             let inherent_properties_def = SerdeDef::new(
@@ -338,7 +356,71 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             );
         }
 
+        // Data coverage check.
+        // If there's no designated ::Data variant purpose, we want to use the ::Identification for both purposes.
+        {
+            let mut cov_table: FnvHashMap<DefId, UnionDefVariantCoverage> = Default::default();
+
+            for variant in &variants {
+                let discriminator = &variant.discriminator;
+                match discriminator.purpose {
+                    VariantPurpose::Identification { entity_id } => {
+                        cov_table.entry(entity_id).or_default().has_id = true;
+                    }
+                    VariantPurpose::Data => {
+                        cov_table
+                            .entry(discriminator.serde_def.def_id)
+                            .or_default()
+                            .has_data = true;
+                    }
+                    VariantPurpose::RawDynamicEntity => {}
+                }
+            }
+
+            let mut extensions = vec![];
+
+            for variant in &mut variants {
+                let discriminator = &mut variant.discriminator;
+
+                if let VariantPurpose::Identification { entity_id } = discriminator.purpose {
+                    let coverage = cov_table.get(&entity_id).unwrap();
+
+                    if !coverage.has_data {
+                        let mut struct_modifier =
+                            def.modifier.cross_def_flags() | SerdeModifier::json_default();
+                        struct_modifier.remove(SerdeModifier::UNION | SerdeModifier::PRIMARY_ID);
+
+                        let struct_def = SerdeDef {
+                            def_id: entity_id,
+                            modifier: struct_modifier,
+                        };
+
+                        let struct_properties_addr = self
+                            .gen_addr_lazy(SerdeKey::Def(struct_def))
+                            .expect("No property struct operator");
+
+                        extensions.push(SerdeUnionVariant {
+                            discriminator: VariantDiscriminator {
+                                discriminant: discriminator.discriminant.clone(),
+                                purpose: VariantPurpose::RawDynamicEntity,
+                                serde_def: struct_def,
+                            },
+                            addr: struct_properties_addr,
+                        });
+                    }
+                }
+            }
+
+            variants.extend(extensions);
+        }
+
         self.operators_by_addr[addr.0 as usize] =
-            SerdeOperator::Union(UnionOperator::new(typename.into(), def, variants));
+            SerdeOperator::Union(UnionOperator::new(typename, def, variants));
     }
+}
+
+#[derive(Default)]
+struct UnionDefVariantCoverage {
+    has_id: bool,
+    has_data: bool,
 }

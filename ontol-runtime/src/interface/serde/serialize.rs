@@ -8,7 +8,10 @@ use tracing::{trace, warn};
 
 use crate::{
     cast::Cast,
-    interface::serde::processor::{RecursionLimitError, ScalarFormat},
+    interface::serde::{
+        operator::AppliedVariants,
+        processor::{RecursionLimitError, ScalarFormat},
+    },
     smart_format,
     text_pattern::{FormatPattern, TextPatternConstantPart},
     value::{Attribute, FormatValueAsText, Value},
@@ -16,8 +19,8 @@ use crate::{
 };
 
 use super::{
-    operator::{FilteredVariants, SequenceRange, SerdeOperator, SerdeStructFlags},
-    processor::{ProcessorProfileFlags, SerdeProcessor, SubProcessorContext},
+    operator::{SequenceRange, SerdeOperator, SerdeStructFlags},
+    processor::{ProcessorProfileFlags, SerdeProcessor, SpecialProperty, SubProcessorContext},
     serialize_raw::RawProxy,
     StructOperator, EDGE_PROPERTY,
 };
@@ -37,7 +40,10 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         rel_params: Option<&Value>,
         serializer: S,
     ) -> Res<S> {
-        trace!("serializing op={:?}", self.value_operator);
+        trace!(
+            "serializing op={:?}",
+            self.ontology.debug(self.value_operator)
+        );
 
         match (self.value_operator, self.scalar_format()) {
             (SerdeOperator::Unit, _) => {
@@ -107,36 +113,38 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
             (SerdeOperator::Alias(value_op), _) => self
                 .narrow(value_op.inner_addr)
                 .serialize_value(value, rel_params, serializer),
-            (SerdeOperator::Union(union_op), _) => match union_op.variants(self.mode, self.level) {
-                FilteredVariants::Single(id) => self
-                    .narrow(id)
-                    .serialize_value(value, rel_params, serializer),
-                FilteredVariants::Union(variants) => {
-                    let variant = variants.iter().find(|variant| {
-                        value.type_def_id() == variant.discriminator.serde_def.def_id
-                    });
+            (SerdeOperator::Union(union_op), _) => {
+                match union_op.applied_variants(self.mode, self.level) {
+                    AppliedVariants::Unambiguous(addr) => self
+                        .narrow(addr)
+                        .serialize_value(value, rel_params, serializer),
+                    AppliedVariants::OneOf(possible_variants) => {
+                        let variant = possible_variants
+                            .into_iter()
+                            .find(|variant| value.type_def_id() == variant.serde_def.def_id);
 
-                    if let Some(variant) = variant {
-                        let processor = self.narrow(variant.addr);
-                        trace!(
-                            "serializing union variant with {:?} {processor:}",
-                            variant.addr
-                        );
+                        if let Some(variant) = variant {
+                            let processor = self.narrow(variant.addr);
+                            trace!(
+                                "serializing union variant with {:?} {processor:}",
+                                variant.addr
+                            );
 
-                        processor.serialize_value(value, rel_params, serializer)
-                    } else {
-                        panic!(
-                            "Discriminator not found while serializing union type {:?}: {:#?}",
-                            value.type_def_id(),
-                            variants
-                        );
+                            processor.serialize_value(value, rel_params, serializer)
+                        } else {
+                            panic!(
+                                "Discriminator not found while serializing union type {:?}: {:#?}",
+                                value.type_def_id(),
+                                possible_variants.into_iter().collect::<Vec<_>>()
+                            );
+                        }
                     }
                 }
-            },
-            (SerdeOperator::IdSingletonStruct(name, inner_addr), _) => {
+            }
+            (SerdeOperator::IdSingletonStruct(_, name_constant, inner_addr), _) => {
                 let mut map = serializer.serialize_map(Some(1 + option_len(&rel_params)))?;
                 map.serialize_entry(
-                    name,
+                    &self.ontology[*name_constant],
                     &Proxy {
                         value,
                         rel_params: None,
@@ -318,6 +326,11 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 
         let mut map = serializer.serialize_map(Some(attributes.len() + option_len(&rel_params)))?;
 
+        let overridden_id_property_key = self
+            .profile
+            .api
+            .find_special_property_name(SpecialProperty::IdOverride);
+
         for (name, serde_prop) in
             struct_op.filter_properties(self.mode, self.ctx.parent_property_id, self.profile.flags)
         {
@@ -328,21 +341,21 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                     if serde_prop.is_optional_for(self.mode, &self.profile.flags) {
                         continue;
                     } else {
-                        match self.ontology.get_serde_operator(serde_prop.value_addr) {
+                        match &self.ontology[serde_prop.value_addr] {
                             SerdeOperator::Struct(struct_op) => {
                                 if struct_op.properties.is_empty() {
                                     &unit_attr
                                 } else {
                                     panic!(
                                         "While serializing value {:?} with `{}`, the expected value was a non-empty struct, but found unit",
-                                        value, struct_op.typename
+                                        value, &self.ontology[struct_op.typename]
                                     )
                                 }
                             }
                             _ => {
                                 panic!(
                                     "While serializing value {:?} with `{}`, property `{}` was not found.",
-                                    value, struct_op.typename, name
+                                    value, &self.ontology[struct_op.typename], name
                                 )
                             }
                         }
@@ -352,7 +365,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 
             let is_entity_id = serde_prop.is_entity_id();
 
-            let name = match (is_entity_id, self.profile.overridden_id_property_key) {
+            let name = match (is_entity_id, overridden_id_property_key) {
                 (true, Some(id_key)) => id_key,
                 _ => name.as_str(),
             };

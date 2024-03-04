@@ -36,7 +36,7 @@ impl DomainEngineTestExt for DomainEngine {
 
         let ontology = self.ontology();
         let key = ontology
-            .get_named_forward_map_meta(package_id, name)
+            .find_named_forward_map_meta(package_id, name)
             .expect("Named map not found");
 
         let output_type_info = ontology.get_type_info(key.output.def_id);
@@ -69,7 +69,7 @@ async fn test_exec_named_map(
 ) -> Value {
     let ontology = engine.ontology();
     let key = ontology
-        .get_named_forward_map_meta(package_id, name)
+        .find_named_forward_map_meta(package_id, name)
         .expect("Named map not found");
 
     let input_type_info = ontology.get_type_info(key.input.def_id);

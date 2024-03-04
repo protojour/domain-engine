@@ -197,8 +197,7 @@ impl InMemoryStore {
 
         let type_info = ctx.ontology.get_type_info(entity.type_def_id());
         let entity_info = type_info
-            .entity_info
-            .as_ref()
+            .entity_info()
             .ok_or(DomainError::NotAnEntity(entity.type_def_id()))?;
 
         let (id, id_generated) = match find_inherent_entity_id(&entity, &ctx.ontology)? {
@@ -296,7 +295,8 @@ impl InMemoryStore {
         ctx: &DbContext,
     ) -> DomainResult<()> {
         debug!(
-            "entity rel attribute: ({rel:?}, {val:?}). Data relationship: {data_relationship:?}"
+            "entity rel attribute: ({rel:?}, {val:?}). Data relationship: {data_relationship:?}",
+            data_relationship = ctx.ontology.debug(data_relationship)
         );
 
         fn write_mode_from_value(value: &Value) -> EdgeWriteMode {
@@ -328,8 +328,7 @@ impl InMemoryStore {
                             *entity_def_id,
                             ctx.ontology
                                 .get_type_info(*entity_def_id)
-                                .entity_info
-                                .as_ref()
+                                .entity_info()
                                 .unwrap(),
                             val,
                             ctx,
@@ -362,8 +361,7 @@ impl InMemoryStore {
                             let entity_info = ctx
                                 .ontology
                                 .get_type_info(*variant_def_id)
-                                .entity_info
-                                .as_ref()
+                                .entity_info()
                                 .unwrap();
 
                             if entity_info.id_value_def_id == val.type_def_id() {
@@ -465,8 +463,7 @@ impl InMemoryStore {
                     *entity_def_id,
                     ctx.ontology
                         .get_type_info(*entity_def_id)
-                        .entity_info
-                        .as_ref()
+                        .entity_info()
                         .unwrap(),
                     foreign_id,
                     ctx,
@@ -481,8 +478,7 @@ impl InMemoryStore {
                         let entity_info = ctx
                             .ontology
                             .get_type_info(*variant_def_id)
-                            .entity_info
-                            .as_ref()
+                            .entity_info()
                             .unwrap();
 
                         if entity_info.id_value_def_id == foreign_id.type_def_id() {

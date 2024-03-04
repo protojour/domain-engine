@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
     interface::serde::{
-        operator::{FilteredVariants, SerdeOperator, SerdeOperatorAddr, SerdeProperty},
+        operator::{AppliedVariants, SerdeOperator, SerdeOperatorAddr, SerdeProperty},
         processor::{ProcessorLevel, ProcessorMode},
     },
     ontology::{Ontology, TypeInfo},
@@ -63,10 +63,9 @@ impl<'e> ObjectGenerator<'e> {
         type_info: &TypeInfo,
         addr: SerdeOperatorAddr,
     ) {
-        let operator = self.ontology.get_serde_operator(addr);
+        let operator = &self.ontology[addr];
         let id_relationship = type_info
-            .entity_info
-            .as_ref()
+            .entity_info()
             .map(|entity_info| entity_info.id_relationship_id);
 
         match operator {
@@ -132,11 +131,11 @@ impl<'e> ObjectGenerator<'e> {
                 }
             }
             SerdeOperator::Union(union_op) => {
-                match union_op.variants(ProcessorMode::Create, ProcessorLevel::new_root()) {
-                    FilteredVariants::Single(child_addr) => {
+                match union_op.applied_variants(ProcessorMode::Create, ProcessorLevel::new_root()) {
+                    AppliedVariants::Unambiguous(child_addr) => {
                         self.generate_struct_relationships(struct_map, type_info, child_addr);
                     }
-                    FilteredVariants::Union(_) => panic!("BUG"),
+                    AppliedVariants::OneOf(_) => panic!("BUG"),
                 }
             }
             _ => {}
@@ -144,7 +143,7 @@ impl<'e> ObjectGenerator<'e> {
     }
 
     fn property_def_id(&self, property: &SerdeProperty) -> DefId {
-        let operator = self.ontology.get_serde_operator(property.value_addr);
+        let operator = &self.ontology[property.value_addr];
         self.operator_def_id(operator)
     }
 
@@ -168,8 +167,8 @@ impl<'e> ObjectGenerator<'e> {
             SerdeOperator::Alias(alias_op) => alias_op.def.def_id,
             SerdeOperator::Union(union_op) => union_op.union_def().def_id,
             SerdeOperator::Struct(struct_op) => struct_op.def.def_id,
-            SerdeOperator::IdSingletonStruct(_, addr) => {
-                self.operator_def_id(self.ontology.get_serde_operator(*addr))
+            SerdeOperator::IdSingletonStruct(.., addr) => {
+                self.operator_def_id(&self.ontology[*addr])
             }
         }
     }

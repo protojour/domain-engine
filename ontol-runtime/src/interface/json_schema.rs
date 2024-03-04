@@ -28,8 +28,7 @@ pub fn build_openapi_schemas<'e>(
 ) -> OpenApiSchemas<'e> {
     let mut graph_builder = SchemaGraphBuilder::default();
 
-    for (_, def_id) in &domain.type_names {
-        let type_info = domain.type_info(*def_id);
+    for type_info in domain.type_infos() {
         if let Some(operator_addr) = &type_info.operator_addr {
             graph_builder.visit(*operator_addr, ontology);
         }
@@ -150,7 +149,7 @@ impl<'e> SchemaCtx<'e> {
     fn definition(self, operator_addr: SerdeOperatorAddr) -> SchemaDefinition<'e> {
         SchemaDefinition {
             ctx: self,
-            value_operator: self.ontology.get_serde_operator(operator_addr),
+            value_operator: &self.ontology[operator_addr],
         }
     }
 
@@ -221,7 +220,8 @@ impl<'e> SchemaCtx<'e> {
         let def_id = serde_def.def_id;
         self.ontology
             .find_domain(def_id.0)
-            .and_then(|domain| domain.type_info(def_id).name.as_ref())
+            .and_then(|domain| domain.type_info(def_id).name())
+            .map(|constant| &self.ontology[constant])
             .map(|type_name| smart_format!("{type_name}{modifier}"))
     }
 
@@ -414,12 +414,7 @@ fn serialize_schema_inline<S: Serializer>(
             }
         }
         SerdeOperator::Alias(value_op) => {
-            serialize_schema_inline::<S>(
-                ctx,
-                ctx.ontology.get_serde_operator(value_op.inner_addr),
-                None,
-                map,
-            )?;
+            serialize_schema_inline::<S>(ctx, &ctx.ontology[value_op.inner_addr], None, map)?;
         }
         SerdeOperator::Union(union_op) => {
             map.serialize_entry(
@@ -430,7 +425,7 @@ fn serialize_schema_inline<S: Serializer>(
                 },
             )?;
         }
-        SerdeOperator::IdSingletonStruct(_name, _inner_operator_addr) => {
+        SerdeOperator::IdSingletonStruct(_entity_id, _name, _inner_operator_addr) => {
             panic!("BUG: Id not handled here")
         }
         SerdeOperator::Struct(struct_op) => {
@@ -475,7 +470,7 @@ struct SchemaReference<'d, 'e> {
 
 impl<'d, 'e> Serialize for SchemaReference<'d, 'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let value_operator = self.ctx.ontology.get_serde_operator(self.operator_addr);
+        let value_operator = &self.ctx.ontology[self.operator_addr];
 
         match value_operator {
             SerdeOperator::Unit
@@ -510,8 +505,11 @@ impl<'d, 'e> Serialize for SchemaReference<'d, 'e> {
             SerdeOperator::Union(union_op) => self
                 .compose(self.ctx.ref_link(union_op.union_def()))
                 .serialize(serializer),
-            SerdeOperator::IdSingletonStruct(name, id_operator_addr) => self
-                .compose(self.ctx.singleton_object(name.as_str(), *id_operator_addr))
+            SerdeOperator::IdSingletonStruct(_entity_id, name, id_operator_addr) => self
+                .compose(
+                    self.ctx
+                        .singleton_object(&self.ctx.ontology[*name], *id_operator_addr),
+                )
                 .serialize(serializer),
             SerdeOperator::Struct(struct_op) => self
                 .compose(self.ctx.ref_link(struct_op.def))
@@ -758,7 +756,7 @@ impl SchemaGraphBuilder {
             return;
         }
 
-        let operator = ontology.get_serde_operator(addr);
+        let operator = &ontology[addr];
 
         match operator {
             SerdeOperator::Unit
@@ -796,7 +794,7 @@ impl SchemaGraphBuilder {
                     self.visit(discriminator.addr, ontology);
                 }
             }
-            SerdeOperator::IdSingletonStruct(_, id_operator_addr) => {
+            SerdeOperator::IdSingletonStruct(_, _, id_operator_addr) => {
                 // id is not represented in the graph
                 self.visit(*id_operator_addr, ontology);
             }

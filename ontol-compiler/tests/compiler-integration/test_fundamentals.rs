@@ -33,17 +33,21 @@ fn test_relations_are_distinct_for_different_domains() {
         let ontology = &test.ontology;
 
         let root_domain = ontology.find_domain(foo.def_id().package_id()).unwrap();
-        expect_eq!(actual = root_domain.unique_name, expected = "test_root.on");
+        expect_eq!(
+            actual = &ontology[root_domain.unique_name()],
+            expected = "test_root.on"
+        );
 
         let other_domain = ontology
             .find_domain(other_foo.def_id().package_id())
             .unwrap();
-        expect_eq!(actual = other_domain.unique_name, expected = "other");
+        expect_eq!(
+            actual = &ontology[other_domain.unique_name()],
+            expected = "other"
+        );
 
         fn extract_prop_rel_id(binding: &TypeBinding, test: &OntolTest) -> RelationshipId {
-            let operator = test
-                .ontology
-                .get_serde_operator(binding.serde_operator_addr());
+            let operator = &test.ontology[binding.serde_operator_addr()];
 
             match operator {
                 SerdeOperator::Struct(struct_op) => {
@@ -119,7 +123,9 @@ fn trailing_comment_confusion() {
 fn ontol_domain_is_documented() {
     "".compile_then(|test| {
         let ontol_domain = test.ontology.find_domain(ONTOL_PKG).unwrap();
-        let text = ontol_domain.type_info_by_identifier("text").unwrap();
+        let text = ontol_domain
+            .find_type_info_by_name(test.ontology.find_text_constant("text").unwrap())
+            .unwrap();
         assert!(test.ontology.get_docs(text.def_id).is_some());
     });
 }

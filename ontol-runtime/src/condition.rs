@@ -5,7 +5,9 @@ use serde::{Deserialize, Serialize};
 use thin_vec::ThinVec;
 
 use crate::{
+    debug::OntolDebug,
     format_utils::Literal,
+    impl_ontol_debug,
     value::{PropertyId, Value, ValueDebug},
     var::Var,
     DefId,
@@ -230,8 +232,24 @@ where
     }
 }
 
+impl<V, Term> OntolDebug for ClausePair<V, Term>
+where
+    V: Display,
+    Term: Display,
+{
+    fn fmt(
+        &self,
+        _ctx: &dyn crate::debug::OntolFormatter,
+        f: &mut std::fmt::Formatter<'_>,
+    ) -> std::fmt::Result {
+        write!(f, "{self}")
+    }
+}
+
 impl Debug for CondTerm {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{self}")
     }
 }
+
+impl_ontol_debug!(CondTerm);

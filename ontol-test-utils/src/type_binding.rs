@@ -42,14 +42,19 @@ impl<'on> TypeBinding<'on> {
     ) -> Self {
         let ontology = &ontol_test.ontology;
         let domain = ontology.find_domain(package_id).unwrap();
-        let def_id = domain
-            .type_names
-            .get(type_name)
-            .unwrap_or_else(|| panic!("type name not found: `{type_name}`"));
-        let type_info = domain.type_info(*def_id).clone();
+        let type_info = domain
+            .type_infos()
+            .find(
+                |type_info| match type_info.name().map(|name| &ontology[name]) {
+                    Some(name) => name == type_name,
+                    None => false,
+                },
+            )
+            .cloned()
+            .unwrap_or_else(|| panic!("type not found: `{type_name}`"));
 
         if !type_info.public {
-            warn!("`{:?}` is not public!", type_info.name);
+            warn!("`{:?}` is not public!", ontology.debug(&type_info.name()));
         }
 
         trace!(
@@ -112,6 +117,14 @@ impl<'on> TypeBinding<'on> {
 
     pub fn def_id(&self) -> DefId {
         self.type_info.def_id
+    }
+
+    #[track_caller]
+    pub fn entity_id_def_id(&self) -> DefId {
+        self.type_info
+            .entity_info()
+            .expect("not an entity")
+            .id_value_def_id
     }
 
     pub fn struct_select(
@@ -199,7 +212,7 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
     }
 
     fn with_json_data(mut self, json: serde_json::Value) -> Self {
-        let value = serde_create(self.binding).to_value_raw(json).unwrap();
+        let value = serde_create(self.binding).to_value_nocheck(json).unwrap();
         *self.value.type_def_id_mut() = value.type_def_id();
         match (&mut self.value, value) {
             (Value::Unit(_), value) => {
@@ -217,8 +230,7 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
         let entity_info = self
             .binding
             .type_info
-            .entity_info
-            .as_ref()
+            .entity_info()
             .expect("Not an entity!");
         let id = self
             .binding

@@ -7,18 +7,22 @@ use ::serde::{Deserialize, Serialize};
 pub mod cast;
 pub mod condition;
 pub mod config;
+pub mod debug;
 pub mod format_utils;
 pub mod interface;
 pub mod ontology;
 pub mod resolve_path;
 pub mod select;
 pub mod sequence;
+pub mod text;
 pub mod text_like_types;
 pub mod text_pattern;
 pub mod value;
 pub mod value_generator;
 pub mod var;
 pub mod vm;
+
+extern crate self as ontol_runtime;
 
 /// Identifies one "package" of ONTOL code.
 /// One package represents a domain,
@@ -49,6 +53,8 @@ impl Debug for DefId {
         write!(f, "def@{}:{}", self.0 .0, self.1)
     }
 }
+
+impl_ontol_debug!(DefId);
 
 impl DefId {
     #[inline]
@@ -127,3 +133,5 @@ impl ::std::fmt::Debug for RelationshipId {
         write!(f, "RelationshipId({:?})", self.0)
     }
 }
+
+impl_ontol_debug!(RelationshipId);

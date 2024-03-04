@@ -19,8 +19,7 @@ pub fn find_inherent_entity_id(
     let def_id = entity.type_def_id();
     let type_info = ontology.get_type_info(def_id);
     let entity_info = type_info
-        .entity_info
-        .as_ref()
+        .entity_info()
         .ok_or(DomainError::NotAnEntity(def_id))?;
 
     let struct_map = match entity {
@@ -45,10 +44,7 @@ pub fn try_generate_entity_id(
     ontology: &Ontology,
     system: &dyn SystemAPI,
 ) -> DomainResult<GeneratedId> {
-    match (
-        ontology.get_serde_operator(id_operator_addr),
-        value_generator,
-    ) {
+    match (&ontology[id_operator_addr], value_generator) {
         (SerdeOperator::String(def_id), ValueGenerator::Uuid) => Ok(GeneratedId::Generated(
             Value::Text(smart_format!("{}", system.generate_uuid()), *def_id),
         )),

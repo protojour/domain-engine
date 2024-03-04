@@ -67,8 +67,7 @@ impl InMemoryStore {
 
         let type_info = ctx.ontology.get_type_info(struct_select.def_id);
         let _entity_info = type_info
-            .entity_info
-            .as_ref()
+            .entity_info()
             .ok_or(DomainError::NotAnEntity(struct_select.def_id))?;
 
         // let filter_plan = compute_filter_plan(condition, &ctx.ontology).unwrap();
@@ -261,8 +260,7 @@ impl InMemoryStore {
 
         let type_info = ctx.ontology.get_type_info(entity_key.type_def_id);
         let entity_info = type_info
-            .entity_info
-            .as_ref()
+            .entity_info()
             .ok_or(DomainError::NotAnEntity(entity_key.type_def_id))?;
 
         match select {

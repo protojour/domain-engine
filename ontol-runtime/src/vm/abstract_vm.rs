@@ -8,6 +8,7 @@ use super::{
 use crate::{
     condition::ClausePair,
     ontology::{Ontology, ValueCardinality},
+    text::TextConstant,
     value::PropertyId,
     var::Var,
     vm::proc::{BuiltinProc, Local, OpCode, Predicate, Procedure},
@@ -63,7 +64,7 @@ pub trait Processor {
     fn move_rest_attrs(&mut self, target: Local, source: Local) -> VmResult<()>;
     fn push_i64(&mut self, k: i64, result_type: DefId);
     fn push_f64(&mut self, k: f64, result_type: DefId);
-    fn push_string(&mut self, k: &str, result_type: DefId);
+    fn push_string(&mut self, k: TextConstant, result_type: DefId);
     fn append_attr2(&mut self, seq: Local) -> VmResult<()>;
     fn append_string(&mut self, to: Local) -> VmResult<()>;
     fn cond_predicate(&mut self, predicate: &Predicate) -> VmResult<bool>;
@@ -98,7 +99,7 @@ pub trait Processor {
 
 impl<'o, P: Processor> AbstractVm<'o, P> {
     pub fn new(ontology: &'o Ontology, procedure: Procedure) -> Self {
-        trace!("AbstractVm::new({procedure:?})");
+        trace!("AbstractVm::new({:?})", ontology.debug(&procedure));
         Self {
             program_counter: procedure.address.0 as usize,
             proc_address: procedure.address.0 as usize,
@@ -206,8 +207,8 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                     processor.push_f64(*k, *result_type);
                     self.program_counter += 1;
                 }
-                OpCode::String(k, result_type) => {
-                    processor.push_string(k, *result_type);
+                OpCode::String(constant, result_type) => {
+                    processor.push_string(*constant, *result_type);
                     self.program_counter += 1;
                 }
                 OpCode::Iter(seq, index, offset) => {
@@ -271,8 +272,9 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                     self.program_counter += 1;
                     return Ok(Some(processor.yield_match_condition(*var, *cardinality)?));
                 }
-                OpCode::Panic(message) => {
-                    panic!("{message}");
+                OpCode::Panic(msg_constant) => {
+                    let msg = &self.ontology[*msg_constant];
+                    panic!("{msg}");
                 }
             }
         }

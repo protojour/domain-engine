@@ -65,8 +65,10 @@ async fn main() -> anyhow::Result<()> {
         .domains()
         .filter(|(package_id, _)| **package_id != PackageId(0))
     {
-        let unique_name = &domain.unique_name;
-        let domain_path = format!("/{unique_name}");
+        let domain_path = format!(
+            "/{unique_name}",
+            unique_name = &ontology[domain.unique_name()]
+        );
         router = router.nest(
             &domain_path,
             domain_router(engine.clone(), &domain_path, *package_id)?,

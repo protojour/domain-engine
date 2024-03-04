@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use fake::{Fake, Faker};
 use ontol_runtime::{
     interface::serde::{
-        operator::{FilteredVariants, SerdeOperator},
+        operator::{AppliedVariants, SerdeOperator},
         processor::{ProcessorLevel, ProcessorMode, SerdeProcessor},
     },
     ontology::Ontology,
@@ -125,7 +125,9 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                 string.pop();
                 Value::Text(string.into(), *def_id)
             }
-            SerdeOperator::StringConstant(s, def_id) => Value::Text(s.clone(), *def_id),
+            SerdeOperator::StringConstant(constant, def_id) => {
+                Value::Text(self.ontology[*constant].into(), *def_id)
+            }
             SerdeOperator::TextPattern(def_id) => {
                 if let Some(string_like_type) = self.ontology.get_text_like_type(*def_id) {
                     match string_like_type {
@@ -182,9 +184,13 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                 return self.fake_attribute(processor.narrow(alias_op.inner_addr));
             }
             SerdeOperator::Union(union_op) => {
-                return match union_op.variants(self.processor_mode, processor.level()) {
-                    FilteredVariants::Single(id) => self.fake_attribute(processor.narrow(id)),
-                    FilteredVariants::Union(variants) => {
+                return match union_op.applied_variants(self.processor_mode, processor.level()) {
+                    AppliedVariants::Unambiguous(addr) => {
+                        self.fake_attribute(processor.narrow(addr))
+                    }
+                    AppliedVariants::OneOf(possible_variants) => {
+                        let variants = possible_variants.into_iter().collect::<Vec<_>>();
+
                         let index: usize = self.rng.gen_range(0..variants.len());
                         let variant = &variants[index];
 
@@ -201,7 +207,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
 
                 Value::Struct(Box::new(attrs), struct_op.def.def_id)
             }
-            SerdeOperator::IdSingletonStruct(_name, inner_addr) => {
+            SerdeOperator::IdSingletonStruct(_entity_id, _name, inner_addr) => {
                 return self.fake_attribute(processor.narrow(*inner_addr))
             }
         };

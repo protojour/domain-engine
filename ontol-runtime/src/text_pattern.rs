@@ -10,6 +10,7 @@ use crate::{
     interface::serde::processor::ProcessorMode,
     ontology::Ontology,
     smart_format,
+    text::TextConstant,
     text_like_types::ParseError,
     value::{Attribute, FormatValueAsText, PropertyId, Value},
     DefId, RelationshipId,
@@ -127,7 +128,7 @@ impl TextPattern {
 #[derive(Debug, Serialize, Deserialize)]
 pub enum TextPatternConstantPart {
     AnyString { capture_group: usize },
-    Literal(String),
+    Literal(TextConstant),
     Property(TextPatternProperty),
 }
 
@@ -184,7 +185,9 @@ impl<'d, 'o> Display for FormatPattern<'d, 'o> {
                         }
                     )?;
                 }
-                (TextPatternConstantPart::Literal(string), _) => write!(f, "{string}")?,
+                (TextPatternConstantPart::Literal(constant), _) => {
+                    write!(f, "{string}", string = &self.ontology[*constant])?
+                }
                 (part, data) => {
                     panic!("unable to format pattern - mismatch between {part:?} and {data:?}")
                 }

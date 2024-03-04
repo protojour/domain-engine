@@ -10,8 +10,7 @@ use crate::{
     interface::serde::{
         deserialize_id::IdSingletonStructVisitor,
         deserialize_matcher::MapMatchResult,
-        deserialize_struct::{deserialize_struct, SpecialAddrs, StructVisitor},
-        operator::SerdeStructFlags,
+        deserialize_struct::{StructDeserializer, StructVisitor},
     },
     sequence::Sequence,
     value::{Attribute, Serial, Value},
@@ -20,11 +19,11 @@ use crate::{
 use super::{
     deserialize_matcher::{
         BooleanMatcher, CapturingTextPatternMatcher, ConstantStringMatcher, ExpectingMatching,
-        MapMatchKind, NumberMatcher, SequenceMatcher, StringMatcher, TextPatternMatcher,
+        MapMatchMode, NumberMatcher, SequenceMatcher, StringMatcher, TextPatternMatcher,
         UnionMatcher, UnitMatcher, ValueMatcher,
     },
     deserialize_patch::GraphqlPatchVisitor,
-    operator::{FilteredVariants, SerdeOperator},
+    operator::{AppliedVariants, SerdeOperator},
     processor::{ProcessorMode, ScalarFormat, SerdeProcessor},
 };
 
@@ -38,7 +37,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         assert!(
             self.ctx.rel_params_addr.is_none(),
             "rel_params_addr should be None for {:?}",
-            self.value_operator
+            self.ontology.debug(self.value_operator)
         );
     }
 }
@@ -147,9 +146,9 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                 }
                 .into_visitor_no_params(self),
             ),
-            (SerdeOperator::StringConstant(literal, def_id), _) => deserializer.deserialize_str(
+            (SerdeOperator::StringConstant(constant, def_id), _) => deserializer.deserialize_str(
                 ConstantStringMatcher {
-                    literal,
+                    constant: &self.ontology[*constant],
                     def_id: *def_id,
                 }
                 .into_visitor_no_params(self),
@@ -203,33 +202,29 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
 
                 Ok(typed_attribute)
             }
-            (SerdeOperator::Union(union_op), _) => match union_op.variants(self.mode, self.level) {
-                FilteredVariants::Single(addr) => self.narrow(addr).deserialize(deserializer),
-                FilteredVariants::Union(variants) => {
-                    assert!(
-                        !variants.is_empty(),
-                        "no variants ({:?}, {:?})",
-                        self.mode,
-                        self.level
-                    );
-
-                    deserializer.deserialize_any(
+            (SerdeOperator::Union(union_op), _) => {
+                match union_op.applied_variants(self.mode, self.level) {
+                    AppliedVariants::Unambiguous(addr) => {
+                        self.narrow(addr).deserialize(deserializer)
+                    }
+                    AppliedVariants::OneOf(variants) => deserializer.deserialize_any(
                         UnionMatcher {
                             typename: union_op.typename(),
-                            variants,
+                            possible_variants: variants,
                             ontology: self.ontology,
                             ctx: self.ctx,
+                            profile: self.profile,
                             mode: self.mode,
                             level: self.level,
                         }
                         .into_visitor(self),
-                    )
+                    ),
                 }
-            },
-            (SerdeOperator::IdSingletonStruct(name, inner_addr), _) => deserializer
+            }
+            (SerdeOperator::IdSingletonStruct(_, name, inner_addr), _) => deserializer
                 .deserialize_map(IdSingletonStructVisitor {
                     processor: self,
-                    property_name: name,
+                    property_name: &self.ontology[*name],
                     inner_addr: *inner_addr,
                     ontology: self.ontology,
                 }),
@@ -238,6 +233,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                 buffered_attrs: Default::default(),
                 struct_op,
                 ctx: self.ctx,
+                raw_dynamic_entity: false,
             }),
         }
     }
@@ -391,36 +387,41 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
             buffered_attrs.push((property, value));
         };
 
-        trace!("matched map: {map_match:?} buffered attrs: {buffered_attrs:?}");
+        trace!(
+            "matched map: {map_match:?} buffered attrs: {buffered_attrs:?}",
+            map_match = self.processor.ontology.debug(&map_match)
+        );
 
         // delegate to the real struct visitor
-        match map_match.kind {
-            MapMatchKind::StructType(struct_op) => StructVisitor {
+        match map_match.mode {
+            MapMatchMode::Struct(struct_op) => StructVisitor {
                 processor: self.processor,
                 buffered_attrs,
                 struct_op,
                 ctx: map_match.ctx,
+                raw_dynamic_entity: false,
             }
             .visit_map(map),
-            MapMatchKind::IdType(name, addr) => {
-                let deserialized_map = deserialize_struct(
-                    map,
-                    buffered_attrs,
-                    self.processor,
-                    &IndexMap::default(),
-                    SerdeStructFlags::empty(),
-                    0,
-                    SpecialAddrs {
-                        rel_params: map_match.ctx.rel_params_addr,
-                        id: Some((name, addr)),
-                    },
-                )?;
-                let id = deserialized_map
+            MapMatchMode::RawDynamicEntity(struct_op) => StructVisitor {
+                processor: self.processor,
+                buffered_attrs,
+                struct_op,
+                ctx: map_match.ctx,
+                raw_dynamic_entity: true,
+            }
+            .visit_map(map),
+            MapMatchMode::EntityId(entity_id, name_constant, addr) => {
+                let output =
+                    StructDeserializer::new(entity_id, self.processor, &IndexMap::default())
+                        .with_rel_params_addr(map_match.ctx.rel_params_addr)
+                        .with_id_property_addr(&self.processor.ontology[name_constant], addr)
+                        .deserialize_struct(buffered_attrs, map)?;
+                let id = output
                     .id
-                    .ok_or_else(|| Error::custom("missing _id attribute".to_string()))?;
+                    .ok_or_else(|| Error::custom("missing identifier attribute".to_string()))?;
 
                 Ok(Attribute {
-                    rel: deserialized_map.rel_params,
+                    rel: output.rel_params,
                     val: id,
                 })
             }

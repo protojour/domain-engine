@@ -1,5 +1,5 @@
 use crate::{
-    ontology::{MapLossiness, Ontology},
+    ontology::{MapLossiness, Ontology, TypeKind},
     select::{EntitySelect, Select, StructOrUnionSelect},
     DefId, MapDef, MapDefFlags, MapFlags, MapKey, PackageId,
 };
@@ -237,7 +237,7 @@ impl<'on, 'a> Probe<'on, 'a> {
 
         if self.options.must_be_entity {
             let type_info = self.ontology.get_type_info(def_id);
-            if type_info.entity_info.is_none() {
+            if !matches!(&type_info.kind, TypeKind::Entity(_)) {
                 return false;
             }
         }

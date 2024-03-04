@@ -52,7 +52,10 @@ fn translate_struct_select(struct_select: &mut StructSelect, key: &MapKey, ontol
         .expect("No mapping procedure for select transformer");
     let prop_flow_slice = ontology.get_prop_flow_slice(map_meta);
 
-    trace!("translate_entity_select flow props: {:#?}", prop_flow_slice);
+    trace!(
+        "translate_entity_select flow props: {:#?}",
+        ontology.debug(prop_flow_slice)
+    );
 
     let processor = SelectFlowProcessor {
         ontology,
@@ -247,7 +250,7 @@ impl<'on> SelectFlowProcessor<'on> {
                 }
                 PropertyFlowData::Type(def_id) if is_dep.0 => {
                     let type_info = self.ontology.get_type_info(*def_id);
-                    is_entity = type_info.entity_info.is_some();
+                    is_entity = type_info.entity_info().is_some();
                 }
                 PropertyFlowData::Cardinality((
                     PropertyCardinality::Mandatory,

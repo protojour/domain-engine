@@ -63,7 +63,7 @@ impl Key {
 }
 
 impl OntolTest {
-    pub fn mapper(&self) -> TestMapper<'_> {
+    pub fn mapper(&self) -> TestMapper<'_, '_> {
         TestMapper {
             test: self,
             yielder: Box::new(Unimock::new(())),
@@ -77,13 +77,13 @@ pub trait Yielder {
     fn yield_match(&self, value_cardinality: ValueCardinality, condition: Condition) -> Value;
 }
 
-pub struct TestMapper<'on> {
+pub struct TestMapper<'on, 'p> {
     test: &'on OntolTest,
     yielder: Box<dyn Yielder>,
-    serde_helper_factory: Box<dyn for<'b> Fn(&'b TypeBinding<'on>) -> SerdeHelper<'b, 'on>>,
+    serde_helper_factory: Box<dyn for<'b> Fn(&'b TypeBinding<'on>) -> SerdeHelper<'b, 'on, 'p>>,
 }
 
-impl<'on> TestMapper<'on> {
+impl<'on, 'p> TestMapper<'on, 'p> {
     pub fn with_mock_yielder(self, yielder_mock_clause: impl unimock::Clause) -> Self {
         Self {
             yielder: Box::new(Unimock::new(yielder_mock_clause)),
@@ -93,7 +93,7 @@ impl<'on> TestMapper<'on> {
 
     pub fn with_serde_helper(
         self,
-        factory: impl for<'b> Fn(&'b TypeBinding<'on>) -> SerdeHelper<'b, 'on> + 'static,
+        factory: impl for<'b> Fn(&'b TypeBinding<'on>) -> SerdeHelper<'b, 'on, 'p> + 'static,
     ) -> Self {
         Self {
             serde_helper_factory: Box::new(factory),
@@ -135,7 +135,7 @@ impl<'on> TestMapper<'on> {
         let key = self
             .test
             .ontology
-            .get_named_forward_map_meta(package_id, name)
+            .find_named_forward_map_meta(package_id, name)
             .unwrap();
 
         let input_binding = TypeBinding::from_def_id(key.input.def_id, &self.test.ontology);
@@ -146,7 +146,7 @@ impl<'on> TestMapper<'on> {
             None => panic!("named map not found"),
         };
         let param = (*self.serde_helper_factory)(&input_binding)
-            .to_value_raw(input)
+            .to_value_nocheck(input)
             .unwrap();
         let value = self.run_vm(procedure, param).unwrap();
 
@@ -174,7 +174,7 @@ impl<'on> TestMapper<'on> {
 
         let [input_binding, output_binding] = self.test.bind([from.typename(), to.typename()]);
         let param = (*self.serde_helper_factory)(&input_binding)
-            .to_value_raw(input)
+            .to_value_nocheck(input)
             .unwrap();
 
         fn get_map_def(key: &Key, binding: &TypeBinding) -> MapDef {

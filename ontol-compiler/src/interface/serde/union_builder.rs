@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use ontol_runtime::{
+    debug::NoFmt,
     interface::discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
     interface::{
         discriminator::LeafDiscriminant,
@@ -12,7 +13,7 @@ use ontol_runtime::{
     smart_format,
 };
 use smartstring::alias::String;
-use tracing::info;
+use tracing::trace;
 
 use super::{
     serde_generator::{operator_to_leaf_discriminant, SerdeGenerator},
@@ -116,6 +117,7 @@ impl UnionBuilder {
                 inner_def.modifier |= cross_def_flags;
                 inner_def
             }
+            VariantPurpose::RawDynamicEntity => unreachable!(),
         };
 
         let addr = match generator.gen_addr_lazy(SerdeKey::Def(inner_def)) {
@@ -140,7 +142,10 @@ impl UnionBuilder {
         match operator {
             SerdeOperator::Union(union_op) => {
                 for variant in union_op.unfiltered_variants() {
-                    info!("push UNION variant discriminator for {variant:?} {discriminator:?}");
+                    trace!(
+                        "push UNION variant discriminator for {variant:?} {discriminator:?}",
+                        variant = NoFmt(variant)
+                    );
 
                     let mut child_scope: Vec<&VariantDiscriminator> = vec![];
                     child_scope.extend(scope.iter());
@@ -156,7 +161,7 @@ impl UnionBuilder {
                 Ok(())
             }
             _other => {
-                // debug!("PUSH DISCR scope={scope:#?} discriminator={discriminator:#?} {other:?}");
+                // info!("PUSH DISCR scope={scope:#?} discriminator={discriminator:#?} {other:?}");
                 match discriminator.discriminant {
                     Discriminant::StructFallback => {
                         if let Some(scoping) = scope.last() {

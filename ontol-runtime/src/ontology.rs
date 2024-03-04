@@ -1,13 +1,19 @@
-use std::{collections::HashMap, fmt::Debug, ops::Range};
+use std::{
+    fmt::Debug,
+    ops::{Index, Range},
+};
 
 use ::serde::{Deserialize, Serialize};
+use arcstr::ArcStr;
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
+use ontol_macros::OntolDebug;
 use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
     config::PackageConfig,
+    debug::{self, OntolFormatter},
     interface::{
         serde::{
             operator::{SerdeOperator, SerdeOperatorAddr},
@@ -15,6 +21,7 @@ use crate::{
         },
         DomainInterface,
     },
+    text::TextConstant,
     text_like_types::TextLikeType,
     text_pattern::TextPattern,
     value::PropertyId,
@@ -33,11 +40,15 @@ use crate::{
 pub struct Ontology {
     pub(crate) const_proc_table: FnvHashMap<DefId, Procedure>,
     pub(crate) map_meta_table: FnvHashMap<MapKey, MapMeta>,
-    pub(crate) named_forward_maps: HashMap<(PackageId, String), MapKey>,
+    pub(crate) named_forward_maps: FnvHashMap<(PackageId, TextConstant), MapKey>,
     pub(crate) text_like_types: FnvHashMap<DefId, TextLikeType>,
     pub(crate) text_patterns: FnvHashMap<DefId, TextPattern>,
     pub(crate) lib: Lib,
     pub(crate) ontol_domain_meta: OntolDomainMeta,
+
+    /// The text constants are stored using ArcStr because it's only one word wide,
+    /// (length is stored on the heap) and which makes the vector as dense as possible:
+    text_constants: Vec<ArcStr>,
 
     domain_table: FnvHashMap<PackageId, Domain>,
     domain_interfaces: FnvHashMap<PackageId, Vec<DomainInterface>>,
@@ -53,6 +64,7 @@ impl Ontology {
     pub fn builder() -> OntologyBuilder {
         OntologyBuilder {
             ontology: Self {
+                text_constants: vec![],
                 const_proc_table: Default::default(),
                 map_meta_table: Default::default(),
                 named_forward_maps: Default::default(),
@@ -81,6 +93,10 @@ impl Ontology {
         writer: impl std::io::Write,
     ) -> Result<(), bincode::Error> {
         bincode::serialize_into(writer, self)
+    }
+
+    pub fn debug<'a, T: ?Sized>(&'a self, value: &'a T) -> debug::Fmt<'a, &'a T> {
+        debug::Fmt(self, value)
     }
 
     pub fn new_vm(&self, proc: Procedure) -> OntolVm<'_> {
@@ -148,14 +164,6 @@ impl Ontology {
         self.map_meta_table.get(key)
     }
 
-    /// This primarily exists for testing only.
-    /// TODO: Find some solution for avoiding having this in ontology
-    pub fn get_named_forward_map_meta(&self, package_id: PackageId, name: &str) -> Option<MapKey> {
-        self.named_forward_maps
-            .get(&(package_id, name.into()))
-            .cloned()
-    }
-
     pub fn get_prop_flow_slice(&self, map_meta: &MapMeta) -> &[PropertyFlow] {
         let range = &map_meta.propflow_range;
         &self.property_flows[range.start as usize..range.end as usize]
@@ -166,7 +174,7 @@ impl Ontology {
             debug!(
                 "get_mapper_proc ({:?}) => {:?}",
                 key.def_ids(),
-                map_info.procedure
+                self.debug(&map_info.procedure)
             );
             map_info.procedure
         })
@@ -187,16 +195,57 @@ impl Ontology {
         }
     }
 
-    pub fn get_serde_operator(&self, addr: SerdeOperatorAddr) -> &SerdeOperator {
-        &self.serde_operators[addr.0 as usize]
-    }
-
     pub fn dynamic_sequence_operator_addr(&self) -> SerdeOperatorAddr {
         self.dynamic_sequence_operator_addr
     }
 
     pub fn get_value_generator(&self, relationship_id: RelationshipId) -> Option<&ValueGenerator> {
         self.value_generators.get(&relationship_id)
+    }
+
+    /// Find a text constant given its string representation.
+    /// NOTE: This intentionally has linear search complexity.
+    /// It's only use case should be testing.
+    pub fn find_text_constant(&self, str: &str) -> Option<TextConstant> {
+        self.text_constants
+            .iter()
+            .enumerate()
+            .find(|(_, arcstr)| arcstr.as_str() == str)
+            .map(|(index, _)| TextConstant(index as u32))
+    }
+
+    /// This primarily exists for testing only.
+    pub fn find_named_forward_map_meta(&self, package_id: PackageId, name: &str) -> Option<MapKey> {
+        let text_constant = self.find_text_constant(name)?;
+        self.named_forward_maps
+            .get(&(package_id, text_constant))
+            .cloned()
+    }
+}
+
+impl Index<TextConstant> for Ontology {
+    type Output = str;
+
+    fn index(&self, index: TextConstant) -> &Self::Output {
+        &self.text_constants[index.0 as usize]
+    }
+}
+
+impl Index<SerdeOperatorAddr> for Ontology {
+    type Output = SerdeOperator;
+
+    fn index(&self, index: SerdeOperatorAddr) -> &Self::Output {
+        &self.serde_operators[index.0 as usize]
+    }
+}
+
+impl OntolFormatter for Ontology {
+    fn fmt_text_constant(
+        &self,
+        constant: crate::text::TextConstant,
+        f: &mut std::fmt::Formatter<'_>,
+    ) -> std::fmt::Result {
+        write!(f, "{str:?}", str = &self[constant])
     }
 }
 
@@ -232,42 +281,43 @@ impl Default for OntolDomainMeta {
 
 #[derive(Serialize, Deserialize)]
 pub struct Domain {
-    pub unique_name: String,
-
-    /// Map that stores types in insertion/definition order
-    pub type_names: IndexMap<String, DefId>,
+    unique_name: TextConstant,
 
     /// Types by DefId.1 (the type's index within the domain)
     info: Vec<TypeInfo>,
 }
 
 impl Domain {
-    pub fn new(unique_name: String) -> Self {
+    pub fn new(unique_name: TextConstant) -> Self {
         Self {
             unique_name,
-            type_names: Default::default(),
             info: Default::default(),
         }
+    }
+
+    pub fn unique_name(&self) -> TextConstant {
+        self.unique_name
+    }
+
+    pub fn type_count(&self) -> usize {
+        self.info.len()
     }
 
     pub fn type_info(&self, def_id: DefId) -> &TypeInfo {
         &self.info[def_id.1 as usize]
     }
 
-    pub fn type_info_by_identifier(&self, identifier: &str) -> Option<&TypeInfo> {
-        let def_id = self.type_names.get(identifier)?;
-        Some(self.type_info(*def_id))
-    }
-
     pub fn type_infos(&self) -> impl Iterator<Item = &TypeInfo> {
         self.info.iter()
     }
 
+    pub fn find_type_by_name(&self, name: TextConstant) -> Option<&TypeInfo> {
+        self.info
+            .iter()
+            .find(|type_info| type_info.name() == Some(name))
+    }
+
     pub fn add_type(&mut self, type_info: TypeInfo) {
-        let def_id = type_info.def_id;
-        if let Some(type_name) = type_info.name.as_ref() {
-            self.type_names.insert(type_name.clone(), def_id);
-        }
         self.register_type_info(type_info);
     }
 
@@ -280,33 +330,27 @@ impl Domain {
             def_id: DefId(type_info.def_id.0, 0),
             kind: TypeKind::Data,
             public: false,
-            name: None,
-            entity_info: None,
+            kind: TypeKind::Data(BasicTypeInfo { name: None }),
             operator_addr: None,
             data_relationships: Default::default(),
         });
 
         self.info[index] = type_info;
     }
+
+    pub fn find_type_info_by_name(&self, name: TextConstant) -> Option<&TypeInfo> {
+        self.info
+            .iter()
+            .find(|type_info| type_info.name() == Some(name))
+    }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub enum TypeKind {
-    Data,
-    Relationship,
-    Function,
-    Domain,
-    Generator,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct TypeInfo {
     pub def_id: DefId,
     pub kind: TypeKind,
     pub public: bool,
-    pub name: Option<String>,
-    /// Some if this type is an entity
-    pub entity_info: Option<EntityInfo>,
+    pub kind: TypeKind,
     /// The SerdeOperatorAddr used for JSON.
     /// FIXME: This should really be connected to a DomainInterface.
     pub operator_addr: Option<SerdeOperatorAddr>,
@@ -315,6 +359,24 @@ pub struct TypeInfo {
 }
 
 impl TypeInfo {
+    pub fn name(&self) -> Option<TextConstant> {
+        match &self.kind {
+            TypeKind::Entity(info) => Some(info.name),
+            TypeKind::Data(info)
+            | TypeKind::Relationship(info)
+            | TypeKind::Function(info)
+            | TypeKind::Domain(info)
+            | TypeKind::Generator(info) => info.name,
+        }
+    }
+
+    pub fn entity_info(&self) -> Option<&EntityInfo> {
+        match &self.kind {
+            TypeKind::Entity(entity_info) => Some(entity_info),
+            _ => None,
+        }
+    }
+
     pub fn entity_relationships(
         &self,
     ) -> impl Iterator<Item = (&PropertyId, &DataRelationshipInfo)> {
@@ -324,8 +386,24 @@ impl TypeInfo {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
+pub enum TypeKind {
+    Entity(EntityInfo),
+    Data(BasicTypeInfo),
+    Relationship(BasicTypeInfo),
+    Function(BasicTypeInfo),
+    Domain(BasicTypeInfo),
+    Generator(BasicTypeInfo),
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize)]
+pub struct BasicTypeInfo {
+    pub name: Option<TextConstant>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
 pub struct EntityInfo {
+    pub name: TextConstant,
     pub id_relationship_id: RelationshipId,
     pub id_value_def_id: DefId,
     pub id_operator_addr: SerdeOperatorAddr,
@@ -335,13 +413,13 @@ pub struct EntityInfo {
     pub id_value_generator: Option<ValueGenerator>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, OntolDebug)]
 pub struct DataRelationshipInfo {
     pub kind: DataRelationshipKind,
     pub subject_cardinality: Cardinality,
     pub object_cardinality: Cardinality,
-    pub subject_name: String,
-    pub object_name: Option<String>,
+    pub subject_name: TextConstant,
+    pub object_name: Option<TextConstant>,
     pub source: DataRelationshipSource,
     pub target: DataRelationshipTarget,
 }
@@ -355,7 +433,7 @@ impl DataRelationshipInfo {
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Serialize, Deserialize, OntolDebug)]
 pub enum DataRelationshipKind {
     /// The relationship is between an entity and its identifier
     Id,
@@ -371,41 +449,43 @@ pub enum DataRelationshipKind {
     },
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, OntolDebug)]
 pub enum DataRelationshipSource {
     Inherent,
     ByUnionProxy,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, OntolDebug)]
 pub enum DataRelationshipTarget {
     Unambiguous(DefId),
     Union {
         union_def_id: DefId,
-        variants: Vec<DefId>,
+        // TODO: Move to one place in the ontology.
+        // It's a lookup from the union DefId to its members.
+        variants: Box<[DefId]>,
     },
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, OntolDebug)]
 pub struct MapMeta {
     pub procedure: Procedure,
     pub propflow_range: Range<u32>,
     pub lossiness: MapLossiness,
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, OntolDebug)]
 pub enum MapLossiness {
     Complete,
     Lossy,
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, OntolDebug, Debug)]
 pub struct PropertyFlow {
     pub id: PropertyId,
     pub data: PropertyFlowData,
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, OntolDebug, Debug)]
 pub enum PropertyFlowData {
     Type(DefId),
     Match(Var),
@@ -432,6 +512,11 @@ impl OntologyBuilder {
         self.ontology
             .package_config_table
             .insert(package_id, config);
+    }
+
+    pub fn text_constants(mut self, text_constants: Vec<ArcStr>) -> Self {
+        self.ontology.text_constants = text_constants;
+        self
     }
 
     pub fn ontol_domain_meta(mut self, meta: OntolDomainMeta) -> Self {
@@ -469,7 +554,7 @@ impl OntologyBuilder {
 
     pub fn named_forward_maps(
         mut self,
-        named_forward_maps: HashMap<(PackageId, String), MapKey>,
+        named_forward_maps: FnvHashMap<(PackageId, TextConstant), MapKey>,
     ) -> Self {
         self.ontology.named_forward_maps = named_forward_maps;
         self
@@ -515,7 +600,9 @@ impl OntologyBuilder {
 
 pub type Cardinality = (PropertyCardinality, ValueCardinality);
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug, OntolDebug,
+)]
 pub enum PropertyCardinality {
     Optional,
     Mandatory,
@@ -531,7 +618,9 @@ impl PropertyCardinality {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, Debug, OntolDebug,
+)]
 pub enum ValueCardinality {
     One,
     Many,

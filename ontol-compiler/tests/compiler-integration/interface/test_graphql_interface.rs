@@ -1,6 +1,7 @@
 use assert_matches::assert_matches;
 use ontol_runtime::{
     config::DataStoreConfig,
+    debug::NoFmt,
     interface::graphql::{
         data::{FieldKind, NativeScalarKind, ObjectData, TypeData},
         schema::{GraphqlSchema, QueryLevel},
@@ -107,8 +108,10 @@ fn test_graphql_scalar_array() {
         let native = prop_field.field_type.unit.native_scalar();
         assert_matches!(native.kind, NativeScalarKind::String);
 
-        let operator = test.test.ontology.get_serde_operator(native.operator_addr);
-        assert_matches!(operator, SerdeOperator::RelationSequence(_));
+        let operator = &test.test.ontology[native.operator_addr];
+        if !matches!(operator, SerdeOperator::RelationSequence(_)) {
+            panic!("{:?} was not RelationSequence", NoFmt(operator));
+        }
     });
 }
 
@@ -128,9 +131,7 @@ fn test_graphql_serde_renaming() {
             .object_data()
             .node_data();
 
-        let fields: Vec<_> = test
-            .ontology
-            .get_serde_operator(foo_node.operator_addr)
+        let fields: Vec<_> = test.ontology[foo_node.operator_addr]
             .struct_op()
             .properties
             .keys()

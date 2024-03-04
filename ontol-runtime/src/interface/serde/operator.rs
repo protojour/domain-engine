@@ -5,11 +5,14 @@ use std::{
 
 use ::serde::{Deserialize, Serialize};
 use indexmap::IndexMap;
+use ontol_macros::OntolDebug;
 use smallvec::SmallVec;
 use smartstring::alias::String;
 
 use crate::{
-    interface::discriminator::{VariantDiscriminator, VariantPurpose},
+    impl_ontol_debug,
+    interface::discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
+    text::TextConstant,
     value::PropertyId,
     value_generator::ValueGenerator,
     DefId,
@@ -30,7 +33,9 @@ impl ::std::fmt::Debug for SerdeOperatorAddr {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+impl_ontol_debug!(SerdeOperatorAddr);
+
+#[derive(Serialize, Deserialize, OntolDebug)]
 pub enum SerdeOperator {
     Unit,
     True(DefId),
@@ -41,7 +46,7 @@ pub enum SerdeOperator {
     F64(DefId, Option<RangeInclusive<f64>>),
     Serial(DefId),
     String(DefId),
-    StringConstant(String, DefId),
+    StringConstant(TextConstant, DefId),
 
     /// Always deserializes into text, ignores capture groups:
     TextPattern(DefId),
@@ -71,10 +76,10 @@ pub enum SerdeOperator {
     Struct(StructOperator),
 
     /// A map with one property: The ID of an entity.
-    IdSingletonStruct(String, SerdeOperatorAddr),
+    IdSingletonStruct(DefId, TextConstant, SerdeOperatorAddr),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, OntolDebug)]
 pub struct RelationSequenceOperator {
     // note: This is constant size array so that it can produce a dynamic slice
     pub ranges: [SequenceRange; 1],
@@ -82,7 +87,7 @@ pub struct RelationSequenceOperator {
     pub to_entity: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, OntolDebug)]
 pub struct ConstructorSequenceOperator {
     pub ranges: SmallVec<[SequenceRange; 3]>,
     pub def: SerdeDef,
@@ -108,7 +113,7 @@ impl ConstructorSequenceOperator {
 }
 
 /// A matcher for a range within a sequence
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, OntolDebug)]
 pub struct SequenceRange {
     /// Operator to use for this range
     pub addr: SerdeOperatorAddr,
@@ -118,30 +123,34 @@ pub struct SequenceRange {
     pub finite_repetition: Option<u16>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, OntolDebug)]
 pub struct AliasOperator {
-    pub typename: String,
+    pub typename: TextConstant,
     pub def: SerdeDef,
     pub inner_addr: SerdeOperatorAddr,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, OntolDebug)]
 pub struct UnionOperator {
-    typename: String,
+    typename: TextConstant,
     union_def: SerdeDef,
     variants: Vec<SerdeUnionVariant>,
 }
 
 impl UnionOperator {
     /// Note: variants must be sorted according to their purpose (VariantPurpose)
-    pub fn new(typename: String, union_def: SerdeDef, variants: Vec<SerdeUnionVariant>) -> Self {
+    pub fn new(
+        typename: TextConstant,
+        union_def: SerdeDef,
+        variants: Vec<SerdeUnionVariant>,
+    ) -> Self {
         variants.iter().fold(
             VariantPurpose::Identification {
                 entity_id: DefId::unit(),
             },
             |last_purpose, variant| {
                 if variant.discriminator.purpose < last_purpose {
-                    panic!("variants are not sorted: {variants:#?}");
+                    panic!("variants are not sorted");
                 }
                 variant.discriminator.purpose
             },
@@ -154,52 +163,29 @@ impl UnionOperator {
         }
     }
 
-    pub fn typename(&self) -> &String {
-        &self.typename
+    pub fn typename(&self) -> TextConstant {
+        self.typename
     }
 
     pub fn union_def(&self) -> SerdeDef {
         self.union_def
     }
 
-    pub fn variants(&self, mode: ProcessorMode, level: ProcessorLevel) -> FilteredVariants<'_> {
-        if matches!(mode, ProcessorMode::Delete) {
-            // Use only VariantPurpose::Identification
-            let skip_data = self
-                .variants
-                .iter()
-                .enumerate()
-                .find(|(_, variant)| variant.discriminator.purpose >= VariantPurpose::Data);
-
-            if let Some((skip_data, _)) = skip_data {
-                Self::filtered_variants(&self.variants[..skip_data])
-            } else {
-                Self::filtered_variants(&self.variants)
-            }
-        } else if matches!(mode, ProcessorMode::Raw) || level.is_global_root() {
-            let skip_id = self
-                .variants
-                .iter()
-                .enumerate()
-                .find(|(_, variant)| variant.discriminator.purpose >= VariantPurpose::Data);
-
-            if let Some((skip_index, _)) = skip_id {
-                Self::filtered_variants(&self.variants[skip_index..])
-            } else {
-                Self::filtered_variants(&self.variants)
-            }
+    /// Get the variant(s) that applies in the given context
+    pub fn applied_variants(
+        &self,
+        mode: ProcessorMode,
+        level: ProcessorLevel,
+    ) -> AppliedVariants<'_> {
+        let possible_variants = PossibleVariants {
+            all_variants: &self.variants,
+            mode,
+            level,
+        };
+        if let Some(certain_addr) = possible_variants.into_iter().find_unambiguous_addr() {
+            AppliedVariants::Unambiguous(certain_addr)
         } else {
-            Self::filtered_variants(&self.variants)
-        }
-    }
-
-    fn filtered_variants(variants: &[SerdeUnionVariant]) -> FilteredVariants<'_> {
-        if variants.len() == 1 {
-            FilteredVariants::Single(variants[0].addr)
-        } else if variants.is_empty() {
-            panic!("All variants got filtered");
-        } else {
-            FilteredVariants::Union(variants)
+            AppliedVariants::OneOf(possible_variants)
         }
     }
 
@@ -208,22 +194,105 @@ impl UnionOperator {
     }
 }
 
-#[derive(Debug)]
-pub enum FilteredVariants<'e> {
-    Single(SerdeOperatorAddr),
-    /// Should serialize one of the union members
-    Union(&'e [SerdeUnionVariant]),
+pub enum AppliedVariants<'on> {
+    Unambiguous(SerdeOperatorAddr),
+    OneOf(PossibleVariants<'on>),
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy)]
+pub struct PossibleVariants<'on> {
+    all_variants: &'on [SerdeUnionVariant],
+    mode: ProcessorMode,
+    level: ProcessorLevel,
+}
+
+impl<'on> IntoIterator for PossibleVariants<'on> {
+    type IntoIter = PossibleVariantsIter<'on>;
+    type Item = PossibleVariant<'on>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        PossibleVariantsIter {
+            inner_iter: self.all_variants.iter(),
+            mode: self.mode,
+            level: self.level,
+        }
+    }
+}
+
+pub struct PossibleVariantsIter<'on> {
+    inner_iter: std::slice::Iter<'on, SerdeUnionVariant>,
+    mode: ProcessorMode,
+    level: ProcessorLevel,
+}
+
+impl<'on> Iterator for PossibleVariantsIter<'on> {
+    type Item = PossibleVariant<'on>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // note: this continues iteration where the previous next() call left off
+        for variant in self.inner_iter.by_ref() {
+            if let Some(possible) = Self::filter_possible(variant, self.mode, self.level) {
+                return Some(possible);
+            }
+        }
+
+        None
+    }
+}
+
+impl<'on> PossibleVariantsIter<'on> {
+    fn find_unambiguous_addr(&mut self) -> Option<SerdeOperatorAddr> {
+        let addr = self.next().map(|variant| variant.addr)?;
+        if self.next().is_some() {
+            None
+        } else {
+            Some(addr)
+        }
+    }
+
+    fn filter_possible(
+        variant: &'on SerdeUnionVariant,
+        mode: ProcessorMode,
+        level: ProcessorLevel,
+    ) -> Option<PossibleVariant<'on>> {
+        match (mode, variant.discriminator.purpose) {
+            (ProcessorMode::Raw, VariantPurpose::RawDynamicEntity) => Some(PossibleVariant {
+                discriminant: &variant.discriminator.discriminant,
+                purpose: variant.discriminator.purpose,
+                addr: variant.addr,
+                serde_def: variant.discriminator.serde_def,
+            }),
+            (ProcessorMode::Raw, VariantPurpose::Identification { .. }) => None,
+            (ProcessorMode::Delete, VariantPurpose::Data) => None,
+            (_, VariantPurpose::RawDynamicEntity) => None,
+            (_, VariantPurpose::Identification { .. }) if level.is_global_root() => None,
+            _ => Some(PossibleVariant {
+                discriminant: &variant.discriminator.discriminant,
+                purpose: variant.discriminator.purpose,
+                addr: variant.addr,
+                serde_def: variant.discriminator.serde_def,
+            }),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct PossibleVariant<'on> {
+    pub discriminant: &'on Discriminant,
+    pub purpose: VariantPurpose,
+    pub addr: SerdeOperatorAddr,
+    pub serde_def: SerdeDef,
+}
+
+#[derive(Clone, Serialize, Deserialize, OntolDebug)]
 pub struct SerdeUnionVariant {
     pub discriminator: VariantDiscriminator,
     pub addr: SerdeOperatorAddr,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, OntolDebug)]
 pub struct StructOperator {
-    pub typename: String,
+    pub typename: TextConstant,
     pub def: SerdeDef,
     pub flags: SerdeStructFlags,
     pub properties: IndexMap<String, SerdeProperty>,
@@ -259,7 +328,7 @@ impl StructOperator {
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Serialize, Deserialize, OntolDebug)]
 pub struct SerdeProperty {
     /// The ID of this property
     pub property_id: PropertyId,
@@ -349,8 +418,8 @@ impl SerdeProperty {
 }
 
 bitflags::bitflags! {
-    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug, Serialize, Deserialize)]
-    pub struct SerdePropertyFlags: u32 {
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Serialize, Deserialize, Debug)]
+    pub struct SerdePropertyFlags: u8 {
         const OPTIONAL        = 0b00000001;
         const READ_ONLY       = 0b00000010;
         const ENTITY_ID       = 0b00000100;
@@ -360,9 +429,13 @@ bitflags::bitflags! {
 }
 
 bitflags::bitflags! {
-    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug, Serialize, Deserialize)]
-    pub struct SerdeStructFlags: u32 {
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Serialize, Deserialize, Debug)]
+    pub struct SerdeStructFlags: u8 {
         /// This struct operator supports open/domainless properties
-        const OPEN_DATA       = 0b00000001;
+        const OPEN_DATA          = 0b00000001;
+        const ENTITY_ID_OPTIONAL = 0b00000010;
     }
 }
+
+impl_ontol_debug!(SerdePropertyFlags);
+impl_ontol_debug!(SerdeStructFlags);
