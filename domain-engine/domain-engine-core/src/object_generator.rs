@@ -65,8 +65,7 @@ impl<'e> ObjectGenerator<'e> {
     ) {
         let operator = self.ontology.get_serde_operator(addr);
         let id_relationship = type_info
-            .entity_info
-            .as_ref()
+            .entity_info()
             .map(|entity_info| entity_info.id_relationship_id);
 
         match operator {

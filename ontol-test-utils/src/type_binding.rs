@@ -42,14 +42,19 @@ impl<'on> TypeBinding<'on> {
     ) -> Self {
         let ontology = &ontol_test.ontology;
         let domain = ontology.find_domain(package_id).unwrap();
-        let def_id = domain
-            .type_names
-            .get(type_name)
-            .unwrap_or_else(|| panic!("type name not found: `{type_name}`"));
-        let type_info = domain.type_info(*def_id).clone();
+        let type_info = domain
+            .type_infos()
+            .find(
+                |type_info| match type_info.name().map(|name| &ontology[name]) {
+                    Some(name) => name == type_name,
+                    None => false,
+                },
+            )
+            .cloned()
+            .unwrap_or_else(|| panic!("type not found: `{type_name}`"));
 
         if !type_info.public {
-            warn!("`{:?}` is not public!", type_info.name);
+            warn!("`{:?}` is not public!", ontology.debug(&type_info.name()));
         }
 
         trace!(
@@ -117,8 +122,7 @@ impl<'on> TypeBinding<'on> {
     #[track_caller]
     pub fn entity_id_def_id(&self) -> DefId {
         self.type_info
-            .entity_info
-            .as_ref()
+            .entity_info()
             .expect("not an entity")
             .id_value_def_id
     }
@@ -226,8 +230,7 @@ impl<'t, 'on> ValueBuilder<'t, 'on> {
         let entity_info = self
             .binding
             .type_info
-            .entity_info
-            .as_ref()
+            .entity_info()
             .expect("Not an entity!");
         let id = self
             .binding

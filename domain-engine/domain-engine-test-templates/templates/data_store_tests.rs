@@ -335,12 +335,7 @@ async fn test_artist_and_instrument_fmt_id_generation() {
     let engine = make_domain_engine(test.ontology.clone()).await;
     let [artist] = test.bind(["artist"]);
     let artist_id = TypeBinding::from_def_id(
-        artist
-            .type_info
-            .entity_info
-            .as_ref()
-            .unwrap()
-            .id_value_def_id,
+        artist.type_info.entity_info().unwrap().id_value_def_id,
         &test.ontology,
     );
 

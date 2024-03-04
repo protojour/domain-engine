@@ -273,10 +273,7 @@ impl Default for OntolDomainMeta {
 
 #[derive(Serialize, Deserialize)]
 pub struct Domain {
-    pub unique_name: TextConstant,
-
-    /// Map that stores types in insertion/definition order
-    pub type_names: IndexMap<String, DefId>,
+    unique_name: TextConstant,
 
     /// Types by DefId.1 (the type's index within the domain)
     info: Vec<TypeInfo>,
@@ -286,29 +283,33 @@ impl Domain {
     pub fn new(unique_name: TextConstant) -> Self {
         Self {
             unique_name,
-            type_names: Default::default(),
             info: Default::default(),
         }
+    }
+
+    pub fn unique_name(&self) -> TextConstant {
+        self.unique_name
+    }
+
+    pub fn type_count(&self) -> usize {
+        self.info.len()
     }
 
     pub fn type_info(&self, def_id: DefId) -> &TypeInfo {
         &self.info[def_id.1 as usize]
     }
 
-    pub fn type_info_by_identifier(&self, identifier: &str) -> Option<&TypeInfo> {
-        let def_id = self.type_names.get(identifier)?;
-        Some(self.type_info(*def_id))
-    }
-
     pub fn type_infos(&self) -> impl Iterator<Item = &TypeInfo> {
         self.info.iter()
     }
 
+    pub fn find_type_by_name(&self, name: TextConstant) -> Option<&TypeInfo> {
+        self.info
+            .iter()
+            .find(|type_info| type_info.name() == Some(name))
+    }
+
     pub fn add_type(&mut self, type_info: TypeInfo) {
-        let def_id = type_info.def_id;
-        if let Some(type_name) = type_info.name.as_ref() {
-            self.type_names.insert(type_name.clone(), def_id);
-        }
         self.register_type_info(type_info);
     }
 
@@ -320,13 +321,18 @@ impl Domain {
         self.info.resize_with(new_size, || TypeInfo {
             def_id: DefId(type_info.def_id.0, 0),
             public: false,
-            name: None,
-            entity_info: None,
+            kind: TypeKind::Data(DataTypeInfo { name: None }),
             operator_addr: None,
             data_relationships: Default::default(),
         });
 
         self.info[index] = type_info;
+    }
+
+    pub fn find_type_info_by_name(&self, name: TextConstant) -> Option<&TypeInfo> {
+        self.info
+            .iter()
+            .find(|type_info| type_info.name() == Some(name))
     }
 }
 
@@ -334,9 +340,7 @@ impl Domain {
 pub struct TypeInfo {
     pub def_id: DefId,
     pub public: bool,
-    pub name: Option<String>,
-    /// Some if this type is an entity
-    pub entity_info: Option<EntityInfo>,
+    pub kind: TypeKind,
     /// The SerdeOperatorAddr used for JSON.
     /// FIXME: This should really be connected to a DomainInterface.
     pub operator_addr: Option<SerdeOperatorAddr>,
@@ -345,6 +349,20 @@ pub struct TypeInfo {
 }
 
 impl TypeInfo {
+    pub fn name(&self) -> Option<TextConstant> {
+        match &self.kind {
+            TypeKind::Data(info) => info.name,
+            TypeKind::Entity(info) => Some(info.name),
+        }
+    }
+
+    pub fn entity_info(&self) -> Option<&EntityInfo> {
+        match &self.kind {
+            TypeKind::Entity(entity_info) => Some(entity_info),
+            TypeKind::Data(_) => None,
+        }
+    }
+
     pub fn entity_relationships(
         &self,
     ) -> impl Iterator<Item = (&PropertyId, &DataRelationshipInfo)> {
@@ -355,7 +373,19 @@ impl TypeInfo {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
+pub enum TypeKind {
+    Data(DataTypeInfo),
+    Entity(EntityInfo),
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct DataTypeInfo {
+    pub name: Option<TextConstant>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
 pub struct EntityInfo {
+    pub name: TextConstant,
     pub id_relationship_id: RelationshipId,
     pub id_value_def_id: DefId,
     pub id_operator_addr: SerdeOperatorAddr,

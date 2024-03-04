@@ -23,17 +23,17 @@ where
     T: OntolDebug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        <T as OntolDebug>::fmt(&self.1, self.0, f)
+        <T as OntolDebug>::fmt(self.1, self.0, f)
     }
 }
 
 #[macro_export]
 macro_rules! impl_ontol_debug {
     ($t:path) => {
-        impl crate::debug::OntolDebug for $t {
+        impl $crate::debug::OntolDebug for $t {
             fn fmt(
                 &self,
-                _: &dyn crate::debug::OntolDebugCtx,
+                _: &dyn $crate::debug::OntolDebugCtx,
                 f: &mut std::fmt::Formatter<'_>,
             ) -> std::fmt::Result {
                 write!(f, "{self:?}")

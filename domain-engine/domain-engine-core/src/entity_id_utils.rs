@@ -19,8 +19,7 @@ pub fn find_inherent_entity_id(
     let def_id = entity.type_def_id();
     let type_info = ontology.get_type_info(def_id);
     let entity_info = type_info
-        .entity_info
-        .as_ref()
+        .entity_info()
         .ok_or(DomainError::NotAnEntity(def_id))?;
 
     let struct_map = match entity {

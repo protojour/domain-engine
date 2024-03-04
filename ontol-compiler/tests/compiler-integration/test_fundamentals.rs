@@ -34,7 +34,7 @@ fn test_relations_are_distinct_for_different_domains() {
 
         let root_domain = ontology.find_domain(foo.def_id().package_id()).unwrap();
         expect_eq!(
-            actual = &ontology[root_domain.unique_name],
+            actual = &ontology[root_domain.unique_name()],
             expected = "test_root.on"
         );
 
@@ -42,7 +42,7 @@ fn test_relations_are_distinct_for_different_domains() {
             .find_domain(other_foo.def_id().package_id())
             .unwrap();
         expect_eq!(
-            actual = &ontology[other_domain.unique_name],
+            actual = &ontology[other_domain.unique_name()],
             expected = "other"
         );
 
@@ -125,7 +125,9 @@ fn trailing_comment_confusion() {
 fn ontol_domain_is_documented() {
     "".compile_then(|test| {
         let ontol_domain = test.ontology.find_domain(ONTOL_PKG).unwrap();
-        let text = ontol_domain.type_info_by_identifier("text").unwrap();
+        let text = ontol_domain
+            .find_type_info_by_name(test.ontology.find_text_constant("text").unwrap())
+            .unwrap();
         assert!(test.ontology.get_docs(text.def_id).is_some());
     });
 }

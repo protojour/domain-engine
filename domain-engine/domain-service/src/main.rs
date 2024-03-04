@@ -67,7 +67,7 @@ async fn main() -> anyhow::Result<()> {
     {
         let domain_path = format!(
             "/{unique_name}",
-            unique_name = &ontology[domain.unique_name]
+            unique_name = &ontology[domain.unique_name()]
         );
         router = router.nest(
             &domain_path,

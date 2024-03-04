@@ -12,6 +12,7 @@ use tracing::debug;
 use crate::{
     format_utils::{DoubleQuote, LogicOp, Missing},
     interface::serde::{deserialize_raw::RawVisitor, EDGE_PROPERTY},
+    ontology::TypeKind,
     value::{Attribute, PropertyId, Value},
     value_generator::ValueGenerator,
     vm::proc::{NParams, Procedure},
@@ -304,7 +305,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
         let (prop_id, _) = output.attributes.iter().next().unwrap();
         let type_info = self.processor.ontology.get_type_info(entity_def_id);
 
-        let Some(entity_info) = &type_info.entity_info else {
+        let TypeKind::Entity(entity_info) = &type_info.kind else {
             return Err(output);
         };
         if prop_id.relationship_id != entity_info.id_relationship_id {
@@ -472,10 +473,9 @@ impl<'a, 'de> Visitor<'de> for PropertyVisitor<'a> {
                         Some(SpecialProperty::IdOverride) => {
                             let type_info =
                                 self.0.processor.ontology.get_type_info(self.0.type_def_id);
-                            let entity_info = type_info
-                                .entity_info
-                                .as_ref()
-                                .ok_or_else(|| Error::custom("not an entity"))?;
+                            let TypeKind::Entity(entity_info) = &type_info.kind else {
+                                return Err(E::custom("not an entity"));
+                            };
 
                             return Ok(PropKind::OverriddenId(
                                 entity_info.id_relationship_id,

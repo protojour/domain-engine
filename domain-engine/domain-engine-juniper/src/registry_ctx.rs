@@ -371,7 +371,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 // If this is an entity, use Edge + ReferenceInput
                 // to get the option of just specifying an ID.
                 // TODO: Ensure this for create mutations only
-                let (query_level, typing_purpose) = if type_info.entity_info.is_some() {
+                let (query_level, typing_purpose) = if type_info.entity_info().is_some() {
                     (
                         QueryLevel::Edge { rel_params: None },
                         TypingPurpose::InputOrReference,
@@ -419,7 +419,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         let type_info = self.schema_ctx.ontology.get_type_info(def_id);
                         panic!(
                             "struct not found for {def_id:?} {name:?}",
-                            name = type_info.name
+                            name = self.schema_ctx.ontology.debug(&type_info.name())
                         );
                     });
 

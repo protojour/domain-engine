@@ -28,8 +28,7 @@ pub fn build_openapi_schemas<'e>(
 ) -> OpenApiSchemas<'e> {
     let mut graph_builder = SchemaGraphBuilder::default();
 
-    for (_, def_id) in &domain.type_names {
-        let type_info = domain.type_info(*def_id);
+    for type_info in domain.type_infos() {
         if let Some(operator_addr) = &type_info.operator_addr {
             graph_builder.visit(*operator_addr, ontology);
         }
@@ -221,7 +220,8 @@ impl<'e> SchemaCtx<'e> {
         let def_id = serde_def.def_id;
         self.ontology
             .find_domain(def_id.0)
-            .and_then(|domain| domain.type_info(def_id).name.as_ref())
+            .and_then(|domain| domain.type_info(def_id).name())
+            .map(|constant| &self.ontology[constant])
             .map(|type_name| smart_format!("{type_name}{modifier}"))
     }
 

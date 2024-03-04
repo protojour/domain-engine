@@ -42,9 +42,8 @@ pub fn generate_graphql_schema<'c>(
         .last();
 
     if !domain
-        .type_names
-        .iter()
-        .any(|(_, def_id)| domain.type_info(*def_id).entity_info.is_some())
+        .type_infos()
+        .any(|type_info| type_info.entity_info().is_some())
     {
         // A domain without entities doesn't get a GraphQL schema.
         return None;
@@ -52,7 +51,7 @@ pub fn generate_graphql_schema<'c>(
 
     let _entered = debug_span!("gql", pkg = ?package_id.0).entered();
 
-    let mut schema = new_schema_with_capacity(package_id, domain.type_names.len());
+    let mut schema = new_schema_with_capacity(package_id, domain.type_count());
     let mut namespace = GraphqlNamespace::with_domain_disambiguation(DomainDisambiguation {
         root_domain: package_id,
         ontology: partial_ontology,
@@ -91,14 +90,13 @@ pub fn generate_graphql_schema<'c>(
     builder.register_fundamental_types();
     builder.register_standard_queries();
 
-    for (_, def_id) in &domain.type_names {
-        let type_info = domain.type_info(*def_id);
+    for type_info in domain.type_infos() {
         if !type_info.public {
             continue;
         }
 
         if type_info.operator_addr.is_some() {
-            trace!("adapt type `{name:?}`", name = type_info.name);
+            trace!("adapt type `{name:?}`", name = type_info.name());
 
             let type_ref = builder.get_def_type_ref(type_info.def_id, QLevel::Node);
 

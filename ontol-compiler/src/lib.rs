@@ -28,7 +28,8 @@ use ontol_runtime::{
     },
     ontology::{
         DataRelationshipInfo, DataRelationshipKind, DataRelationshipSource, DataRelationshipTarget,
-        Domain, EntityInfo, MapLossiness, MapMeta, OntolDomainMeta, Ontology, TypeInfo,
+        DataTypeInfo, Domain, EntityInfo, MapLossiness, MapMeta, OntolDomainMeta, Ontology,
+        TypeInfo, TypeKind,
     },
     text::TextConstant,
     value::PropertyId,
@@ -267,10 +268,10 @@ impl<'m> Compiler<'m> {
         };
 
         let mut strings = self.strings.detach();
-        let mut serde_generator = self.serde_generator(&mut strings, &union_member_cache);
+        let mut serde_gen = self.serde_generator(&mut strings, &union_member_cache);
         let mut builder = Ontology::builder();
 
-        let dynamic_sequence_operator_addr = serde_generator.make_dynamic_sequence_addr();
+        let dynamic_sequence_operator_addr = serde_gen.make_dynamic_sequence_addr();
 
         let map_namespaces: FnvHashMap<_, _> = namespaces
             .iter_mut()
@@ -294,6 +295,7 @@ impl<'m> Compiler<'m> {
             }
 
             for (type_name, type_def_id) in type_namespace {
+                let type_name_constant = serde_gen.strings.intern_constant(type_name);
                 let data_relationships =
                     self.find_data_relationships(type_def_id, &union_member_cache);
 
@@ -305,13 +307,18 @@ impl<'m> Compiler<'m> {
                         }
                         _ => true,
                     },
-                    name: Some(type_name.into()),
-                    entity_info: self.entity_info(
+                    kind: match self.entity_info(
                         type_def_id,
-                        &mut serde_generator,
+                        type_name_constant,
+                        &mut serde_gen,
                         &data_relationships,
-                    ),
-                    operator_addr: serde_generator.gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
+                    ) {
+                        Some(entity_info) => TypeKind::Entity(entity_info),
+                        None => TypeKind::Data(DataTypeInfo {
+                            name: Some(type_name_constant),
+                        }),
+                    },
+                    operator_addr: serde_gen.gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
                         type_def_id,
                         SerdeModifier::json_default(),
                     ))),
@@ -323,9 +330,8 @@ impl<'m> Compiler<'m> {
                 domain.add_type(TypeInfo {
                     def_id: type_def_id,
                     public: false,
-                    name: None,
-                    entity_info: None,
-                    operator_addr: serde_generator.gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
+                    kind: TypeKind::Data(DataTypeInfo { name: None }),
+                    operator_addr: serde_gen.gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
                         type_def_id,
                         SerdeModifier::json_default(),
                     ))),
@@ -352,7 +358,7 @@ impl<'m> Compiler<'m> {
                     map_namespaces.get(&package_id),
                     &self.codegen_tasks,
                     &union_member_cache,
-                    &mut serde_generator,
+                    &mut serde_gen,
                 ) {
                     interfaces
                         .entry(package_id)
@@ -363,7 +369,7 @@ impl<'m> Compiler<'m> {
             interfaces
         };
 
-        let (serde_operators, _) = serde_generator.finish();
+        let (serde_operators, _) = serde_gen.finish();
 
         let mut property_flows = vec![];
 
@@ -571,6 +577,7 @@ impl<'m> Compiler<'m> {
     fn entity_info(
         &self,
         type_def_id: DefId,
+        name: TextConstant,
         serde_generator: &mut SerdeGenerator,
         data_relationships: &IndexMap<PropertyId, DataRelationshipInfo>,
     ) -> Option<EntityInfo> {
@@ -600,6 +607,7 @@ impl<'m> Compiler<'m> {
         };
 
         Some(EntityInfo {
+            name,
             // The entity is self-identifying if it has an inherent primary_id and that is its only inherent property.
             // TODO: Is the entity still self-identifying if it has only an external primary id (i.e. it is a unit type)?
             is_self_identifying: inherent_primary_id_meta.is_some() && inherent_property_count <= 1,

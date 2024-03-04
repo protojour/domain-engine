@@ -281,8 +281,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     kind: ObjectKind::Node(NodeData {
                         def_id: type_info.def_id,
                         entity_id: type_info
-                            .entity_info
-                            .as_ref()
+                            .entity_info()
                             .map(|entity_info| entity_info.id_value_def_id),
                         operator_addr,
                     }),

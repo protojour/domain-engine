@@ -63,18 +63,20 @@ fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let ontology = Arc::new(load_ontology(args.ontology)?);
     let domain = ontology.find_domain(PackageId(1)).unwrap();
+    let from_name = ontology.find_text_constant(args.from.as_str()).unwrap();
+    let to_name = ontology.find_text_constant(args.to.as_str()).unwrap();
     let input = MapDef {
-        def_id: *domain
-            .type_names
-            .get(args.from.as_str())
-            .expect("--from def not found in domain"),
+        def_id: domain
+            .find_type_by_name(from_name)
+            .expect("--from def not found in domain")
+            .def_id,
         flags: MapDefFlags::empty(),
     };
     let output = MapDef {
-        def_id: *domain
-            .type_names
-            .get(args.to.as_str())
-            .expect("--to def not found in domain"),
+        def_id: domain
+            .find_type_by_name(to_name)
+            .expect("--to def not found in domain")
+            .def_id,
         flags: MapDefFlags::empty(),
     };
     let proc = ontology

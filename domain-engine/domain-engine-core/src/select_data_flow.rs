@@ -250,7 +250,7 @@ impl<'on> SelectFlowProcessor<'on> {
                 }
                 PropertyFlowData::Type(def_id) if is_dep.0 => {
                     let type_info = self.ontology.get_type_info(*def_id);
-                    is_entity = type_info.entity_info.is_some();
+                    is_entity = type_info.entity_info().is_some();
                 }
                 PropertyFlowData::Cardinality((
                     PropertyCardinality::Mandatory,
