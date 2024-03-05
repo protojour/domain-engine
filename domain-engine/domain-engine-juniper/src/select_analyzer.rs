@@ -1,6 +1,6 @@
 use std::collections::hash_map::Entry;
 
-use fnv::FnvHashMap;
+use fnv::{FnvHashMap, FnvHashSet};
 use juniper::{FieldError, LookAheadChildren};
 use ontol_runtime::{
     condition::Condition,
@@ -83,6 +83,7 @@ impl<'a> SelectAnalyzer<'a> {
                     unit_property(),
                     map_queries,
                     &mut output_selects,
+                    &mut Default::default(),
                 )?;
 
                 Ok(AnalyzedQuery::Map {
@@ -103,7 +104,12 @@ impl<'a> SelectAnalyzer<'a> {
         parent_property: PropertyId,
         input_queries: &FnvHashMap<PropertyId, Var>,
         output_selects: &mut FnvHashMap<Var, EntitySelect>,
+        recursion_guard: &mut FnvHashSet<PropertyId>,
     ) -> Result<(), FieldError<GqlScalar>> {
+        if !recursion_guard.insert(parent_property) {
+            return Ok(());
+        }
+
         match input_queries.get(&parent_property) {
             Some(var) => {
                 let selection = self.analyze_selection(look_ahead, field_data)?;
@@ -117,9 +123,24 @@ impl<'a> SelectAnalyzer<'a> {
             }
             None => match self.schema_ctx.lookup_type_data(field_data.field_type.unit) {
                 Ok(TypeData {
-                    kind: TypeKind::Object(_),
+                    kind: TypeKind::Object(object_data),
                     ..
-                }) => Ok(()),
+                }) => {
+                    for field in object_data.fields.values() {
+                        if let FieldKind::Property(property_data) = &field.kind {
+                            self.analyze_map(
+                                look_ahead,
+                                field_data,
+                                property_data.property_id,
+                                input_queries,
+                                output_selects,
+                                recursion_guard,
+                            )?;
+                        }
+                    }
+
+                    Ok(())
+                }
                 _ => {
                     panic!();
                 }

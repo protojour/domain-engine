@@ -10,7 +10,7 @@ use ontol_runtime::{
     },
     ontology::{MapLossiness, Ontology},
     resolve_path::ResolverGraph,
-    DefId, PackageId,
+    DefId, MapKey, PackageId,
 };
 use tracing::{debug_span, trace};
 
@@ -33,7 +33,7 @@ pub fn generate_graphql_schema<'c>(
     map_namespace: Option<&'c IndexMap<&str, DefId>>,
     codegen_tasks: &'c CodegenTasks,
     union_member_cache: &'c UnionMemberCache,
-    serde_generator: &mut SerdeGenerator<'c, '_>,
+    serde_gen: &mut SerdeGenerator<'c, '_>,
 ) -> Option<GraphqlSchema> {
     let domain = partial_ontology.find_domain(package_id).unwrap();
 
@@ -41,11 +41,28 @@ pub fn generate_graphql_schema<'c>(
         .map(|(package_id, _)| package_id)
         .last();
 
-    if !domain
+    let contains_entities = domain
         .type_infos()
-        .any(|type_info| type_info.entity_info().is_some())
-    {
-        // A domain without entities doesn't get a GraphQL schema.
+        .any(|type_info| type_info.entity_info().is_some());
+
+    let mut named_maps: Vec<(&'c str, MapKey)> = vec![];
+
+    if let Some(map_namespace) = map_namespace {
+        // Register named maps in the user-specified order (using the IndexMap from the namespace)
+        for name in map_namespace.keys() {
+            let name_constant = serde_gen.strings.intern_constant(name);
+
+            if let Some(map_key) = codegen_tasks
+                .result_named_forward_maps
+                .get(&(package_id, name_constant))
+            {
+                named_maps.push((name, *map_key));
+            }
+        }
+    }
+
+    if !contains_entities && named_maps.is_empty() {
+        // A domain with no queries or mutations doesn't get a GraphQL schema.
         return None;
     }
 
@@ -58,15 +75,15 @@ pub fn generate_graphql_schema<'c>(
     });
 
     let mut builder = {
-        let relations = serde_generator.relations;
-        let defs = serde_generator.defs;
-        let seal_ctx = serde_generator.seal_ctx;
+        let relations = serde_gen.relations;
+        let defs = serde_gen.defs;
+        let seal_ctx = serde_gen.seal_ctx;
         SchemaBuilder {
             lazy_tasks: vec![],
             schema: &mut schema,
             type_namespace: &mut namespace,
             partial_ontology,
-            serde_gen: serde_generator,
+            serde_gen,
             relations,
             defs,
             primitives,
@@ -106,20 +123,10 @@ pub fn generate_graphql_schema<'c>(
         }
     }
 
-    if let Some(map_namespace) = map_namespace {
-        // Register named maps in the user-specified order (using the IndexMap from the namespace)
-        for name in map_namespace.keys() {
-            let name_constant = builder.serde_gen.strings.intern_constant(name);
+    for (name, map_key) in named_maps {
+        let prop_flow = codegen_tasks.result_propflow_table.get(&map_key).unwrap();
 
-            if let Some(map_key) = codegen_tasks
-                .result_named_forward_maps
-                .get(&(package_id, name_constant))
-            {
-                let prop_flow = codegen_tasks.result_propflow_table.get(map_key).unwrap();
-
-                builder.add_named_map_query(name, *map_key, prop_flow);
-            }
-        }
+        builder.add_named_map_query(name, map_key, prop_flow);
     }
 
     builder.exec_lazy_tasks();

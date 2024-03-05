@@ -339,73 +339,6 @@ impl DomainEngine {
             .ok_or_else(|| DomainError::DataStore(anyhow!("No entity inserted")))
     }
 
-    async fn exec_map_query(
-        &self,
-        value_cardinality: ValueCardinality,
-        mut entity_select: EntitySelect,
-        session: Session,
-    ) -> DomainResult<ontol_runtime::value::Value> {
-        let data_store = self.get_data_store()?;
-
-        debug!("match condition:\n{:#?}", entity_select.condition);
-
-        match &entity_select.source {
-            StructOrUnionSelect::Struct(struct_select) => {
-                let inner_entity_def_id = entity_select
-                    .condition
-                    .root_def_id()
-                    .expect("Root entity DefId not found in condition clauses");
-
-                // TODO: The probe algorithm here needs to work differently.
-                // The map statement (currently) knows about the data store type
-                // because the conditions must be expressed in its domain.
-                // So we don't need to search for a target type, only a valid resolve
-                // path _between_ the two known types
-                let resolve_path = self
-                    .resolver_graph
-                    .probe_path(
-                        &self.ontology,
-                        struct_select.def_id,
-                        data_store.package_id(),
-                        ProbeOptions {
-                            must_be_entity: true,
-                            direction: ProbeDirection::ByOutput,
-                            filter: ProbeFilter::Complete,
-                        },
-                    )
-                    .ok_or(DomainError::NoResolvePathToDataStore)?;
-
-                if let Some(map_key) = resolve_path.iter().last() {
-                    assert_eq!(map_key.input.def_id, inner_entity_def_id);
-                }
-
-                // Transform select
-                for map_key in resolve_path.iter() {
-                    translate_entity_select(&mut entity_select, &map_key, &self.ontology);
-                }
-            }
-            _ => todo!("Basically apply the same operation as above, but refactor"),
-        }
-
-        let data_store::Response::Query(edge_seq) = data_store
-            .api()
-            .execute(data_store::Request::Query(entity_select), session)
-            .await?
-        else {
-            return Err(DomainError::DataStore(anyhow!(
-                "data store returned invalid response"
-            )));
-        };
-
-        match value_cardinality {
-            ValueCardinality::One => match edge_seq.attrs.into_iter().next() {
-                Some(attribute) => Ok(attribute.val),
-                None => Ok(Value::unit()),
-            },
-            ValueCardinality::Many => Ok(Value::Sequence(edge_seq, DefId::unit())),
-        }
-    }
-
     async fn run_vm_to_completion(
         &self,
         vm: &mut OntolVm<'_>,
@@ -487,6 +420,75 @@ impl DomainEngine {
                     }
                 }
             }
+        }
+    }
+
+    async fn exec_map_query(
+        &self,
+        value_cardinality: ValueCardinality,
+        mut entity_select: EntitySelect,
+        session: Session,
+    ) -> DomainResult<ontol_runtime::value::Value> {
+        let data_store = self.get_data_store()?;
+
+        debug!("match condition:\n{:#?}", entity_select.condition);
+
+        match &entity_select.source {
+            StructOrUnionSelect::Struct(struct_select) => {
+                let inner_entity_def_id = entity_select
+                    .condition
+                    .root_def_id()
+                    .expect("Root entity DefId not found in condition clauses");
+
+                debug!("exec_map_query: inner entity def id: {inner_entity_def_id:?}");
+
+                // TODO: The probe algorithm here needs to work differently.
+                // The map statement (currently) knows about the data store type
+                // because the conditions must be expressed in its domain.
+                // So we don't need to search for a target type, only a valid resolve
+                // path _between_ the two known types
+                let resolve_path = self
+                    .resolver_graph
+                    .probe_path(
+                        &self.ontology,
+                        struct_select.def_id,
+                        data_store.package_id(),
+                        ProbeOptions {
+                            must_be_entity: true,
+                            direction: ProbeDirection::ByOutput,
+                            filter: ProbeFilter::Complete,
+                        },
+                    )
+                    .ok_or(DomainError::NoResolvePathToDataStore)?;
+
+                if let Some(map_key) = resolve_path.iter().last() {
+                    assert_eq!(map_key.input.def_id, inner_entity_def_id);
+                }
+
+                // Transform select
+                for map_key in resolve_path.iter() {
+                    translate_entity_select(&mut entity_select, &map_key, &self.ontology);
+                }
+            }
+            _ => todo!("Basically apply the same operation as above, but refactor"),
+        }
+
+        let data_store::Response::Query(edge_seq) = data_store
+            .api()
+            .execute(data_store::Request::Query(entity_select), session)
+            .await?
+        else {
+            return Err(DomainError::DataStore(anyhow!(
+                "data store returned invalid response"
+            )));
+        };
+
+        match value_cardinality {
+            ValueCardinality::One => match edge_seq.attrs.into_iter().next() {
+                Some(attribute) => Ok(attribute.val),
+                None => Ok(Value::unit()),
+            },
+            ValueCardinality::Many => Ok(Value::Sequence(edge_seq, DefId::unit())),
         }
     }
 }

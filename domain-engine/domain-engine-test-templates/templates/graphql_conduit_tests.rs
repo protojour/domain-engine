@@ -15,7 +15,7 @@ use domain_engine_test_utils::{
 };
 use ontol_runtime::{config::DataStoreConfig, ontology::Ontology};
 use ontol_test_utils::{
-    examples::conduit::{BLOG_POST_PUBLIC, CONDUIT_DB},
+    examples::conduit::{BLOG_POST_PUBLIC, CONDUIT_DB, FEED_PUBLIC},
     expect_eq, TestPackages,
 };
 use test_log::test;
@@ -25,11 +25,12 @@ fn conduit_db_only() -> TestPackages {
     TestPackages::with_sources([CONDUIT_DB]).with_data_store(CONDUIT_DB.0, DataStoreConfig::Default)
 }
 
-async fn make_domain_engine(ontology: Arc<Ontology>) -> DomainEngine {
+async fn make_domain_engine(
+    ontology: Arc<Ontology>,
+    mock_clause: impl unimock::Clause,
+) -> DomainEngine {
     DomainEngine::builder(ontology)
-        .system(Box::new(unimock::Unimock::new(
-            mock_current_time_monotonic(),
-        )))
+        .system(Box::new(unimock::Unimock::new(mock_clause)))
         .build(crate::TestDataStoreFactory::default(), Session::default())
         .await
         .unwrap()
@@ -39,7 +40,9 @@ async fn make_domain_engine(ontology: Arc<Ontology>) -> DomainEngine {
 async fn test_graphql_conduit_db() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology.clone()).await.into();
+    let ctx: ServiceCtx = make_domain_engine(test.ontology.clone(), mock_current_time_monotonic())
+        .await
+        .into();
 
     expect_eq!(
         actual = r#"mutation {
@@ -102,7 +105,9 @@ async fn test_graphql_conduit_db() {
 async fn test_graphql_conduit_db_create_with_foreign_reference() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology.clone()).await.into();
+    let ctx: ServiceCtx = make_domain_engine(test.ontology.clone(), mock_current_time_monotonic())
+        .await
+        .into();
 
     let response = r#"mutation {
         User(create: [{
@@ -168,7 +173,9 @@ async fn test_graphql_conduit_db_create_with_foreign_reference() {
 async fn test_graphql_conduit_db_query_article_with_tags() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology.clone()).await.into();
+    let ctx: ServiceCtx = make_domain_engine(test.ontology.clone(), mock_current_time_monotonic())
+        .await
+        .into();
 
     let _response = r#"mutation {
         Article(create: [{
@@ -226,23 +233,27 @@ async fn test_graphql_conduit_db_query_article_with_tags() {
     );
 }
 
-struct BlogPostConduit {
+struct ConduitBundle {
     domain_engine: Arc<DomainEngine>,
     db_schema: Schema,
     blog_schema: Schema,
+    feed_schema: Schema,
 }
 
-impl BlogPostConduit {
-    async fn new() -> Self {
-        let test_packages = TestPackages::with_sources([BLOG_POST_PUBLIC, CONDUIT_DB])
+impl ConduitBundle {
+    async fn new(mock_clauses: impl unimock::Clause) -> Self {
+        let test_packages = TestPackages::with_sources([BLOG_POST_PUBLIC, FEED_PUBLIC, CONDUIT_DB])
+            .with_roots([BLOG_POST_PUBLIC.0, FEED_PUBLIC.0])
             .with_data_store(CONDUIT_DB.0, DataStoreConfig::Default);
 
-        let (test, [db_schema, blog_schema]) =
-            test_packages.compile_schemas([CONDUIT_DB.0, BLOG_POST_PUBLIC.0]);
+        let (test, [blog_schema, feed_schema, db_schema]) =
+            test_packages.compile_schemas([BLOG_POST_PUBLIC.0, FEED_PUBLIC.0, CONDUIT_DB.0]);
+
         Self {
-            domain_engine: Arc::new(make_domain_engine(test.ontology.clone()).await),
+            domain_engine: Arc::new(make_domain_engine(test.ontology.clone(), mock_clauses).await),
             db_schema,
             blog_schema,
+            feed_schema,
         }
     }
 
@@ -313,7 +324,7 @@ impl BlogPostConduit {
 
 #[test(tokio::test)]
 async fn test_graphql_blog_post_conduit_implicit_join() {
-    let test = BlogPostConduit::new().await;
+    let test = ConduitBundle::new(mock_current_time_monotonic()).await;
     test.create_db_article().await;
 
     expect_eq!(
@@ -364,7 +375,7 @@ async fn test_graphql_blog_post_conduit_implicit_join() {
 /// is threaded through the domain engine pipeline.
 #[test(tokio::test)]
 async fn test_graphql_blog_post_conduit_paginated() {
-    let test = BlogPostConduit::new().await;
+    let test = ConduitBundle::new(mock_current_time_monotonic()).await;
     for _ in 0..3 {
         test.create_db_article().await;
     }
@@ -412,7 +423,7 @@ async fn test_graphql_blog_post_conduit_paginated() {
 
 #[test(tokio::test)]
 async fn test_graphql_blog_post_conduit_tags() {
-    let test = BlogPostConduit::new().await;
+    let test = ConduitBundle::new(mock_current_time_monotonic()).await;
     test.create_db_article_with_tag().await;
 
     expect_eq!(
@@ -447,7 +458,7 @@ async fn test_graphql_blog_post_conduit_tags() {
 
 #[test(tokio::test)]
 async fn test_graphql_blog_post_conduit_no_join_real() {
-    let test = BlogPostConduit::new().await;
+    let test = ConduitBundle::new(mock_current_time_monotonic()).await;
     test.create_db_article().await;
 
     expect_eq!(
@@ -480,7 +491,9 @@ async fn test_graphql_blog_post_conduit_no_join_real() {
 async fn test_graphql_conduit_db_article_shallow_update() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology.clone()).await.into();
+    let ctx: ServiceCtx = make_domain_engine(test.ontology.clone(), mock_current_time_monotonic())
+        .await
+        .into();
 
     let response = r#"mutation {
         Article(
@@ -589,7 +602,9 @@ async fn test_graphql_conduit_db_article_shallow_update() {
 async fn test_graphql_conduit_db_user_deletion() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology.clone()).await.into();
+    let ctx: ServiceCtx = make_domain_engine(test.ontology.clone(), mock_current_time_monotonic())
+        .await
+        .into();
 
     let response = r#"mutation {
         User(
@@ -670,7 +685,7 @@ async fn test_graphql_conduit_db_user_deletion() {
 
 #[test(tokio::test)]
 async fn test_graphql_blog_post_conduit_update_body_create_comment() {
-    let test = BlogPostConduit::new().await;
+    let test = ConduitBundle::new(mock_current_time_monotonic()).await;
     let article_id = test.create_db_article().await;
 
     expect_eq!(
@@ -737,7 +752,7 @@ async fn test_graphql_blog_post_conduit_update_body_create_comment() {
 
 #[test(tokio::test)]
 async fn test_graphql_blog_post_conduit_delete() {
-    let test = BlogPostConduit::new().await;
+    let test = ConduitBundle::new(mock_current_time_monotonic()).await;
     let article_id = test.create_db_article().await;
 
     expect_eq!(
@@ -752,6 +767,29 @@ async fn test_graphql_blog_post_conduit_delete() {
         .await,
         expected = Ok(graphql_value!({
             "BlogPost": [{ "deleted": true }]
+        })),
+    );
+}
+
+#[test(tokio::test)]
+#[should_panic(expected = "no resolve path to data store")]
+async fn test_graphql_conduit_feed_public() {
+    let test = ConduitBundle::new(()).await;
+
+    expect_eq!(
+        actual = format!(
+            "{{
+                feed(input: {{ username: \"u\" }}) {{
+                    title
+                }}
+            }}"
+        )
+        .exec([], &test.feed_schema, &test.ctx())
+        .await,
+        expected = Ok(graphql_value!({
+            "feed": {
+                "title": "whatever"
+            }
         })),
     );
 }
