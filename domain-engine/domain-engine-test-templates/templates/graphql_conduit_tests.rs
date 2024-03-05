@@ -14,16 +14,13 @@ use domain_engine_test_utils::graphql_test_utils::{
 use ontol_runtime::{config::DataStoreConfig, ontology::Ontology};
 use ontol_test_utils::{
     examples::conduit::{BLOG_POST_PUBLIC, CONDUIT_DB},
-    expect_eq, SourceName, TestPackages,
+    expect_eq, TestPackages,
 };
 use test_log::test;
 use tracing::info;
 
-const ROOT: SourceName = SourceName::root();
-
 fn conduit_db_only() -> TestPackages {
-    TestPackages::with_sources([(ROOT, CONDUIT_DB.1)])
-        .with_data_store(ROOT, DataStoreConfig::Default)
+    TestPackages::with_sources([CONDUIT_DB]).with_data_store(CONDUIT_DB.0, DataStoreConfig::Default)
 }
 
 async fn make_domain_engine(ontology: Arc<Ontology>) -> DomainEngine {
@@ -36,7 +33,7 @@ async fn make_domain_engine(ontology: Arc<Ontology>) -> DomainEngine {
 #[test(tokio::test)]
 async fn test_graphql_conduit_db() {
     let test_packages = conduit_db_only();
-    let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
+    let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
     let ctx: ServiceCtx = make_domain_engine(test.ontology.clone()).await.into();
 
     expect_eq!(
@@ -99,7 +96,7 @@ async fn test_graphql_conduit_db() {
 #[test(tokio::test)]
 async fn test_graphql_conduit_db_create_with_foreign_reference() {
     let test_packages = conduit_db_only();
-    let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
+    let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
     let ctx: ServiceCtx = make_domain_engine(test.ontology.clone()).await.into();
 
     let response = r#"mutation {
@@ -165,7 +162,7 @@ async fn test_graphql_conduit_db_create_with_foreign_reference() {
 #[test(tokio::test)]
 async fn test_graphql_conduit_db_query_article_with_tags() {
     let test_packages = conduit_db_only();
-    let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
+    let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
     let ctx: ServiceCtx = make_domain_engine(test.ontology.clone()).await.into();
 
     let _response = r#"mutation {
@@ -232,10 +229,11 @@ struct BlogPostConduit {
 
 impl BlogPostConduit {
     async fn new() -> Self {
-        let test_packages = TestPackages::with_sources([(ROOT, BLOG_POST_PUBLIC.1), CONDUIT_DB])
+        let test_packages = TestPackages::with_sources([BLOG_POST_PUBLIC, CONDUIT_DB])
             .with_data_store(CONDUIT_DB.0, DataStoreConfig::Default);
 
-        let (test, [db_schema, blog_schema]) = test_packages.compile_schemas([CONDUIT_DB.0, ROOT]);
+        let (test, [db_schema, blog_schema]) =
+            test_packages.compile_schemas([CONDUIT_DB.0, BLOG_POST_PUBLIC.0]);
         Self {
             domain_engine: Arc::new(make_domain_engine(test.ontology.clone()).await),
             db_schema,
@@ -476,7 +474,7 @@ async fn test_graphql_blog_post_conduit_no_join_real() {
 #[test(tokio::test)]
 async fn test_graphql_conduit_db_article_shallow_update() {
     let test_packages = conduit_db_only();
-    let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
+    let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
     let ctx: ServiceCtx = make_domain_engine(test.ontology.clone()).await.into();
 
     let response = r#"mutation {
@@ -585,7 +583,7 @@ async fn test_graphql_conduit_db_article_shallow_update() {
 #[test(tokio::test)]
 async fn test_graphql_conduit_db_user_deletion() {
     let test_packages = conduit_db_only();
-    let (test, [schema]) = test_packages.compile_schemas([SourceName::root()]);
+    let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
     let ctx: ServiceCtx = make_domain_engine(test.ontology.clone()).await.into();
 
     let response = r#"mutation {

@@ -14,21 +14,21 @@ use domain_engine_juniper::{
 };
 use juniper::ScalarValue;
 use ontol_runtime::{config::DataStoreConfig, sequence::Sequence};
-use ontol_test_utils::{OntolTest, SourceName, TestCompile, TestPackages};
+use ontol_test_utils::{OntolTest, SrcName, TestCompile, TestPackages};
 use ordered_float::NotNan;
 use unimock::*;
 
 pub trait TestCompileSchema {
     fn compile_schemas<const N: usize>(
         self,
-        source_names: [SourceName; N],
+        source_names: [SrcName; N],
     ) -> (OntolTest, [Schema; N]);
 }
 
 impl<T: TestCompile> TestCompileSchema for T {
     fn compile_schemas<const N: usize>(
         self,
-        source_names: [SourceName; N],
+        source_names: [SrcName; N],
     ) -> (OntolTest, [Schema; N]) {
         compile_schemas_inner(self.compile(), source_names)
     }
@@ -42,9 +42,9 @@ impl TestCompileSingletonSchema for &'static str {
     fn compile_single_schema_with_datastore(self) -> (OntolTest, Schema) {
         let (ontol_test, [schema]) = compile_schemas_inner(
             TestPackages::with_root(self)
-                .with_data_store(SourceName::root(), DataStoreConfig::Default)
+                .with_data_store(SrcName::default(), DataStoreConfig::Default)
                 .compile(),
-            [SourceName::root()],
+            [SrcName::default()],
         );
         (ontol_test, schema)
     }
@@ -52,7 +52,7 @@ impl TestCompileSingletonSchema for &'static str {
 
 fn compile_schemas_inner<const N: usize>(
     mut ontol_test: OntolTest,
-    source_names: [SourceName; N],
+    source_names: [SrcName; N],
 ) -> (OntolTest, [Schema; N]) {
     // Don't want JSON schema noise in GraphQL tests:
     ontol_test.compile_json_schema = false;
@@ -109,7 +109,7 @@ pub fn mock_data_store_query_entities_empty() -> impl unimock::Clause {
 
 pub fn gql_ctx_mock_data_store(
     ontol_test: &OntolTest,
-    data_store_package: SourceName,
+    data_store_package: SrcName,
     setup: impl unimock::Clause,
 ) -> ServiceCtx {
     let domain_engine = DomainEngine::test_builder(ontol_test.ontology.clone())

@@ -1,6 +1,6 @@
-use crate::SourceName;
+use crate::SrcName;
 
-type Example = (SourceName, &'static str);
+type Example = (SrcName, &'static str);
 
 pub mod stix {
     use crate::TestPackages;
@@ -8,27 +8,27 @@ pub mod stix {
     use super::*;
 
     pub const STIX: Example = (
-        SourceName("stix"),
+        SrcName("stix"),
         include_str!("../../examples/stix_lite/stix.on"),
     );
 
     pub const STIX_COMMON: Example = (
-        SourceName("stix_common"),
+        SrcName("stix_common"),
         include_str!("../../examples/stix_lite/stix_common.on"),
     );
 
     pub const STIX_META: Example = (
-        SourceName("stix_meta"),
+        SrcName("stix_meta"),
         include_str!("../../examples/stix_lite/stix_meta.on"),
     );
 
     pub const STIX_OPEN_VOCAB: Example = (
-        SourceName("stix_open_vocab"),
+        SrcName("stix_open_vocab"),
         include_str!("../../examples/stix_lite/stix_open_vocab.on"),
     );
 
     pub fn stix_bundle() -> TestPackages {
-        TestPackages::with_sources([STIX.root(), STIX_META, STIX_COMMON, STIX_OPEN_VOCAB, SI])
+        TestPackages::with_sources([STIX, STIX_META, STIX_COMMON, STIX_OPEN_VOCAB, SI])
     }
 }
 
@@ -36,68 +36,58 @@ pub mod conduit {
     use super::*;
 
     pub const CONDUIT_DB: Example = (
-        SourceName("conduit_db"),
+        SrcName("conduit_db"),
         include_str!("../../examples/conduit/conduit_db.on"),
     );
 
     pub const CONDUIT_PUBLIC: Example = (
-        SourceName("conduit_public"),
+        SrcName("conduit_public"),
         include_str!("../../examples/conduit/conduit_public.on"),
     );
 
     pub const CONDUIT_CONTRIVED_SIGNUP: Example = (
-        SourceName("conduit_contrived_signup"),
+        SrcName("conduit_contrived_signup"),
         include_str!("../../examples/conduit/conduit_contrived_signup.on"),
     );
 
     pub const BLOG_POST_PUBLIC: Example = (
-        SourceName("blog_post_public"),
+        SrcName("blog_post_public"),
         include_str!("../../examples/conduit/blog_post_public.on"),
     );
 
     pub const FEED_PUBLIC: Example = (
-        SourceName("feed_public"),
+        SrcName("feed_public"),
         include_str!("../../examples/conduit/feed_public.on"),
     );
 }
 
 pub const ARTIST_AND_INSTRUMENT: Example = (
-    SourceName("artist_and_instrument"),
+    SrcName("artist_and_instrument"),
     include_str!("../../examples/artist_and_instrument.on"),
 );
 
-pub const DEMO: Example = (SourceName("demo"), include_str!("../../examples/demo.on"));
+pub const DEMO: Example = (SrcName("demo"), include_str!("../../examples/demo.on"));
 
 pub const GITMESH: Example = (
-    SourceName("gitmesh"),
+    SrcName("gitmesh"),
     include_str!("../../examples/gitmesh.on"),
 );
 
 pub const GEOJSON: Example = (
-    SourceName("geojson"),
+    SrcName("geojson"),
     include_str!("../../examples/geojson.on"),
 );
 
 pub const GUITAR_SYNTH_UNION: Example = (
-    SourceName("guitar_synth_union"),
+    SrcName("guitar_synth_union"),
     include_str!("../../examples/guitar_synth_union.on"),
 );
 
 pub const MUNICIPALITIES: Example = (
-    SourceName("municipalities"),
+    SrcName("municipalities"),
     include_str!("../../examples/municipalities.on"),
 );
 
-pub const SI: Example = (SourceName("SI"), include_str!("../../examples/SI.on"));
+pub const SI: Example = (SrcName("SI"), include_str!("../../examples/SI.on"));
 
-pub const WGS: Example = (SourceName("wgs"), include_str!("../../examples/wgs.on"));
-
-pub trait Root {
-    fn root(self) -> Self;
-}
-
-impl Root for (SourceName, &'static str) {
-    fn root(self) -> Self {
-        (SourceName::root(), self.1)
-    }
-}
+pub const WGS: Example = (SrcName("wgs"), include_str!("../../examples/wgs.on"));

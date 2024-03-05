@@ -1,8 +1,8 @@
 use ontol_test_utils::{
     assert_error_msg, assert_json_io_matches,
-    examples::{Root, GEOJSON, WGS},
+    examples::{GEOJSON, WGS},
     serde_helper::*,
-    SourceName, TestCompile, TestPackages,
+    SrcName, TestCompile, TestPackages,
 };
 use serde_json::json;
 use test_log::test;
@@ -10,7 +10,7 @@ use test_log::test;
 #[test]
 fn test_geojson() {
     TestPackages::with_sources(
-        [GEOJSON.root(), WGS]
+        [GEOJSON, WGS]
     ).compile_then(|test| {
         let [geometry] = test.bind(["Geometry"]);
         assert_json_io_matches!(serde_create(&geometry), {
@@ -66,10 +66,8 @@ fn test_geojson() {
 #[test]
 fn test_municipalities() {
     TestPackages::with_sources([
-        GEOJSON,
-        WGS,
         (
-            SourceName::root(),
+            SrcName("entry"),
             "
             use 'geojson' as geojson
 
@@ -83,6 +81,8 @@ fn test_municipalities() {
             )
             ",
         ),
+        GEOJSON,
+        WGS,
     ])
     .compile_then(|_test| {});
 }

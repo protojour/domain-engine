@@ -1,4 +1,4 @@
-use ontol_test_utils::{SourceName, TestCompile, TestPackages};
+use ontol_test_utils::{SrcName, TestCompile, TestPackages};
 use serde_json::json;
 use test_log::test;
 
@@ -260,10 +260,8 @@ def developer (
 #[test]
 fn test_map_invert() {
     TestPackages::with_sources([
-        (SourceName("work"), WORK),
-        (SourceName("dev"), DEV),
         (
-            SourceName::root(),
+            SrcName("entry"),
             "
             use 'work' as work
             use 'dev' as dev
@@ -288,6 +286,8 @@ fn test_map_invert() {
             )
             ",
         ),
+        (SrcName("work"), WORK),
+        (SrcName("dev"), DEV),
     ])
     .compile_fail();
 }

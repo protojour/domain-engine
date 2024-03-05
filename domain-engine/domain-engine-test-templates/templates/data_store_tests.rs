@@ -9,12 +9,12 @@ use ontol_runtime::{
 };
 use ontol_test_utils::{
     assert_error_msg,
-    examples::{conduit::CONDUIT_DB, Root, ARTIST_AND_INSTRUMENT},
+    examples::{conduit::CONDUIT_DB, ARTIST_AND_INSTRUMENT},
     expect_eq,
     json_utils::{json_map, json_prop},
     serde_helper::{serde_create, serde_read},
     type_binding::TypeBinding,
-    SourceName, TestCompile, TestPackages,
+    TestCompile, TestPackages,
 };
 use serde_json::json;
 use std::sync::Arc;
@@ -22,13 +22,12 @@ use test_log::test;
 use uuid::Uuid;
 
 fn conduit_db() -> TestPackages {
-    TestPackages::with_sources([CONDUIT_DB.root()])
-        .with_data_store(SourceName::root(), DataStoreConfig::Default)
+    TestPackages::with_sources([CONDUIT_DB]).with_data_store(CONDUIT_DB.0, DataStoreConfig::Default)
 }
 
 fn artist_and_instrument() -> TestPackages {
-    TestPackages::with_sources([ARTIST_AND_INSTRUMENT.root()])
-        .with_data_store(SourceName::root(), DataStoreConfig::Default)
+    TestPackages::with_sources([ARTIST_AND_INSTRUMENT])
+        .with_data_store(ARTIST_AND_INSTRUMENT.0, DataStoreConfig::Default)
 }
 
 async fn make_domain_engine(ontology: Arc<Ontology>) -> DomainEngine {

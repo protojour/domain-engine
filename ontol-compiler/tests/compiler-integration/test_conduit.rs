@@ -1,11 +1,8 @@
 use indoc::indoc;
 use ontol_runtime::{format_utils::Literal, ontology::ValueCardinality, value::Value};
 use ontol_test_utils::{
-    examples::{
-        conduit::{
-            BLOG_POST_PUBLIC, CONDUIT_CONTRIVED_SIGNUP, CONDUIT_DB, CONDUIT_PUBLIC, FEED_PUBLIC,
-        },
-        Root,
+    examples::conduit::{
+        BLOG_POST_PUBLIC, CONDUIT_CONTRIVED_SIGNUP, CONDUIT_DB, CONDUIT_PUBLIC, FEED_PUBLIC,
     },
     test_map::YielderMock,
     TestCompile, TestPackages,
@@ -26,7 +23,7 @@ fn test_compile_conduit_db() {
 
 #[test]
 fn test_map_conduit_blog_post() {
-    let test = TestPackages::with_sources([CONDUIT_DB, BLOG_POST_PUBLIC.root()]).compile();
+    let test = TestPackages::with_sources([BLOG_POST_PUBLIC, CONDUIT_DB]).compile();
     test.mapper().assert_map_eq(
         ("conduit_db.Article", "BlogPost"),
         json!({
@@ -57,7 +54,7 @@ fn test_map_conduit_blog_post() {
 /// Test that the mapping works without providing the "tags" property in the input.
 #[test]
 fn test_map_conduit_no_tags_in_db_object() {
-    let test = TestPackages::with_sources([CONDUIT_DB, BLOG_POST_PUBLIC.root()]).compile();
+    let test = TestPackages::with_sources([BLOG_POST_PUBLIC, CONDUIT_DB]).compile();
     test.mapper().assert_map_eq(
         ("conduit_db.Article", "BlogPost"),
         json!({
@@ -86,7 +83,7 @@ fn test_map_conduit_no_tags_in_db_object() {
 
 #[test]
 fn test_map_match_conduit_blog_post_cond_clauses() {
-    let test = TestPackages::with_sources([CONDUIT_DB, BLOG_POST_PUBLIC.root()]).compile();
+    let test = TestPackages::with_sources([BLOG_POST_PUBLIC, CONDUIT_DB]).compile();
     let [article] = test.bind(["conduit_db.Article"]);
     let return_value = Value::sequence_of([article
         .entity_builder(
@@ -130,7 +127,7 @@ fn test_map_match_conduit_blog_post_cond_clauses() {
 
 #[test]
 fn test_conduit_feed_public() {
-    let test = TestPackages::with_sources([CONDUIT_DB, FEED_PUBLIC.root()]).compile();
+    let test = TestPackages::with_sources([FEED_PUBLIC, CONDUIT_DB]).compile();
     let [article] = test.bind(["conduit_db.Article"]);
     let article_return_value = Value::sequence_of([article
         .entity_builder(
@@ -191,5 +188,5 @@ fn test_conduit_feed_public() {
 #[test]
 #[should_panic(expected = "unbound variable")]
 fn test_map_conduit_contrived_signup() {
-    TestPackages::with_sources([CONDUIT_DB, CONDUIT_CONTRIVED_SIGNUP.root()]).compile();
+    TestPackages::with_sources([CONDUIT_CONTRIVED_SIGNUP, CONDUIT_DB]).compile();
 }

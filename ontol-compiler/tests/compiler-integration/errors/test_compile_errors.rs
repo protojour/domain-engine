@@ -1,4 +1,4 @@
-use ontol_test_utils::{expect_eq, SourceName, TestCompile, TestPackages};
+use ontol_test_utils::{expect_eq, SrcName, TestCompile, TestPackages};
 use test_log::test;
 
 // BUG: This should recognize the `//` comment token
@@ -368,13 +368,13 @@ fn error_complains_about_ambiguous_pattern_based_unions() {
 #[test]
 fn error_compile_error_in_dependency() {
     TestPackages::with_sources([
+        (SrcName("entry"), "use 'fail' as f"),
         (
-            SourceName("fail"),
+            SrcName("fail"),
             "
             ! // ERROR parse error: found `!`, expected one of `use`, `def`, `rel`, `fmt`, `map`
             ",
         ),
-        (SourceName::root(), "use 'fail' as f"),
     ])
     .compile_fail();
 }
@@ -391,9 +391,8 @@ fn error_rel_wildcard_span() {
 #[test]
 fn error_fail_import_private_type() {
     TestPackages::with_sources([
-        (SourceName("dep"), "def(private) foo ()"),
         (
-            SourceName::root(),
+            SrcName("root"),
             "
             use 'dep' as dep
             def bar (
@@ -401,6 +400,7 @@ fn error_fail_import_private_type() {
             )
             ",
         ),
+        (SrcName("dep"), "def(private) foo ()"),
     ])
     .compile_fail();
 }
@@ -408,10 +408,8 @@ fn error_fail_import_private_type() {
 #[test]
 fn error_domain_named_relation() {
     TestPackages::with_sources([
-        (SourceName("dep0"), ""),
-        (SourceName("dep1"), ""),
         (
-            SourceName::root(),
+            SrcName("entry"),
             "
             use 'dep0' as dep0
             use 'dep1' as dep1
@@ -419,6 +417,8 @@ fn error_domain_named_relation() {
             rel dep0 'fond_of': dep1 // ERROR subject must be a domain type// ERROR object must be a data type
             ",
         ),
+        (SrcName("dep0"), ""),
+        (SrcName("dep1"), ""),
     ])
     .compile_fail();
 }
@@ -448,10 +448,8 @@ fn error_constant_in_weird_place() {
 #[test]
 fn bad_domain_relation() {
     TestPackages::with_sources([
-        (SourceName("a"), ""),
-        (SourceName("b"), ""),
         (
-            SourceName::root(),
+            SrcName("root"),
             "
             use 'a' as a
             use 'b' as b
@@ -459,6 +457,8 @@ fn bad_domain_relation() {
             rel a 'to'[]: b // ERROR subject must be a domain type// ERROR object must be a data type
             ",
         ),
+        (SrcName("a"), ""),
+        (SrcName("b"), ""),
     ])
     .compile_fail();
 }
@@ -502,9 +502,8 @@ fn error_test_lazy_seal_by_map() {
 #[test]
 fn error_test_error_object_property_in_foreign_domain() {
     TestPackages::with_sources([
-        (SourceName("foreign"), "def foo ()"),
         (
-            SourceName::root(),
+            SrcName("root"),
             "
             use 'foreign' as foreign
 
@@ -518,6 +517,7 @@ fn error_test_error_object_property_in_foreign_domain() {
             )
             ",
         ),
+        (SrcName("foreign"), "def foo ()"),
     ])
     .compile_fail();
 }

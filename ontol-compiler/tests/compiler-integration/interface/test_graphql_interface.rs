@@ -15,7 +15,7 @@ use ontol_test_utils::{
         graphql::{ObjectDataExt, TypeDataExt, UnitTypeRefExt},
         serde::SerdeOperatorExt,
     },
-    OntolTest, SourceName, TestCompile, TestPackages, ROOT_SRC_NAME,
+    OntolTest, SrcName, TestCompile, TestPackages,
 };
 use test_log::test;
 
@@ -33,7 +33,7 @@ fn test_graphql_small_range_number_becomes_int() {
     )
     "
     .compile_then(|test| {
-        let (_schema, test) = schema_test(&test, ROOT_SRC_NAME);
+        let (_schema, test) = schema_test(&test, SrcName::default());
         let foo_type = test.type_data("foo", QueryLevel::Node);
         let foo_object = foo_type.object_data();
 
@@ -54,7 +54,7 @@ fn test_graphql_i64_custom_scalar() {
     )
     "
     .compile_then(|test| {
-        let (schema, test) = schema_test(&test, ROOT_SRC_NAME);
+        let (schema, test) = schema_test(&test, SrcName::default());
         let ontology = &test.test.ontology;
         let foo_type = test.type_data("foo", QueryLevel::Node);
         let foo_object = foo_type.object_data();
@@ -81,7 +81,7 @@ fn test_graphql_default_scalar() {
     )
     "
     .compile_then(|test| {
-        let (_schema, test) = schema_test(&test, ROOT_SRC_NAME);
+        let (_schema, test) = schema_test(&test, SrcName::default().0);
         let foo_type = test.type_data("foo", QueryLevel::Node);
         let foo_object = foo_type.object_data();
 
@@ -102,7 +102,7 @@ fn test_graphql_scalar_array() {
     )
     "
     .compile_then(|test| {
-        let (_schema, test) = schema_test(&test, ROOT_SRC_NAME);
+        let (_schema, test) = schema_test(&test, SrcName::default());
         let foo_type = test.type_data("foo", QueryLevel::Node);
         let foo_object = foo_type.object_data();
 
@@ -129,7 +129,7 @@ fn test_graphql_serde_renaming() {
     )
     "
     .compile_then(|test| {
-        let (_schema, schema_test) = schema_test(&test, ROOT_SRC_NAME);
+        let (_schema, schema_test) = schema_test(&test, SrcName::default());
         let foo_node = schema_test
             .type_data("foo", QueryLevel::Node)
             .object_data()
@@ -162,7 +162,7 @@ fn test_query_map_empty_input_becomes_hidden_arg() {
     )
     "
     .compile_then(|test| {
-        let (schema, _test) = schema_test(&test, ROOT_SRC_NAME);
+        let (schema, _test) = schema_test(&test, SrcName::default());
 
         let query = schema.type_data(schema.query).object_data();
         let my_query = query.fields.get("my_query").unwrap();
@@ -177,7 +177,7 @@ fn test_query_map_empty_input_becomes_hidden_arg() {
 #[test]
 fn test_graphql_artist_and_instrument() {
     let test = ARTIST_AND_INSTRUMENT.1.compile();
-    let (schema, test) = schema_test(&test, ROOT_SRC_NAME);
+    let (schema, test) = schema_test(&test, SrcName::default());
     let ontology = &test.test.ontology;
     let query_object = test.query_object_data();
 
@@ -218,7 +218,7 @@ fn test_no_datastore_yields_empty_mutation() {
     )
     "
     .compile();
-    let (_schema, test) = schema_test(&test, ROOT_SRC_NAME);
+    let (_schema, test) = schema_test(&test, SrcName::default());
     assert!(test.mutation_object_data().fields.is_empty());
 }
 
@@ -226,7 +226,7 @@ fn test_no_datastore_yields_empty_mutation() {
 fn test_imperfect_mapping_mutation() {
     let test = TestPackages::with_sources([
         (
-            SourceName::root(),
+            SrcName::default(),
             "
             use 'inner' as inner
 
@@ -248,7 +248,7 @@ fn test_imperfect_mapping_mutation() {
             ",
         ),
         (
-            SourceName("inner"),
+            SrcName("inner"),
             "
             def inner (
                 rel .'id'|id: (rel .is: text)
@@ -258,9 +258,9 @@ fn test_imperfect_mapping_mutation() {
             ",
         ),
     ])
-    .with_data_store(SourceName("inner"), DataStoreConfig::Default)
+    .with_data_store(SrcName("inner"), DataStoreConfig::Default)
     .compile();
-    let (_schema, test) = schema_test(&test, ROOT_SRC_NAME);
+    let (_schema, test) = schema_test(&test, SrcName::default());
     let mutation_object = test.mutation_object_data();
     let outer_field = mutation_object.fields.get("outer").unwrap();
     let FieldKind::EntityMutation {
@@ -303,7 +303,7 @@ fn incompatible_edge_types_are_distinct() {
     )
     "
     .compile_then(|test| {
-        let (schema, test) = schema_test(&test, ROOT_SRC_NAME);
+        let (schema, test) = schema_test(&test, SrcName::default());
         let ontology = &test.test.ontology;
 
         let query = schema.type_data(schema.query).object_data();
@@ -387,7 +387,10 @@ impl<'o> SchemaTest<'o> {
     }
 }
 
-fn schema_test<'o>(test: &'o OntolTest, source_name: &str) -> (&'o GraphqlSchema, SchemaTest<'o>) {
+fn schema_test<'o>(
+    test: &'o OntolTest,
+    source_name: impl Into<SrcName>,
+) -> (&'o GraphqlSchema, SchemaTest<'o>) {
     let schema = test.graphql_schema(source_name);
     (schema, SchemaTest { test, schema })
 }

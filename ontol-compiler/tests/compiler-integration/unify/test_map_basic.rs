@@ -1,5 +1,5 @@
 use ontol_test_utils::{
-    serde_helper::serde_raw, test_map::AsKey, SourceName, TestCompile, TestPackages,
+    serde_helper::serde_raw, test_map::AsKey, SrcName, TestCompile, TestPackages,
 };
 use serde_json::json;
 use test_log::test;
@@ -661,7 +661,7 @@ fn test_map_complex_flow() {
 fn test_map_delegation() {
     TestPackages::with_sources([
         (
-            SourceName::root(),
+            SrcName("root"),
             "
             use 'SI' as SI
 
@@ -675,7 +675,7 @@ fn test_map_delegation() {
             ",
         ),
         (
-            SourceName("SI"),
+            SrcName("SI"),
             "
             def meters (rel .is: i64)
             def millimeters (rel .is: i64)
@@ -707,7 +707,19 @@ fn test_map_delegation() {
 fn test_map_delegation_abstract_types() {
     TestPackages::with_sources([
         (
-            SourceName("SI"),
+            SrcName("entry"),
+            "
+            use 'car' as c
+            use 'vehicle' as v
+
+            map(
+                c.car('length': len),
+                v.vehicle('length': len),
+            )
+            ",
+        ),
+        (
+            SrcName("SI"),
             "
             def meters (rel .is: number)
             def millimeters (rel .is: number)
@@ -719,7 +731,7 @@ fn test_map_delegation_abstract_types() {
             ",
         ),
         (
-            SourceName("car"),
+            SrcName("car"),
             "
             use 'SI' as SI
             def car (
@@ -731,7 +743,7 @@ fn test_map_delegation_abstract_types() {
             ",
         ),
         (
-            SourceName("vehicle"),
+            SrcName("vehicle"),
             "
             use 'SI' as SI
             def vehicle (
@@ -739,18 +751,6 @@ fn test_map_delegation_abstract_types() {
                     rel .is: f64
                     rel .is: SI.millimeters
                 )
-            )
-            ",
-        ),
-        (
-            SourceName::root(),
-            "
-            use 'car' as c
-            use 'vehicle' as v
-
-            map(
-                c.car('length': len),
-                v.vehicle('length': len),
             )
             ",
         ),

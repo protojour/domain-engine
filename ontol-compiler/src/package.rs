@@ -113,24 +113,34 @@ pub struct PackageGraphBuilder {
 }
 
 impl PackageGraphBuilder {
-    /// Create an empty builder, which should produce a request for the root package.
-    pub fn new(root_package_name: String) -> Self {
-        let generation = 0;
+    /// Create an empty builder, seeded with the given root package names,
+    /// which will the builder will attempt to resolve in the next transition.
+    pub fn with_roots(root_package_names: impl IntoIterator<Item = String>) -> Self {
+        let mut next_package_id = ROOT_PKG;
+        let package_graph = root_package_names
+            .into_iter()
+            .map(|package_name| {
+                let package_id = next_package_id;
+                next_package_id.0 += 1;
+
+                (
+                    PackageReference::Named(package_name),
+                    PackageNode {
+                        package_id,
+                        use_source_span: NO_SPAN,
+                        requested_at_generation: 0,
+                        dependencies: Default::default(),
+                        found: false,
+                    },
+                )
+            })
+            .collect();
+
         Self {
-            next_package_id: PackageId(ROOT_PKG.0 + 1),
-            generation,
+            next_package_id,
+            generation: 0,
             parsed_packages: Default::default(),
-            package_graph: [(
-                PackageReference::Named(root_package_name),
-                PackageNode {
-                    package_id: ROOT_PKG,
-                    use_source_span: NO_SPAN,
-                    requested_at_generation: generation,
-                    dependencies: Default::default(),
-                    found: false,
-                },
-            )]
-            .into(),
+            package_graph,
         }
     }
 

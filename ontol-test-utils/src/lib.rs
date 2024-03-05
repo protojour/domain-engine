@@ -27,8 +27,6 @@ pub mod test_extensions;
 pub mod test_map;
 pub mod type_binding;
 
-pub const ROOT_SRC_NAME: &str = "test_root.on";
-
 /// Workaround for `pretty_assertions::assert_eq` arguments appearing
 /// in a (slightly?) unnatural order. The _expected_ expression ideally comes first,
 /// in order to show the most sensible colored diff.
@@ -122,9 +120,9 @@ impl OntolTest {
     }
 
     /// Get the ontol_runtime GraphQL schema
-    pub fn graphql_schema(&self, source_name: &str) -> &GraphqlSchema {
+    pub fn graphql_schema(&self, source_name: impl Into<SrcName>) -> &GraphqlSchema {
         self.ontology
-            .domain_interfaces(self.get_package_id(source_name))
+            .domain_interfaces(self.get_package_id(source_name.into().0))
             .iter()
             .map(|interface| match interface {
                 DomainInterface::GraphQL(schema) => schema,
@@ -171,36 +169,50 @@ impl TestCompile for &'static str {
     }
 }
 
-#[derive(Eq, PartialEq, Hash)]
-pub struct SourceName(pub &'static str);
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
+pub struct SrcName(pub &'static str);
 
-impl SourceName {
-    pub const fn root() -> Self {
-        Self(ROOT_SRC_NAME)
+impl From<&'static str> for SrcName {
+    fn from(value: &'static str) -> Self {
+        SrcName(value)
+    }
+}
+
+impl Default for SrcName {
+    fn default() -> Self {
+        SrcName("test_root.on")
     }
 }
 
 pub struct TestPackages {
     sources_by_name: HashMap<&'static str, &'static str>,
+    root_package_names: Vec<SrcName>,
     sources: Sources,
     source_code_registry: SourceCodeRegistry,
-    data_store: Option<(SourceName, DataStoreConfig)>,
+    data_store: Option<(SrcName, DataStoreConfig)>,
     packages_by_source_name: HashMap<String, PackageId>,
 }
 
 impl TestPackages {
+    /// Configure the test packages one single source file, which gets the default source name.
     pub fn with_root(text: &'static str) -> Self {
-        Self::with_sources([(SourceName::root(), text)])
+        Self::with_sources([(SrcName::default(), text)])
     }
 
+    /// Configure with an explicit set of named sources.
+    /// By default, the first one is chosen as the only root source.
     pub fn with_sources(
-        sources_by_name: impl IntoIterator<Item = (SourceName, &'static str)>,
+        sources_by_name: impl IntoIterator<Item = (SrcName, &'static str)>,
     ) -> Self {
+        let sources_by_name: Vec<(SrcName, &'static str)> = sources_by_name.into_iter().collect();
+        let default_root = sources_by_name.first().map(|(name, _)| *name);
+
         Self {
             sources_by_name: sources_by_name
                 .into_iter()
                 .map(|(name, text)| (name.0, text))
                 .collect(),
+            root_package_names: default_root.into_iter().collect(),
             sources: Default::default(),
             source_code_registry: Default::default(),
             data_store: None,
@@ -208,13 +220,25 @@ impl TestPackages {
         }
     }
 
-    pub fn with_data_store(mut self, name: SourceName, config: DataStoreConfig) -> Self {
+    /// Override the set of root packages.
+    /// By default, the first source file is the only root file, and all other files will be loaded from that file.
+    ///
+    /// This method can configure any number of root sources which will be used to seed the package topology resolver.
+    pub fn with_roots(mut self, roots: impl IntoIterator<Item = SrcName>) -> Self {
+        self.root_package_names = roots.into_iter().collect();
+        self
+    }
+
+    /// Set data store config for one of the sources.
+    pub fn with_data_store(mut self, name: SrcName, config: DataStoreConfig) -> Self {
         self.data_store = Some((name, config));
         self
     }
 
     fn load_topology(&mut self) -> Result<(PackageTopology, PackageId), UnifiedCompileError> {
-        let mut package_graph_builder = PackageGraphBuilder::new(ROOT_SRC_NAME.into());
+        let mut package_graph_builder = PackageGraphBuilder::with_roots(
+            self.root_package_names.iter().map(|name| name.0.into()),
+        );
         let mut root_package = None;
 
         loop {
@@ -230,8 +254,10 @@ impl TestPackages {
                         self.packages_by_source_name
                             .insert(source_name.to_string(), request.package_id);
 
-                        if source_name == ROOT_SRC_NAME {
-                            root_package = Some(request.package_id);
+                        if let Some(first_root) = self.root_package_names.first() {
+                            if source_name == first_root.0 {
+                                root_package = Some(request.package_id);
+                            }
                         }
 
                         let mut package_config = PackageConfig::default();

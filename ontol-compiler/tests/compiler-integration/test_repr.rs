@@ -1,4 +1,4 @@
-use ontol_test_utils::{SourceName, TestCompile, TestPackages};
+use ontol_test_utils::{SrcName, TestCompile, TestPackages};
 use test_log::test;
 
 #[test]
@@ -114,9 +114,8 @@ fn test_repr_tuple() {
 #[test]
 fn test_repr_valid_mesh1() {
     TestPackages::with_sources([
-        (SourceName("si"), "def meters (rel .is: number)"),
         (
-            SourceName::root(),
+            SrcName("entry"),
             "
             use 'si' as si
 
@@ -131,6 +130,7 @@ fn test_repr_valid_mesh1() {
             )
             ",
         ),
+        (SrcName("si"), "def meters (rel .is: number)"),
     ])
     .compile_then(|test| {
         let [meters, length] = test.bind(["si.meters", "length"]);

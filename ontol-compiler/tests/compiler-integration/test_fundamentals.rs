@@ -2,7 +2,7 @@ use ontol_compiler::package::ONTOL_PKG;
 use ontol_runtime::{interface::serde::operator::SerdeOperator, RelationshipId};
 use ontol_test_utils::{
     assert_json_io_matches, expect_eq, serde_helper::serde_create, type_binding::TypeBinding,
-    OntolTest, SourceName, TestCompile, TestPackages,
+    OntolTest, SrcName, TestCompile, TestPackages,
 };
 use test_log::test;
 
@@ -10,18 +10,18 @@ use test_log::test;
 fn test_relations_are_distinct_for_different_domains() {
     TestPackages::with_sources([
         (
-            SourceName("other"),
+            SrcName("entry"),
             "
+            use 'other' as other
+
             def foo (
                 rel .'prop': text
             )
             ",
         ),
         (
-            SourceName::root(),
+            SrcName("other"),
             "
-            use 'other' as other
-
             def foo (
                 rel .'prop': text
             )
@@ -35,7 +35,7 @@ fn test_relations_are_distinct_for_different_domains() {
         let root_domain = ontology.find_domain(foo.def_id().package_id()).unwrap();
         expect_eq!(
             actual = &ontology[root_domain.unique_name()],
-            expected = "test_root.on"
+            expected = "entry"
         );
 
         let other_domain = ontology

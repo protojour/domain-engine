@@ -1,10 +1,12 @@
 use domain_engine_test_utils::graphql_test_utils::{
     gql_ctx_mock_data_store, Exec, TestCompileSingletonSchema,
 };
-use ontol_test_utils::{assert_error_msg, SourceName};
+use ontol_test_utils::{assert_error_msg, SrcName};
 use test_log::test;
 
-const ROOT: SourceName = SourceName::root();
+fn root() -> SrcName {
+    SrcName::default()
+}
 
 #[test(tokio::test)]
 async fn test_graphql_input_deserialization_error() {
@@ -16,7 +18,7 @@ async fn test_graphql_input_deserialization_error() {
     "
     .compile_single_schema_with_datastore();
 
-    let ctx = gql_ctx_mock_data_store(&test, ROOT, ());
+    let ctx = gql_ctx_mock_data_store(&test, root(), ());
     assert_error_msg!(
         r#"mutation {
             foo(create: [{
@@ -57,7 +59,7 @@ async fn test_graphql_input_constructor_sequence_as_json_scalar() {
             node { prop }
         }
     }"#
-    .exec([], &schema, &gql_ctx_mock_data_store(&test, ROOT, ()))
+    .exec([], &schema, &gql_ctx_mock_data_store(&test, root(), ()))
     .await
     .unwrap();
 }

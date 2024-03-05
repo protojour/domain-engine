@@ -237,7 +237,8 @@ fn compile(
     }
 
     let mut source_code_registry = SourceCodeRegistry::default();
-    let mut package_graph_builder = PackageGraphBuilder::new(root_file_name.clone().into());
+    let mut package_graph_builder =
+        PackageGraphBuilder::with_roots([root_file_name.clone().into()]);
     let mut root_package = None;
 
     let topology = loop {

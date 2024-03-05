@@ -178,7 +178,7 @@ impl State {
 
         let mut ontol_sources = Sources::default();
         let mut source_code_registry = SourceCodeRegistry::default();
-        let mut package_graph_builder = PackageGraphBuilder::new(root_name.into());
+        let mut package_graph_builder = PackageGraphBuilder::with_roots([root_name.into()]);
 
         let topology = loop {
             match package_graph_builder.transition()? {
