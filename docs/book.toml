@@ -5,5 +5,8 @@ multilingual = false
 src = "src"
 title = "ONTOL Documentation"
 
+[preprocessor.ontol-documentation]
+command = "cargo run -p ontol-documentation-preprocessor"
+
 [output.html]
 additional-js = ["theme/ontol-highlight.js"]
