@@ -18,6 +18,7 @@ use ontol_runtime::{
     },
     ontology::{Ontology, PropertyFlow, PropertyFlowData},
     resolve_path::{ProbeDirection, ProbeFilter, ProbeOptions, ResolverGraph},
+    text::TextConstant,
     value::PropertyId,
     var::Var,
     DefId, MapDefFlags, MapKey, PackageId,
@@ -30,6 +31,7 @@ use crate::{
     primitive::Primitives,
     relation::{Relations, UnionMemberCache},
     repr::repr_model::ReprKind,
+    strings::Strings,
     type_check::seal::SealCtx,
 };
 
@@ -140,7 +142,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
     pub fn register_fundamental_types(&mut self) {
         self.schema.query = self.next_type_addr();
         self.schema.types.push(TypeData {
-            typename: "Query".into(),
+            typename: self.serde_gen.strings.intern_constant("Query"),
             input_typename: None,
             partial_input_typename: None,
             kind: TypeKind::Object(ObjectData {
@@ -151,7 +153,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
         self.schema.mutation = self.next_type_addr();
         self.schema.types.push(TypeData {
-            typename: "Mutation".into(),
+            typename: self.serde_gen.strings.intern_constant("Mutation"),
             input_typename: None,
             partial_input_typename: None,
             kind: TypeKind::Object(ObjectData {
@@ -163,7 +165,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         {
             self.schema.page_info = self.next_type_addr();
             self.schema.types.push(TypeData {
-                typename: "PageInfo".into(),
+                typename: self.serde_gen.strings.intern_constant("PageInfo"),
                 input_typename: None,
                 partial_input_typename: None,
                 kind: TypeKind::Object(ObjectData {
@@ -214,7 +216,10 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
         self.schema.json_scalar = self.next_type_addr();
         self.schema.types.push(TypeData {
-            typename: self.type_namespace.unique_literal("_ontol_json"),
+            typename: self
+                .serde_gen
+                .strings
+                .intern_constant(&self.type_namespace.unique_literal("_ontol_json")),
             input_typename: None,
             partial_input_typename: None,
             kind: TypeKind::CustomScalar(ScalarData {
@@ -273,7 +278,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         let index = self.next_type_addr();
         // note: this will be overwritten later
         self.schema.types.push(TypeData {
-            typename: String::new(),
+            typename: self.serde_gen.strings.intern_constant(""),
             input_typename: None,
             partial_input_typename: None,
             kind: TypeKind::CustomScalar(ScalarData {
@@ -323,7 +328,9 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
                 MapInputArg {
                     operator_addr: input_operator_addr,
-                    scalar_input_name: Some(scalar_input_name),
+                    scalar_input_name: Some(
+                        self.serde_gen.strings.intern_constant(&scalar_input_name),
+                    ),
                     default_arg: None,
                     hidden: false,
                 }
@@ -483,6 +490,14 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         .to_array(Optionality::Mandatory),
                 },
             );
+    }
+
+    pub fn mk_typename_constant<S: AsRef<str>>(
+        &mut self,
+        f: impl Fn(&mut GraphqlNamespace, &Strings<'m>) -> S,
+    ) -> TextConstant {
+        let string = f(self.type_namespace, self.serde_gen.strings);
+        self.serde_gen.strings.intern_constant(string.as_ref())
     }
 }
 

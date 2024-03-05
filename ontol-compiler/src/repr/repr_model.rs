@@ -33,6 +33,7 @@ pub enum ReprKind {
     Intersection(Vec<(DefId, SourceSpan)>),
     StructUnion(Vec<(DefId, SourceSpan)>),
     Union(Vec<(DefId, SourceSpan)>),
+    Extern,
 }
 
 #[derive(Eq, PartialEq, Debug)]

@@ -450,6 +450,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         &mut self,
         field_kind: &FieldKind,
     ) -> Option<Vec<juniper::meta::Argument<'r, GqlScalar>>> {
+        let ontology = &self.schema_ctx.ontology;
         let mut arguments = vec![];
 
         match field_kind {
@@ -459,9 +460,9 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 ..
             } => {
                 arguments.extend([
-                    self.registry.arg::<Option<i32>>(first.name(), &()),
+                    self.registry.arg::<Option<i32>>(first.name(ontology), &()),
                     self.registry
-                        .arg::<Option<std::string::String>>(after.name(), &()),
+                        .arg::<Option<std::string::String>>(after.name(ontology), &()),
                 ]);
             }
             FieldKind::MapConnection {
@@ -472,9 +473,10 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             } => {
                 arguments.extend(self.get_domain_field_arg(input_arg));
                 arguments.extend([
-                    self.registry.arg::<Option<i32>>(first_arg.name(), &()),
                     self.registry
-                        .arg::<Option<std::string::String>>(after_arg.name(), &()),
+                        .arg::<Option<i32>>(first_arg.name(ontology), &()),
+                    self.registry
+                        .arg::<Option<std::string::String>>(after_arg.name(ontology), &()),
                 ]);
             }
             FieldKind::MapFind { input_arg, .. } => {
@@ -520,16 +522,17 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         &mut self,
         field_arg: &dyn DomainFieldArg,
     ) -> Option<juniper::meta::Argument<'r, GqlScalar>> {
+        let ontology = &self.schema_ctx.ontology;
         let arg = match field_arg.kind() {
             ArgKind::Addr(type_addr, modifier) => {
                 let schema_type = self
                     .schema_ctx
                     .get_schema_type(type_addr, field_arg.typing_purpose());
 
-                self.modified_arg::<InputType>(field_arg.name(), modifier, &schema_type)
+                self.modified_arg::<InputType>(field_arg.name(ontology), modifier, &schema_type)
             }
             ArgKind::Operator(addr) => self.get_operator_argument(
-                field_arg.name(),
+                field_arg.name(ontology),
                 addr,
                 None,
                 SerdePropertyFlags::default(),

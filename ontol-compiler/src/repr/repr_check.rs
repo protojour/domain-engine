@@ -383,6 +383,9 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                         data,
                     );
                 }
+                DefKind::Extern(_) => {
+                    self.merge_repr(&mut builder, ReprKind::Extern, def_id, data);
+                }
                 _ => {}
             }
 

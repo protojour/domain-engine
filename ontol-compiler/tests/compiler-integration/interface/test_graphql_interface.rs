@@ -55,6 +55,7 @@ fn test_graphql_i64_custom_scalar() {
     "
     .compile_then(|test| {
         let (schema, test) = schema_test(&test, ROOT_SRC_NAME);
+        let ontology = &test.test.ontology;
         let foo_type = test.type_data("foo", QueryLevel::Node);
         let foo_object = foo_type.object_data();
 
@@ -63,7 +64,10 @@ fn test_graphql_i64_custom_scalar() {
 
         let prop_type_data = schema.type_data(prop_field.field_type.unit.addr());
 
-        expect_eq!(actual = prop_type_data.typename, expected = "_ontol_i64");
+        expect_eq!(
+            actual = &ontology[prop_type_data.typename],
+            expected = "_ontol_i64"
+        );
         let _i64_scalar_data = prop_type_data.custom_scalar();
     });
 }
@@ -174,27 +178,33 @@ fn test_query_map_empty_input_becomes_hidden_arg() {
 fn test_graphql_artist_and_instrument() {
     let test = ARTIST_AND_INSTRUMENT.1.compile();
     let (schema, test) = schema_test(&test, ROOT_SRC_NAME);
+    let ontology = &test.test.ontology;
     let query_object = test.query_object_data();
 
     let artists_field = query_object.fields.get("artists").unwrap();
     let artist_connection = schema.type_data(artists_field.field_type.unit.addr());
 
     expect_eq!(
-        actual = artist_connection.typename,
+        actual = &ontology[artist_connection.typename],
         expected = "artistConnection"
     );
 
     let edges_field = artist_connection.object_data().fields.get("edges").unwrap();
     let artist_edge = schema.type_data(edges_field.field_type.unit.addr());
 
-    expect_eq!(actual = artist_edge.typename, expected = "artistEdge");
+    expect_eq!(
+        actual = &ontology[artist_edge.typename],
+        expected = "artistEdge"
+    );
 
     let node_field = artist_edge.object_data().fields.get("node").unwrap();
     let artist = schema.type_data(node_field.field_type.unit.addr());
 
-    expect_eq!(actual = artist.typename, expected = "artist");
+    expect_eq!(actual = &ontology[artist.typename], expected = "artist");
     expect_eq!(
-        actual = artist.input_typename.as_deref(),
+        actual = artist
+            .input_typename
+            .map(|constant| &test.test.ontology[constant]),
         expected = Some("artistInput")
     );
 }
@@ -294,6 +304,7 @@ fn incompatible_edge_types_are_distinct() {
     "
     .compile_then(|test| {
         let (schema, test) = schema_test(&test, ROOT_SRC_NAME);
+        let ontology = &test.test.ontology;
 
         let query = schema.type_data(schema.query).object_data();
 
@@ -301,7 +312,10 @@ fn incompatible_edge_types_are_distinct() {
             let targets_query = query.fields.get("targets").unwrap();
             let targets_query_connection = schema.type_data(targets_query.field_type.unit.addr());
 
-            assert_eq!(targets_query_connection.typename, "targetConnection");
+            assert_eq!(
+                &ontology[targets_query_connection.typename],
+                "targetConnection"
+            );
 
             let targets_query_edge = schema.type_data(
                 targets_query_connection
@@ -313,7 +327,7 @@ fn incompatible_edge_types_are_distinct() {
                     .unit
                     .addr(),
             );
-            assert_eq!(targets_query_edge.typename, "targetEdge");
+            assert_eq!(&ontology[targets_query_edge.typename], "targetEdge");
             assert!(!targets_query_edge
                 .fields()
                 .unwrap()
@@ -325,7 +339,10 @@ fn incompatible_edge_types_are_distinct() {
             let targets_field = source.fields.get("targets").unwrap();
 
             let targets_connection = schema.type_data(targets_field.field_type.unit.addr());
-            assert_eq!(targets_connection.typename, "_anon1_10targetConnection");
+            assert_eq!(
+                &ontology[targets_connection.typename],
+                "_anon1_10targetConnection"
+            );
 
             let targets_edge = schema.type_data(
                 targets_connection
@@ -338,7 +355,7 @@ fn incompatible_edge_types_are_distinct() {
                     .addr(),
             );
 
-            assert_eq!(targets_edge.typename, "_anon1_10targetEdge");
+            assert_eq!(&ontology[targets_edge.typename], "_anon1_10targetEdge");
             assert!(targets_edge.fields().unwrap().contains_key("edge_field"));
         }
     });

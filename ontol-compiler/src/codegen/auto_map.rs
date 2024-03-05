@@ -16,7 +16,7 @@ use crate::{
     Compiler, NO_SPAN,
 };
 
-use super::task::ExplicitMapCodegenTask;
+use super::task::{ExplicitMapCodegenTask, OntolMap};
 
 pub fn autogenerate_mapping<'m>(
     key_pair: UndirectedMapKey,
@@ -41,11 +41,15 @@ pub fn autogenerate_mapping<'m>(
             )?;
 
             Some(ExplicitMapCodegenTask {
-                def_id: compiler
-                    .defs
-                    .add_def(DefKind::AutoMapping, package_id, NO_SPAN),
-                arms,
-                span: NO_SPAN,
+                ontol_map: Some(OntolMap {
+                    def_id: compiler
+                        .defs
+                        .add_def(DefKind::AutoMapping, package_id, NO_SPAN),
+                    arms,
+                    span: NO_SPAN,
+                }),
+                forward_extern: None,
+                backward_extern: None,
             })
         }
         (Constructor::TextFmt(fmt), Constructor::Transparent) => {
@@ -53,11 +57,15 @@ pub fn autogenerate_mapping<'m>(
                 autogenerate_fmt_to_transparent((first_def_id, fmt), second_def_id, compiler)?;
 
             Some(ExplicitMapCodegenTask {
-                def_id: compiler
-                    .defs
-                    .add_def(DefKind::AutoMapping, package_id, NO_SPAN),
-                arms: [fmt_node, transparent_node],
-                span: NO_SPAN,
+                ontol_map: Some(OntolMap {
+                    def_id: compiler
+                        .defs
+                        .add_def(DefKind::AutoMapping, package_id, NO_SPAN),
+                    arms: [fmt_node, transparent_node],
+                    span: NO_SPAN,
+                }),
+                forward_extern: None,
+                backward_extern: None,
             })
         }
         (Constructor::Transparent, Constructor::TextFmt(fmt)) => {
@@ -65,11 +73,15 @@ pub fn autogenerate_mapping<'m>(
                 autogenerate_fmt_to_transparent((second_def_id, fmt), first_def_id, compiler)?;
 
             Some(ExplicitMapCodegenTask {
-                def_id: compiler
-                    .defs
-                    .add_def(DefKind::AutoMapping, package_id, NO_SPAN),
-                arms: [transparent_node, fmt_node],
-                span: NO_SPAN,
+                ontol_map: Some(OntolMap {
+                    def_id: compiler
+                        .defs
+                        .add_def(DefKind::AutoMapping, package_id, NO_SPAN),
+                    arms: [transparent_node, fmt_node],
+                    span: NO_SPAN,
+                }),
+                forward_extern: None,
+                backward_extern: None,
             })
         }
         _ => None,

@@ -2,10 +2,11 @@ use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use smartstring::alias::String;
+use thin_vec::ThinVec;
 
 use crate::{
-    interface::serde::operator::SerdeOperatorAddr, ontology::Ontology, value::PropertyId, var::Var,
-    DefId, MapKey, RelationshipId,
+    interface::serde::operator::SerdeOperatorAddr, ontology::Ontology, text::TextConstant,
+    value::PropertyId, var::Var, DefId, MapKey, RelationshipId,
 };
 
 use super::argument::{self};
@@ -117,9 +118,9 @@ impl TypeRef {
 
 #[derive(Serialize, Deserialize)]
 pub struct TypeData {
-    pub typename: String,
-    pub input_typename: Option<String>,
-    pub partial_input_typename: Option<String>,
+    pub typename: TextConstant,
+    pub input_typename: Option<TextConstant>,
+    pub partial_input_typename: Option<TextConstant>,
     pub kind: TypeKind,
 }
 
@@ -201,7 +202,7 @@ pub struct NodeData {
 #[derive(Serialize, Deserialize)]
 pub struct UnionData {
     pub union_def_id: DefId,
-    pub variants: Vec<TypeAddr>,
+    pub variants: ThinVec<TypeAddr>,
     pub operator_addr: SerdeOperatorAddr,
 }
 

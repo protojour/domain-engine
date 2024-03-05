@@ -40,6 +40,7 @@ pub struct DefStatement {
     pub kw: Span,
     pub private: Option<Span>,
     pub open: Option<Span>,
+    pub extern_: Option<Span>,
     pub ident: Spanned<String>,
     pub block: Spanned<Vec<Spanned<Statement>>>,
 }

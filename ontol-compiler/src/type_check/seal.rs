@@ -63,12 +63,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
         }
 
-        if let Some(ReprKind::Union(_) | ReprKind::StructUnion(_)) =
-            self.seal_ctx.get_repr_kind(&def_id)
-        {
-            for error in self.check_union(def_id) {
-                self.errors.push(error);
+        match self.seal_ctx.get_repr_kind(&def_id) {
+            Some(ReprKind::Union(_) | ReprKind::StructUnion(_)) => {
+                for error in self.check_union(def_id) {
+                    self.errors.push(error);
+                }
             }
+            Some(ReprKind::Extern) => {
+                self.check_extern(def_id, self.defs.def_span(def_id));
+            }
+            _ => {}
         }
 
         self.seal_memberships(def_id);

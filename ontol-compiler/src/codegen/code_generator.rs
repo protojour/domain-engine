@@ -50,7 +50,7 @@ pub(super) fn const_codegen<'m>(
 
     let expr_meta = *expr.data().meta();
 
-    let mut builder = ProcBuilder::new(NParams(0));
+    let mut builder = ProcBuilder::new(NParams(1));
     let mut block = builder.new_block(Delta(0), expr_meta.span);
     let mut generator = CodeGenerator {
         proc_table,

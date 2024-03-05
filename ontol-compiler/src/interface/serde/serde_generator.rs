@@ -428,9 +428,12 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             Type::Domain(_) => {
                 panic!("Domain not handled here")
             }
-            Type::Function { .. } => None,
-            Type::Anonymous(_) => None,
-            Type::Package | Type::BuiltinRelation | Type::ValueGenerator(_) => None,
+            Type::Function { .. }
+            | Type::Anonymous(..)
+            | Type::Package
+            | Type::BuiltinRelation
+            | Type::ValueGenerator(_)
+            | Type::Extern(_) => None,
             Type::Tautology | Type::Infer(_) | Type::Error => {
                 panic!("crap: {:?}", self.get_def_type(def.def_id));
             }
@@ -620,6 +623,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     unreachable!("{:?}: {constructor:?}: repr {repr:?}", def.def_id)
                 }
             },
+            ReprKind::Extern => None,
         }
     }
 

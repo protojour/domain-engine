@@ -3,7 +3,7 @@ use ontol_runtime::var::VarAllocator;
 
 use crate::{
     codegen::{
-        task::{ExplicitMapCodegenTask, MapCodegenTask},
+        task::{MapCodegenRequest, OntolMap},
         type_mapper::TypeMapper,
     },
     def::Def,
@@ -103,11 +103,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         {
             self.codegen_tasks.add_map_task(
                 key_pair,
-                MapCodegenTask::Explicit(ExplicitMapCodegenTask {
+                MapCodegenRequest::ExplicitOntol(OntolMap {
                     def_id: def.id,
                     arms: arm_nodes,
                     span: def.span,
                 }),
+                self.defs,
+                self.errors,
             );
         }
 
@@ -168,7 +170,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                         self.codegen_tasks.add_map_task(
                             UndirectedMapKey::new([first_def_id.into(), second_def_id.into()]),
-                            MapCodegenTask::Auto(def.id.package_id()),
+                            MapCodegenRequest::Auto(def.id.package_id()),
+                            self.defs,
+                            self.errors,
                         );
                     }
                 }

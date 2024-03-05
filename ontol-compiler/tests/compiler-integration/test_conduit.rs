@@ -132,7 +132,7 @@ fn test_map_match_conduit_blog_post_cond_clauses() {
 fn test_conduit_feed_public() {
     let test = TestPackages::with_sources([CONDUIT_DB, FEED_PUBLIC.root()]).compile();
     let [article] = test.bind(["conduit_db.Article"]);
-    let return_value = Value::sequence_of([article
+    let article_return_value = Value::sequence_of([article
         .entity_builder(
             json!("11111111-1111-1111-1111-111111111111"),
             json!({
@@ -143,7 +143,7 @@ fn test_conduit_feed_public() {
         .into()]);
 
     test.mapper()
-        .with_mock_yielder(
+        .with_mock_yielder((
             YielderMock::yield_match
                 .next_call(matching!(
                     eq!(&ValueCardinality::Many),
@@ -158,14 +158,26 @@ fn test_conduit_feed_public() {
                     "#
                     }))
                 ))
-                .returns(return_value.clone()),
-        )
+                .returns(article_return_value.clone()),
+            YielderMock::yield_call_extern_http_json
+                .next_call(matching!("http://localhost:8080/map_channel", _json))
+                .answers(move |(_url, json)| {
+                    let json_obj = json.as_object().unwrap();
+
+                    json!({
+                        "title": "extern title",
+                        "username": "extern username",
+                        "link": json_obj.get("link").unwrap(),
+                        "items": json_obj.get("items").unwrap()
+                    })
+                }),
+        ))
         .assert_named_forward_map(
             "feed",
             json!({ "username": "foobar", }),
             json!({
-                "title": "Conduit RSS channel",
-                "username": "foobar",
+                "title": "extern title",
+                "username": "extern username",
                 "link": "http://blogs.com/foobar/feed",
                 "items": [{
                     "guid": "11111111-1111-1111-1111-111111111111",

@@ -62,13 +62,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 arms,
                 var_alloc,
                 ident: _,
-            } => match self.check_map(def, var_alloc, *arms) {
-                Ok(ty) => ty,
-                Err(error) => {
-                    debug!("Check map error: {error:?}");
-                    self.types.intern(Type::Error)
+                extern_def_id,
+            } => {
+                if let Some(extern_def_id) = extern_def_id {
+                    self.check_map_extern(def, *arms, *extern_def_id)
+                } else {
+                    match self.check_map(def, var_alloc, *arms) {
+                        Ok(ty) => ty,
+                        Err(error) => {
+                            debug!("Check map error: {error:?}");
+                            self.types.intern(Type::Error)
+                        }
+                    }
                 }
-            },
+            }
             DefKind::Constant(pat_id) => {
                 let pattern = self.patterns.table.remove(pat_id).unwrap();
                 let ty = match self.expected_constant_types.remove(&def_id) {
@@ -106,6 +113,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
             }
+            DefKind::Extern(_) => self.types.intern(Type::Extern(def_id)),
             other => {
                 panic!("failed def typecheck: {other:?}");
             }

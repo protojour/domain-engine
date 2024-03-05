@@ -433,7 +433,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         };
 
         match self.defs.def_kind(def_id) {
-            DefKind::Primitive(..) | DefKind::Type(_) => {
+            DefKind::Primitive(..) | DefKind::Type(_) | DefKind::Extern(_) => {
                 self.check_not_sealed(ty, span);
             }
             _ => {

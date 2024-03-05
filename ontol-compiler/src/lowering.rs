@@ -49,6 +49,7 @@ type RootDefs = Vec<DefId>;
 
 struct Open(Option<Span>);
 struct Private(Option<Span>);
+struct Extern(Option<Span>);
 
 /// Statement after scanning once
 enum PreDefinedStmt {
@@ -148,6 +149,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     &def_stmt.ident.1,
                     Private(def_stmt.private),
                     Open(def_stmt.open),
+                    Extern(def_stmt.extern_),
                 )?;
 
                 Ok(Some((
@@ -185,7 +187,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             PreDefinedStmt::Fmt(fmt_stmt) => {
                 self.fmt_transitions_to_def(fmt_stmt, span, block_context)
             }
-            PreDefinedStmt::Map(map_stmt) => self.map_stmt_to_def((map_stmt, span)),
+            PreDefinedStmt::Map(map_stmt) => self.map_stmt_to_def((map_stmt, span), block_context),
         }
     }
 
@@ -202,6 +204,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     &def_stmt.ident.1,
                     Private(def_stmt.private),
                     Open(def_stmt.open),
+                    Extern(def_stmt.extern_),
                 )?;
                 let mut root_defs: RootDefs = [def_id].into();
                 root_defs.extend(self.provide_definition(def_id, def_stmt.docs, def_stmt.block)?);
@@ -213,7 +216,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ast::Statement::Fmt(fmt_stmt) => {
                 self.fmt_transitions_to_def(fmt_stmt, span, block_context)
             }
-            ast::Statement::Map(map_stmt) => self.map_stmt_to_def((map_stmt, span)),
+            ast::Statement::Map(map_stmt) => self.map_stmt_to_def((map_stmt, span), block_context),
         }
     }
 
@@ -628,6 +631,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             },
             span,
         ): (ast::MapStatement, Span),
+        block_context: BlockContext,
     ) -> Res<RootDefs> {
         let mut var_table = MapVarTable::default();
         let first = self.lower_map_arm(first, &mut var_table)?;
@@ -652,6 +656,20 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 ident,
                 arms: [first, second],
                 var_alloc,
+                extern_def_id: match block_context {
+                    BlockContext::NoContext => None,
+                    BlockContext::Context(context_fn) => {
+                        let context_def_id = context_fn();
+                        if matches!(
+                            self.compiler.defs.def_kind(context_def_id),
+                            DefKind::Extern(_)
+                        ) {
+                            Some(context_def_id)
+                        } else {
+                            None
+                        }
+                    }
+                },
             },
             &span,
         );
@@ -1214,14 +1232,16 @@ impl<'s, 'm> Lowering<'s, 'm> {
         ident_span: &Span,
         private: Private,
         open: Open,
+        extern_: Extern,
     ) -> Res<DefId> {
         let (def_id, coinage) = self.named_def_id(Space::Type, &ident, ident_span)?;
         if matches!(coinage, Coinage::New) {
             let ident = self.compiler.strings.intern(&ident);
             debug!("{def_id:?}: `{}`", ident);
 
-            self.set_def_kind(
-                def_id,
+            let kind = if extern_.0.is_some() {
+                DefKind::Extern(ident)
+            } else {
                 DefKind::Type(TypeDef {
                     visibility: if private.0.is_some() {
                         DefVisibility::Private
@@ -1232,9 +1252,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     ident: Some(ident),
                     rel_type_for: None,
                     concrete: true,
-                }),
-                ident_span,
-            );
+                })
+            };
+
+            self.set_def_kind(def_id, kind, ident_span);
         }
 
         Ok(def_id)
@@ -1330,7 +1351,7 @@ enum RelationKey {
     Indexed,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 enum BlockContext<'a> {
     NoContext,
     Context(&'a dyn Fn() -> DefId),

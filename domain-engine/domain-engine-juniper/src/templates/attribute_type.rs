@@ -56,11 +56,11 @@ impl<'v> ::juniper::GraphQLValue<GqlScalar> for AttributeType<'v> {
         Some(info.typename())
     }
 
-    fn concrete_type_name(&self, _context: &ServiceCtx, info: &SchemaType) -> String {
+    fn concrete_type_name(&self, context: &ServiceCtx, info: &SchemaType) -> String {
         match &info.type_data().kind {
             TypeKind::Union(union_data) => {
                 let (_, variant_data) = self.find_union_variant(union_data, &info.schema_ctx);
-                variant_data.typename.to_string()
+                context.domain_engine.ontology()[variant_data.typename].to_string()
             }
             _ => panic!(
                 "should not need concrete type name for other things than unions or interfaces"

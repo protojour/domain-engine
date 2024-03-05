@@ -43,6 +43,7 @@ pub struct Ontology {
     pub(crate) named_forward_maps: FnvHashMap<(PackageId, TextConstant), MapKey>,
     pub(crate) text_like_types: FnvHashMap<DefId, TextLikeType>,
     pub(crate) text_patterns: FnvHashMap<DefId, TextPattern>,
+    pub(crate) extern_table: FnvHashMap<DefId, Extern>,
     pub(crate) lib: Lib,
     pub(crate) ontol_domain_meta: OntolDomainMeta,
 
@@ -70,6 +71,7 @@ impl Ontology {
                 named_forward_maps: Default::default(),
                 text_like_types: Default::default(),
                 text_patterns: Default::default(),
+                extern_table: Default::default(),
                 domain_table: Default::default(),
                 ontol_domain_meta: Default::default(),
                 domain_interfaces: Default::default(),
@@ -164,9 +166,9 @@ impl Ontology {
         self.map_meta_table.get(key)
     }
 
-    pub fn get_prop_flow_slice(&self, map_meta: &MapMeta) -> &[PropertyFlow] {
-        let range = &map_meta.propflow_range;
-        &self.property_flows[range.start as usize..range.end as usize]
+    pub fn get_prop_flow_slice(&self, map_meta: &MapMeta) -> Option<&[PropertyFlow]> {
+        let range = map_meta.propflow_range.as_ref()?;
+        Some(&self.property_flows[range.start as usize..range.end as usize])
     }
 
     pub fn get_mapper_proc(&self, key: &MapKey) -> Option<Procedure> {
@@ -201,6 +203,10 @@ impl Ontology {
 
     pub fn get_value_generator(&self, relationship_id: RelationshipId) -> Option<&ValueGenerator> {
         self.value_generators.get(&relationship_id)
+    }
+
+    pub fn get_extern(&self, def_id: DefId) -> Option<&Extern> {
+        self.extern_table.get(&def_id)
     }
 
     /// Find a text constant given its string representation.
@@ -467,7 +473,7 @@ pub enum DataRelationshipTarget {
 #[derive(Clone, Serialize, Deserialize, OntolDebug)]
 pub struct MapMeta {
     pub procedure: Procedure,
-    pub propflow_range: Range<u32>,
+    pub propflow_range: Option<Range<u32>>,
     pub lossiness: MapLossiness,
 }
 
@@ -490,6 +496,11 @@ pub enum PropertyFlowData {
     Cardinality(Cardinality),
     ChildOf(PropertyId),
     DependentOn(PropertyId),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum Extern {
+    HttpJson { url: TextConstant },
 }
 
 pub struct OntologyBuilder {
@@ -583,6 +594,11 @@ impl OntologyBuilder {
         self
     }
 
+    pub fn externs(mut self, externs: FnvHashMap<DefId, Extern>) -> Self {
+        self.ontology.extern_table = externs;
+        self
+    }
+
     pub fn value_generators(
         mut self,
         generators: FnvHashMap<RelationshipId, ValueGenerator>,
@@ -622,5 +638,4 @@ impl PropertyCardinality {
 pub enum ValueCardinality {
     One,
     Many,
-    // ManyInRange(Option<u16>, Option<u16>),
 }

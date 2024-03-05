@@ -60,7 +60,7 @@ impl<'o> OntolVm<'o> {
         };
 
         match result {
-            Some(y) => Ok(VmState::Yielded(y)),
+            Some(y) => Ok(VmState::Yield(y)),
             None => {
                 let mut stack = std::mem::take(&mut self.processor.stack);
                 Ok(VmState::Complete(stack.pop().unwrap()))
@@ -411,6 +411,18 @@ impl<'o> Processor for OntolProcessor<'o> {
             Value::Condition(condition, _) => Ok(Yield::Match(var, value_cardinality, *condition)),
             _ => Err(VmError::InvalidType(Local(self.stack.len() as u16))),
         }
+    }
+
+    fn yield_call_extern(
+        &mut self,
+        extern_def_id: DefId,
+        output_def_id: DefId,
+    ) -> VmResult<Self::Yield> {
+        Ok(Yield::CallExtern(
+            extern_def_id,
+            self.stack.pop().unwrap(),
+            output_def_id,
+        ))
     }
 }
 

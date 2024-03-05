@@ -106,7 +106,7 @@ fn main() -> anyhow::Result<()> {
     };
     let value = match ontology.new_vm(proc).run([attr.val])? {
         VmState::Complete(value) => value,
-        VmState::Yielded(_) => return Err(anyhow!("ONTOL-VM yielded!")),
+        VmState::Yield(_) => return Err(anyhow!("ONTOL-VM yielded!")),
     };
     let to_type = ontology.get_type_info(output.def_id);
     let to_processor = ontology.new_serde_processor(

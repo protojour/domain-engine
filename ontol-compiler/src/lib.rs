@@ -412,9 +412,9 @@ impl<'m> Compiler<'m> {
                     let start: u32 = property_flows.len().try_into().unwrap();
                     let len: u32 = current_prop_flows.len().try_into().unwrap();
                     property_flows.extend(current_prop_flows);
-                    start..(start + len)
+                    Some(start..(start + len))
                 } else {
-                    0..0
+                    None
                 };
 
                 let metadata = self.codegen_tasks.result_metadata_table.remove(&key);
@@ -451,6 +451,7 @@ impl<'m> Compiler<'m> {
             .property_flows(property_flows)
             .string_like_types(self.defs.string_like_types)
             .text_patterns(self.text_patterns.text_patterns)
+            .externs(self.def_types.ontology_externs)
             .value_generators(self.relations.value_generators)
             .domain_interfaces(domain_interfaces)
             .build()

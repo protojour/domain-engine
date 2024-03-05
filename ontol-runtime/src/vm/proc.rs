@@ -10,7 +10,7 @@ use crate::{
     impl_ontol_debug,
     ontology::ValueCardinality,
     text::TextConstant,
-    value::PropertyId,
+    value::{PropertyId, Value},
     var::Var,
     DefId,
 };
@@ -78,6 +78,8 @@ pub enum OpCode {
     PopUntil(Local),
     /// Call a builtin procedure
     CallBuiltin(BuiltinProc, DefId),
+    /// Call the given extern, having the given return value
+    CallExtern(DefId, DefId),
     /// Iterate all items in #0, #1 is the counter.
     /// Pushes two items on the stack
     Iter(Local, Local, AddressOffset),
@@ -192,6 +194,7 @@ impl GetAttrFlags {
 
 pub enum Yield {
     Match(Var, ValueCardinality, Condition),
+    CallExtern(DefId, Value, DefId),
 }
 
 #[derive(Serialize, Deserialize, OntolDebug)]

@@ -50,7 +50,11 @@ fn translate_struct_select(struct_select: &mut StructSelect, key: &MapKey, ontol
     let map_meta = ontology
         .get_map_meta(key)
         .expect("No mapping procedure for select transformer");
-    let prop_flow_slice = ontology.get_prop_flow_slice(map_meta);
+    let Some(prop_flow_slice) = ontology.get_prop_flow_slice(map_meta) else {
+        debug!("clearing properties since there is no property flow");
+        struct_select.properties.clear();
+        return;
+    };
 
     trace!(
         "translate_entity_select flow props: {:#?}",

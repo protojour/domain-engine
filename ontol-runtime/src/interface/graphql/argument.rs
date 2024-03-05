@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
-use smartstring::alias::String;
 
-use crate::{interface::serde::operator::SerdeOperatorAddr, DefId};
+use crate::{
+    interface::serde::operator::SerdeOperatorAddr, ontology::Ontology, text::TextConstant, DefId,
+};
 
 use super::{
     data::{Optionality, TypeAddr, TypeModifier},
@@ -17,7 +18,7 @@ pub enum ArgKind {
 }
 
 pub trait FieldArg {
-    fn name(&self) -> &str;
+    fn name<'on>(&self, ontology: &'on Ontology) -> &'on str;
 }
 
 pub trait DomainFieldArg: FieldArg {
@@ -42,15 +43,15 @@ pub enum DefaultArg {
 pub struct MapInputArg {
     pub operator_addr: SerdeOperatorAddr,
     /// If this string is defined, there will be a single argument with this name.
-    pub scalar_input_name: Option<String>,
+    pub scalar_input_name: Option<TextConstant>,
     pub default_arg: Option<DefaultArg>,
     pub hidden: bool,
 }
 
 impl FieldArg for MapInputArg {
-    fn name(&self) -> &str {
+    fn name<'on>(&self, ontology: &'on Ontology) -> &'on str {
         match &self.scalar_input_name {
-            Some(name) => name,
+            Some(name) => &ontology[*name],
             None => "input",
         }
     }
@@ -86,7 +87,7 @@ pub struct InputArg {
 }
 
 impl FieldArg for InputArg {
-    fn name(&self) -> &str {
+    fn name<'on>(&self, _: &'on Ontology) -> &'on str {
         "input"
     }
 }
@@ -117,7 +118,7 @@ pub struct EntityCreateInputsArg {
 }
 
 impl FieldArg for EntityCreateInputsArg {
-    fn name(&self) -> &str {
+    fn name<'on>(&self, _: &'on Ontology) -> &'on str {
         "create"
     }
 }
@@ -154,7 +155,7 @@ pub struct EntityUpdateInputsArg {
 }
 
 impl FieldArg for EntityUpdateInputsArg {
-    fn name(&self) -> &str {
+    fn name<'on>(&self, _: &'on Ontology) -> &'on str {
         "update"
     }
 }
@@ -190,7 +191,7 @@ pub struct EntityDeleteInputsArg {
 }
 
 impl FieldArg for EntityDeleteInputsArg {
-    fn name(&self) -> &str {
+    fn name<'on>(&self, _: &'on Ontology) -> &'on str {
         "delete"
     }
 }
@@ -217,7 +218,7 @@ impl DomainFieldArg for EntityDeleteInputsArg {
 pub struct FirstArg;
 
 impl FieldArg for FirstArg {
-    fn name(&self) -> &str {
+    fn name<'on>(&self, _: &'on Ontology) -> &'on str {
         "first"
     }
 }
@@ -226,7 +227,7 @@ impl FieldArg for FirstArg {
 pub struct AfterArg;
 
 impl FieldArg for AfterArg {
-    fn name(&self) -> &str {
+    fn name<'on>(&self, _: &'on Ontology) -> &'on str {
         "after"
     }
 }
