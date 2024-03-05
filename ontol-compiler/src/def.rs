@@ -111,27 +111,16 @@ pub struct FmtFinalState(pub bool);
 
 #[derive(Clone, Debug, AsRefStr, DocumentedFields)]
 pub enum BuiltinRelationKind {
-    /// doc comment for Is
     Is,
-    /// doc comment for Identifies
     Identifies,
-    /// doc comment for Id
     Id,
-    /// doc comment for Indexed
     Indexed,
-    /// doc comment for Min
     Min,
-    /// doc comment for Max
     Max,
-    /// doc comment for Default
     Default,
-    /// doc comment for Gen
     Gen,
-    /// doc comment for Route
     Route,
-    /// doc comment for Doc
     Doc,
-    /// doc comment for Example
     Example,
 }
 

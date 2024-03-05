@@ -9,9 +9,7 @@ use crate::{smart_format, value::Value, DefId};
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize, DocumentedFields, AsRefStr)]
 pub enum TextLikeType {
-    /// This is a UUID
     Uuid,
-    /// This is a DateTime
     DateTime,
 }
 
