@@ -14,6 +14,8 @@ use serde::de::DeserializeSeed;
 pub mod graphql_test_utils;
 pub mod parser_document_utils;
 
+pub use unimock;
+
 #[async_trait::async_trait]
 pub trait DomainEngineTestExt {
     async fn exec_named_map_json(
@@ -128,5 +130,38 @@ impl domain_engine_core::FindEntitySelect for TestFindQuery {
             after_cursor: None,
             include_total_len: self.include_total_len,
         }
+    }
+}
+
+pub mod system {
+    use std::sync::Mutex;
+
+    use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
+    use domain_engine_core::system::SystemApiMock;
+    use unimock::*;
+
+    /// Mock [domain_engine_core::system::SystemApi::current_time] in a way that increases the year with every call.
+    /// Starts at 1970 (January 1st, 00:00).
+    pub fn mock_current_time_monotonic() -> impl unimock::Clause {
+        let year_counter: Mutex<i32> = Mutex::new(1970);
+
+        SystemApiMock::current_time
+            .each_call(matching!())
+            .answers(move |_| {
+                let year = {
+                    let mut lock = year_counter.lock().unwrap();
+                    let year = *lock;
+                    *lock += 1;
+                    year
+                };
+
+                DateTime::<Utc>::from_naive_utc_and_offset(
+                    NaiveDateTime::new(
+                        NaiveDate::from_ymd_opt(year, 1, 1).unwrap(),
+                        NaiveTime::from_hms_opt(0, 0, 0).unwrap(),
+                    ),
+                    Utc,
+                )
+            })
     }
 }

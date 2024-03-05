@@ -8,8 +8,10 @@ use domain_engine_juniper::{
     juniper::{graphql_value, InputValue, ScalarValue, Value},
     Schema,
 };
-use domain_engine_test_utils::graphql_test_utils::{
-    Exec, GraphQLPageDebug, TestCompileSchema, ValueExt,
+use domain_engine_test_utils::{
+    graphql_test_utils::{Exec, GraphQLPageDebug, TestCompileSchema, ValueExt},
+    system::mock_current_time_monotonic,
+    unimock,
 };
 use ontol_runtime::{config::DataStoreConfig, ontology::Ontology};
 use ontol_test_utils::{
@@ -24,7 +26,10 @@ fn conduit_db_only() -> TestPackages {
 }
 
 async fn make_domain_engine(ontology: Arc<Ontology>) -> DomainEngine {
-    DomainEngine::test_builder(ontology)
+    DomainEngine::builder(ontology)
+        .system(Box::new(unimock::Unimock::new(
+            mock_current_time_monotonic(),
+        )))
         .build(crate::TestDataStoreFactory::default(), Session::default())
         .await
         .unwrap()

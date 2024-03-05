@@ -12,6 +12,7 @@ domain-engine-in-memory-store.path = "../domain-engine-in-memory-store"
 serde.workspace = true
 serde_json.workspace = true
 fnv.workspace = true
+chrono.workspace = true
 unimock = "0.5"
 async-trait = "0.1"
 juniper = { git = "https://github.com/protojour/juniper", branch = "protojour-mods", default-features = false, features = ["schema-language"] }

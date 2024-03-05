@@ -5,7 +5,7 @@ use std::{
 };
 
 use domain_engine_core::{
-    data_store::{DataStoreAPIMock, Request, Response},
+    data_store::{DataStore, DataStoreAPIMock, Request, Response},
     DomainEngine, Session,
 };
 use domain_engine_in_memory_store::InMemoryDataStoreFactory;
@@ -112,8 +112,13 @@ pub fn gql_ctx_mock_data_store(
     data_store_package: SrcName,
     setup: impl unimock::Clause,
 ) -> ServiceCtx {
-    let domain_engine = DomainEngine::test_builder(ontol_test.ontology.clone())
-        .mock_data_store(ontol_test.get_package_id(data_store_package.0), setup)
+    let unimock = Unimock::new(setup);
+    let domain_engine = DomainEngine::builder(ontol_test.ontology.clone())
+        .data_store(DataStore::new(
+            ontol_test.get_package_id(data_store_package.0),
+            Box::new(unimock.clone()),
+        ))
+        .system(Box::new(unimock))
         .build_sync(InMemoryDataStoreFactory, Session::default())
         .unwrap();
 

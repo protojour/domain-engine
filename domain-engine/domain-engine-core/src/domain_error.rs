@@ -40,6 +40,10 @@ pub enum DomainError {
     DataStoreBadRequest(anyhow::Error),
     #[error("ontol data error: {0}")]
     OntolVm(#[from] VmError),
+    #[error("serialization failed")]
+    SerializationFailed,
+    #[error("deserialization failed")]
+    DeserializationFailed,
 }
 
 pub type DomainResult<T> = Result<T, DomainError>;

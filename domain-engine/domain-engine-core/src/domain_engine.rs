@@ -3,14 +3,16 @@ use std::sync::Arc;
 use anyhow::{anyhow, Context};
 use ontol_runtime::{
     config::data_store_backed_domains,
-    ontology::{Ontology, ValueCardinality},
+    interface::serde::processor::ProcessorMode,
+    ontology::{Extern, Ontology, ValueCardinality},
     resolve_path::{ProbeDirection, ProbeFilter, ProbeOptions, ResolvePath, ResolverGraph},
     select::{EntitySelect, Select, StructOrUnionSelect},
     sequence::Sequence,
     value::Value,
-    vm::{proc::Yield, VmState},
+    vm::{ontol_vm::OntolVm, proc::Yield, VmState},
     DefId, MapKey, PackageId,
 };
+use serde::de::DeserializeSeed;
 use tracing::{debug, trace};
 
 use crate::{
@@ -20,7 +22,7 @@ use crate::{
     },
     domain_error::DomainResult,
     select_data_flow::{translate_entity_select, translate_select},
-    system::{ArcSystemApi, SystemAPI, TestSystem},
+    system::{ArcSystemApi, SystemAPI},
     update::sanitize_update,
     DomainError, FindEntitySelect, Session,
 };
@@ -39,10 +41,6 @@ impl DomainEngine {
             data_store: None,
             system: None,
         }
-    }
-
-    pub fn test_builder(ontology: Arc<Ontology>) -> Builder {
-        Self::builder(ontology).system(Box::<TestSystem>::default())
     }
 
     pub fn ontology(&self) -> &Ontology {
@@ -64,7 +62,7 @@ impl DomainEngine {
     pub async fn exec_map(
         &self,
         key: MapKey,
-        mut input: Value,
+        input: Value,
         selects: &mut (dyn FindEntitySelect + Send),
         session: Session,
     ) -> DomainResult<Value> {
@@ -74,23 +72,8 @@ impl DomainEngine {
             .ok_or(DomainError::MappingProcedureNotFound)?;
         let mut vm = self.ontology.new_vm(proc);
 
-        loop {
-            match vm.run([input])? {
-                VmState::Complete(value) => return Ok(value),
-                VmState::Yield(Yield::Match(match_var, value_cardinality, condition)) => {
-                    let mut entity_select = selects.find_select(match_var, &condition);
-
-                    // Merge the condition into the select
-                    assert!(entity_select.condition.expansions().is_empty());
-                    entity_select.condition = condition;
-
-                    input = self
-                        .exec_map_query(value_cardinality, entity_select, session.clone())
-                        .await?;
-                }
-                VmState::Yield(Yield::CallExtern(..)) => todo!(),
-            }
-        }
+        self.run_vm_to_completion(&mut vm, input, &mut Some(selects), session)
+            .await
     }
 
     pub async fn query_entities(
@@ -113,7 +96,7 @@ impl DomainEngine {
 
         let data_store::Response::Query(mut edge_seq) = data_store
             .api()
-            .execute(data_store::Request::Query(select), session)
+            .execute(data_store::Request::Query(select), session.clone())
             .await?
         else {
             return Err(DomainError::DataStore(anyhow!(
@@ -133,12 +116,10 @@ impl DomainEngine {
 
             for attr in edge_seq.attrs.iter_mut() {
                 let mut vm = ontology.new_vm(procedure);
-                let param = attr.val.take();
 
-                attr.val = match vm.run([param])? {
-                    VmState::Complete(value) => value,
-                    VmState::Yield(_yield) => return Err(DomainError::ImpureMapping),
-                };
+                attr.val = self
+                    .run_vm_to_completion(&mut vm, attr.val.take(), &mut None, session.clone())
+                    .await?;
             }
         }
 
@@ -178,14 +159,15 @@ impl DomainEngine {
 
                         for value in mut_values.iter_mut() {
                             let mut vm = ontology.new_vm(procedure);
-                            let param = value.take();
 
-                            *value = match vm.run([param])? {
-                                VmState::Complete(value) => value,
-                                VmState::Yield(_yield) => {
-                                    return Err(DomainError::ImpureMapping);
-                                }
-                            };
+                            *value = self
+                                .run_vm_to_completion(
+                                    &mut vm,
+                                    value.take(),
+                                    &mut None,
+                                    session.clone(),
+                                )
+                                .await?;
                         }
                     }
 
@@ -227,14 +209,15 @@ impl DomainEngine {
 
                         for value in mut_values.iter_mut() {
                             let mut vm = ontology.new_vm(procedure);
-                            let param = value.take();
 
-                            *value = match vm.run([param])? {
-                                VmState::Complete(value) => value,
-                                VmState::Yield(_yield) => {
-                                    return Err(DomainError::ImpureMapping);
-                                }
-                            };
+                            *value = self
+                                .run_vm_to_completion(
+                                    &mut vm,
+                                    value.take(),
+                                    &mut None,
+                                    session.clone(),
+                                )
+                                .await?;
                         }
                     }
 
@@ -284,7 +267,7 @@ impl DomainEngine {
 
         let data_store::Response::BatchWrite(mut responses) = data_store
             .api()
-            .execute(data_store::Request::BatchWrite(requests), session)
+            .execute(data_store::Request::BatchWrite(requests), session.clone())
             .await?
         else {
             return Err(DomainError::DataStore(anyhow!(
@@ -306,14 +289,15 @@ impl DomainEngine {
 
                             for value in mut_values.iter_mut() {
                                 let mut vm = ontology.new_vm(procedure);
-                                let param = value.take();
 
-                                *value = match vm.run([param])? {
-                                    VmState::Complete(value) => value,
-                                    VmState::Yield(_yield) => {
-                                        return Err(DomainError::ImpureMapping);
-                                    }
-                                };
+                                *value = self
+                                    .run_vm_to_completion(
+                                        &mut vm,
+                                        value.take(),
+                                        &mut None,
+                                        session.clone(),
+                                    )
+                                    .await?;
                             }
                         }
                     }
@@ -419,6 +403,90 @@ impl DomainEngine {
                 None => Ok(Value::unit()),
             },
             ValueCardinality::Many => Ok(Value::Sequence(edge_seq, DefId::unit())),
+        }
+    }
+
+    async fn run_vm_to_completion(
+        &self,
+        vm: &mut OntolVm<'_>,
+        mut param: Value,
+        selects: &mut Option<&mut (dyn FindEntitySelect + Send)>,
+        session: Session,
+    ) -> DomainResult<Value> {
+        loop {
+            match vm.run([param])? {
+                VmState::Complete(value) => return Ok(value),
+                VmState::Yield(vm_yield) => {
+                    param = self.exec_yield(vm_yield, selects, session.clone()).await?;
+                }
+            }
+        }
+    }
+
+    async fn exec_yield(
+        &self,
+        vm_yield: Yield,
+        selects: &mut Option<&mut (dyn FindEntitySelect + Send)>,
+        session: Session,
+    ) -> DomainResult<Value> {
+        match vm_yield {
+            Yield::Match(match_var, value_cardinality, condition) => {
+                if let Some(selects) = selects {
+                    let mut entity_select = selects.find_select(match_var, &condition);
+
+                    // Merge the condition into the select
+                    assert!(entity_select.condition.expansions().is_empty());
+                    entity_select.condition = condition;
+
+                    self.exec_map_query(value_cardinality, entity_select, session.clone())
+                        .await
+                } else {
+                    Err(DomainError::ImpureMapping)
+                }
+            }
+            Yield::CallExtern(extern_def_id, input, output_def_id) => {
+                let ontology = &self.ontology;
+                let input_operator_addr = ontology
+                    .get_type_info(input.type_def_id())
+                    .operator_addr
+                    .ok_or(DomainError::SerializationFailed)?;
+                let output_operator_addr = ontology
+                    .get_type_info(output_def_id)
+                    .operator_addr
+                    .ok_or(DomainError::DeserializationFailed)?;
+
+                match self
+                    .ontology
+                    .get_extern(extern_def_id)
+                    .ok_or(DomainError::MappingProcedureNotFound)?
+                {
+                    Extern::HttpJson { url } => {
+                        let url = &self.ontology[*url];
+                        let mut input_json: Vec<u8> = vec![];
+                        self.ontology
+                            .new_serde_processor(input_operator_addr, ProcessorMode::Read)
+                            .serialize_value(
+                                &input,
+                                None,
+                                &mut serde_json::Serializer::new(&mut input_json),
+                            )
+                            .map_err(|_| DomainError::SerializationFailed)?;
+
+                        let output_json = self
+                            .system
+                            .call_http_json_hook(url, session, input_json)
+                            .await?;
+
+                        let output_attr = self
+                            .ontology
+                            .new_serde_processor(output_operator_addr, ProcessorMode::Read)
+                            .deserialize(&mut serde_json::Deserializer::from_slice(&output_json))
+                            .map_err(|_| DomainError::DeserializationFailed)?;
+
+                        Ok(output_attr.val)
+                    }
+                }
+            }
         }
     }
 }

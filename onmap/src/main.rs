@@ -6,7 +6,8 @@ use anyhow::{anyhow, Context};
 use chrono::{DateTime, Utc};
 use clap::{Parser, ValueEnum};
 use clap_stdin::FileOrStdin;
-use domain_engine_core::system::SystemAPI;
+use domain_engine_core::{system::SystemAPI, DomainError, DomainResult, Session};
+use domain_engine_juniper::juniper::async_trait;
 use ontol_runtime::{
     interface::serde::processor::ProcessorMode, ontology::Ontology, vm::VmState, MapDef,
     MapDefFlags, MapFlags, MapKey, PackageId,
@@ -140,8 +141,13 @@ fn load_ontology(path: PathBuf) -> anyhow::Result<Ontology> {
 
 struct System;
 
+#[async_trait]
 impl SystemAPI for System {
     fn current_time(&self) -> DateTime<Utc> {
         Utc::now()
+    }
+
+    async fn call_http_json_hook(&self, _: &str, _: Session, _: Vec<u8>) -> DomainResult<Vec<u8>> {
+        Err(DomainError::NotImplemented)
     }
 }

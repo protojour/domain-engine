@@ -10,6 +10,8 @@ use domain_engine_test_utils::{
         Exec, GraphqlTestResultExt, GraphqlValueResultExt, TestCompileSchema, ValueExt,
     },
     graphql_value_unordered,
+    system::mock_current_time_monotonic,
+    unimock,
 };
 use ontol_runtime::{config::DataStoreConfig, ontology::Ontology};
 use ontol_test_utils::{
@@ -22,7 +24,10 @@ use ontol_test_utils::{
 use test_log::test;
 
 async fn make_domain_engine(ontology: Arc<Ontology>) -> DomainEngine {
-    DomainEngine::test_builder(ontology)
+    DomainEngine::builder(ontology)
+        .system(Box::new(unimock::Unimock::new(
+            mock_current_time_monotonic(),
+        )))
         .build(crate::TestDataStoreFactory::default(), Session::default())
         .await
         .unwrap()

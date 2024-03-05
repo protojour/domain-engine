@@ -5,7 +5,7 @@ use std::{fs::File, path::PathBuf, sync::Arc};
 use anyhow::Context;
 use axum::Extension;
 use clap::Parser;
-use domain_engine_core::{DomainEngine, Session};
+use domain_engine_core::{DomainEngine, DomainError, DomainResult, Session};
 use domain_engine_in_memory_store::InMemoryDataStoreFactory;
 use domain_engine_juniper::CreateSchemaError;
 use graphql::{graphiql_handler, graphql_handler, GraphqlService};
@@ -96,7 +96,16 @@ fn load_ontology(path: PathBuf) -> anyhow::Result<Ontology> {
 
 struct System;
 
-impl domain_engine_core::system::SystemAPI for System {}
+#[async_trait::async_trait]
+impl domain_engine_core::system::SystemAPI for System {
+    fn current_time(&self) -> chrono::DateTime<chrono::Utc> {
+        domain_engine_core::system::current_time()
+    }
+
+    async fn call_http_json_hook(&self, _: &str, _: Session, _: Vec<u8>) -> DomainResult<Vec<u8>> {
+        Err(DomainError::NotImplemented)
+    }
+}
 
 fn domain_router(
     engine: Arc<DomainEngine>,

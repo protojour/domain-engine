@@ -1,13 +1,15 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
+use chrono::Utc;
+
+use crate::{DomainResult, Session};
 
 /// Combination of system-specific functionality and configuration for the domain engine.
+#[unimock::unimock(api = SystemApiMock)]
+#[async_trait::async_trait]
 pub trait SystemAPI: Sync {
     /// Get the system's current time.
-    fn current_time(&self) -> chrono::DateTime<chrono::Utc> {
-        chrono::Utc::now()
-    }
+    fn current_time(&self) -> chrono::DateTime<chrono::Utc>;
 
     /// Generate a new [uuid::Uuid].
     ///
@@ -21,39 +23,20 @@ pub trait SystemAPI: Sync {
     fn default_query_limit(&self) -> usize {
         20
     }
+
+    /// Call a HTTP JSON hook.
+    /// It should return a JSON value encoded as Vec<u8>.
+    async fn call_http_json_hook(
+        &self,
+        url: &str,
+        session: Session,
+        input: Vec<u8>,
+    ) -> DomainResult<Vec<u8>>;
 }
 
 /// A [SystemAPI] in an [Arc].
 pub type ArcSystemApi = Arc<dyn SystemAPI + Send + Sync>;
 
-/// A system API for use in tests with a fake clock.
-pub struct TestSystem {
-    year_counter: Arc<Mutex<i32>>,
-}
-
-impl Default for TestSystem {
-    fn default() -> Self {
-        Self {
-            year_counter: Arc::new(Mutex::new(1970)),
-        }
-    }
-}
-
-impl SystemAPI for TestSystem {
-    fn current_time(&self) -> chrono::DateTime<chrono::Utc> {
-        let year = {
-            let mut lock = self.year_counter.lock().unwrap();
-            let year = *lock;
-            *lock += 1;
-            year
-        };
-
-        DateTime::from_naive_utc_and_offset(
-            NaiveDateTime::new(
-                NaiveDate::from_ymd_opt(year, 1, 1).unwrap(),
-                NaiveTime::from_hms_opt(0, 0, 0).unwrap(),
-            ),
-            Utc,
-        )
-    }
+pub fn current_time() -> chrono::DateTime<chrono::Utc> {
+    Utc::now()
 }

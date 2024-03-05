@@ -743,6 +743,7 @@ name = "domain-engine-test-utils"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "chrono",
  "domain-engine-core",
  "domain-engine-in-memory-store",
  "domain-engine-juniper",
