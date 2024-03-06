@@ -12,6 +12,10 @@ pub enum Select {
     Entity(EntitySelect),
 }
 
+/// FIXME: This doesn't necessarily always represent an entity select.
+/// In the exposed domain it can represent any string.
+/// The point is that it must be _translated_ to an entity select in a data store domain.
+/// TODO: Rename?
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EntitySelect {
     pub source: StructOrUnionSelect,

@@ -835,17 +835,19 @@ async fn test_graphql_conduit_feed_public_with_items_query() {
                 _
             ))
             .answers(|(_, _, input)| {
-                assert_eq!(
-                    input.as_slice(),
-                    br#"{"link":"http://blogs.com/teh_user/feed","username":"teh_user","items":[]}"#
-                );
+                // Assert that there is at least one item (from the datastore),
+                // and there is one if the JSON contains "guid"
+                assert!(input.windows(6).any(|subslice| subslice == b"\"guid\""));
 
                 // Inject "title"
                 Ok(br#"{
                     "title": "http",
                     "link": "",
                     "username": "",
-                    "items": []
+                    "items": [{
+                        "guid": "11111111-2222-3333-4444-555555555555",
+                        "title": "pwned"
+                    }]
                 }"#
                 .to_vec())
             }),
@@ -859,7 +861,7 @@ async fn test_graphql_conduit_feed_public_with_items_query() {
             "{{
                 feed(input: {{ username: \"teh_user\" }}) {{
                     title
-                    items {{ title }}
+                    items {{ guid }}
                 }}
             }}"
         )
@@ -867,7 +869,8 @@ async fn test_graphql_conduit_feed_public_with_items_query() {
         .await,
         expected = Ok(graphql_value!({
             "feed": {
-                "title": "http"
+                "title": "http",
+                "items": [{ "guid": "11111111-2222-3333-4444-555555555555" }]
             }
         })),
     );

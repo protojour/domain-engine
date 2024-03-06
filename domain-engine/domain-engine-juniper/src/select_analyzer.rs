@@ -122,6 +122,20 @@ impl<'a> SelectAnalyzer<'a> {
                         output_selects.insert(*var, entity_select);
                         Ok(())
                     }
+                    Some(Select::Struct(struct_select)) => {
+                        // Need to convert struct select to "entity" select..
+                        output_selects.insert(
+                            *var,
+                            EntitySelect {
+                                source: StructOrUnionSelect::Struct(struct_select),
+                                condition: Condition::default(),
+                                limit: self.default_query_limit(),
+                                after_cursor: None,
+                                include_total_len: false,
+                            },
+                        );
+                        Ok(())
+                    }
                     select => panic!("BUG: not an entity select: {select:?}"),
                 }
             }
