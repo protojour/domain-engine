@@ -901,7 +901,7 @@ async fn test_unified_mutation_create() {
 
 #[test(tokio::test)]
 async fn test_create_through_mapped_domain() {
-    let (test, [schema]) = TestPackages::with_sources([
+    let (test, [schema]) = TestPackages::with_static_sources([
         (
             root(),
             "
@@ -973,7 +973,7 @@ async fn test_create_through_mapped_domain() {
 
 #[test(tokio::test)]
 async fn test_create_through_three_domains() {
-    let (test, [schema]) = TestPackages::with_sources([
+    let (test, [schema]) = TestPackages::with_static_sources([
         (
             root(),
             "
@@ -1244,7 +1244,7 @@ async fn test_graphql_guitar_synth_union_input_error_span() {
 
 #[test(tokio::test)]
 async fn test_graphql_municipalities() {
-    let (test, [schema]) = TestPackages::with_sources([MUNICIPALITIES, GEOJSON, WGS])
+    let (test, [schema]) = TestPackages::with_static_sources([MUNICIPALITIES, GEOJSON, WGS])
         .compile_schemas([MUNICIPALITIES.0]);
 
     expect_eq!(
@@ -1290,7 +1290,7 @@ async fn test_graphql_municipalities() {
 
 #[test(tokio::test)]
 async fn test_graphql_municipalities_named_query() {
-    let (test, [schema]) = TestPackages::with_sources([MUNICIPALITIES, GEOJSON, WGS])
+    let (test, [schema]) = TestPackages::with_static_sources([MUNICIPALITIES, GEOJSON, WGS])
         .compile_schemas([MUNICIPALITIES.0]);
     let [municipality] = test.bind(["municipality"]);
 
@@ -1379,7 +1379,7 @@ async fn test_graphql_municipalities_named_query() {
 
 #[test]
 fn test_graphql_municipalities_geojson_union() {
-    let (_test, [schema]) = TestPackages::with_sources([MUNICIPALITIES, GEOJSON, WGS])
+    let (_test, [schema]) = TestPackages::with_static_sources([MUNICIPALITIES, GEOJSON, WGS])
         .with_data_store(MUNICIPALITIES.0, DataStoreConfig::Default)
         .compile_schemas([MUNICIPALITIES.0]);
 
@@ -1529,7 +1529,7 @@ async fn test_gitmesh_id_error() {
 // A bug when using both .is and .'member' from foreign domain
 #[test(tokio::test)]
 async fn test_extendsion_and_member_from_foreign_domain() {
-    let (_test, [_]) = TestPackages::with_sources([
+    let (_test, [_]) = TestPackages::with_static_sources([
         (
             SrcName("entry"),
             "

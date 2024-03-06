@@ -23,7 +23,8 @@ use test_log::test;
 use tracing::info;
 
 fn conduit_db_only() -> TestPackages {
-    TestPackages::with_sources([CONDUIT_DB]).with_data_store(CONDUIT_DB.0, DataStoreConfig::Default)
+    TestPackages::with_static_sources([CONDUIT_DB])
+        .with_data_store(CONDUIT_DB.0, DataStoreConfig::Default)
 }
 
 async fn make_domain_engine(
@@ -243,9 +244,10 @@ struct ConduitBundle {
 
 impl ConduitBundle {
     async fn new(mock_clauses: impl unimock::Clause) -> Self {
-        let test_packages = TestPackages::with_sources([BLOG_POST_PUBLIC, FEED_PUBLIC, CONDUIT_DB])
-            .with_roots([BLOG_POST_PUBLIC.0, FEED_PUBLIC.0])
-            .with_data_store(CONDUIT_DB.0, DataStoreConfig::Default);
+        let test_packages =
+            TestPackages::with_static_sources([BLOG_POST_PUBLIC, FEED_PUBLIC, CONDUIT_DB])
+                .with_roots([BLOG_POST_PUBLIC.0, FEED_PUBLIC.0])
+                .with_data_store(CONDUIT_DB.0, DataStoreConfig::Default);
 
         let (test, [blog_schema, feed_schema, db_schema]) =
             test_packages.compile_schemas([BLOG_POST_PUBLIC.0, FEED_PUBLIC.0, CONDUIT_DB.0]);

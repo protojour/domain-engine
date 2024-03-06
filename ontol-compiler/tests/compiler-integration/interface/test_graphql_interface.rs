@@ -224,7 +224,7 @@ fn test_no_datastore_yields_empty_mutation() {
 
 #[test]
 fn test_imperfect_mapping_mutation() {
-    let test = TestPackages::with_sources([
+    let test = TestPackages::with_static_sources([
         (
             SrcName::default(),
             "

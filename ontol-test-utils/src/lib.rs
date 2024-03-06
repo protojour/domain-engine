@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use std::{collections::HashMap, sync::Arc};
+use std::{borrow::Cow, collections::HashMap, sync::Arc};
 
 use diagnostics::AnnotatedCompileError;
 use ontol_compiler::{
@@ -157,15 +157,15 @@ pub trait TestCompile: Sized {
 
 impl TestCompile for &'static str {
     fn compile(self) -> OntolTest {
-        TestPackages::with_root(self).compile()
+        TestPackages::with_static_sources([(SrcName::default(), self)]).compile()
     }
 
     fn compile_fail(self) -> Vec<AnnotatedCompileError> {
-        TestPackages::with_root(self).compile_fail()
+        TestPackages::with_static_sources([(SrcName::default(), self)]).compile_fail()
     }
 
     fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>)) {
-        TestPackages::with_root(self).compile_fail_then(validator)
+        TestPackages::with_static_sources([(SrcName::default(), self)]).compile_fail_then(validator)
     }
 }
 
@@ -185,7 +185,7 @@ impl Default for SrcName {
 }
 
 pub struct TestPackages {
-    sources_by_name: HashMap<&'static str, &'static str>,
+    sources_by_name: HashMap<&'static str, Cow<'static, str>>,
     root_package_names: Vec<SrcName>,
     sources: Sources,
     source_code_registry: SourceCodeRegistry,
@@ -194,17 +194,30 @@ pub struct TestPackages {
 }
 
 impl TestPackages {
-    /// Configure the test packages one single source file, which gets the default source name.
-    pub fn with_root(text: &'static str) -> Self {
-        Self::with_sources([(SrcName::default(), text)])
+    /// Configure with an explicit set of named sources.
+    /// By default, the first one is chosen as the only root source.
+    pub fn with_sources(
+        sources_by_name: impl IntoIterator<Item = (SrcName, Cow<'static, str>)>,
+    ) -> Self {
+        Self::new(sources_by_name.into_iter().collect())
     }
 
     /// Configure with an explicit set of named sources.
     /// By default, the first one is chosen as the only root source.
-    pub fn with_sources(
+    ///
+    /// This version requires the ONTOL sources to be &'static str.
+    pub fn with_static_sources(
         sources_by_name: impl IntoIterator<Item = (SrcName, &'static str)>,
     ) -> Self {
-        let sources_by_name: Vec<(SrcName, &'static str)> = sources_by_name.into_iter().collect();
+        Self::new(
+            sources_by_name
+                .into_iter()
+                .map(|(name, src)| (name, Cow::Borrowed(src)))
+                .collect(),
+        )
+    }
+
+    fn new(sources_by_name: Vec<(SrcName, Cow<'static, str>)>) -> Self {
         let default_root = sources_by_name.first().map(|(name, _)| *name);
 
         Self {

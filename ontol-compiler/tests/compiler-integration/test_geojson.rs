@@ -9,7 +9,7 @@ use test_log::test;
 
 #[test]
 fn test_geojson() {
-    TestPackages::with_sources(
+    TestPackages::with_static_sources(
         [GEOJSON, WGS]
     ).compile_then(|test| {
         let [geometry] = test.bind(["Geometry"]);
@@ -65,7 +65,7 @@ fn test_geojson() {
 
 #[test]
 fn test_municipalities() {
-    TestPackages::with_sources([
+    TestPackages::with_static_sources([
         (
             SrcName("entry"),
             "

@@ -8,7 +8,7 @@ use test_log::test;
 
 #[test]
 fn test_relations_are_distinct_for_different_domains() {
-    TestPackages::with_sources([
+    TestPackages::with_static_sources([
         (
             SrcName("entry"),
             "

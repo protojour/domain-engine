@@ -259,7 +259,7 @@ def developer (
 
 #[test]
 fn test_map_invert() {
-    TestPackages::with_sources([
+    TestPackages::with_static_sources([
         (
             SrcName("entry"),
             "

@@ -367,7 +367,7 @@ fn error_complains_about_ambiguous_pattern_based_unions() {
 
 #[test]
 fn error_compile_error_in_dependency() {
-    TestPackages::with_sources([
+    TestPackages::with_static_sources([
         (SrcName("entry"), "use 'fail' as f"),
         (
             SrcName("fail"),
@@ -390,7 +390,7 @@ fn error_rel_wildcard_span() {
 
 #[test]
 fn error_fail_import_private_type() {
-    TestPackages::with_sources([
+    TestPackages::with_static_sources([
         (
             SrcName("root"),
             "
@@ -407,7 +407,7 @@ fn error_fail_import_private_type() {
 
 #[test]
 fn error_domain_named_relation() {
-    TestPackages::with_sources([
+    TestPackages::with_static_sources([
         (
             SrcName("entry"),
             "
@@ -447,7 +447,7 @@ fn error_constant_in_weird_place() {
 
 #[test]
 fn bad_domain_relation() {
-    TestPackages::with_sources([
+    TestPackages::with_static_sources([
         (
             SrcName("root"),
             "
@@ -501,7 +501,7 @@ fn error_test_lazy_seal_by_map() {
 
 #[test]
 fn error_test_error_object_property_in_foreign_domain() {
-    TestPackages::with_sources([
+    TestPackages::with_static_sources([
         (
             SrcName("root"),
             "

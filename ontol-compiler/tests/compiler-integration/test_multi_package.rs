@@ -16,7 +16,7 @@ fn import_package_not_found_error() {
 
 #[test]
 fn load_package() {
-    TestPackages::with_sources([
+    TestPackages::with_static_sources([
         (
             SrcName("root"),
             "
@@ -48,7 +48,7 @@ fn load_package() {
 
 #[test]
 fn dependency_dag() {
-    TestPackages::with_sources([
+    TestPackages::with_static_sources([
         (
             SrcName("root"),
             "
@@ -95,7 +95,7 @@ fn dependency_dag() {
 
 #[test]
 fn multiple_roots() {
-    TestPackages::with_sources([
+    TestPackages::with_static_sources([
         (
             SrcName("foo"),
             "

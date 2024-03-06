@@ -70,7 +70,7 @@ async fn test_graphql_stix() {
 
 #[test(tokio::test)]
 async fn test_guitar_synth_union_mutation_and_query() {
-    let (test, [schema]) = TestPackages::with_sources([GUITAR_SYNTH_UNION])
+    let (test, [schema]) = TestPackages::with_static_sources([GUITAR_SYNTH_UNION])
         .with_data_store(GUITAR_SYNTH_UNION.0, DataStoreConfig::Default)
         .compile_schemas([GUITAR_SYNTH_UNION.0]);
     let ctx: ServiceCtx = make_domain_engine(test.ontology.clone()).await.into();
@@ -190,7 +190,7 @@ async fn test_guitar_synth_union_mutation_and_query() {
 
 #[test(tokio::test)]
 async fn test_gitmesh_misc() {
-    let (test, [schema]) = TestPackages::with_sources([GITMESH])
+    let (test, [schema]) = TestPackages::with_static_sources([GITMESH])
         .with_data_store(GITMESH.0, DataStoreConfig::Default)
         .compile_schemas([GITMESH.0]);
     let ctx: ServiceCtx = make_domain_engine(test.ontology.clone()).await.into();
@@ -421,7 +421,7 @@ async fn test_gitmesh_misc() {
 
 #[test(tokio::test)]
 async fn test_gitmesh_fancy_filters() {
-    let (test, [schema]) = TestPackages::with_sources([GITMESH])
+    let (test, [schema]) = TestPackages::with_static_sources([GITMESH])
         .with_data_store(GITMESH.0, DataStoreConfig::Default)
         .compile_schemas([GITMESH.0]);
     let ctx: ServiceCtx = make_domain_engine(test.ontology.clone()).await.into();
@@ -492,7 +492,7 @@ async fn test_gitmesh_fancy_filters() {
 
 #[test(tokio::test)]
 async fn test_gitmesh_update_owner_relation() {
-    let (test, [schema]) = TestPackages::with_sources([GITMESH])
+    let (test, [schema]) = TestPackages::with_static_sources([GITMESH])
         .with_data_store(GITMESH.0, DataStoreConfig::Default)
         .compile_schemas([GITMESH.0]);
     let ctx: ServiceCtx = make_domain_engine(test.ontology.clone()).await.into();
@@ -573,7 +573,7 @@ async fn test_gitmesh_update_owner_relation() {
 
 #[test(tokio::test)]
 async fn test_gitmesh_patch_members() {
-    let (test, [schema]) = TestPackages::with_sources([GITMESH])
+    let (test, [schema]) = TestPackages::with_static_sources([GITMESH])
         .with_data_store(GITMESH.0, DataStoreConfig::Default)
         .compile_schemas([GITMESH.0]);
     let ctx: ServiceCtx = make_domain_engine(test.ontology.clone()).await.into();
@@ -709,7 +709,7 @@ async fn test_gitmesh_patch_members() {
 
 #[test(tokio::test)]
 async fn test_gitmesh_ownership_transfer() {
-    let (test, [schema]) = TestPackages::with_sources([GITMESH])
+    let (test, [schema]) = TestPackages::with_static_sources([GITMESH])
         .with_data_store(GITMESH.0, DataStoreConfig::Default)
         .compile_schemas([GITMESH.0]);
     let ctx: ServiceCtx = make_domain_engine(test.ontology.clone()).await.into();

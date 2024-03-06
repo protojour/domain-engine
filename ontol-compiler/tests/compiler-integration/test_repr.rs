@@ -113,7 +113,7 @@ fn test_repr_tuple() {
 
 #[test]
 fn test_repr_valid_mesh1() {
-    TestPackages::with_sources([
+    TestPackages::with_static_sources([
         (
             SrcName("entry"),
             "

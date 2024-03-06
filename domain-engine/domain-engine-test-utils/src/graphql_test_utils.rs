@@ -41,7 +41,7 @@ pub trait TestCompileSingletonSchema {
 impl TestCompileSingletonSchema for &'static str {
     fn compile_single_schema_with_datastore(self) -> (OntolTest, Schema) {
         let (ontol_test, [schema]) = compile_schemas_inner(
-            TestPackages::with_root(self)
+            TestPackages::with_static_sources([(SrcName::default(), self)])
                 .with_data_store(SrcName::default(), DataStoreConfig::Default)
                 .compile(),
             [SrcName::default()],

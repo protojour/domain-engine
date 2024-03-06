@@ -28,7 +28,7 @@ pub mod stix {
     );
 
     pub fn stix_bundle() -> TestPackages {
-        TestPackages::with_sources([STIX, STIX_META, STIX_COMMON, STIX_OPEN_VOCAB, SI])
+        TestPackages::with_static_sources([STIX, STIX_META, STIX_COMMON, STIX_OPEN_VOCAB, SI])
     }
 }
 

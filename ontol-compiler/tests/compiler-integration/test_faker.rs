@@ -50,7 +50,7 @@ fn test_fake_text_like_types() {
 
 #[test]
 fn test_fake_geojson() {
-    let test = TestPackages::with_sources([GEOJSON, WGS]).compile();
+    let test = TestPackages::with_static_sources([GEOJSON, WGS]).compile();
     let [geometry] = test.bind(["Geometry"]);
     expect_eq!(
         actual = serde_read(&geometry).as_json(&geometry.new_fake(ProcessorMode::Raw)),

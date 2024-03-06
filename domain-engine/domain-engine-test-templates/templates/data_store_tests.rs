@@ -24,11 +24,12 @@ use test_log::test;
 use uuid::Uuid;
 
 fn conduit_db() -> TestPackages {
-    TestPackages::with_sources([CONDUIT_DB]).with_data_store(CONDUIT_DB.0, DataStoreConfig::Default)
+    TestPackages::with_static_sources([CONDUIT_DB])
+        .with_data_store(CONDUIT_DB.0, DataStoreConfig::Default)
 }
 
 fn artist_and_instrument() -> TestPackages {
-    TestPackages::with_sources([ARTIST_AND_INSTRUMENT])
+    TestPackages::with_static_sources([ARTIST_AND_INSTRUMENT])
         .with_data_store(ARTIST_AND_INSTRUMENT.0, DataStoreConfig::Default)
 }
 

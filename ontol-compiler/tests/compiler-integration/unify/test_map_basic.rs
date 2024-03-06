@@ -659,7 +659,7 @@ fn test_map_complex_flow() {
 
 #[test]
 fn test_map_delegation() {
-    TestPackages::with_sources([
+    TestPackages::with_static_sources([
         (
             SrcName("root"),
             "
@@ -705,7 +705,7 @@ fn test_map_delegation() {
 // BUG
 #[should_panic = "called `Option::unwrap()` on a `None` value"]
 fn test_map_delegation_abstract_types() {
-    TestPackages::with_sources([
+    TestPackages::with_static_sources([
         (
             SrcName("entry"),
             "
