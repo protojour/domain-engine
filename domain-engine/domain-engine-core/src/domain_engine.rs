@@ -13,7 +13,7 @@ use ontol_runtime::{
     DefId, MapKey, PackageId,
 };
 use serde::de::DeserializeSeed;
-use tracing::{debug, trace};
+use tracing::{debug, error, trace};
 
 use crate::{
     data_store::{
@@ -24,7 +24,7 @@ use crate::{
     select_data_flow::{translate_entity_select, translate_select},
     system::{ArcSystemApi, SystemAPI},
     update::sanitize_update,
-    DomainError, FindEntitySelect, Session,
+    DomainError, FindEntitySelect, MaybeSelect, Session,
 };
 
 pub struct DomainEngine {
@@ -365,14 +365,25 @@ impl DomainEngine {
         match vm_yield {
             Yield::Match(match_var, value_cardinality, condition) => {
                 if let Some(selects) = selects {
-                    let mut entity_select = selects.find_select(match_var, &condition);
+                    match selects.find_select(match_var, &condition) {
+                        MaybeSelect::Select(mut entity_select) => {
+                            // Merge the condition into the select
+                            assert!(entity_select.condition.expansions().is_empty());
+                            entity_select.condition = condition;
 
-                    // Merge the condition into the select
-                    assert!(entity_select.condition.expansions().is_empty());
-                    entity_select.condition = condition;
-
-                    self.exec_map_query(value_cardinality, entity_select, session.clone())
-                        .await
+                            self.exec_map_query(value_cardinality, entity_select, session.clone())
+                                .await
+                        }
+                        MaybeSelect::Skip(def_id) => {
+                            debug!("skipping selection");
+                            match value_cardinality {
+                                ValueCardinality::One => Ok(Value::unit()),
+                                ValueCardinality::Many => {
+                                    Ok(Value::Sequence(Sequence::default(), def_id))
+                                }
+                            }
+                        }
+                    }
                 } else {
                     Err(DomainError::ImpureMapping)
                 }
@@ -386,7 +397,10 @@ impl DomainEngine {
                 let output_operator_addr = ontology
                     .get_type_info(output_def_id)
                     .operator_addr
-                    .ok_or(DomainError::DeserializationFailed)?;
+                    .ok_or_else(|| {
+                        error!("No deserialization operator");
+                        DomainError::DeserializationFailed
+                    })?;
 
                 match self
                     .ontology
@@ -410,11 +424,16 @@ impl DomainEngine {
                             .call_http_json_hook(url, session, input_json)
                             .await?;
 
+                        debug!("output json: `{output_json:?}`");
+
                         let output_attr = self
                             .ontology
                             .new_serde_processor(output_operator_addr, ProcessorMode::Read)
                             .deserialize(&mut serde_json::Deserializer::from_slice(&output_json))
-                            .map_err(|_| DomainError::DeserializationFailed)?;
+                            .map_err(|error| {
+                                debug!("hook deserialization error: {error:?}");
+                                DomainError::DeserializationFailed
+                            })?;
 
                         Ok(output_attr.val)
                     }
@@ -440,7 +459,7 @@ impl DomainEngine {
                     .root_def_id()
                     .expect("Root entity DefId not found in condition clauses");
 
-                debug!("exec_map_query: inner entity def id: {inner_entity_def_id:?}");
+                debug!("exec_map_query: inner entity def id: {inner_entity_def_id:?}. struct_select.def_id: {:?}", struct_select.def_id);
 
                 // TODO: The probe algorithm here needs to work differently.
                 // The map statement (currently) knows about the data store type

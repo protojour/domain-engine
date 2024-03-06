@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use domain_engine_core::{DomainEngine, Session};
+use domain_engine_core::{system::SystemApiMock, DomainEngine, Session};
 use domain_engine_juniper::{
     context::ServiceCtx,
     gql_scalar::GqlScalar,
@@ -12,6 +12,7 @@ use domain_engine_test_utils::{
     graphql_test_utils::{Exec, GraphQLPageDebug, TestCompileSchema, ValueExt},
     system::mock_current_time_monotonic,
     unimock,
+    unimock::MockFn,
 };
 use ontol_runtime::{config::DataStoreConfig, ontology::Ontology};
 use ontol_test_utils::{
@@ -261,7 +262,7 @@ impl ConduitBundle {
         self.domain_engine.clone().into()
     }
 
-    async fn create_db_article(&self) -> String {
+    async fn create_db_article_for_teh_user(&self) -> String {
         // Insert using the data store domain directly:
         let response = r#"mutation {
             Article(create: [{
@@ -293,7 +294,7 @@ impl ConduitBundle {
         article_id.as_string().unwrap().into()
     }
 
-    async fn create_db_article_with_tag(&self) {
+    async fn create_db_article_with_tag_for_teh_user(&self) {
         expect_eq!(
             actual = r#"mutation {
                 Article(create: [{
@@ -325,7 +326,7 @@ impl ConduitBundle {
 #[test(tokio::test)]
 async fn test_graphql_blog_post_conduit_implicit_join() {
     let test = ConduitBundle::new(mock_current_time_monotonic()).await;
-    test.create_db_article().await;
+    test.create_db_article_for_teh_user().await;
 
     expect_eq!(
         actual = r#"{
@@ -377,7 +378,7 @@ async fn test_graphql_blog_post_conduit_implicit_join() {
 async fn test_graphql_blog_post_conduit_paginated() {
     let test = ConduitBundle::new(mock_current_time_monotonic()).await;
     for _ in 0..3 {
-        test.create_db_article().await;
+        test.create_db_article_for_teh_user().await;
     }
 
     let mut prev_end_cursor: Option<InputValue<GqlScalar>> = None;
@@ -424,7 +425,7 @@ async fn test_graphql_blog_post_conduit_paginated() {
 #[test(tokio::test)]
 async fn test_graphql_blog_post_conduit_tags() {
     let test = ConduitBundle::new(mock_current_time_monotonic()).await;
-    test.create_db_article_with_tag().await;
+    test.create_db_article_with_tag_for_teh_user().await;
 
     expect_eq!(
         actual = "{
@@ -459,7 +460,7 @@ async fn test_graphql_blog_post_conduit_tags() {
 #[test(tokio::test)]
 async fn test_graphql_blog_post_conduit_no_join_real() {
     let test = ConduitBundle::new(mock_current_time_monotonic()).await;
-    test.create_db_article().await;
+    test.create_db_article_for_teh_user().await;
 
     expect_eq!(
         actual = "{
@@ -686,7 +687,7 @@ async fn test_graphql_conduit_db_user_deletion() {
 #[test(tokio::test)]
 async fn test_graphql_blog_post_conduit_update_body_create_comment() {
     let test = ConduitBundle::new(mock_current_time_monotonic()).await;
-    let article_id = test.create_db_article().await;
+    let article_id = test.create_db_article_for_teh_user().await;
 
     expect_eq!(
         actual = format!(
@@ -753,7 +754,7 @@ async fn test_graphql_blog_post_conduit_update_body_create_comment() {
 #[test(tokio::test)]
 async fn test_graphql_blog_post_conduit_delete() {
     let test = ConduitBundle::new(mock_current_time_monotonic()).await;
-    let article_id = test.create_db_article().await;
+    let article_id = test.create_db_article_for_teh_user().await;
 
     expect_eq!(
         actual = format!(
@@ -772,14 +773,43 @@ async fn test_graphql_blog_post_conduit_delete() {
 }
 
 #[test(tokio::test)]
-#[should_panic(expected = "no resolve path to data store")]
-async fn test_graphql_conduit_feed_public() {
-    let test = ConduitBundle::new(()).await;
+async fn test_graphql_conduit_feed_public_no_query_selection() {
+    let test = ConduitBundle::new((
+        mock_current_time_monotonic(),
+        SystemApiMock::call_http_json_hook
+            .next_call(unimock::matching!(
+                "http://localhost:8080/map_channel",
+                _,
+                _
+            ))
+            .answers(|(_, _, input)| {
+                // The query does not select `items` in the channel,
+                // so that query output ("items") should be empty, even if the datastore contains
+                // an article for "teh_user":
+                assert_eq!(
+                    input.as_slice(),
+                    br#"{"link":"http://blogs.com/teh_user/feed","username":"teh_user","items":[]}"#
+                );
+
+                // Inject "title"
+                Ok(br#"{
+                    "title": "http",
+                    "link": "",
+                    "username": "",
+                    "items": []
+                }"#
+                .to_vec())
+            }),
+    ))
+    .await;
+
+    // create the article
+    test.create_db_article_for_teh_user().await;
 
     expect_eq!(
         actual = format!(
             "{{
-                feed(input: {{ username: \"u\" }}) {{
+                feed(input: {{ username: \"teh_user\" }}) {{
                     title
                 }}
             }}"
@@ -788,7 +818,56 @@ async fn test_graphql_conduit_feed_public() {
         .await,
         expected = Ok(graphql_value!({
             "feed": {
-                "title": "whatever"
+                "title": "http"
+            }
+        })),
+    );
+}
+
+#[test(tokio::test)]
+async fn test_graphql_conduit_feed_public_with_items_query() {
+    let test = ConduitBundle::new((
+        mock_current_time_monotonic(),
+        SystemApiMock::call_http_json_hook
+            .next_call(unimock::matching!(
+                "http://localhost:8080/map_channel",
+                _,
+                _
+            ))
+            .answers(|(_, _, input)| {
+                assert_eq!(
+                    input.as_slice(),
+                    br#"{"link":"http://blogs.com/teh_user/feed","username":"teh_user","items":[]}"#
+                );
+
+                // Inject "title"
+                Ok(br#"{
+                    "title": "http",
+                    "link": "",
+                    "username": "",
+                    "items": []
+                }"#
+                .to_vec())
+            }),
+    ))
+    .await;
+
+    test.create_db_article_for_teh_user().await;
+
+    expect_eq!(
+        actual = format!(
+            "{{
+                feed(input: {{ username: \"teh_user\" }}) {{
+                    title
+                    items {{ title }}
+                }}
+            }}"
+        )
+        .exec([], &test.feed_schema, &test.ctx())
+        .await,
+        expected = Ok(graphql_value!({
+            "feed": {
+                "title": "http"
             }
         })),
     );

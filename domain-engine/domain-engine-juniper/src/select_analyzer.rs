@@ -16,7 +16,7 @@ use ontol_runtime::{
     var::Var,
     DefId, MapKey, RelationshipId,
 };
-use tracing::trace;
+use tracing::{debug, trace};
 
 use crate::{
     context::SchemaCtx, cursor_util::GraphQLCursor, gql_scalar::GqlScalar,
@@ -75,6 +75,8 @@ impl<'a> SelectAnalyzer<'a> {
                     )?
                     .val;
 
+                debug!("field map queries: {map_queries:?}");
+
                 let mut output_selects: FnvHashMap<Var, EntitySelect> = Default::default();
 
                 self.analyze_map(
@@ -110,6 +112,8 @@ impl<'a> SelectAnalyzer<'a> {
             return Ok(());
         }
 
+        debug!("analyze_map {parent_property:}: {field_data:?}");
+
         match input_queries.get(&parent_property) {
             Some(var) => {
                 let selection = self.analyze_selection(look_ahead, field_data)?;
@@ -126,24 +130,49 @@ impl<'a> SelectAnalyzer<'a> {
                     kind: TypeKind::Object(object_data),
                     ..
                 }) => {
-                    for field in object_data.fields.values() {
-                        if let FieldKind::Property(property_data) = &field.kind {
-                            self.analyze_map(
-                                look_ahead,
-                                field_data,
-                                property_data.property_id,
-                                input_queries,
-                                output_selects,
-                                recursion_guard,
-                            )?;
+                    if true {
+                        for child_look_ahead in look_ahead.children() {
+                            let field_name = child_look_ahead.field_original_name();
+
+                            if let Some(field_data) = object_data.fields.get(field_name) {
+                                if let FieldKind::Property(property_data) = &field_data.kind {
+                                    self.analyze_map(
+                                        child_look_ahead,
+                                        field_data,
+                                        property_data.property_id,
+                                        input_queries,
+                                        output_selects,
+                                        recursion_guard,
+                                    )?;
+                                }
+                            }
+                        }
+                    } else {
+                        for field in object_data.fields.values() {
+                            if let FieldKind::Property(property_data) = &field.kind {
+                                self.analyze_map(
+                                    look_ahead,
+                                    field_data,
+                                    property_data.property_id,
+                                    input_queries,
+                                    output_selects,
+                                    recursion_guard,
+                                )?;
+                            }
                         }
                     }
 
                     Ok(())
                 }
-                _ => {
-                    panic!();
-                }
+                Ok(TypeData {
+                    kind: TypeKind::Union(_),
+                    ..
+                }) => todo!("union"),
+                Ok(TypeData {
+                    kind: TypeKind::CustomScalar(_),
+                    ..
+                }) => Ok(()),
+                Err(_native_scalar) => Ok(()),
             },
         }
     }
@@ -435,7 +464,7 @@ impl<'a> SelectAnalyzer<'a> {
                         limit,
                         after_cursor,
                         include_total_len,
-                    }))
+                    }));
                 }
                 Select::StructUnion(def_id, variants) => {
                     return Ok(Select::Entity(EntitySelect {

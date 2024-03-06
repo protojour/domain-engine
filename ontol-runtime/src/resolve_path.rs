@@ -235,14 +235,14 @@ impl<'on, 'a> Probe<'on, 'a> {
             return false;
         }
 
-        if self.options.must_be_entity {
-            let type_info = self.ontology.get_type_info(def_id);
-            if !matches!(&type_info.kind, TypeKind::Entity(_)) {
-                return false;
-            }
-        }
-
         if def_id.package_id() == self.target_package {
+            if self.options.must_be_entity {
+                let type_info = self.ontology.get_type_info(def_id);
+                if !matches!(&type_info.kind, TypeKind::Entity(_)) {
+                    return false;
+                }
+            }
+
             return true;
         }
 

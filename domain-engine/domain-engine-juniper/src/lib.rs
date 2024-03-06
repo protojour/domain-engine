@@ -121,6 +121,8 @@ async fn query(
             input,
             mut selects,
         } => {
+            debug!("exec_map with selects: {selects:?}");
+
             let output = service_ctx
                 .domain_engine
                 .exec_map(map_key, input, &mut selects, service_ctx.session.clone())

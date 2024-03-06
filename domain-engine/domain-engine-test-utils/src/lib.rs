@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use domain_engine_core::{DomainEngine, Session};
+use domain_engine_core::{DomainEngine, MaybeSelect, Session};
 use ontol_runtime::{
     condition::Condition,
     interface::serde::processor::ProcessorMode,
@@ -115,12 +115,12 @@ impl Default for TestFindQuery {
 }
 
 impl domain_engine_core::FindEntitySelect for TestFindQuery {
-    fn find_select(&mut self, _match_var: Var, condition: &Condition) -> EntitySelect {
+    fn find_select(&mut self, _match_var: Var, condition: &Condition) -> MaybeSelect {
         let def_id = condition
             .root_def_id()
             .expect("Unable to detect an entity being queried");
 
-        EntitySelect {
+        MaybeSelect::Select(EntitySelect {
             source: StructOrUnionSelect::Struct(StructSelect {
                 def_id,
                 properties: Default::default(),
@@ -129,7 +129,7 @@ impl domain_engine_core::FindEntitySelect for TestFindQuery {
             limit: self.limit,
             after_cursor: None,
             include_total_len: self.include_total_len,
-        }
+        })
     }
 }
 
