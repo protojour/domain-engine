@@ -114,7 +114,7 @@ fn domain_router(
 ) -> anyhow::Result<axum::Router> {
     let mut router: axum::Router = axum::Router::new();
 
-    match domain_engine_juniper::create_graphql_schema(package_id, engine.ontology_owned()) {
+    match domain_engine_juniper::create_graphql_schema(engine.ontology_owned(), package_id) {
         Err(CreateSchemaError::GraphqlInterfaceNotFound) => {
             // Don't create the graphql endpoints
         }

@@ -55,7 +55,7 @@ fn test_graphql_i64_custom_scalar() {
     "
     .compile_then(|test| {
         let (schema, test) = schema_test(&test, SrcName::default());
-        let ontology = &test.test.ontology;
+        let ontology = test.test.ontology();
         let foo_type = test.type_data("foo", QueryLevel::Node);
         let foo_object = foo_type.object_data();
 
@@ -112,7 +112,7 @@ fn test_graphql_scalar_array() {
         let native = prop_field.field_type.unit.native_scalar();
         assert_matches!(native.kind, NativeScalarKind::String);
 
-        let operator = &test.test.ontology[native.operator_addr];
+        let operator = &test.test.ontology()[native.operator_addr];
         if !matches!(operator, SerdeOperator::RelationSequence(_)) {
             panic!("{:?} was not RelationSequence", NoFmt(operator));
         }
@@ -135,7 +135,7 @@ fn test_graphql_serde_renaming() {
             .object_data()
             .node_data();
 
-        let fields: Vec<_> = test.ontology[foo_node.operator_addr]
+        let fields: Vec<_> = test.ontology()[foo_node.operator_addr]
             .struct_op()
             .properties
             .keys()
@@ -178,7 +178,7 @@ fn test_query_map_empty_input_becomes_hidden_arg() {
 fn test_graphql_artist_and_instrument() {
     let test = ARTIST_AND_INSTRUMENT.1.compile();
     let (schema, test) = schema_test(&test, SrcName::default());
-    let ontology = &test.test.ontology;
+    let ontology = test.test.ontology();
     let query_object = test.query_object_data();
 
     let artists_field = query_object.fields.get("artists").unwrap();
@@ -204,7 +204,7 @@ fn test_graphql_artist_and_instrument() {
     expect_eq!(
         actual = artist
             .input_typename
-            .map(|constant| &test.test.ontology[constant]),
+            .map(|constant| &test.test.ontology()[constant]),
         expected = Some("artistInput")
     );
 }
@@ -304,7 +304,7 @@ fn incompatible_edge_types_are_distinct() {
     "
     .compile_then(|test| {
         let (schema, test) = schema_test(&test, SrcName::default());
-        let ontology = &test.test.ontology;
+        let ontology = test.test.ontology();
 
         let query = schema.type_data(schema.query).object_data();
 

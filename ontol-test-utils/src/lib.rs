@@ -75,13 +75,29 @@ macro_rules! assert_json_io_matches {
 
 #[derive(Clone)]
 pub struct OntolTest {
-    pub ontology: Arc<Ontology>,
-    pub root_package: PackageId,
-    pub compile_json_schema: bool,
-    pub packages_by_source_name: HashMap<String, PackageId>,
+    ontology: Arc<Ontology>,
+    root_package: PackageId,
+    compile_json_schema: bool,
+    packages_by_source_name: HashMap<String, PackageId>,
 }
 
 impl OntolTest {
+    pub fn ontology(&self) -> &Ontology {
+        &self.ontology
+    }
+
+    pub fn ontology_owned(&self) -> Arc<Ontology> {
+        self.ontology.clone()
+    }
+
+    pub fn root_package(&self) -> PackageId {
+        self.root_package
+    }
+
+    pub fn set_compile_json_schema(&mut self, enabled: bool) {
+        self.compile_json_schema = enabled;
+    }
+
     pub fn parse_test_ident<'s>(&self, ident: &'s str) -> (PackageId, &'s str) {
         if ident.contains('.') {
             let vector: Vec<&str> = ident.split('.').collect();
@@ -153,20 +169,6 @@ pub trait TestCompile: Sized {
     /// Compile, expect failure with error closure
     #[track_caller]
     fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>));
-}
-
-impl TestCompile for &'static str {
-    fn compile(self) -> OntolTest {
-        TestPackages::with_static_sources([(SrcName::default(), self)]).compile()
-    }
-
-    fn compile_fail(self) -> Vec<AnnotatedCompileError> {
-        TestPackages::with_static_sources([(SrcName::default(), self)]).compile_fail()
-    }
-
-    fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>)) {
-        TestPackages::with_static_sources([(SrcName::default(), self)]).compile_fail_then(validator)
-    }
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
@@ -368,6 +370,34 @@ impl TestCompile for TestPackages {
                 validator(annotated_errors);
             }
         }
+    }
+}
+
+impl TestCompile for &'static str {
+    fn compile(self) -> OntolTest {
+        TestPackages::with_static_sources([(SrcName::default(), self)]).compile()
+    }
+
+    fn compile_fail(self) -> Vec<AnnotatedCompileError> {
+        TestPackages::with_static_sources([(SrcName::default(), self)]).compile_fail()
+    }
+
+    fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>)) {
+        TestPackages::with_static_sources([(SrcName::default(), self)]).compile_fail_then(validator)
+    }
+}
+
+impl TestCompile for String {
+    fn compile(self) -> OntolTest {
+        TestPackages::with_sources([(SrcName::default(), self.into())]).compile()
+    }
+
+    fn compile_fail(self) -> Vec<AnnotatedCompileError> {
+        TestPackages::with_sources([(SrcName::default(), self.into())]).compile_fail()
+    }
+
+    fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>)) {
+        TestPackages::with_sources([(SrcName::default(), self.into())]).compile_fail_then(validator)
     }
 }
 

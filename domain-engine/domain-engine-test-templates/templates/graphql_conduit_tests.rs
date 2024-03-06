@@ -42,7 +42,7 @@ async fn make_domain_engine(
 async fn test_graphql_conduit_db() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology.clone(), mock_current_time_monotonic())
+    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic())
         .await
         .into();
 
@@ -107,7 +107,7 @@ async fn test_graphql_conduit_db() {
 async fn test_graphql_conduit_db_create_with_foreign_reference() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology.clone(), mock_current_time_monotonic())
+    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic())
         .await
         .into();
 
@@ -175,7 +175,7 @@ async fn test_graphql_conduit_db_create_with_foreign_reference() {
 async fn test_graphql_conduit_db_query_article_with_tags() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology.clone(), mock_current_time_monotonic())
+    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic())
         .await
         .into();
 
@@ -253,7 +253,7 @@ impl ConduitBundle {
             test_packages.compile_schemas([BLOG_POST_PUBLIC.0, FEED_PUBLIC.0, CONDUIT_DB.0]);
 
         Self {
-            domain_engine: Arc::new(make_domain_engine(test.ontology.clone(), mock_clauses).await),
+            domain_engine: Arc::new(make_domain_engine(test.ontology_owned(), mock_clauses).await),
             db_schema,
             blog_schema,
             feed_schema,
@@ -494,7 +494,7 @@ async fn test_graphql_blog_post_conduit_no_join_real() {
 async fn test_graphql_conduit_db_article_shallow_update() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology.clone(), mock_current_time_monotonic())
+    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic())
         .await
         .into();
 
@@ -605,7 +605,7 @@ async fn test_graphql_conduit_db_article_shallow_update() {
 async fn test_graphql_conduit_db_user_deletion() {
     let test_packages = conduit_db_only();
     let (test, [schema]) = test_packages.compile_schemas([CONDUIT_DB.0]);
-    let ctx: ServiceCtx = make_domain_engine(test.ontology.clone(), mock_current_time_monotonic())
+    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned(), mock_current_time_monotonic())
         .await
         .into();
 

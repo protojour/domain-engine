@@ -83,7 +83,7 @@ fn dependency_dag() {
     ])
     .compile_then(|test| {
         // four user domains, plus `ontol`:
-        expect_eq!(actual = test.ontology.domains().count(), expected = 5);
+        expect_eq!(actual = test.ontology().domains().count(), expected = 5);
 
         let [foobar] = test.bind(["foobar"]);
         assert_json_io_matches!(serde_create(&foobar), {

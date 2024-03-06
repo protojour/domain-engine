@@ -817,7 +817,7 @@ fn test_serde_recursion_limit() {
 
         let [foo] = test.bind(["foo"]);
         let error = test
-            .ontology
+            .ontology()
             .new_serde_processor(foo.serde_operator_addr(), ProcessorMode::Create)
             .with_level(ProcessorLevel::new_root_with_recursion_limit(
                 RECURSION_LIMIT,

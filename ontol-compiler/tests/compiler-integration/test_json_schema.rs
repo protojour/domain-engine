@@ -71,9 +71,9 @@ fn json_schema_from_simple_entity() {
 fn test_artist_and_instrument_json_schema() {
     ARTIST_AND_INSTRUMENT.1.compile_then(|test| {
         serde_json::to_string(&build_openapi_schemas(
-            &test.ontology,
-            test.root_package,
-            test.ontology.find_domain(test.root_package).unwrap(),
+            &test.ontology(),
+            test.root_package(),
+            test.ontology().find_domain(test.root_package()).unwrap(),
         ))
         .unwrap();
     });

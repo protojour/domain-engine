@@ -55,12 +55,12 @@ fn compile_schemas_inner<const N: usize>(
     source_names: [SrcName; N],
 ) -> (OntolTest, [Schema; N]) {
     // Don't want JSON schema noise in GraphQL tests:
-    ontol_test.compile_json_schema = false;
+    ontol_test.set_compile_json_schema(false);
 
     let schemas: [Schema; N] = source_names.map(|source_name| {
         create_graphql_schema(
+            ontol_test.ontology_owned(),
             ontol_test.get_package_id(source_name.0),
-            ontol_test.ontology.clone(),
         )
         .unwrap()
     });
@@ -113,7 +113,7 @@ pub fn gql_ctx_mock_data_store(
     setup: impl unimock::Clause,
 ) -> ServiceCtx {
     let unimock = Unimock::new(setup);
-    let domain_engine = DomainEngine::builder(ontol_test.ontology.clone())
+    let domain_engine = DomainEngine::builder(ontol_test.ontology_owned())
         .data_store(DataStore::new(
             ontol_test.get_package_id(data_store_package.0),
             Box::new(unimock.clone()),

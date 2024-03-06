@@ -61,9 +61,11 @@ pub enum CreateSchemaError {
     GraphqlInterfaceNotFound,
 }
 
+pub trait CreateGraphqlSchema {}
+
 pub fn create_graphql_schema(
-    package_id: PackageId,
     ontology: Arc<Ontology>,
+    package_id: PackageId,
 ) -> Result<Schema, CreateSchemaError> {
     let ontol_interface_schema = ontology
         .domain_interfaces(package_id)
