@@ -1,4 +1,4 @@
-# map
+# `map`
 
 A `map` statement describes how one struct [`def`](def.md) maps to another (and vice versa). The `map` statement has two arms, each containing a `def` identifer.
 
@@ -15,11 +15,11 @@ map(
     def_b(       // second map arm, name of a struct def
         'Foo': f,  // name of a property in `def_b` and a variable name
         'Bar': b,  // name of a property in `def_b` and a variable name
-    ).
+    )
 )
 ```
 
-# match map
+# `match`
 
 If one map arm is followed by the `match` keyword, the semantics change. `def_a` can be mapped to `def_b`, but not vice versa, and `def_b` does not need to have all properties accounted for.
 
@@ -28,8 +28,23 @@ map(
     def_a(
         // ...
     ),
-    def_b match(
+    def_b match (
         // ...
+    )
+)
+```
+
+# Named `map`
+
+Named maps express one-way mappings used in APIs.
+
+```ontol
+map query (
+    (
+        'name': n
+    ),
+    def_a match (
+        'name': n
     )
 )
 ```

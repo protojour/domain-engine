@@ -111,16 +111,62 @@ pub struct FmtFinalState(pub bool);
 
 #[derive(Clone, Debug, AsRefStr, DocumentedFields)]
 pub enum BuiltinRelationKind {
+    /// Relates one type to another.
+    /// The subject type takes on all properties of the object type,
+    /// or binds the subject type to a [union](def.md#unions) if the `is` relation is conditional.
+    /// ```ontol
+    /// rel .is: text
+    /// ```
     Is,
+    /// Binds an identifier to a type, making instances of the object unique entities.
+    /// ```ontol
+    /// rel .identifies: some_type
+    /// ```
     Identifies,
+    /// Binds an identifier to a type, making instances of a type unique entities.
+    /// Shorthand reverse relation of `identifies`.
+    /// ```ontol
+    /// rel .'id'|id: some_id
+    /// ```
     Id,
+    /// ...
     Indexed,
+    /// Minimum value for the subject type, which may be any `number`.
+    /// ```ontol
+    /// rel .is: number
+    /// rel .min: 1
+    /// ```
     Min,
+    /// Maximum value for the subject type, which may be any `number`.
+    /// ```ontol
+    /// rel .is: number
+    /// rel .max: 100
+    /// ```
     Max,
+    /// Assigns a default value to a type or property if none is given.
+    /// Uses the operator `:=` to indicate assignment.
+    /// Often used inline in a property relationship.
+    /// ```ontol
+    /// rel .'active'[rel .default := true]: boolean
+    /// ```
     Default,
+    /// Generates a value using a [generator type](generator_types.md) if no value is given.
+    /// Often used inline in a property relationship.
+    /// ```ontol
+    /// rel .'id'[rel .gen: auto]|id: (rel .is: uuid)
+    /// ```
     Gen,
+    /// _Deprecated_
     Route,
+    /// _Deprecated_
     Doc,
+    /// Gives an example value for a type, for documentation purposes.
+    /// ```ontol
+    /// rel .is: text
+    /// rel .example: 'Alice'
+    /// rel .example: 'Bob'
+    /// rel .example: 'Carlos'
+    /// ```
     Example,
 }
 

@@ -123,7 +123,7 @@ pub fn get_ontol_docs(ident: &str) -> Option<HoverDoc> {
         )),
         "uuid" => Some(HoverDoc::from(
             "ontol.uuid",
-            "#### Primitive\nUUID v4 string."
+            "#### Primitive\nUUID v7 string."
         )),
         "regex" => Some(HoverDoc::from(
             "ontol.regex",

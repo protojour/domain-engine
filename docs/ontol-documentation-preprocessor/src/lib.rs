@@ -50,7 +50,7 @@ fn get_ontol_docs_md(ontology: &Ontology, predicate: &dyn Fn(&TypeInfo) -> bool)
     let mut docs_string = String::from("");
 
     for (type_name, doc_string) in docs {
-        docs_string.push_str(&format!("## {type_name}\n\n"));
+        docs_string.push_str(&format!("## `{type_name}`\n\n"));
         docs_string.push_str(&format!("{doc_string}\n"));
     }
     docs_string
@@ -65,11 +65,11 @@ impl Preprocessor for OntolDocumentationPreprocessor {
         let ontology = compile();
         book.for_each_mut(|book_item| match book_item {
             mdbook::BookItem::Chapter(c) => {
-                if c.content.contains("{{#ontol-data-types}}") {
+                if c.content.contains("{{#ontol-primitives}}") {
                     let ontol_docs = get_ontol_docs_md(&ontology, &|t| {
                         matches!(t.kind, TypeKind::Data(_) | TypeKind::Entity(_))
                     });
-                    let new_string = c.content.replace("{{#ontol-data-types}}", &ontol_docs);
+                    let new_string = c.content.replace("{{#ontol-primitives}}", &ontol_docs);
                     c.content = new_string;
                 }
                 if c.content.contains("{{#ontol-relationship-types}}") {
@@ -85,12 +85,6 @@ impl Preprocessor for OntolDocumentationPreprocessor {
                     let ontol_docs =
                         get_ontol_docs_md(&ontology, &|t| matches!(t.kind, TypeKind::Function(_)));
                     let new_string = c.content.replace("{{#ontol-function-types}}", &ontol_docs);
-                    c.content = new_string;
-                }
-                if c.content.contains("{{#ontol-domain-types}}") {
-                    let ontol_docs =
-                        get_ontol_docs_md(&ontology, &|t| matches!(t.kind, TypeKind::Domain(_)));
-                    let new_string = c.content.replace("{{#ontol-domain-types}}", &ontol_docs);
                     c.content = new_string;
                 }
                 if c.content.contains("{{#ontol-generator-types}}") {
