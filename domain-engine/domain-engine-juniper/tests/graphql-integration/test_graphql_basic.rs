@@ -129,7 +129,7 @@ async fn test_graphql_int_scalars() {
 
     map foos(
         (),
-        foo: {..foo match()},
+        foo: {..@match foo()},
     )
     "
     .compile_single_schema_with_datastore();
@@ -291,7 +291,7 @@ async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
     )
     map foos(
         (),
-        foo: {..foo match()}
+        foo: {..@match foo()}
     )
     "
     .compile_single_schema_with_datastore();
@@ -328,7 +328,7 @@ async fn test_graphql_basic_pagination() {
     )
     map foos(
         (),
-        foo: { ..foo match() },
+        foo: { ..@match foo() },
     )
     "
     .compile_single_schema_with_datastore();
@@ -463,7 +463,7 @@ async fn test_graphql_nodes() {
     )
     map foos(
         (),
-        foo: { ..foo match() }
+        foo: { ..@match foo() }
     )
     "
     .compile_single_schema_with_datastore();
@@ -538,7 +538,7 @@ async fn test_inner_struct() {
     )
     map foos(
         (),
-        foo: { ..foo match() },
+        foo: { ..@match foo() },
     )
     "
     .compile_single_schema_with_datastore();
@@ -1407,7 +1407,7 @@ fn test_graphql_municipalities_geojson_union() {
 #[test(tokio::test)]
 async fn test_graphql_open_data() {
     let (test, schema) = "
-    def(open) foo (
+    def @open foo (
         rel .'id'[rel .gen: auto]|id: (rel .is: text)
     )
     "
@@ -1456,7 +1456,7 @@ async fn test_graphql_open_data() {
 #[test(tokio::test)]
 async fn test_open_data_disabled() {
     let (test, schema) = "
-    def(open) foo (
+    def @open foo (
         rel .'id'[rel .gen: auto]|id: (rel .is: text)
     )
     "

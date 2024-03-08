@@ -12,27 +12,64 @@ use crate::{
 pub enum PrimitiveKind {
     /// The unit data type which contains no information
     Unit,
-    /// The set of false and true
+    /// The set of `false` and `true`.
+    /// ```ontol
+    /// rel .'active': boolean
+    /// ```
     Boolean,
-    /// The false value
+    /// The false value.
+    /// ```ontol
+    /// rel .'documentation_done': false
+    /// ```
     False,
-    /// The true value
+    /// The true value.
+    /// ```ontol
+    /// rel .'truism': true
+    /// ```
     True,
-    /// All numbers (realistically all rational numbers, as all computer numbers are rational)
+    /// The set of all numbers (realistically all rational numbers, as all computer numbers are rational).
+    /// `number` is an abstract type.
+    /// ```ontol
+    /// rel .is: number
+    /// ```
     Number,
-    /// All the integers
+    /// The set of all the integers.
+    /// `integer` is an abstract type.
+    /// ```ontol
+    /// rel .is: integer
+    /// ```
     Integer,
-    /// 64-bit signed integers
+    /// 64-bit signed integers.
+    /// ```ontol
+    /// rel .is: i64
+    /// ```
     I64,
-    /// All the floats
+    /// The set of all the floating-point numbers.
+    /// `float` is an abstract type.
+    /// ```ontol
+    /// rel .is: float
+    /// ```
     Float,
-    /// 32-bit floating point
+    /// 32-bit floating point.
+    /// ```ontol
+    /// rel .is: f32
+    /// ```
     F32,
-    /// 64-bit floating point
+    /// 64-bit floating point.
+    /// ```ontol
+    /// rel .is: f64
+    /// ```
     F64,
     /// Unsigned 64-bit integer that can be used as a numeric identifier in data stores.
+    /// While `serial` is an integer, it cannot be used in arithmetic.
+    /// ```ontol
+    /// rel .'id'|id: (rel .is: serial)
+    /// ```
     Serial,
-    /// Set of all possible texts
+    /// The set of all possible texts.
+    /// ```ontol
+    /// rel .is: text
+    /// ```
     Text,
     /// Open relationship to domainless data
     OpenDataRelationship,

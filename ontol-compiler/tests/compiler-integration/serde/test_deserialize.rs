@@ -383,7 +383,7 @@ fn union_tree() {
 #[test]
 fn test_deserialize_open_data() {
     "
-    def(open) foo (
+    def @open foo (
         rel .'closed': i64
     )
     "

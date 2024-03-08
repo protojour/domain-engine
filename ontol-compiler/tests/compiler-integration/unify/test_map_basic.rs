@@ -522,7 +522,7 @@ fn test_sequence_flat_map1() {
     )
 
     map(
-        foo match(
+        @match foo(
             'a': a,
             'inner': {..foo_inner(
                 'b': b
@@ -558,7 +558,7 @@ fn test_sequence_composer_no_iteration() {
     )
 
     map(
-        foo match(
+        @match foo(
             'a': a,
             'b': b,
         ),
@@ -592,7 +592,7 @@ fn test_sequence_composer_with_iteration() {
     )
 
     map(
-        foo match(
+        @match foo(
             'a': a,
             'b': {..b},
             'c': c,
@@ -636,7 +636,7 @@ fn test_map_complex_flow() {
     )
 
     map(
-        one match(
+        @match one(
             'a': x,
             'b': y,
         ),
@@ -826,7 +826,7 @@ fn test_seq_scope_escape1() {
     )
 
     map(
-        bar match(
+        @match bar(
             'foo': foo(),
             'p1': {..p1},
         ),
@@ -869,7 +869,7 @@ fn test_seq_scope_escape2() {
     )
 
     map(
-        bar match(
+        @match bar(
             'foo': foo(
                 'p0': {..p0},
             ),
@@ -897,8 +897,8 @@ fn test_seq_scope_escape2() {
 #[test]
 fn test_map_open_data_on_root_struct() {
     "
-    def(open) foo (rel .'p0': {text})
-    def(open) bar (rel .'p1': {text})
+    def @open foo (rel .'p0': {text})
+    def @open bar (rel .'p1': {text})
 
     map(
         foo('p0': {..x}),
@@ -925,7 +925,7 @@ fn test_map_spread_concat() {
     def bar (rel .'p2': {text})
 
     map(
-        foo match(
+        @match foo(
             'p0': { ..p0 },
             'p1': { ..p1 }
         ),

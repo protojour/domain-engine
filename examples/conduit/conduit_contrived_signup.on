@@ -8,7 +8,7 @@ def signup (
 )
 
 map(
-    signup match(
+    @match signup(
         'username': username,
         'email': email,
         'password': password,
@@ -19,7 +19,7 @@ map(
         'email': email,
         'password_hash': password,
         'following': {
-            ..db.User match(
+            ..@match db.User(
                 'username': follow_username
             )
         }

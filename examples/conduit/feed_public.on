@@ -6,7 +6,7 @@ def channel (
     rel .is: channel_base
 )
 
-def(private) channel_base (
+def @private channel_base (
     rel .'link': text
     rel .'username': text
     rel .'items': {item}
@@ -19,7 +19,7 @@ def item (
 )
 
 map(
-    db.Article match(
+    @match db.Article(
         // BUG: Don't want this to be optional.
         // it's clearly a mapping from top to bottom, and then it will come from the data store
         'article_id'?: id,
@@ -32,7 +32,7 @@ map(
 )
 
 /// The channel
-def(extern) channel_hook (
+def @extern channel_hook (
     rel .'url': 'http://localhost:8080/map_channel'
     map(channel_base(), channel())
 )
@@ -45,7 +45,7 @@ map feed(
         'username': username,
         'link': /http:\/\/blogs\.com\/(?<username>\w+)\/feed/,
         'items': {
-            ..db.Article match (
+            ..@match db.Article(
                 'author': db.User (
                     'username': username,
                 )

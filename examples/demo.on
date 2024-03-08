@@ -2,7 +2,7 @@
 // database
 
 /// Item type enum
-def(private) ItemType (
+def @private ItemType (
     /// worthless junk
     rel .is?: 'worthless junk'
     /// ancient treasure
@@ -10,7 +10,7 @@ def(private) ItemType (
     /// alien artifact
     rel .is?: 'alien artifact'
 )
-def(private) archive_item (
+def @private archive_item (
     rel .'id'|id: (fmt '' => 'archive_item/' => uuid => .)
     rel .'created': datetime
     rel .'updated': datetime
@@ -20,7 +20,7 @@ def(private) archive_item (
     rel .'asset_score': i64
     rel .'type': ItemType
 )
-def(private) archive_group (
+def @private archive_group (
     rel .'id'|id: (fmt '' => 'archive_group/' => uuid => .)
     rel .'created': datetime
     rel .'updated': datetime

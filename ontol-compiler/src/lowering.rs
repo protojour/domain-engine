@@ -3,10 +3,9 @@ use std::{
     ops::Range,
 };
 
-use chumsky::chain::Chain;
 use either::Either;
 use indexmap::map::Entry;
-use ontol_parser::{ast, Span};
+use ontol_parser::{ast, Span, Spanned};
 use ontol_runtime::{
     ontology::{PropertyCardinality, ValueCardinality},
     smart_format,
@@ -692,15 +691,23 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 ast @ (ast::AnyPattern::Expr(_) | ast::AnyPattern::Struct(_)) => {
                     self.lower_map_root_binding_pattern(path, ast, span, var_table)?
                 }
-                ast::AnyPattern::Set(ast_elements) => {
-                    self.lower_set_pattern(Some(path), ast_elements, pat_span, var_table)?
+                ast::AnyPattern::Set((set_pattern, _span)) => {
+                    if let Some((_modifier, span)) = set_pattern.modifier {
+                        Err((
+                            CompileError::TODO(smart_format!(
+                                "top-level set-algebraic operators not supported"
+                            )),
+                            span,
+                        ))
+                    } else {
+                        self.lower_set_pattern(
+                            Some(path),
+                            set_pattern.elements,
+                            pat_span,
+                            var_table,
+                        )
+                    }?
                 }
-                ast::AnyPattern::SetAlgebra(_) => Err((
-                    CompileError::TODO(smart_format!(
-                        "top-level set-algebraic operators not supported"
-                    )),
-                    pat_span,
-                ))?,
             },
             ast::MapArm::Struct(ast) => {
                 self.lower_struct_pattern((ast, span.clone()), var_table)?
@@ -725,7 +732,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         let pattern = match ast {
             ast::AnyPattern::Expr(ast) => self.lower_expr_pattern(ast, var_table)?,
             ast::AnyPattern::Struct(ast) => self.lower_struct_pattern(ast, var_table)?,
-            ast::AnyPattern::Set(_) | ast::AnyPattern::SetAlgebra(_) => unreachable!(),
+            ast::AnyPattern::Set(_) => unreachable!(),
         };
 
         Ok(self.mk_pattern(
@@ -805,13 +812,16 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ast::AnyPattern::Struct((ast, span)) => {
                 self.lower_struct_pattern((ast, span), var_table)
             }
-            ast::AnyPattern::Set(ast_elements) => {
-                self.lower_set_pattern(None, ast_elements, span, var_table)
+            ast::AnyPattern::Set((ast, span)) => {
+                if let Some((_modifier, span)) = ast.modifier {
+                    Err((
+                        CompileError::TODO(smart_format!("set algebra not supported here")),
+                        span.clone(),
+                    ))
+                } else {
+                    self.lower_set_pattern(None, ast.elements, span, var_table)
+                }
             }
-            ast::AnyPattern::SetAlgebra((_ast, span)) => Err((
-                CompileError::TODO(smart_format!("set algebra not supported here")),
-                span.clone(),
-            )),
         }
     }
 
@@ -856,7 +866,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
     fn lower_compound_pattern_attr(
         &mut self,
-        (ast_struct_attr, _span): (ast::StructPatternAttr, Span),
+        (ast_struct_attr, span): (ast::StructPatternAttr, Span),
         var_table: &mut MapVarTable,
     ) -> Res<CompoundPatternAttr> {
         let ast::StructPatternAttr {
@@ -868,49 +878,42 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
         let def = self.resolve_type_reference(relation.0, &relation.1, None)?;
 
-        match object {
-            ast::AnyPattern::SetAlgebra((ast, span)) => {
-                if let Some((_, _rel_span)) = relation_attrs {
-                    return Err((
-                        CompileError::TODO(smart_format!("set algebra not supported here")),
-                        span.clone(),
-                    ));
-                }
-                let kind = self.lower_set_algebra_pattern(ast, span, var_table)?;
-                Ok(CompoundPatternAttr {
-                    key: (def, self.src.span(&relation.1)),
-                    bind_option: option.is_some(),
-                    kind,
-                })
-            }
-            object => {
-                let object_pattern = self.lower_any_pattern((object, object_span), var_table)?;
-                let rel = match relation_attrs {
-                    Some((attrs, span)) => {
-                        // Inherit modifier from object pattern
-                        let modifier = match &object_pattern {
-                            Pattern {
-                                kind: PatternKind::Compound { modifier, .. },
-                                ..
-                            } => *modifier,
-                            _ => None,
-                        };
+        // Inherit modifier from object pattern
+        fn lower_relation_attrs(
+            lowering: &mut Lowering,
+            ast_relation_attrs: Option<Spanned<Vec<Spanned<ast::StructPatternArgument>>>>,
+            object_pattern: &Pattern,
+            var_table: &mut MapVarTable,
+        ) -> Res<Option<Pattern>> {
+            let Some((attrs, span)) = ast_relation_attrs else {
+                return Ok(None);
+            };
+            // Inherit modifier from object pattern
+            let modifier = match &object_pattern {
+                Pattern {
+                    kind: PatternKind::Compound { modifier, .. },
+                    ..
+                } => *modifier,
+                _ => None,
+            };
 
-                        let (attrs, rest_label) =
-                            self.lower_struct_pattern_args(attrs, var_table)?;
-                        Some(self.mk_pattern(
-                            PatternKind::Compound {
-                                type_path: TypePath::RelContextual,
-                                modifier,
-                                is_unit_binding: false,
-                                attributes: attrs,
-                                spread_label: rest_label,
-                            },
-                            &span,
-                        ))
-                    }
-                    None => None,
-                };
+            let (attrs, rest_label) = lowering.lower_struct_pattern_args(attrs, var_table)?;
+            Ok(Some(lowering.mk_pattern(
+                PatternKind::Compound {
+                    type_path: TypePath::RelContextual,
+                    modifier,
+                    is_unit_binding: false,
+                    attributes: attrs,
+                    spread_label: rest_label,
+                },
+                &span,
+            )))
+        }
+
+        match object {
+            object @ (ast::AnyPattern::Expr(_) | ast::AnyPattern::Struct(_)) => {
+                let object_pattern = self.lower_any_pattern((object, object_span), var_table)?;
+                let rel = lower_relation_attrs(self, relation_attrs, &object_pattern, var_table)?;
 
                 Ok(CompoundPatternAttr {
                     key: (def, self.src.span(&relation.1)),
@@ -921,6 +924,40 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     },
                 })
             }
+            ast::AnyPattern::Set((mut ast, set_span)) => match ast.modifier.take() {
+                Some((modifier, _mod_span)) => {
+                    if relation_attrs.is_some() {
+                        return Err((
+                            CompileError::TODO(smart_format!("set algebra not supported here")),
+                            span.clone(),
+                        ));
+                    }
+
+                    let kind = self.lower_set_algebra_pattern(ast, modifier, span, var_table)?;
+                    Ok(CompoundPatternAttr {
+                        key: (def, self.src.span(&relation.1)),
+                        bind_option: option.is_some(),
+                        kind,
+                    })
+                }
+                None => {
+                    let object_pattern = self.lower_any_pattern(
+                        (ast::AnyPattern::Set((ast, set_span)), span.clone()),
+                        var_table,
+                    )?;
+                    let rel =
+                        lower_relation_attrs(self, relation_attrs, &object_pattern, var_table)?;
+
+                    Ok(CompoundPatternAttr {
+                        key: (def, self.src.span(&relation.1)),
+                        bind_option: option.is_some(),
+                        kind: CompoundPatternAttrKind::Value {
+                            rel,
+                            val: object_pattern,
+                        },
+                    })
+                }
+            },
         }
     }
 
@@ -965,20 +1002,21 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
     fn lower_set_algebra_pattern(
         &mut self,
-        alg_pattern: ast::SetAlgebraPattern,
+        set_pattern: ast::SetPattern,
+        modifier: ast::SetPatternModifier,
         span: Span,
         var_table: &mut MapVarTable,
     ) -> Res<CompoundPatternAttrKind> {
-        if alg_pattern.elements.is_empty() {
+        if set_pattern.elements.is_empty() {
             return Err((
                 CompileError::TODO(smart_format!("inner set must have at least one element")),
                 span.clone(),
             ));
         }
 
-        let mut elements = Vec::with_capacity(alg_pattern.len());
+        let mut elements = Vec::with_capacity(set_pattern.elements.len());
 
-        for (ast_element, _span) in alg_pattern.elements {
+        for (ast_element, _span) in set_pattern.elements {
             elements.push(SetElement {
                 iter: ast_element.spread.is_some(),
                 rel: match ast_element.relation_attrs {
@@ -1001,24 +1039,24 @@ impl<'s, 'm> Lowering<'s, 'm> {
             });
         }
 
-        Ok(match alg_pattern.operator.0 {
-            ast::SetAlgebraicOperator::In => CompoundPatternAttrKind::SetOperator {
+        Ok(match modifier {
+            ast::SetPatternModifier::In => CompoundPatternAttrKind::SetOperator {
                 operator: SetBinaryOperator::ElementIn,
                 elements: self.lower_set_pattern_elements(elements),
             },
-            ast::SetAlgebraicOperator::AllIn => CompoundPatternAttrKind::SetOperator {
+            ast::SetPatternModifier::AllIn => CompoundPatternAttrKind::SetOperator {
                 operator: SetBinaryOperator::AllIn,
                 elements: self.lower_set_pattern_elements(elements),
             },
-            ast::SetAlgebraicOperator::ContainsAll => CompoundPatternAttrKind::SetOperator {
+            ast::SetPatternModifier::ContainsAll => CompoundPatternAttrKind::SetOperator {
                 operator: SetBinaryOperator::ContainsAll,
                 elements: self.lower_set_pattern_elements(elements),
             },
-            ast::SetAlgebraicOperator::Intersects => CompoundPatternAttrKind::SetOperator {
+            ast::SetPatternModifier::Intersects => CompoundPatternAttrKind::SetOperator {
                 operator: SetBinaryOperator::Intersects,
                 elements: self.lower_set_pattern_elements(elements),
             },
-            ast::SetAlgebraicOperator::Equals => CompoundPatternAttrKind::SetOperator {
+            ast::SetPatternModifier::Equals => CompoundPatternAttrKind::SetOperator {
                 operator: SetBinaryOperator::SetEquals,
                 elements: self.lower_set_pattern_elements(elements),
             },

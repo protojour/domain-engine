@@ -9,7 +9,22 @@ use crate::{smart_format, value::Value, DefId};
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize, DocumentedFields, AsRefStr)]
 pub enum TextLikeType {
+    /// A UUID value, e.g. `"018e0f80-7bb4-7475-ac1d-7a0ada330122"`.
+    /// The input deserializer accepts any UUID string, but [generated values](generator_types.md) are
+    /// [UUIDv7](https://datatracker.ietf.org/doc/html/draft-ietf-uuidrev-rfc4122bis)
+    /// (time-ordered), making them naturally sortable and ideal as database primary keys.
+    /// ```ontol
+    /// rel .is: uuid
+    /// ```
     Uuid,
+    /// An [RFC3339](https://datatracker.ietf.org/doc/html/rfc3339)-formatted
+    /// datetime string, e.g. `"1970-01-01T00:00:00.000Z"`.
+    /// The input deserializer accepts any RFC3339-conformant value, but [generated values](generator_types.md)
+    /// are in UTC, and the output serializer will format values with the structure
+    /// `"1970-01-01T00:00:00+00:00"`
+    /// ```ontol
+    /// rel .is: datetime
+    /// ```
     DateTime,
 }
 

@@ -30,7 +30,6 @@ pre code.hljs {
 .hljs-bullet,
 .hljs-quote,
 .hljs-number,
-.hljs-regexp,
 .hljs-literal,
 .hljs-link {
   color: #ae81ff;
@@ -74,6 +73,7 @@ pre code.hljs {
 }
 
 .hljs-string,
+.hljs-regexp,
 .hljs-selector-id,
 .hljs-selector-attr,
 .hljs-selector-pseudo,

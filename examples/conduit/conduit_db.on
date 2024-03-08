@@ -50,10 +50,10 @@ rel {Comment} 'author'::'authored_comments'? User
 
 map users(
     (),
-    User: { ..User match() }
+    User: { ..@match User() }
 )
 
 map articles(
     (),
-    Article: { ..Article match() }
+    Article: { ..@match Article() }
 )

@@ -236,7 +236,7 @@ fn test_imperfect_mapping_mutation() {
             )
 
             map(
-                inner.inner match(
+                @match inner.inner(
                     'id': id,
                     'a': x,
                 ),
@@ -298,7 +298,7 @@ fn incompatible_edge_types_are_distinct() {
     map targets (
         (),
         target: {
-            ..target match()
+            ..@match target()
         }
     )
     "

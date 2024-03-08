@@ -52,7 +52,7 @@ fn map_missing_attributes_in_match_is_ok() {
     def foo ( rel .'a'|'b': text )
     def bar ( rel .'c'|'d': text )
     map (
-        foo match( 'a': x ),
+        @match foo( 'a': x ),
         bar( 'c': x ) // ERROR missing property `d`// NOTE Consider using `match {}`
     )
     "
@@ -301,7 +301,7 @@ fn map_error_inference_cardinality_mismatch() {
     )
     map(
         ('a'?: x), // ERROR cardinality mismatch
-        foo match('a': x)
+        @match foo('a': x)
     )
     "
     .compile_fail();

@@ -765,8 +765,8 @@ fn get_struct_pattern_path(s: &StructPattern, cursor: &usize) -> Option<Path> {
 fn get_pattern_path(pattern: &AnyPattern, cursor: &usize) -> Option<Path> {
     match pattern {
         AnyPattern::Struct((s, _)) => get_struct_pattern_path(s, cursor),
-        AnyPattern::Set(seq) => {
-            for (elem, range) in seq {
+        AnyPattern::Set((set, _)) => {
+            for (elem, range) in &set.elements {
                 if in_range(range, cursor) {
                     return get_pattern_path(&elem.pattern.0, cursor);
                 }
@@ -774,6 +774,5 @@ fn get_pattern_path(pattern: &AnyPattern, cursor: &usize) -> Option<Path> {
             None
         }
         AnyPattern::Expr(_) => None,
-        AnyPattern::SetAlgebra(_) => None,
     }
 }

@@ -32,8 +32,12 @@ fn error_invalid_statement() {
 
 #[test]
 fn error_def_parse_error() {
-    "def // ERROR parse error: expected `(`".compile_fail();
-    "def() // ERROR parse error: found `)`, expected modifier".compile_fail();
+    "def // ERROR parse error: expected one of `@private`, `@open`, `@extern`, identifier"
+        .compile_fail();
+    "def() // ERROR parse error: found `(`, expected one of `@private`, `@open`, `@extern`, identifier"
+        .compile_fail();
+    "def @hello world() // ERROR parse error: found `@hello`, expected one of `@private`, `@open`, `@extern`, identifier"
+        .compile_fail();
 }
 
 #[test]
@@ -43,7 +47,7 @@ fn error_incomplete_statement() {
 
 #[test]
 fn error_underscore_not_allowed_at_start_of_identifier() {
-    "def _foo // ERROR parse error: found `_`, expected `(`".compile_fail();
+    "def _foo // ERROR parse error: found `_`, expected one of `@private`, `@open`, `@extern`, identifier".compile_fail();
 }
 
 #[test]
@@ -74,7 +78,7 @@ fn error_lex_recovery_works() {
 fn error_rel_needs_a_triple() {
     "
     def a (
-        rel 'b': i64 // ERROR parse error: found `:`, expected `(` or `..`
+        rel 'b': i64 // ERROR parse error: found `:`, expected one of `(`, `..`, number, symbol
     )
     "
     .compile_fail();
@@ -400,7 +404,7 @@ fn error_fail_import_private_type() {
             )
             ",
         ),
-        (SrcName("dep"), "def(private) foo ()"),
+        (SrcName("dep"), "def @private foo ()"),
     ])
     .compile_fail();
 }

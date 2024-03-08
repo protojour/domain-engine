@@ -31,10 +31,10 @@ map users(
         'member_of'?: { ..member_of }
     ),
     User: {
-        ..User match(
-            'id'?: in { ..id },
+        ..@match User(
+            'id'?: @in { ..id },
             'member_of'?: Organization (
-                'id': in { ..member_of }
+                'id': @in { ..member_of }
             ),
         ),
     }
@@ -43,13 +43,13 @@ map users(
 map organizations(
     (),
     Organization: {
-        ..Organization match(),
+        ..@match Organization(),
     }
 )
 
 map repositories(
     (),
     Repository: {
-        ..Repository match(),
+        ..@match Repository(),
     }
 )
