@@ -19,16 +19,16 @@ map(
 )
 ```
 
-# `match`
+# `@match`
 
-If one map arm is followed by the `match` keyword, the semantics change. `def_a` can be mapped to `def_b`, but not vice versa, and `def_b` does not need to have all properties accounted for.
+If one map arm is preceded by the `@match` modifier, the semantics change. `def_a` can be mapped to `def_b`, but not vice versa, and `def_b` does not need to have all properties accounted for.
 
 ```ontol
 map(
     def_a(
         // ...
     ),
-    def_b match (
+    @match def_b(
         // ...
     )
 )
@@ -43,7 +43,7 @@ map query (
     (
         'name': n
     ),
-    def_a match (
+    @match def_a(
         'name': n
     )
 )
