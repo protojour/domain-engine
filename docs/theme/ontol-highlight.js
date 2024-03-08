@@ -15,6 +15,7 @@ hljs.registerLanguage("ontol", (hljs) => ({
     hljs.QUOTE_STRING_MODE,
     hljs.C_LINE_COMMENT_MODE,
     hljs.C_NUMBER_MODE,
+    hljs.REGEXP_MODE,
     {
       begin: /(\s|\{)/,
       contains: [
