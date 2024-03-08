@@ -291,7 +291,7 @@ fn test_map_match_sequence_filter_in_set() {
     map query(
         ('input': { ..x }),
         bar: {
-            ..foo match('foo': in { ..x })
+            ..foo match('foo': @in { ..x })
         }
     )
     "#
@@ -343,9 +343,9 @@ mod match_contains_all {
         ),
         foo: {
             ..foo match(
-                'tags'?: contains all { ..tags },
+                'tags'?: @contains_all { ..tags },
                 'sub'?: sub(
-                    'tags': contains all { sub_tag }
+                    'tags': @contains_all { sub_tag }
                 )
             )
         }
@@ -424,7 +424,7 @@ fn test_map_match_in_sub_multi_edge() {
         foo: {
             ..foo match(
                 'bars'?: bar match(
-                    'tags': contains all { ..tags }
+                    'tags': @contains_all { ..tags }
                 )
             )
         }

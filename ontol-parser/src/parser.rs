@@ -5,9 +5,9 @@ use either::Either;
 use smartstring::alias::String;
 
 use crate::ast::{
-    AnyPattern, Dot, ExprPattern, FmtStatement, MapArm, Path, SetAlgebraPattern,
-    SetAlgebraicOperator, SetPatternElement, StructPattern, StructPatternArgument,
-    StructPatternAttr, StructPatternModifier, TypeOrPattern, UseStatement,
+    AnyPattern, Dot, ExprPattern, FmtStatement, MapArm, Path, SetPattern, SetPatternElement,
+    SetPatternModifier, StructPattern, StructPatternArgument, StructPatternAttr,
+    StructPatternModifier, TypeOrPattern, UseStatement,
 };
 
 use super::{
@@ -312,7 +312,6 @@ fn any_pattern() -> impl AstParser<AnyPattern> {
         spanned(parenthesized_struct_pattern(this.clone()))
             .map(AnyPattern::Struct)
             .or(set_pattern(this.clone()).map(AnyPattern::Set))
-            .or(set_algebra_pattern(this).map(AnyPattern::SetAlgebra))
             .or(expr_pattern().map(AnyPattern::Expr))
     })
 }
@@ -376,21 +375,43 @@ fn struct_pattern_spread() -> impl AstParser<StructPatternArgument> {
 
 fn set_pattern(
     any_pattern: impl AstParser<AnyPattern> + Clone + 'static,
-) -> impl AstParser<Vec<Spanned<SetPatternElement>>> {
+) -> impl AstParser<Spanned<SetPattern>> {
+    fn set_pattern_modifier() -> impl AstParser<Spanned<SetPatternModifier>> {
+        spanned(
+            modifier::in_()
+                .map(|_| SetPatternModifier::In)
+                .or(modifier::contains_all().map(|_| SetPatternModifier::ContainsAll))
+                .or(modifier::all_in().map(|_| SetPatternModifier::AllIn))
+                .or(modifier::intersects().map(|_| SetPatternModifier::Intersects))
+                .or(modifier::equals().map(|_| SetPatternModifier::Equals)),
+        )
+    }
+
+    fn set_pattern_elements(
+        any_pattern: impl AstParser<AnyPattern> + Clone + 'static,
+    ) -> impl AstParser<Vec<Spanned<SetPatternElement>>> {
+        spanned(
+            spanned(dot_dot())
+                .or_not()
+                .then(spanned(any_pattern))
+                .map(|(spread, pattern)| SetPatternElement {
+                    spread: spread.map(|(_, span)| span),
+                    // TODO: Support parsing relation attributes
+                    relation_attrs: None,
+                    pattern,
+                }),
+        )
+        .separated_by(sigil(','))
+        .allow_trailing()
+        .delimited_by(open('{'), close('}'))
+    }
+
     spanned(
-        spanned(dot_dot())
+        set_pattern_modifier()
             .or_not()
-            .then(spanned(any_pattern))
-            .map(|(spread, pattern)| SetPatternElement {
-                spread: spread.map(|(_, span)| span),
-                // TODO: Support parsing relation attributes
-                relation_attrs: None,
-                pattern,
-            }),
+            .then(set_pattern_elements(any_pattern.clone()))
+            .map(|(modifier, elements)| SetPattern { modifier, elements }),
     )
-    .separated_by(sigil(','))
-    .allow_trailing()
-    .delimited_by(open('{'), close('}'))
 }
 
 fn expr_pattern() -> impl AstParser<Spanned<ExprPattern>> {
@@ -442,31 +463,6 @@ fn expr_pattern() -> impl AstParser<Spanned<ExprPattern>> {
             })
     })
     .labelled("expression pattern")
-}
-
-fn set_algebra_pattern(
-    any_pattern: impl AstParser<AnyPattern> + Clone + 'static,
-) -> impl AstParser<Spanned<SetAlgebraPattern>> {
-    spanned(
-        set_algebraic_operator()
-            .then(set_pattern(any_pattern.clone()))
-            .map(|(operator, elements)| SetAlgebraPattern { operator, elements }),
-    )
-}
-
-fn set_algebraic_operator() -> impl AstParser<Spanned<SetAlgebraicOperator>> {
-    spanned(
-        kw_in()
-            .map(|_| SetAlgebraicOperator::In)
-            .or(kw_contains()
-                .then_ignore(kw_all())
-                .map(|_| SetAlgebraicOperator::ContainsAll))
-            .or(kw_all()
-                .then_ignore(kw_in())
-                .map(|_| SetAlgebraicOperator::AllIn))
-            .or(kw_intersects().map(|_| SetAlgebraicOperator::Intersects))
-            .or(kw_equals().map(|_| SetAlgebraicOperator::Equals)),
-    )
 }
 
 fn spanned_named_type_or_dot() -> impl AstParser<Spanned<Either<Dot, Type>>> {
@@ -575,24 +571,28 @@ fn sym(str: &'static str, label: &'static str) -> impl AstParser<String> {
         })
 }
 
-fn kw_in() -> impl AstParser<()> {
-    sym("in", "`in`").ignored()
-}
+mod modifier {
+    use super::*;
 
-fn kw_contains() -> impl AstParser<()> {
-    sym("contains", "`contains`").ignored()
-}
+    pub fn in_() -> impl AstParser<()> {
+        sym("@in", "`@in`").ignored()
+    }
 
-fn kw_all() -> impl AstParser<()> {
-    sym("all", "`all`").ignored()
-}
+    pub fn contains_all() -> impl AstParser<()> {
+        sym("@contains_all", "`@contains_all`").ignored()
+    }
 
-fn kw_intersects() -> impl AstParser<()> {
-    sym("intersects", "`intersects`").ignored()
-}
+    pub fn all_in() -> impl AstParser<()> {
+        sym("@all_in", "`@all_in`").ignored()
+    }
 
-fn kw_equals() -> impl AstParser<()> {
-    sym("equals", "`equals`").ignored()
+    pub fn intersects() -> impl AstParser<()> {
+        sym("@intersects", "`@intersects`").ignored()
+    }
+
+    pub fn equals() -> impl AstParser<()> {
+        sym("@equals", "`@equals`").ignored()
+    }
 }
 
 fn sym_set(set: &'static [&'static str], label: &'static str) -> impl AstParser<String> {

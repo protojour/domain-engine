@@ -114,8 +114,7 @@ pub enum MapArm {
 pub enum AnyPattern {
     Expr(Spanned<ExprPattern>),
     Struct(Spanned<StructPattern>),
-    Set(Vec<Spanned<SetPatternElement>>),
-    SetAlgebra(Spanned<SetAlgebraPattern>),
+    Set(Spanned<SetPattern>),
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -146,13 +145,13 @@ pub struct StructPatternAttr {
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct SetAlgebraPattern {
-    pub operator: Spanned<SetAlgebraicOperator>,
+pub struct SetPattern {
+    pub modifier: Option<Spanned<SetPatternModifier>>,
     pub elements: Vec<Spanned<SetPatternElement>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub enum SetAlgebraicOperator {
+pub enum SetPatternModifier {
     /// element: IN set
     In,
     /// set: ALL IN set
