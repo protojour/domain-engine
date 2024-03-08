@@ -300,10 +300,6 @@ fn map_statement() -> impl AstParser<MapStatement> {
 fn map_arm() -> impl AstParser<MapArm> {
     let struct_arm = parenthesized_struct_pattern(any_pattern()).map(MapArm::Struct);
     let set_arm = set_pattern(any_pattern()).map(MapArm::Set);
-    // let binding_arm = spanned(path())
-    //     .then_ignore(colon())
-    //     .then(spanned(any_pattern()))
-    //     .map(|(path, pattern)| MapArm::Binding { path, pattern });
 
     struct_arm.or(set_arm)
 }
@@ -348,10 +344,7 @@ fn struct_pattern_param(
         .rewind()
         .map(|_| StructPatternParameter::Attributes(vec![]));
 
-    // expr.or(attributes)
     attributes.or(pattern).or(nothing)
-
-    // attributes.or(expr_pattern().map(StructPatternParameter::Expr))
 }
 
 fn struct_pattern_attribute_kind(
