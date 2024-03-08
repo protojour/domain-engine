@@ -2,6 +2,10 @@
 
 use ariadne::{ColorGenerator, Label, Report, ReportKind, Source};
 use clap::{Args, Parser, Subcommand};
+use notify_debouncer_full::{
+    new_debouncer,
+    notify::{RecursiveMode, Watcher},
+};
 use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
@@ -18,13 +22,17 @@ use ontol_runtime::{
 };
 use std::{
     collections::HashMap,
-    fs::{self, File},
+    fs::{self, read_dir, File},
     path::{Path, PathBuf},
+    time::Duration,
 };
 use thiserror::Error;
 use tower_lsp::{LspService, Server};
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+mod graphql;
+mod service;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -49,6 +57,8 @@ enum Commands {
     Generate(Generate),
     /// Run ontool in language server mode
     Lsp,
+    /// Run ontool in serve mode
+    Serve(Serve),
 }
 
 #[derive(Args)]
@@ -73,8 +83,35 @@ struct Compile {
     #[arg(short('b'), long)]
     backend: Option<String>,
 
+    /// Directory of ontol files to compile
+    #[arg(short('w'), long, default_value = ".")]
+    dir: PathBuf,
+
     /// ONTOL (.on) files to compile
     files: Vec<PathBuf>,
+}
+
+#[derive(Args)]
+#[command(arg_required_else_help(true))]
+struct Serve {
+    /// Output file (default = "ontology")
+    #[arg(short)]
+    output: Option<PathBuf>,
+
+    /// Specify a domain file to be backed by a data store
+    #[arg(short('d'), long)]
+    data_store: Option<PathBuf>,
+
+    /// Specify a data store backend (e.g. "arangodb")
+    #[arg(short('b'), long)]
+    backend: Option<String>,
+
+    /// Directory of ontol files to compile
+    #[arg(short('w'), long, default_value = ".")]
+    dir: PathBuf,
+
+    /// The root files of the ontology
+    root_files: Vec<PathBuf>,
 }
 
 #[derive(Args)]
@@ -86,6 +123,9 @@ struct Generate {
     /// Generate JSON schema in YAML format from public types
     #[arg(short, long)]
     yaml_schema: bool,
+    /// Directory of ontol files to compile
+    #[arg(short('w'), long, default_value = ".")]
+    dir: PathBuf,
     /// ONTOL (.on) files to generate schemas from
     files: Vec<PathBuf>,
 }
@@ -117,7 +157,7 @@ pub async fn run() -> Result<(), OntoolError> {
         Some(Commands::Compile(args)) => {
             init_tracing();
 
-            let compile_output = compile(args.files, args.data_store, args.backend)?;
+            let compile_output = compile(args.dir, args.files, args.data_store, args.backend)?;
 
             let output_path = args.output.unwrap_or_else(|| PathBuf::from("ontology"));
 
@@ -129,13 +169,59 @@ pub async fn run() -> Result<(), OntoolError> {
 
             Ok(())
         }
+        Some(Commands::Serve(args)) => {
+            init_tracing();
+            let (tx, rx) = std::sync::mpsc::channel();
+            let mut debouncer = new_debouncer(Duration::from_secs(1), None, tx).unwrap();
+
+            debouncer
+                .watcher()
+                .watch(&args.dir, RecursiveMode::NonRecursive)
+                .unwrap();
+
+            // initial compilation
+            let compile_output = compile(
+                args.dir.clone(),
+                args.root_files.clone(),
+                args.data_store.clone(),
+                args.backend.clone(),
+            );
+            match compile_output {
+                Ok(_output) => println!("serve!"),
+                Err(error) => println!("{:?}", error),
+            }
+
+            for res in rx {
+                match res {
+                    Ok(debounced_event_vec) => {
+                        for debounced_event in debounced_event_vec {
+                            if debounced_event.event.kind.is_modify() {
+                                let compile_output = compile(
+                                    args.dir.clone(),
+                                    args.root_files.clone(),
+                                    args.data_store.clone(),
+                                    args.backend.clone(),
+                                );
+                                match compile_output {
+                                    Ok(_output) => println!("serve!"),
+                                    Err(error) => println!("{:?}", error),
+                                }
+                            }
+                            // println!("{:?}", debounced_event);
+                        }
+                    }
+                    Err(error) => println!("{:?}", error),
+                }
+            }
+            Ok(())
+        }
         Some(Commands::Generate(args)) => {
             init_tracing();
 
             let CompileOutput {
                 ontology,
                 root_package,
-            } = compile(args.files, None, None)?;
+            } = compile(args.dir, args.files, None, None)?;
 
             let domain = ontology.find_domain(root_package).unwrap();
             let schemas = build_openapi_schemas(&ontology, root_package, domain);
@@ -215,25 +301,34 @@ struct CompileOutput {
 }
 
 fn compile(
-    paths: Vec<PathBuf>,
+    root_dir: PathBuf,
+    root_paths: Vec<PathBuf>,
     data_store_path: Option<PathBuf>,
     backend: Option<String>,
 ) -> Result<CompileOutput, OntoolError> {
-    if paths.is_empty() {
+    if root_paths.is_empty() {
         return Err(OntoolError::NoInputFiles);
     }
 
-    let root_file_name = get_source_name(paths.first().unwrap());
+    let root_file_name = get_source_name(root_paths.first().unwrap());
     let mut ontol_sources = Sources::default();
     let mut sources_by_name: HashMap<String, String> = Default::default();
     let mut paths_by_name: HashMap<String, PathBuf> = Default::default();
 
-    for path in paths {
-        let source = fs::read_to_string(&path)?;
-        let source_name = get_source_name(&path);
+    for entry in read_dir(root_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_dir() {
+            continue;
+        }
+        // TODO: only insert needed ontol files
+        if matches!(path.extension(), Some(ext) if ext == "on") {
+            let source = fs::read_to_string(&path)?;
+            let source_name = get_source_name(&path);
 
-        sources_by_name.insert(source_name.clone(), source);
-        paths_by_name.insert(source_name, path);
+            sources_by_name.insert(source_name.clone(), source);
+            paths_by_name.insert(source_name, path);
+        }
     }
 
     let mut source_code_registry = SourceCodeRegistry::default();

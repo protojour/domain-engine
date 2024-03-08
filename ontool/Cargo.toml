@@ -19,3 +19,19 @@ clap.workspace = true
 ariadne = { version = "0.4.0", features = ["auto-color"] }
 tower-lsp = "0.20.0"
 tokio = { workspace = true, features = ["full"] }
+notify-debouncer-full = "0.3.1"
+futures = "0.3"
+tempfile = "3.5.0"
+domain-engine-core.path = "../domain-engine/domain-engine-core"
+domain-engine-in-memory-store.path = "../domain-engine/domain-engine-in-memory-store"
+chrono.workspace = true
+smartstring.workspace = true
+async-trait.workspace = true
+axum = "0.6"
+anyhow = "1"
+tower-http = { version = "0.4", features = ["trace"] }
+tikv-jemallocator = "0.5"
+
+[dependencies.juniper_axum]
+git = "https://github.com/protojour/juniper"
+branch = "protojour-mods"
