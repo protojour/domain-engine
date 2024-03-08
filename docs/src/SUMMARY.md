@@ -1,9 +1,9 @@
-# Introduction
+# The ONTOL language
 
 - [Introduction](./introduction.md)
 - [Theory and background](./theory_and_background.md)
 
-# ONTOL Reference
+# ONTOL reference
 
 - [Definitions (`def`)](./def.md)
 - [Relationships (`rel`)](./rel.md)
