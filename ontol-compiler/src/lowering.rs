@@ -879,8 +879,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
         let def = self.resolve_type_reference(relation.0, &relation.1, None)?;
 
         // Inherit modifier from object pattern
-        fn lower_relation_attrs<'s, 'm>(
-            lowering: &mut Lowering<'s, 'm>,
+        fn lower_relation_attrs(
+            lowering: &mut Lowering,
             ast_relation_attrs: Option<Spanned<Vec<Spanned<ast::StructPatternArgument>>>>,
             object_pattern: &Pattern,
             var_table: &mut MapVarTable,
@@ -926,7 +926,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }
             ast::AnyPattern::Set((mut ast, set_span)) => match ast.modifier.take() {
                 Some((modifier, _mod_span)) => {
-                    if let Some(_) = relation_attrs {
+                    if relation_attrs.is_some() {
                         return Err((
                             CompileError::TODO(smart_format!("set algebra not supported here")),
                             span.clone(),

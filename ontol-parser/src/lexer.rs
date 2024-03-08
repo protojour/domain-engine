@@ -99,7 +99,7 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
         "@intersects" => Token::Modifier(Modifier::Intersects),
         "@equals" => Token::Modifier(Modifier::Equals),
         _ => {
-            if ident.starts_with("@") {
+            if ident.starts_with('@') {
                 Token::UnknownModifer(ident)
             } else {
                 Token::Sym(ident)
