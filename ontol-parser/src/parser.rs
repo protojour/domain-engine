@@ -4,10 +4,13 @@ use chumsky::prelude::*;
 use either::Either;
 use smartstring::alias::String;
 
-use crate::ast::{
-    AnyPattern, Dot, ExprPattern, FmtStatement, MapArm, Path, SetPattern, SetPatternElement,
-    SetPatternModifier, StructPattern, StructPatternArgument, StructPatternAttr,
-    StructPatternModifier, TypeOrPattern, UseStatement,
+use crate::{
+    ast::{
+        AnyPattern, Dot, ExprPattern, FmtStatement, MapArm, Path, SetPattern, SetPatternElement,
+        SetPatternModifier, StructPattern, StructPatternArgument, StructPatternAttr,
+        StructPatternModifier, TypeOrPattern, UseStatement,
+    },
+    lexer::Modifier,
 };
 
 use super::{
@@ -73,14 +76,13 @@ fn def_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstPar
     doc_comments()
         .then(keyword(Token::Def))
         .then(
-            open('(')
-                .ignore_then(
-                    spanned(sym_set(&["private", "open", "extern"], "modifier"))
-                        .separated_by(sigil('|'))
-                        .at_least(1),
-                )
-                .then_ignore(close(')'))
-                .or_not(),
+            spanned(
+                modifier(Modifier::Private)
+                    .or(modifier(Modifier::Open))
+                    .or(modifier(Modifier::Extern)),
+            )
+            .repeated()
+            .collect::<Vec<_>>(),
         )
         .then(spanned(ident()))
         .then(spanned(
@@ -91,14 +93,12 @@ fn def_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstPar
             let mut open = None;
             let mut extern_ = None;
 
-            if let Some(modifiers) = modifiers {
-                for (sym, span) in modifiers {
-                    match sym.as_str() {
-                        "private" => private = Some(span),
-                        "open" => open = Some(span),
-                        "extern" => extern_ = Some(span),
-                        _ => unreachable!(),
-                    }
+            for (modifier, span) in modifiers {
+                match modifier {
+                    Modifier::Private => private = Some(span),
+                    Modifier::Open => open = Some(span),
+                    Modifier::Extern => extern_ = Some(span),
+                    _ => unreachable!(),
                 }
             }
 
@@ -118,7 +118,7 @@ fn rel_statement(
     stmt_parser: impl AstParser<Spanned<Statement>> + 'static,
 ) -> impl AstParser<RelStatement> {
     let object_type_or_pattern =
-        with_unit_or_seq(spanned_named_or_anonymous_type_or_dot(stmt_parser.clone()))
+        with_unit_or_set(spanned_named_or_anonymous_type_or_dot(stmt_parser.clone()))
             .map(|(unit_or_seq, (opt_ty, span))| {
                 (unit_or_seq, (opt_ty.map_right(TypeOrPattern::Type), span))
             })
@@ -134,7 +134,7 @@ fn rel_statement(
     doc_comments()
         .then(keyword(Token::Rel))
         // subject:
-        .then(with_unit_or_seq(spanned_named_or_anonymous_type_or_dot(
+        .then(with_unit_or_set(spanned_named_or_anonymous_type_or_dot(
             stmt_parser.clone(),
         )))
         // forward relations:
@@ -271,7 +271,7 @@ fn fmt_statement() -> impl AstParser<FmtStatement> {
         })
 }
 
-fn with_unit_or_seq<T>(inner: impl AstParser<T> + Clone) -> impl AstParser<(UnitOrSet, T)> {
+fn with_unit_or_set<T>(inner: impl AstParser<T> + Clone) -> impl AstParser<(UnitOrSet, T)> {
     inner.clone().map(|unit| (UnitOrSet::Unit, unit)).or(inner
         .delimited_by(open('{'), close('}'))
         .map(|seq| (UnitOrSet::Set, seq)))
@@ -376,40 +376,30 @@ fn struct_pattern_spread() -> impl AstParser<StructPatternArgument> {
 fn set_pattern(
     any_pattern: impl AstParser<AnyPattern> + Clone + 'static,
 ) -> impl AstParser<Spanned<SetPattern>> {
-    fn set_pattern_modifier() -> impl AstParser<Spanned<SetPatternModifier>> {
-        spanned(
-            modifier::in_()
-                .map(|_| SetPatternModifier::In)
-                .or(modifier::contains_all().map(|_| SetPatternModifier::ContainsAll))
-                .or(modifier::all_in().map(|_| SetPatternModifier::AllIn))
-                .or(modifier::intersects().map(|_| SetPatternModifier::Intersects))
-                .or(modifier::equals().map(|_| SetPatternModifier::Equals)),
-        )
-    }
+    let modifier = spanned(
+        modifier(Modifier::In)
+            .to(SetPatternModifier::In)
+            .or(modifier(Modifier::ContainsAll).to(SetPatternModifier::ContainsAll))
+            .or(modifier(Modifier::AllIn).to(SetPatternModifier::AllIn))
+            .or(modifier(Modifier::Intersects).to(SetPatternModifier::Intersects))
+            .or(modifier(Modifier::Equals).to(SetPatternModifier::Equals)),
+    );
 
-    fn set_pattern_elements(
-        any_pattern: impl AstParser<AnyPattern> + Clone + 'static,
-    ) -> impl AstParser<Vec<Spanned<SetPatternElement>>> {
-        spanned(
-            spanned(dot_dot())
-                .or_not()
-                .then(spanned(any_pattern))
-                .map(|(spread, pattern)| SetPatternElement {
-                    spread: spread.map(|(_, span)| span),
-                    // TODO: Support parsing relation attributes
-                    relation_attrs: None,
-                    pattern,
-                }),
-        )
-        .separated_by(sigil(','))
-        .allow_trailing()
-        .delimited_by(open('{'), close('}'))
-    }
+    let elements = spanned(spanned(dot_dot()).or_not().then(spanned(any_pattern)).map(
+        |(spread, pattern)| SetPatternElement {
+            spread: spread.map(|(_, span)| span),
+            // TODO: Support parsing relation attributes
+            relation_attrs: None,
+            pattern,
+        },
+    ))
+    .separated_by(sigil(','))
+    .allow_trailing();
 
     spanned(
-        set_pattern_modifier()
+        modifier
             .or_not()
-            .then(set_pattern_elements(any_pattern.clone()))
+            .then(elements.delimited_by(open('{'), close('}')))
             .map(|(modifier, elements)| SetPattern { modifier, elements }),
     )
 }
@@ -493,11 +483,7 @@ fn named_type() -> impl AstParser<Type> {
     let text_literal = text_literal().map(Type::TextLiteral);
     let regex = select! { Token::Regex(pattern) => pattern }.map(Type::Regex);
 
-    unit.or(path)
-        .or(number_literal)
-        .or(text_literal)
-        .or(regex)
-        .labelled("type")
+    unit.or(path).or(number_literal).or(text_literal).or(regex)
 }
 
 fn anonymous_type(
@@ -525,9 +511,7 @@ fn sigil(char: char) -> impl AstParser<Token> {
 }
 
 fn keyword(token: Token) -> impl AstParser<Span> {
-    just(token)
-        .map_with_span(|_, span| span)
-        .labelled("keyword")
+    just(token).map_with_span(|_, span| span)
 }
 
 fn path() -> impl AstParser<Path> {
@@ -556,72 +540,19 @@ fn path() -> impl AstParser<Path> {
 }
 
 fn any_sym() -> impl AstParser<String> {
-    select! { Token::Sym(ident) => ident }
+    select! { Token::Sym(ident) => ident }.map_err(expected("symbol"))
 }
 
 fn sym(str: &'static str, label: &'static str) -> impl AstParser<String> {
-    select! { Token::Sym(sym) => sym }
-        .labelled(label)
-        .try_map(move |string, span| {
-            if string == str {
-                Ok(string)
-            } else {
-                Err(Simple::custom(span, format!("expected `{str}`")))
-            }
-        })
-}
-
-mod modifier {
-    use super::*;
-
-    pub fn in_() -> impl AstParser<()> {
-        sym("@in", "`@in`").ignored()
-    }
-
-    pub fn contains_all() -> impl AstParser<()> {
-        sym("@contains_all", "`@contains_all`").ignored()
-    }
-
-    pub fn all_in() -> impl AstParser<()> {
-        sym("@all_in", "`@all_in`").ignored()
-    }
-
-    pub fn intersects() -> impl AstParser<()> {
-        sym("@intersects", "`@intersects`").ignored()
-    }
-
-    pub fn equals() -> impl AstParser<()> {
-        sym("@equals", "`@equals`").ignored()
-    }
-}
-
-fn sym_set(set: &'static [&'static str], label: &'static str) -> impl AstParser<String> {
-    select! { Token::Sym(sym) => sym }
-        .labelled(label)
-        .try_map(move |string, span| {
-            if set.contains(&string.as_str()) {
-                Ok(string)
-            } else {
-                let mut msg = String::from("expected ");
-
-                let mut iterator = set.iter().peekable();
-                while let Some(candidate) = iterator.next() {
-                    msg.push('`');
-                    msg.push_str(candidate);
-                    msg.push('`');
-
-                    if iterator.peek().is_some() {
-                        msg.push_str(", ");
-                    }
-                }
-
-                Err(Simple::custom(span, msg))
-            }
-        })
+    select! { Token::Sym(sym) if sym == str => sym }.map_err(expected(label))
 }
 
 fn ident() -> impl AstParser<String> {
-    select! { Token::Sym(ident) => ident }.labelled("identifier")
+    select! { Token::Sym(ident) => ident }.map_err(expected("identifier"))
+}
+
+fn modifier(modifier: Modifier) -> impl AstParser<Modifier> {
+    just(Token::Modifier(modifier)).to(modifier)
 }
 
 fn symbol_pattern() -> impl AstParser<ExprPattern> {
@@ -629,11 +560,11 @@ fn symbol_pattern() -> impl AstParser<ExprPattern> {
     Token::Sym(ident) if ident == "true" => ExprPattern::BooleanLiteral(true),
     Token::Sym(ident) if ident == "false" => ExprPattern::BooleanLiteral(false),
     Token::Sym(ident) => ExprPattern::Variable(ident) }
-    .labelled("symbol")
+    .map_err(expected("symbol"))
 }
 
 fn number_literal() -> impl AstParser<String> {
-    select! { Token::Number(literal) => literal }.labelled("number")
+    select! { Token::Number(literal) => literal }.map_err(expected("number"))
 }
 
 fn u16() -> impl AstParser<u16> {
@@ -690,6 +621,16 @@ where
     F: (Fn(T) -> U) + Clone,
 {
     move |(data, span)| (f(data), span)
+}
+
+fn expected(label: &'static str) -> impl Fn(Simple<Token>) -> Simple<Token> + Clone {
+    move |error| {
+        Simple::expected_input_found(
+            error.span(),
+            Some(Some(Token::Expected(label))),
+            error.found().cloned(),
+        )
+    }
 }
 
 #[cfg(test)]

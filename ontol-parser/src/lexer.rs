@@ -22,7 +22,11 @@ pub enum Token {
     TextLiteral(String),
     Regex(String),
     Sym(String),
+    Modifier(Modifier),
+    UnknownModifer(String),
     DocComment(String),
+    /// Used in error reporting only
+    Expected(&'static str),
 }
 
 impl Display for Token {
@@ -40,8 +44,41 @@ impl Display for Token {
             Self::TextLiteral(_) => write!(f, "`string`"),
             Self::Regex(_) => write!(f, "`regex`"),
             Self::Sym(sym) => write!(f, "`{sym}`"),
+            Self::Modifier(m) => write!(f, "`{m}`"),
+            Self::UnknownModifer(m) => write!(f, "`{m}`"),
             Self::DocComment(_) => write!(f, "`doc_comment`"),
+            Self::Expected(expected) => write!(f, "{expected}"),
         }
+    }
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub enum Modifier {
+    Private,
+    Open,
+    Extern,
+    In,
+    AllIn,
+    ContainsAll,
+    Intersects,
+    Equals,
+}
+
+impl Display for Modifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            Modifier::Private => "private",
+            Modifier::Open => "open",
+            Modifier::Extern => "extern",
+            Modifier::In => "in",
+            Modifier::AllIn => "all_in",
+            Modifier::ContainsAll => "contains_all",
+            Modifier::Intersects => "intersects",
+            Modifier::Equals => "equals",
+        };
+
+        write!(f, "@{str}")
     }
 }
 
@@ -53,7 +90,21 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
         "rel" => Token::Rel,
         "fmt" => Token::Fmt,
         "map" => Token::Map,
-        _ => Token::Sym(ident),
+        "@private" => Token::Modifier(Modifier::Private),
+        "@open" => Token::Modifier(Modifier::Open),
+        "@extern" => Token::Modifier(Modifier::Extern),
+        "@in" => Token::Modifier(Modifier::In),
+        "@all_in" => Token::Modifier(Modifier::AllIn),
+        "@contains_all" => Token::Modifier(Modifier::ContainsAll),
+        "@intersects" => Token::Modifier(Modifier::Intersects),
+        "@equals" => Token::Modifier(Modifier::Equals),
+        _ => {
+            if ident.starts_with("@") {
+                Token::UnknownModifer(ident)
+            } else {
+                Token::Sym(ident)
+            }
+        }
     });
 
     let comment = just("//")

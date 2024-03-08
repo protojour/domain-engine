@@ -780,7 +780,7 @@ mod serde_raw_dynamic_entity_in_union {
 #[test]
 fn test_serde_open_properties() {
     "
-    def(open) foo (
+    def @open foo (
         rel .'closed': text
     )
     "

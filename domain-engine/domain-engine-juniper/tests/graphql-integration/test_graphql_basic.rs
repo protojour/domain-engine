@@ -1407,7 +1407,7 @@ fn test_graphql_municipalities_geojson_union() {
 #[test(tokio::test)]
 async fn test_graphql_open_data() {
     let (test, schema) = "
-    def(open) foo (
+    def @open foo (
         rel .'id'[rel .gen: auto]|id: (rel .is: text)
     )
     "
@@ -1456,7 +1456,7 @@ async fn test_graphql_open_data() {
 #[test(tokio::test)]
 async fn test_open_data_disabled() {
     let (test, schema) = "
-    def(open) foo (
+    def @open foo (
         rel .'id'[rel .gen: auto]|id: (rel .is: text)
     )
     "

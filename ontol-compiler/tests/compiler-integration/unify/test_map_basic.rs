@@ -897,8 +897,8 @@ fn test_seq_scope_escape2() {
 #[test]
 fn test_map_open_data_on_root_struct() {
     "
-    def(open) foo (rel .'p0': {text})
-    def(open) bar (rel .'p1': {text})
+    def @open foo (rel .'p0': {text})
+    def @open bar (rel .'p1': {text})
 
     map(
         foo('p0': {..x}),
