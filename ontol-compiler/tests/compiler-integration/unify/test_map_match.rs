@@ -13,7 +13,7 @@ fn test_map_match_non_inherent_id() {
     def ent (rel .id: key)
     map(
         key: key,
-        ent match( // ERROR no properties expected
+        @match ent( // ERROR no properties expected
             id: key
         )
     )
@@ -31,7 +31,7 @@ fn test_map_match_scalar_key() {
     )
     map query(
         key: key,
-        foo match('key': key),
+        @match foo('key': key),
     )
     "#
     .compile_then(|test| {
@@ -74,7 +74,7 @@ fn test_map_match_parameterless_query() {
     )
     map query(
         (),
-        foo: { ..foo match() }
+        foo: { ..@match foo() }
     )
     "#
     .compile_then(|test| {
@@ -121,7 +121,7 @@ fn test_map_match_query_mandatory_properties() {
             'input_a': a,
             'input_b': b,
         ),
-        foo: { ..foo match(
+        foo: { ..@match foo(
             'prop_a': a,
             'prop_b': b,
         )},
@@ -170,7 +170,7 @@ fn test_map_match_query_optional_property() {
             'input_a': a,
             'input_b'?: b,
         ),
-        foo: {..foo match(
+        foo: {..@match foo(
             'prop_a': a,
             'prop_b'?: b,
         )}
@@ -240,12 +240,12 @@ fn test_map_match_anonymous_with_translation() {
         rel .'bar': text
     )
     map(
-        foo match('foo': x),
+        @match foo('foo': x),
         bar('bar': x),
     )
     map query(
         ('input': x),
-        bar: {..foo match(
+        bar: {..@match foo(
             'foo': x
         )}
     )
@@ -285,13 +285,13 @@ fn test_map_match_sequence_filter_in_set() {
         rel .'bar': text
     )
     map(
-        foo match('foo': x),
+        @match foo('foo': x),
         bar('bar': x),
     )
     map query(
         ('input': { ..x }),
         bar: {
-            ..foo match('foo': @in { ..x })
+            ..@match foo('foo': @in { ..x })
         }
     )
     "#
@@ -342,7 +342,7 @@ mod match_contains_all {
             'sub_tag'?: sub_tag
         ),
         foo: {
-            ..foo match(
+            ..@match foo(
                 'tags'?: @contains_all { ..tags },
                 'sub'?: sub(
                     'tags': @contains_all { sub_tag }
@@ -422,8 +422,8 @@ fn test_map_match_in_sub_multi_edge() {
     map foos(
         ('bar_tags'?: { ..tags }),
         foo: {
-            ..foo match(
-                'bars'?: bar match(
+            ..@match foo(
+                'bars'?: @match bar(
                     'tags': @contains_all { ..tags }
                 )
             )

@@ -179,7 +179,7 @@ fn more_members() {
 
     map foos (
         (),
-        foo: { ..foo match () }
+        foo: { ..@match foo() }
     )
     "
     .compile();
@@ -202,7 +202,7 @@ fn forward_mapping() {
 
     map foos (
         (),
-        foo: { ..foo match () }
+        foo: { ..@match foo() }
     )
     "
     .compile();

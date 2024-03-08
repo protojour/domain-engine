@@ -319,16 +319,16 @@ fn any_pattern() -> impl AstParser<AnyPattern> {
 fn parenthesized_struct_pattern(
     any_pattern: impl AstParser<AnyPattern> + Clone + 'static,
 ) -> impl AstParser<StructPattern> {
-    spanned(path())
+    spanned(struct_pattern_modifier())
         .or_not()
-        .then(struct_pattern_modifier().or_not())
+        .then(spanned(path()).or_not())
         .then(
             spanned(struct_pattern_attr(any_pattern).or(struct_pattern_spread()))
                 .separated_by(sigil(','))
                 .allow_trailing()
                 .delimited_by(open('('), close(')')),
         )
-        .map(|((path, modifier), args)| StructPattern {
+        .map(|((modifier, path), args)| StructPattern {
             path,
             modifier,
             args,
@@ -336,8 +336,8 @@ fn parenthesized_struct_pattern(
         .labelled("struct pattern")
 }
 
-fn struct_pattern_modifier() -> impl AstParser<Spanned<StructPatternModifier>> {
-    spanned(sym("match", "match").map(|_| StructPatternModifier::Match))
+fn struct_pattern_modifier() -> impl AstParser<StructPatternModifier> {
+    modifier(Modifier::Match).to(StructPatternModifier::Match)
 }
 
 fn struct_pattern_attr(

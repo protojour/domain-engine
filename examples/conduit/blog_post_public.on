@@ -8,7 +8,7 @@ def BlogPost (
 )
 
 map(
-    db.Article match(
+    @match db.Article(
         'article_id'?: id,
         'body': body,
         'author': db.User(
@@ -31,8 +31,8 @@ map posts(
         'written_by'?: by
     ),
     BlogPost: {
-        ..db.Article match(
-            'author': db.User match(
+        ..@match db.Article(
+            'author': @match db.User(
                 'username'?: by
             )
         )

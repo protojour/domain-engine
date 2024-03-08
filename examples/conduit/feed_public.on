@@ -19,7 +19,7 @@ def item (
 )
 
 map(
-    db.Article match(
+    @match db.Article(
         // BUG: Don't want this to be optional.
         // it's clearly a mapping from top to bottom, and then it will come from the data store
         'article_id'?: id,
@@ -45,7 +45,7 @@ map feed(
         'username': username,
         'link': /http:\/\/blogs\.com\/(?<username>\w+)\/feed/,
         'items': {
-            ..db.Article match (
+            ..@match db.Article(
                 'author': db.User (
                     'username': username,
                 )

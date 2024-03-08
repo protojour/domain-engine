@@ -186,7 +186,7 @@ fn test_map_relation_sequence_default_fallback() {
     )
 
     map(
-        bar_inner match(
+        @match bar_inner(
             'bar_id': id,
             'foos': { ..foo_inner('foo_id': foo) },
         ),

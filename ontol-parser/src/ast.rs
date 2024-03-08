@@ -119,8 +119,8 @@ pub enum AnyPattern {
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct StructPattern {
-    pub path: Option<Spanned<Path>>,
     pub modifier: Option<Spanned<StructPatternModifier>>,
+    pub path: Option<Spanned<Path>>,
     pub args: Vec<Spanned<StructPatternArgument>>,
 }
 

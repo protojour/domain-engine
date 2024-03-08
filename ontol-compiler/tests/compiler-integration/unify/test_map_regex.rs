@@ -50,7 +50,7 @@ fn test_map_regex_alternation1() {
         rel .'second'?: text
     )
     map(
-        foo match(
+        @match foo(
             'input': /(first=(?<first>\w+))|(second=(?<second>\w+))!/
         ),
         bar(
@@ -88,7 +88,7 @@ fn test_map_regex_loop_pattern() {
         rel .'captures': {capture}
     )
     map(
-        in match(
+        @match in(
             'input': { ../(?<one>\w+) (?<two>\w+),?/ }
         ),
         out(
@@ -132,7 +132,7 @@ fn test_map_regex_loop_alternation() {
         rel .'bar': {capture}
     )
     map(
-        in match(
+        @match in(
             'input': {
                 ../FOO=(?<foo>\w+)|BAR=(?<bar>\w+)/
             }
