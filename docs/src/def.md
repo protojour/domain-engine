@@ -34,17 +34,15 @@ def some_def (
 
 ## `def` modifiers
 
-`def` modifiers are contextual keywords appearing within parentheses right after the keyword: `def(modifiers)`.
-
-Multiple modifiers are separated by a `|` character: `def(private|open)`
+`def` modifiers are contextual keywords appearing right after the keyword: `def @modifier`. Multiple modifiers are possible.
 
 
-### `private`
+### `@private`
 
-`def(private)` makes the definition *private*. It will not be accessible to other domains if the domain is imported in a `use` statement.
+`def @private` makes the definition *private*. It will not be accessible to other domains if the domain is imported in a `use` statement.
 
 ```ontol
-def(private) private_def ()
+def @private private_def ()
 
 def public_def (
     rel .'exposed': private_def
@@ -54,20 +52,20 @@ def public_def (
 Including `private_def` in `public_def` will indirectly expose `private_def`, but it cannot be referred to except through `public_def`.
 
 
-### `open`
+### `@open`
 
-`def(open)` makes the definition's immediate tree-like relationships _open_, so that any arbitrary data can be associated with it.
+`def @open` makes the definition's immediate tree-like relationships _open_, so that any arbitrary data can be associated with it.
 
 ```ontol
-def(open) all_yours ()
+def @open all_yours ()
 ```
 
 
-### `extern` (unstable)
+### `@extern` (unstable)
 
-_The details of `def(extern)` are subject to change._
+_The details of `def @extern` are subject to change._
 
-`def(extern)` defines an external hook, and must include an `'url'` property and a [`map`](map.md) statement.
+`def @extern` defines an external hook, and must include an `'url'` property and a [`map`](map.md) statement.
 
 ```ontol
 def input (
@@ -79,7 +77,7 @@ def output (
     rel .'additional_prop': text
 )
 
-def(extern) hook (
+def @extern hook (
     rel .'url': 'http://localhost:8080/listener'
     map(input(), output())
 )

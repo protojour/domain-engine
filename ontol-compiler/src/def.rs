@@ -111,25 +111,20 @@ pub struct FmtFinalState(pub bool);
 
 #[derive(Clone, Debug, AsRefStr, DocumentedFields)]
 pub enum BuiltinRelationKind {
-    /// Relates one type to another.
+    /// Relates one definition to another.
     /// The subject type takes on all properties of the object type,
     /// or binds the subject type to a [union](def.md#unions) if the `is` relation is conditional.
     /// ```ontol
     /// rel .is: text
     /// ```
     Is,
-    /// Binds an identifier to a type, making instances of the object unique entities.
-    /// ```ontol
-    /// rel .identifies: some_type
-    /// ```
+    /// Binds an identifier to a type.
     Identifies,
-    /// Binds an identifier to a type, making instances of a type unique entities.
-    /// Shorthand reverse relation of `identifies`.
+    /// Binds a type to an identifier, making instances of a type unique entities.
     /// ```ontol
     /// rel .'id'|id: some_id
     /// ```
     Id,
-    /// ...
     Indexed,
     /// Minimum value for the subject type, which may be any `number`.
     /// ```ontol

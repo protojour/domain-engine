@@ -9,8 +9,8 @@ use crate::{smart_format, value::Value, DefId};
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize, DocumentedFields, AsRefStr)]
 pub enum TextLikeType {
-    /// A UUID value, e.g. `018e0f80-7bb4-7475-ac1d-7a0ada330122`.
-    /// The input deserializer accepts any UUID, but [generated values](generator_types.md) are
+    /// A UUID value, e.g. `"018e0f80-7bb4-7475-ac1d-7a0ada330122"`.
+    /// The input deserializer accepts any UUID string, but [generated values](generator_types.md) are
     /// [UUIDv7](https://datatracker.ietf.org/doc/html/draft-ietf-uuidrev-rfc4122bis)
     /// (time-ordered), making them naturally sortable and ideal as database primary keys.
     /// ```ontol

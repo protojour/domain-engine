@@ -1,6 +1,6 @@
 # The `ontol` domain
 
-The ONTOL compiler has a built-in domain called `'ontol'`, which defines some essential building blocks on which to build other concepts.
+The ONTOL language has a built-in domain called `'ontol'`, which defines some essential building blocks on which to build other concepts.
 
 Everything in the `ontol` namespace is automatically imported and available in other domains, but the `ontol` prefix may be used to disambiguate types when name collisions occur:
 

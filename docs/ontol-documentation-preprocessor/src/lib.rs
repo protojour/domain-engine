@@ -13,6 +13,11 @@ use ontol_compiler::Compiler;
 /// A ontol documentation preprocessor.
 pub struct OntolDocumentationPreprocessor;
 
+/// Type names to ignore;
+/// they might be for internal use, deprecated,
+/// or otherwise unwanted in documentation.
+const IGNORELIST: [&str; 3] = ["identifies", "route", "doc"];
+
 impl OntolDocumentationPreprocessor {
     pub fn new() -> OntolDocumentationPreprocessor {
         OntolDocumentationPreprocessor
@@ -50,6 +55,9 @@ fn get_ontol_docs_md(ontology: &Ontology, predicate: &dyn Fn(&TypeInfo) -> bool)
     let mut docs_string = String::from("");
 
     for (type_name, doc_string) in docs {
+        if IGNORELIST.contains(&type_name.as_str()) {
+            continue;
+        }
         docs_string.push_str(&format!("## `{type_name}`\n\n"));
         docs_string.push_str(&format!("{doc_string}\n"));
     }
@@ -72,13 +80,11 @@ impl Preprocessor for OntolDocumentationPreprocessor {
                     let new_string = c.content.replace("{{#ontol-primitives}}", &ontol_docs);
                     c.content = new_string;
                 }
-                if c.content.contains("{{#ontol-relationship-types}}") {
+                if c.content.contains("{{#ontol-relation-types}}") {
                     let ontol_docs = get_ontol_docs_md(&ontology, &|t| {
                         matches!(t.kind, TypeKind::Relationship(_))
                     });
-                    let new_string = c
-                        .content
-                        .replace("{{#ontol-relationship-types}}", &ontol_docs);
+                    let new_string = c.content.replace("{{#ontol-relation-types}}", &ontol_docs);
                     c.content = new_string;
                 }
                 if c.content.contains("{{#ontol-function-types}}") {
