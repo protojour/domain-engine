@@ -7,8 +7,8 @@ use smartstring::alias::String;
 use crate::{
     ast::{
         AnyPattern, Dot, ExprPattern, FmtStatement, MapArm, Path, SetPattern, SetPatternElement,
-        SetPatternModifier, StructPattern, StructPatternArgument, StructPatternAttr,
-        StructPatternModifier, TypeOrPattern, UseStatement,
+        SetPatternModifier, StructPattern, StructPatternAttr, StructPatternAttributeKind,
+        StructPatternModifier, StructPatternParameter, TypeOrPattern, UseStatement,
     },
     lexer::Modifier,
 };
@@ -299,19 +299,20 @@ fn map_statement() -> impl AstParser<MapStatement> {
 
 fn map_arm() -> impl AstParser<MapArm> {
     let struct_arm = parenthesized_struct_pattern(any_pattern()).map(MapArm::Struct);
-    let binding_arm = spanned(path())
-        .then_ignore(colon())
-        .then(spanned(any_pattern()))
-        .map(|(path, pattern)| MapArm::Binding { path, pattern });
+    let set_arm = set_pattern(any_pattern()).map(MapArm::Set);
+    // let binding_arm = spanned(path())
+    //     .then_ignore(colon())
+    //     .then(spanned(any_pattern()))
+    //     .map(|(path, pattern)| MapArm::Binding { path, pattern });
 
-    struct_arm.or(binding_arm)
+    struct_arm.or(set_arm)
 }
 
 fn any_pattern() -> impl AstParser<AnyPattern> {
     recursive(|this| {
         spanned(parenthesized_struct_pattern(this.clone()))
             .map(AnyPattern::Struct)
-            .or(set_pattern(this.clone()).map(AnyPattern::Set))
+            .or(spanned(set_pattern(this.clone())).map(AnyPattern::Set))
             .or(expr_pattern().map(AnyPattern::Expr))
     })
 }
@@ -319,30 +320,43 @@ fn any_pattern() -> impl AstParser<AnyPattern> {
 fn parenthesized_struct_pattern(
     any_pattern: impl AstParser<AnyPattern> + Clone + 'static,
 ) -> impl AstParser<StructPattern> {
-    spanned(struct_pattern_modifier())
+    let modifier = modifier(Modifier::Match).to(StructPatternModifier::Match);
+
+    spanned(modifier)
         .or_not()
         .then(spanned(path()).or_not())
-        .then(
-            spanned(struct_pattern_attr(any_pattern).or(struct_pattern_spread()))
-                .separated_by(sigil(','))
-                .allow_trailing()
-                .delimited_by(open('('), close(')')),
-        )
-        .map(|((modifier, path), args)| StructPattern {
+        .then(struct_pattern_param(any_pattern).delimited_by(open('('), close(')')))
+        .map(|((modifier, path), param)| StructPattern {
             path,
             modifier,
-            args,
+            param,
         })
         .labelled("struct pattern")
 }
 
-fn struct_pattern_modifier() -> impl AstParser<StructPatternModifier> {
-    modifier(Modifier::Match).to(StructPatternModifier::Match)
+fn struct_pattern_param(
+    any_pattern: impl AstParser<AnyPattern> + Clone + 'static,
+) -> impl AstParser<StructPatternParameter> {
+    let attributes =
+        spanned(struct_pattern_attribute_kind(any_pattern.clone()).or(struct_pattern_spread()))
+            .separated_by(sigil(','))
+            .allow_trailing()
+            .at_least(1)
+            .map(StructPatternParameter::Attributes);
+    let pattern = any_pattern.map(|pat| StructPatternParameter::Pattern(Box::new(pat)));
+    let nothing = close(')')
+        .rewind()
+        .map(|_| StructPatternParameter::Attributes(vec![]));
+
+    // expr.or(attributes)
+    attributes.or(pattern).or(nothing)
+
+    // attributes.or(expr_pattern().map(StructPatternParameter::Expr))
 }
 
-fn struct_pattern_attr(
-    pattern: impl AstParser<AnyPattern> + Clone + 'static,
-) -> impl AstParser<StructPatternArgument> {
+fn struct_pattern_attribute_kind(
+    any_pattern: impl AstParser<AnyPattern> + Clone + 'static,
+) -> impl AstParser<StructPatternAttributeKind> {
     recursive(|struct_pattern_attr| {
         spanned(named_type())
             .then(
@@ -355,9 +369,9 @@ fn struct_pattern_attr(
             )
             .then(spanned(sigil('?')).or_not())
             .then_ignore(colon())
-            .then(spanned(pattern))
+            .then(spanned(any_pattern))
             .map_with_span(|(((relation, relation_args), option), object), _span| {
-                StructPatternArgument::Attr(StructPatternAttr {
+                StructPatternAttributeKind::Attr(StructPatternAttr {
                     relation,
                     relation_args,
                     option: option.map(|(_, span)| ((), span)),
@@ -367,15 +381,15 @@ fn struct_pattern_attr(
     })
 }
 
-fn struct_pattern_spread() -> impl AstParser<StructPatternArgument> {
+fn struct_pattern_spread() -> impl AstParser<StructPatternAttributeKind> {
     dot_dot()
         .ignore_then(ident())
-        .map(StructPatternArgument::Spread)
+        .map(StructPatternAttributeKind::Spread)
 }
 
 fn set_pattern(
     any_pattern: impl AstParser<AnyPattern> + Clone + 'static,
-) -> impl AstParser<Spanned<SetPattern>> {
+) -> impl AstParser<SetPattern> {
     let modifier = spanned(
         modifier(Modifier::In)
             .to(SetPatternModifier::In)
@@ -396,12 +410,15 @@ fn set_pattern(
     .separated_by(sigil(','))
     .allow_trailing();
 
-    spanned(
-        modifier
-            .or_not()
-            .then(elements.delimited_by(open('{'), close('}')))
-            .map(|(modifier, elements)| SetPattern { modifier, elements }),
-    )
+    modifier
+        .or_not()
+        .then(spanned(path()).or_not())
+        .then(elements.delimited_by(open('{'), close('}')))
+        .map(|((modifier, path), elements)| SetPattern {
+            modifier,
+            path,
+            elements,
+        })
 }
 
 fn expr_pattern() -> impl AstParser<Spanned<ExprPattern>> {
@@ -630,108 +647,5 @@ fn expected(label: &'static str) -> impl Fn(Simple<Token>) -> Simple<Token> + Cl
             Some(Some(Token::Expected(label))),
             error.found().cloned(),
         )
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use assert_matches::assert_matches;
-    use chumsky::Stream;
-
-    use crate::lexer::lexer;
-
-    use super::*;
-
-    #[derive(Debug)]
-    enum Error {
-        Lex(Vec<Simple<char>>),
-        Parse(Vec<Simple<Token>>),
-    }
-
-    fn parse(input: &str) -> Result<Vec<Statement>, Error> {
-        let tokens = lexer().parse(input).map_err(Error::Lex)?;
-        let len = input.len();
-        let stmts = statement_sequence()
-            .parse(Stream::from_iter(len..len + 1, tokens.into_iter()))
-            .map_err(Error::Parse)?;
-        Ok(stmts.into_iter().map(|(stmt, _)| stmt).collect())
-    }
-
-    #[test]
-    fn parse_def() {
-        let source = "
-        /// doc comment
-        def foo()
-        /// doc comment
-        def bar(
-            rel a '': b
-            rel .lol: c
-            fmt a => . => .
-        )
-        ";
-
-        let stmts = parse(source).unwrap();
-        assert_matches!(stmts.as_slice(), [Statement::Def(_), Statement::Def(_)]);
-
-        assert_eq!(1, stmts[0].docs().len());
-    }
-
-    #[test]
-    fn parse_fmt() {
-        let source = "fmt '' => '' => ''";
-
-        let stmts = parse(source).unwrap();
-        assert_matches!(stmts.as_slice(), [Statement::Fmt(_)]);
-    }
-
-    #[test]
-    fn parse_map() {
-        let source = "
-        map(
-            foo: x,
-            bar(
-                'foo': x
-            )
-        )
-
-        // comment
-        map(
-            foo: x + 1,
-            bar(
-                'foo': (x / 3) + 4,
-            ),
-        )
-        ";
-
-        let stmts = parse(source).unwrap();
-        assert_matches!(stmts.as_slice(), [Statement::Map(_), Statement::Map(_)]);
-    }
-
-    #[test]
-    fn parse_regex_in_map() {
-        let source = r"
-        map(
-            foo: x,
-            bar(
-                'foo': /Hello (?<name>\w+)!/
-            )
-        )
-        ";
-
-        let stmts = parse(source).unwrap();
-        assert_matches!(stmts.as_slice(), [Statement::Map(_)]);
-    }
-
-    #[test]
-    fn parse_spread_in_map() {
-        let source = r"
-        map(
-            foo: x,
-            bar('a': b, ..rest)
-        )
-        ";
-
-        let stmts = parse(source).unwrap();
-        assert_matches!(stmts.as_slice(), [Statement::Map(_)]);
     }
 }

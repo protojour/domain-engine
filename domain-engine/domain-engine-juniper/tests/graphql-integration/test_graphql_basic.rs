@@ -129,7 +129,7 @@ async fn test_graphql_int_scalars() {
 
     map foos(
         (),
-        foo: {..@match foo()},
+        foo {..@match foo()},
     )
     "
     .compile_single_schema_with_datastore();
@@ -291,7 +291,7 @@ async fn test_graphql_basic_inherent_auto_id_anonymous_type() {
     )
     map foos(
         (),
-        foo: {..@match foo()}
+        foo {..@match foo()}
     )
     "
     .compile_single_schema_with_datastore();
@@ -328,7 +328,7 @@ async fn test_graphql_basic_pagination() {
     )
     map foos(
         (),
-        foo: { ..@match foo() },
+        foo { ..@match foo() },
     )
     "
     .compile_single_schema_with_datastore();
@@ -463,7 +463,7 @@ async fn test_graphql_nodes() {
     )
     map foos(
         (),
-        foo: { ..@match foo() }
+        foo { ..@match foo() }
     )
     "
     .compile_single_schema_with_datastore();
@@ -538,7 +538,7 @@ async fn test_inner_struct() {
     )
     map foos(
         (),
-        foo: { ..@match foo() },
+        foo { ..@match foo() },
     )
     "
     .compile_single_schema_with_datastore();

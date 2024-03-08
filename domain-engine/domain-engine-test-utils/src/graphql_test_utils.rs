@@ -26,6 +26,7 @@ pub trait TestCompileSchema {
 }
 
 impl<T: TestCompile> TestCompileSchema for T {
+    #[track_caller]
     fn compile_schemas<const N: usize>(
         self,
         source_names: [SrcName; N],
@@ -39,6 +40,7 @@ pub trait TestCompileSingletonSchema {
 }
 
 impl TestCompileSingletonSchema for &'static str {
+    #[track_caller]
     fn compile_single_schema_with_datastore(self) -> (OntolTest, Schema) {
         let (ontol_test, [schema]) = compile_schemas_inner(
             TestPackages::with_static_sources([(SrcName::default(), self)])

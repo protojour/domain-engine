@@ -11,8 +11,8 @@ use ontol_compiler::{
 };
 use ontol_parser::{
     ast::{
-        AnyPattern, DefStatement, MapArm, Path, Statement, StructPattern, Type, TypeOrPattern,
-        UseStatement,
+        AnyPattern, DefStatement, MapArm, Path, Statement, StructPattern, StructPatternParameter,
+        Type, TypeOrPattern, UseStatement,
     },
     lexer::lexer,
     parse_statements, Spanned, Token,
@@ -712,7 +712,10 @@ pub fn parse_map_arm(arm: &MapArm) -> String {
             Some(path) => parse_path(&path.0),
             None => "".into(),
         },
-        MapArm::Binding { path, pattern: _ } => parse_path(&path.0),
+        MapArm::Set(s) => match &s.path {
+            Some(path) => parse_path(&path.0),
+            None => "".into(),
+        },
     }
 }
 
@@ -731,14 +734,9 @@ fn parse_path(path: &Path) -> String {
 /// Try to find a Path in a MapArm
 fn get_map_arm_path(arm: &MapArm, cursor: &usize) -> Option<Path> {
     match arm {
-        MapArm::Struct(s) => return get_struct_pattern_path(s, cursor),
-        MapArm::Binding { path, pattern: _ } => {
-            if in_range(&path.1, cursor) {
-                return Some(path.0.to_owned());
-            }
-        }
+        MapArm::Struct(s) => get_struct_pattern_path(s, cursor),
+        MapArm::Set(s) => s.path.as_ref().map(|(path, _)| path.clone()),
     }
-    None
 }
 
 /// Try to find a Path in a StructPattern
@@ -748,14 +746,16 @@ fn get_struct_pattern_path(s: &StructPattern, cursor: &usize) -> Option<Path> {
     if in_range(range, cursor) {
         return Some(path.0.to_owned());
     }
-    for (arg, range) in &s.args {
-        match arg {
-            ontol_parser::ast::StructPatternArgument::Attr(attr) => {
-                if in_range(range, cursor) {
-                    return get_pattern_path(&attr.object.0, cursor);
+    if let StructPatternParameter::Attributes(attrs) = &s.param {
+        for (arg, range) in attrs {
+            match arg {
+                ontol_parser::ast::StructPatternAttributeKind::Attr(attr) => {
+                    if in_range(range, cursor) {
+                        return get_pattern_path(&attr.object.0, cursor);
+                    }
                 }
+                ontol_parser::ast::StructPatternAttributeKind::Spread(_) => (),
             }
-            ontol_parser::ast::StructPatternArgument::Spread(_) => (),
         }
     }
     None

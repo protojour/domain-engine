@@ -27,5 +27,5 @@ def artist (
 
 map artists(
     (),
-    artist: {..@match artist()}
+    artist {..@match artist()}
 )

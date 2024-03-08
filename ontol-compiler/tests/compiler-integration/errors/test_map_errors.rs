@@ -39,8 +39,8 @@ fn map_attribute_mismatch() {
     rel foo 'prop2': bar
     rel bar is: i64
     map (
-        foo: x,
-        bar () // ERROR expected attribute
+        foo(x),
+        bar() // ERROR expected attribute
     )
     "
     .compile_fail();

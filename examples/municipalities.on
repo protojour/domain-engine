@@ -11,11 +11,11 @@ def municipality (
 
 /// Get a single municipality
 map municipality(
-    code: code,
+    code(code),
     @match municipality('code': code)
 )
 
 map municipalities(
     (),
-    municipality: {..@match municipality()}
+    municipality {..@match municipality()}
 )

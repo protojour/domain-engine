@@ -41,15 +41,17 @@ map feed(
     (
         'username': username
     ),
-    channel: channel_base(
-        'username': username,
-        'link': /http:\/\/blogs\.com\/(?<username>\w+)\/feed/,
-        'items': {
-            ..@match db.Article(
-                'author': db.User (
-                    'username': username,
+    channel(
+        channel_base(
+            'username': username,
+            'link': /http:\/\/blogs\.com\/(?<username>\w+)\/feed/,
+            'items': {
+                ..@match db.Article(
+                    'author': db.User (
+                        'username': username,
+                    )
                 )
-            )
-        }
+            }
+        )
     )
 )

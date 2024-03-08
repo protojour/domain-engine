@@ -14,6 +14,9 @@ pub type Spanned<T> = (T, Span);
 
 pub use lexer::Token;
 
+#[cfg(test)]
+mod tests;
+
 pub enum Error {
     Lex(Simple<char>),
     Parse(Simple<Token>),

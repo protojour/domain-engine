@@ -297,7 +297,7 @@ fn incompatible_edge_types_are_distinct() {
 
     map targets (
         (),
-        target: {
+        target {
             ..@match target()
         }
     )
