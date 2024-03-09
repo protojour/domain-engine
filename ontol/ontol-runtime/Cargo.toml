@@ -36,6 +36,9 @@ documented = "0.3.0"
 strum = { version = "0.26.1", features = ["derive"] }
 strum_macros = "0.26.1"
 ahash = "0.8"
+phf_shared = "0.11"
+phf_generator = "0.11"
+phf = "0.11"
 
 [dev-dependencies]
 tracing-subscriber.workspace = true

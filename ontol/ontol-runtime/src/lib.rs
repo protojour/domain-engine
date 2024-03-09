@@ -18,6 +18,7 @@ pub mod var;
 pub mod vm;
 
 mod equality;
+mod phf_map;
 
 extern crate self as ontol_runtime;
 
