@@ -1,11 +1,12 @@
-use crate::docs::{get_ontol_docs, get_ontol_var, RESERVED_WORDS};
+use crate::docs::{get_core_completions, get_ontol_var, COMPLETIONS};
 use chumsky::prelude::*;
+use derivative::Derivative;
 use either::Either;
-use lsp_types::{Location, MarkedString, Position, Range, Url};
+use lsp_types::{CompletionItem, Location, MarkedString, Position, Range, Url};
 use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
-    package::{GraphState, PackageGraphBuilder, PackageReference, ParsedPackage},
+    package::{GraphState, PackageGraphBuilder, PackageReference, ParsedPackage, ONTOL_PKG},
     CompileError, Compiler, SourceCodeRegistry, SourceId, SourceSpan, Sources, SpannedCompileError,
     NO_SPAN,
 };
@@ -17,18 +18,24 @@ use ontol_parser::{
     lexer::lexer,
     parse_statements, Spanned, Token,
 };
-use ontol_runtime::{config::PackageConfig, smart_format};
+use ontol_runtime::{
+    config::PackageConfig,
+    ontology::{Ontology, TypeInfo},
+    smart_format,
+};
 use regex::Regex;
 use std::{
     collections::{HashMap, HashSet},
     format,
     io::Error,
-    panic::{self},
+    panic,
+    sync::Arc,
 };
 use substring::Substring;
 
 /// Language server state
-#[derive(Clone, Debug, Default)]
+#[derive(Derivative)]
+#[derivative(Clone, Debug)]
 pub struct State {
     /// Current documents, by uri
     pub docs: HashMap<String, Document>,
@@ -38,6 +45,17 @@ pub struct State {
 
     /// Precompiled regex
     pub regex: CompiledRegex,
+
+    /// Ontology with only the `ontol` domain
+    #[derivative(Debug = "ignore")]
+    pub ontology: Arc<Ontology>,
+
+    /// Fast lookup for TypeInfo
+    #[derivative(Debug = "ignore")]
+    pub ontol_type_info: HashMap<String, TypeInfo>,
+
+    /// Prebuilt data structure
+    pub core_completions: Vec<CompletionItem>,
 }
 
 /// A document and its various constituents
@@ -99,8 +117,41 @@ pub struct CompiledRegex {
 }
 
 impl State {
+    /// Compile ontology for docs, prepare data, and return a new State
+    pub fn new() -> Self {
+        let mem = Mem::default();
+        let mut compiler = Compiler::new(&mem, Default::default()).with_ontol();
+        compiler
+            .compile_package_topology(Default::default())
+            .unwrap();
+        let ontology = compiler.into_ontology();
+
+        let ontol_domain = ontology.find_domain(ONTOL_PKG).unwrap();
+        let mut ontol_type_info = HashMap::new();
+
+        for type_info in ontol_domain.type_infos() {
+            if let Some(name) = type_info.name() {
+                let name = &ontology[name];
+                ontol_type_info.insert(name.to_string(), type_info.clone());
+            }
+        }
+
+        let core_completions = get_core_completions();
+
+        Self {
+            docs: Default::default(),
+            srcref: Default::default(),
+            regex: Default::default(),
+            ontology: Arc::new(ontology),
+            ontol_type_info,
+            core_completions,
+        }
+    }
+
     /// Parse ONTOL file, collecting tokens, statements and related data
     pub fn parse_statements(&mut self, uri: &str) {
+        let reserved_words = COMPLETIONS.map(|(label, _)| label);
+
         if let Some(doc) = self.docs.get_mut(uri) {
             doc.tokens.clear();
             doc.symbols.clear();
@@ -115,7 +166,7 @@ impl State {
 
             for (token, _) in &doc.tokens {
                 if let Token::Sym(sym) = token {
-                    if !RESERVED_WORDS.contains(&sym.as_str()) {
+                    if !reserved_words.contains(&sym.as_str()) {
                         doc.symbols.insert(sym.to_string());
                     }
                 }
@@ -409,11 +460,12 @@ impl State {
                         hover.path = format!("{}.{}", &doc.name, &stmt.ident.0);
                         hover.signature = get_signature(&doc.text, range, &self.regex);
                         hover.docs = stmt.docs.join("\n");
+                        break;
                     }
                     Statement::Rel(stmt) => {
                         if stmt.subject.1.contains(&cursor) {
                             match &stmt.subject.0 {
-                                Either::Left(_) => return get_ontol_docs("."),
+                                Either::Left(_) => return self.get_ontol_docs("."),
                                 Either::Right(Type::Path(path)) => {
                                     return self.get_hoverdoc_for_path(doc, path);
                                 }
@@ -446,7 +498,7 @@ impl State {
                             for trans in &stmt.transitions {
                                 if trans.1.contains(&cursor) {
                                     match &trans.0 {
-                                        Either::Left(_) => return get_ontol_docs("."),
+                                        Either::Left(_) => return self.get_ontol_docs("."),
                                         Either::Right(Type::Path(path)) => {
                                             return self.get_hoverdoc_for_path(doc, path);
                                         }
@@ -469,35 +521,77 @@ impl State {
                                 return self.get_hoverdoc_for_path(doc, &path);
                             }
                         }
+                        let ident = if let Some(ident) = &stmt.ident {
+                            format!("{} ", ident.0)
+                        } else {
+                            "".to_string()
+                        };
                         let first = parse_map_arm(&stmt.first.0);
                         let second = parse_map_arm(&stmt.second.0);
-                        hover.path = format!("map {} {}", first, second);
+                        hover.path = format!("map {}{}() {}()", ident, first, second);
                         break;
                     }
                 }
             }
 
             // check tokens, may replace hover
-            for (token, range) in doc.tokens.iter() {
+            for (index, (token, range)) in doc.tokens.iter().enumerate() {
                 if range.contains(&cursor) {
                     match token {
-                        Token::Use => return get_ontol_docs("use"),
-                        Token::Def => return get_ontol_docs("def"),
-                        Token::Rel => return get_ontol_docs("rel"),
-                        Token::Fmt => return get_ontol_docs("fmt"),
-                        Token::Map => return get_ontol_docs("map"),
+                        Token::Use => return self.get_ontol_docs("use"),
+                        Token::Def => return self.get_ontol_docs("def"),
+                        Token::Rel => return self.get_ontol_docs("rel"),
+                        Token::Fmt => return self.get_ontol_docs("fmt"),
+                        Token::Map => return self.get_ontol_docs("map"),
+                        Token::DotDot => return self.get_ontol_docs(".."),
+                        Token::Modifier(modifier) => {
+                            return self.get_ontol_docs(format!("{modifier}").as_str())
+                        }
+                        // Token::Number(num) => todo!(),
+                        // Token::TextLiteral(text) => todo!(),
+                        // Token::Regex(regex) => todo!(),
                         Token::Sigil(sigil) => {
                             if *sigil == '?' {
-                                return get_ontol_docs("?");
+                                return self.get_ontol_docs("?");
                             }
                         }
                         Token::Sym(ident) => {
-                            let map = hover.path.starts_with("map");
-                            let sym = get_ontol_docs(ident);
-                            if !map || ident == "match" {
-                                return sym;
-                            } else if map {
-                                return Some(get_ontol_var(ident));
+                            // Peek ahead and behind, try to find a def path if any
+                            if index > 1 && index < (doc.tokens.len() - 2) {
+                                let pp = &doc.tokens[index - 2];
+                                let p = &doc.tokens[index - 1];
+                                let n = &doc.tokens[index + 1];
+                                let nn = &doc.tokens[index + 2];
+
+                                match (&pp.0, &p.0, &n.0, &nn.0) {
+                                    (Token::Sym(root), Token::Sigil('.'), _, _) => {
+                                        let path = [root.to_string(), ident.to_string()];
+                                        if let Some(doc) =
+                                            self.get_hoverdoc_for_ext_ident(doc, &path)
+                                        {
+                                            return Some(doc);
+                                        }
+                                    }
+                                    (_, _, Token::Sigil('.'), Token::Sym(ext_ident)) => {
+                                        let path = [ident.to_string(), ext_ident.to_string()];
+                                        if let Some(doc) =
+                                            self.get_hoverdoc_for_ext_ident(doc, &path)
+                                        {
+                                            return Some(doc);
+                                        }
+                                    }
+                                    _ => {}
+                                };
+                            }
+
+                            let doc_opt = self
+                                .get_hoverdoc_for_ident(doc, ident)
+                                .or(self.get_ontol_docs(ident));
+
+                            match (doc_opt, hover.path.starts_with("map")) {
+                                (Some(doc_opt), _) => return Some(doc_opt),
+                                (None, true) => return Some(get_ontol_var(ident)),
+                                _ => {}
                             }
                         }
                         _ => {}
@@ -533,7 +627,7 @@ impl State {
                 docs: stmt.docs.join("\n"),
                 ..Default::default()
             }),
-            None => get_ontol_docs(ident),
+            None => self.get_ontol_docs(ident),
         }
     }
 
@@ -685,10 +779,8 @@ fn get_byte_pos(text: &str, pos: &Position) -> usize {
         if line_index == pos.line as usize {
             cursor += pos.character as usize;
             break;
-        } else {
-            // utf-16 is LSP standard encoding
-            cursor += line.encode_utf16().count() + 1;
         }
+        cursor += line.encode_utf16().count() + 1;
     }
     cursor
 }

@@ -2,13 +2,13 @@ hljs.registerLanguage("ontol", (hljs) => ({
   name: "ONTOL",
   keywords: {
     keyword: "def fmt map rel use as",
-    rels: "is identifies id min max gen default example",
+    rels: "is id min max gen default example",
     built_in: "auto create_time update_time",
     type: "boolean number integer i64 float f32 f64 serial text uuid datetime",
-    literal: "true false inf nan",
-    $pattern: /\w+|[.,:?+*=<>|]+/,
-    operator: ". .. , : :: ? ?: + * = | =>",
-    param: "private open extern match",
+    literal: "true false",
+    $pattern: /@?\w+|[.,:?+*=<>|]+/,
+    operator: ". .. , : :: ? ?: + * = := | =>",
+    param: "@private @open @extern @match @in @all_in @contains_all @intersects @equals",
   },
   contains: [
     hljs.APOS_STRING_MODE,

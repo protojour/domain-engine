@@ -18,7 +18,7 @@
     "def mod block": {
         "prefix": "def block",
         "body": [
-            "def ($1) ${2:name} (",
+            "def ${1:modifier} ${2:name} (",
             "\t$3",
             ")"
         ],
@@ -37,15 +37,6 @@
             "rel .is$1: ${2:object}"
         ],
         "description": "Relation"
-    },
-    "rel block": {
-        "prefix": "rel . block",
-        "body": [
-            "rel .'${1:name}'$2: ${3:object} (",
-            "\t$4",
-            ")"
-        ],
-        "description": "Relation block"
     },
     "rel id": {
         "prefix": "rel .id",
@@ -73,7 +64,7 @@
         "body": [
             "rel {.}'${1:name_a}'::'${2:name_b}' {${3:object}}"
         ],
-        "description": "Relation (.)-to-many"
+        "description": "Relation {.}-to-many"
     },
 	"rel 1-1": {
         "prefix": "rel 1::1",
@@ -156,10 +147,10 @@
         "prefix": "map named",
         "body": [
             "map $1 (",
-            "\t${2:a}: (",
+            "\t${2:a} (",
             "\t\t$4",
             "\t)",
-            "\t${3:b}: (",
+            "\t${3:b} (",
             "\t\t$5",
             "\t)",
             "="
@@ -173,7 +164,7 @@
             "\t(",
             "\t\t$3",
             "\t)",
-            "\t${2:b}: (",
+            "\t${2:b} (",
             "\t\t$4",
             "\t)",
             "="

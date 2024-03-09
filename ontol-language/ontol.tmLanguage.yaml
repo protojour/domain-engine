@@ -15,11 +15,14 @@ patterns:
     match: \s(as)\s
 
   - comment: def declaration
-    match: ^(def)(\s?\((private|open)\))?
+    match: \b(def)\b
+    name: keyword.declaration.def.ontol
+
+  - comment: subject/self dot rel
+    match: \b(rel)\s*?(\.)
     captures:
-      '1': {name: keyword.declaration.def.ontol}
-      '2': {}
-      '3': {name: variable.parameter.ontol}
+      '1': {name: keyword.declaration.rel.ontol}
+      '2': {name: variable.language.ontol}
 
   - comment: rel declaration
     name: keyword.declaration.rel.ontol
@@ -34,29 +37,29 @@ patterns:
     match: (=>)
 
   - comment: map declaration
-    match: ^(map)(\s(\w+))?
+    match: \b(map)(\s*?(\w+))?
     captures:
       '1': {name: keyword.declaration.map.ontol}
       '2': {}
       '3': {name: variable.ontol}
 
-  - comment: map match matcher
+  - comment: modifier
     name: variable.parameter.ontol
-    match: \s(match)\s
+    match: (@(private|open|extern|match|in|all_in|contains_all|intersects|equals))\s
 
-  - comment: built-in defs
+  - comment: ontol defs
     name: storage.type.ontol
-    match: \b(boolean|number|integer|i64|float|f64|text|datetime|date|time|uuid|regex|seq|dict|fn)\b
+    match: \b(boolean|number|integer|i64|float|f32|f64|serial|text|uuid|datetime)\b
 
-  - comment: built-in constant value
+  - comment: ontol constants
     name: constant.language.ontol
-    match: \b(true|false|inf|nan|\(\)|\[\])\b
+    match: \b(true|false|\(\)|\[\])\b
 
-  - comment: built-in rel props
+  - comment: ontol relation types
     name: variable.function.ontol
-    match: \b(is|id|gen|default|example)\b
+    match: \b(is|id|min|max|gen|default|example)\b
 
-  - comment: built-in generators
+  - comment: ontol generator types
     name: entity.name.function.ontol
     match: \b(auto|create_time|update_time)\b
 
@@ -64,17 +67,24 @@ patterns:
     name: constant.numeric.ontol
     match: \b\-?(\d+(\.?\d+)?)\b
 
-  - comment: spread operator
-    name: keyword.operator.spread.ontol
-    match: \.\.
-
-  - comment: subject/self dot
-    name: variable.language.ontol
-    match: \s(\.)
-
   - comment: sigil
     name: keyword.operator.sigil.ontol
     match: '[.,:?+*=|]+'
+
+  - comment: subject/self dot alone
+    match: \s(\.)\s
+    name: variable.language.ontol
+
+  - comment: subject/self dot in set
+    match: ({\s?)(\.)(\s?})
+    captures:
+      '1': {}
+      '2': {name: variable.language.ontol}
+      '3': {}
+
+  - comment: spread operator
+    name: keyword.operator.spread.ontol
+    match: (\.\.)
 
   - comment: special case sigil
     name: keyword.operator.ontol
@@ -99,8 +109,7 @@ patterns:
     begin: \s/[^/\s]
     end: '[^\\]/'
     patterns:
-      - include: source.regexp
-      - include: '#escaped_char'
+      - include: source.js.regexp
 
   - comment: comment
     name: comment.line.double-slash.ontol

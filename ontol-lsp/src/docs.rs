@@ -1,355 +1,156 @@
 use lsp_types::{CompletionItem, CompletionItemKind};
+use ontol_runtime::ontology::TypeKind;
 
-use crate::state::HoverDoc;
-
-/// Get a HoverDoc for ONTOL core keywords, values and types
-pub fn get_ontol_docs(ident: &str) -> Option<HoverDoc> {
-    match ident {
-        "use" => Some(HoverDoc::from(
-            "use",
-            "#### Use statement\nImports a domain by name, and defines a local namespace.",
-        )),
-        "def" => Some(HoverDoc::from(
-            "def",
-            "#### Def statement\nDefines a type.",
-        )),
-        "rel" => Some(HoverDoc::from(
-            "rel",
-            "#### Relation statement\nDefines relations between types, properties of a type, or properties of a relation."
-        )),
-        "fmt" => Some(HoverDoc::from(
-            "fmt",
-            "#### Format statement\nDescribes a build/match pattern for strings or sequences."
-        )),
-        "map" => Some(HoverDoc::from(
-            "map",
-            "#### Map statement\nDescribes a map between two types."
-        )),
-        "pub" => Some(HoverDoc::from(
-            "pub",
-            "#### Public modifier\nMarks a type as public and importable from other domains.",
-        )),
-        "match" => Some(HoverDoc::from(
-            "match",
-            "#### Partial modifier\nPartial matching for `map` arm."
-        )),
-        "id" => Some(HoverDoc::from(
-            "ontol.id",
-            "#### Relation prop\nBinds an identifier to a type, making instances of a type unique entities.",
-        )),
-        "is" => Some(HoverDoc::from(
-            "ontol.is",
-            "#### Relation prop\nThe subject type takes on all properties of the object type, or binds the subject type to a union.",
-        )),
-        "min" => Some(HoverDoc::from(
-            "ontol.min",
-            "#### Relation prop\nMinimum value for the subject type.",
-        )),
-        "max" => Some(HoverDoc::from(
-            "ontol.max",
-            "#### Relation prop\nMaximum value for the subject type.",
-        )),
-        "default" => Some(HoverDoc::from(
-            "ontol.default",
-            "#### Relation prop\nAssigns a default value to a type or property if none is given.",
-        )),
-        "example" => Some(HoverDoc::from(
-            "ontol.example",
-            "#### Relation prop\nGives an example value for a type for documentation."
-        )),
-        "gen" => Some(HoverDoc::from(
-            "ontol.gen",
-            "#### Relation prop\nUse a generator function.",
-        )),
-        "auto" => Some(HoverDoc::from(
-            "ontol.auto",
-            "#### Generator\nAutogenerate value according to type, e.g. autoincrement (integer) or randomization (uuid).",
-        )),
-        "create_time" => Some(HoverDoc::from(
-            "ontol.create_time",
-            "#### Generator\nAutogenerate a datetime when instance is created.",
-        )),
-        "update_time" => Some(HoverDoc::from(
-            "ontol.update_time",
-            "#### Generator\nAutogenerate a datetime when instance is updated.",
-        )),
-        "boolean" => Some(HoverDoc::from(
-            "ontol.boolean",
-            "#### Primitive\nBoolean type."
-        )),
-        "true" => Some(HoverDoc::from(
-            "ontol.true",
-            "#### Primitive\nBoolean `true` value."
-        )),
-        "false" => Some(HoverDoc::from(
-            "ontol.false",
-            "#### Primitive\nBoolean `false` value."
-        )),
-        "number" => Some(HoverDoc::from(
-            "ontol.number",
-            "#### Primitive\nAbstract number type.",
-        )),
-        "integer" => Some(HoverDoc::from(
-            "ontol.integer",
-            "#### Primitive\nAbstract integer type.",
-        )),
-        "i64" => Some(HoverDoc::from(
-            "ontol.i64",
-            "#### Primitive\n64-bit signed integer.",
-        )),
-        "float" => Some(HoverDoc::from(
-            "ontol.float",
-            "#### Primitive\nAbstract floating point number type.",
-        )),
-        "f64" => Some(HoverDoc::from(
-            "ontol.f64",
-            "#### Primitive\n64-bit floating point number.",
-        )),
-        "text" => Some(HoverDoc::from(
-            "ontol.text",
-            "#### Primitive\nAny Unicode-encoded text.",
-        )),
-        "datetime" => Some(HoverDoc::from(
-            "ontol.datetime",
-            "#### Primitive\nRFC 3339-formatted datetime string.",
-        )),
-        "date" => Some(HoverDoc::from(
-            "ontol.date",
-            "#### Primitive\nRFC 3339-formatted date string.",
-        )),
-        "time" => Some(HoverDoc::from(
-            "ontol.time",
-            "#### Primitive\nRFC 3339-formatted time string.",
-        )),
-        "uuid" => Some(HoverDoc::from(
-            "ontol.uuid",
-            "#### Primitive\nUUID v7 string."
-        )),
-        "regex" => Some(HoverDoc::from(
-            "ontol.regex",
-            "#### Primitive\nRegular expression.",
-        )),
-        "." => Some(HoverDoc::from(
-            ".",
-            "#### Self reference\nRefers to the identity of the enclosing scope.",
-        )),
-        "?" => Some(HoverDoc::from(
-            "?",
-            "#### Optional modifier\nMakes the property optional.",
-        )),
-        _ => None,
-    }
-}
+use crate::state::{HoverDoc, State};
 
 pub fn get_ontol_var(ident: &str) -> HoverDoc {
     HoverDoc::from(ident, "#### Variable\nLocal variable or type reference.")
 }
 
-/// Completions for built-in keywords and defs
-pub fn get_core_completions() -> Vec<CompletionItem> {
-    vec![
-        CompletionItem {
-            label: "ontol".to_string(),
-            kind: Some(CompletionItemKind::KEYWORD),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "def".to_string(),
-            kind: Some(CompletionItemKind::KEYWORD),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "rel".to_string(),
-            kind: Some(CompletionItemKind::KEYWORD),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "map".to_string(),
-            kind: Some(CompletionItemKind::KEYWORD),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "use".to_string(),
-            kind: Some(CompletionItemKind::KEYWORD),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "as".to_string(),
-            kind: Some(CompletionItemKind::KEYWORD),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "pub".to_string(),
-            kind: Some(CompletionItemKind::KEYWORD),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "fmt".to_string(),
-            kind: Some(CompletionItemKind::KEYWORD),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "match".to_string(),
-            kind: Some(CompletionItemKind::KEYWORD),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "id".to_string(),
-            kind: Some(CompletionItemKind::PROPERTY),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "is".to_string(),
-            kind: Some(CompletionItemKind::PROPERTY),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "min".to_string(),
-            kind: Some(CompletionItemKind::PROPERTY),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "max".to_string(),
-            kind: Some(CompletionItemKind::PROPERTY),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "gen".to_string(),
-            kind: Some(CompletionItemKind::PROPERTY),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "auto".to_string(),
-            kind: Some(CompletionItemKind::PROPERTY),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "create_time".to_string(),
-            kind: Some(CompletionItemKind::PROPERTY),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "update_time".to_string(),
-            kind: Some(CompletionItemKind::PROPERTY),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "default".to_string(),
-            kind: Some(CompletionItemKind::PROPERTY),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "example".to_string(),
-            kind: Some(CompletionItemKind::PROPERTY),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "boolean".to_string(),
-            kind: Some(CompletionItemKind::UNIT),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "true".to_string(),
-            kind: Some(CompletionItemKind::UNIT),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "false".to_string(),
-            kind: Some(CompletionItemKind::UNIT),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "number".to_string(),
-            kind: Some(CompletionItemKind::UNIT),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "integer".to_string(),
-            kind: Some(CompletionItemKind::UNIT),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "float".to_string(),
-            kind: Some(CompletionItemKind::UNIT),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "i64".to_string(),
-            kind: Some(CompletionItemKind::UNIT),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "f64".to_string(),
-            kind: Some(CompletionItemKind::UNIT),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "string".to_string(),
-            kind: Some(CompletionItemKind::UNIT),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "datetime".to_string(),
-            kind: Some(CompletionItemKind::UNIT),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "date".to_string(),
-            kind: Some(CompletionItemKind::UNIT),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "time".to_string(),
-            kind: Some(CompletionItemKind::UNIT),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "uuid".to_string(),
-            kind: Some(CompletionItemKind::UNIT),
-            ..Default::default()
-        },
-        CompletionItem {
-            label: "regex".to_string(),
-            kind: Some(CompletionItemKind::UNIT),
-            ..Default::default()
-        },
-    ]
+impl State {
+    /// Get a HoverDoc for ONTOL core keywords, values and types
+    pub fn get_ontol_docs(&self, ident: &str) -> Option<HoverDoc> {
+        match ident {
+                "use" => Some(HoverDoc::from(
+                    ident,
+                    "#### Use statement\nImports a domain by name, and defines a local namespace alias.",
+                )),
+                "def" => Some(HoverDoc::from(
+                    ident,
+                    "#### Def statement\nDefines a a concept, type or data structure.",
+                )),
+                "rel" => Some(HoverDoc::from(
+                    ident,
+                    "#### Relation statement\nDefines properties of a definition, properties of a relation, or relationships between entities."
+                )),
+                "fmt" => Some(HoverDoc::from(
+                    ident,
+                    "#### Format statement\nDescribes a build/match pattern for strings or sequences."
+                )),
+                "map" => Some(HoverDoc::from(
+                    ident,
+                    "#### Map statement\nDescribes a map of the data flow between two definitions."
+                )),
+                "." => Some(HoverDoc::from(
+                    ident,
+                    "#### Self reference\nRefers to the identity of the enclosing scope.",
+                )),
+                ".." => Some(HoverDoc::from(
+                    ident,
+                    "#### Loop operator\nIndicates looping over the values of the containing set.",
+                )),
+                "?" => Some(HoverDoc::from(
+                    ident,
+                    "#### Optional modifier\nMakes the property optional.",
+                )),
+                "@private" => Some(HoverDoc::from(
+                    ident,
+                    "#### Def modifier\nThe definition is private. It will not be accessible to other domains if the domain is imported in a `use` statement."
+                )),
+                "@open" => Some(HoverDoc::from(
+                    ident,
+                    "#### Def modifier\nThe definition and its immediate non-entity relationships are open. Arbitrary data can be associated with it."
+                )),
+                "@extern" => Some(HoverDoc::from(
+                    ident,
+                    "#### Def modifier\nThe definition describes an external hook."
+                )),
+                "@match" => Some(HoverDoc::from(
+                    ident,
+                    "#### Map modifier\nThe map becomes one-way and the `@match` arm tries to match given variables against structures that follow."
+                )),
+                "@in" => Some(HoverDoc::from(
+                    ident,
+                    "#### Set modifier\nThe given value must be in the set that follows."
+                )),
+                "@all_in" => Some(HoverDoc::from(
+                    ident,
+                    "#### Set modifier\nThe given values must all be in the set that follows."
+                )),
+                "@contains_all" => Some(HoverDoc::from(
+                    ident,
+                    "#### Set modifier\nThe set must contain all the values that follow."
+                )),
+                "@intersects" => Some(HoverDoc::from(
+                    ident,
+                    "#### Set modifier\nThe set must intersect with the set that follows."
+                )),
+                "@equals" => Some(HoverDoc::from(
+                    ident,
+                    "#### Set modifier\nThe values must be equal."
+                )),
+                ident => {
+                    match self.ontol_type_info.get(ident) {
+                        Some(type_info) => {
+                            let doc = self.ontology.get_docs(type_info.def_id).unwrap_or_default();
+                            let kind = match type_info.kind {
+                                TypeKind::Entity(_) | TypeKind::Data(_) => Some("Primitive"),
+                                TypeKind::Relationship(_) => Some("Relation type"),
+                                TypeKind::Generator(_) => Some("Generator type"),
+                                _ => Some("")
+                            };
+                            kind.map(|kind| HoverDoc::from(
+                                &format!("ontol.{ident}"),
+                                &format!("#### {kind}\n{doc}")
+                            ))
+                        }
+                        None => None
+                    }
+                }
+            }
+    }
 }
 
-/// A list of reserved words in ONTOL, to separate them from user-defined symbols
-pub const RESERVED_WORDS: [&str; 34] = [
-    "ontol",
-    "use",
-    "as",
-    "pub",
-    "def",
-    "rel",
-    "fmt",
-    "map",
-    "unify",
-    "match",
-    "id",
-    "is",
-    "min",
-    "max",
-    "default",
-    "example",
-    "gen",
-    "auto",
-    "create_time",
-    "update_time",
-    "number",
-    "boolean",
-    "true",
-    "false",
-    "integer",
-    "i64",
-    "float",
-    "f64",
-    "string",
-    "datetime",
-    "date",
-    "time",
-    "uuid",
-    "regex",
+/// A list of Completions and their Kind
+pub const COMPLETIONS: [(&str, CompletionItemKind); 39] = [
+    ("ontol", CompletionItemKind::MODULE),
+    ("def", CompletionItemKind::KEYWORD),
+    ("fmt", CompletionItemKind::KEYWORD),
+    ("map", CompletionItemKind::KEYWORD),
+    ("rel", CompletionItemKind::KEYWORD),
+    ("use", CompletionItemKind::KEYWORD),
+    ("as", CompletionItemKind::KEYWORD),
+    ("is", CompletionItemKind::PROPERTY),
+    ("id", CompletionItemKind::PROPERTY),
+    ("min", CompletionItemKind::PROPERTY),
+    ("max", CompletionItemKind::PROPERTY),
+    ("gen", CompletionItemKind::PROPERTY),
+    ("default", CompletionItemKind::PROPERTY),
+    ("example", CompletionItemKind::PROPERTY),
+    ("auto", CompletionItemKind::FUNCTION),
+    ("create_time", CompletionItemKind::FUNCTION),
+    ("update_time", CompletionItemKind::FUNCTION),
+    ("boolean", CompletionItemKind::UNIT),
+    ("number", CompletionItemKind::UNIT),
+    ("integer", CompletionItemKind::UNIT),
+    ("i64", CompletionItemKind::UNIT),
+    ("float", CompletionItemKind::UNIT),
+    ("f32", CompletionItemKind::UNIT),
+    ("f64", CompletionItemKind::UNIT),
+    ("serial", CompletionItemKind::UNIT),
+    ("text", CompletionItemKind::UNIT),
+    ("uuid", CompletionItemKind::UNIT),
+    ("datetime", CompletionItemKind::UNIT),
+    ("true", CompletionItemKind::CONSTANT),
+    ("false", CompletionItemKind::CONSTANT),
+    ("@private", CompletionItemKind::TYPE_PARAMETER),
+    ("@open", CompletionItemKind::TYPE_PARAMETER),
+    ("@extern", CompletionItemKind::TYPE_PARAMETER),
+    ("@match", CompletionItemKind::TYPE_PARAMETER),
+    ("@in", CompletionItemKind::TYPE_PARAMETER),
+    ("@all_in", CompletionItemKind::TYPE_PARAMETER),
+    ("@contains_all", CompletionItemKind::TYPE_PARAMETER),
+    ("@intersects", CompletionItemKind::TYPE_PARAMETER),
+    ("@equals", CompletionItemKind::TYPE_PARAMETER),
 ];
+
+/// Completions for built-in keywords and defs
+pub fn get_core_completions() -> Vec<CompletionItem> {
+    COMPLETIONS
+        .map(|(label, kind)| CompletionItem {
+            label: label.to_string(),
+            kind: Some(kind),
+            ..Default::default()
+        })
+        .to_vec()
+}
