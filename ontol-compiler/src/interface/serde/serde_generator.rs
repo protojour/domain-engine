@@ -29,7 +29,7 @@ use super::{sequence_range_builder::SequenceRangeBuilder, SerdeIntersection, Ser
 use crate::{
     codegen::task::CodegenTasks,
     compiler_queries::GetDefType,
-    def::{DefKind, Defs, LookupRelationshipMeta, TypeDef},
+    def::{DefKind, Defs, LookupRelationshipMeta, TypeDef, TypeDefFlags},
     interface::graphql::graphql_namespace::{adapt_graphql_identifier, GqlAdaptedIdent},
     primitive::{PrimitiveKind, Primitives},
     relation::{Constructor, Properties, Relations, UnionMemberCache},
@@ -880,7 +880,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     pub(super) fn struct_flags_from_def_id(&self, def_id: DefId) -> SerdeStructFlags {
         let mut flags = SerdeStructFlags::empty();
         if let DefKind::Type(type_def) = self.defs.def_kind(def_id) {
-            if type_def.open {
+            if type_def.flags.contains(TypeDefFlags::OPEN) {
                 flags |= SerdeStructFlags::OPEN_DATA;
             }
         }

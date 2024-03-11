@@ -26,7 +26,7 @@ use thin_vec::thin_vec;
 use tracing::{trace, trace_span};
 
 use crate::{
-    def::{DefKind, LookupRelationshipMeta, RelParams},
+    def::{DefKind, LookupRelationshipMeta, RelParams, TypeDefFlags},
     interface::serde::{serde_generator::SerdeGenerator, SerdeKey},
     relation::Property,
     repr::repr_model::{ReprKind, ReprScalarKind},
@@ -432,7 +432,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         let mut fields = vec![];
 
         if let DefKind::Type(type_def) = self.defs.def_kind(def_id) {
-            if type_def.open {
+            if type_def.flags.contains(TypeDefFlags::OPEN) {
                 struct_flags |= SerdeStructFlags::OPEN_DATA;
             }
         }

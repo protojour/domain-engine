@@ -352,6 +352,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 subject_ty
             }
+            BuiltinRelationKind::Order | BuiltinRelationKind::Direction => {
+                let _subject_ty = self.check_def_shallow(subject.0);
+                let object_ty = self.check_def_shallow(object.0);
+
+                object_ty
+            }
         }
     }
 

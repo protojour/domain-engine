@@ -81,49 +81,24 @@ impl PrimitiveKind {
     }
 }
 
-/// Set of fundamental/primitive definitions
+/// Set of fundamental/primitive definitions.
+///
+/// This struct is for quick lookup by the compiler.
 #[derive(Debug)]
 pub struct Primitives {
-    /// The unit type that carries no information
     pub unit: DefId,
-
-    /// The false type, a subtype of bool
     pub false_value: DefId,
-
-    /// The true type, a subtype of bool
     pub true_value: DefId,
-
-    /// The bool type, the union of true and false
     pub bool: DefId,
-
-    /// The empty sequence type.
     pub empty_sequence: DefId,
-
-    /// The empty text type.
     pub empty_text: DefId,
-
-    /// The text type: All valid unicode sequences.
     pub text: DefId,
-
-    /// The abstract type of a number. Supertype of integers and fractionals.
     pub number: DefId,
-
-    /// The integer type.
     pub integer: DefId,
-
-    /// The 64 bit signed integer type
     pub i64: DefId,
-
-    /// The float type.
     pub float: DefId,
-
-    /// 32 bit floating point
     pub f32: DefId,
-
-    /// 64 bit floating point
     pub f64: DefId,
-
-    /// 64 bit unsigned
     pub serial: DefId,
 
     /// The definition of the ontol domain
@@ -137,34 +112,34 @@ pub struct Primitives {
 
     pub generators: Generators,
 
+    pub symbols: OntolSymbols,
+
     /// Documentation relations
     pub doc: Doc,
 }
 
 /// Built-in relation types
+///
+/// For documentation, see [BuiltinRelationKind].
 #[derive(Debug)]
 pub struct OntolRelations {
-    /// Relation between a type and a representation of the type.
     pub is: DefId,
-
-    /// Relation between an ID type and the entity that it identifies.
     pub identifies: DefId,
-
-    /// Relation between an entity and its primary id type.
     pub id: DefId,
-
-    /// Relation between a tuple and one of its fields.
     pub indexed: DefId,
-
-    /// TODO: Remove? "min" and "max" are type attributes, not field attributes
     pub min: DefId,
     pub max: DefId,
-
-    /// Relation between a field and its default value.
     pub default: DefId,
-
-    /// Relation between a field and its read-only mode generator function.
     pub gen: DefId,
+    pub order: DefId,
+    pub direction: DefId,
+}
+
+/// Built-in symbols (named subtypes of text)
+#[derive(Debug)]
+pub struct OntolSymbols {
+    pub ascending: DefId,
+    pub descending: DefId,
 }
 
 #[derive(Debug)]
@@ -210,12 +185,20 @@ impl Primitives {
                 max: defs.add_builtin_relation(BuiltinRelationKind::Max, Some("max")),
                 default: defs.add_builtin_relation(BuiltinRelationKind::Default, Some("default")),
                 gen: defs.add_builtin_relation(BuiltinRelationKind::Gen, Some("gen")),
+                order: defs.add_builtin_relation(BuiltinRelationKind::Order, Some("order")),
+                direction: defs
+                    .add_builtin_relation(BuiltinRelationKind::Direction, Some("direction")),
             },
 
             generators: Generators {
                 auto: defs.add_def(DefKind::EmptySequence, ONTOL_PKG, NO_SPAN),
                 create_time: defs.add_def(DefKind::EmptySequence, ONTOL_PKG, NO_SPAN),
                 update_time: defs.add_def(DefKind::EmptySequence, ONTOL_PKG, NO_SPAN),
+            },
+
+            symbols: OntolSymbols {
+                ascending: defs.add_builtin_symbol("ascending"),
+                descending: defs.add_builtin_symbol("descending"),
             },
 
             doc: Doc {

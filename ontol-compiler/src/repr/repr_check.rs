@@ -13,7 +13,7 @@ use ontol_runtime::{value::PropertyId, DefId};
 use tracing::trace;
 
 use crate::{
-    def::{Def, DefKind, Defs, LookupRelationshipMeta, RelParams},
+    def::{Def, DefKind, Defs, LookupRelationshipMeta, RelParams, TypeDefFlags},
     error::CompileError,
     package::ONTOL_PKG,
     primitive::{PrimitiveKind, Primitives},
@@ -329,7 +329,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                             def_id,
                             data,
                         )
-                    } else if type_def.concrete {
+                    } else if type_def.flags.contains(TypeDefFlags::CONCRETE) {
                         if let Some(properties) = self.relations.properties_by_def_id(def_id) {
                             let mut has_table = false;
                             if properties.table.is_some() {

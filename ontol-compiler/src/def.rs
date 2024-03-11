@@ -90,20 +90,23 @@ impl<'m> DefKind<'m> {
 
 #[derive(Debug)]
 pub struct TypeDef<'m> {
-    /// Whether the definition's export is ignored
-    pub visibility: DefVisibility,
-    /// Whether the definition can have an "open relationship" to arbitrary data
-    pub open: bool,
     pub ident: Option<&'m str>,
     pub rel_type_for: Option<RelationshipId>,
-    /// for now: Every user-domain defined type is concrete.
-    pub concrete: bool,
+    pub flags: TypeDefFlags,
 }
 
-#[derive(Copy, Clone, Debug)]
-pub enum DefVisibility {
-    Public,
-    Private,
+bitflags::bitflags! {
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
+    pub struct TypeDefFlags: u8 {
+        /// Whether the definition is exported
+        const PUBLIC         = 0b00000001;
+        /// Whether the definition can have an "open relationship" to arbitrary data
+        const OPEN           = 0b00000010;
+        /// for now: Every user-domain defined type is concrete.
+        const CONCRETE       = 0b00000100;
+        /// Whether the defintion is a ontol-builtin symbol
+        const BUILTIN_SYMBOL = 0b00001000;
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -151,6 +154,10 @@ pub enum BuiltinRelationKind {
     /// rel .'id'[rel .gen: auto]|id: (rel .is: uuid)
     /// ```
     Gen,
+    /// A relation between an entity and an ordering.
+    Order,
+    /// A relation that expresses that something has a direction.
+    Direction,
     /// Gives an example value for a type, for documentation purposes.
     /// ```ontol
     /// rel .is: text
@@ -207,7 +214,7 @@ pub struct RelationshipMeta<'d, 'm> {
 pub struct Defs<'m> {
     def_id_allocators: FnvHashMap<PackageId, u16>,
     pub(crate) table: FnvHashMap<DefId, Def<'m>>,
-    pub(crate) string_literals: HashMap<&'m str, DefId>,
+    pub(crate) text_literals: HashMap<&'m str, DefId>,
     pub(crate) regex_strings: HashMap<&'m str, DefId>,
     pub(crate) literal_regex_meta_table: FnvHashMap<DefId, RegexMeta<'m>>,
     pub(crate) string_like_types: FnvHashMap<DefId, TextLikeType>,
@@ -231,7 +238,7 @@ impl<'m> Defs<'m> {
         Self {
             def_id_allocators: Default::default(),
             table: Default::default(),
-            string_literals: Default::default(),
+            text_literals: Default::default(),
             regex_strings: Default::default(),
             literal_regex_meta_table: Default::default(),
             string_like_types: Default::default(),
@@ -294,13 +301,25 @@ impl<'m> Defs<'m> {
         self.add_def(DefKind::BuiltinRelType(kind, ident), ONTOL_PKG, NO_SPAN)
     }
 
-    pub fn def_string_literal(&mut self, lit: &str, strings: &mut Strings<'m>) -> DefId {
-        match self.string_literals.get(&lit) {
+    pub fn add_builtin_symbol(&mut self, ident: &'static str) -> DefId {
+        self.add_def(
+            DefKind::Type(TypeDef {
+                ident: Some(ident),
+                rel_type_for: None,
+                flags: TypeDefFlags::PUBLIC | TypeDefFlags::CONCRETE | TypeDefFlags::BUILTIN_SYMBOL,
+            }),
+            ONTOL_PKG,
+            NO_SPAN,
+        )
+    }
+
+    pub fn def_text_literal(&mut self, lit: &str, strings: &mut Strings<'m>) -> DefId {
+        match self.text_literals.get(&lit) {
             Some(def_id) => *def_id,
             None => {
                 let lit = strings.intern(lit);
                 let def_id = self.add_def(DefKind::TextLiteral(lit), ONTOL_PKG, NO_SPAN);
-                self.string_literals.insert(lit, def_id);
+                self.text_literals.insert(lit, def_id);
                 def_id
             }
         }

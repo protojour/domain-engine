@@ -5,7 +5,7 @@ use std::ops::Range;
 use ontol_runtime::{text_like_types::TextLikeType, vm::proc::BuiltinProc, DefId};
 
 use crate::{
-    def::{BuiltinRelationKind, DefKind, DefVisibility, TypeDef},
+    def::{BuiltinRelationKind, DefKind, TypeDef, TypeDefFlags},
     mem::Intern,
     namespace::Space,
     package::ONTOL_PKG,
@@ -27,7 +27,9 @@ impl<'m> Compiler<'m> {
         // Pre-processe primitive definitions
         let mut named_builtin_relations: Vec<(DefId, &'static str)> = vec![];
         for def_id in self.defs.iter_package_def_ids(ONTOL_PKG) {
-            match self.defs.def_kind(def_id) {
+            let def_kind = self.defs.def_kind(def_id);
+
+            match def_kind {
                 DefKind::Primitive(kind, ident) => {
                     let ty = self.types.intern(Type::Primitive(*kind, def_id));
                     if let Some(ident) = *ident {
@@ -53,6 +55,26 @@ impl<'m> Compiler<'m> {
                     self.relations
                         .rel_type_constraints
                         .insert(def_id, constraints);
+                }
+                DefKind::Type(type_def) => {
+                    if type_def.flags.contains(TypeDefFlags::BUILTIN_SYMBOL) {
+                        let ident = type_def.ident.unwrap();
+
+                        let symbol_literal_def_id =
+                            self.defs.def_text_literal(ident, &mut self.strings);
+
+                        self.register_type(def_id, Type::Domain);
+
+                        self.is(
+                            def_id,
+                            (TypeRelation::Subset, TypeRelation::Super),
+                            symbol_literal_def_id,
+                        );
+
+                        self.namespaces
+                            .get_namespace_mut(ONTOL_PKG, Space::Type)
+                            .insert(ident, def_id);
+                    }
                 }
                 _ => {}
             }
@@ -124,6 +146,10 @@ impl<'m> Compiler<'m> {
             "update_time",
             Type::ValueGenerator,
         );
+
+        for def_id in self.defs.iter_package_def_ids(ONTOL_PKG) {
+            self.type_check().check_def_sealed(def_id);
+        }
 
         self.seal_domain(ONTOL_PKG);
         self.repr_smoke_test();
@@ -231,11 +257,9 @@ impl<'m> Compiler<'m> {
     ) -> (DefId, TypeRef<'m>) {
         let def_id = self.defs.add_def(
             DefKind::Type(TypeDef {
-                visibility: DefVisibility::Public,
-                open: false,
                 ident: Some(ident),
                 rel_type_for: None,
-                concrete: true,
+                flags: TypeDefFlags::PUBLIC | TypeDefFlags::CONCRETE,
             }),
             ONTOL_PKG,
             NO_SPAN,

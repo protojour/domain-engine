@@ -64,6 +64,18 @@ fn test_serde_booleans() {
 }
 
 #[test]
+fn test_serde_builtin_symbol() {
+    "def foo ( rel .'const': ontol.ascending )".compile_then(|test| {
+        let [foo] = test.bind(["foo"]);
+        assert_json_io_matches!(serde_create(&foo), { "const": "ascending" });
+        assert_error_msg!(
+            serde_create(&foo).to_value(json!({ "const": "abc" })),
+            "invalid type: string \"abc\", expected \"ascending\" at line 1 column 14"
+        );
+    });
+}
+
+#[test]
 fn test_serde_struct_type() {
     "
     def foo ( rel .'a': text )
