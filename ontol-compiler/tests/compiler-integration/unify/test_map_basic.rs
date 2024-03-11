@@ -63,8 +63,8 @@ fn test_meters() {
     def meters (rel .is: i64)
     def millimeters (rel .is: i64)
     map(
-        meters: x / 1000,
-        millimeters: x,
+        meters(x / 1000),
+        millimeters(x),
     )
     "
     .compile_then(|test| {
@@ -81,8 +81,8 @@ fn test_temperature() {
     def celsius (rel .is: i64)
     def fahrenheit (rel .is: i64)
     map(
-        celsius: x,
-        fahrenheit: x * 9 / 5 + 32,
+        celsius(x),
+        fahrenheit(x * 9 / 5 + 32),
     )
     "
     .compile_then(|test| {
@@ -100,8 +100,8 @@ fn test_nested_optional_attribute() {
     def years (rel .is: i64)
 
     map(
-        seconds: y * 60 * 60 * 24 * 365,
-        years: y
+        seconds(y * 60 * 60 * 24 * 365),
+        years(y)
     )
 
     def person (rel .'age'?: years)
@@ -160,7 +160,7 @@ fn test_map_value_to_struct_no_func() {
     def one (rel .is: text)
     def two (rel .'a': text)
     map(
-        one: x,
+        one(x),
         two('a': x)
     )
     "
@@ -178,7 +178,7 @@ fn test_map_value_to_struct_func() {
     def one (rel .is: i64)
     def two (rel .'a': i64)
     map(
-        one: x,
+        one(x),
         two('a': x * 2),
     )
     "
@@ -528,7 +528,7 @@ fn test_sequence_flat_map1() {
                 'b': b
             )}
         ),
-        bar: {
+        bar {
             ..bar(
                 'a': a,
                 'b': b,
@@ -681,8 +681,8 @@ fn test_map_delegation() {
             def millimeters (rel .is: i64)
 
             map(
-                meters: m,
-                millimeters: m * 1000,
+                meters(m),
+                millimeters(m * 1000),
             )
             ",
         ),
@@ -725,8 +725,8 @@ fn test_map_delegation_abstract_types() {
             def millimeters (rel .is: number)
 
             map(
-                meters: m,
-                millimeters: m * 1000,
+                meters(m),
+                millimeters(m * 1000),
             )
             ",
         ),

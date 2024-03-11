@@ -151,10 +151,6 @@ pub enum BuiltinRelationKind {
     /// rel .'id'[rel .gen: auto]|id: (rel .is: uuid)
     /// ```
     Gen,
-    /// _Deprecated_
-    Route,
-    /// _Deprecated_
-    Doc,
     /// Gives an example value for a type, for documentation purposes.
     /// ```ontol
     /// rel .is: text

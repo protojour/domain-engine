@@ -241,15 +241,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 object_ty
             }
-            BuiltinRelationKind::Route => {
-                let subject_ty = self.check_def_shallow(subject.0);
-                let object_ty = self.check_def_shallow(object.0);
-
-                self.check_package_data_type(subject_ty, &subject.1);
-                self.check_package_data_type(object_ty, &object.1);
-
-                object_ty
-            }
             BuiltinRelationKind::Default => {
                 let _subject_ty = self.check_def_shallow(subject.0);
                 let subject_def_kind = self.defs.def_kind(subject.0);
@@ -342,10 +333,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 );
                 object_ty
             }
-            BuiltinRelationKind::Min
-            | BuiltinRelationKind::Max
-            | BuiltinRelationKind::Doc
-            | BuiltinRelationKind::Example => {
+            BuiltinRelationKind::Min | BuiltinRelationKind::Max | BuiltinRelationKind::Example => {
                 let subject_ty = self.check_def_shallow(subject.0);
                 let _ = self.check_def_shallow(object.0);
 
@@ -461,15 +449,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         if let Some(def_id) = ty.get_single_def_id() {
             if self.seal_ctx.is_sealed(def_id) {
                 self.error(CompileError::MutationOfSealedDef, span);
-            }
-        }
-    }
-
-    fn check_package_data_type(&mut self, ty: TypeRef<'m>, span: &SourceSpan) {
-        match ty {
-            Type::Package => {}
-            _ => {
-                self.error(CompileError::SubjectMustBeDomainType, span);
             }
         }
     }

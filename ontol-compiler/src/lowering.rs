@@ -5,7 +5,10 @@ use std::{
 
 use either::Either;
 use indexmap::map::Entry;
-use ontol_parser::{ast, Span, Spanned};
+use ontol_parser::{
+    ast::{self, AnyPattern, StructPatternParameter},
+    Span, Spanned,
+};
 use ontol_runtime::{
     ontology::{PropertyCardinality, ValueCardinality},
     smart_format,
@@ -684,33 +687,11 @@ impl<'s, 'm> Lowering<'s, 'm> {
         var_table: &mut MapVarTable,
     ) -> Res<PatId> {
         let pattern = match ast {
-            ast::MapArm::Binding {
-                path,
-                pattern: (pattern, pat_span),
-            } => match pattern {
-                ast @ (ast::AnyPattern::Expr(_) | ast::AnyPattern::Struct(_)) => {
-                    self.lower_map_root_binding_pattern(path, ast, span, var_table)?
-                }
-                ast::AnyPattern::Set((set_pattern, _span)) => {
-                    if let Some((_modifier, span)) = set_pattern.modifier {
-                        Err((
-                            CompileError::TODO(smart_format!(
-                                "top-level set-algebraic operators not supported"
-                            )),
-                            span,
-                        ))
-                    } else {
-                        self.lower_set_pattern(
-                            Some(path),
-                            set_pattern.elements,
-                            pat_span,
-                            var_table,
-                        )
-                    }?
-                }
-            },
             ast::MapArm::Struct(ast) => {
                 self.lower_struct_pattern((ast, span.clone()), var_table)?
+            }
+            ast::MapArm::Set(ast) => {
+                self.lower_set_pattern(ast.path, ast.elements, span.clone(), var_table)?
             }
         };
 
@@ -718,44 +699,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
         self.compiler.patterns.table.insert(pat_id, pattern);
 
         Ok(pat_id)
-    }
-
-    fn lower_map_root_binding_pattern(
-        &mut self,
-        type_path: (ast::Path, Span),
-        ast: ast::AnyPattern,
-        span: Span,
-        var_table: &mut MapVarTable,
-    ) -> Res<Pattern> {
-        let type_def_id = self.lookup_path(&type_path.0, &type_path.1)?;
-        let key = (DefId::unit(), self.src.span(&span));
-        let pattern = match ast {
-            ast::AnyPattern::Expr(ast) => self.lower_expr_pattern(ast, var_table)?,
-            ast::AnyPattern::Struct(ast) => self.lower_struct_pattern(ast, var_table)?,
-            ast::AnyPattern::Set(_) => unreachable!(),
-        };
-
-        Ok(self.mk_pattern(
-            PatternKind::Compound {
-                type_path: TypePath::Specified {
-                    def_id: type_def_id,
-                    span: self.src.span(&type_path.1),
-                },
-                modifier: None,
-                is_unit_binding: true,
-                attributes: [CompoundPatternAttr {
-                    key,
-                    bind_option: false,
-                    kind: CompoundPatternAttrKind::Value {
-                        rel: None,
-                        val: pattern,
-                    },
-                }]
-                .into(),
-                spread_label: None,
-            },
-            &span,
-        ))
     }
 
     fn lower_struct_pattern(
@@ -786,20 +729,65 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 TypePath::Inferred { def_id }
             }
         };
-        let (attrs, rest_label) = self.lower_struct_pattern_args(ast.args, var_table)?;
 
-        Ok(self.mk_pattern(
-            PatternKind::Compound {
-                type_path,
-                modifier: ast.modifier.map(|(modifier, _span)| match modifier {
-                    ast::StructPatternModifier::Match => CompoundPatternModifier::Match,
-                }),
-                is_unit_binding: false,
-                attributes: attrs,
-                spread_label: rest_label,
-            },
-            &span,
-        ))
+        match ast.param {
+            StructPatternParameter::Attributes(params) => {
+                let (attrs, rest_label) =
+                    self.lower_struct_pattern_attributes(params, var_table)?;
+
+                Ok(self.mk_pattern(
+                    PatternKind::Compound {
+                        type_path,
+                        modifier: ast.modifier.map(|(modifier, _span)| match modifier {
+                            ast::StructPatternModifier::Match => CompoundPatternModifier::Match,
+                        }),
+                        is_unit_binding: false,
+                        attributes: attrs,
+                        spread_label: rest_label,
+                    },
+                    &span,
+                ))
+            }
+            StructPatternParameter::Pattern(inner_ast) => {
+                let unit_pattern = match *inner_ast {
+                    AnyPattern::Struct(ast) => self.lower_struct_pattern(ast, var_table)?,
+                    AnyPattern::Expr(ast) => self.lower_expr_pattern(ast, var_table)?,
+                    AnyPattern::Set((_ast, span)) => {
+                        return Err((
+                            CompileError::TODO(smart_format!("set pattern not allowed here")),
+                            span,
+                        ));
+                    }
+                };
+
+                if let Some((_modifier, span)) = ast.modifier {
+                    return Err((
+                        CompileError::TODO(smart_format!("modifier not supported here")),
+                        span,
+                    ));
+                }
+                let key = (DefId::unit(), self.src.span(&span));
+
+                Ok(self.mk_pattern(
+                    PatternKind::Compound {
+                        type_path,
+                        modifier: None,
+                        is_unit_binding: true,
+                        attributes: [CompoundPatternAttr {
+                            key,
+                            bind_option: false,
+                            kind: CompoundPatternAttrKind::Value {
+                                rel: None,
+                                val: unit_pattern,
+                            },
+                        }]
+                        .into(),
+                        spread_label: None,
+                    },
+                    &span,
+                ))
+            }
+        }
     }
 
     fn lower_any_pattern(
@@ -819,15 +807,15 @@ impl<'s, 'm> Lowering<'s, 'm> {
                         span.clone(),
                     ))
                 } else {
-                    self.lower_set_pattern(None, ast.elements, span, var_table)
+                    self.lower_set_pattern(ast.path, ast.elements, span, var_table)
                 }
             }
         }
     }
 
-    fn lower_struct_pattern_args(
+    fn lower_struct_pattern_attributes(
         &mut self,
-        args: Vec<(ast::StructPatternArgument, Range<usize>)>,
+        args: Vec<(ast::StructPatternAttributeKind, Range<usize>)>,
         var_table: &mut MapVarTable,
     ) -> Res<(Box<[CompoundPatternAttr]>, OptionSpreadLabel)> {
         let mut attrs: Vec<CompoundPatternAttr> = Vec::with_capacity(args.len());
@@ -839,10 +827,10 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }
 
             match struct_arg {
-                ast::StructPatternArgument::Attr(attr) => {
+                ast::StructPatternAttributeKind::Attr(attr) => {
                     attrs.push(self.lower_compound_pattern_attr((attr, span), var_table)?);
                 }
-                ast::StructPatternArgument::Spread(label) => {
+                ast::StructPatternAttributeKind::Spread(label) => {
                     rest_label = Some(Box::new(SpreadLabel(label, self.src.span(&span))))
                 }
             }
@@ -881,7 +869,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         // Inherit modifier from object pattern
         fn lower_relation_attrs(
             lowering: &mut Lowering,
-            ast_relation_attrs: Option<Spanned<Vec<Spanned<ast::StructPatternArgument>>>>,
+            ast_relation_attrs: Option<Spanned<Vec<Spanned<ast::StructPatternAttributeKind>>>>,
             object_pattern: &Pattern,
             var_table: &mut MapVarTable,
         ) -> Res<Option<Pattern>> {
@@ -897,7 +885,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 _ => None,
             };
 
-            let (attrs, rest_label) = lowering.lower_struct_pattern_args(attrs, var_table)?;
+            let (attrs, rest_label) = lowering.lower_struct_pattern_attributes(attrs, var_table)?;
             Ok(Some(lowering.mk_pattern(
                 PatternKind::Compound {
                     type_path: TypePath::RelContextual,

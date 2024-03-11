@@ -35,11 +35,11 @@ fn test_extract_rel_params() {
     def b2_id(fmt '' => 'b2/' => uuid => .)
 
     def a2(
-        rel a2_id identifies: .
+        rel .id: a2_id
         rel .'foo': text
     )
     def b2(
-        rel b2_id identifies: .
+        rel .id: b2_id
         rel .'foo': text
         rel .'bar': text
     )
@@ -49,11 +49,11 @@ fn test_extract_rel_params() {
     )
 
     def a1(
-        rel a1_id identifies: .
+        rel .id: a1_id
         rel .'foreign'[rel .is: a_edge]: a2
     )
     def b1(
-        rel b1_id identifies: .
+        rel .id: b1_id
         rel .'foreign': b2
     )
 
@@ -117,11 +117,11 @@ fn test_rel_params_implicit_map() {
     def b_inner_id (fmt '' => 'b_inner/' => uuid => .)
 
     def a_inner (
-        rel a_inner_id identifies: .
+        rel .id: a_inner_id
         rel .'a_prop': text
     )
     def b_inner (
-        rel b_inner_id identifies: .
+        rel .id: b_inner_id
         rel .'b_prop': text
     )
 
@@ -129,11 +129,11 @@ fn test_rel_params_implicit_map() {
     def b_edge (rel .'bb': text)
 
     def a (
-        rel a_id identifies: .
+        rel .id: a_id
         rel .'foreign'[rel .is: a_edge]: a_inner
     )
     def b (
-        rel b_id identifies: .
+        rel .id: b_id
         rel .'foreign'[rel .is: b_edge]: b_inner
     )
 
@@ -222,7 +222,7 @@ def technology ()
 
 def worker (
     rel .'ID': worker_id
-    rel worker_id identifies: .
+    rel .id: worker_id
     rel .'name': text
 
     rel .'technologies': {technology}
@@ -230,7 +230,7 @@ def worker (
 
 def technology (
     rel .'ID': tech_id
-    rel tech_id identifies: .
+    rel .id: tech_id
     rel .'name': text
 )
 ";
@@ -244,7 +244,7 @@ def developer ()
 
 def language (
     rel .'id': lang_id
-    rel lang_id identifies: .
+    rel .id: lang_id
 
     rel .'name': text
     rel .'developers': {developer}
@@ -252,7 +252,7 @@ def language (
 
 def developer (
     rel .'id': dev_id
-    rel dev_id identifies: .
+    rel .id: dev_id
     rel .'name': text
 )
 ";

@@ -12,7 +12,7 @@ fn test_map_match_non_inherent_id() {
     def key (rel .is: text)
     def ent (rel .id: key)
     map(
-        key: key,
+        key(key),
         @match ent( // ERROR no properties expected
             id: key
         )
@@ -30,7 +30,7 @@ fn test_map_match_scalar_key() {
         rel .'prop': text
     )
     map query(
-        key: key,
+        key(key),
         @match foo('key': key),
     )
     "#
@@ -74,7 +74,7 @@ fn test_map_match_parameterless_query() {
     )
     map query(
         (),
-        foo: { ..@match foo() }
+        foo { ..@match foo() }
     )
     "#
     .compile_then(|test| {
@@ -121,7 +121,7 @@ fn test_map_match_query_mandatory_properties() {
             'input_a': a,
             'input_b': b,
         ),
-        foo: { ..@match foo(
+        foo { ..@match foo(
             'prop_a': a,
             'prop_b': b,
         )},
@@ -170,7 +170,7 @@ fn test_map_match_query_optional_property() {
             'input_a': a,
             'input_b'?: b,
         ),
-        foo: {..@match foo(
+        foo {..@match foo(
             'prop_a': a,
             'prop_b'?: b,
         )}
@@ -245,7 +245,7 @@ fn test_map_match_anonymous_with_translation() {
     )
     map query(
         ('input': x),
-        bar: {..@match foo(
+        bar {..@match foo(
             'foo': x
         )}
     )
@@ -290,7 +290,7 @@ fn test_map_match_sequence_filter_in_set() {
     )
     map query(
         ('input': { ..x }),
-        bar: {
+        bar {
             ..@match foo('foo': @in { ..x })
         }
     )
@@ -341,7 +341,7 @@ mod match_contains_all {
             'foo_tags'?: { ..tags },
             'sub_tag'?: sub_tag
         ),
-        foo: {
+        foo {
             ..@match foo(
                 'tags'?: @contains_all { ..tags },
                 'sub'?: sub(
@@ -421,7 +421,7 @@ fn test_map_match_in_sub_multi_edge() {
     )
     map foos(
         ('bar_tags'?: { ..tags }),
-        foo: {
+        foo {
             ..@match foo(
                 'bars'?: @match bar(
                     'tags': @contains_all { ..tags }

@@ -12,7 +12,7 @@ fn json_schema_from_simple_entity() {
 
     /// This is type entity
     def entity (
-        rel some_id identifies: .
+        rel .id: some_id
 
         /// This is property 'foo'
         rel .'foo': text

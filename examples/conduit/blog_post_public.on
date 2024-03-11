@@ -30,7 +30,7 @@ map posts(
     (
         'written_by'?: by
     ),
-    BlogPost: {
+    BlogPost {
         ..@match db.Article(
             'author': @match db.User(
                 'username'?: by

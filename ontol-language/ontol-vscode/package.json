@@ -51,7 +51,7 @@
         "scopeName": "source.ontol",
         "path": "./ontol.tmLanguage.json",
         "embeddedLanguages": {
-          "string.regexp.ontol": "regexp",
+          "string.regexp.ontol": "regex",
           "comment.block.documentation.ontol": "markdown"
         }
       }

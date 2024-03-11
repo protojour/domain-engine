@@ -165,14 +165,10 @@ pub struct OntolRelations {
 
     /// Relation between a field and its read-only mode generator function.
     pub gen: DefId,
-
-    /// TODO: Remove, probably
-    pub route: DefId,
 }
 
 #[derive(Debug)]
 pub struct Doc {
-    pub doc_relation: DefId,
     pub example_relation: DefId,
 }
 
@@ -207,15 +203,13 @@ impl Primitives {
 
             relations: OntolRelations {
                 is: defs.add_builtin_relation(BuiltinRelationKind::Is, Some("is")),
-                identifies: defs
-                    .add_builtin_relation(BuiltinRelationKind::Identifies, Some("identifies")),
+                identifies: defs.add_builtin_relation(BuiltinRelationKind::Identifies, None),
                 id: defs.add_builtin_relation(BuiltinRelationKind::Id, Some("id")),
                 indexed: defs.add_builtin_relation(BuiltinRelationKind::Indexed, None),
                 min: defs.add_builtin_relation(BuiltinRelationKind::Min, Some("min")),
                 max: defs.add_builtin_relation(BuiltinRelationKind::Max, Some("max")),
                 default: defs.add_builtin_relation(BuiltinRelationKind::Default, Some("default")),
                 gen: defs.add_builtin_relation(BuiltinRelationKind::Gen, Some("gen")),
-                route: defs.add_builtin_relation(BuiltinRelationKind::Route, Some("route")),
             },
 
             generators: Generators {
@@ -225,7 +219,6 @@ impl Primitives {
             },
 
             doc: Doc {
-                doc_relation: defs.add_builtin_relation(BuiltinRelationKind::Doc, None),
                 example_relation: defs
                     .add_builtin_relation(BuiltinRelationKind::Example, Some("example")),
             },

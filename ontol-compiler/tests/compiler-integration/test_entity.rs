@@ -12,12 +12,11 @@ use test_log::test;
 #[test]
 fn id_cannot_identify_two_things() {
     "
-    def foo ()
-    def bar ()
-    def id (
-        rel .identifies: foo
-        rel .identifies: bar // ERROR already identifies a type
+    def foo (rel .id: my_id)
+    def bar (
+        rel .id: my_id // ERROR already identifies a type
     )
+    def my_id (rel .is: text)
     "
     .compile_fail();
 }
@@ -263,7 +262,7 @@ fn test_entity_self_relationship_optional_object() {
     "
     def node_id (fmt '' => text => .)
     def node (
-        rel node_id identifies: .
+        rel .id: node_id
         rel .'name': text
         rel .'children'::'parent'? {node}
     )
@@ -301,7 +300,7 @@ fn test_entity_self_relationship_mandatory_object() {
     "
     def node_id (fmt '' => text => .)
     def node (
-        rel node_id identifies: .
+        rel .id: node_id
         rel .'children'::'parent' {.}
     )
     "
@@ -417,11 +416,11 @@ fn entity_relationship_without_reverse() {
     def lang_id (fmt '' => text => .)
     def prog_id (fmt '' => text => .)
     def language (
-        rel lang_id identifies: .
+        rel .id: lang_id
         rel .'lang-id': lang_id
     )
     def programmer (
-        rel prog_id identifies: .
+        rel .id: prog_id
         rel .'name': text
         rel .'favorite-language': language
     )
@@ -444,19 +443,19 @@ fn recursive_entity_union() {
 
     def lifeform ()
     def animal (
-        rel animal_id identifies: .
+        rel .id: animal_id
         rel .'class': 'animal'
         rel .'eats': {lifeform}
     )
     def plant (
-        rel plant_id identifies: .
+        rel .id: plant_id
         rel .'class': 'plant'
     )
     rel lifeform is?: animal
     rel lifeform is?: plant
 
     def owner (
-        rel owner_id identifies: .
+        rel .id: owner_id
         rel .'name': text
         rel .'owns': {lifeform}
     )

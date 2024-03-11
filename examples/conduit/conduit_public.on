@@ -69,7 +69,7 @@ def ArticleFilter (
 
 // endpoint '/api/articles/:slug'
 map article(
-    article_slug: slug,
+    article_slug(slug),
     SingleArticle(
         'article': ArticleFilter(
             'slug'?: slug
@@ -79,7 +79,7 @@ map article(
 
 // endpoint '/api/articles'
 map articles(
-    ArticleFilter: filter,
+    ArticleFilter(filter),
     MultipleArticles(
         // The idea is that ArticleFilter can map to many db.Articles,
         // and each db.Article maps to one public.Article.

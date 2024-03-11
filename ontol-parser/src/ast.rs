@@ -99,13 +99,8 @@ pub struct MapStatement {
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum MapArm {
-    // `x: y` syntax
-    Binding {
-        path: Spanned<Path>,
-        pattern: Spanned<AnyPattern>,
-    },
-    // `x {}` syntax
     Struct(StructPattern),
+    Set(SetPattern),
 }
 
 /// A pattern is either `struct()` or leaf expr.
@@ -121,7 +116,7 @@ pub enum AnyPattern {
 pub struct StructPattern {
     pub modifier: Option<Spanned<StructPatternModifier>>,
     pub path: Option<Spanned<Path>>,
-    pub args: Vec<Spanned<StructPatternArgument>>,
+    pub param: StructPatternParameter,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -130,7 +125,13 @@ pub enum StructPatternModifier {
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub enum StructPatternArgument {
+pub enum StructPatternParameter {
+    Attributes(Vec<Spanned<StructPatternAttributeKind>>),
+    Pattern(Box<AnyPattern>),
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub enum StructPatternAttributeKind {
     Attr(StructPatternAttr),
     Spread(String),
 }
@@ -139,7 +140,7 @@ pub enum StructPatternArgument {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct StructPatternAttr {
     pub relation: Spanned<Type>,
-    pub relation_args: Option<Spanned<Vec<Spanned<StructPatternArgument>>>>,
+    pub relation_args: Option<Spanned<Vec<Spanned<StructPatternAttributeKind>>>>,
     pub option: Option<Spanned<()>>,
     pub object: Spanned<AnyPattern>,
 }
@@ -147,6 +148,7 @@ pub struct StructPatternAttr {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct SetPattern {
     pub modifier: Option<Spanned<SetPatternModifier>>,
+    pub path: Option<Spanned<Path>>,
     pub elements: Vec<Spanned<SetPatternElement>>,
 }
 

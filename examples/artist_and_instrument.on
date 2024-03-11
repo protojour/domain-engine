@@ -24,12 +24,12 @@ rel {artist} 'plays'[rel .is: plays]::'played_by' {instrument}
 
 map artists (
     (),
-    artist: {..@match artist()}
+    artist {..@match artist()}
 )
 
 map artists_by_name (
     ( 'name': x ),
-    artist: {
+    artist {
         ..@match artist( 'name': x )
     }
 )
@@ -43,5 +43,5 @@ map artists_by_name (
 
 map instruments (
     (),
-    instrument: { ..@match instrument() }
+    instrument { ..@match instrument() }
 )

@@ -1,6 +1,5 @@
 #![forbid(unsafe_code)]
 
-use docs::get_core_completions;
 use ontol_parser::ast::Statement;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -35,7 +34,7 @@ impl Backend {
     pub fn new(client: Client) -> Self {
         Self {
             client,
-            state: RwLock::new(State::default()),
+            state: RwLock::new(State::new()),
             params: RwLock::new(InitializeParams::default()),
         }
     }
@@ -277,9 +276,10 @@ impl LanguageServer for Backend {
 
     async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
         let uri = params.text_document_position.text_document.uri.as_str();
-        match self.state.read().await.docs.get(uri) {
+        let state = self.state.read().await;
+        match state.docs.get(uri) {
             Some(doc) => {
-                let mut builtin = get_core_completions();
+                let mut builtin = state.core_completions.clone();
                 let mut symbols = doc
                     .symbols
                     .iter()
@@ -316,9 +316,12 @@ impl LanguageServer for Backend {
                         Statement::Use(stmt) => {
                             format!("use '{}' as {}", stmt.reference.0, stmt.as_ident.0)
                         }
-                        Statement::Def(stmt) => match &stmt.private {
-                            Some(_) => format!("def(private) {}", stmt.ident.0),
-                            None => format!("def {}", stmt.ident.0),
+                        Statement::Def(stmt) => match (&stmt.private, &stmt.open, &stmt.extern_) {
+                            (Some(_), None, _) => format!("def @private {}", stmt.ident.0),
+                            (Some(_), Some(_), _) => format!("def @private @open {}", stmt.ident.0),
+                            (None, Some(_), _) => format!("def @open {}", stmt.ident.0),
+                            (_, _, Some(_)) => format!("def @extern {}", stmt.ident.0),
+                            (_, _, _) => format!("def {}", stmt.ident.0),
                         },
                         Statement::Rel(_) => {
                             let sig = get_signature(&doc.text, range, &state.regex);
@@ -331,9 +334,14 @@ impl LanguageServer for Backend {
                         }
                         Statement::Fmt(_) => get_signature(&doc.text, range, &state.regex),
                         Statement::Map(stmt) => {
+                            let ident = if let Some(ident) = &stmt.ident {
+                                format!("{} ", ident.0)
+                            } else {
+                                "".to_string()
+                            };
                             let first = parse_map_arm(&stmt.first.0);
                             let second = parse_map_arm(&stmt.second.0);
-                            format!("map {} {}", first, second)
+                            format!("map {}{}() {}()", ident, first, second)
                         }
                     };
                     let kind = match stmt {
