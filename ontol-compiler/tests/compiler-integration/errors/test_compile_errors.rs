@@ -32,11 +32,11 @@ fn error_invalid_statement() {
 
 #[test]
 fn error_def_parse_error() {
-    "def // ERROR parse error: expected one of `@private`, `@open`, `@extern`, identifier"
+    "def // ERROR parse error: expected one of `@private`, `@open`, `@extern`, `@symbol`, identifier"
         .compile_fail();
-    "def() // ERROR parse error: found `(`, expected one of `@private`, `@open`, `@extern`, identifier"
+    "def() // ERROR parse error: found `(`, expected one of `@private`, `@open`, `@extern`, `@symbol`, identifier"
         .compile_fail();
-    "def @hello world() // ERROR parse error: found `@hello`, expected one of `@private`, `@open`, `@extern`, identifier"
+    "def @hello world() // ERROR parse error: found `@hello`, expected one of `@private`, `@open`, `@extern`, `@symbol`, identifier"
         .compile_fail();
 }
 
@@ -47,7 +47,7 @@ fn error_incomplete_statement() {
 
 #[test]
 fn error_underscore_not_allowed_at_start_of_identifier() {
-    "def _foo // ERROR parse error: found `_`, expected one of `@private`, `@open`, `@extern`, identifier".compile_fail();
+    "def _foo // ERROR parse error: found `_`, expected one of `@private`, `@open`, `@extern`, `@symbol`, identifier".compile_fail();
 }
 
 #[test]

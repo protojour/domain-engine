@@ -52,6 +52,7 @@ type RootDefs = Vec<DefId>;
 struct Open(Option<Span>);
 struct Private(Option<Span>);
 struct Extern(Option<Span>);
+struct Symbol(Option<Span>);
 
 /// Statement after scanning once
 enum PreDefinedStmt {
@@ -152,6 +153,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     Private(def_stmt.private),
                     Open(def_stmt.open),
                     Extern(def_stmt.extern_),
+                    Symbol(def_stmt.symbol),
                 )?;
 
                 Ok(Some((
@@ -207,6 +209,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     Private(def_stmt.private),
                     Open(def_stmt.open),
                     Extern(def_stmt.extern_),
+                    Symbol(def_stmt.symbol),
                 )?;
                 let mut root_defs: RootDefs = [def_id].into();
                 root_defs.extend(self.provide_definition(def_id, def_stmt.docs, def_stmt.block)?);
@@ -1252,6 +1255,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         private: Private,
         open: Open,
         extern_: Extern,
+        symbol: Symbol,
     ) -> Res<DefId> {
         let (def_id, coinage) = self.named_def_id(Space::Type, &ident, ident_span)?;
         if matches!(coinage, Coinage::New) {
@@ -1279,6 +1283,35 @@ impl<'s, 'm> Lowering<'s, 'm> {
             };
 
             self.set_def_kind(def_id, kind, ident_span);
+
+            if let Some(symbol_span) = symbol.0 {
+                let span = self.src.span(&symbol_span);
+                let ident_literal = self
+                    .compiler
+                    .defs
+                    .def_text_literal(ident, &mut self.compiler.strings);
+
+                let relationship_id = self.compiler.defs.alloc_def_id(self.src.package_id);
+
+                self.set_def_kind(
+                    relationship_id,
+                    DefKind::Relationship(Relationship {
+                        relation_def_id: self.compiler.primitives.relations.is,
+                        subject: (def_id, span),
+                        subject_cardinality: (
+                            PropertyCardinality::Mandatory,
+                            ValueCardinality::One,
+                        ),
+                        object: (ident_literal, span),
+                        object_prop: None,
+                        object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
+                        rel_params: RelParams::Unit,
+                    }),
+                    &symbol_span,
+                );
+
+                self.root_defs.push(relationship_id);
+            }
         }
 
         Ok(def_id)

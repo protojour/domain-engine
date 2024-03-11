@@ -41,6 +41,7 @@ pub struct DefStatement {
     pub private: Option<Span>,
     pub open: Option<Span>,
     pub extern_: Option<Span>,
+    pub symbol: Option<Span>,
     pub ident: Spanned<String>,
     pub block: Spanned<Vec<Spanned<Statement>>>,
 }

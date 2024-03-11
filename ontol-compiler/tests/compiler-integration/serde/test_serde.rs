@@ -76,6 +76,22 @@ fn test_serde_builtin_symbol() {
 }
 
 #[test]
+fn test_serde_domain_symbol() {
+    "
+    def @symbol abc ()
+    def foo ( rel .'const': abc )
+    "
+    .compile_then(|test| {
+        let [foo] = test.bind(["foo"]);
+        assert_json_io_matches!(serde_create(&foo), { "const": "abc" });
+        assert_error_msg!(
+            serde_create(&foo).to_value(json!({ "const": "bogus" })),
+            "invalid type: string \"bogus\", expected \"abc\" at line 1 column 16"
+        );
+    });
+}
+
+#[test]
 fn test_serde_struct_type() {
     "
     def foo ( rel .'a': text )

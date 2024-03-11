@@ -79,7 +79,8 @@ fn def_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstPar
             spanned(
                 modifier(Modifier::Private)
                     .or(modifier(Modifier::Open))
-                    .or(modifier(Modifier::Extern)),
+                    .or(modifier(Modifier::Extern))
+                    .or(modifier(Modifier::Symbol)),
             )
             .repeated()
             .collect::<Vec<_>>(),
@@ -92,12 +93,14 @@ fn def_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstPar
             let mut private = None;
             let mut open = None;
             let mut extern_ = None;
+            let mut symbol = None;
 
             for (modifier, span) in modifiers {
                 match modifier {
                     Modifier::Private => private = Some(span),
                     Modifier::Open => open = Some(span),
                     Modifier::Extern => extern_ = Some(span),
+                    Modifier::Symbol => symbol = Some(span),
                     _ => unreachable!(),
                 }
             }
@@ -107,6 +110,7 @@ fn def_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstPar
                 private,
                 open,
                 extern_,
+                symbol,
                 kw,
                 ident,
                 block: ctx_block,
