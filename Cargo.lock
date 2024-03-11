@@ -2099,6 +2099,7 @@ dependencies = [
  "thiserror",
  "tikv-jemallocator",
  "tokio",
+ "tokio-util",
  "tower-http",
  "tower-lsp",
  "tracing",

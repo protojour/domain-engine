@@ -27,9 +27,12 @@ use std::{
     time::Duration,
 };
 use thiserror::Error;
+use tokio_util::sync::CancellationToken;
 use tower_lsp::{LspService, Server};
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+use crate::service::serve;
 
 mod graphql;
 mod service;
@@ -75,9 +78,9 @@ struct Compile {
     #[arg(short)]
     output: Option<PathBuf>,
 
-    /// Specify a domain file to be backed by a data store
+    /// Specify a domain to be backed by a data store
     #[arg(short('d'), long)]
-    data_store: Option<PathBuf>,
+    data_store: Option<String>,
 
     /// Specify a data store backend (e.g. "arangodb")
     #[arg(short('b'), long)]
@@ -98,9 +101,9 @@ struct Serve {
     #[arg(short)]
     output: Option<PathBuf>,
 
-    /// Specify a domain file to be backed by a data store
+    /// Specify a domain to be backed by a data store
     #[arg(short('d'), long)]
-    data_store: Option<PathBuf>,
+    data_store: Option<String>,
 
     /// Specify a data store backend (e.g. "arangodb")
     #[arg(short('b'), long)]
@@ -179,6 +182,7 @@ pub async fn run() -> Result<(), OntoolError> {
                 .watch(&args.dir, RecursiveMode::NonRecursive)
                 .unwrap();
 
+            let mut cancellation_token = CancellationToken::new();
             // initial compilation
             let compile_output = compile(
                 args.dir.clone(),
@@ -187,7 +191,14 @@ pub async fn run() -> Result<(), OntoolError> {
                 args.backend.clone(),
             );
             match compile_output {
-                Ok(_output) => println!("serve!"),
+                Ok(output) => {
+                    tokio::spawn({
+                        let cancellation_token = cancellation_token.clone();
+                        async move {
+                            serve(output.ontology, cancellation_token).await;
+                        }
+                    });
+                }
                 Err(error) => println!("{:?}", error),
             }
 
@@ -195,7 +206,11 @@ pub async fn run() -> Result<(), OntoolError> {
                 match res {
                     Ok(debounced_event_vec) => {
                         for debounced_event in debounced_event_vec {
-                            if debounced_event.event.kind.is_modify() {
+                            if debounced_event.event.kind.is_modify()
+                                || debounced_event.event.kind.is_create()
+                            {
+                                cancellation_token.cancel();
+                                cancellation_token = CancellationToken::new();
                                 let compile_output = compile(
                                     args.dir.clone(),
                                     args.root_files.clone(),
@@ -203,7 +218,14 @@ pub async fn run() -> Result<(), OntoolError> {
                                     args.backend.clone(),
                                 );
                                 match compile_output {
-                                    Ok(_output) => println!("serve!"),
+                                    Ok(output) => {
+                                        tokio::spawn({
+                                            let cancellation_token = cancellation_token.clone();
+                                            async move {
+                                                serve(output.ontology, cancellation_token).await;
+                                            }
+                                        });
+                                    }
                                     Err(error) => println!("{:?}", error),
                                 }
                             }
@@ -303,7 +325,7 @@ struct CompileOutput {
 fn compile(
     root_dir: PathBuf,
     root_paths: Vec<PathBuf>,
-    data_store_path: Option<PathBuf>,
+    data_store_domain: Option<String>,
     backend: Option<String>,
 ) -> Result<CompileOutput, OntoolError> {
     if root_paths.is_empty() {
@@ -357,25 +379,20 @@ fn compile(
 
                     let mut package_config = PackageConfig::default();
 
-                    if let Some(path) = paths_by_name.get(source_name) {
-                        if Some(path) == data_store_path.as_ref() {
-                            package_config.data_store = match &backend {
-                                Some(backend) => Some(DataStoreConfig::ByName(backend.into())),
-                                None => Some(DataStoreConfig::Default),
-                            }
+                    if Some(source_name) == data_store_domain.as_deref() {
+                        package_config.data_store = match &backend {
+                            Some(backend) => Some(DataStoreConfig::ByName(backend.into())),
+                            None => Some(DataStoreConfig::Default),
                         }
-
-                        if let Some(source_text) = sources_by_name.get(source_name) {
-                            package_graph_builder.provide_package(ParsedPackage::parse(
-                                request,
-                                source_text,
-                                package_config,
-                                &mut ontol_sources,
-                                &mut source_code_registry,
-                            ));
-                        } else {
-                            eprintln!("Could not load `{source_name}`");
-                        }
+                    }
+                    if let Some(source_text) = sources_by_name.get(source_name) {
+                        package_graph_builder.provide_package(ParsedPackage::parse(
+                            request,
+                            source_text,
+                            package_config,
+                            &mut ontol_sources,
+                            &mut source_code_registry,
+                        ));
                     } else {
                         eprintln!("Could not load `{source_name}`");
                     }

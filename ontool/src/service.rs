@@ -1,20 +1,21 @@
 #![forbid(unsafe_code)]
 
-use std::{fs::File, path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 
 use crate::graphql::{graphiql_handler, graphql_handler, GraphqlService};
-use anyhow::Context;
+
 use axum::Extension;
 use clap::Parser;
 use domain_engine_core::{DomainEngine, DomainError, DomainResult, Session};
 use domain_engine_in_memory_store::InMemoryDataStoreFactory;
 use domain_engine_juniper::CreateSchemaError;
 use ontol_runtime::{ontology::Ontology, PackageId};
+
+use tokio_util::sync::CancellationToken;
 use tracing::info;
-use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 /// This environment variable is used to control logs.
-const LOG_ENV_VAR: &str = "LOG";
+// const LOG_ENV_VAR: &str = "LOG";
 
 const SERVER_SOCKET_ADDR: &str = "0.0.0.0:8080";
 
@@ -29,71 +30,44 @@ struct Args {
     ontology: PathBuf,
 }
 
-// #[tokio::main]
-// async fn main() -> anyhow::Result<()> {
-//     tracing_subscriber::registry()
-//         .with(tracing_subscriber::fmt::layer())
-//         .with(tracing_subscriber::filter::FilterFn::new(|metadata| {
-//             let target = metadata.target();
-//             target.starts_with("domain_")
-//                 || target.starts_with("ontol")
-//                 || target.starts_with("tower_http")
-//         }))
-//         .with(
-//             tracing_subscriber::EnvFilter::builder()
-//                 .with_default_directive(LevelFilter::INFO.into())
-//                 .with_env_var(LOG_ENV_VAR)
-//                 .from_env_lossy(),
-//         )
-//         .init();
+pub async fn serve(ontology: Ontology, cancellation_token: CancellationToken) {
+    // let ontology = Arc::new(load_ontology(ontology_file_path)?);
+    let ontology = Arc::new(ontology);
+    let engine = Arc::new(
+        DomainEngine::builder(ontology.clone())
+            .system(Box::new(System))
+            .build(InMemoryDataStoreFactory, Session::default())
+            .await
+            .unwrap(),
+    );
 
-//     let args: Args = Args::parse();
-//     let ontology = Arc::new(load_ontology(args.ontology)?);
-//     let engine = Arc::new(
-//         DomainEngine::builder(ontology.clone())
-//             .system(Box::new(System))
-//             .build(InMemoryDataStoreFactory, Session::default())
-//             .await
-//             .unwrap(),
-//     );
+    let mut router: axum::Router = axum::Router::new();
 
-//     let mut router: axum::Router = axum::Router::new();
+    for (package_id, domain) in ontology
+        .domains()
+        .filter(|(package_id, _)| **package_id != PackageId(0))
+    {
+        let domain_path = format!(
+            "/{unique_name}",
+            unique_name = &ontology[domain.unique_name()]
+        );
+        router = router.nest(
+            &domain_path,
+            domain_router(engine.clone(), &domain_path, *package_id).unwrap(),
+        );
 
-//     for (package_id, domain) in ontology
-//         .domains()
-//         .filter(|(package_id, _)| **package_id != PackageId(0))
-//     {
-//         let domain_path = format!(
-//             "/{unique_name}",
-//             unique_name = &ontology[domain.unique_name()]
-//         );
-//         router = router.nest(
-//             &domain_path,
-//             domain_router(engine.clone(), &domain_path, *package_id)?,
-//         );
+        info!("domain {package_id:?} served under {domain_path}");
+    }
 
-//         info!("domain {package_id:?} served under {domain_path}");
-//     }
+    router = router.layer(tower_http::trace::TraceLayer::new_for_http());
 
-//     router = router.layer(tower_http::trace::TraceLayer::new_for_http());
+    info!("binding server to {SERVER_SOCKET_ADDR}");
 
-//     info!("binding server to {SERVER_SOCKET_ADDR}");
-
-//     axum::Server::bind(&SERVER_SOCKET_ADDR.parse()?)
-//         .serve(router.into_make_service())
-//         .await
-//         .context("error running HTTP server")?;
-
-//     Ok(())
-// }
-
-// pub async fn serve(ontology: Ontology, cancellation_token: CancellationToken) {
-//     todo!();
-// }
-
-fn load_ontology(path: PathBuf) -> anyhow::Result<Ontology> {
-    let ontology_file = File::open(path).context("Ontology file not found")?;
-    Ontology::try_from_bincode(ontology_file).context("Problem reading ontology")
+    tokio::select! {
+        _ = cancellation_token.cancelled() => {
+        },
+        _ = axum::Server::bind(&SERVER_SOCKET_ADDR.parse().unwrap()).serve(router.into_make_service()) => {}
+    }
 }
 
 struct System;
