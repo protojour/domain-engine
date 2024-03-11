@@ -122,7 +122,7 @@ async fn test_graphql_int_scalars() {
         rel .max: 255
     )
     def foo (
-        rel foo_id identifies: .
+        rel .id: foo_id
         rel .'small': smallint
         rel .'big': i64
     )
@@ -533,7 +533,7 @@ async fn test_inner_struct() {
         rel .'prop': text
     )
     def foo (
-        rel foo_id identifies: .
+        rel .id: foo_id
         rel .'inner': inner
     )
     map foos(
@@ -616,7 +616,7 @@ async fn test_docs_introspection() {
 
     /// this is a type
     def PublicType (
-        rel Key identifies: .
+        rel .id: Key
         /// this is a field
         rel .'relation': text
     )

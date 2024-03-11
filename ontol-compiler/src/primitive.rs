@@ -203,8 +203,7 @@ impl Primitives {
 
             relations: OntolRelations {
                 is: defs.add_builtin_relation(BuiltinRelationKind::Is, Some("is")),
-                identifies: defs
-                    .add_builtin_relation(BuiltinRelationKind::Identifies, Some("identifies")),
+                identifies: defs.add_builtin_relation(BuiltinRelationKind::Identifies, None),
                 id: defs.add_builtin_relation(BuiltinRelationKind::Id, Some("id")),
                 indexed: defs.add_builtin_relation(BuiltinRelationKind::Indexed, None),
                 min: defs.add_builtin_relation(BuiltinRelationKind::Min, Some("min")),

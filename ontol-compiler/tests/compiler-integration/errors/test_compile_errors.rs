@@ -333,11 +333,11 @@ fn error_complains_about_non_disambiguatable_text_id() {
         fmt '' => text => .
     )
     def animal (
-        rel animal_id identifies: .
+        rel .id: animal_id
         rel .'class': 'animal'
     )
     def plant (
-        rel plant_id identifies: .
+        rel .id: plant_id
         rel .'class': 'plant'
     )
     def lifeform ( // ERROR entity variants of the union are not uniquely identifiable
