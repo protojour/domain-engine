@@ -31,7 +31,7 @@ use std::{
 use thiserror::Error;
 use tokio_util::sync::CancellationToken;
 use tower_lsp::{LspService, Server};
-use tracing::level_filters::LevelFilter;
+use tracing::{info, level_filters::LevelFilter};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::service::Detach;
@@ -187,12 +187,12 @@ pub async fn run() -> Result<(), OntoolError> {
             tokio::spawn({
                 let app = router_cell.clone();
                 async move {
-                    const SERVER_SOCKET_ADDR: &str = "0.0.0.0:8080";
+                    const SERVER_SOCKET_ADDR: &str = "0.0.0.0:5000";
                     let detach = Detach { router: app };
 
                     let mut outer_router: axum::Router = axum::Router::new();
                     outer_router = outer_router.nest_service("/", detach);
-
+                    info!("Binding server to {SERVER_SOCKET_ADDR}");
                     let _ = axum::Server::bind(&SERVER_SOCKET_ADDR.parse().unwrap())
                         .serve(outer_router.into_make_service())
                         .await;
@@ -244,7 +244,6 @@ pub async fn run() -> Result<(), OntoolError> {
                                     }
                                 }
                             }
-                            // println!("{:?}", debounced_event);
                         }
                     }
                     Err(error) => println!("{:?}", error),
