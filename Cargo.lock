@@ -771,29 +771,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "domain-service"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "axum",
- "chrono",
- "clap",
- "domain-engine-core",
- "domain-engine-in-memory-store",
- "domain-engine-juniper",
- "juniper_axum",
- "ontol-runtime",
- "serde_json",
- "smartstring",
- "tikv-jemallocator",
- "tokio",
- "tower-http",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "either"
 version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -51,7 +51,7 @@ executable code:
 
 ## Running the domain service locally
 
-### Compile ONTOL files
+### Compile ONTOL files and development mode
 
 The following command compiles a domain into an ontology and also
 specifies that it represents the data store:
@@ -62,14 +62,7 @@ cd examples
 ontool compile demo.on --data-store demo -o ontology
 ```
 
-To run a dev server run `ontool serve demo.on --data-store demo`
-
-### Run the domain service
-
-```
-cd domain-service
-cargo run -- --ontology ../ontology
-```
+To start a dev server, run `ontool serve demo.on --data-store demo`
 
 ## Testing
 
