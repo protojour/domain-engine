@@ -61,11 +61,20 @@ def @open all_yours ()
 ```
 
 
+### `@symbol`
+
+`def @symbol` creates a _symbol_, an otherwise empty definition representing the definition name itself.
+
+```ontol
+def @symbol def_label ()
+```
+
+
 ### `@extern` (unstable)
 
 _The details of `def @extern` are subject to change._
 
-`def @extern` defines an external hook, and must include an `'url'` property and a [`map`](map.md) statement.
+`def @extern` defines an _external_ hook, and must include an `'url'` property and a [`map`](map.md) statement.
 
 ```ontol
 def input (
@@ -83,7 +92,7 @@ def @extern hook (
 )
 ```
 
-Here, the listener, a server endpoint at the url defined in `hook` can expect to get a structure on the form of `input`, and is expected to respond with a structure corresponding to `output` – in other words, it is expected to supply the property `'additional_prop'`.
+Here, the listener, a server endpoint at the url defined in `hook` can expect to get a structure on the form of `input`, and is expected to respond with a structure corresponding to `output` – in other words, it is expected to supply the text property `'additional_prop'`.
 
 
 ## Unions
