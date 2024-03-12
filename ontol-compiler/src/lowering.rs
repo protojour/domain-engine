@@ -20,7 +20,7 @@ use smartstring::alias::String;
 use tracing::{debug, debug_span};
 
 use crate::{
-    def::{Def, DefKind, DefVisibility, FmtFinalState, RelParams, Relationship, TypeDef},
+    def::{Def, DefKind, FmtFinalState, RelParams, Relationship, TypeDef, TypeDefFlags},
     error::CompileError,
     namespace::Space,
     package::{PackageReference, ONTOL_PKG},
@@ -52,6 +52,7 @@ type RootDefs = Vec<DefId>;
 struct Open(Option<Span>);
 struct Private(Option<Span>);
 struct Extern(Option<Span>);
+struct Symbol(Option<Span>);
 
 /// Statement after scanning once
 enum PreDefinedStmt {
@@ -152,6 +153,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     Private(def_stmt.private),
                     Open(def_stmt.open),
                     Extern(def_stmt.extern_),
+                    Symbol(def_stmt.symbol),
                 )?;
 
                 Ok(Some((
@@ -207,6 +209,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     Private(def_stmt.private),
                     Open(def_stmt.open),
                     Extern(def_stmt.extern_),
+                    Symbol(def_stmt.symbol),
                 )?;
                 let mut root_defs: RootDefs = [def_id].into();
                 root_defs.extend(self.provide_definition(def_id, def_stmt.docs, def_stmt.block)?);
@@ -339,11 +342,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
         } else if let Some((ctx_block, _)) = ctx_block {
             let rel_def_id = self.define_anonymous_type(
                 TypeDef {
-                    visibility: DefVisibility::Private,
-                    open: false,
                     ident: None,
                     rel_type_for: Some(RelationshipId(relationship_id)),
-                    concrete: true,
+                    flags: TypeDefFlags::CONCRETE,
                 },
                 &span,
             );
@@ -456,11 +457,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
             let target_def_id = self.define_anonymous_type(
                 TypeDef {
-                    visibility: DefVisibility::Private,
-                    open: false,
                     ident: None,
                     rel_type_for: None,
-                    concrete: true,
+                    flags: TypeDefFlags::CONCRETE,
                 },
                 &span,
             );
@@ -554,11 +553,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 if let Some(root_defs) = root_defs {
                     let def_id = self.define_anonymous_type(
                         TypeDef {
-                            visibility: DefVisibility::Private,
-                            open: false,
                             ident: None,
                             rel_type_for: None,
-                            concrete: true,
+                            flags: TypeDefFlags::CONCRETE,
                         },
                         span,
                     );
@@ -605,7 +602,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     _ => self
                         .compiler
                         .defs
-                        .def_string_literal(&lit, &mut self.compiler.strings),
+                        .def_text_literal(&lit, &mut self.compiler.strings),
                 };
                 Ok(def_id)
             }
@@ -714,11 +711,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
             None => {
                 let def_id = self.define_anonymous_type(
                     TypeDef {
-                        visibility: DefVisibility::Public,
-                        open: false,
                         ident: None,
                         rel_type_for: None,
-                        concrete: true,
+                        flags: TypeDefFlags::CONCRETE | TypeDefFlags::PUBLIC,
                     },
                     &span,
                 );
@@ -1203,10 +1198,11 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                 match def_id {
                     Some(def_id) => match self.compiler.defs.def_kind(*def_id) {
-                        DefKind::Type(TypeDef {
-                            visibility: DefVisibility::Private,
-                            ..
-                        }) => Err((CompileError::PrivateDefinition, span.clone())),
+                        DefKind::Type(TypeDef { flags, .. })
+                            if !flags.contains(TypeDefFlags::PUBLIC) =>
+                        {
+                            Err((CompileError::PrivateDefinition, span.clone()))
+                        }
                         _ => Ok(*def_id),
                     },
                     None => Err((CompileError::TypeNotFound, span.clone())),
@@ -1259,6 +1255,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         private: Private,
         open: Open,
         extern_: Extern,
+        symbol: Symbol,
     ) -> Res<DefId> {
         let (def_id, coinage) = self.named_def_id(Space::Type, &ident, ident_span)?;
         if matches!(coinage, Coinage::New) {
@@ -1268,20 +1265,53 @@ impl<'s, 'm> Lowering<'s, 'm> {
             let kind = if extern_.0.is_some() {
                 DefKind::Extern(ident)
             } else {
+                let mut flags = TypeDefFlags::CONCRETE | TypeDefFlags::PUBLIC;
+
+                if private.0.is_some() {
+                    flags.remove(TypeDefFlags::PUBLIC);
+                }
+
+                if open.0.is_some() {
+                    flags.insert(TypeDefFlags::OPEN);
+                }
+
                 DefKind::Type(TypeDef {
-                    visibility: if private.0.is_some() {
-                        DefVisibility::Private
-                    } else {
-                        DefVisibility::Public
-                    },
-                    open: open.0.is_some(),
                     ident: Some(ident),
                     rel_type_for: None,
-                    concrete: true,
+                    flags,
                 })
             };
 
             self.set_def_kind(def_id, kind, ident_span);
+
+            if let Some(symbol_span) = symbol.0 {
+                let span = self.src.span(&symbol_span);
+                let ident_literal = self
+                    .compiler
+                    .defs
+                    .def_text_literal(ident, &mut self.compiler.strings);
+
+                let relationship_id = self.compiler.defs.alloc_def_id(self.src.package_id);
+
+                self.set_def_kind(
+                    relationship_id,
+                    DefKind::Relationship(Relationship {
+                        relation_def_id: self.compiler.primitives.relations.is,
+                        subject: (def_id, span),
+                        subject_cardinality: (
+                            PropertyCardinality::Mandatory,
+                            ValueCardinality::One,
+                        ),
+                        object: (ident_literal, span),
+                        object_prop: None,
+                        object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
+                        rel_params: RelParams::Unit,
+                    }),
+                    &symbol_span,
+                );
+
+                self.root_defs.push(relationship_id);
+            }
         }
 
         Ok(def_id)

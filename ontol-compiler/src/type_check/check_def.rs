@@ -114,6 +114,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             DefKind::Extern(_) => self.types.intern(Type::Extern(def_id)),
+            DefKind::BuiltinRelType(..) => self.types.intern(Type::Tautology),
             other => {
                 panic!("failed def typecheck: {other:?}");
             }

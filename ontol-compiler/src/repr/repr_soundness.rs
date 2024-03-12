@@ -4,11 +4,13 @@ use fnv::FnvHashSet;
 use indexmap::IndexMap;
 use ontol_runtime::{smart_format, DefId};
 use ordered_float::NotNan;
+use tracing::info;
 
 use crate::{
     def::{BuiltinRelationKind, DefKind},
     error::CompileError,
-    relation::{RelObjectConstraint, TypeRelation},
+    relation::RelObjectConstraint,
+    thesaurus::TypeRelation,
     types::FormatType,
     Note, SpannedNote,
 };
@@ -22,7 +24,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
     pub(super) fn check_soundness(
         &mut self,
         mut builder: ReprBuilder,
-        collected_mesh: &IndexMap<DefId, IsData>,
+        thesaurus_mesh: &IndexMap<DefId, IsData>,
     ) -> Option<Repr> {
         let number_resolution = self.check_number_resolution(&mut builder);
 
@@ -43,12 +45,12 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                             self.collect_base_defs(*def_id, &mut base_defs);
                         }
 
-                        for mesh_def_id in collected_mesh.keys() {
+                        for mesh_def_id in thesaurus_mesh.keys() {
                             self.collect_base_defs(*mesh_def_id, &mut base_defs);
                         }
 
                         let base_def_id =
-                            self.check_valid_intersection(base_defs, collected_mesh)?;
+                            self.check_valid_intersection(base_defs, thesaurus_mesh)?;
                         self.check_type_params(base_def_id, &mut repr, &mut checked_type_params)?;
                         Some(repr)
                     }
@@ -59,12 +61,12 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
 
                         self.collect_base_defs(def_id, &mut base_defs);
 
-                        for mesh_def_id in collected_mesh.keys() {
+                        for mesh_def_id in thesaurus_mesh.keys() {
                             self.collect_base_defs(*mesh_def_id, &mut base_defs);
                         }
 
                         let base_def_id =
-                            self.check_valid_intersection(base_defs, collected_mesh)?;
+                            self.check_valid_intersection(base_defs, thesaurus_mesh)?;
                         self.check_type_params(base_def_id, &mut repr, &mut checked_type_params)?;
 
                         if base_def_id == self.primitives.number {
@@ -115,7 +117,13 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                                     None
                                 }
                             }
+                        } else if base_def_id == self.primitives.text {
+                            Some(Repr {
+                                kind: ReprKind::Scalar(def_id, ReprScalarKind::Text, span),
+                                type_params: Default::default(),
+                            })
                         } else {
+                            info!("other scalar: {def_id:?} - base: {base_def_id:?}");
                             Some(repr)
                         }
                     }
@@ -192,13 +200,11 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
     fn collect_base_defs(&self, def_id: DefId, output: &mut BTreeSet<DefId>) {
         let mut has_supertypes = false;
 
-        if let Some(ontology_mesh) = self.relations.ontology_mesh.get(&def_id) {
-            for (is, _) in ontology_mesh {
-                if is.is_super() {
-                    self.collect_base_defs(is.def_id, output);
+        for (is, _) in self.thesaurus.entries(def_id, self.defs) {
+            if is.is_super() {
+                self.collect_base_defs(is.def_id, output);
 
-                    has_supertypes = true;
-                }
+                has_supertypes = true;
             }
         }
 
@@ -274,13 +280,11 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             return false;
         }
 
-        if let Some(mesh) = self.relations.ontology_mesh.get(&sub_def_id) {
-            for (is, _) in mesh {
-                if matches!(is.rel, TypeRelation::Super | TypeRelation::ImplicitSuper)
-                    && self.has_path_to_base(is.def_id, super_def_id, visited)
-                {
-                    return true;
-                }
+        for (is, _) in self.thesaurus.entries(sub_def_id, self.defs) {
+            if matches!(is.rel, TypeRelation::Super | TypeRelation::ImplicitSuper)
+                && self.has_path_to_base(is.def_id, super_def_id, visited)
+            {
+                return true;
             }
         }
 

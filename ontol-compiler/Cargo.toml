@@ -26,6 +26,7 @@ bit-set.workspace = true
 thin-vec.workspace = true
 regex-automata.workspace = true
 arcstr.workspace = true
+bitflags.workspace = true
 ena = "0.14"
 bumpalo = "3"
 regex-syntax = "0.8"

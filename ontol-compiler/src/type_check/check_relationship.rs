@@ -1,4 +1,3 @@
-use indexmap::map::Entry;
 use ontol_runtime::{
     ontology::PropertyCardinality, smart_format, value::PropertyId, DefId, RelationshipId,
 };
@@ -9,9 +8,10 @@ use crate::{
     error::CompileError,
     mem::Intern,
     primitive::PrimitiveKind,
-    relation::{Constructor, Is, Properties, Property, TypeParam, TypeRelation},
+    relation::{Constructor, Properties, Property, TypeParam},
     sequence::Sequence,
     text_patterns::TextPatternSegment,
+    thesaurus::TypeRelation,
     types::{Type, TypeRef},
     SourceSpan,
 };
@@ -144,32 +144,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 // Ensure properties
                 self.relations.properties_by_def_id_mut(subject.0);
 
-                let prev_entry = self
-                    .relations
-                    .ontology_mesh
-                    .entry(subject.0)
-                    .or_default()
-                    .entry(Is {
-                        def_id: object.0,
-                        rel: match relationship.subject_cardinality.0 {
-                            PropertyCardinality::Mandatory => TypeRelation::Super,
-                            PropertyCardinality::Optional => TypeRelation::SubVariant,
-                        },
-                    });
-
-                match prev_entry {
-                    Entry::Vacant(vacant) => {
-                        vacant.insert(*span);
-
-                        self.relations
-                            .reverse_ontology_mesh
-                            .entry(object.0)
-                            .or_default()
-                            .insert(subject.0);
-                    }
-                    Entry::Occupied(_) => {
-                        self.error(CompileError::DuplicateAnonymousRelationship, span);
-                    }
+                if !self.thesaurus.insert_domain_is(
+                    subject.0,
+                    match relationship.subject_cardinality.0 {
+                        PropertyCardinality::Mandatory => TypeRelation::Super,
+                        PropertyCardinality::Optional => TypeRelation::SubVariant,
+                    },
+                    object.0,
+                    *span,
+                ) {
+                    self.error(CompileError::DuplicateAnonymousRelationship, span);
                 }
 
                 object_ty
@@ -351,6 +335,28 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     );
 
                 subject_ty
+            }
+            BuiltinRelationKind::Order => {
+                let subject_ty = self.check_def_shallow(subject.0);
+                let object_ty = self.check_def_shallow(object.0);
+
+                self.check_subject_data_type(subject_ty, &subject.1);
+                self.check_object_data_type(object_ty, &object.1);
+
+                // This will be checked post-seal in check_entity.rs
+                self.relations
+                    .order_relationships
+                    .entry(subject.0)
+                    .or_default()
+                    .push(relationship_id);
+
+                object_ty
+            }
+            BuiltinRelationKind::Direction => {
+                let _subject_ty = self.check_def_shallow(subject.0);
+                let object_ty = self.check_def_shallow(object.0);
+
+                object_ty
             }
         }
     }

@@ -1914,6 +1914,7 @@ dependencies = [
  "arcstr",
  "assert_matches",
  "bit-set",
+ "bitflags 2.4.2",
  "bumpalo",
  "chumsky",
  "convert_case",

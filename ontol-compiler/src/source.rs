@@ -107,7 +107,7 @@ pub struct SourceCodeRegistry {
 }
 
 /// Sources currently being compiled
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Sources {
     next_source_id: SourceId,
     package: PackageId,

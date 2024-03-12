@@ -82,7 +82,6 @@ impl<'m> Type<'m> {
     }
 }
 
-#[derive(Debug)]
 pub struct Types<'m> {
     mem: &'m Mem,
     pub(crate) types: FnvHashSet<&'m Type<'m>>,
@@ -144,7 +143,7 @@ impl<'m> Intern<Vec<TypeRef<'m>>> for Types<'m> {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub struct DefTypes<'m> {
     pub table: FnvHashMap<DefId, TypeRef<'m>>,
     pub ontology_externs: FnvHashMap<DefId, Extern>,

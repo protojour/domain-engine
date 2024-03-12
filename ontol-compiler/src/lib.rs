@@ -7,10 +7,7 @@ use std::{
 };
 
 use codegen::task::{execute_codegen_tasks, CodegenTasks};
-use def::{
-    BuiltinRelationKind, DefKind, DefVisibility, Defs, LookupRelationshipMeta, RelationshipMeta,
-    TypeDef,
-};
+use def::{BuiltinRelationKind, DefKind, Defs, LookupRelationshipMeta, RelationshipMeta, TypeDef};
 
 use documented::DocumentedFields;
 pub use error::*;
@@ -34,6 +31,7 @@ use ontol_runtime::{
         DataRelationshipTarget, Domain, EntityInfo, MapLossiness, MapMeta, OntolDomainMeta,
         Ontology, TypeInfo, TypeKind,
     },
+    smart_format,
     text::TextConstant,
     text_like_types::TextLikeType,
     value::PropertyId,
@@ -47,11 +45,16 @@ use relation::{Properties, Relations, UnionMemberCache};
 pub use source::*;
 use strings::Strings;
 use text_patterns::{compile_all_text_patterns, TextPatterns};
+use thesaurus::Thesaurus;
 use tracing::debug;
 use type_check::seal::SealCtx;
 use types::{DefTypes, Types};
 
-use crate::{def::RelParams, primitive::PrimitiveKind, repr::repr_model::ReprKind};
+use crate::{
+    def::{RelParams, TypeDefFlags},
+    primitive::PrimitiveKind,
+    repr::repr_model::ReprKind,
+};
 
 pub mod error;
 pub mod hir_unify;
@@ -77,11 +80,11 @@ mod repr;
 mod sequence;
 mod strings;
 mod text_patterns;
+mod thesaurus;
 mod type_check;
 mod typed_hir;
 mod types;
 
-#[derive(Debug)]
 pub struct Compiler<'m> {
     pub sources: Sources,
 
@@ -98,6 +101,7 @@ pub struct Compiler<'m> {
     pub(crate) types: Types<'m>,
     pub(crate) def_types: DefTypes<'m>,
     pub(crate) relations: Relations,
+    pub(crate) thesaurus: Thesaurus,
     pub(crate) seal_ctx: SealCtx,
     pub(crate) text_patterns: TextPatterns,
 
@@ -110,6 +114,8 @@ impl<'m> Compiler<'m> {
     pub fn new(mem: &'m Mem, sources: Sources) -> Self {
         let mut defs = Defs::default();
         let primitives = Primitives::new(&mut defs);
+
+        let thesaurus = Thesaurus::new(&primitives);
 
         Self {
             sources,
@@ -124,6 +130,7 @@ impl<'m> Compiler<'m> {
             types: Types::new(mem),
             def_types: Default::default(),
             relations: Relations::default(),
+            thesaurus,
             seal_ctx: Default::default(),
             text_patterns: TextPatterns::default(),
             codegen_tasks: Default::default(),
@@ -253,11 +260,18 @@ impl<'m> Compiler<'m> {
                         docs.insert(def_id, vec![field_docs.into()]);
                     }
                 }
-                DefKind::Type(_) => {
-                    let tlt = self.defs.string_like_types.get(&def_id).unwrap();
-                    let name = tlt.as_ref();
-                    if let Ok(field_docs) = TextLikeType::get_field_docs(name) {
-                        docs.insert(def_id, vec![field_docs.into()]);
+                DefKind::Type(type_def) => {
+                    if type_def.flags.contains(TypeDefFlags::BUILTIN_SYMBOL) {
+                        let ident = type_def.ident.unwrap();
+
+                        // TODO: Structured documentation of `is`-relations.
+                        // Then a prose-based documentation string will probably be superfluous?
+                        docs.insert(def_id, vec![smart_format!("The symbol `'{}'`", ident)]);
+                    } else if let Some(slt) = self.defs.string_like_types.get(&def_id) {
+                        let name = slt.as_ref();
+                        if let Ok(field_docs) = TextLikeType::get_field_docs(name) {
+                            docs.insert(def_id, vec![field_docs.into()]);
+                        }
                     }
                 }
                 _ => {}
@@ -324,8 +338,8 @@ impl<'m> Compiler<'m> {
                 domain.add_type(TypeInfo {
                     def_id: type_def_id,
                     public: match def_kind {
-                        DefKind::Type(TypeDef { visibility, .. }) => {
-                            matches!(visibility, DefVisibility::Public)
+                        DefKind::Type(TypeDef { flags, .. }) => {
+                            flags.contains(TypeDefFlags::PUBLIC)
                         }
                         _ => true,
                     },
@@ -721,6 +735,10 @@ impl<'m> Compiler<'m> {
                     }
                 }
             }
+        }
+
+        for def_id in self.defs.iter_package_def_ids(package_id) {
+            self.type_check().check_entity_post_seal(def_id);
         }
     }
 

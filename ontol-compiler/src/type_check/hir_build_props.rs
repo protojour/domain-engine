@@ -19,8 +19,9 @@ use crate::{
         PatternKind, SetBinaryOperator,
     },
     primitive::PrimitiveKind,
-    relation::{Property, TypeRelation},
+    relation::Property,
     repr::repr_model::ReprKind,
+    thesaurus::TypeRelation,
     type_check::{ena_inference::Strength, hir_build::NodeInfo, TypeError},
     typed_hir::{Meta, TypedHirData},
     types::{Type, TypeRef, UNIT_TYPE},
@@ -199,13 +200,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         def_id: DefId,
         match_attributes: &mut IndexMap<&'m str, MatchAttribute>,
     ) {
-        let Some(memberships) = self.relations.reverse_ontology_mesh.get(&def_id) else {
+        let Some(memberships) = self.thesaurus.reverse_table.get(&def_id) else {
             return;
         };
 
         for mem_def_id in memberships {
-            let mesh = self.relations.ontology_mesh.get(mem_def_id).unwrap();
-            let Some(is) = mesh.keys().find(|is| is.def_id == def_id) else {
+            let mesh = self.thesaurus.entries(*mem_def_id, self.defs);
+            let Some((is, _)) = mesh.iter().find(|(is, _)| is.def_id == def_id) else {
                 continue;
             };
 

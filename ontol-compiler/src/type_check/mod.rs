@@ -11,6 +11,7 @@ use crate::{
     relation::Relations,
     repr::repr_check::ReprCheck,
     strings::Strings,
+    thesaurus::Thesaurus,
     types::{DefTypes, FormatType, Type, TypeRef, Types, ERROR_TYPE},
     CompileErrors, Compiler, SourceSpan, SpannedNote,
 };
@@ -24,6 +25,7 @@ pub mod check_union;
 pub mod ena_inference;
 pub mod seal;
 
+mod check_entity;
 mod check_extern;
 mod check_map;
 mod check_relationship;
@@ -64,6 +66,7 @@ pub struct TypeCheck<'c, 'm> {
     pub types: &'c mut Types<'m>,
     pub def_types: &'c mut DefTypes<'m>,
     pub relations: &'c mut Relations,
+    pub thesaurus: &'c mut Thesaurus,
     pub errors: &'c mut CompileErrors,
     pub codegen_tasks: &'c mut CodegenTasks<'m>,
     pub patterns: &'c mut Patterns,
@@ -144,6 +147,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             defs: self.defs,
             def_types: self.def_types,
             relations: self.relations,
+            thesaurus: self.thesaurus,
             primitives: self.primitives,
             seal_ctx: self.seal_ctx,
             errors: self.errors,
@@ -172,6 +176,7 @@ impl<'m> Compiler<'m> {
             errors: &mut self.errors,
             def_types: &mut self.def_types,
             relations: &mut self.relations,
+            thesaurus: &mut self.thesaurus,
             codegen_tasks: &mut self.codegen_tasks,
             patterns: &mut self.patterns,
             seal_ctx: &mut self.seal_ctx,

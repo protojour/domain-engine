@@ -16,7 +16,7 @@ use crate::{
     Compiler,
 };
 
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub struct TextPatterns {
     pub text_patterns: FnvHashMap<DefId, TextPattern>,
 }

@@ -32,11 +32,11 @@ fn error_invalid_statement() {
 
 #[test]
 fn error_def_parse_error() {
-    "def // ERROR parse error: expected one of `@private`, `@open`, `@extern`, identifier"
+    "def // ERROR parse error: expected one of `@private`, `@open`, `@extern`, `@symbol`, identifier"
         .compile_fail();
-    "def() // ERROR parse error: found `(`, expected one of `@private`, `@open`, `@extern`, identifier"
+    "def() // ERROR parse error: found `(`, expected one of `@private`, `@open`, `@extern`, `@symbol`, identifier"
         .compile_fail();
-    "def @hello world() // ERROR parse error: found `@hello`, expected one of `@private`, `@open`, `@extern`, identifier"
+    "def @hello world() // ERROR parse error: found `@hello`, expected one of `@private`, `@open`, `@extern`, `@symbol`, identifier"
         .compile_fail();
 }
 
@@ -47,7 +47,7 @@ fn error_incomplete_statement() {
 
 #[test]
 fn error_underscore_not_allowed_at_start_of_identifier() {
-    "def _foo // ERROR parse error: found `_`, expected one of `@private`, `@open`, `@extern`, identifier".compile_fail();
+    "def _foo // ERROR parse error: found `_`, expected one of `@private`, `@open`, `@extern`, `@symbol`, identifier".compile_fail();
 }
 
 #[test]
@@ -539,6 +539,39 @@ fn error_ambiguous_number_resolution() {
         rel .is: a
         rel .is: b
     )
+    "
+    .compile_fail();
+}
+
+#[test]
+fn error_order() {
+    "
+    def struct (
+        rel . // ERROR relation subject must be an entity
+            order[]: text
+    )
+
+    def entity (
+        rel .'id'|id: (rel .is: text)
+
+        rel .order[
+        ]: by_text_bug // ERROR order identifier must be a symbol in this domain
+
+        rel .order[
+        ]: ontol.ascending // ERROR order identifier must be a symbol in this domain
+
+        rel .order[
+        ]: 'by_text' // ERROR order identifier must be a symbol in this domain
+
+        rel .order[
+        ]: 42 // ERROR order identifier must be a symbol in this domain
+
+        rel .order[ // ERROR order tuple parameters expected
+        ]: by_text
+    )
+
+    def by_text_bug (rel .is: text)
+    def @symbol by_text()
     "
     .compile_fail();
 }

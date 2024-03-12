@@ -42,7 +42,7 @@ impl<'m> Namespace<'m> {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub struct Namespaces<'m> {
     pub(crate) namespaces: FnvHashMap<PackageId, Namespace<'m>>,
     pub(crate) docs: FnvHashMap<DefId, Vec<String>>,
