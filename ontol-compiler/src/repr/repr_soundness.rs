@@ -4,7 +4,6 @@ use fnv::FnvHashSet;
 use indexmap::IndexMap;
 use ontol_runtime::{smart_format, DefId};
 use ordered_float::NotNan;
-use tracing::info;
 
 use crate::{
     def::{BuiltinRelationKind, DefKind},
@@ -123,7 +122,6 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                                 type_params: Default::default(),
                             })
                         } else {
-                            info!("other scalar: {def_id:?} - base: {base_def_id:?}");
                             Some(repr)
                         }
                     }
