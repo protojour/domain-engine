@@ -50,16 +50,22 @@ executable code:
    assembly-like language.
 
 ## Running the domain service locally
+
 ### Compile ONTOL files
+
 The following command compiles a domain into an ontology and also
 specifies that it represents the data store:
 
 ```
-cd ontool
-cargo run compile ../examples/demo.on --data-store ../examples/demo.on -o ../ontology
+just ontool
+cd examples
+ontool compile demo.on --data-store demo -o ontology
 ```
 
+To run a dev server run `ontool serve demo.on --data-store demo`
+
 ### Run the domain service
+
 ```
 cd domain-service
 cargo run -- --ontology ../ontology
