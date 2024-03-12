@@ -20,10 +20,12 @@ use ontol_runtime::{
     ontology::Ontology,
     PackageId,
 };
+use service::app;
 use std::{
     collections::HashMap,
     fs::{self, read_dir, File},
     path::{Path, PathBuf},
+    sync::{Arc, Mutex},
     time::Duration,
 };
 use thiserror::Error;
@@ -32,7 +34,7 @@ use tower_lsp::{LspService, Server};
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::service::serve;
+use crate::service::Detach;
 
 mod graphql;
 mod service;
@@ -181,6 +183,21 @@ pub async fn run() -> Result<(), OntoolError> {
                 .watcher()
                 .watch(&args.dir, RecursiveMode::NonRecursive)
                 .unwrap();
+            let router_cell: Arc<Mutex<Option<axum::Router>>> = Arc::new(Mutex::new(None));
+            tokio::spawn({
+                let app = router_cell.clone();
+                async move {
+                    const SERVER_SOCKET_ADDR: &str = "0.0.0.0:8080";
+                    let detach = Detach { router: app };
+
+                    let mut outer_router: axum::Router = axum::Router::new();
+                    outer_router = outer_router.nest_service("/", detach);
+
+                    let _ = axum::Server::bind(&SERVER_SOCKET_ADDR.parse().unwrap())
+                        .serve(outer_router.into_make_service())
+                        .await;
+                }
+            });
 
             let mut cancellation_token = CancellationToken::new();
             // initial compilation
@@ -192,12 +209,9 @@ pub async fn run() -> Result<(), OntoolError> {
             );
             match compile_output {
                 Ok(output) => {
-                    tokio::spawn({
-                        let cancellation_token = cancellation_token.clone();
-                        async move {
-                            serve(output.ontology, cancellation_token).await;
-                        }
-                    });
+                    let new_app = app(output.ontology).await;
+                    let mut lock = router_cell.lock().unwrap();
+                    *lock = Some(new_app);
                 }
                 Err(error) => println!("{:?}", error),
             }
@@ -219,14 +233,15 @@ pub async fn run() -> Result<(), OntoolError> {
                                 );
                                 match compile_output {
                                     Ok(output) => {
-                                        tokio::spawn({
-                                            let cancellation_token = cancellation_token.clone();
-                                            async move {
-                                                serve(output.ontology, cancellation_token).await;
-                                            }
-                                        });
+                                        let new_app = app(output.ontology).await;
+                                        let mut lock = router_cell.lock().unwrap();
+                                        *lock = Some(new_app);
                                     }
-                                    Err(error) => println!("{:?}", error),
+                                    Err(error) => {
+                                        let mut lock = router_cell.lock().unwrap();
+                                        *lock = None;
+                                        println!("{:?}", error);
+                                    }
                                 }
                             }
                             // println!("{:?}", debounced_event);

@@ -1,6 +1,11 @@
 #![forbid(unsafe_code)]
 
-use std::{path::PathBuf, sync::Arc};
+use std::{
+    convert::Infallible,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+    task::Poll,
+};
 
 use crate::graphql::{graphiql_handler, graphql_handler, GraphqlService};
 
@@ -11,13 +16,10 @@ use domain_engine_in_memory_store::InMemoryDataStoreFactory;
 use domain_engine_juniper::CreateSchemaError;
 use ontol_runtime::{ontology::Ontology, PackageId};
 
-use tokio_util::sync::CancellationToken;
 use tracing::info;
 
 /// This environment variable is used to control logs.
 // const LOG_ENV_VAR: &str = "LOG";
-
-const SERVER_SOCKET_ADDR: &str = "0.0.0.0:8080";
 
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
@@ -30,8 +32,8 @@ struct Args {
     ontology: PathBuf,
 }
 
-pub async fn serve(ontology: Ontology, cancellation_token: CancellationToken) {
-    // let ontology = Arc::new(load_ontology(ontology_file_path)?);
+// app -> router
+pub async fn app(ontology: Ontology) -> axum::Router {
     let ontology = Arc::new(ontology);
     let engine = Arc::new(
         DomainEngine::builder(ontology.clone())
@@ -59,15 +61,7 @@ pub async fn serve(ontology: Ontology, cancellation_token: CancellationToken) {
         info!("domain {package_id:?} served under {domain_path}");
     }
 
-    router = router.layer(tower_http::trace::TraceLayer::new_for_http());
-
-    info!("binding server to {SERVER_SOCKET_ADDR}");
-
-    tokio::select! {
-        _ = cancellation_token.cancelled() => {
-        },
-        _ = axum::Server::bind(&SERVER_SOCKET_ADDR.parse().unwrap()).serve(router.into_make_service()) => {}
-    }
+    router.layer(tower_http::trace::TraceLayer::new_for_http())
 }
 
 struct System;
@@ -109,4 +103,44 @@ fn domain_router(
     };
 
     Ok(router)
+}
+
+pub struct Detach<B> {
+    pub router: Arc<Mutex<Option<axum::Router<(), B>>>>,
+}
+
+impl<B> Clone for Detach<B> {
+    fn clone(&self) -> Self {
+        Self {
+            router: self.router.clone(),
+        }
+    }
+}
+
+impl<B> tower_service::Service<axum::http::Request<B>> for Detach<B>
+where
+    B: axum::body::HttpBody + Send + 'static,
+{
+    type Response = axum::response::Response;
+    type Error = Infallible;
+    type Future = <axum::Router<(), B> as tower_service::Service<axum::http::Request<B>>>::Future;
+
+    fn poll_ready(
+        &mut self,
+        _cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, req: axum::http::Request<B>) -> Self::Future {
+        let mut router = {
+            let router = self.router.lock().unwrap();
+            match router.as_ref() {
+                Some(router) => router.clone(),
+                None => axum::Router::new(),
+            }
+        };
+
+        router.call(req)
+    }
 }

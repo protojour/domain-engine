@@ -2114,6 +2114,7 @@ dependencies = [
  "tokio-util",
  "tower-http",
  "tower-lsp",
+ "tower-service",
  "tracing",
  "tracing-subscriber",
 ]
