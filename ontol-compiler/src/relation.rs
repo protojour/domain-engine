@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashSet};
+use std::collections::BTreeSet;
 
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
@@ -9,7 +9,7 @@ use ontol_runtime::{
 
 use crate::{sequence::Sequence, text_patterns::TextPatternSegment, SourceSpan};
 
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub struct Relations {
     pub properties_by_def_id: FnvHashMap<DefId, Properties>,
     /// A map from "idenfities" relationship to named relationship:
@@ -24,10 +24,8 @@ pub struct Relations {
     pub value_generators_unchecked: FnvHashMap<RelationshipId, (DefId, SourceSpan)>,
     /// `gen` relations after proper type check:
     pub value_generators: FnvHashMap<RelationshipId, ValueGenerator>,
-
-    /// `is` relations
-    pub ontology_mesh: FnvHashMap<DefId, IndexMap<Is, SourceSpan>>,
-    pub reverse_ontology_mesh: FnvHashMap<DefId, HashSet<DefId>>,
+    /// `order` relations
+    pub order_relationships: FnvHashMap<DefId, Vec<RelationshipId>>,
 
     /// `rel type` parameters (instantiated) for various types
     pub type_params: FnvHashMap<DefId, IndexMap<DefId, TypeParam>>,
@@ -70,34 +68,6 @@ impl Relations {
             }
         }
     }
-}
-
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub struct Is {
-    pub def_id: DefId,
-    pub rel: TypeRelation,
-}
-
-impl Is {
-    pub fn is_super(&self) -> bool {
-        matches!(self.rel, TypeRelation::Super | TypeRelation::ImplicitSuper)
-    }
-
-    pub fn is_sub(&self) -> bool {
-        matches!(self.rel, TypeRelation::Subset | TypeRelation::SubVariant)
-    }
-}
-
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub enum TypeRelation {
-    /// Explicit supertype relation
-    Super,
-    /// Implicit supertype relation, no actual "inheritance" (built-in only)
-    ImplicitSuper,
-    /// Explicit subvariant relation
-    SubVariant,
-    /// Implicit subset relation (built-in only)
-    Subset,
 }
 
 #[derive(Default, Debug)]

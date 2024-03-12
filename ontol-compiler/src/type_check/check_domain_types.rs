@@ -13,9 +13,10 @@ use crate::{
     def::{Def, LookupRelationshipMeta},
     error::CompileError,
     primitive::PrimitiveKind,
-    relation::{Constructor, Property, TypeRelation},
+    relation::{Constructor, Property},
     repr::repr_model::ReprKind,
     text_patterns::TextPatternSegment,
+    thesaurus::TypeRelation,
     types::{FormatType, Type},
     SourceSpan,
 };
@@ -41,9 +42,10 @@ enum Action {
 }
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
-    pub fn check_domain_type_pre_repr(&mut self, def_id: DefId, _def: &Def) -> Option<()> {
-        let properties = self.relations.properties_by_def_id.get(&def_id)?;
-        let table = properties.table.as_ref()?;
+    pub fn check_domain_type_pre_repr(&mut self, def_id: DefId, _def: &Def) {
+        let Some(table) = self.relations.properties_table_by_def_id(def_id) else {
+            return;
+        };
 
         let mut actions = vec![];
 
@@ -82,14 +84,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
 
         self.perform_actions(actions);
-
-        None
     }
 
-    pub fn check_domain_type_post_repr(&mut self, def_id: DefId, _def: &Def) -> Option<()> {
-        let properties = self.relations.properties_by_def_id.get(&def_id)?;
-        let ontology_mesh = self.relations.ontology_mesh.get(&def_id);
-        let table = properties.table.as_ref()?;
+    pub fn check_domain_type_post_repr(&mut self, def_id: DefId, _def: &Def) {
+        let Some(properties) = self.relations.properties_by_def_id.get(&def_id) else {
+            return;
+        };
+        let Some(table) = properties.table.as_ref() else {
+            return;
+        };
+        let thesaurus_entries = self.thesaurus.entries(def_id, self.defs);
 
         let mut actions = vec![];
         let mut subject_relation_set: FnvHashSet<DefId> = Default::default();
@@ -142,43 +146,37 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
                 Role::Object => {
                     if properties.identified_by.is_none() {
-                        match ontology_mesh {
-                            Some(mesh)
-                                if mesh.iter().any(|(is, _)| {
-                                    matches!(
-                                        is.rel,
-                                        TypeRelation::SubVariant | TypeRelation::Subset
-                                    )
-                                }) =>
-                            {
-                                if let Some(table) = &properties.table {
-                                    assert!(table.get(property_id).is_some());
+                        if thesaurus_entries.is_empty() {
+                            // it is illegal to specify an object property to something that is not an entity (has no id)
+                            actions.push(Action::ReportNonEntityInObjectRelationship(
+                                def_id,
+                                property_id.relationship_id,
+                            ));
+                        }
 
-                                    let all_entities =
-                                        mesh.iter().filter(|(is, _)| is.is_sub()).any(|(is, _)| {
-                                            let subject_properties = self
-                                                .relations
-                                                .properties_by_def_id(is.def_id)
-                                                .unwrap();
+                        if thesaurus_entries.iter().any(|(is, _)| {
+                            matches!(is.rel, TypeRelation::SubVariant | TypeRelation::Subset)
+                        }) {
+                            let Some(table) = &properties.table else {
+                                panic!("No table in value union");
+                            };
 
-                                            subject_properties.identified_by.is_some()
-                                        });
+                            assert!(table.get(property_id).is_some());
 
-                                    if all_entities {
-                                        actions.push(Action::AdjustEntityPropertyCardinality(
-                                            def_id,
-                                            *property_id,
-                                        ));
-                                    }
-                                } else {
-                                    panic!("No table in value union");
-                                }
-                            }
-                            _ => {
-                                // it is illegal to specify an object property to something that is not an entity (has no id)
-                                actions.push(Action::ReportNonEntityInObjectRelationship(
+                            let all_entities = thesaurus_entries
+                                .iter()
+                                .filter(|(is, _)| is.is_sub())
+                                .any(|(is, _)| {
+                                    let subject_properties =
+                                        self.relations.properties_by_def_id(is.def_id).unwrap();
+
+                                    subject_properties.identified_by.is_some()
+                                });
+
+                            if all_entities {
+                                actions.push(Action::AdjustEntityPropertyCardinality(
                                     def_id,
-                                    property_id.relationship_id,
+                                    *property_id,
                                 ));
                             }
                         }
@@ -201,8 +199,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
 
         self.perform_actions(actions);
-
-        None
     }
 
     fn perform_actions(&mut self, actions: Vec<Action>) {

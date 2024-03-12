@@ -10,8 +10,9 @@ use crate::{
     namespace::Space,
     package::ONTOL_PKG,
     regex_util,
-    relation::{Constructor, Is, RelObjectConstraint, RelTypeConstraints, TypeParam, TypeRelation},
+    relation::{Constructor, RelObjectConstraint, RelTypeConstraints, TypeParam},
     text_patterns::{store_text_pattern_segment, TextPatternSegment},
+    thesaurus::TypeRelation,
     types::{Type, TypeRef},
     Compiler, NO_SPAN,
 };
@@ -301,28 +302,8 @@ impl<'m> Compiler<'m> {
         (super_rel, sub_rel): (TypeRelation, TypeRelation),
         super_def_id: DefId,
     ) {
-        self.relations
-            .ontology_mesh
-            .entry(sub_def_id)
-            .or_default()
-            .insert(
-                Is {
-                    def_id: super_def_id,
-                    rel: sub_rel,
-                },
-                NO_SPAN,
-            );
-        self.relations
-            .ontology_mesh
-            .entry(super_def_id)
-            .or_default()
-            .insert(
-                Is {
-                    def_id: sub_def_id,
-                    rel: super_rel,
-                },
-                NO_SPAN,
-            );
+        self.thesaurus
+            .insert_builtin_is(sub_def_id, (super_rel, sub_rel), super_def_id);
     }
 
     fn repr_smoke_test(&self) {

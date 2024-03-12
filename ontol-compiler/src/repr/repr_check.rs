@@ -17,7 +17,9 @@ use crate::{
     error::CompileError,
     package::ONTOL_PKG,
     primitive::{PrimitiveKind, Primitives},
-    relation::{Constructor, Properties, Relations, TypeRelation},
+    relation::{Constructor, Properties, Relations},
+    thesaurus::Thesaurus,
+    thesaurus::TypeRelation,
     type_check::seal::SealCtx,
     types::{DefTypes, Type},
     CompileErrors, Note, SourceId, SourceSpan, SpannedCompileError, SpannedNote, NATIVE_SOURCE,
@@ -35,6 +37,7 @@ pub struct ReprCheck<'c, 'm> {
     pub defs: &'c Defs<'m>,
     pub def_types: &'c DefTypes<'m>,
     pub relations: &'c Relations,
+    pub thesaurus: &'c Thesaurus,
     pub seal_ctx: &'c mut SealCtx,
     pub primitives: &'c Primitives,
 
@@ -236,10 +239,10 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
     }
 
     fn compute_repr(&mut self, leaf_def_id: DefId) -> Option<Repr> {
-        let ontology_mesh = self.collect_ontology_mesh(leaf_def_id);
+        let mesh = self.collect_thesaurus(leaf_def_id);
 
-        if ontology_mesh.len() > 1 && self.state.do_trace {
-            trace!("    mesh for {leaf_def_id:?}: {:?}", ontology_mesh);
+        if mesh.len() > 1 && self.state.do_trace {
+            trace!("    mesh for {leaf_def_id:?}: {:?}", mesh);
         }
 
         let mut builder = ReprBuilder {
@@ -248,7 +251,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             type_params: Default::default(),
         };
 
-        for (def_id, data) in &ontology_mesh {
+        for (def_id, data) in &mesh {
             let def_id = *def_id;
 
             match self.defs.def_kind(def_id) {
@@ -434,7 +437,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             );
         }
 
-        self.check_soundness(builder, &ontology_mesh)
+        self.check_soundness(builder, &mesh)
     }
 
     fn merge_repr(
@@ -559,10 +562,10 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         builder.number_resolutions.entry(resolution).or_insert(span);
     }
 
-    fn collect_ontology_mesh(&mut self, def_id: DefId) -> IndexMap<DefId, IsData> {
+    fn collect_thesaurus(&mut self, def_id: DefId) -> IndexMap<DefId, IsData> {
         let mut output = IndexMap::default();
 
-        self.traverse_ontology_mesh(def_id, IsRelation::Origin, 0, NO_SPAN, &mut output);
+        self.traverse_thesaurus(def_id, IsRelation::Origin, 0, NO_SPAN, &mut output);
 
         if !self.state.circular_spans.is_empty() {
             let spans = std::mem::take(&mut self.state.circular_spans);
@@ -578,7 +581,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         output
     }
 
-    fn traverse_ontology_mesh(
+    fn traverse_thesaurus(
         &mut self,
         def_id: DefId,
         is_relation: IsRelation,
@@ -605,38 +608,30 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
 
             let mut was_leaf = true;
 
-            if let Some(entries) = self.relations.ontology_mesh.get(&def_id) {
-                for (is, next_span) in entries {
-                    let next_relation = match (is_relation, is.rel) {
-                        (_, TypeRelation::ImplicitSuper | TypeRelation::Subset) => {
-                            continue;
-                        }
-                        (IsRelation::Origin | IsRelation::Super, TypeRelation::Super) => {
-                            IsRelation::Super
-                        }
-                        (IsRelation::Sub, TypeRelation::Super) => {
-                            // If traversing _down_ once, don't traverse _up_ again.
-                            continue;
-                        }
-                        _ => IsRelation::Sub,
-                    };
+            for (is, next_span) in self.thesaurus.entries(def_id, self.defs) {
+                let next_relation = match (is_relation, is.rel) {
+                    (_, TypeRelation::ImplicitSuper | TypeRelation::Subset) => {
+                        continue;
+                    }
+                    (IsRelation::Origin | IsRelation::Super, TypeRelation::Super) => {
+                        IsRelation::Super
+                    }
+                    (IsRelation::Sub, TypeRelation::Super) => {
+                        // If traversing _down_ once, don't traverse _up_ again.
+                        continue;
+                    }
+                    _ => IsRelation::Sub,
+                };
 
-                    // Don't traverse built-in spans:
-                    let next_span = if next_span.source_id == SourceId(0) {
-                        span
-                    } else {
-                        *next_span
-                    };
+                // Don't traverse built-in spans:
+                let next_span = if next_span.source_id == SourceId(0) {
+                    span
+                } else {
+                    *next_span
+                };
 
-                    self.traverse_ontology_mesh(
-                        is.def_id,
-                        next_relation,
-                        level + 1,
-                        next_span,
-                        output,
-                    );
-                    was_leaf = false;
-                }
+                self.traverse_thesaurus(is.def_id, next_relation, level + 1, next_span, output);
+                was_leaf = false;
             }
 
             output.get_mut(&def_id).unwrap().is_leaf = was_leaf;

@@ -7,7 +7,7 @@ use crate::repr::repr_model::{Repr, ReprKind};
 
 use super::TypeCheck;
 
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub struct SealCtx {
     /// Map of repr results
     pub repr_table: FnvHashMap<DefId, Repr>,
@@ -82,7 +82,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     /// In that case the relations should be mirrored onto every type _part_ of that union.
     fn seal_memberships(&mut self, def_id: DefId) {
         // Also seal every union/etc which contains this def_id
-        let Some(memberships) = self.relations.reverse_ontology_mesh.get(&def_id) else {
+        let Some(memberships) = self.thesaurus.reverse_table.get(&def_id) else {
             return;
         };
 

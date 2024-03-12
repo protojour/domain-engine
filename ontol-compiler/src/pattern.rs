@@ -188,7 +188,6 @@ impl<'m> Compiler<'m> {
     }
 }
 
-#[derive(Debug)]
 pub struct Patterns {
     next_pat_id: PatId,
     pub table: FnvHashMap<PatId, Pattern>,

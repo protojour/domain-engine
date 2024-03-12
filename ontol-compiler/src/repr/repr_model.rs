@@ -21,7 +21,7 @@ pub struct Repr {
 pub enum ReprKind {
     Unit,
     /// Scalar type without further attributes.
-    /// Currently placeholder for boolean, unit, string
+    /// Currently placeholder for boolean, unit, text
     Scalar(DefId, ReprScalarKind, SourceSpan),
     /// Sequence
     Seq,
@@ -40,6 +40,7 @@ pub enum ReprKind {
 pub enum ReprScalarKind {
     I64(RangeInclusive<i64>),
     F64(RangeInclusive<NotNan<f64>>),
+    Text,
     Other,
 }
 

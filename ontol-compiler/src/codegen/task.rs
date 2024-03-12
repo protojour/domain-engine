@@ -44,14 +44,6 @@ pub struct CodegenTasks<'m> {
     pub result_metadata_table: FnvHashMap<MapKey, MapOutputMeta>,
 }
 
-impl<'m> Debug for CodegenTasks<'m> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CodegenTasks")
-            .field("tasks", &self.const_tasks)
-            .finish()
-    }
-}
-
 impl<'m> CodegenTasks<'m> {
     pub fn add_map_task(
         &mut self,

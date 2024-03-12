@@ -45,6 +45,7 @@ use relation::{Properties, Relations, UnionMemberCache};
 pub use source::*;
 use strings::Strings;
 use text_patterns::{compile_all_text_patterns, TextPatterns};
+use thesaurus::Thesaurus;
 use tracing::debug;
 use type_check::seal::SealCtx;
 use types::{DefTypes, Types};
@@ -79,11 +80,11 @@ mod repr;
 mod sequence;
 mod strings;
 mod text_patterns;
+mod thesaurus;
 mod type_check;
 mod typed_hir;
 mod types;
 
-#[derive(Debug)]
 pub struct Compiler<'m> {
     pub sources: Sources,
 
@@ -100,6 +101,7 @@ pub struct Compiler<'m> {
     pub(crate) types: Types<'m>,
     pub(crate) def_types: DefTypes<'m>,
     pub(crate) relations: Relations,
+    pub(crate) thesaurus: Thesaurus,
     pub(crate) seal_ctx: SealCtx,
     pub(crate) text_patterns: TextPatterns,
 
@@ -112,6 +114,8 @@ impl<'m> Compiler<'m> {
     pub fn new(mem: &'m Mem, sources: Sources) -> Self {
         let mut defs = Defs::default();
         let primitives = Primitives::new(&mut defs);
+
+        let thesaurus = Thesaurus::new(&primitives);
 
         Self {
             sources,
@@ -126,6 +130,7 @@ impl<'m> Compiler<'m> {
             types: Types::new(mem),
             def_types: Default::default(),
             relations: Relations::default(),
+            thesaurus,
             seal_ctx: Default::default(),
             text_patterns: TextPatterns::default(),
             codegen_tasks: Default::default(),
@@ -730,6 +735,10 @@ impl<'m> Compiler<'m> {
                     }
                 }
             }
+        }
+
+        for def_id in self.defs.iter_package_def_ids(package_id) {
+            self.type_check().check_entity_post_seal(def_id);
         }
     }
 

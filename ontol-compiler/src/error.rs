@@ -71,6 +71,9 @@ pub enum CompileError {
     InferenceCardinalityMismatch,
     CannotConvertMissingMapping { input: String, output: String },
     NonEntityInReverseRelationship,
+    RelationSubjectMustBeEntity,
+    EntityOrderMustBeSymbolInThisDomain,
+    EntityOrderMustSpecifyParameters,
     OverlappingSequenceIndexes,
     UnsupportedSequenceIndexType,
     ConstructorMismatch,
@@ -213,6 +216,15 @@ impl std::fmt::Display for CompileError {
             ),
             Self::NonEntityInReverseRelationship => {
                 write!(f, "only entities may have named reverse relationship")
+            }
+            Self::RelationSubjectMustBeEntity => {
+                write!(f, "relation subject must be an entity")
+            }
+            Self::EntityOrderMustBeSymbolInThisDomain => {
+                write!(f, "order identifier must be a symbol in this domain")
+            }
+            Self::EntityOrderMustSpecifyParameters => {
+                write!(f, "order tuple parameters expected")
             }
             Self::OverlappingSequenceIndexes => write!(f, "overlapping indexes"),
             Self::UnsupportedSequenceIndexType => write!(f, "unsupported sequence index type"),
@@ -383,7 +395,7 @@ impl CompileError {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub struct CompileErrors {
     pub(crate) errors: Vec<SpannedCompileError>,
 }

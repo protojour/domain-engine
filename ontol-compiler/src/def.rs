@@ -210,7 +210,6 @@ pub struct RelationshipMeta<'d, 'm> {
     pub relation_def_kind: SpannedBorrow<'d, DefKind<'m>>,
 }
 
-#[derive(Debug)]
 pub struct Defs<'m> {
     def_id_allocators: FnvHashMap<PackageId, u16>,
     pub(crate) table: FnvHashMap<DefId, Def<'m>>,

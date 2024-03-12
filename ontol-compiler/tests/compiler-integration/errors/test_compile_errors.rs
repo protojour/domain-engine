@@ -542,3 +542,36 @@ fn error_ambiguous_number_resolution() {
     "
     .compile_fail();
 }
+
+#[test]
+fn error_order() {
+    "
+    def struct (
+        rel . // ERROR relation subject must be an entity
+            order[]: text
+    )
+
+    def entity (
+        rel .'id'|id: (rel .is: text)
+
+        rel .order[
+        ]: by_text_bug // ERROR order identifier must be a symbol in this domain
+
+        rel .order[
+        ]: ontol.ascending // ERROR order identifier must be a symbol in this domain
+
+        rel .order[
+        ]: 'by_text' // ERROR order identifier must be a symbol in this domain
+
+        rel .order[
+        ]: 42 // ERROR order identifier must be a symbol in this domain
+
+        rel .order[ // ERROR order tuple parameters expected
+        ]: by_text
+    )
+
+    def by_text_bug (rel .is: text)
+    def @symbol by_text()
+    "
+    .compile_fail();
+}

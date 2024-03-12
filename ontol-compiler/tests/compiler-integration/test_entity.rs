@@ -481,3 +481,19 @@ fn serial_gen_auto() {
     "
     .compile();
 }
+
+#[test]
+fn entity_order_a() {
+    "
+    def foo (
+        rel .'id'|id: (rel .is: text)
+        rel .'name': text
+        rel .order[
+            rel .0: 'text'
+            rel .direction: ascending
+        ]: by_name
+    )
+    def @symbol by_name ()
+    "
+    .compile();
+}

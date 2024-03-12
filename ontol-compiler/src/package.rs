@@ -23,7 +23,7 @@ pub const ONTOL_PKG: PackageId = PackageId(0);
 const ROOT_PKG: PackageId = PackageId(1);
 
 /// The compiler's loaded packages
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub(crate) struct Packages {
     pub loaded_packages: HashMap<PackageReference, DefId>,
 }
