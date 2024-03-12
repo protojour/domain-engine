@@ -45,15 +45,19 @@ impl State {
                 )),
                 "@private" => Some(HoverDoc::from(
                     ident,
-                    "#### Def modifier\nThe definition is private. It will not be accessible to other domains if the domain is imported in a `use` statement."
+                    "#### Def modifier\nThe definition is _private_. It will not be accessible to other domains if the domain is imported in a `use` statement."
                 )),
                 "@open" => Some(HoverDoc::from(
                     ident,
-                    "#### Def modifier\nThe definition and its immediate non-entity relationships are open. Arbitrary data can be associated with it."
+                    "#### Def modifier\nThe definition and its immediate non-entity relationships are _open_. Arbitrary data can be associated with it."
+                )),
+                "@symbol" => Some(HoverDoc::from(
+                    ident,
+                    "#### Def modifier\nThe definition is a _symbol_, an otherwise empty definition representing the symbol name itself."
                 )),
                 "@extern" => Some(HoverDoc::from(
                     ident,
-                    "#### Def modifier\nThe definition describes an external hook."
+                    "#### Def modifier\nThe definition describes an _external_ hook."
                 )),
                 "@match" => Some(HoverDoc::from(
                     ident,
@@ -102,7 +106,7 @@ impl State {
 }
 
 /// A list of Completions and their Kind
-pub const COMPLETIONS: [(&str, CompletionItemKind); 39] = [
+pub const COMPLETIONS: [(&str, CompletionItemKind); 40] = [
     ("ontol", CompletionItemKind::MODULE),
     ("def", CompletionItemKind::KEYWORD),
     ("fmt", CompletionItemKind::KEYWORD),
@@ -135,6 +139,7 @@ pub const COMPLETIONS: [(&str, CompletionItemKind); 39] = [
     ("false", CompletionItemKind::CONSTANT),
     ("@private", CompletionItemKind::TYPE_PARAMETER),
     ("@open", CompletionItemKind::TYPE_PARAMETER),
+    ("@symbol", CompletionItemKind::TYPE_PARAMETER),
     ("@extern", CompletionItemKind::TYPE_PARAMETER),
     ("@match", CompletionItemKind::TYPE_PARAMETER),
     ("@in", CompletionItemKind::TYPE_PARAMETER),
