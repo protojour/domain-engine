@@ -308,8 +308,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     )),
                     cardinality: (PropertyCardinality::Optional, ValueCardinality::One),
                     rel_params_def: None,
-                    // TODO: Union of ascending and descending:
-                    value_def: DefId::unit(),
+                    value_def: self.primitives.direction_union,
                     mentioned: false,
                 },
             );

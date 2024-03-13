@@ -295,26 +295,31 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 Constructor::Transparent => {
                     debug!("was Transparent: {properties:?}");
                     match &properties.table {
-                        Some(property_set) => Ok(DomainTypeMatchData::Struct(property_set)),
-                        None => match repr_kind {
-                            ReprKind::Scalar(def_id, ReprScalarKind::Text, _) => {
-                                match self.defs.def_kind(*def_id) {
-                                    DefKind::TextLiteral(lit) => {
-                                        Ok(DomainTypeMatchData::TextLiteral(lit))
-                                    }
-                                    _ => Err(UnionCheckError::UnitTypePartOfUnion(*def_id)),
-                                }
-                            }
-                            _ => Err(UnionCheckError::UnitTypePartOfUnion(def_id)),
-                        },
+                        Some(property_set) => return Ok(DomainTypeMatchData::Struct(property_set)),
+                        None => {}
                     }
                 }
-                Constructor::Sequence(sequence) => Ok(DomainTypeMatchData::Sequence(sequence)),
+                Constructor::Sequence(sequence) => {
+                    return Ok(DomainTypeMatchData::Sequence(sequence))
+                }
                 Constructor::TextFmt(segment) => {
-                    Ok(DomainTypeMatchData::ConstructorStringPattern(segment))
+                    return Ok(DomainTypeMatchData::ConstructorStringPattern(segment))
                 }
             },
-            None => Err(UnionCheckError::UnitTypePartOfUnion(def_id)),
+            None => {}
+        }
+
+        match repr_kind {
+            ReprKind::Scalar(scalar_def_id, ReprScalarKind::Text, _) => {
+                match self.defs.def_kind(*scalar_def_id) {
+                    DefKind::TextLiteral(lit) => Ok(DomainTypeMatchData::TextLiteral(lit)),
+                    _other => {
+                        debug!("other: {_other:?}");
+                        Err(UnionCheckError::UnitTypePartOfUnion(*scalar_def_id))
+                    }
+                }
+            }
+            _ => Err(UnionCheckError::UnitTypePartOfUnion(def_id)),
         }
     }
 
