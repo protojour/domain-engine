@@ -103,6 +103,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     self.collect_membership_match_attributes(type_def_id, &mut match_attributes);
 
                     self.build_struct_node(
+                        type_def_id,
                         pattern_attrs,
                         hir_meta,
                         match_attributes,
@@ -136,6 +137,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.collect_membership_match_attributes(type_def_id, &mut match_attributes);
 
                 self.build_struct_node(
+                    type_def_id,
                     pattern_attrs,
                     hir_meta,
                     match_attributes,
@@ -253,6 +255,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn build_struct_node(
         &mut self,
+        type_def_id: DefId,
         pattern_attrs: &[CompoundPatternAttr],
         hir_meta: Meta<'m>,
         mut match_attributes: IndexMap<&'m str, MatchAttribute>,
@@ -265,20 +268,25 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let mut hir_props = Vec::with_capacity(pattern_attrs.len());
 
-        let mut special_attributes = IndexMap::from_iter([
-            (
-                BuiltinRelationKind::Order,
-                MatchAttribute {
-                    property_id: PropertyId::subject(RelationshipId(
-                        self.primitives.relations.order,
-                    )),
-                    cardinality: (PropertyCardinality::Optional, ValueCardinality::One),
-                    rel_params_def: None,
-                    value_def: self.primitives.text,
-                    mentioned: false,
-                },
-            ),
-            (
+        let mut special_attributes: IndexMap<BuiltinRelationKind, MatchAttribute> = IndexMap::new();
+
+        if self.relations.identified_by(type_def_id).is_some() {
+            if let Some(order_union_def_id) = self.relations.order_unions.get(&type_def_id) {
+                special_attributes.insert(
+                    BuiltinRelationKind::Order,
+                    MatchAttribute {
+                        property_id: PropertyId::subject(RelationshipId(
+                            self.primitives.relations.order,
+                        )),
+                        cardinality: (PropertyCardinality::Optional, ValueCardinality::One),
+                        rel_params_def: None,
+                        value_def: *order_union_def_id,
+                        mentioned: false,
+                    },
+                );
+            }
+
+            special_attributes.insert(
                 BuiltinRelationKind::Direction,
                 MatchAttribute {
                     property_id: PropertyId::subject(RelationshipId(
@@ -290,8 +298,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     value_def: DefId::unit(),
                     mentioned: false,
                 },
-            ),
-        ]);
+            );
+        }
 
         // Actually match the written attributes to the match attributes:
         for pattern_attr in pattern_attrs {

@@ -17,7 +17,7 @@ use ontol_runtime::{
 };
 use patricia_tree::PatriciaMap;
 use smartstring::alias::String;
-use tracing::debug;
+use tracing::{debug, debug_span};
 
 use crate::{
     def::{Def, DefKind, LookupRelationshipMeta},
@@ -36,6 +36,8 @@ use super::TypeCheck;
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
     pub fn check_union(&mut self, value_union_def_id: DefId) -> Vec<SpannedCompileError> {
+        let _entered = debug_span!("union", id = ?value_union_def_id).entered();
+
         let mut strings = self.strings.detach();
 
         // An error set to avoid reporting the same error more than once

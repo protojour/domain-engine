@@ -25,7 +25,6 @@ pub mod check_union;
 pub mod ena_inference;
 pub mod seal;
 
-mod check_entity;
 mod check_extern;
 mod check_map;
 mod check_relationship;

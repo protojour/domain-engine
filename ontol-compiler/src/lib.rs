@@ -67,6 +67,7 @@ pub mod source;
 mod codegen;
 mod compiler_queries;
 mod def;
+mod entity;
 mod interface;
 mod lowering;
 mod map;
@@ -733,11 +734,17 @@ impl<'m> Compiler<'m> {
                     }
                 }
             }
+        }
 
-            // entity check
-            for def_id in type_check.defs.iter_package_def_ids(package_id) {
-                type_check.check_entity(def_id);
-            }
+        // entity check
+        // this is not in the TypeCheck context because it may
+        // generate new DefIds
+        for def_id in self.defs.iter_package_def_ids(package_id) {
+            self.check_entity(def_id);
+        }
+
+        {
+            let mut type_check = self.type_check();
 
             // union and extern checks
             for def_id in type_check.defs.iter_package_def_ids(package_id) {

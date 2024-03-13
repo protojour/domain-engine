@@ -5,40 +5,23 @@ use crate::{
     def::{DefKind, LookupRelationshipMeta, RelParams},
     relation::Constructor,
     repr::repr_model::{ReprKind, ReprScalarKind},
-    CompileError, CompileErrors, SourceSpan,
+    thesaurus::TypeRelation,
+    CompileError, CompileErrors, Compiler, SourceSpan,
 };
 
-use super::TypeCheck;
-
-impl<'c, 'm> TypeCheck<'c, 'm> {
-    /// Check entity-related relationships.
-    /// This is also run for non-entities.
-    pub fn check_entity(&mut self, def_id: DefId) {
-        let identified_by = self
-            .relations
-            .properties_by_def_id
-            .get(&def_id)
-            .and_then(|properties| properties.identified_by);
-
-        if let Some(orderings) = self.relations.order_relationships.remove(&def_id) {
-            for ordering in orderings {
-                if identified_by.is_some() {
-                    self.check_ordering(def_id, ordering);
-                } else {
-                    let meta = self.defs.relationship_meta(ordering);
-                    self.errors.error(
-                        CompileError::RelationSubjectMustBeEntity,
-                        &meta.relationship.subject.1,
-                    );
-                }
-            }
-        }
-    }
-
-    fn check_ordering(&mut self, entity_def_id: DefId, order_relationship: RelationshipId) {
+impl<'m> Compiler<'m> {
+    /// Returns the object (symbol) of the order.
+    /// Adds the order as a subvariant to the order union
+    pub(super) fn check_order(
+        &mut self,
+        entity_def_id: DefId,
+        order_relationship: RelationshipId,
+        order_union: DefId,
+    ) {
         let package_id = entity_def_id.package_id();
         let meta = self.defs.relationship_meta(order_relationship);
         let object = meta.relationship.object;
+        let rel_span = *meta.relationship.span;
 
         match self.seal_ctx.get_repr_kind(&object.0) {
             Some(ReprKind::Scalar(scalar_def_id, ReprScalarKind::Text, _)) => {
@@ -68,6 +51,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 );
             }
         }
+
+        self.thesaurus
+            .insert_domain_is(order_union, TypeRelation::SubVariant, object.0, rel_span);
     }
 
     fn check_order_params(
