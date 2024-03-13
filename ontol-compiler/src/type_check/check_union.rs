@@ -290,13 +290,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         debug!("find domain type match data {def_id:?}: {repr_kind:?}");
 
-        match self.relations.properties_by_def_id(def_id) {
-            Some(properties) => match &properties.constructor {
+        if let Some(properties) = self.relations.properties_by_def_id(def_id) {
+            match &properties.constructor {
                 Constructor::Transparent => {
                     debug!("was Transparent: {properties:?}");
-                    match &properties.table {
-                        Some(property_set) => return Ok(DomainTypeMatchData::Struct(property_set)),
-                        None => {}
+                    if let Some(property_set) = &properties.table {
+                        return Ok(DomainTypeMatchData::Struct(property_set));
                     }
                 }
                 Constructor::Sequence(sequence) => {
@@ -305,8 +304,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 Constructor::TextFmt(segment) => {
                     return Ok(DomainTypeMatchData::ConstructorStringPattern(segment))
                 }
-            },
-            None => {}
+            }
         }
 
         match repr_kind {

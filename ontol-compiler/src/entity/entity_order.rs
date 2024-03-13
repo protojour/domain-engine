@@ -112,7 +112,7 @@ impl<'m> Compiler<'m> {
                 _ => {
                     self.errors.error(
                         CompileError::TODO("invalid ordering field".into()),
-                        &meta.relationship.span,
+                        meta.relationship.span,
                     );
                 }
             }
@@ -146,7 +146,7 @@ impl<'m> Compiler<'m> {
         let mut output: Vec<RelationshipId> = vec![];
         let mut errors = CompileErrors::default();
 
-        for field_segment in field.split(".") {
+        for field_segment in field.split('.') {
             let Ok((relationship_id, next_def_id)) = self.lookup_order_field(def_id, field_segment)
             else {
                 errors.error(

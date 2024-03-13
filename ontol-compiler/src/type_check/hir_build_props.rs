@@ -103,11 +103,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     self.collect_membership_match_attributes(type_def_id, &mut match_attributes);
 
                     self.build_struct_node(
-                        type_def_id,
+                        (type_def_id, actual_struct_flags),
                         pattern_attrs,
                         hir_meta,
                         match_attributes,
-                        actual_struct_flags,
                         span,
                         ctx,
                     )
@@ -137,11 +136,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.collect_membership_match_attributes(type_def_id, &mut match_attributes);
 
                 self.build_struct_node(
-                    type_def_id,
+                    (type_def_id, actual_struct_flags),
                     pattern_attrs,
                     hir_meta,
                     match_attributes,
-                    actual_struct_flags,
                     span,
                     ctx,
                 )
@@ -269,11 +267,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn build_struct_node(
         &mut self,
-        type_def_id: DefId,
+        (type_def_id, actual_struct_flags): (DefId, StructFlags),
         pattern_attrs: &[CompoundPatternAttr],
         hir_meta: Meta<'m>,
         mut match_attributes: IndexMap<&'m str, MatchAttribute>,
-        actual_struct_flags: StructFlags,
         span: SourceSpan,
         ctx: &mut HirBuildCtx<'m>,
     ) -> ontol_hir::Node {
@@ -786,11 +783,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 true
             }
             Some(ReprKind::Unit) => true,
-            Some(ReprKind::Scalar(scalar_def_id, ..)) => match self.defs.def_kind(*scalar_def_id) {
-                DefKind::TextLiteral(_) => true,
-                DefKind::NumberLiteral(_) => true,
-                _ => false,
-            },
+            Some(ReprKind::Scalar(scalar_def_id, ..)) => matches!(
+                self.defs.def_kind(*scalar_def_id),
+                DefKind::TextLiteral(_) | DefKind::NumberLiteral(_)
+            ),
             Some(ReprKind::Union(members) | ReprKind::StructUnion(members)) => members
                 .iter()
                 .all(|(def_id, _)| self.check_can_construct_default_inner(*def_id)),
