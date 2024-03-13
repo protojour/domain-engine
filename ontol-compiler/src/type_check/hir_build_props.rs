@@ -6,13 +6,13 @@ use ontol_runtime::{
     smart_format,
     value::{Attribute, PropertyId},
     var::Var,
-    DefId, Role,
+    DefId, RelationshipId, Role,
 };
 use smallvec::smallvec;
 use tracing::{debug, info};
 
 use crate::{
-    def::{DefKind, LookupRelationshipMeta, RelParams},
+    def::{BuiltinRelationKind, DefKind, LookupRelationshipMeta, RelParams},
     mem::Intern,
     pattern::{
         CompoundPatternAttr, CompoundPatternAttrKind, CompoundPatternModifier, Pattern,
@@ -99,7 +99,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             ReprKind::Struct | ReprKind::Unit => match property_set {
                 Some(property_set) => {
                     let mut match_attributes = IndexMap::new();
-                    self.collect_match_attributes(property_set, &mut match_attributes);
+                    self.collect_named_match_attributes(property_set, &mut match_attributes);
                     self.collect_membership_match_attributes(type_def_id, &mut match_attributes);
 
                     self.build_struct_node(
@@ -122,14 +122,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let mut match_attributes = IndexMap::new();
 
                 if let Some(property_set) = property_set {
-                    self.collect_match_attributes(property_set, &mut match_attributes);
+                    self.collect_named_match_attributes(property_set, &mut match_attributes);
                 }
 
                 for (member_def_id, _) in members {
                     if let Some(property_set) =
                         self.relations.properties_table_by_def_id(*member_def_id)
                     {
-                        self.collect_match_attributes(property_set, &mut match_attributes);
+                        self.collect_named_match_attributes(property_set, &mut match_attributes);
                     }
                 }
 
@@ -185,7 +185,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     /// The written attribute patterns should match against
     /// the relations defined on the type. Compute `MatchAttributes`:
-    fn collect_match_attributes(
+    fn collect_named_match_attributes(
         &self,
         property_set: &IndexMap<PropertyId, Property>,
         match_attributes: &mut IndexMap<&'m str, MatchAttribute>,
@@ -212,7 +212,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
             if matches!(is.rel, TypeRelation::SubVariant) {
                 if let Some(property_set) = self.relations.properties_table_by_def_id(*mem_def_id) {
-                    self.collect_match_attributes(property_set, match_attributes);
+                    self.collect_named_match_attributes(property_set, match_attributes);
                 }
             }
         }
@@ -265,12 +265,41 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let mut hir_props = Vec::with_capacity(pattern_attrs.len());
 
+        let mut special_attributes = IndexMap::from_iter([
+            (
+                BuiltinRelationKind::Order,
+                MatchAttribute {
+                    property_id: PropertyId::subject(RelationshipId(
+                        self.primitives.relations.order,
+                    )),
+                    cardinality: (PropertyCardinality::Optional, ValueCardinality::One),
+                    rel_params_def: None,
+                    value_def: self.primitives.text,
+                    mentioned: false,
+                },
+            ),
+            (
+                BuiltinRelationKind::Direction,
+                MatchAttribute {
+                    property_id: PropertyId::subject(RelationshipId(
+                        self.primitives.relations.direction,
+                    )),
+                    cardinality: (PropertyCardinality::Optional, ValueCardinality::One),
+                    rel_params_def: None,
+                    // TODO: Union of ascending and descending:
+                    value_def: DefId::unit(),
+                    mentioned: false,
+                },
+            ),
+        ]);
+
         // Actually match the written attributes to the match attributes:
         for pattern_attr in pattern_attrs {
             let prop_node = self.build_struct_property_node(
                 struct_binder.hir().var,
                 pattern_attr,
                 &mut match_attributes,
+                &mut special_attributes,
                 actual_struct_flags,
                 ctx,
             );
@@ -304,6 +333,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         struct_binder_var: Var,
         attr: &CompoundPatternAttr,
         match_attributes: &mut IndexMap<&'m str, MatchAttribute>,
+        special_attributes: &mut IndexMap<BuiltinRelationKind, MatchAttribute>,
         actual_struct_flags: StructFlags,
         ctx: &mut HirBuildCtx<'m>,
     ) -> Option<ontol_hir::Node> {
@@ -317,14 +347,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             flags.insert(PropFlags::PAT_OPTIONAL);
         }
 
-        let DefKind::TextLiteral(attr_prop) = self.defs.def_kind(def_id) else {
-            self.error(CompileError::NamedPropertyExpected, &prop_span);
-            return None;
+        let match_attribute = match self.defs.def_kind(def_id) {
+            DefKind::TextLiteral(name) => match_attributes.get_mut(name),
+            DefKind::BuiltinRelType(kind, _) => special_attributes.get_mut(kind),
+            _ => None,
         };
-        let Some(match_attribute) = match_attributes.get_mut(attr_prop) else {
+        let Some(match_attribute) = match_attribute else {
             self.error(CompileError::UnknownProperty, &prop_span);
             return None;
         };
+
         if match_attribute.mentioned {
             // TODO: This is probably allowed in match
             self.error(CompileError::DuplicateProperty, &prop_span);
@@ -740,7 +772,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn check_relations_can_construct_default(&self, def_id: DefId) -> bool {
         if let Some(property_set) = self.relations.properties_table_by_def_id(def_id) {
             let mut match_attributes = Default::default();
-            self.collect_match_attributes(property_set, &mut match_attributes);
+            self.collect_named_match_attributes(property_set, &mut match_attributes);
 
             for (_, match_attribute) in match_attributes {
                 if let (PropertyCardinality::Mandatory, ValueCardinality::One) =

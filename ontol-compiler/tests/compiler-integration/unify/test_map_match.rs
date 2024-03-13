@@ -461,3 +461,35 @@ fn test_map_match_in_sub_multi_edge() {
             );
     });
 }
+
+#[test]
+fn test_map_with_order() {
+    r#"
+    def foo (
+        rel .'key'|id: (rel .is: text)
+        rel .'field': text
+        rel .order[
+            rel .0: 'field'
+            rel .direction: descending
+        ]: by_field
+    )
+    def @symbol by_field ()
+
+    map foos(
+        (),
+        foo {
+            ..@match foo(
+                order: by_field(),
+                // direction: 'descending'
+            )
+        }
+    )
+    "#
+    .compile_then(|test| {
+        let [_foo] = test.bind(["foo"]);
+        let foo_json = json!({ "key": "k", "field": "x" });
+        test.mapper()
+            .with_mock_yielder(())
+            .assert_named_forward_map("foos", json!({}), json!([foo_json]));
+    });
+}
