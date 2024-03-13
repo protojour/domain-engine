@@ -141,7 +141,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
     }
 
-    fn repr_check<'tc>(&'tc mut self, root_def_id: DefId) -> ReprCheck<'tc, 'm> {
+    pub(crate) fn repr_check<'tc>(&'tc mut self, root_def_id: DefId) -> ReprCheck<'tc, 'm> {
         ReprCheck {
             root_def_id,
             defs: self.defs,

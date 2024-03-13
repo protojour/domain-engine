@@ -486,19 +486,17 @@ fn error_nonsense_value_generator() {
 }
 
 #[test]
-fn error_test_lazy_seal_by_map() {
+fn can_add_property_after_map() {
     "
     def foo ( rel .'prop': text )
     def bar ( rel .'prop': text )
 
     map(
-        foo( 'prop': prop ),
+        foo( 'prop': prop ), // ERROR missing property `here`// NOTE Consider using `match {}`
         bar( 'prop': prop )
     )
 
-    rel
-        foo // ERROR definition is sealed and cannot be modified
-        'fail': text
+    rel foo 'here': text
     "
     .compile_fail();
 }

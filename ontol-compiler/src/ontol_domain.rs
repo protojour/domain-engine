@@ -149,7 +149,7 @@ impl<'m> Compiler<'m> {
         );
 
         for def_id in self.defs.iter_package_def_ids(ONTOL_PKG) {
-            self.type_check().check_def_sealed(def_id);
+            self.type_check().check_def_shallow(def_id);
         }
 
         self.seal_domain(ONTOL_PKG);

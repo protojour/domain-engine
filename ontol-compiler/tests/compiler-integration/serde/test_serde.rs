@@ -92,6 +92,23 @@ fn test_serde_domain_symbol() {
 }
 
 #[test]
+fn test_serde_domain_symbol_union() {
+    "
+    def @symbol a ()
+    def @symbol b ()
+    def ab (
+        rel .is?: a
+        rel .is?: b
+    )
+    def foo ( rel .'const': ab )
+    "
+    .compile_then(|test| {
+        let [foo] = test.bind(["foo"]);
+        assert_json_io_matches!(serde_create(&foo), { "const": "a" });
+    });
+}
+
+#[test]
 fn test_serde_struct_type() {
     "
     def foo ( rel .'a': text )

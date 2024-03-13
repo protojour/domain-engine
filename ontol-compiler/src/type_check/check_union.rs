@@ -281,7 +281,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &self,
         def_id: DefId,
     ) -> Result<DomainTypeMatchData<'_>, UnionCheckError> {
-        debug!("find domain type match data {def_id:?}");
+        let repr = self.seal_ctx.get_repr_kind(&def_id);
+
+        debug!("find domain type match data {def_id:?}: {repr:?}");
 
         match self.relations.properties_by_def_id(def_id) {
             Some(properties) => match &properties.constructor {
@@ -289,7 +291,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     debug!("was Transparent: {properties:?}");
                     match &properties.table {
                         Some(property_set) => Ok(DomainTypeMatchData::Struct(property_set)),
-                        None => Err(UnionCheckError::UnitTypePartOfUnion(def_id)),
+                        None => {
+                            panic!();
+                        } // None => Err(UnionCheckError::UnitTypePartOfUnion(def_id)),
                     }
                 }
                 Constructor::Sequence(sequence) => Ok(DomainTypeMatchData::Sequence(sequence)),

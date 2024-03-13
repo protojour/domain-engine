@@ -703,18 +703,63 @@ impl<'m> Compiler<'m> {
         self.namespaces.namespaces.keys().copied().collect()
     }
 
-    /// Seal all the types in a single domain.
+    /// Do all the (remaining) checks and generations for the package/domain and seal it
     fn seal_domain(&mut self, package_id: PackageId) {
         debug!("seal {package_id:?}");
 
         let iterator = self.defs.iter_package_def_ids(package_id);
-        let mut type_check = self.type_check();
 
-        for def_id in iterator {
-            type_check.seal_def(def_id);
+        let mut type_defs = vec![];
+        let mut map_defs = vec![];
+
+        {
+            let mut type_check = self.type_check();
+
+            for def_id in iterator {
+                match type_check.defs.table.get(&def_id).map(|def| &def.kind) {
+                    Some(DefKind::Mapping { .. }) => map_defs.push(def_id),
+                    _ => type_defs.push(def_id),
+                }
+            }
+
+            // pre repr checks
+            for def_id in &type_defs {
+                if let Some(def) = type_check.defs.table.get(def_id) {
+                    if let DefKind::Type(_) = &def.kind {
+                        type_check.check_domain_type_pre_repr(*def_id, def);
+                    }
+                }
+            }
+
+            // repr checks
+            for def_id in &type_defs {
+                type_check.repr_check(*def_id).check_repr_root();
+            }
+
+            // domain type checks
+            for def_id in &type_defs {
+                if let Some(def) = type_check.defs.table.get(def_id) {
+                    if let DefKind::Type(_) = &def.kind {
+                        type_check.check_domain_type_post_repr(*def_id, def);
+                    }
+                }
+            }
+
+            // union and extern checks
+            for def_id in &type_defs {
+                match type_check.seal_ctx.get_repr_kind(&def_id) {
+                    Some(ReprKind::Union(_) | ReprKind::StructUnion(_)) => {
+                        for error in type_check.check_union(*def_id) {
+                            type_check.errors.push(error);
+                        }
+                    }
+                    Some(ReprKind::Extern) => {
+                        type_check.check_extern(*def_id, type_check.defs.def_span(*def_id));
+                    }
+                    _ => {}
+                }
+            }
         }
-
-        self.seal_ctx.mark_domain_sealed(package_id);
 
         // Various cleanup/normalization
         for def_id in self.defs.iter_package_def_ids(package_id) {
@@ -737,9 +782,43 @@ impl<'m> Compiler<'m> {
             }
         }
 
-        for def_id in self.defs.iter_package_def_ids(package_id) {
-            self.type_check().check_entity_post_seal(def_id);
+        for def_id in &type_defs {
+            self.type_check().check_entity_post_seal(*def_id);
         }
+
+        // check map statements
+        {
+            let mut type_check = self.type_check();
+            for def_id in map_defs {
+                let Some(def) = type_check.defs.table.get(&def_id) else {
+                    // Can happen in error cases
+                    continue;
+                };
+
+                let DefKind::Mapping {
+                    ident: _,
+                    arms,
+                    var_alloc,
+                    extern_def_id,
+                } = &def.kind
+                else {
+                    panic!();
+                };
+
+                if let Some(extern_def_id) = extern_def_id {
+                    type_check.check_map_extern(def, *arms, *extern_def_id);
+                } else {
+                    match type_check.check_map(def, var_alloc, *arms) {
+                        Ok(_) => {}
+                        Err(error) => {
+                            debug!("Check map error: {error:?}");
+                        }
+                    }
+                }
+            }
+        }
+
+        self.seal_ctx.mark_domain_sealed(package_id);
     }
 
     fn unique_domain_names(&self) -> FnvHashMap<PackageId, TextConstant> {
