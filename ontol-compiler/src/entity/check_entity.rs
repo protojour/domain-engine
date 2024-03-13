@@ -40,6 +40,8 @@ impl<'m> Compiler<'m> {
                     self.check_order(def_id, order_rel, order_union);
                 }
 
+                // This type is introduced very late, after the main repr check.
+                // But before the union check!
                 self.type_check().repr_check(order_union).check_repr_root();
                 self.relations.order_unions.insert(def_id, order_union);
             }

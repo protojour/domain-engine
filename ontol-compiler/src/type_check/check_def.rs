@@ -14,15 +14,9 @@ use crate::{
 use super::{ena_inference::Strength, hir_build::NodeInfo, TypeCheck};
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
-    pub fn check_def_sealed(&mut self, def_id: DefId) -> TypeRef<'m> {
-        self.check_def_shallow(def_id)
-    }
-
     /// Compute the immediate type of a definition.
-    /// Does not perform deep type check.
-    ///
-    /// This function is called for every definition in a loop.
-    pub fn check_def_shallow(&mut self, def_id: DefId) -> TypeRef<'m> {
+    /// Performs relationship analysis for relationship definitions (rel statements).
+    pub fn check_def(&mut self, def_id: DefId) -> TypeRef<'m> {
         if let Some(type_ref) = self.def_types.table.get(&def_id) {
             return type_ref;
         }

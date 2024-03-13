@@ -20,7 +20,7 @@ use crate::{
     },
     primitive::PrimitiveKind,
     relation::Property,
-    repr::repr_model::ReprKind,
+    repr::repr_model::{ReprKind, ReprScalarKind},
     thesaurus::TypeRelation,
     type_check::{ena_inference::Strength, hir_build::NodeInfo, TypeError},
     typed_hir::{Meta, TypedHirData},
@@ -146,9 +146,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ctx,
                 )
             }
-            ReprKind::Scalar(..) => {
+            ReprKind::Scalar(scalar_def_id, scalar_kind, _) => {
                 let mut attributes = pattern_attrs.iter();
-                match attributes.next() {
+
+                let inner_node = match attributes.next() {
                     Some(CompoundPatternAttr {
                         key: (attr_def_id, _),
                         bind_option: _,
@@ -156,26 +157,39 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }) if is_unit_binding => {
                         assert!(*attr_def_id == DefId::unit());
 
-                        let inner_node = self.build_node(
+                        self.build_node(
                             val,
                             NodeInfo {
                                 expected_ty: Some((ty, Strength::Strong)),
                                 parent_struct_flags,
                             },
                             ctx,
-                        );
-
-                        if ctx.hir_arena[inner_node].ty() != ty {
-                            // The type of the inner node could be a built-in scalar (e.g. i64)
-                            // as a result of being the value of a mathematical expression.
-                            // But at the "unpack-level" here we need the type to be some domain-specific alias.
-                            // So generate a `(map inner)` to type-pun the result.
-                            ctx.mk_node(ontol_hir::Kind::Map(inner_node), Meta { ty, span })
-                        } else {
-                            inner_node
-                        }
+                        )
                     }
-                    _ => self.error_node(CompileError::ExpectedPatternAttribute, &span, ctx),
+                    _ => match (scalar_kind, self.defs.def_kind(*scalar_def_id)) {
+                        (ReprScalarKind::Text, DefKind::TextLiteral(lit)) => {
+                            // A symbol instantiation:
+                            // Make a text constant with the `ty` DefId
+                            ctx.mk_node(ontol_hir::Kind::Text((*lit).into()), Meta { ty, span })
+                        }
+                        _ => {
+                            return self.error_node(
+                                CompileError::ExpectedPatternAttribute,
+                                &span,
+                                ctx,
+                            );
+                        }
+                    },
+                };
+
+                if ctx.hir_arena[inner_node].ty() != ty {
+                    // The type of the inner node could be a built-in scalar (e.g. i64)
+                    // as a result of being the value of a mathematical expression.
+                    // But at the "unpack-level" here we need the type to be some domain-specific alias.
+                    // So generate a `(map inner)` to type-pun the result.
+                    ctx.mk_node(ontol_hir::Kind::Map(inner_node), Meta { ty, span })
+                } else {
+                    inner_node
                 }
             }
             ReprKind::Union(_) | ReprKind::StructUnion(_) => {
@@ -373,7 +387,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         match_attribute.mentioned = true;
 
         let rel_params_ty = match match_attribute.rel_params_def {
-            Some(rel_def_id) => self.check_def_sealed(rel_def_id),
+            Some(rel_def_id) => self.check_def(rel_def_id),
             None => &UNIT_TYPE,
         };
 
@@ -381,7 +395,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         match kind {
             CompoundPatternAttrKind::Value { rel, val } => {
-                let value_ty = self.check_def_sealed(match_attribute.value_def);
+                let value_ty = self.check_def(match_attribute.value_def);
                 let rel_node = self.build_rel_node_from_option(
                     rel_params_ty,
                     rel.as_ref(),
@@ -526,7 +540,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 ))
             }
             CompoundPatternAttrKind::SetOperator { operator, elements } => {
-                let value_ty = self.check_def_sealed(match_attribute.value_def);
+                let value_ty = self.check_def(match_attribute.value_def);
                 let set_node = self.build_hir_set_of(
                     elements,
                     rel_params_ty,
@@ -669,7 +683,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 .cloned()
             {
                 // Generate code for default value.
-                let value_ty = self.check_def_sealed(const_def_id);
+                let value_ty = self.check_def(const_def_id);
 
                 let prop_node = {
                     let rel = ctx.mk_unit_node_no_span();
@@ -773,6 +787,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 true
             }
             Some(ReprKind::Unit) => true,
+            Some(ReprKind::Scalar(scalar_def_id, ..)) => match self.defs.def_kind(*scalar_def_id) {
+                DefKind::TextLiteral(_) => true,
+                DefKind::NumberLiteral(_) => true,
+                _ => false,
+            },
+            Some(ReprKind::Union(members) | ReprKind::StructUnion(members)) => members
+                .iter()
+                .all(|(def_id, _)| self.check_can_construct_default_inner(*def_id)),
             _ => false,
         }
     }

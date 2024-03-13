@@ -480,16 +480,33 @@ fn test_map_with_order() {
         foo {
             ..@match foo(
                 order: by_field(),
+                // TODO: Make a built-in direction union
                 // direction: 'descending'
             )
         }
     )
     "#
     .compile_then(|test| {
-        let [_foo] = test.bind(["foo"]);
+        let [foo] = test.bind(["foo"]);
         let foo_json = json!({ "key": "k", "field": "x" });
         test.mapper()
-            .with_mock_yielder(())
+            .with_mock_yielder(
+                YielderMock::yield_match
+                    .next_call(matching!(
+                        eq!(&ValueCardinality::Many),
+                        // FIXME: `order` is not a condition!
+                        eq!(&Literal(indoc! { r#"
+                            (root $a)
+                            (is-entity $a def@1:1)
+                            (match-prop $a S:0:24 (element-in $b))
+                            (member $b (_ 'by_field'))
+                        "#
+                        }))
+                    ))
+                    .returns(Value::sequence_of([foo
+                        .value_builder(foo_json.clone())
+                        .into()])),
+            )
             .assert_named_forward_map("foos", json!({}), json!([foo_json]));
     });
 }

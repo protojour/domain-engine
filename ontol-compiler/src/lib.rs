@@ -208,20 +208,20 @@ impl<'m> Compiler<'m> {
         for def_id in lowered.root_defs {
             if lowered.map_defs.contains(&def_id) {
                 if let Some(inference_info) = self.check_map_arm_def_inference(def_id) {
-                    self.type_check().check_def_sealed(inference_info.source.1);
+                    self.type_check().check_def(inference_info.source.1);
                     let new_defs = self
                         .map_arm_def_inferencer(def_id)
                         .infer_map_arm_type(inference_info);
 
                     for def_id in new_defs {
-                        self.type_check().check_def_shallow(def_id);
+                        self.type_check().check_def(def_id);
                     }
 
-                    self.type_check().check_def_sealed(inference_info.target.1);
+                    self.type_check().check_def(inference_info.target.1);
                 }
             }
 
-            self.type_check().check_def_shallow(def_id);
+            self.type_check().check_def(def_id);
         }
 
         self.seal_domain(package.package_id);
