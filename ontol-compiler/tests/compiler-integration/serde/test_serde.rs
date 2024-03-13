@@ -105,6 +105,10 @@ fn test_serde_domain_symbol_union() {
     .compile_then(|test| {
         let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(serde_create(&foo), { "const": "a" });
+        assert_error_msg!(
+            serde_create(&foo).to_value(json!({ "const": "bogus" })),
+            "invalid type: string \"bogus\", expected `ab` (`a` or `b`) at line 1 column 16"
+        );
     });
 }
 

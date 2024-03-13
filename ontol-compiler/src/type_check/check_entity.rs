@@ -13,7 +13,7 @@ use super::TypeCheck;
 impl<'c, 'm> TypeCheck<'c, 'm> {
     /// Check entity-related relationships.
     /// This is also run for non-entities.
-    pub fn check_entity_post_seal(&mut self, def_id: DefId) {
+    pub fn check_entity(&mut self, def_id: DefId) {
         let identified_by = self
             .relations
             .properties_by_def_id

@@ -24,7 +24,7 @@ use crate::{
     error::CompileError,
     primitive::PrimitiveKind,
     relation::{Constructor, Property},
-    repr::repr_model::ReprKind,
+    repr::repr_model::{ReprKind, ReprScalarKind},
     sequence::Sequence,
     strings::Strings,
     text_patterns::TextPatternSegment,
@@ -266,6 +266,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Ok(DomainTypeMatchData::ConstructorStringPattern(segment)) => {
                         builder.add_text_pattern(key, segment, variant_def);
                     }
+                    Ok(DomainTypeMatchData::TextLiteral(lit)) => {
+                        builder.add_text_literal(key, lit, variant_def);
+                    }
                     Err(error) => {
                         error_set.report(variant_def, error, span);
                     }
@@ -281,9 +284,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &self,
         def_id: DefId,
     ) -> Result<DomainTypeMatchData<'_>, UnionCheckError> {
-        let repr = self.seal_ctx.get_repr_kind(&def_id);
+        let repr_kind = self.seal_ctx.get_repr_kind(&def_id).unwrap();
 
-        debug!("find domain type match data {def_id:?}: {repr:?}");
+        debug!("find domain type match data {def_id:?}: {repr_kind:?}");
 
         match self.relations.properties_by_def_id(def_id) {
             Some(properties) => match &properties.constructor {
@@ -291,9 +294,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     debug!("was Transparent: {properties:?}");
                     match &properties.table {
                         Some(property_set) => Ok(DomainTypeMatchData::Struct(property_set)),
-                        None => {
-                            panic!();
-                        } // None => Err(UnionCheckError::UnitTypePartOfUnion(def_id)),
+                        None => match repr_kind {
+                            ReprKind::Scalar(def_id, ReprScalarKind::Text, _) => {
+                                match self.defs.def_kind(*def_id) {
+                                    DefKind::TextLiteral(lit) => {
+                                        Ok(DomainTypeMatchData::TextLiteral(lit))
+                                    }
+                                    _ => Err(UnionCheckError::UnitTypePartOfUnion(*def_id)),
+                                }
+                            }
+                            _ => Err(UnionCheckError::UnitTypePartOfUnion(def_id)),
+                        },
                     }
                 }
                 Constructor::Sequence(sequence) => Ok(DomainTypeMatchData::Sequence(sequence)),
@@ -639,6 +650,7 @@ enum DomainTypeMatchData<'a> {
     Struct(&'a IndexMap<PropertyId, Property>),
     Sequence(&'a Sequence),
     ConstructorStringPattern(&'a TextPatternSegment),
+    TextLiteral(&'a str),
 }
 
 #[derive(Default, Debug)]
