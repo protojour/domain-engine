@@ -356,6 +356,18 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let _subject_ty = self.check_def_shallow(subject.0);
                 let object_ty = self.check_def_shallow(object.0);
 
+                if self
+                    .relations
+                    .direction_relationships
+                    .insert(subject.0, (relationship_id, object.0))
+                    .is_some()
+                {
+                    return self.error(
+                        CompileError::TODO(smart_format!("duplicate `direction` relationship")),
+                        span,
+                    );
+                }
+
                 object_ty
             }
         }

@@ -26,6 +26,8 @@ pub struct Relations {
     pub value_generators: FnvHashMap<RelationshipId, ValueGenerator>,
     /// `order` relations
     pub order_relationships: FnvHashMap<DefId, Vec<RelationshipId>>,
+    /// `direction` relations
+    pub direction_relationships: FnvHashMap<DefId, (RelationshipId, DefId)>,
 
     /// `rel type` parameters (instantiated) for various types
     pub type_params: FnvHashMap<DefId, IndexMap<DefId, TypeParam>>,

@@ -483,14 +483,14 @@ fn serial_gen_auto() {
 }
 
 #[test]
-fn entity_order_a() {
+fn entity_order_ok() {
     "
     def foo (
         rel .'id'|id: (rel .is: text)
         rel .'name': text
         rel .order[
-            rel .0: 'text'
-            rel .direction: ascending
+            rel .0: 'name'
+            rel .direction: descending
         ]: by_name
     )
     def @symbol by_name ()
