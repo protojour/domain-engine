@@ -11,8 +11,8 @@ use smartstring::alias::String;
 use thin_vec::ThinVec;
 
 use crate::{
-    cast::Cast, impl_ontol_debug, ontology::Ontology, query::condition::Condition,
-    sequence::Sequence, DefId, PackageId, RelationshipId, Role,
+    cast::Cast, impl_ontol_debug, ontology::Ontology, query::filter::Filter, sequence::Sequence,
+    DefId, PackageId, RelationshipId, Role,
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -61,7 +61,7 @@ pub enum Value {
     /// Special rel_params used for edge deletion
     DeleteRelationship(DefId),
 
-    Condition(Box<Condition>, DefId),
+    Filter(Box<Filter>, DefId),
 }
 
 impl Value {
@@ -111,7 +111,7 @@ impl Value {
             Value::Patch(_, def_id) => *def_id,
             Value::StructUpdate(_, def_id) => *def_id,
             Value::DeleteRelationship(def_id) => *def_id,
-            Value::Condition(_, def_id) => *def_id,
+            Value::Filter(_, def_id) => *def_id,
         }
     }
 
@@ -134,7 +134,7 @@ impl Value {
             Value::Patch(_, def_id) => def_id,
             Value::StructUpdate(_, def_id) => def_id,
             Value::DeleteRelationship(def_id) => def_id,
-            Value::Condition(_, def_id) => def_id,
+            Value::Filter(_, def_id) => def_id,
         }
     }
 
@@ -447,7 +447,7 @@ impl<'v> Display for ValueDebug<'v> {
             Value::DeleteRelationship(_) => {
                 write!(f, "DELETE_RELATIONSHIP")
             }
-            Value::Condition(..) => write!(f, "condition"),
+            Value::Filter(..) => write!(f, "filter"),
         }
     }
 }

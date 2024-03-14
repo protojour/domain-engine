@@ -279,7 +279,7 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
                     processor.cond_var(*condition)?;
                     self.program_counter += 1;
                 }
-                OpCode::MatchCondition(var, cardinality) => {
+                OpCode::MatchFilter(var, cardinality) => {
                     self.program_counter += 1;
                     return Ok(Some(processor.yield_match_condition(*var, *cardinality)?));
                 }

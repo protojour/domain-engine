@@ -6,7 +6,6 @@ use thin_vec::ThinVec;
 
 use crate::{
     debug::OntolDebug,
-    format_utils::Literal,
     impl_ontol_debug,
     value::{PropertyId, Value, ValueDebug},
     var::Var,
@@ -106,15 +105,6 @@ impl Default for Condition {
             expansions: FnvHashMap::default(),
             next_cond_var: Var(0),
         }
-    }
-}
-
-/// The PartialEq implementation is only meant for debugging purposes
-impl<'a> PartialEq<Literal<'a>> for Condition {
-    fn eq(&self, other: &Literal<'a>) -> bool {
-        let a = format!("{self}");
-        let b = format!("{other}");
-        a == b
     }
 }
 

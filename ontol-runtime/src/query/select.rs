@@ -1,9 +1,8 @@
 use fnv::FnvHashMap;
 use serde::{Deserialize, Serialize};
 
+use super::filter::Filter;
 use crate::{value::PropertyId, DefId};
-
-use super::condition::Condition;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Select {
@@ -21,7 +20,7 @@ pub enum Select {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EntitySelect {
     pub source: StructOrUnionSelect,
-    pub condition: Condition,
+    pub filter: Filter,
     pub limit: usize,
     pub after_cursor: Option<Box<[u8]>>,
     pub include_total_len: bool,
@@ -52,7 +51,7 @@ impl StructSelect {
     pub fn into_entity_select(self, limit: usize, after_cursor: Option<Box<[u8]>>) -> EntitySelect {
         EntitySelect {
             source: StructOrUnionSelect::Struct(self),
-            condition: Condition::default(),
+            filter: Filter::default(),
             limit,
             after_cursor,
             include_total_len: false,
@@ -70,7 +69,7 @@ impl From<StructSelect> for EntitySelect {
     fn from(value: StructSelect) -> Self {
         EntitySelect {
             source: StructOrUnionSelect::Struct(value),
-            condition: Condition::default(),
+            filter: Filter::default(),
             limit: 20,
             after_cursor: None,
             include_total_len: false,

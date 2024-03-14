@@ -127,7 +127,7 @@ impl domain_engine_core::FindEntitySelect for TestFindQuery {
                 def_id,
                 properties: Default::default(),
             }),
-            condition: Default::default(),
+            filter: Default::default(),
             limit: self.limit,
             after_cursor: None,
             include_total_len: self.include_total_len,

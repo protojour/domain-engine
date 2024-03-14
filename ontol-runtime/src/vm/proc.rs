@@ -8,7 +8,7 @@ use crate::{
     debug::NoFmt,
     impl_ontol_debug,
     ontology::ValueCardinality,
-    query::condition::{ClausePair, Condition},
+    query::{condition::ClausePair, filter::Filter},
     text::TextConstant,
     value::{PropertyId, Value},
     var::Var,
@@ -124,8 +124,8 @@ pub enum OpCode {
     CondVar(Local),
     /// Push a condition clause into the condition at local
     PushCondClause(Local, ClausePair<Local, OpCodeCondTerm>),
-    /// Execute a match on a datastore, using the condition at top of stack
-    MatchCondition(Var, ValueCardinality),
+    /// Execute a match on a datastore, using the filter at top of stack
+    MatchFilter(Var, ValueCardinality),
     Panic(TextConstant),
 }
 
@@ -158,7 +158,7 @@ pub enum BuiltinProc {
     NewStruct,
     NewSeq,
     NewUnit,
-    NewCondition,
+    NewFilter,
     NewVoid,
 }
 
@@ -193,7 +193,7 @@ impl GetAttrFlags {
 }
 
 pub enum Yield {
-    Match(Var, ValueCardinality, Condition),
+    Match(Var, ValueCardinality, Filter),
     CallExtern(DefId, Value, DefId),
 }
 

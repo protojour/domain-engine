@@ -363,13 +363,13 @@ impl DomainEngine {
         session: Session,
     ) -> DomainResult<Value> {
         match vm_yield {
-            Yield::Match(match_var, value_cardinality, condition) => {
+            Yield::Match(match_var, value_cardinality, filter) => {
                 if let Some(selects) = selects {
-                    match selects.find_select(match_var, &condition) {
+                    match selects.find_select(match_var, filter.condition()) {
                         MaybeSelect::Select(mut entity_select) => {
-                            // Merge the condition into the select
-                            assert!(entity_select.condition.expansions().is_empty());
-                            entity_select.condition = condition;
+                            // Merge the filter into the select
+                            assert!(entity_select.filter.condition().expansions().is_empty());
+                            entity_select.filter = filter;
 
                             self.exec_map_query(value_cardinality, entity_select, session.clone())
                                 .await
@@ -450,12 +450,13 @@ impl DomainEngine {
     ) -> DomainResult<ontol_runtime::value::Value> {
         let data_store = self.get_data_store()?;
 
-        debug!("match condition:\n{:#?}", entity_select.condition);
+        debug!("match filter:\n{:#?}", entity_select.filter);
 
         match &entity_select.source {
             StructOrUnionSelect::Struct(struct_select) => {
                 let inner_entity_def_id = entity_select
-                    .condition
+                    .filter
+                    .condition()
                     .root_def_id()
                     .expect("Root entity DefId not found in condition clauses");
 

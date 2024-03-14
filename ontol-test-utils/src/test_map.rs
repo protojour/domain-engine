@@ -1,7 +1,7 @@
 use ontol_runtime::{
     interface::serde::processor::ProcessorMode,
     ontology::{Extern, ValueCardinality},
-    query::condition::Condition,
+    query::filter::Filter,
     value::Value,
     vm::{
         proc::{Procedure, Yield},
@@ -78,7 +78,7 @@ struct IsVariant(bool);
 
 #[unimock(api = YielderMock)]
 pub trait Yielder {
-    fn yield_match(&self, value_cardinality: ValueCardinality, condition: Condition) -> Value;
+    fn yield_match(&self, value_cardinality: ValueCardinality, filter: Filter) -> Value;
     fn yield_call_extern_http_json(&self, url: &str, body: serde_json::Value) -> serde_json::Value;
 }
 
@@ -262,8 +262,8 @@ impl<'on, 'p> TestMapper<'on, 'p> {
         loop {
             match vm.run([param])? {
                 VmState::Complete(value) => return Ok(value),
-                VmState::Yield(Yield::Match(_var, cardinality, condition)) => {
-                    param = self.yielder.yield_match(cardinality, condition);
+                VmState::Yield(Yield::Match(_var, cardinality, filter)) => {
+                    param = self.yielder.yield_match(cardinality, filter);
                 }
                 VmState::Yield(Yield::CallExtern(extern_def_id, extern_param, output_def_id)) => {
                     let ontology = &self.test.ontology;

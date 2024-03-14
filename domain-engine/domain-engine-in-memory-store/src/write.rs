@@ -9,7 +9,7 @@ use ontol_runtime::{
         DataRelationshipInfo, DataRelationshipKind, DataRelationshipTarget, EntityInfo,
         ValueCardinality,
     },
-    query::{condition::Condition, select::Select},
+    query::{filter::Filter, select::Select},
     smart_format,
     value::{Attribute, PropertyId, Serial, Value, ValueDebug},
     value_generator::ValueGenerator,
@@ -158,7 +158,7 @@ impl InMemoryStore {
                 let target_dynamic_key = Self::extract_dynamic_key(&entity_id)?;
                 let entity_seq = self.query_single_entity_collection(
                     struct_select,
-                    &Condition::default(),
+                    &Filter::default(),
                     Limit(usize::MAX),
                     Option::<Cursor>::None,
                     IncludeTotalLen(false),

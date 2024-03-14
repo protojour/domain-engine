@@ -364,11 +364,11 @@ impl<'o> Processor for OntolProcessor<'o> {
     }
 
     fn cond_var(&mut self, cond_local: Local) -> VmResult<()> {
-        let Value::Condition(condition, _) = &mut self.local_mut(cond_local) else {
+        let Value::Filter(filter, _) = &mut self.local_mut(cond_local) else {
             return Err(VmError::InvalidType(cond_local));
         };
 
-        let cond_var = condition.mk_cond_var();
+        let cond_var = filter.condition_mut().mk_cond_var();
 
         self.stack_mut()
             .push(Value::I64(cond_var.0 as i64, DefId::unit()));
@@ -378,7 +378,7 @@ impl<'o> Processor for OntolProcessor<'o> {
 
     fn push_cond_clause(
         &mut self,
-        cond_local: Local,
+        filter_local: Local,
         input: &ClausePair<Local, OpCodeCondTerm>,
     ) -> VmResult<()> {
         let var = self.var_local(input.0)?;
@@ -395,10 +395,10 @@ impl<'o> Processor for OntolProcessor<'o> {
             }
         };
 
-        let Value::Condition(condition, _) = &mut self.local_mut(cond_local) else {
+        let Value::Filter(filter, _) = &mut self.local_mut(filter_local) else {
             panic!();
         };
-        condition.add_clause(var, evaluated_clause);
+        filter.condition_mut().add_clause(var, evaluated_clause);
         Ok(())
     }
 
@@ -408,7 +408,7 @@ impl<'o> Processor for OntolProcessor<'o> {
         value_cardinality: ValueCardinality,
     ) -> VmResult<Self::Yield> {
         match self.stack.pop().unwrap() {
-            Value::Condition(condition, _) => Ok(Yield::Match(var, value_cardinality, *condition)),
+            Value::Filter(filter, _) => Ok(Yield::Match(var, value_cardinality, *filter)),
             _ => Err(VmError::InvalidType(Local(self.stack.len() as u16))),
         }
     }
@@ -452,7 +452,7 @@ impl<'o> OntolProcessor<'o> {
             BuiltinProc::NewStruct => Value::Struct(Default::default(), result_type),
             BuiltinProc::NewSeq => Value::Sequence(Sequence::new(vec![]), result_type),
             BuiltinProc::NewUnit => Value::Unit(result_type),
-            BuiltinProc::NewCondition => Value::Condition(Default::default(), result_type),
+            BuiltinProc::NewFilter => Value::Filter(Default::default(), result_type),
             BuiltinProc::NewVoid => Value::Void(result_type),
         }
     }

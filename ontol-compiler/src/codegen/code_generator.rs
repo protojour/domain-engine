@@ -585,7 +585,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     };
 
                     let condition_local = block.op(
-                        OpCode::CallBuiltin(BuiltinProc::NewCondition, DefId::unit()),
+                        OpCode::CallBuiltin(BuiltinProc::NewFilter, DefId::unit()),
                         Delta(1),
                         span,
                         self.builder,
@@ -599,7 +599,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     self.scope.remove(&binder.hir().var);
                     block.pop_until(condition_local, span, self.builder);
                     block.op(
-                        OpCode::MatchCondition(binder.0.var, value_cardinality),
+                        OpCode::MatchFilter(binder.0.var, value_cardinality),
                         Delta(0),
                         span,
                         self.builder,

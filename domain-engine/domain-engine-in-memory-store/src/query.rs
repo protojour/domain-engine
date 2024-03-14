@@ -3,7 +3,7 @@ use fnv::FnvHashMap;
 use ontol_runtime::{
     ontology::{DataRelationshipKind, DataRelationshipTarget, TypeInfo, ValueCardinality},
     query::{
-        condition::Condition,
+        filter::Filter,
         select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
     },
     sequence::{Sequence, SubSequence},
@@ -35,7 +35,7 @@ impl InMemoryStore {
         match &select.source {
             StructOrUnionSelect::Struct(struct_select) => self.query_single_entity_collection(
                 struct_select,
-                &select.condition,
+                &select.filter,
                 Limit(select.limit),
                 select
                     .after_cursor
@@ -55,7 +55,7 @@ impl InMemoryStore {
     pub fn query_single_entity_collection(
         &self,
         struct_select: &StructSelect,
-        condition: &Condition,
+        filter: &Filter,
         Limit(limit): Limit,
         after_cursor: Option<Cursor>,
         IncludeTotalLen(include_total_len): IncludeTotalLen,
@@ -73,7 +73,7 @@ impl InMemoryStore {
             .ok_or(DomainError::NotAnEntity(struct_select.def_id))?;
 
         // let filter_plan = compute_filter_plan(condition, &ctx.ontology).unwrap();
-        debug!("eval condition: {condition}");
+        debug!("eval filter: {filter}");
 
         let mut raw_props_vec = {
             let mut vec = vec![];
@@ -84,7 +84,7 @@ impl InMemoryStore {
                     dynamic_key: Some(key),
                     prop_tree: props,
                 };
-                if self.eval_condition(filter_val, condition, ctx)? {
+                if self.eval_condition(filter_val, filter.condition(), ctx)? {
                     vec.push((key.clone(), props.clone()));
                 }
             }
