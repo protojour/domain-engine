@@ -1,8 +1,8 @@
 use indexmap::IndexMap;
 use ontol_hir::{PropFlags, StructFlags};
 use ontol_runtime::{
-    condition::SetOperator,
     ontology::{Cardinality, PropertyCardinality, ValueCardinality},
+    query::condition::SetOperator,
     smart_format,
     value::{Attribute, PropertyId},
     var::Var,

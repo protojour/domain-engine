@@ -1,8 +1,8 @@
 use anyhow::anyhow;
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    condition::{Clause, CondTerm, Condition, SetOperator},
     ontology::DataRelationshipKind,
+    query::condition::{Clause, CondTerm, Condition, SetOperator},
     value::{Attribute, PropertyId, Value},
     var::Var,
     DefId, Role,

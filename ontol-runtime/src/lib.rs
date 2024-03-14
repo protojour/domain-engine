@@ -5,15 +5,13 @@ use std::fmt::Debug;
 use ::serde::{Deserialize, Serialize};
 
 pub mod cast;
-pub mod condition;
 pub mod config;
 pub mod debug;
 pub mod format_utils;
 pub mod interface;
 pub mod ontology;
-pub mod order;
+pub mod query;
 pub mod resolve_path;
-pub mod select;
 pub mod sequence;
 pub mod text;
 pub mod text_like_types;

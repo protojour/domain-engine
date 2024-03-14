@@ -1,5 +1,5 @@
 use ontol_runtime::{
-    condition::{Clause, CondTerm, Condition},
+    query::condition::{Clause, CondTerm, Condition},
     var::Var,
 };
 

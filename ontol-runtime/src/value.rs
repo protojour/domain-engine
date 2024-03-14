@@ -11,8 +11,8 @@ use smartstring::alias::String;
 use thin_vec::ThinVec;
 
 use crate::{
-    cast::Cast, condition::Condition, impl_ontol_debug, ontology::Ontology, sequence::Sequence,
-    DefId, PackageId, RelationshipId, Role,
+    cast::Cast, impl_ontol_debug, ontology::Ontology, query::condition::Condition,
+    sequence::Sequence, DefId, PackageId, RelationshipId, Role,
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

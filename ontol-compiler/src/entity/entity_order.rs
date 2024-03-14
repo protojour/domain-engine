@@ -1,4 +1,4 @@
-use ontol_runtime::{order::Direction, smart_format, DefId, RelationshipId};
+use ontol_runtime::{query::order::Direction, smart_format, DefId, RelationshipId};
 use tracing::{debug, info};
 
 use crate::{

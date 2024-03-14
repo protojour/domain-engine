@@ -4,13 +4,12 @@ use anyhow::anyhow;
 use fnv::FnvHashMap;
 use itertools::Itertools;
 use ontol_runtime::{
-    condition::Condition,
     interface::serde::{operator::SerdeOperatorAddr, processor::ProcessorMode},
     ontology::{
         DataRelationshipInfo, DataRelationshipKind, DataRelationshipTarget, EntityInfo,
         ValueCardinality,
     },
-    select::Select,
+    query::{condition::Condition, select::Select},
     smart_format,
     value::{Attribute, PropertyId, Serial, Value, ValueDebug},
     value_generator::ValueGenerator,

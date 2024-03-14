@@ -1,7 +1,9 @@
 use fnv::FnvHashMap;
 use serde::{Deserialize, Serialize};
 
-use crate::{condition::Condition, value::PropertyId, DefId};
+use crate::{value::PropertyId, DefId};
+
+use super::condition::Condition;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Select {

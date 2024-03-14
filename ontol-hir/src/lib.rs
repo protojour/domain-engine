@@ -4,7 +4,7 @@ use std::fmt::{Debug, Display};
 
 use arena::{Arena, NodeRef};
 use ontol_runtime::{
-    condition::{ClausePair, SetOperator},
+    query::condition::{ClausePair, SetOperator},
     value::{Attribute, PropertyId},
     var::Var,
     vm::proc::BuiltinProc,

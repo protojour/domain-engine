@@ -1,8 +1,8 @@
 use std::fmt::{Debug, Display};
 
 use ontol_runtime::{
-    condition::{Clause, ClausePair},
     format_utils::AsAlpha,
+    query::condition::{Clause, ClausePair},
     value::Attribute,
     var::Var,
     vm::proc::BuiltinProc,

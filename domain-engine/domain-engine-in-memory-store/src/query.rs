@@ -1,9 +1,11 @@
 use anyhow::anyhow;
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    condition::Condition,
     ontology::{DataRelationshipKind, DataRelationshipTarget, TypeInfo, ValueCardinality},
-    select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
+    query::{
+        condition::Condition,
+        select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
+    },
     sequence::{Sequence, SubSequence},
     value::{Attribute, PropertyId, Value},
     DefId, Role,

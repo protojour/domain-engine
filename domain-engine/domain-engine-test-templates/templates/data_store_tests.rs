@@ -6,7 +6,7 @@ use ontol_runtime::{
     config::DataStoreConfig,
     interface::serde::processor::{ProcessorProfile, ProcessorProfileFlags},
     ontology::Ontology,
-    select::Select,
+    query::select::Select,
     value::Serial,
 };
 use ontol_test_utils::{

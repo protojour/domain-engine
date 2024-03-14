@@ -16,8 +16,11 @@ use std::{collections::HashMap, hash::BuildHasher, sync::Arc};
 
 pub use domain_engine::DomainEngine;
 pub use domain_error::{DomainError, DomainResult};
-use ontol_runtime::DefId;
-use ontol_runtime::{condition::Condition, select::EntitySelect, var::Var};
+use ontol_runtime::{
+    query::{condition::Condition, select::EntitySelect},
+    var::Var,
+    DefId,
+};
 
 /// A session that's passed through the DomainEngine APIs into the data store layer.
 #[derive(Clone)]

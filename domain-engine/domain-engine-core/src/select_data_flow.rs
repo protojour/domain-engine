@@ -4,7 +4,7 @@ use fnv::FnvHashMap;
 use itertools::Itertools;
 use ontol_runtime::{
     ontology::{Ontology, PropertyCardinality, PropertyFlow, PropertyFlowData, ValueCardinality},
-    select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
+    query::select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
     value::PropertyId,
     DefId, MapKey, PackageId,
 };

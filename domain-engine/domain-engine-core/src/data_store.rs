@@ -3,7 +3,7 @@ use std::sync::Arc;
 use ontol_runtime::{
     config::DataStoreConfig,
     ontology::Ontology,
-    select::{EntitySelect, Select},
+    query::select::{EntitySelect, Select},
     sequence::Sequence,
     value::Value,
     DefId, PackageId,

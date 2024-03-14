@@ -3,7 +3,6 @@ use std::collections::hash_map::Entry;
 use fnv::{FnvHashMap, FnvHashSet};
 use juniper::{FieldError, LookAheadChildren};
 use ontol_runtime::{
-    condition::Condition,
     interface::graphql::{
         argument::{AfterArg, FieldArg, FirstArg},
         data::{
@@ -11,7 +10,10 @@ use ontol_runtime::{
             TypeData, TypeKind, TypeModifier,
         },
     },
-    select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
+    query::{
+        condition::Condition,
+        select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
+    },
     value::{PropertyId, Value},
     var::Var,
     DefId, MapKey, RelationshipId,

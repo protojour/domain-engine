@@ -1,6 +1,6 @@
 use crate::{
     ontology::{MapLossiness, Ontology, TypeKind},
-    select::{EntitySelect, Select, StructOrUnionSelect},
+    query::select::{EntitySelect, Select, StructOrUnionSelect},
     DefId, MapDef, MapDefFlags, MapFlags, MapKey, PackageId,
 };
 use fnv::{FnvHashMap, FnvHashSet};

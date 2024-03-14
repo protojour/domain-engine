@@ -9,7 +9,7 @@ use ontol_runtime::{
         processor::{ProcessorLevel, ProcessorMode},
     },
     ontology::{Ontology, TypeInfo},
-    select::{Select, StructSelect},
+    query::select::{Select, StructSelect},
     sequence::Sequence,
     value::{Attribute, PropertyId, Value},
     DefId, PackageId,

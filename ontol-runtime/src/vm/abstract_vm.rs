@@ -6,8 +6,8 @@ use super::{
     VmResult,
 };
 use crate::{
-    condition::ClausePair,
     ontology::{Ontology, ValueCardinality},
+    query::condition::ClausePair,
     text::TextConstant,
     value::PropertyId,
     var::Var,

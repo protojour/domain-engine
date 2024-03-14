@@ -5,10 +5,10 @@ use bit_vec::BitVec;
 use ontol_macros::OntolDebug;
 
 use crate::{
-    condition::{ClausePair, Condition},
     debug::NoFmt,
     impl_ontol_debug,
     ontology::ValueCardinality,
+    query::condition::{ClausePair, Condition},
     text::TextConstant,
     value::{PropertyId, Value},
     var::Var,

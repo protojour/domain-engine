@@ -4,7 +4,7 @@ use ontol_hir::{
     PropVariant, SetEntry, StructFlags,
 };
 use ontol_runtime::{
-    condition::{Clause, ClausePair, SetOperator},
+    query::condition::{Clause, ClausePair, SetOperator},
     smart_format,
     value::{Attribute, PropertyId},
     var::{Var, VarAllocator, VarSet},
@@ -369,7 +369,42 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         meta: &Meta<'m>,
         mode: ExprMode,
     ) -> UnifierResult<ontol_hir::Nodes> {
-        match (mode, variant) {
+        let relationship_id = prop_id.relationship_id;
+        let builtin_rels = &self.primitives.relations;
+
+        let (applied_mode, struct_var) = match mode {
+            ExprMode::MatchStruct {
+                match_var,
+                match_level,
+                ..
+            } => {
+                if relationship_id.0 == builtin_rels.order
+                    || relationship_id.0 == builtin_rels.direction
+                {
+                    if match_level != 0 {
+                        self.errors.error(
+                            CompileError::TODO("order/direction at incorrect location".into()),
+                            &meta.span,
+                        );
+
+                        return Err(UnifierError::Reported);
+                    }
+
+                    (
+                        ExprMode::Expr {
+                            flags: Default::default(),
+                            struct_level: None,
+                        },
+                        match_var,
+                    )
+                } else {
+                    (mode, struct_var)
+                }
+            }
+            other => (other, struct_var),
+        };
+
+        match (applied_mode, variant) {
             (ExprMode::Expr { .. }, PropVariant::Value(Attribute { rel, val })) => {
                 let free_vars = scan_immediate_free_vars(self.expr_arena, [*rel, *val]);
                 self.maybe_apply_catch_block(free_vars, meta.span, &|zelf| {

@@ -9,8 +9,8 @@ use tracing::{trace, Level};
 
 use crate::{
     cast::Cast,
-    condition::{Clause, ClausePair, CondTerm},
     ontology::{Ontology, ValueCardinality},
+    query::condition::{Clause, ClausePair, CondTerm},
     sequence::Sequence,
     text::TextConstant,
     value::{Attribute, PropertyId, Value, ValueDebug},

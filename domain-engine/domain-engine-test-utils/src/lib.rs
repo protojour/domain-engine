@@ -2,9 +2,11 @@
 
 use domain_engine_core::{DomainEngine, MaybeSelect, Session};
 use ontol_runtime::{
-    condition::Condition,
     interface::serde::processor::ProcessorMode,
-    select::{EntitySelect, StructOrUnionSelect, StructSelect},
+    query::{
+        condition::Condition,
+        select::{EntitySelect, StructOrUnionSelect, StructSelect},
+    },
     value::Value,
     var::Var,
     PackageId,

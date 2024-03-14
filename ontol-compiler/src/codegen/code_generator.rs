@@ -4,8 +4,8 @@ use bit_set::BitSet;
 use fnv::FnvHashMap;
 use ontol_hir::{EvalCondTerm, PropVariant, StructFlags};
 use ontol_runtime::{
-    condition::{Clause, ClausePair},
     ontology::{MapLossiness, ValueCardinality},
+    query::condition::{Clause, ClausePair},
     smart_format,
     value::{Attribute, PropertyId},
     var::{Var, VarSet},

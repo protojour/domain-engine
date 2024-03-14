@@ -1,7 +1,7 @@
 use ontol_runtime::{
-    condition::Condition,
     interface::serde::processor::ProcessorMode,
     ontology::{Extern, ValueCardinality},
+    query::condition::Condition,
     value::Value,
     vm::{
         proc::{Procedure, Yield},
