@@ -192,9 +192,28 @@ impl<'o> Processor for OntolProcessor<'o> {
     fn put_attr1(&mut self, target: Local, key: PropertyId) -> VmResult<()> {
         let value = self.stack.pop().unwrap();
         if !matches!(value, Value::Unit(_)) {
-            let map = self.struct_local_mut(target)?;
-            map.insert(key, value.to_unit_attr());
+            match &mut self.stack[target.0 as usize] {
+                Value::Struct(attrs, _) | Value::StructUpdate(attrs, _) => {
+                    attrs.insert(key, value.to_unit_attr());
+                }
+                Value::Filter(filter, _) => {
+                    let meta = self.ontology.ontol_domain_meta();
+                    let relationship = key.relationship_id.0;
+
+                    if relationship == meta.order_relationship {
+                        filter.set_order(value);
+                    } else if relationship == meta.direction_relationship {
+                        filter
+                            .set_direction(value, self.ontology)
+                            .map_err(|_| VmError::InvalidDirection)?;
+                    } else {
+                        return Err(VmError::InvalidType(target));
+                    }
+                }
+                _ => return Err(VmError::InvalidType(target)),
+            }
         }
+
         Ok(())
     }
 

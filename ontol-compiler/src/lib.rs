@@ -454,7 +454,11 @@ impl<'m> Compiler<'m> {
                 i64: self.primitives.i64,
                 f64: self.primitives.f64,
                 text: self.primitives.text,
+                ascending: self.primitives.symbols.ascending,
+                descending: self.primitives.symbols.descending,
                 open_data_relationship: self.primitives.open_data_relationship,
+                order_relationship: self.primitives.relations.order,
+                direction_relationship: self.primitives.relations.direction,
             })
             .lib(self.codegen_tasks.result_lib)
             .docs(docs)

@@ -261,7 +261,11 @@ pub struct OntolDomainMeta {
     pub i64: DefId,
     pub f64: DefId,
     pub text: DefId,
+    pub ascending: DefId,
+    pub descending: DefId,
     pub open_data_relationship: DefId,
+    pub order_relationship: DefId,
+    pub direction_relationship: DefId,
 }
 
 impl OntolDomainMeta {
@@ -280,7 +284,11 @@ impl Default for OntolDomainMeta {
             i64: DefId::unit(),
             f64: DefId::unit(),
             text: DefId::unit(),
+            ascending: DefId::unit(),
+            descending: DefId::unit(),
             open_data_relationship: DefId::unit(),
+            order_relationship: DefId::unit(),
+            direction_relationship: DefId::unit(),
         }
     }
 }

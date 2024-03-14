@@ -493,14 +493,11 @@ fn test_map_with_order() {
                 YielderMock::yield_match
                     .next_call(matching!(
                         eq!(&ValueCardinality::Many),
-                        // FIXME: `order` and `direction` are not conditions!
                         eq!(&Literal(indoc! { r#"
                             (root $a)
                             (is-entity $a def@1:1)
-                            (match-prop $a S:0:25 (element-in $b))
-                            (match-prop $a S:0:26 (element-in $c))
-                            (member $b (_ 'by_field'))
-                            (member $c (_ 'descending'))
+                            (order 'by_field')
+                            (direction Descending)
                         "#
                         }))
                     ))

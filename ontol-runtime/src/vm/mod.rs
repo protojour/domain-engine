@@ -31,6 +31,8 @@ pub enum VmError {
     AssertionFailed,
     #[error("overflow")]
     Overflow,
+    #[error("invalid direction")]
+    InvalidDirection,
 }
 
 pub type VmResult<T> = Result<T, VmError>;
