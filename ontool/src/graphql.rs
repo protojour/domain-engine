@@ -91,7 +91,7 @@ const GRAPHIQL: &str = r#"
             if (e.data === "reload") {
                 document.querySelector('[aria-label="Re-fetch GraphQL schema"]').click();
             }
-        })
+        });
     </script>
 </body>
 
