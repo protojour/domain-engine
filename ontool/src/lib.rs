@@ -1,6 +1,14 @@
 #![forbid(unsafe_code)]
 
 use ariadne::{ColorGenerator, Label, Report, ReportKind, Source};
+use axum::{
+    extract::{
+        ws::{Message, WebSocket},
+        WebSocketUpgrade,
+    },
+    response::Response,
+    routing::get,
+};
 use clap::{Args, Parser, Subcommand};
 use notify_debouncer_full::{
     new_debouncer,
@@ -29,7 +37,7 @@ use std::{
     time::Duration,
 };
 use thiserror::Error;
-use tokio::sync::broadcast;
+use tokio::sync::broadcast::{self, Sender};
 use tokio_util::sync::CancellationToken;
 use tower_lsp::{LspService, Server};
 use tracing::{info, level_filters::LevelFilter};
@@ -157,6 +165,23 @@ pub enum ChannelMessage {
     Reload,
 }
 
+async fn ws_upgrade_handler(ws: WebSocketUpgrade, tx: Sender<ChannelMessage>) -> Response {
+    ws.on_upgrade(|socket| handle_ws(socket, tx))
+}
+
+async fn handle_ws(mut socket: WebSocket, tx: Sender<ChannelMessage>) {
+    let mut rx = tx.subscribe();
+    while let Ok(msg) = rx.recv().await {
+        match msg {
+            ChannelMessage::Reload => {
+                if socket.send(Message::Text("reload".into())).await.is_err() {
+                    return;
+                }
+            }
+        }
+    }
+}
+
 pub async fn run() -> Result<(), OntoolError> {
     let cli = Cli::parse();
 
@@ -193,12 +218,15 @@ pub async fn run() -> Result<(), OntoolError> {
             let router_cell: Arc<Mutex<Option<axum::Router>>> = Arc::new(Mutex::new(None));
             tokio::spawn({
                 let app = router_cell.clone();
+                let reload_tx = reload_tx.clone();
                 async move {
                     const SERVER_SOCKET_ADDR: &str = "0.0.0.0:5000";
                     let detach = Detach { router: app };
 
                     let mut outer_router: axum::Router = axum::Router::new();
-                    outer_router = outer_router.nest_service("/", detach);
+                    outer_router = outer_router.nest_service("/d", detach);
+                    outer_router = outer_router
+                        .route("/ws", get(|socket| ws_upgrade_handler(socket, reload_tx)));
                     info!("Binding server to {SERVER_SOCKET_ADDR}");
                     let _ = axum::Server::bind(&SERVER_SOCKET_ADDR.parse().unwrap())
                         .serve(outer_router.into_make_service())
@@ -216,7 +244,7 @@ pub async fn run() -> Result<(), OntoolError> {
             );
             match compile_output {
                 Ok(output) => {
-                    let new_app = app(output.ontology, reload_tx.clone()).await;
+                    let new_app = app(output.ontology).await;
                     let mut lock = router_cell.lock().unwrap();
                     *lock = Some(new_app);
                 }
@@ -240,7 +268,7 @@ pub async fn run() -> Result<(), OntoolError> {
                                 );
                                 match compile_output {
                                     Ok(output) => {
-                                        let new_app = app(output.ontology, reload_tx.clone()).await;
+                                        let new_app = app(output.ontology).await;
                                         let mut lock = router_cell.lock().unwrap();
                                         *lock = Some(new_app);
                                         let _ = reload_tx.send(ChannelMessage::Reload);
