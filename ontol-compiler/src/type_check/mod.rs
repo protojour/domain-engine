@@ -4,6 +4,7 @@ use ontol_runtime::{smart_format, DefId};
 use crate::{
     codegen::task::CodegenTasks,
     def::Defs,
+    entity::Entities,
     error::CompileError,
     mem::Intern,
     pattern::Patterns,
@@ -72,6 +73,7 @@ pub struct TypeCheck<'c, 'm> {
     pub seal_ctx: &'c mut SealCtx,
     pub strings: &'c mut Strings<'m>,
     pub defs: &'c Defs<'m>,
+    pub entities: &'c Entities,
     pub primitives: &'c Primitives,
 }
 
@@ -182,6 +184,7 @@ impl<'m> Compiler<'m> {
             strings: &mut self.strings,
             defs: &self.defs,
             primitives: &self.primitives,
+            entities: &self.entities,
         }
     }
 }

@@ -10,9 +10,9 @@ use codegen::task::{execute_codegen_tasks, CodegenTasks};
 use def::{BuiltinRelationKind, DefKind, Defs, LookupRelationshipMeta, RelationshipMeta, TypeDef};
 
 use documented::DocumentedFields;
+use entity::Entities;
 pub use error::*;
 use fnv::FnvHashMap;
-use indexmap::IndexMap;
 use interface::{
     graphql::generate_schema::generate_graphql_schema,
     serde::{serde_generator::SerdeGenerator, SerdeKey},
@@ -105,6 +105,7 @@ pub struct Compiler<'m> {
     pub(crate) thesaurus: Thesaurus,
     pub(crate) seal_ctx: SealCtx,
     pub(crate) text_patterns: TextPatterns,
+    pub(crate) entities: Entities,
 
     pub(crate) codegen_tasks: CodegenTasks<'m>,
 
@@ -133,6 +134,7 @@ impl<'m> Compiler<'m> {
             relations: Relations::default(),
             thesaurus,
             seal_ctx: Default::default(),
+            entities: Default::default(),
             text_patterns: TextPatterns::default(),
             codegen_tasks: Default::default(),
             errors: Default::default(),
@@ -303,6 +305,7 @@ impl<'m> Compiler<'m> {
         let mut strings = self.strings.detach();
         let mut serde_gen = self.serde_generator(&mut strings, &union_member_cache);
         let mut builder = Ontology::builder();
+        let mut ontology_union_variants: FnvHashMap<DefId, Box<[DefId]>> = Default::default();
 
         let dynamic_sequence_operator_addr = serde_gen.make_dynamic_sequence_addr();
 
@@ -335,6 +338,15 @@ impl<'m> Compiler<'m> {
                     serde_gen.strings,
                 );
                 let def_kind = self.defs.def_kind(type_def_id);
+
+                if let Some(ReprKind::StructUnion(members)) =
+                    self.seal_ctx.get_repr_kind(&type_def_id)
+                {
+                    ontology_union_variants.insert(
+                        type_def_id,
+                        members.iter().map(|(member, _)| *member).collect(),
+                    );
+                }
 
                 domain.add_type(TypeInfo {
                     def_id: type_def_id,
@@ -460,6 +472,7 @@ impl<'m> Compiler<'m> {
                 order_relationship: self.primitives.relations.order,
                 direction_relationship: self.primitives.relations.direction,
             })
+            .union_variants(ontology_union_variants)
             .lib(self.codegen_tasks.result_lib)
             .docs(docs)
             .const_procs(self.codegen_tasks.result_const_procs)
@@ -481,8 +494,8 @@ impl<'m> Compiler<'m> {
         type_def_id: DefId,
         union_member_cache: &UnionMemberCache,
         strings: &mut Strings<'m>,
-    ) -> IndexMap<PropertyId, DataRelationshipInfo> {
-        let mut data_relationships = IndexMap::default();
+    ) -> FnvHashMap<PropertyId, DataRelationshipInfo> {
+        let mut data_relationships = FnvHashMap::default();
         self.add_inherent_data_relationships(type_def_id, &mut data_relationships, strings);
 
         if let Some(ReprKind::StructIntersection(members)) =
@@ -524,7 +537,7 @@ impl<'m> Compiler<'m> {
     fn add_inherent_data_relationships(
         &self,
         type_def_id: DefId,
-        output: &mut IndexMap<PropertyId, DataRelationshipInfo>,
+        output: &mut FnvHashMap<PropertyId, DataRelationshipInfo>,
         strings: &mut Strings<'m>,
     ) {
         let Some(properties) = self.relations.properties_by_def_id(type_def_id) else {
@@ -571,10 +584,7 @@ impl<'m> Compiler<'m> {
 
         let (data_relationship_kind, target) = match repr_kind {
             ReprKind::StructUnion(members) => {
-                let target = DataRelationshipTarget::Union {
-                    union_def_id: target_def_id,
-                    variants: members.iter().map(|(def_id, _)| *def_id).collect(),
-                };
+                let target = DataRelationshipTarget::Union(target_def_id);
 
                 if members.iter().all(|(member_def_id, _)| {
                     self.relations
@@ -640,7 +650,7 @@ impl<'m> Compiler<'m> {
         type_def_id: DefId,
         name: TextConstant,
         serde_generator: &mut SerdeGenerator,
-        data_relationships: &IndexMap<PropertyId, DataRelationshipInfo>,
+        data_relationships: &FnvHashMap<PropertyId, DataRelationshipInfo>,
     ) -> Option<EntityInfo> {
         let properties = self.relations.properties_by_def_id(type_def_id)?;
         let id_relationship_id = properties.identified_by?;

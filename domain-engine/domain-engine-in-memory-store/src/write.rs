@@ -335,10 +335,8 @@ impl InMemoryStore {
                     )
                 }
             }
-            DataRelationshipTarget::Union {
-                union_def_id: _,
-                variants,
-            } => {
+            DataRelationshipTarget::Union(union_def_id) => {
+                let variants = ctx.ontology.union_variants(*union_def_id);
                 if variants.contains(&val.type_def_id()) {
                     // Explicit data struct of a given variant
 
@@ -467,10 +465,8 @@ impl InMemoryStore {
                     foreign_id,
                     ctx,
                 )?,
-            DataRelationshipTarget::Union {
-                union_def_id: _,
-                variants,
-            } => {
+            DataRelationshipTarget::Union(union_def_id) => {
+                let variants = ctx.ontology.union_variants(*union_def_id);
                 let (variant_def_id, entity_info) = variants
                     .iter()
                     .find_map(|variant_def_id| {

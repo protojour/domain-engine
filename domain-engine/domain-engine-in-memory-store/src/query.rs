@@ -184,7 +184,7 @@ impl InMemoryStore {
                             Sequence::new(attrs),
                             match data_relationship.target {
                                 DataRelationshipTarget::Unambiguous(def_id) => def_id,
-                                DataRelationshipTarget::Union { union_def_id, .. } => union_def_id,
+                                DataRelationshipTarget::Union(union_def_id) => union_def_id,
                             },
                         )
                         .into(),

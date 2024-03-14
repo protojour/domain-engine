@@ -5,6 +5,8 @@ use crate::{
     CompileError, Compiler,
 };
 
+use super::Entity;
+
 impl<'m> Compiler<'m> {
     /// Check entity-related relationships.
     /// This is also run for non-entities.
@@ -15,8 +17,12 @@ impl<'m> Compiler<'m> {
             .get(&def_id)
             .and_then(|properties| properties.identified_by);
 
+        let is_entity = identified_by.is_some();
+
+        let mut entity = Entity { order_union: None };
+
         if let Some(order_rels) = self.relations.order_relationships.remove(&def_id) {
-            if identified_by.is_none() {
+            if !is_entity {
                 for order_rel in &order_rels {
                     let meta = self.defs.relationship_meta(*order_rel);
                     self.errors.error(
@@ -43,8 +49,13 @@ impl<'m> Compiler<'m> {
                 // This type is introduced very late, after the main repr check.
                 // But before the union check!
                 self.type_check().repr_check(order_union).check_repr_root();
-                self.relations.order_unions.insert(def_id, order_union);
+
+                entity.order_union = Some(order_union);
             }
+        }
+
+        if is_entity {
+            self.entities.entities.insert(def_id, entity);
         }
     }
 }

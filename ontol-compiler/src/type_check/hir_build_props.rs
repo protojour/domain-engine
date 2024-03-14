@@ -282,7 +282,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let mut special_attributes: IndexMap<BuiltinRelationKind, MatchAttribute> = IndexMap::new();
 
         if self.relations.identified_by(type_def_id).is_some() {
-            if let Some(order_union_def_id) = self.relations.order_unions.get(&type_def_id) {
+            if let Some(order_union_def_id) = self.entities.order_union(&type_def_id) {
                 special_attributes.insert(
                     BuiltinRelationKind::Order,
                     MatchAttribute {
@@ -291,7 +291,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         )),
                         cardinality: (PropertyCardinality::Optional, ValueCardinality::One),
                         rel_params_def: None,
-                        value_def: *order_union_def_id,
+                        value_def: order_union_def_id,
                         mentioned: false,
                     },
                 );

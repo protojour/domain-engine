@@ -6,7 +6,6 @@ use std::{
 use ::serde::{Deserialize, Serialize};
 use arcstr::ArcStr;
 use fnv::FnvHashMap;
-use indexmap::IndexMap;
 use ontol_macros::OntolDebug;
 use smartstring::alias::String;
 use tracing::debug;
@@ -52,6 +51,7 @@ pub struct Ontology {
     text_constants: Vec<ArcStr>,
 
     domain_table: FnvHashMap<PackageId, Domain>,
+    union_variants: FnvHashMap<DefId, Box<[DefId]>>,
     domain_interfaces: FnvHashMap<PackageId, Vec<DomainInterface>>,
     package_config_table: FnvHashMap<PackageId, PackageConfig>,
     docs: FnvHashMap<DefId, Vec<String>>,
@@ -72,8 +72,9 @@ impl Ontology {
                 text_like_types: Default::default(),
                 text_patterns: Default::default(),
                 extern_table: Default::default(),
-                domain_table: Default::default(),
                 ontol_domain_meta: Default::default(),
+                domain_table: Default::default(),
+                union_variants: Default::default(),
                 domain_interfaces: Default::default(),
                 package_config_table: Default::default(),
                 docs: Default::default(),
@@ -141,6 +142,15 @@ impl Ontology {
 
     pub fn find_domain(&self, package_id: PackageId) -> Option<&Domain> {
         self.domain_table.get(&package_id)
+    }
+
+    /// Get the members of a given union.
+    /// Returns an empty slice if it's not a union.
+    pub fn union_variants(&self, union_def_id: DefId) -> &[DefId] {
+        self.union_variants
+            .get(&union_def_id)
+            .map(|slice| slice.as_ref())
+            .unwrap_or(&[])
     }
 
     pub fn get_package_config(&self, package_id: PackageId) -> Option<&PackageConfig> {
@@ -367,7 +377,7 @@ pub struct TypeInfo {
     /// FIXME: This should really be connected to a DomainInterface.
     pub operator_addr: Option<SerdeOperatorAddr>,
 
-    pub data_relationships: IndexMap<PropertyId, DataRelationshipInfo>,
+    pub data_relationships: FnvHashMap<PropertyId, DataRelationshipInfo>,
 }
 
 impl TypeInfo {
@@ -425,6 +435,16 @@ pub struct EntityInfo {
     pub id_value_generator: Option<ValueGenerator>,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+pub struct ExtendedEntityInfo {
+    pub orders: FnvHashMap<DefId, EntityOrder>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct EntityOrder {
+    pub fields: Box<[PropertyId]>,
+}
+
 #[derive(Clone, Serialize, Deserialize, OntolDebug)]
 pub struct DataRelationshipInfo {
     pub kind: DataRelationshipKind,
@@ -470,12 +490,9 @@ pub enum DataRelationshipSource {
 #[derive(Clone, Serialize, Deserialize, OntolDebug)]
 pub enum DataRelationshipTarget {
     Unambiguous(DefId),
-    Union {
-        union_def_id: DefId,
-        // TODO: Move to one place in the ontology.
-        // It's a lookup from the union DefId to its members.
-        variants: Box<[DefId]>,
-    },
+    /// The target is a union of types, only known during runtime.
+    /// The union's variants are accessed using [Ontology::union_variants].
+    Union(DefId),
 }
 
 #[derive(Clone, Serialize, Deserialize, OntolDebug)]
@@ -529,6 +546,11 @@ impl OntologyBuilder {
         self.ontology
             .package_config_table
             .insert(package_id, config);
+    }
+
+    pub fn union_variants(mut self, table: FnvHashMap<DefId, Box<[DefId]>>) -> Self {
+        self.ontology.union_variants = table;
+        self
     }
 
     pub fn text_constants(mut self, text_constants: Vec<ArcStr>) -> Self {
