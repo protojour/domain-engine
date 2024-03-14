@@ -976,3 +976,89 @@ fn test_explicit_struct_path() {
     "
     .compile_fail();
 }
+
+#[test]
+fn test_map_symbol_simple() {
+    "
+    def @symbol a ()
+    def @symbol b ()
+
+    map(a(), b())
+    "
+    .compile_then(|test| {
+        test.mapper()
+            .assert_map_eq(("a", "b"), json!("a"), json!("b"));
+    });
+}
+
+#[test]
+fn test_map_symbol_auto_union() {
+    "
+    def @symbol a ()
+    def @symbol b ()
+    def ab (
+        rel .is?: a
+        rel .is?: b
+    )
+
+    def @symbol x ()
+    def @symbol y ()
+    def xy (
+        rel .is?: x
+        rel .is?: y
+    )
+
+    def @symbol f ()
+    def @symbol g ()
+    def fg (
+        rel .is?: f
+        rel .is?: g
+    )
+
+    map(a(), x())
+    map(b(), y())
+    map(b(), f())
+    "
+    .compile_then(|test| {
+        test.mapper()
+            .assert_map_eq_variant(("ab", "xy"), json!("a"), json!("x"));
+        test.mapper()
+            .assert_map_eq_variant(("ab", "xy"), json!("b"), json!("y"));
+        test.mapper()
+            .assert_map_eq_variant(("xy", "ab"), json!("x"), json!("a"));
+
+        assert!(test.mapper().get_mapper_proc(("ab", "fg")).is_none());
+    });
+}
+
+#[test]
+fn test_auto_union_forced_surjection() {
+    "
+    def @symbol a ()
+    def @symbol b ()
+    def @symbol c ()
+    def abc (
+        rel .is?: a
+        rel .is?: b
+        rel .is?: c
+    )
+
+    def @symbol x ()
+    def @symbol y ()
+    def xy (
+        rel .is?: x
+        rel .is?: y
+    )
+
+    // abc maps to xy, but not vice versa:
+    map(a(), x())
+    map(b(), y())
+    map(c(), y())
+    "
+    .compile_then(|test| {
+        test.mapper()
+            .assert_map_eq_variant(("abc", "xy"), json!("c"), json!("y"));
+
+        assert!(test.mapper().get_mapper_proc(("xy", "abc")).is_none());
+    });
+}

@@ -74,6 +74,8 @@ impl OntolTest {
     }
 }
 
+struct IsVariant(bool);
+
 #[unimock(api = YielderMock)]
 pub trait Yielder {
     fn yield_match(&self, value_cardinality: ValueCardinality, condition: Condition) -> Value;
@@ -112,10 +114,34 @@ impl<'on, 'p> TestMapper<'on, 'p> {
         input: serde_json::Value,
         expected: serde_json::Value,
     ) {
+        self.assert_map_eq_inner((from, to), input, expected, IsVariant(false))
+    }
+
+    /// Assert that the serialized output of the mapping of the json-encoded input value matches the expected json document.
+    /// Output should be a union variant, i.e. it runtime DefId should not be the same as `to`, which should be a union.
+    #[track_caller]
+    pub fn assert_map_eq_variant(
+        &self,
+        (from, to): (impl AsKey, impl AsKey),
+        input: serde_json::Value,
+        expected: serde_json::Value,
+    ) {
+        self.assert_map_eq_inner((from, to), input, expected, IsVariant(true))
+    }
+
+    fn assert_map_eq_inner(
+        &self,
+        (from, to): (impl AsKey, impl AsKey),
+        input: serde_json::Value,
+        expected: serde_json::Value,
+        is_variant: IsVariant,
+    ) {
         let from = from.as_key();
         let to = to.as_key();
 
-        let value = self.domain_map((from.clone(), to.clone()), input).unwrap();
+        let value = self
+            .domain_map((from.clone(), to.clone()), input, is_variant)
+            .unwrap();
         let [output_binding] = self.test.bind([to.typename()]);
         let output_json = match &to {
             Key::Unit(_) => (*self.serde_helper_factory)(&output_binding).as_json(&value),
@@ -167,10 +193,11 @@ impl<'on, 'p> TestMapper<'on, 'p> {
 
     /// Use mapping procedure to map the json-encoded input value to an output value.
     #[track_caller]
-    pub fn domain_map(
+    fn domain_map(
         &self,
         (from, to): (impl AsKey, impl AsKey),
         input: serde_json::Value,
+        is_variant: IsVariant,
     ) -> VmResult<Value> {
         let from = from.as_key();
         let to = to.as_key();
@@ -179,6 +206,35 @@ impl<'on, 'p> TestMapper<'on, 'p> {
         let param = (*self.serde_helper_factory)(&input_binding)
             .to_value_nocheck(input)
             .unwrap();
+
+        let procedure = match self.get_mapper_proc((from, to)) {
+            Some(procedure) => procedure,
+            None => panic!(
+                "No mapping procedure found for ({:?}, {:?})",
+                input_binding.type_info.def_id, output_binding.type_info.def_id
+            ),
+        };
+        let value = self.run_vm(procedure, param)?;
+
+        if is_variant.0 {
+            // The resulting value must have the runtime def_id of the requested to_key.
+            assert_ne!(value.type_def_id(), output_binding.def_id());
+        } else {
+            // The resulting value must have the runtime def_id of the requested to_key.
+            expect_eq!(
+                actual = value.type_def_id(),
+                expected = output_binding.def_id()
+            );
+        }
+
+        Ok(value)
+    }
+
+    pub fn get_mapper_proc(&self, (from, to): (impl AsKey, impl AsKey)) -> Option<Procedure> {
+        let from = from.as_key();
+        let to = to.as_key();
+
+        let [input_binding, output_binding] = self.test.bind([from.typename(), to.typename()]);
 
         fn get_map_def(key: &Key, binding: &TypeBinding) -> MapDef {
             let mut flags = MapDefFlags::empty();
@@ -194,24 +250,11 @@ impl<'on, 'p> TestMapper<'on, 'p> {
         let input_def = get_map_def(&from, &input_binding);
         let output_def = get_map_def(&to, &output_binding);
 
-        let procedure = match self.test.ontology.get_mapper_proc(&MapKey {
+        self.test.ontology.get_mapper_proc(&MapKey {
             input: input_def,
             output: output_def,
             flags: MapFlags::empty(),
-        }) {
-            Some(procedure) => procedure,
-            None => panic!(
-                "No mapping procedure found for ({:?}, {:?})",
-                input_binding.type_info.def_id, output_binding.type_info.def_id
-            ),
-        };
-
-        let value = self.run_vm(procedure, param)?;
-
-        // The resulting value must have the runtime def_id of the requested to_key.
-        expect_eq!(actual = value.type_def_id(), expected = output_def.def_id);
-
-        Ok(value)
+        })
     }
 
     fn run_vm(&self, procedure: Procedure, mut param: Value) -> VmResult<Value> {

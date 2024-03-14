@@ -29,6 +29,7 @@ use super::{
     ir::Terminator,
     link::{link, LinkResult},
     proc_builder::{Delta, ProcBuilder},
+    union_map_generator::generate_union_maps,
 };
 
 #[derive(Default)]
@@ -236,6 +237,8 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
     for (key, task) in explicit_map_tasks {
         generate_explicit_map(key, task, &mut proc_table, compiler);
     }
+
+    generate_union_maps(&mut proc_table, compiler);
 
     let LinkResult {
         lib,
