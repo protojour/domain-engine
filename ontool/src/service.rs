@@ -50,7 +50,7 @@ pub async fn app(ontology: Ontology) -> axum::Router {
         .filter(|(package_id, _)| **package_id != PackageId(0))
     {
         let domain_path = format!(
-            "/{unique_name}",
+            "/d/{unique_name}",
             unique_name = &ontology[domain.unique_name()]
         );
         router = router.nest(
