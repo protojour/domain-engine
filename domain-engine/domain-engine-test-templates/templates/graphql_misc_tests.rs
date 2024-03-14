@@ -13,7 +13,7 @@ use domain_engine_test_utils::{
     system::mock_current_time_monotonic,
     unimock,
 };
-use ontol_runtime::{config::DataStoreConfig, ontology::Ontology};
+use ontol_runtime::ontology::{config::DataStoreConfig, Ontology};
 use ontol_test_utils::{
     examples::{
         stix::{stix_bundle, STIX},

@@ -13,7 +13,7 @@ use domain_engine_juniper::{
     context::ServiceCtx, create_graphql_schema, gql_scalar::GqlScalar, Schema,
 };
 use juniper::ScalarValue;
-use ontol_runtime::{config::DataStoreConfig, sequence::Sequence};
+use ontol_runtime::{ontology::config::DataStoreConfig, sequence::Sequence};
 use ontol_test_utils::{OntolTest, SrcName, TestCompile, TestPackages};
 use ordered_float::NotNan;
 use unimock::*;

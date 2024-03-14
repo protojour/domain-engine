@@ -1,14 +1,15 @@
 use anyhow::anyhow;
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    ontology::{DataRelationshipKind, DataRelationshipTarget, TypeInfo, ValueCardinality},
+    ontology::domain::{DataRelationshipKind, DataRelationshipTarget, TypeInfo},
+    property::{PropertyId, Role, ValueCardinality},
     query::{
         filter::Filter,
         select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
     },
     sequence::{Sequence, SubSequence},
-    value::{Attribute, PropertyId, Value},
-    DefId, Role,
+    value::{Attribute, Value},
+    DefId,
 };
 use tracing::{debug, error};
 

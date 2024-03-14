@@ -10,10 +10,12 @@ use ontol_compiler::{
     Compiler, SourceCodeRegistry, Sources,
 };
 use ontol_runtime::{
-    config::{DataStoreConfig, PackageConfig},
     interface::{graphql::schema::GraphqlSchema, DomainInterface},
-    ontology::Ontology,
-    value::PropertyId,
+    ontology::{
+        config::{DataStoreConfig, PackageConfig},
+        Ontology,
+    },
+    property::PropertyId,
     PackageId,
 };
 use tracing::info;

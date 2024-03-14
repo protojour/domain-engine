@@ -10,7 +10,7 @@ use ontol_parser::{
     Span, Spanned,
 };
 use ontol_runtime::{
-    ontology::{PropertyCardinality, ValueCardinality},
+    property::{PropertyCardinality, ValueCardinality},
     smart_format,
     var::{Var, VarAllocator},
     DefId, RelationshipId,

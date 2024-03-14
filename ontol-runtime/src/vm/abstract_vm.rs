@@ -6,10 +6,9 @@ use super::{
     VmResult,
 };
 use crate::{
-    ontology::{Ontology, ValueCardinality},
+    ontology::{ontol::TextConstant, Ontology},
+    property::{PropertyId, ValueCardinality},
     query::condition::ClausePair,
-    text::TextConstant,
-    value::PropertyId,
     var::Var,
     vm::proc::{BuiltinProc, Local, OpCode, Predicate, Procedure},
     DefId,

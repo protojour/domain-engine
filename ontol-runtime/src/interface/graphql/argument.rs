@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    interface::serde::operator::SerdeOperatorAddr, ontology::Ontology, text::TextConstant, DefId,
+    interface::serde::operator::SerdeOperatorAddr,
+    ontology::{ontol::TextConstant, Ontology},
+    DefId,
 };
 
 use super::{

@@ -4,10 +4,10 @@ use ontol_runtime::{
         operator::{AppliedVariants, SerdeOperator, SerdeOperatorAddr, SerdeProperty},
         processor::{ProcessorLevel, ProcessorMode},
     },
-    ontology::{Ontology, TypeInfo},
-    value::{Attribute, PropertyId, Value},
-    value_generator::ValueGenerator,
-    DefId, Role,
+    ontology::{domain::TypeInfo, ontol::ValueGenerator, Ontology},
+    property::{PropertyId, Role},
+    value::{Attribute, Value},
+    DefId,
 };
 
 use crate::system::SystemAPI;

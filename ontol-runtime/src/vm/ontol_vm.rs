@@ -9,11 +9,11 @@ use tracing::{trace, Level};
 
 use crate::{
     cast::Cast,
-    ontology::{Ontology, ValueCardinality},
+    ontology::{ontol::TextConstant, Ontology},
+    property::{PropertyId, ValueCardinality},
     query::condition::{Clause, ClausePair, CondTerm},
     sequence::Sequence,
-    text::TextConstant,
-    value::{Attribute, PropertyId, Value, ValueDebug},
+    value::{Attribute, Value, ValueDebug},
     var::Var,
     vm::proc::{BuiltinProc, Local, Procedure},
     vm::{

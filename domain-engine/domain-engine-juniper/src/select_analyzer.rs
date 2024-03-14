@@ -10,11 +10,12 @@ use ontol_runtime::{
             TypeData, TypeKind, TypeModifier,
         },
     },
+    property::PropertyId,
     query::{
         filter::Filter,
         select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
     },
-    value::{PropertyId, Value},
+    value::Value,
     var::Var,
     DefId, MapKey, RelationshipId,
 };

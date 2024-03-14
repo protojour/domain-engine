@@ -1,4 +1,5 @@
 /target
 .vscode
 *.sublime-*
-ontology
+./ontology
+./examples/*/ontology

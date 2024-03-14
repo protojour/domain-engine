@@ -4,8 +4,12 @@ use anyhow::anyhow;
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
-    ontology::{Cardinality, DataRelationshipInfo, Ontology, TypeInfo},
-    value::{Attribute, PropertyId, Serial, Value},
+    ontology::{
+        domain::{DataRelationshipInfo, TypeInfo},
+        Ontology,
+    },
+    property::{Cardinality, PropertyId},
+    value::{Attribute, Serial, Value},
     DefId, RelationshipId,
 };
 use smallvec::SmallVec;

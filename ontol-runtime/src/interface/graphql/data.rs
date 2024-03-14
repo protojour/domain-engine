@@ -5,8 +5,11 @@ use smartstring::alias::String;
 use thin_vec::ThinVec;
 
 use crate::{
-    interface::serde::operator::SerdeOperatorAddr, ontology::Ontology, text::TextConstant,
-    value::PropertyId, var::Var, DefId, MapKey, RelationshipId,
+    interface::serde::operator::SerdeOperatorAddr,
+    ontology::{ontol::TextConstant, Ontology},
+    property::PropertyId,
+    var::Var,
+    DefId, MapKey, RelationshipId,
 };
 
 use super::argument::{self};

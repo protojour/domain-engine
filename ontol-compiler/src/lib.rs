@@ -21,21 +21,22 @@ use lowering::Lowering;
 use mem::Mem;
 use namespace::{Namespaces, Space};
 use ontol_runtime::{
-    config::PackageConfig,
     interface::{
         serde::{SerdeDef, SerdeModifier},
         DomainInterface,
     },
     ontology::{
-        BasicTypeInfo, DataRelationshipInfo, DataRelationshipKind, DataRelationshipSource,
-        DataRelationshipTarget, Domain, EntityInfo, MapLossiness, MapMeta, OntolDomainMeta,
-        Ontology, TypeInfo, TypeKind,
+        config::PackageConfig,
+        domain::{
+            BasicTypeInfo, DataRelationshipInfo, DataRelationshipKind, DataRelationshipSource,
+            DataRelationshipTarget, Domain, EntityInfo, TypeInfo, TypeKind,
+        },
+        map::{MapLossiness, MapMeta},
+        ontol::{OntolDomainMeta, TextConstant, TextLikeType},
+        Ontology,
     },
-    smart_format,
-    text::TextConstant,
-    text_like_types::TextLikeType,
-    value::PropertyId,
-    DefId, PackageId,
+    property::PropertyId,
+    smart_format, DefId, PackageId,
 };
 use ontology_graph::OntologyGraph;
 use package::{PackageTopology, Packages, ParsedPackage, ONTOL_PKG};

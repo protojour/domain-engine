@@ -19,8 +19,7 @@ use ontol_parser::{
     parse_statements, Spanned, Token,
 };
 use ontol_runtime::{
-    config::PackageConfig,
-    ontology::{Ontology, TypeInfo},
+    ontology::{config::PackageConfig, domain::TypeInfo, Ontology},
     smart_format,
 };
 use regex::Regex;

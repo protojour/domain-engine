@@ -12,8 +12,8 @@ use crate::{
         operator::AppliedVariants,
         processor::{RecursionLimitError, ScalarFormat},
     },
+    ontology::ontol::text_pattern::{FormatPattern, TextPatternConstantPart},
     smart_format,
-    text_pattern::{FormatPattern, TextPatternConstantPart},
     value::{Attribute, FormatValueAsText, Value},
     DefId,
 };

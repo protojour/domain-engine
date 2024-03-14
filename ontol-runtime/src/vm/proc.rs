@@ -7,10 +7,10 @@ use ontol_macros::OntolDebug;
 use crate::{
     debug::NoFmt,
     impl_ontol_debug,
-    ontology::ValueCardinality,
+    ontology::ontol::TextConstant,
+    property::{PropertyId, ValueCardinality},
     query::{condition::ClausePair, filter::Filter},
-    text::TextConstant,
-    value::{PropertyId, Value},
+    value::Value,
     var::Var,
     DefId,
 };

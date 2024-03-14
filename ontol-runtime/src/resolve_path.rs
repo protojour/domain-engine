@@ -1,5 +1,5 @@
 use crate::{
-    ontology::{MapLossiness, Ontology, TypeKind},
+    ontology::{domain::TypeKind, map::MapLossiness, Ontology},
     query::select::{EntitySelect, Select, StructOrUnionSelect},
     DefId, MapDef, MapDefFlags, MapFlags, MapKey, PackageId,
 };

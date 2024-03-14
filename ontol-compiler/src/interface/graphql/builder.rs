@@ -16,10 +16,13 @@ use ontol_runtime::{
         },
         serde::SerdeModifier,
     },
-    ontology::{Ontology, PropertyFlow, PropertyFlowData},
+    ontology::{
+        map::{PropertyFlow, PropertyFlowData},
+        ontol::TextConstant,
+        Ontology,
+    },
+    property::PropertyId,
     resolve_path::{ProbeDirection, ProbeFilter, ProbeOptions, ResolverGraph},
-    text::TextConstant,
-    value::PropertyId,
     var::Var,
     DefId, MapDefFlags, MapKey, PackageId,
 };

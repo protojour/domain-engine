@@ -4,10 +4,11 @@ use bit_set::BitSet;
 use fnv::FnvHashMap;
 use ontol_hir::{EvalCondTerm, PropVariant, StructFlags};
 use ontol_runtime::{
-    ontology::{MapLossiness, ValueCardinality},
+    ontology::map::MapLossiness,
+    property::{PropertyId, ValueCardinality},
     query::condition::{Clause, ClausePair},
     smart_format,
-    value::{Attribute, PropertyId},
+    value::Attribute,
     var::{Var, VarSet},
     vm::proc::{
         BuiltinProc, GetAttrFlags, Local, NParams, OpCode, OpCodeCondTerm, Predicate, Procedure,

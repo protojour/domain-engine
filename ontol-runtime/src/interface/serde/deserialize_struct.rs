@@ -12,9 +12,9 @@ use tracing::debug;
 use crate::{
     format_utils::{DoubleQuote, LogicOp, Missing},
     interface::serde::{deserialize_raw::RawVisitor, EDGE_PROPERTY},
-    ontology::TypeKind,
-    value::{Attribute, PropertyId, Value},
-    value_generator::ValueGenerator,
+    ontology::{domain::TypeKind, ontol::ValueGenerator},
+    property::PropertyId,
+    value::{Attribute, Value},
     vm::proc::{NParams, Procedure},
     DefId, RelationshipId,
 };

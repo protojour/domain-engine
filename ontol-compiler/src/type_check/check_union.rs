@@ -10,10 +10,9 @@ use ontol_runtime::{
         },
         serde::{SerdeDef, SerdeModifier},
     },
-    smart_format,
-    text::TextConstant,
-    value::PropertyId,
-    DefId, RelationshipId,
+    ontology::ontol::TextConstant,
+    property::PropertyId,
+    smart_format, DefId, RelationshipId,
 };
 use patricia_tree::PatriciaMap;
 use smartstring::alias::String;

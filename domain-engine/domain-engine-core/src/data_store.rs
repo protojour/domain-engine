@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use ontol_runtime::{
-    config::DataStoreConfig,
-    ontology::Ontology,
+    ontology::{config::DataStoreConfig, Ontology},
     query::select::{EntitySelect, Select},
     sequence::Sequence,
     value::Value,

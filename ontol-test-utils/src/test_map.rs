@@ -1,6 +1,7 @@
 use ontol_runtime::{
     interface::serde::processor::ProcessorMode,
-    ontology::{Extern, ValueCardinality},
+    ontology::map::Extern,
+    property::ValueCardinality,
     query::filter::Filter,
     value::Value,
     vm::{

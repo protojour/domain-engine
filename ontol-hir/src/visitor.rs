@@ -1,4 +1,4 @@
-use ontol_runtime::value::PropertyId;
+use ontol_runtime::property::PropertyId;
 
 use crate::{
     arena::{Arena, NodeRef},

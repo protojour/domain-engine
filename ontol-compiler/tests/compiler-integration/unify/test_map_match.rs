@@ -1,5 +1,5 @@
 use indoc::indoc;
-use ontol_runtime::{format_utils::Literal, ontology::ValueCardinality, value::Value};
+use ontol_runtime::{format_utils::Literal, property::ValueCardinality, value::Value};
 use ontol_test_utils::{test_map::YielderMock, TestCompile};
 use serde_json::json;
 use test_log::test;

@@ -2,7 +2,6 @@ use std::{
     collections::HashMap,
     fmt::{Debug, Display},
     ops::Index,
-    str::FromStr,
 };
 
 use ::serde::{Deserialize, Serialize};
@@ -11,8 +10,8 @@ use smartstring::alias::String;
 use thin_vec::ThinVec;
 
 use crate::{
-    cast::Cast, impl_ontol_debug, ontology::Ontology, query::filter::Filter, sequence::Sequence,
-    DefId, PackageId, RelationshipId, Role,
+    cast::Cast, ontology::Ontology, property::PropertyId, query::filter::Filter,
+    sequence::Sequence, DefId,
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -260,75 +259,6 @@ impl<'d, 'o> Display for FormatValueAsText<'d, 'o> {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
-pub struct PropertyId {
-    pub role: Role,
-    pub relationship_id: RelationshipId,
-}
-
-impl Display for PropertyId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}:{}:{}",
-            match self.role {
-                Role::Subject => 'S',
-                Role::Object => 'O',
-            },
-            self.relationship_id.0 .0 .0,
-            self.relationship_id.0 .1,
-        )
-    }
-}
-
-impl FromStr for PropertyId {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut iterator = s.split(':');
-        let role = match iterator.next().ok_or(())? {
-            "S" => Role::Subject,
-            "O" => Role::Object,
-            _ => Err(())?,
-        };
-        let package_id = PackageId(iterator.next().ok_or(())?.parse().map_err(|_| ())?);
-        let def_idx: u16 = iterator.next().ok_or(())?.parse().map_err(|_| ())?;
-
-        if iterator.next().is_some() {
-            return Err(());
-        }
-
-        Ok(PropertyId {
-            role,
-            relationship_id: RelationshipId(DefId(package_id, def_idx)),
-        })
-    }
-}
-
-impl Debug for PropertyId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self}")
-    }
-}
-
-impl_ontol_debug!(PropertyId);
-
-impl PropertyId {
-    pub const fn subject(relationship_id: RelationshipId) -> Self {
-        Self {
-            role: Role::Subject,
-            relationship_id,
-        }
-    }
-
-    pub const fn object(relationship_id: RelationshipId) -> Self {
-        Self {
-            role: Role::Object,
-            relationship_id,
-        }
-    }
-}
-
 /// An Attribute is a Value that is part of another value.
 ///
 /// An attribute may be parameterized (rel_params).
@@ -471,7 +401,7 @@ impl<'a> Display for AttrDebug<'a> {
 mod tests {
     use std::collections::{BTreeMap, HashMap};
 
-    use crate::PackageId;
+    use crate::{PackageId, RelationshipId};
 
     use super::*;
     use indexmap::IndexMap;

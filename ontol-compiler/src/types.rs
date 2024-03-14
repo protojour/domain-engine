@@ -1,7 +1,10 @@
 use std::{collections::HashSet, fmt::Display};
 
 use fnv::{FnvHashMap, FnvHashSet};
-use ontol_runtime::{ontology::Extern, text_like_types::TextLikeType, DefId};
+use ontol_runtime::{
+    ontology::{map::Extern, ontol::TextLikeType},
+    DefId,
+};
 use ordered_float::NotNan;
 
 use crate::{

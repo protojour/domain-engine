@@ -2,7 +2,7 @@ use fnv::FnvHashMap;
 use serde::{Deserialize, Serialize};
 
 use super::filter::Filter;
-use crate::{value::PropertyId, DefId};
+use crate::{property::PropertyId, DefId};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Select {

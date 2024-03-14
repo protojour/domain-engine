@@ -1,0 +1,48 @@
+//! Data models related to ONTOL definition mapping
+
+use std::ops::Range;
+
+use ontol_macros::OntolDebug;
+use serde::{Deserialize, Serialize};
+
+use crate::{
+    property::{Cardinality, PropertyId},
+    var::Var,
+    vm::proc::Procedure,
+    DefId,
+};
+
+use super::ontol::TextConstant;
+
+#[derive(Clone, Serialize, Deserialize, OntolDebug)]
+pub struct MapMeta {
+    pub procedure: Procedure,
+    pub propflow_range: Option<Range<u32>>,
+    pub lossiness: MapLossiness,
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, OntolDebug)]
+pub enum MapLossiness {
+    Complete,
+    Lossy,
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, OntolDebug, Debug)]
+pub struct PropertyFlow {
+    pub id: PropertyId,
+    pub data: PropertyFlowData,
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, OntolDebug, Debug)]
+pub enum PropertyFlowData {
+    Type(DefId),
+    Match(Var),
+    Cardinality(Cardinality),
+    ChildOf(PropertyId),
+    DependentOn(PropertyId),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum Extern {
+    HttpJson { url: TextConstant },
+}

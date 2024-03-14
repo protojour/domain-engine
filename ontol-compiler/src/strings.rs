@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fmt::Debug, ops::Index};
 
 use arcstr::ArcStr;
-use ontol_runtime::text::TextConstant;
+use ontol_runtime::ontology::ontol::TextConstant;
 
 use crate::mem::Mem;
 

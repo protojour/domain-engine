@@ -1,12 +1,12 @@
 use indexmap::IndexMap;
 use ontol_hir::{PropFlags, StructFlags};
 use ontol_runtime::{
-    ontology::{Cardinality, PropertyCardinality, ValueCardinality},
+    property::{Cardinality, PropertyCardinality, PropertyId, Role, ValueCardinality},
     query::condition::SetOperator,
     smart_format,
-    value::{Attribute, PropertyId},
+    value::Attribute,
     var::Var,
-    DefId, RelationshipId, Role,
+    DefId, RelationshipId,
 };
 use smallvec::smallvec;
 use tracing::{debug, info};

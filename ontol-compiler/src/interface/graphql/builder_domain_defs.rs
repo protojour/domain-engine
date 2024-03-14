@@ -16,10 +16,8 @@ use ontol_runtime::{
             SerdeModifier,
         },
     },
-    ontology::{PropertyCardinality, ValueCardinality},
-    smart_format,
-    value::PropertyId,
-    DefId, Role,
+    property::{PropertyCardinality, PropertyId, Role, ValueCardinality},
+    smart_format, DefId,
 };
 use smartstring::alias::String;
 use thin_vec::thin_vec;

@@ -9,7 +9,7 @@ use std::collections::hash_map::Entry;
 
 use fnv::FnvHashSet;
 use indexmap::IndexMap;
-use ontol_runtime::{value::PropertyId, DefId};
+use ontol_runtime::{property::PropertyId, DefId};
 use tracing::{debug_span, trace};
 
 use crate::{

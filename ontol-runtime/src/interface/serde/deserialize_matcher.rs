@@ -11,12 +11,16 @@ use crate::{
         discriminator::{Discriminant, LeafDiscriminant, VariantPurpose},
         serde::processor::SpecialProperty,
     },
-    ontology::Ontology,
-    text::TextConstant,
-    text_like_types::ParseError,
-    text_pattern::{TextPattern, TextPatternConstantPart},
-    value::{Attribute, PropertyId, Serial, Value},
-    DefId, RelationshipId, Role,
+    ontology::{
+        ontol::{
+            text_pattern::{TextPattern, TextPatternConstantPart},
+            ParseError, TextConstant,
+        },
+        Ontology,
+    },
+    property::{PropertyId, Role},
+    value::{Attribute, Serial, Value},
+    DefId, RelationshipId,
 };
 
 use super::{

@@ -16,10 +16,9 @@ use ontol_runtime::{
         discriminator::LeafDiscriminant,
         serde::{operator::SerdeStructFlags, SerdeDef, SerdeModifier},
     },
-    ontology::{Cardinality, PropertyCardinality, ValueCardinality},
-    smart_format,
-    text::TextConstant,
-    DefId,
+    ontology::ontol::TextConstant,
+    property::{Cardinality, PropertyCardinality, ValueCardinality},
+    smart_format, DefId,
 };
 use smartstring::alias::String;
 use tracing::{debug, debug_span, error, trace, warn};

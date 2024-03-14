@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use fnv::FnvHashMap;
 use ontol_parser::ast;
 use ontol_parser::Spanned;
-use ontol_runtime::config::PackageConfig;
+use ontol_runtime::ontology::config::PackageConfig;
 use ontol_runtime::DefId;
 use ontol_runtime::PackageId;
 use smartstring::alias::String;

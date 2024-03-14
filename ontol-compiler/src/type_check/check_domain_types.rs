@@ -1,11 +1,8 @@
 use fnv::FnvHashSet;
 use ontol_runtime::{
-    ontology::{PropertyCardinality, ValueCardinality},
-    smart_format,
-    text_like_types::TextLikeType,
-    value::PropertyId,
-    value_generator::ValueGenerator,
-    DefId, RelationshipId, Role,
+    ontology::ontol::{TextLikeType, ValueGenerator},
+    property::{PropertyCardinality, PropertyId, Role, ValueCardinality},
+    smart_format, DefId, RelationshipId,
 };
 use tracing::{debug, instrument, trace};
 

@@ -3,8 +3,8 @@ use domain_engine_test_utils::{
     system::mock_current_time_monotonic, unimock, DomainEngineTestExt, TestFindQuery,
 };
 use ontol_runtime::{
-    config::DataStoreConfig,
     interface::serde::processor::{ProcessorProfile, ProcessorProfileFlags},
+    ontology::config::DataStoreConfig,
     ontology::Ontology,
     query::select::Select,
     value::Serial,

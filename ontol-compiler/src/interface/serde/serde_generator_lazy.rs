@@ -14,10 +14,9 @@ use ontol_runtime::{
             SerdeDef, SerdeModifier,
         },
     },
-    text::TextConstant,
-    value::PropertyId,
-    value_generator::ValueGenerator,
-    DefId, Role,
+    ontology::ontol::{TextConstant, ValueGenerator},
+    property::{PropertyId, Role},
+    DefId,
 };
 use smartstring::alias::String;
 use tracing::{debug, debug_span, warn};

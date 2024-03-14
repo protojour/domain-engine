@@ -14,7 +14,7 @@ use domain_engine_test_utils::{
     unimock,
     unimock::MockFn,
 };
-use ontol_runtime::{config::DataStoreConfig, ontology::Ontology};
+use ontol_runtime::ontology::{config::DataStoreConfig, Ontology};
 use ontol_test_utils::{
     examples::conduit::{BLOG_POST_PUBLIC, CONDUIT_DB, FEED_PUBLIC},
     expect_eq, TestPackages,

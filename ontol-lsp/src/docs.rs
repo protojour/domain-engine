@@ -1,5 +1,5 @@
 use lsp_types::{CompletionItem, CompletionItemKind};
-use ontol_runtime::ontology::TypeKind;
+use ontol_runtime::ontology::domain::TypeKind;
 
 use crate::state::{HoverDoc, State};
 

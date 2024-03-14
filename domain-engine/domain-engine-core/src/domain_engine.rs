@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Context};
 use ontol_runtime::{
-    config::data_store_backed_domains,
     interface::serde::processor::ProcessorMode,
-    ontology::{Extern, Ontology, ValueCardinality},
+    ontology::{config::data_store_backed_domains, map::Extern, Ontology},
+    property::ValueCardinality,
     query::select::{EntitySelect, Select, StructOrUnionSelect},
     resolve_path::{ProbeDirection, ProbeFilter, ProbeOptions, ResolvePath, ResolverGraph},
     sequence::Sequence,

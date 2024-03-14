@@ -6,7 +6,7 @@ use std::{
 use indexmap::IndexMap;
 use smallvec::SmallVec;
 
-use crate::text::TextConstant;
+use crate::ontology::ontol::TextConstant;
 
 /// A debug trait that has access to a [OntolFormatter]
 ///

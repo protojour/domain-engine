@@ -5,7 +5,10 @@ use mdbook::{
 };
 use ontol_compiler::mem::Mem;
 
-use ontol_runtime::ontology::{Ontology, TypeInfo, TypeKind};
+use ontol_runtime::ontology::{
+    domain::{TypeInfo, TypeKind},
+    Ontology,
+};
 
 use ontol_compiler::package::ONTOL_PKG;
 use ontol_compiler::Compiler;

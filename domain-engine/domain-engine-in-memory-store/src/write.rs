@@ -6,14 +6,14 @@ use itertools::Itertools;
 use ontol_runtime::{
     interface::serde::{operator::SerdeOperatorAddr, processor::ProcessorMode},
     ontology::{
-        DataRelationshipInfo, DataRelationshipKind, DataRelationshipTarget, EntityInfo,
-        ValueCardinality,
+        domain::{DataRelationshipInfo, DataRelationshipKind, DataRelationshipTarget, EntityInfo},
+        ontol::ValueGenerator,
     },
+    property::{PropertyId, Role, ValueCardinality},
     query::{filter::Filter, select::Select},
     smart_format,
-    value::{Attribute, PropertyId, Serial, Value, ValueDebug},
-    value_generator::ValueGenerator,
-    DefId, Role,
+    value::{Attribute, Serial, Value, ValueDebug},
+    DefId,
 };
 use smartstring::alias::String;
 use tracing::{debug, warn};

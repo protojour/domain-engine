@@ -1,6 +1,6 @@
 use ontol_hir::{visitor::HirVisitor, Node, PropFlags, PropVariant};
 use ontol_runtime::{
-    value::PropertyId,
+    property::PropertyId,
     var::{Var, VarAllocator, VarSet},
     MapFlags,
 };

@@ -8,10 +8,11 @@ use ontol_runtime::{
         operator::{AppliedVariants, SerdeOperator},
         processor::{ProcessorLevel, ProcessorMode, SerdeProcessor},
     },
-    ontology::Ontology,
+    ontology::{
+        ontol::{text_pattern::TextPattern, TextLikeType},
+        Ontology,
+    },
     sequence::Sequence,
-    text_like_types::TextLikeType,
-    text_pattern::TextPattern,
     value::{Attribute, Serial, Value},
     DefId,
 };

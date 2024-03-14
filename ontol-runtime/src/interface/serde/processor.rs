@@ -5,7 +5,7 @@ use ontol_macros::OntolDebug;
 use crate::{
     format_utils::{Backticks, CommaSeparated, DoubleQuote},
     ontology::Ontology,
-    value::PropertyId,
+    property::PropertyId,
     DefId,
 };
 

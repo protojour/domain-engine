@@ -1,7 +1,7 @@
 use ::serde::{Deserialize, Serialize};
 use ontol_macros::OntolDebug;
 
-use crate::{interface::serde::SerdeDef, text::TextConstant, DefId, RelationshipId};
+use crate::{interface::serde::SerdeDef, ontology::ontol::TextConstant, DefId, RelationshipId};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UnionDiscriminator {

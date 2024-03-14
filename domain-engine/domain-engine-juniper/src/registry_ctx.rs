@@ -19,8 +19,7 @@ use ontol_runtime::{
             processor::ProcessorProfileFlags,
         },
     },
-    value::PropertyId,
-    Role,
+    property::{PropertyId, Role},
 };
 use tracing::{debug, trace, trace_span};
 

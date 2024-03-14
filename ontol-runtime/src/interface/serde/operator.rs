@@ -12,9 +12,8 @@ use smartstring::alias::String;
 use crate::{
     impl_ontol_debug,
     interface::discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
-    text::TextConstant,
-    value::PropertyId,
-    value_generator::ValueGenerator,
+    ontology::ontol::{TextConstant, ValueGenerator},
+    property::PropertyId,
     DefId,
 };
 

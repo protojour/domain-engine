@@ -8,10 +8,11 @@ use ontol_runtime::{
         deserialize_raw,
         processor::{ProcessorLevel, ProcessorMode},
     },
-    ontology::{Ontology, TypeInfo},
+    ontology::{domain::TypeInfo, Ontology},
+    property::PropertyId,
     query::select::{Select, StructSelect},
     sequence::Sequence,
-    value::{Attribute, PropertyId, Value},
+    value::{Attribute, Value},
     DefId, PackageId,
 };
 use serde::de::DeserializeSeed;

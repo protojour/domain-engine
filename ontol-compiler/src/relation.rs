@@ -3,8 +3,10 @@ use std::collections::BTreeSet;
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
-    interface::discriminator::UnionDiscriminator, ontology::Cardinality, value::PropertyId,
-    value_generator::ValueGenerator, DefId, PackageId, RelationshipId,
+    interface::discriminator::UnionDiscriminator,
+    ontology::ontol::ValueGenerator,
+    property::{Cardinality, PropertyId},
+    DefId, PackageId, RelationshipId,
 };
 
 use crate::{sequence::Sequence, text_patterns::TextPatternSegment, SourceSpan};

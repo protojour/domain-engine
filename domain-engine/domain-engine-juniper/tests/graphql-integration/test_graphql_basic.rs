@@ -6,8 +6,8 @@ use domain_engine_juniper::{
     Schema,
 };
 use ontol_runtime::{
-    config::DataStoreConfig,
     interface::serde::processor::ProcessorProfileFlags,
+    ontology::config::DataStoreConfig,
     sequence::{Sequence, SubSequence},
     value::Attribute,
 };

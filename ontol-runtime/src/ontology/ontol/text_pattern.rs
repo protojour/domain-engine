@@ -9,12 +9,13 @@ use tracing::{debug, error};
 use crate::{
     interface::serde::processor::ProcessorMode,
     ontology::Ontology,
+    property::PropertyId,
     smart_format,
-    text::TextConstant,
-    text_like_types::ParseError,
-    value::{Attribute, FormatValueAsText, PropertyId, Value},
+    value::{Attribute, FormatValueAsText, Value},
     DefId, RelationshipId,
 };
+
+use super::{text_like_types::ParseError, TextConstant};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TextPattern {

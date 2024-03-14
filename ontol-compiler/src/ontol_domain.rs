@@ -2,7 +2,7 @@
 
 use std::ops::Range;
 
-use ontol_runtime::{text_like_types::TextLikeType, vm::proc::BuiltinProc, DefId};
+use ontol_runtime::{ontology::ontol::TextLikeType, vm::proc::BuiltinProc, DefId};
 
 use crate::{
     def::{BuiltinRelationKind, DefKind, TypeDef, TypeDefFlags},

@@ -1,11 +1,12 @@
 use anyhow::anyhow;
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    ontology::DataRelationshipKind,
+    ontology::domain::DataRelationshipKind,
+    property::{PropertyId, Role},
     query::condition::{Clause, CondTerm, Condition, SetOperator},
-    value::{Attribute, PropertyId, Value},
+    value::{Attribute, Value},
     var::Var,
-    DefId, Role,
+    DefId,
 };
 
 use domain_engine_core::{

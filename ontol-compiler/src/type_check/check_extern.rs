@@ -1,4 +1,7 @@
-use ontol_runtime::{ontology::Extern, smart_format, text::TextConstant, DefId};
+use ontol_runtime::{
+    ontology::{map::Extern, ontol::TextConstant},
+    smart_format, DefId,
+};
 use smartstring::alias::String;
 use tracing::warn;
 

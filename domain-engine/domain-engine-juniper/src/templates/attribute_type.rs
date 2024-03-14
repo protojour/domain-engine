@@ -15,8 +15,9 @@ use ontol_runtime::{
         processor::{ProcessorLevel, ProcessorMode, ProcessorProfileFlags},
         serialize_raw,
     },
+    property::PropertyId,
     sequence::{Sequence, SubSequence},
-    value::{Attribute, PropertyId, Value},
+    value::{Attribute, Value},
     DefId,
 };
 use serde::Serialize;

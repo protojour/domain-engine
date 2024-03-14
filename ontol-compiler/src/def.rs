@@ -3,11 +3,12 @@ use std::{borrow::Cow, collections::HashMap, ops::Range};
 use documented::DocumentedFields;
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    ontology::{BasicTypeInfo, Cardinality, TypeKind},
-    text_like_types::TextLikeType,
+    ontology::domain::{BasicTypeInfo, TypeKind},
+    ontology::ontol::TextLikeType,
+    property::{Cardinality, Role},
     var::VarAllocator,
     vm::proc::BuiltinProc,
-    DefId, PackageId, RelationshipId, Role,
+    DefId, PackageId, RelationshipId,
 };
 use smartstring::alias::String;
 use strum::AsRefStr;

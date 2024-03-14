@@ -1,12 +1,12 @@
 use assert_matches::assert_matches;
 use ontol_runtime::{
-    config::DataStoreConfig,
     debug::NoFmt,
     interface::graphql::{
         data::{FieldKind, NativeScalarKind, ObjectData, TypeData},
         schema::{GraphqlSchema, QueryLevel},
     },
     interface::serde::operator::SerdeOperator,
+    ontology::config::DataStoreConfig,
 };
 use ontol_test_utils::{
     examples::ARTIST_AND_INSTRUMENT,

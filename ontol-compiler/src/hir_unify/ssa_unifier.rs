@@ -4,9 +4,10 @@ use ontol_hir::{
     PropVariant, SetEntry, StructFlags,
 };
 use ontol_runtime::{
+    property::PropertyId,
     query::condition::{Clause, ClausePair, SetOperator},
     smart_format,
-    value::{Attribute, PropertyId},
+    value::Attribute,
     var::{Var, VarAllocator, VarSet},
     MapFlags,
 };

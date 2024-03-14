@@ -5,10 +5,11 @@ use std::{collections::BTreeSet, fmt::Debug};
 use fnv::{FnvHashMap, FnvHashSet};
 use ontol_hir::{PropVariant, StructFlags};
 use ontol_runtime::{
-    ontology::{PropertyFlow, PropertyFlowData},
-    value::{Attribute, PropertyId},
+    ontology::map::{PropertyFlow, PropertyFlowData},
+    property::{PropertyId, Role},
+    value::Attribute,
     var::{Var, VarSet},
-    DefId, RelationshipId, Role,
+    DefId, RelationshipId,
 };
 
 use crate::{

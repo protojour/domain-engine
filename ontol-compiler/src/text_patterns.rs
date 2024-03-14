@@ -1,7 +1,9 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    text_pattern::{Regex, TextPattern, TextPatternConstantPart, TextPatternProperty},
-    value::PropertyId,
+    ontology::ontol::text_pattern::{
+        Regex, TextPattern, TextPatternConstantPart, TextPatternProperty,
+    },
+    property::PropertyId,
     DefId,
 };
 use regex_syntax::hir::{Capture, Hir, Look};

@@ -6,9 +6,8 @@ use domain_engine_core::object_generator::ObjectGenerator;
 use domain_engine_core::system::ArcSystemApi;
 use domain_engine_core::Session;
 use fnv::FnvHashMap;
-use ontol_runtime::config::DataStoreConfig;
 use ontol_runtime::interface::serde::processor::ProcessorMode;
-use ontol_runtime::ontology::{DataRelationshipSource, Ontology};
+use ontol_runtime::ontology::{config::DataStoreConfig, domain::DataRelationshipSource, Ontology};
 use ontol_runtime::{DefId, PackageId, RelationshipId};
 use tokio::sync::RwLock;
 

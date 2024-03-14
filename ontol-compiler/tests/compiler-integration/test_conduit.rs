@@ -1,5 +1,5 @@
 use indoc::indoc;
-use ontol_runtime::{format_utils::Literal, ontology::ValueCardinality, value::Value};
+use ontol_runtime::{format_utils::Literal, property::ValueCardinality, value::Value};
 use ontol_test_utils::{
     examples::conduit::{
         BLOG_POST_PUBLIC, CONDUIT_CONTRIVED_SIGNUP, CONDUIT_DB, CONDUIT_PUBLIC, FEED_PUBLIC,

@@ -23,9 +23,11 @@ use ontol_compiler::{
 use ontol_lsp::Backend;
 use ontol_parser::parse_statements;
 use ontol_runtime::{
-    config::{DataStoreConfig, PackageConfig},
     interface::json_schema::build_openapi_schemas,
-    ontology::Ontology,
+    ontology::{
+        config::{DataStoreConfig, PackageConfig},
+        Ontology,
+    },
     PackageId,
 };
 use service::app;

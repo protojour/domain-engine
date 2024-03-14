@@ -4,7 +4,8 @@ use ontol_runtime::{
         ProcessorLevel, ProcessorMode, ProcessorProfile, ProcessorProfileApi,
         ProcessorProfileFlags, SpecialProperty,
     },
-    value::{Attribute, PropertyId, Value},
+    property::PropertyId,
+    value::{Attribute, Value},
     DefId,
 };
 use serde::de::DeserializeSeed;

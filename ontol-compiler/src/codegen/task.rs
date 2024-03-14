@@ -5,9 +5,11 @@ use indexmap::{map::Entry, IndexMap};
 use ontol_hir::StructFlags;
 use ontol_runtime::{
     format_utils::DebugViaDisplay,
-    ontology::{MapLossiness, PropertyFlow},
+    ontology::{
+        map::{MapLossiness, PropertyFlow},
+        ontol::TextConstant,
+    },
     smart_format,
-    text::TextConstant,
     vm::proc::{Address, Lib, NParams, OpCode, Procedure},
     DefId, MapDef, MapFlags, MapKey, PackageId,
 };

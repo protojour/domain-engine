@@ -7,7 +7,8 @@ use thin_vec::ThinVec;
 use crate::{
     debug::OntolDebug,
     impl_ontol_debug,
-    value::{PropertyId, Value, ValueDebug},
+    property::PropertyId,
+    value::{Value, ValueDebug},
     var::Var,
     DefId,
 };

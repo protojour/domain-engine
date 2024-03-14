@@ -1,9 +1,8 @@
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
-    ontology::{PropertyCardinality, ValueCardinality},
+    property::{PropertyCardinality, PropertyId, ValueCardinality},
     smart_format,
-    value::PropertyId,
     var::Var,
     DefId,
 };

@@ -1,14 +1,13 @@
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
-    config::data_store_backed_domains,
     interface::graphql::{
         data::{
             EntityData, NodeData, ObjectData, ObjectKind, TypeAddr, TypeData, TypeKind, UnitTypeRef,
         },
         schema::GraphqlSchema,
     },
-    ontology::{MapLossiness, Ontology},
+    ontology::{config::data_store_backed_domains, map::MapLossiness, Ontology},
     resolve_path::ResolverGraph,
     DefId, MapKey, PackageId,
 };

@@ -5,19 +5,15 @@ use std::fmt::Debug;
 use ::serde::{Deserialize, Serialize};
 
 pub mod cast;
-pub mod config;
 pub mod debug;
 pub mod format_utils;
 pub mod interface;
 pub mod ontology;
+pub mod property;
 pub mod query;
 pub mod resolve_path;
 pub mod sequence;
-pub mod text;
-pub mod text_like_types;
-pub mod text_pattern;
 pub mod value;
-pub mod value_generator;
 pub mod var;
 pub mod vm;
 
@@ -37,7 +33,7 @@ impl ::std::fmt::Debug for PackageId {
     }
 }
 
-/// One definition inside some domain.
+/// One definition inside some ONTOL domain.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct DefId(pub PackageId, pub u16);
 
@@ -107,22 +103,7 @@ impl From<DefId> for MapDef {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize, Deserialize)]
-pub enum Role {
-    Subject,
-    Object,
-}
-
-impl Role {
-    /// Get the role that is opposite to this role
-    pub fn opposite(self) -> Self {
-        match self {
-            Self::Subject => Self::Object,
-            Self::Object => Self::Subject,
-        }
-    }
-}
-
+/// The ID of some relationship between ONTOL types.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct RelationshipId(pub DefId);
 

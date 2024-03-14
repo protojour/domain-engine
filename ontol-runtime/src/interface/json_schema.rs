@@ -11,10 +11,12 @@ use crate::interface::serde::operator::{
     SequenceRange, SerdeOperator, SerdeOperatorAddr, StructOperator, UnionOperator,
 };
 use crate::interface::serde::processor::ProcessorMode;
-use crate::ontology::TypeInfo;
 use crate::smart_format;
 use crate::{
-    ontology::{Domain, Ontology},
+    ontology::{
+        domain::{Domain, TypeInfo},
+        Ontology,
+    },
     DefId, PackageId,
 };
 

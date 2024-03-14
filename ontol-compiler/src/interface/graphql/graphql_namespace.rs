@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use convert_case::{Case, Casing};
 use ontol_runtime::{
-    ontology::{Ontology, TypeInfo},
+    ontology::{domain::TypeInfo, Ontology},
     smart_format, DefId, PackageId,
 };
 use smartstring::alias::String;

@@ -1,12 +1,16 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
     interface::serde::operator::{AliasOperator, SerdeOperator, SerdeOperatorAddr},
-    ontology::Ontology,
+    ontology::{
+        ontol::{
+            text_pattern::{TextPattern, TextPatternConstantPart, TextPatternProperty},
+            TextLikeType, ValueGenerator,
+        },
+        Ontology,
+    },
+    property::PropertyId,
     smart_format,
-    text_like_types::TextLikeType,
-    text_pattern::{TextPattern, TextPatternConstantPart, TextPatternProperty},
-    value::{PropertyId, Value},
-    value_generator::ValueGenerator,
+    value::Value,
     DefId,
 };
 
