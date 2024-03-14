@@ -58,7 +58,7 @@ pub async fn app(ontology: Ontology) -> axum::Router {
             domain_router(engine.clone(), &domain_path, *package_id).unwrap(),
         );
 
-        info!("domain {package_id:?} served under {domain_path}");
+        info!("domain {package_id:?} served under /d{domain_path}");
     }
 
     router.layer(tower_http::trace::TraceLayer::new_for_http())
