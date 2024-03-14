@@ -85,6 +85,14 @@ const GRAPHIQL: &str = r#"
             document.getElementById('root'),
         )
     </script>
+    <script>
+        const socket = new WebSocket(window.location.origin + "/ws");
+        socket.addEventListener("message", (e) => {
+            if (e.data === "reload") {
+                document.querySelector('[aria-label="Re-fetch GraphQL schema"]').click();
+            }
+        })
+    </script>
 </body>
 
 </html>

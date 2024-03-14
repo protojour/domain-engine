@@ -29,6 +29,7 @@ use std::{
     time::Duration,
 };
 use thiserror::Error;
+use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 use tower_lsp::{LspService, Server};
 use tracing::{info, level_filters::LevelFilter};
@@ -151,6 +152,11 @@ pub enum OntoolError {
     IO(#[from] std::io::Error),
 }
 
+#[derive(Clone)]
+pub enum ChannelMessage {
+    Reload,
+}
+
 pub async fn run() -> Result<(), OntoolError> {
     let cli = Cli::parse();
 
@@ -177,6 +183,7 @@ pub async fn run() -> Result<(), OntoolError> {
         Some(Commands::Serve(args)) => {
             init_tracing();
             let (tx, rx) = std::sync::mpsc::channel();
+            let (reload_tx, _reload_rx) = broadcast::channel::<ChannelMessage>(16);
             let mut debouncer = new_debouncer(Duration::from_secs(1), None, tx).unwrap();
 
             debouncer
@@ -209,7 +216,7 @@ pub async fn run() -> Result<(), OntoolError> {
             );
             match compile_output {
                 Ok(output) => {
-                    let new_app = app(output.ontology).await;
+                    let new_app = app(output.ontology, reload_tx.clone()).await;
                     let mut lock = router_cell.lock().unwrap();
                     *lock = Some(new_app);
                 }
@@ -233,9 +240,10 @@ pub async fn run() -> Result<(), OntoolError> {
                                 );
                                 match compile_output {
                                     Ok(output) => {
-                                        let new_app = app(output.ontology).await;
+                                        let new_app = app(output.ontology, reload_tx.clone()).await;
                                         let mut lock = router_cell.lock().unwrap();
                                         *lock = Some(new_app);
+                                        let _ = reload_tx.send(ChannelMessage::Reload);
                                     }
                                     Err(error) => {
                                         let mut lock = router_cell.lock().unwrap();

@@ -7,15 +7,24 @@ use std::{
     task::Poll,
 };
 
-use crate::graphql::{graphiql_handler, graphql_handler, GraphqlService};
+use crate::{
+    graphql::{graphiql_handler, graphql_handler, GraphqlService},
+    ChannelMessage,
+};
 
-use axum::Extension;
+use axum::{
+    extract::ws::{Message, WebSocket, WebSocketUpgrade},
+    response::Response,
+    routing::get,
+    Extension,
+};
 use clap::Parser;
 use domain_engine_core::{DomainEngine, DomainError, DomainResult, Session};
 use domain_engine_in_memory_store::InMemoryDataStoreFactory;
 use domain_engine_juniper::CreateSchemaError;
 use ontol_runtime::{ontology::Ontology, PackageId};
 
+use tokio::sync::broadcast::Sender;
 use tracing::info;
 
 /// This environment variable is used to control logs.
@@ -32,8 +41,25 @@ struct Args {
     ontology: PathBuf,
 }
 
+async fn ws_upgrade_handler(ws: WebSocketUpgrade, tx: Sender<ChannelMessage>) -> Response {
+    ws.on_upgrade(|socket| handle_ws(socket, tx))
+}
+
+async fn handle_ws(mut socket: WebSocket, tx: Sender<ChannelMessage>) {
+    let mut rx = tx.subscribe();
+    while let Ok(msg) = rx.recv().await {
+        match msg {
+            ChannelMessage::Reload => {
+                if socket.send(Message::Text("reload".into())).await.is_err() {
+                    return;
+                }
+            }
+        }
+    }
+}
+
 // app -> router
-pub async fn app(ontology: Ontology) -> axum::Router {
+pub async fn app(ontology: Ontology, tx: Sender<ChannelMessage>) -> axum::Router {
     let ontology = Arc::new(ontology);
     let engine = Arc::new(
         DomainEngine::builder(ontology.clone())
@@ -44,6 +70,8 @@ pub async fn app(ontology: Ontology) -> axum::Router {
     );
 
     let mut router: axum::Router = axum::Router::new();
+
+    router = router.route("/ws", get(|socket| ws_upgrade_handler(socket, tx)));
 
     for (package_id, domain) in ontology
         .domains()
