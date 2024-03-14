@@ -17,14 +17,14 @@ use ontol_runtime::{
 };
 use patricia_tree::PatriciaMap;
 use smartstring::alias::String;
-use tracing::debug;
+use tracing::{debug, debug_span};
 
 use crate::{
     def::{Def, DefKind, LookupRelationshipMeta},
     error::CompileError,
     primitive::PrimitiveKind,
     relation::{Constructor, Property},
-    repr::repr_model::ReprKind,
+    repr::repr_model::{ReprKind, ReprScalarKind},
     sequence::Sequence,
     strings::Strings,
     text_patterns::TextPatternSegment,
@@ -36,6 +36,8 @@ use super::TypeCheck;
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
     pub fn check_union(&mut self, value_union_def_id: DefId) -> Vec<SpannedCompileError> {
+        let _entered = debug_span!("union", id = ?value_union_def_id).entered();
+
         let mut strings = self.strings.detach();
 
         // An error set to avoid reporting the same error more than once
@@ -266,6 +268,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Ok(DomainTypeMatchData::ConstructorStringPattern(segment)) => {
                         builder.add_text_pattern(key, segment, variant_def);
                     }
+                    Ok(DomainTypeMatchData::TextLiteral(lit)) => {
+                        builder.add_text_literal(key, lit, variant_def);
+                    }
                     Err(error) => {
                         error_set.report(variant_def, error, span);
                     }
@@ -281,23 +286,38 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &self,
         def_id: DefId,
     ) -> Result<DomainTypeMatchData<'_>, UnionCheckError> {
-        debug!("find domain type match data {def_id:?}");
+        let repr_kind = self.seal_ctx.get_repr_kind(&def_id).unwrap();
 
-        match self.relations.properties_by_def_id(def_id) {
-            Some(properties) => match &properties.constructor {
+        debug!("find domain type match data {def_id:?}: {repr_kind:?}");
+
+        if let Some(properties) = self.relations.properties_by_def_id(def_id) {
+            match &properties.constructor {
                 Constructor::Transparent => {
                     debug!("was Transparent: {properties:?}");
-                    match &properties.table {
-                        Some(property_set) => Ok(DomainTypeMatchData::Struct(property_set)),
-                        None => Err(UnionCheckError::UnitTypePartOfUnion(def_id)),
+                    if let Some(property_set) = &properties.table {
+                        return Ok(DomainTypeMatchData::Struct(property_set));
                     }
                 }
-                Constructor::Sequence(sequence) => Ok(DomainTypeMatchData::Sequence(sequence)),
-                Constructor::TextFmt(segment) => {
-                    Ok(DomainTypeMatchData::ConstructorStringPattern(segment))
+                Constructor::Sequence(sequence) => {
+                    return Ok(DomainTypeMatchData::Sequence(sequence))
                 }
-            },
-            None => Err(UnionCheckError::UnitTypePartOfUnion(def_id)),
+                Constructor::TextFmt(segment) => {
+                    return Ok(DomainTypeMatchData::ConstructorStringPattern(segment))
+                }
+            }
+        }
+
+        match repr_kind {
+            ReprKind::Scalar(scalar_def_id, ReprScalarKind::Text, _) => {
+                match self.defs.def_kind(*scalar_def_id) {
+                    DefKind::TextLiteral(lit) => Ok(DomainTypeMatchData::TextLiteral(lit)),
+                    _other => {
+                        debug!("other: {_other:?}");
+                        Err(UnionCheckError::UnitTypePartOfUnion(*scalar_def_id))
+                    }
+                }
+            }
+            _ => Err(UnionCheckError::UnitTypePartOfUnion(def_id)),
         }
     }
 
@@ -635,6 +655,7 @@ enum DomainTypeMatchData<'a> {
     Struct(&'a IndexMap<PropertyId, Property>),
     Sequence(&'a Sequence),
     ConstructorStringPattern(&'a TextPatternSegment),
+    TextLiteral(&'a str),
 }
 
 #[derive(Default, Debug)]

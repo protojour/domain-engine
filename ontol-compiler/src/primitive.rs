@@ -3,7 +3,7 @@ use ontol_runtime::DefId;
 use strum::AsRefStr;
 
 use crate::{
-    def::{BuiltinRelationKind, DefKind, Defs},
+    def::{BuiltinRelationKind, DefKind, Defs, TypeDef, TypeDefFlags},
     package::ONTOL_PKG,
     NO_SPAN,
 };
@@ -100,6 +100,7 @@ pub struct Primitives {
     pub f32: DefId,
     pub f64: DefId,
     pub serial: DefId,
+    pub direction_union: DefId,
 
     /// The definition of the ontol domain
     pub ontol_domain: DefId,
@@ -173,6 +174,15 @@ impl Primitives {
             f64: defs.add_primitive(PrimitiveKind::F64, Some("f64")),
             serial: defs.add_primitive(PrimitiveKind::Serial, Some("serial")),
             text: defs.add_primitive(PrimitiveKind::Text, Some("text")),
+            direction_union: defs.add_def(
+                DefKind::Type(TypeDef {
+                    ident: None,
+                    rel_type_for: None,
+                    flags: TypeDefFlags::CONCRETE | TypeDefFlags::PUBLIC,
+                }),
+                ONTOL_PKG,
+                NO_SPAN,
+            ),
             ontol_domain: defs.alloc_def_id(ONTOL_PKG),
             open_data_relationship: defs.add_primitive(PrimitiveKind::OpenDataRelationship, None),
 

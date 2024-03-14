@@ -112,7 +112,7 @@ bitflags::bitflags! {
 #[derive(Clone, Copy, Debug)]
 pub struct FmtFinalState(pub bool);
 
-#[derive(Clone, Debug, AsRefStr, DocumentedFields)]
+#[derive(Clone, Hash, PartialEq, Eq, Debug, AsRefStr, DocumentedFields)]
 pub enum BuiltinRelationKind {
     /// Relates one definition to another.
     /// The subject type takes on all properties of the object type,

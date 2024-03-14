@@ -6,13 +6,13 @@ use ontol_runtime::{
     smart_format,
     value::{Attribute, PropertyId},
     var::Var,
-    DefId, Role,
+    DefId, RelationshipId, Role,
 };
 use smallvec::smallvec;
 use tracing::{debug, info};
 
 use crate::{
-    def::{DefKind, LookupRelationshipMeta, RelParams},
+    def::{BuiltinRelationKind, DefKind, LookupRelationshipMeta, RelParams},
     mem::Intern,
     pattern::{
         CompoundPatternAttr, CompoundPatternAttrKind, CompoundPatternModifier, Pattern,
@@ -20,7 +20,7 @@ use crate::{
     },
     primitive::PrimitiveKind,
     relation::Property,
-    repr::repr_model::ReprKind,
+    repr::repr_model::{ReprKind, ReprScalarKind},
     thesaurus::TypeRelation,
     type_check::{ena_inference::Strength, hir_build::NodeInfo, TypeError},
     typed_hir::{Meta, TypedHirData},
@@ -99,14 +99,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             ReprKind::Struct | ReprKind::Unit => match property_set {
                 Some(property_set) => {
                     let mut match_attributes = IndexMap::new();
-                    self.collect_match_attributes(property_set, &mut match_attributes);
+                    self.collect_named_match_attributes(property_set, &mut match_attributes);
                     self.collect_membership_match_attributes(type_def_id, &mut match_attributes);
 
                     self.build_struct_node(
+                        (type_def_id, actual_struct_flags),
                         pattern_attrs,
                         hir_meta,
                         match_attributes,
-                        actual_struct_flags,
                         span,
                         ctx,
                     )
@@ -122,31 +122,32 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let mut match_attributes = IndexMap::new();
 
                 if let Some(property_set) = property_set {
-                    self.collect_match_attributes(property_set, &mut match_attributes);
+                    self.collect_named_match_attributes(property_set, &mut match_attributes);
                 }
 
                 for (member_def_id, _) in members {
                     if let Some(property_set) =
                         self.relations.properties_table_by_def_id(*member_def_id)
                     {
-                        self.collect_match_attributes(property_set, &mut match_attributes);
+                        self.collect_named_match_attributes(property_set, &mut match_attributes);
                     }
                 }
 
                 self.collect_membership_match_attributes(type_def_id, &mut match_attributes);
 
                 self.build_struct_node(
+                    (type_def_id, actual_struct_flags),
                     pattern_attrs,
                     hir_meta,
                     match_attributes,
-                    actual_struct_flags,
                     span,
                     ctx,
                 )
             }
-            ReprKind::Scalar(..) => {
+            ReprKind::Scalar(scalar_def_id, scalar_kind, _) => {
                 let mut attributes = pattern_attrs.iter();
-                match attributes.next() {
+
+                let inner_node = match attributes.next() {
                     Some(CompoundPatternAttr {
                         key: (attr_def_id, _),
                         bind_option: _,
@@ -154,26 +155,39 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }) if is_unit_binding => {
                         assert!(*attr_def_id == DefId::unit());
 
-                        let inner_node = self.build_node(
+                        self.build_node(
                             val,
                             NodeInfo {
                                 expected_ty: Some((ty, Strength::Strong)),
                                 parent_struct_flags,
                             },
                             ctx,
-                        );
-
-                        if ctx.hir_arena[inner_node].ty() != ty {
-                            // The type of the inner node could be a built-in scalar (e.g. i64)
-                            // as a result of being the value of a mathematical expression.
-                            // But at the "unpack-level" here we need the type to be some domain-specific alias.
-                            // So generate a `(map inner)` to type-pun the result.
-                            ctx.mk_node(ontol_hir::Kind::Map(inner_node), Meta { ty, span })
-                        } else {
-                            inner_node
-                        }
+                        )
                     }
-                    _ => self.error_node(CompileError::ExpectedPatternAttribute, &span, ctx),
+                    _ => match (scalar_kind, self.defs.def_kind(*scalar_def_id)) {
+                        (ReprScalarKind::Text, DefKind::TextLiteral(lit)) => {
+                            // A symbol instantiation:
+                            // Make a text constant with the `ty` DefId
+                            ctx.mk_node(ontol_hir::Kind::Text((*lit).into()), Meta { ty, span })
+                        }
+                        _ => {
+                            return self.error_node(
+                                CompileError::ExpectedPatternAttribute,
+                                &span,
+                                ctx,
+                            );
+                        }
+                    },
+                };
+
+                if ctx.hir_arena[inner_node].ty() != ty {
+                    // The type of the inner node could be a built-in scalar (e.g. i64)
+                    // as a result of being the value of a mathematical expression.
+                    // But at the "unpack-level" here we need the type to be some domain-specific alias.
+                    // So generate a `(map inner)` to type-pun the result.
+                    ctx.mk_node(ontol_hir::Kind::Map(inner_node), Meta { ty, span })
+                } else {
+                    inner_node
                 }
             }
             ReprKind::Union(_) | ReprKind::StructUnion(_) => {
@@ -185,7 +199,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     /// The written attribute patterns should match against
     /// the relations defined on the type. Compute `MatchAttributes`:
-    fn collect_match_attributes(
+    fn collect_named_match_attributes(
         &self,
         property_set: &IndexMap<PropertyId, Property>,
         match_attributes: &mut IndexMap<&'m str, MatchAttribute>,
@@ -212,7 +226,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
             if matches!(is.rel, TypeRelation::SubVariant) {
                 if let Some(property_set) = self.relations.properties_table_by_def_id(*mem_def_id) {
-                    self.collect_match_attributes(property_set, match_attributes);
+                    self.collect_named_match_attributes(property_set, match_attributes);
                 }
             }
         }
@@ -253,10 +267,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn build_struct_node(
         &mut self,
+        (type_def_id, actual_struct_flags): (DefId, StructFlags),
         pattern_attrs: &[CompoundPatternAttr],
         hir_meta: Meta<'m>,
         mut match_attributes: IndexMap<&'m str, MatchAttribute>,
-        actual_struct_flags: StructFlags,
         span: SourceSpan,
         ctx: &mut HirBuildCtx<'m>,
     ) -> ontol_hir::Node {
@@ -265,12 +279,45 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let mut hir_props = Vec::with_capacity(pattern_attrs.len());
 
+        let mut special_attributes: IndexMap<BuiltinRelationKind, MatchAttribute> = IndexMap::new();
+
+        if self.relations.identified_by(type_def_id).is_some() {
+            if let Some(order_union_def_id) = self.relations.order_unions.get(&type_def_id) {
+                special_attributes.insert(
+                    BuiltinRelationKind::Order,
+                    MatchAttribute {
+                        property_id: PropertyId::subject(RelationshipId(
+                            self.primitives.relations.order,
+                        )),
+                        cardinality: (PropertyCardinality::Optional, ValueCardinality::One),
+                        rel_params_def: None,
+                        value_def: *order_union_def_id,
+                        mentioned: false,
+                    },
+                );
+            }
+
+            special_attributes.insert(
+                BuiltinRelationKind::Direction,
+                MatchAttribute {
+                    property_id: PropertyId::subject(RelationshipId(
+                        self.primitives.relations.direction,
+                    )),
+                    cardinality: (PropertyCardinality::Optional, ValueCardinality::One),
+                    rel_params_def: None,
+                    value_def: self.primitives.direction_union,
+                    mentioned: false,
+                },
+            );
+        }
+
         // Actually match the written attributes to the match attributes:
         for pattern_attr in pattern_attrs {
             let prop_node = self.build_struct_property_node(
                 struct_binder.hir().var,
                 pattern_attr,
                 &mut match_attributes,
+                &mut special_attributes,
                 actual_struct_flags,
                 ctx,
             );
@@ -304,6 +351,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         struct_binder_var: Var,
         attr: &CompoundPatternAttr,
         match_attributes: &mut IndexMap<&'m str, MatchAttribute>,
+        special_attributes: &mut IndexMap<BuiltinRelationKind, MatchAttribute>,
         actual_struct_flags: StructFlags,
         ctx: &mut HirBuildCtx<'m>,
     ) -> Option<ontol_hir::Node> {
@@ -317,14 +365,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             flags.insert(PropFlags::PAT_OPTIONAL);
         }
 
-        let DefKind::TextLiteral(attr_prop) = self.defs.def_kind(def_id) else {
-            self.error(CompileError::NamedPropertyExpected, &prop_span);
-            return None;
+        let match_attribute = match self.defs.def_kind(def_id) {
+            DefKind::TextLiteral(name) => match_attributes.get_mut(name),
+            DefKind::BuiltinRelType(kind, _) => special_attributes.get_mut(kind),
+            _ => None,
         };
-        let Some(match_attribute) = match_attributes.get_mut(attr_prop) else {
+        let Some(match_attribute) = match_attribute else {
             self.error(CompileError::UnknownProperty, &prop_span);
             return None;
         };
+
         if match_attribute.mentioned {
             // TODO: This is probably allowed in match
             self.error(CompileError::DuplicateProperty, &prop_span);
@@ -333,7 +383,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         match_attribute.mentioned = true;
 
         let rel_params_ty = match match_attribute.rel_params_def {
-            Some(rel_def_id) => self.check_def_sealed(rel_def_id),
+            Some(rel_def_id) => self.check_def(rel_def_id),
             None => &UNIT_TYPE,
         };
 
@@ -341,7 +391,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         match kind {
             CompoundPatternAttrKind::Value { rel, val } => {
-                let value_ty = self.check_def_sealed(match_attribute.value_def);
+                let value_ty = self.check_def(match_attribute.value_def);
                 let rel_node = self.build_rel_node_from_option(
                     rel_params_ty,
                     rel.as_ref(),
@@ -486,7 +536,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 ))
             }
             CompoundPatternAttrKind::SetOperator { operator, elements } => {
-                let value_ty = self.check_def_sealed(match_attribute.value_def);
+                let value_ty = self.check_def(match_attribute.value_def);
                 let set_node = self.build_hir_set_of(
                     elements,
                     rel_params_ty,
@@ -629,7 +679,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 .cloned()
             {
                 // Generate code for default value.
-                let value_ty = self.check_def_sealed(const_def_id);
+                let value_ty = self.check_def(const_def_id);
 
                 let prop_node = {
                     let rel = ctx.mk_unit_node_no_span();
@@ -733,6 +783,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 true
             }
             Some(ReprKind::Unit) => true,
+            Some(ReprKind::Scalar(scalar_def_id, ..)) => matches!(
+                self.defs.def_kind(*scalar_def_id),
+                DefKind::TextLiteral(_) | DefKind::NumberLiteral(_)
+            ),
+            Some(ReprKind::Union(members) | ReprKind::StructUnion(members)) => members
+                .iter()
+                .all(|(def_id, _)| self.check_can_construct_default_inner(*def_id)),
             _ => false,
         }
     }
@@ -740,7 +797,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn check_relations_can_construct_default(&self, def_id: DefId) -> bool {
         if let Some(property_set) = self.relations.properties_table_by_def_id(def_id) {
             let mut match_attributes = Default::default();
-            self.collect_match_attributes(property_set, &mut match_attributes);
+            self.collect_named_match_attributes(property_set, &mut match_attributes);
 
             for (_, match_attribute) in match_attributes {
                 if let (PropertyCardinality::Mandatory, ValueCardinality::One) =

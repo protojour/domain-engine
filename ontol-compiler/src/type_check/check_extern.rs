@@ -98,7 +98,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         pat_ids: [PatId; 2],
         extern_def_id: DefId,
     ) -> TypeRef<'m> {
-        self.check_def_sealed(extern_def_id);
+        self.check_def(extern_def_id);
 
         let first = self.check_arm(pat_ids[0]);
         let second = self.check_arm(pat_ids[1]);
@@ -138,7 +138,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     );
                 }
 
-                self.check_def_sealed(def_id)
+                self.check_def(def_id)
             }
             _ => {
                 self.error(

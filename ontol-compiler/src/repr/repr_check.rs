@@ -10,7 +10,7 @@ use std::collections::hash_map::Entry;
 use fnv::FnvHashSet;
 use indexmap::IndexMap;
 use ontol_runtime::{value::PropertyId, DefId};
-use tracing::trace;
+use tracing::{debug_span, trace};
 
 use crate::{
     def::{Def, DefKind, Defs, LookupRelationshipMeta, RelParams, TypeDefFlags},
@@ -87,6 +87,8 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             // This can happen in case of errors
             return;
         };
+
+        let _entered = debug_span!("repr", id = ?self.root_def_id).entered();
 
         self.state.do_trace = TRACE_BUILTIN || self.root_def_id.package_id() != ONTOL_PKG;
 

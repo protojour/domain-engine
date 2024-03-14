@@ -25,7 +25,6 @@ pub mod check_union;
 pub mod ena_inference;
 pub mod seal;
 
-mod check_entity;
 mod check_extern;
 mod check_map;
 mod check_relationship;
@@ -141,7 +140,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
     }
 
-    fn repr_check<'tc>(&'tc mut self, root_def_id: DefId) -> ReprCheck<'tc, 'm> {
+    pub(crate) fn repr_check<'tc>(&'tc mut self, root_def_id: DefId) -> ReprCheck<'tc, 'm> {
         ReprCheck {
             root_def_id,
             defs: self.defs,

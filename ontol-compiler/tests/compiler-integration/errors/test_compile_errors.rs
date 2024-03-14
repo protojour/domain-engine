@@ -486,19 +486,17 @@ fn error_nonsense_value_generator() {
 }
 
 #[test]
-fn error_test_lazy_seal_by_map() {
+fn can_add_property_after_map() {
     "
     def foo ( rel .'prop': text )
     def bar ( rel .'prop': text )
 
     map(
-        foo( 'prop': prop ),
+        foo( 'prop': prop ), // ERROR missing property `here`// NOTE Consider using `match {}`
         bar( 'prop': prop )
     )
 
-    rel
-        foo // ERROR definition is sealed and cannot be modified
-        'fail': text
+    rel foo 'here': text
     "
     .compile_fail();
 }
@@ -553,6 +551,7 @@ fn error_order() {
 
     def entity (
         rel .'id'|id: (rel .is: text)
+        rel .'field': text
 
         rel .order[
         ]: by_text_bug // ERROR order identifier must be a symbol in this domain
@@ -567,6 +566,15 @@ fn error_order() {
         ]: 42 // ERROR order identifier must be a symbol in this domain
 
         rel .order[ // ERROR order tuple parameters expected
+        ]: by_text
+
+        rel .order[
+            rel .0: 'missing' // ERROR TODO: no such field: `missing`
+        ]: by_text
+
+        rel .order[
+            rel .0: 'field'
+            rel .direction: 'ASC' // ERROR TODO: invalid direction
         ]: by_text
     )
 

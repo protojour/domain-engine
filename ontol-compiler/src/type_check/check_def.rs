@@ -2,7 +2,6 @@ use std::str::FromStr;
 
 use ontol_runtime::{var::VarAllocator, DefId};
 use ordered_float::NotNan;
-use tracing::debug;
 
 use crate::{
     codegen::task::ConstCodegenTask,
@@ -15,20 +14,9 @@ use crate::{
 use super::{ena_inference::Strength, hir_build::NodeInfo, TypeCheck};
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
-    /// Do type check of a type and then seal it.
-    ///
-    /// The type must be complete at the first usage site, e.g. in a map expression.
-    pub fn check_def_sealed(&mut self, def_id: DefId) -> TypeRef<'m> {
-        let ty = self.check_def_shallow(def_id);
-        self.seal_def(def_id);
-        ty
-    }
-
     /// Compute the immediate type of a definition.
-    /// Does not perform deep type check.
-    ///
-    /// This function is called for every definition in a loop.
-    pub fn check_def_shallow(&mut self, def_id: DefId) -> TypeRef<'m> {
+    /// Performs relationship analysis for relationship definitions (rel statements).
+    pub fn check_def(&mut self, def_id: DefId) -> TypeRef<'m> {
         if let Some(type_ref) = self.def_types.table.get(&def_id) {
             return type_ref;
         }
@@ -58,24 +46,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.check_relationship(def_id, relationship, &def.span)
             }
             DefKind::Primitive(kind, _ident) => self.types.intern(Type::Primitive(*kind, def_id)),
-            DefKind::Mapping {
-                arms,
-                var_alloc,
-                ident: _,
-                extern_def_id,
-            } => {
-                if let Some(extern_def_id) = extern_def_id {
-                    self.check_map_extern(def, *arms, *extern_def_id)
-                } else {
-                    match self.check_map(def, var_alloc, *arms) {
-                        Ok(ty) => ty,
-                        Err(error) => {
-                            debug!("Check map error: {error:?}");
-                            self.types.intern(Type::Error)
-                        }
-                    }
-                }
-            }
+            DefKind::Mapping { .. } => self.types.intern(Type::Tautology),
             DefKind::Constant(pat_id) => {
                 let pattern = self.patterns.table.remove(pat_id).unwrap();
                 let ty = match self.expected_constant_types.remove(&def_id) {

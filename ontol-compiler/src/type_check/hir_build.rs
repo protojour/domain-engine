@@ -15,6 +15,7 @@ use crate::{
         SetPatternElement, TypePath,
     },
     primitive::PrimitiveKind,
+    repr::repr_model::ReprKind,
     type_check::{
         ena_inference::{InferValue, Strength},
         hir_build_ctx::{ExplicitVariableArm, PatternVariable},
@@ -140,7 +141,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 },
                 Some((expected_struct_ty @ Type::Anonymous(def_id), _)),
             ) => {
-                let actual_ty = self.check_def_sealed(*def_id);
+                let actual_ty = self.check_def(*def_id);
                 if actual_ty != expected_struct_ty {
                     return self.type_error_node(
                         TypeError::Mismatch(TypeEquation {
@@ -180,7 +181,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         def_id: path_def_id,
                         span,
                     } => {
-                        let struct_ty = self.check_def_sealed(*path_def_id);
+                        let struct_ty = self.check_def(*path_def_id);
                         match struct_ty {
                             Type::Domain(def_id) => {
                                 assert_eq!(*def_id, *path_def_id);
@@ -192,7 +193,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         (struct_ty, *path_def_id)
                     }
                     TypePath::Inferred { def_id } => {
-                        let struct_ty = self.check_def_sealed(*def_id);
+                        let struct_ty = self.check_def(*def_id);
                         // ONTOL syntax (currently) requires that the explicit struct type be specified
                         // when being part of a parent expression (the reason why the expected_ty would be defined)
                         if expected_ty.is_some() {
@@ -222,10 +223,35 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ctx,
                 );
 
+                debug!("built unpacker node! expected_ty: {expected_ty:?}");
+
                 let meta = *ctx.hir_arena[node].meta();
                 match expected_ty {
                     Some((Type::Infer(_), _)) => node,
-                    Some((Type::Domain(_), _)) => node,
+                    Some((expected_ty @ (Type::Domain(def_id) | Type::Anonymous(def_id)), _)) => {
+                        match self.seal_ctx.get_repr_kind(def_id) {
+                            Some(ReprKind::Union(members) | ReprKind::StructUnion(members)) => {
+                                let hir_def_id = meta.ty.get_single_def_id().unwrap();
+
+                                if members
+                                    .iter()
+                                    .any(|(member_def_id, _)| *member_def_id == hir_def_id)
+                                {
+                                    node
+                                } else {
+                                    self.type_error_node(
+                                        TypeError::Mismatch(TypeEquation {
+                                            actual: (meta.ty, Strength::Strong),
+                                            expected: (expected_ty, Strength::Strong),
+                                        }),
+                                        &pattern.span,
+                                        ctx,
+                                    )
+                                }
+                            }
+                            _ => node,
+                        }
+                    }
                     Some((Type::Option(Type::Domain(_)), _)) => {
                         *ctx.hir_arena[node].meta_mut() = Meta {
                             ty: self.types.intern(Type::Option(meta.ty)),
@@ -305,7 +331,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                     None => {
                         let val_ty = val_type_def
-                            .map(|def_id| self.check_def_sealed(def_id))
+                            .map(|def_id| self.check_def(def_id))
                             .unwrap_or_else(|| {
                                 let val_pat_id = self.patterns.alloc_pat_id();
                                 let val_ty = self.types.intern(Type::Infer(

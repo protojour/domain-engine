@@ -11,6 +11,7 @@ pub mod debug;
 pub mod format_utils;
 pub mod interface;
 pub mod ontology;
+pub mod order;
 pub mod resolve_path;
 pub mod select;
 pub mod sequence;

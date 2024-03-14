@@ -67,6 +67,7 @@ pub mod source;
 mod codegen;
 mod compiler_queries;
 mod def;
+mod entity;
 mod interface;
 mod lowering;
 mod map;
@@ -207,20 +208,20 @@ impl<'m> Compiler<'m> {
         for def_id in lowered.root_defs {
             if lowered.map_defs.contains(&def_id) {
                 if let Some(inference_info) = self.check_map_arm_def_inference(def_id) {
-                    self.type_check().check_def_sealed(inference_info.source.1);
+                    self.type_check().check_def(inference_info.source.1);
                     let new_defs = self
                         .map_arm_def_inferencer(def_id)
                         .infer_map_arm_type(inference_info);
 
                     for def_id in new_defs {
-                        self.type_check().check_def_shallow(def_id);
+                        self.type_check().check_def(def_id);
                     }
 
-                    self.type_check().check_def_sealed(inference_info.target.1);
+                    self.type_check().check_def(inference_info.target.1);
                 }
             }
 
-            self.type_check().check_def_shallow(def_id);
+            self.type_check().check_def(def_id);
         }
 
         self.seal_domain(package.package_id);
@@ -703,18 +704,63 @@ impl<'m> Compiler<'m> {
         self.namespaces.namespaces.keys().copied().collect()
     }
 
-    /// Seal all the types in a single domain.
+    /// Do all the (remaining) checks and generations for the package/domain and seal it
+    /// Initial check_def must be done before this
     fn seal_domain(&mut self, package_id: PackageId) {
         debug!("seal {package_id:?}");
 
-        let iterator = self.defs.iter_package_def_ids(package_id);
-        let mut type_check = self.type_check();
+        {
+            let mut type_check = self.type_check();
 
-        for def_id in iterator {
-            type_check.seal_def(def_id);
+            // pre repr checks
+            for def_id in type_check.defs.iter_package_def_ids(package_id) {
+                if let Some(def) = type_check.defs.table.get(&def_id) {
+                    if let DefKind::Type(_) = &def.kind {
+                        type_check.check_domain_type_pre_repr(def_id, def);
+                    }
+                }
+            }
+
+            // repr checks
+            for def_id in type_check.defs.iter_package_def_ids(package_id) {
+                type_check.repr_check(def_id).check_repr_root();
+            }
+
+            // domain type checks
+            for def_id in type_check.defs.iter_package_def_ids(package_id) {
+                if let Some(def) = type_check.defs.table.get(&def_id) {
+                    if let DefKind::Type(_) = &def.kind {
+                        type_check.check_domain_type_post_repr(def_id, def);
+                    }
+                }
+            }
         }
 
-        self.seal_ctx.mark_domain_sealed(package_id);
+        // entity check
+        // this is not in the TypeCheck context because it may
+        // generate new DefIds
+        for def_id in self.defs.iter_package_def_ids(package_id) {
+            self.check_entity(def_id);
+        }
+
+        {
+            let mut type_check = self.type_check();
+
+            // union and extern checks
+            for def_id in type_check.defs.iter_package_def_ids(package_id) {
+                match type_check.seal_ctx.get_repr_kind(&def_id) {
+                    Some(ReprKind::Union(_) | ReprKind::StructUnion(_)) => {
+                        for error in type_check.check_union(def_id) {
+                            type_check.errors.push(error);
+                        }
+                    }
+                    Some(ReprKind::Extern) => {
+                        type_check.check_extern(def_id, type_check.defs.def_span(def_id));
+                    }
+                    _ => {}
+                }
+            }
+        }
 
         // Various cleanup/normalization
         for def_id in self.defs.iter_package_def_ids(package_id) {
@@ -737,9 +783,37 @@ impl<'m> Compiler<'m> {
             }
         }
 
-        for def_id in self.defs.iter_package_def_ids(package_id) {
-            self.type_check().check_entity_post_seal(def_id);
+        // check map statements
+        {
+            let mut type_check = self.type_check();
+            for def_id in type_check.defs.iter_package_def_ids(package_id) {
+                let Some(def) = type_check.defs.table.get(&def_id) else {
+                    // Can happen in error cases
+                    continue;
+                };
+
+                if let DefKind::Mapping {
+                    ident: _,
+                    arms,
+                    var_alloc,
+                    extern_def_id,
+                } = &def.kind
+                {
+                    if let Some(extern_def_id) = extern_def_id {
+                        type_check.check_map_extern(def, *arms, *extern_def_id);
+                    } else {
+                        match type_check.check_map(def, var_alloc, *arms) {
+                            Ok(_) => {}
+                            Err(error) => {
+                                debug!("Check map error: {error:?}");
+                            }
+                        }
+                    }
+                }
+            }
         }
+
+        self.seal_ctx.mark_domain_sealed(package_id);
     }
 
     fn unique_domain_names(&self) -> FnvHashMap<PackageId, TextConstant> {

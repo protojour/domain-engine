@@ -461,3 +461,53 @@ fn test_map_match_in_sub_multi_edge() {
             );
     });
 }
+
+#[test]
+fn test_map_with_order() {
+    r#"
+    def foo (
+        rel .'key'|id: (rel .is: text)
+        rel .'field': text
+        rel .order[
+            rel .0: 'field'
+            rel .direction: descending
+        ]: by_field
+    )
+    def @symbol by_field ()
+
+    map foos(
+        (),
+        foo {
+            ..@match foo(
+                order: by_field(),
+                direction: descending()
+            )
+        }
+    )
+    "#
+    .compile_then(|test| {
+        let [foo] = test.bind(["foo"]);
+        let foo_json = json!({ "key": "k", "field": "x" });
+        test.mapper()
+            .with_mock_yielder(
+                YielderMock::yield_match
+                    .next_call(matching!(
+                        eq!(&ValueCardinality::Many),
+                        // FIXME: `order` and `direction` are not conditions!
+                        eq!(&Literal(indoc! { r#"
+                            (root $a)
+                            (is-entity $a def@1:1)
+                            (match-prop $a S:0:25 (element-in $b))
+                            (match-prop $a S:0:26 (element-in $c))
+                            (member $b (_ 'by_field'))
+                            (member $c (_ 'descending'))
+                        "#
+                        }))
+                    ))
+                    .returns(Value::sequence_of([foo
+                        .value_builder(foo_json.clone())
+                        .into()])),
+            )
+            .assert_named_forward_map("foos", json!({}), json!([foo_json]));
+    });
+}

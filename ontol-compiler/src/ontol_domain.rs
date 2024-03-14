@@ -148,8 +148,22 @@ impl<'m> Compiler<'m> {
             Type::ValueGenerator,
         );
 
+        // union setup
+        {
+            let symbols = &self.primitives.symbols;
+
+            for direction in [symbols.ascending, symbols.descending] {
+                self.thesaurus.insert_domain_is(
+                    self.primitives.direction_union,
+                    TypeRelation::SubVariant,
+                    direction,
+                    NO_SPAN,
+                );
+            }
+        }
+
         for def_id in self.defs.iter_package_def_ids(ONTOL_PKG) {
-            self.type_check().check_def_sealed(def_id);
+            self.type_check().check_def(def_id);
         }
 
         self.seal_domain(ONTOL_PKG);

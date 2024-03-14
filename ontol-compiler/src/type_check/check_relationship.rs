@@ -36,7 +36,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.check_builtin_relation(relationship_id, relationship, kind, span);
             }
             DefKind::FmtTransition(def_id, final_state) => {
-                self.check_def_shallow(*def_id);
+                self.check_def(*def_id);
                 self.check_fmt_relation(relationship_id, relationship, *def_id, final_state, span);
             }
             _ => {
@@ -57,8 +57,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let subject = &relationship.subject;
         let object = &relationship.object;
 
-        let subject_ty = self.check_def_shallow(subject.0);
-        let object_ty = self.check_def_shallow(object.0);
+        let subject_ty = self.check_def(subject.0);
+        let object_ty = self.check_def(object.0);
 
         self.check_subject_data_type(subject_ty, &subject.1);
         self.check_object_data_type(object_ty, &object.1);
@@ -135,8 +135,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         match relation {
             BuiltinRelationKind::Is => {
-                let subject_ty = self.check_def_shallow(subject.0);
-                let object_ty = self.check_def_shallow(object.0);
+                let subject_ty = self.check_def(subject.0);
+                let object_ty = self.check_def(object.0);
 
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
@@ -159,8 +159,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 object_ty
             }
             BuiltinRelationKind::Identifies => {
-                let subject_ty = self.check_def_shallow(subject.0);
-                let object_ty = self.check_def_shallow(object.0);
+                let subject_ty = self.check_def(subject.0);
+                let object_ty = self.check_def(object.0);
 
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
@@ -192,8 +192,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 panic!("This should not have been lowered");
             }
             BuiltinRelationKind::Indexed => {
-                let subject_ty = self.check_def_shallow(subject.0);
-                let object_ty = self.check_def_shallow(object.0);
+                let subject_ty = self.check_def(subject.0);
+                let object_ty = self.check_def(object.0);
 
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
@@ -226,7 +226,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 object_ty
             }
             BuiltinRelationKind::Default => {
-                let _subject_ty = self.check_def_shallow(subject.0);
+                let _subject_ty = self.check_def(subject.0);
                 let subject_def_kind = self.defs.def_kind(subject.0);
 
                 let DefKind::Type(TypeDef {
@@ -262,7 +262,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 // just copy the type, type check done later
                 self.expected_constant_types.insert(object.0, object_ty);
 
-                let _object_ty = self.check_def_shallow(object.0);
+                let _object_ty = self.check_def(object.0);
 
                 self.relations
                     .default_const_objects
@@ -271,8 +271,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 object_ty
             }
             BuiltinRelationKind::Gen => {
-                let _subject_ty = self.check_def_shallow(subject.0);
-                let object_ty = self.check_def_shallow(object.0);
+                let _subject_ty = self.check_def(subject.0);
+                let object_ty = self.check_def(object.0);
 
                 let subject_def_kind = self.defs.def_kind(subject.0);
 
@@ -318,8 +318,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 object_ty
             }
             BuiltinRelationKind::Min | BuiltinRelationKind::Max | BuiltinRelationKind::Example => {
-                let subject_ty = self.check_def_shallow(subject.0);
-                let _ = self.check_def_shallow(object.0);
+                let subject_ty = self.check_def(subject.0);
+                let _ = self.check_def(object.0);
 
                 self.relations
                     .type_params
@@ -337,8 +337,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 subject_ty
             }
             BuiltinRelationKind::Order => {
-                let subject_ty = self.check_def_shallow(subject.0);
-                let object_ty = self.check_def_shallow(object.0);
+                let subject_ty = self.check_def(subject.0);
+                let object_ty = self.check_def(object.0);
 
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
@@ -353,8 +353,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 object_ty
             }
             BuiltinRelationKind::Direction => {
-                let _subject_ty = self.check_def_shallow(subject.0);
-                let object_ty = self.check_def_shallow(object.0);
+                let _subject_ty = self.check_def(subject.0);
+                let object_ty = self.check_def(object.0);
+
+                if self
+                    .relations
+                    .direction_relationships
+                    .insert(subject.0, (relationship_id, object.0))
+                    .is_some()
+                {
+                    return self.error(
+                        CompileError::TODO(smart_format!("duplicate `direction` relationship")),
+                        span,
+                    );
+                }
 
                 object_ty
             }
@@ -372,8 +384,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let subject = &relationship.subject;
         let object = &relationship.object;
 
-        let subject_ty = self.check_def_shallow(subject.0);
-        let object_ty = self.check_def_shallow(object.0);
+        let subject_ty = self.check_def(subject.0);
+        let object_ty = self.check_def(object.0);
 
         match subject_ty {
             Type::TextConstant(subject_def_id) if *subject_def_id == self.primitives.empty_text => {
