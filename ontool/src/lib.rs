@@ -221,10 +221,9 @@ pub async fn run() -> Result<(), OntoolError> {
                 let reload_tx = reload_tx.clone();
                 async move {
                     const SERVER_SOCKET_ADDR: &str = "0.0.0.0:5000";
-                    let detach = Detach { router: app };
 
                     let outer_router: axum::Router = axum::Router::new()
-                        .nest_service("/d", detach)
+                        .nest_service("/d", Detach { router: app })
                         .route("/ws", get(|socket| ws_upgrade_handler(socket, reload_tx)));
                     info!("Binding server to {SERVER_SOCKET_ADDR}");
                     let _ = axum::Server::bind(&SERVER_SOCKET_ADDR.parse().unwrap())
