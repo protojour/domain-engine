@@ -223,7 +223,7 @@ pub async fn run() -> Result<(), OntoolError> {
                     const SERVER_SOCKET_ADDR: &str = "0.0.0.0:5000";
                     let detach = Detach { router: app };
 
-                    let mut outer_router: axum::Router = axum::Router::new()
+                    let outer_router: axum::Router = axum::Router::new()
                         .nest_service("/d", detach)
                         .route("/ws", get(|socket| ws_upgrade_handler(socket, reload_tx)));
                     info!("Binding server to {SERVER_SOCKET_ADDR}");
