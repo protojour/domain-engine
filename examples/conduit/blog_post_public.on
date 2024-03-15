@@ -2,6 +2,7 @@ use 'conduit_db' as db
 
 def BlogPost (
     rel .'post_id'|id: (rel .is: uuid)
+    rel .'name': text
     rel .'contents': text
     rel .'written_by': text
     rel .'tags': {text}
@@ -11,6 +12,7 @@ map(
     @match db.Article(
         'article_id'?: id,
         'body': body,
+        'title': title,
         'author': db.User(
             'username': author
         ),
@@ -20,6 +22,7 @@ map(
     ),
     BlogPost(
         'post_id'?: id,
+        'name': title,
         'contents': body,
         'written_by': author,
         'tags': {..tag},
@@ -34,7 +37,8 @@ map posts(
         ..@match db.Article(
             'author': @match db.User(
                 'username'?: by
-            )
+            ),
+            order: db.by_date()
         )
     }
 )

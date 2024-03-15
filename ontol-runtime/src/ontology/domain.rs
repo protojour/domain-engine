@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     interface::serde::operator::SerdeOperatorAddr,
     property::{Cardinality, PropertyId, Role},
+    query::order::Direction,
     DefId, RelationshipId,
 };
 
@@ -145,17 +146,6 @@ pub struct EntityInfo {
     pub id_value_generator: Option<ValueGenerator>,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct ExtendedEntityInfo {
-    /// The `order` definitions on the entity.
-    pub order_table: FnvHashMap<DefId, EntityOrder>,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct EntityOrder {
-    pub fields: Box<[PropertyId]>,
-}
-
 #[derive(Clone, Serialize, Deserialize, OntolDebug)]
 pub struct DataRelationshipInfo {
     pub kind: DataRelationshipKind,
@@ -205,3 +195,20 @@ pub enum DataRelationshipTarget {
     /// The union's variants are accessed using [Ontology::union_variants].
     Union(DefId),
 }
+
+#[derive(Clone, Default, Serialize, Deserialize)]
+pub struct ExtendedEntityInfo {
+    pub order_union: Option<DefId>,
+
+    /// The `order` definitions on the entity.
+    pub order_table: FnvHashMap<DefId, EntityOrder>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct EntityOrder {
+    pub tuple: Box<[FieldPath]>,
+    pub direction: Direction,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct FieldPath(pub Box<[PropertyId]>);

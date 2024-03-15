@@ -1,11 +1,9 @@
-use ontol_runtime::DefId;
+use ontol_runtime::{ontology::domain::ExtendedEntityInfo, DefId};
 
 use crate::{
     def::{DefKind, LookupRelationshipMeta, TypeDef, TypeDefFlags},
     CompileError, Compiler,
 };
-
-use super::Entity;
 
 impl<'m> Compiler<'m> {
     /// Check entity-related relationships.
@@ -19,7 +17,7 @@ impl<'m> Compiler<'m> {
 
         let is_entity = identified_by.is_some();
 
-        let mut entity = Entity { order_union: None };
+        let mut info = ExtendedEntityInfo::default();
 
         if let Some(order_rels) = self.relations.order_relationships.remove(&def_id) {
             if !is_entity {
@@ -43,19 +41,23 @@ impl<'m> Compiler<'m> {
                 );
 
                 for order_rel in order_rels {
-                    self.check_order(def_id, order_rel, order_union);
+                    if let Some((order_def_id, entity_order)) =
+                        self.check_order(def_id, order_rel, order_union)
+                    {
+                        info.order_table.insert(order_def_id, entity_order);
+                    }
                 }
 
                 // This type is introduced very late, after the main repr check.
                 // But before the union check!
                 self.type_check().repr_check(order_union).check_repr_root();
 
-                entity.order_union = Some(order_union);
+                info.order_union = Some(order_union);
             }
         }
 
         if is_entity {
-            self.entities.entities.insert(def_id, entity);
+            self.entities.entities.insert(def_id, info);
         }
     }
 }

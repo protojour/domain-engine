@@ -1,7 +1,7 @@
 //! Entity-related compiler checks
 
 use fnv::FnvHashMap;
-use ontol_runtime::DefId;
+use ontol_runtime::{ontology::domain::ExtendedEntityInfo, DefId};
 
 pub mod check_entity;
 
@@ -10,7 +10,7 @@ mod entity_order;
 /// Compiler data structure storing the output of check_entity
 #[derive(Default)]
 pub struct Entities {
-    pub entities: FnvHashMap<DefId, Entity>,
+    pub entities: FnvHashMap<DefId, ExtendedEntityInfo>,
 }
 
 impl Entities {
@@ -19,9 +19,4 @@ impl Entities {
             .get(def_id)
             .and_then(|entity| entity.order_union)
     }
-}
-
-/// Various information about one entity
-pub struct Entity {
-    pub order_union: Option<DefId>,
 }

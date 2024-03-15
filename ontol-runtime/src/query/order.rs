@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Debug)]
@@ -7,6 +9,14 @@ pub enum Direction {
 }
 
 impl Direction {
+    /// Re-order an [Ordering] by this direction
+    pub fn reorder(self, ordering: Ordering) -> Ordering {
+        match self {
+            Self::Ascending => ordering,
+            Self::Descending => ordering.reverse(),
+        }
+    }
+
     /// Chain two directions.
     ///
     /// for example, applying descending twice leads to ascending order.

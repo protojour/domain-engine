@@ -25,6 +25,14 @@ impl Filter {
         &self.condition
     }
 
+    pub fn order(&self) -> Option<&Value> {
+        self.order.as_ref()
+    }
+
+    pub fn direction(&self) -> Direction {
+        self.direction.unwrap_or(Direction::Ascending)
+    }
+
     pub fn condition_mut(&mut self) -> &mut Condition {
         &mut self.condition
     }

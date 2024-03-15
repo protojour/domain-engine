@@ -264,12 +264,12 @@ impl ConduitBundle {
         self.domain_engine.clone().into()
     }
 
-    async fn create_db_article_for_teh_user(&self) -> String {
+    async fn create_db_article_for_teh_user(&self, title: &str) -> String {
         // Insert using the data store domain directly:
-        let response = r#"mutation {
+        let response = r#"mutation new_article($title: String!) {
             Article(create: [{
                 slug: "the-slug",
-                title: "The title",
+                title: $title,
                 description: "An article",
                 body: "THE BODY",
                 author: {
@@ -281,7 +281,11 @@ impl ConduitBundle {
                 node { article_id }
             }
         }"#
-        .exec([], &self.db_schema, &self.ctx())
+        .exec(
+            [("title".to_owned(), InputValue::Scalar(title.into()))],
+            &self.db_schema,
+            &self.ctx(),
+        )
         .await
         .unwrap();
 
@@ -328,7 +332,7 @@ impl ConduitBundle {
 #[test(tokio::test)]
 async fn test_graphql_blog_post_conduit_implicit_join() {
     let test = ConduitBundle::new(mock_current_time_monotonic()).await;
-    test.create_db_article_for_teh_user().await;
+    test.create_db_article_for_teh_user("The title").await;
 
     expect_eq!(
         actual = r#"{
@@ -380,7 +384,7 @@ async fn test_graphql_blog_post_conduit_implicit_join() {
 async fn test_graphql_blog_post_conduit_paginated() {
     let test = ConduitBundle::new(mock_current_time_monotonic()).await;
     for _ in 0..3 {
-        test.create_db_article_for_teh_user().await;
+        test.create_db_article_for_teh_user("The title").await;
     }
 
     let mut prev_end_cursor: Option<InputValue<GqlScalar>> = None;
@@ -462,7 +466,7 @@ async fn test_graphql_blog_post_conduit_tags() {
 #[test(tokio::test)]
 async fn test_graphql_blog_post_conduit_no_join_real() {
     let test = ConduitBundle::new(mock_current_time_monotonic()).await;
-    test.create_db_article_for_teh_user().await;
+    test.create_db_article_for_teh_user("The title").await;
 
     expect_eq!(
         actual = "{
@@ -484,6 +488,29 @@ async fn test_graphql_blog_post_conduit_no_join_real() {
                             "contents": "THE BODY",
                         }
                     }
+                ]
+            }
+        })),
+    );
+}
+
+#[test(tokio::test)]
+async fn test_graphql_blog_post_conduit_order() {
+    let test = ConduitBundle::new(mock_current_time_monotonic()).await;
+    test.create_db_article_for_teh_user("Oldest").await;
+    test.create_db_article_for_teh_user("Middle").await;
+    test.create_db_article_for_teh_user("Newest").await;
+
+    expect_eq!(
+        actual = "{ posts { nodes { name } } }"
+            .exec([], &test.blog_schema, &test.ctx())
+            .await,
+        expected = Ok(graphql_value!({
+            "posts": {
+                "nodes": [
+                    { "name": "Newest" },
+                    { "name": "Middle" },
+                    { "name": "Oldest" },
                 ]
             }
         })),
@@ -689,7 +716,7 @@ async fn test_graphql_conduit_db_user_deletion() {
 #[test(tokio::test)]
 async fn test_graphql_blog_post_conduit_update_body_create_comment() {
     let test = ConduitBundle::new(mock_current_time_monotonic()).await;
-    let article_id = test.create_db_article_for_teh_user().await;
+    let article_id = test.create_db_article_for_teh_user("The title").await;
 
     expect_eq!(
         actual = format!(
@@ -756,7 +783,7 @@ async fn test_graphql_blog_post_conduit_update_body_create_comment() {
 #[test(tokio::test)]
 async fn test_graphql_blog_post_conduit_delete() {
     let test = ConduitBundle::new(mock_current_time_monotonic()).await;
-    let article_id = test.create_db_article_for_teh_user().await;
+    let article_id = test.create_db_article_for_teh_user("The title").await;
 
     expect_eq!(
         actual = format!(
@@ -806,7 +833,7 @@ async fn test_graphql_conduit_feed_public_no_query_selection() {
     .await;
 
     // create the article
-    test.create_db_article_for_teh_user().await;
+    test.create_db_article_for_teh_user("The title").await;
 
     expect_eq!(
         actual = format!(
@@ -856,7 +883,7 @@ async fn test_graphql_conduit_feed_public_with_items_query() {
     ))
     .await;
 
-    test.create_db_article_for_teh_user().await;
+    test.create_db_article_for_teh_user("The title").await;
 
     expect_eq!(
         actual = format!(

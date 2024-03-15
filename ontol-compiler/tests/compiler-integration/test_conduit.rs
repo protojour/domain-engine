@@ -44,6 +44,7 @@ fn test_map_conduit_blog_post() {
         }),
         json!({
             "post_id": "11111111-1111-1111-1111-111111111111",
+            "name": "t",
             "contents": "THE BODY",
             "written_by": "some_user",
             "tags": ["foobar"]
@@ -74,6 +75,7 @@ fn test_map_conduit_no_tags_in_db_object() {
         }),
         json!({
             "post_id": "11111111-1111-1111-1111-111111111111",
+            "name": "t",
             "contents": "THE BODY",
             "written_by": "some_user",
             "tags": []
@@ -103,11 +105,12 @@ fn test_map_match_conduit_blog_post_cond_clauses() {
                     eq!(&Literal(indoc! { r#"
                         (root $a)
                         (is-entity $a def@2:5)
-                        (match-prop $a S:2:55 (element-in $c))
+                        (match-prop $a S:2:66 (element-in $c))
                         (is-entity $b def@2:4)
-                        (match-prop $b S:2:15 (element-in $d))
+                        (match-prop $b S:2:19 (element-in $d))
                         (member $c (_ $b))
                         (member $d (_ 'someone'))
+                        (order 'by_date')
                     "#
                     }))
                 ))
@@ -118,6 +121,7 @@ fn test_map_match_conduit_blog_post_cond_clauses() {
             json!({ "written_by": "someone", }),
             json!([{
                 "post_id": "11111111-1111-1111-1111-111111111111",
+                "name": "t",
                 "contents": "b",
                 "tags": [],
                 "written_by": "u",
@@ -147,11 +151,12 @@ fn test_conduit_feed_public() {
                     eq!(&Literal(indoc! { r#"
                         (root $a)
                         (is-entity $a def@2:5)
-                        (match-prop $a S:2:55 (element-in $c))
+                        (match-prop $a S:2:66 (element-in $c))
                         (is-entity $b def@2:4)
-                        (match-prop $b S:2:15 (element-in $d))
+                        (match-prop $b S:2:19 (element-in $d))
                         (member $c (_ $b))
                         (member $d (_ 'foobar'))
+                        (order 'by_date')
                     "#
                     }))
                 ))

@@ -27,7 +27,7 @@ use crate::{
 use self::{
     builder::OntologyBuilder,
     config::PackageConfig,
-    domain::{Domain, TypeInfo},
+    domain::{Domain, ExtendedEntityInfo, TypeInfo},
     map::{Extern, MapMeta, PropertyFlow},
     ontol::{
         text_pattern::TextPattern, OntolDomainMeta, TextConstant, TextLikeType, ValueGenerator,
@@ -57,6 +57,7 @@ pub struct Ontology {
     text_constants: Vec<ArcStr>,
 
     domain_table: FnvHashMap<PackageId, Domain>,
+    extended_entity_table: FnvHashMap<DefId, ExtendedEntityInfo>,
     union_variants: FnvHashMap<DefId, Box<[DefId]>>,
     domain_interfaces: FnvHashMap<PackageId, Vec<DomainInterface>>,
     package_config_table: FnvHashMap<PackageId, PackageConfig>,
@@ -136,6 +137,10 @@ impl Ontology {
             .get(&union_def_id)
             .map(|slice| slice.as_ref())
             .unwrap_or(&[])
+    }
+
+    pub fn extended_entity_info(&self, def_id: DefId) -> Option<&ExtendedEntityInfo> {
+        self.extended_entity_table.get(&def_id)
     }
 
     pub fn get_package_config(&self, package_id: PackageId) -> Option<&PackageConfig> {

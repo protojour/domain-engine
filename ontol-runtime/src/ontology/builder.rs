@@ -13,7 +13,7 @@ use crate::{
 
 use super::{
     config::PackageConfig,
-    domain::Domain,
+    domain::{Domain, ExtendedEntityInfo},
     map::{Extern, MapMeta, PropertyFlow},
     ontol::{
         text_pattern::TextPattern, OntolDomainMeta, TextConstant, TextLikeType, ValueGenerator,
@@ -43,6 +43,11 @@ impl OntologyBuilder {
 
     pub fn union_variants(mut self, table: FnvHashMap<DefId, Box<[DefId]>>) -> Self {
         self.ontology.union_variants = table;
+        self
+    }
+
+    pub fn extended_entity_info(mut self, table: FnvHashMap<DefId, ExtendedEntityInfo>) -> Self {
+        self.ontology.extended_entity_table = table;
         self
     }
 
@@ -147,6 +152,7 @@ pub(super) fn new_builder() -> OntologyBuilder {
             extern_table: Default::default(),
             ontol_domain_meta: Default::default(),
             domain_table: Default::default(),
+            extended_entity_table: Default::default(),
             union_variants: Default::default(),
             domain_interfaces: Default::default(),
             package_config_table: Default::default(),

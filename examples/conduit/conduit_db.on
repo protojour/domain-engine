@@ -29,6 +29,12 @@ def Article (
     rel .'body': text
     rel .'created_at'[rel .gen: create_time]: datetime
     rel .'updated_at'[rel .gen: update_time]: datetime
+
+    rel .order[rel .0: 'title']: alphabetical
+    rel .order[
+        rel .0: 'created_at'
+        rel .direction: descending
+    ]: by_date
 )
 
 def Comment (
@@ -47,6 +53,9 @@ rel Article 'favorited_by'::'favorited'? {User}
 rel {TagEntity} 'tagged'::'tags' {Article}
 rel {Comment} 'comment_on'::'comments'? Article
 rel {Comment} 'author'::'authored_comments'? User
+
+def @symbol by_date ()
+def @symbol alphabetical ()
 
 map users(
     (),

@@ -23,6 +23,7 @@ mod core;
 // mod filter;
 mod filter;
 mod query;
+mod sort;
 mod write;
 
 pub struct InMemoryDb {

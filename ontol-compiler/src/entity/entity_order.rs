@@ -1,4 +1,9 @@
-use ontol_runtime::{query::order::Direction, smart_format, DefId, RelationshipId};
+use ontol_runtime::{
+    ontology::domain::{EntityOrder, FieldPath},
+    property::PropertyId,
+    query::order::Direction,
+    smart_format, DefId, RelationshipId,
+};
 use tracing::{debug, info};
 
 use crate::{
@@ -17,7 +22,7 @@ impl<'m> Compiler<'m> {
         entity_def_id: DefId,
         order_relationship: RelationshipId,
         order_union: DefId,
-    ) {
+    ) -> Option<(DefId, EntityOrder)> {
         let package_id = entity_def_id.package_id();
         let meta = self.defs.relationship_meta(order_relationship);
         let object = meta.relationship.object;
@@ -30,30 +35,33 @@ impl<'m> Compiler<'m> {
                 {
                     self.errors
                         .error(CompileError::EntityOrderMustBeSymbolInThisDomain, &object.1);
-                    return;
+                    return None;
                 }
             }
             _other => {
                 self.errors
                     .error(CompileError::EntityOrderMustBeSymbolInThisDomain, &object.1);
-                return;
+                return None;
             }
         }
 
-        match meta.relationship.rel_params {
+        let entity_order = match meta.relationship.rel_params {
             RelParams::Type(params_def_id) => {
-                self.check_order_params(entity_def_id, params_def_id, *meta.relationship.span);
+                self.check_order_params(entity_def_id, params_def_id, *meta.relationship.span)?
             }
             _ => {
                 self.errors.error(
                     CompileError::EntityOrderMustSpecifyParameters,
                     meta.relationship.span,
                 );
+                return None;
             }
-        }
+        };
 
         self.thesaurus
             .insert_domain_is(order_union, TypeRelation::SubVariant, object.0, rel_span);
+
+        Some((object.0, entity_order))
     }
 
     fn check_order_params(
@@ -61,18 +69,18 @@ impl<'m> Compiler<'m> {
         entity_def_id: DefId,
         params_def_id: DefId,
         rel_span: SourceSpan,
-    ) {
+    ) -> Option<EntityOrder> {
         let Some(properties) = self.relations.properties_by_def_id(params_def_id) else {
             self.errors
                 .error(CompileError::EntityOrderMustSpecifyParameters, &rel_span);
-            return;
+            return None;
         };
         let Constructor::Sequence(sequence) = &properties.constructor else {
             self.errors.error(
                 CompileError::TODO("must specify a tuple of fields".into()),
                 &rel_span,
             );
-            return;
+            return None;
         };
 
         if sequence.is_infinite() {
@@ -80,10 +88,10 @@ impl<'m> Compiler<'m> {
                 CompileError::TODO("order tuple sequence must be finite".into()),
                 &rel_span,
             );
-            return;
+            return None;
         }
 
-        let mut fields: Vec<Vec<RelationshipId>> = vec![];
+        let mut tuple: Vec<FieldPath> = vec![];
 
         for (_index, relationship) in sequence.elements() {
             let Some(relationship_id) = relationship else {
@@ -101,8 +109,8 @@ impl<'m> Compiler<'m> {
                         // self.defs.def_span(meta.relationship.sp),
                         entity_def_id,
                     ) {
-                        Ok(relationships) => {
-                            fields.push(relationships);
+                        Ok(path) => {
+                            tuple.push(path);
                         }
                         Err(errors) => {
                             self.errors.extend(errors);
@@ -128,13 +136,18 @@ impl<'m> Compiler<'m> {
                     let span = self.defs.def_span(rel_id.0);
                     self.errors
                         .error(CompileError::TODO("invalid direction".into()), &span);
-                    return;
+                    return None;
                 }
             }
             None => Direction::Ascending,
         };
 
-        info!("ordering: {fields:?} {direction:?}");
+        info!("ordering: {tuple:?} {direction:?}");
+
+        Some(EntityOrder {
+            tuple: tuple.into(),
+            direction,
+        })
     }
 
     fn parse_order_field(
@@ -142,12 +155,12 @@ impl<'m> Compiler<'m> {
         field: &str,
         field_span: SourceSpan,
         mut def_id: DefId,
-    ) -> Result<Vec<RelationshipId>, CompileErrors> {
-        let mut output: Vec<RelationshipId> = vec![];
+    ) -> Result<FieldPath, CompileErrors> {
+        let mut output: Vec<PropertyId> = vec![];
         let mut errors = CompileErrors::default();
 
         for field_segment in field.split('.') {
-            let Ok((relationship_id, next_def_id)) = self.lookup_order_field(def_id, field_segment)
+            let Ok((property_id, next_def_id)) = self.lookup_order_field(def_id, field_segment)
             else {
                 errors.error(
                     CompileError::TODO(smart_format!("no such field: `{field_segment}`")),
@@ -156,12 +169,12 @@ impl<'m> Compiler<'m> {
                 break;
             };
 
-            output.push(relationship_id);
+            output.push(property_id);
             def_id = next_def_id;
         }
 
         if errors.errors.is_empty() {
-            Ok(output)
+            Ok(FieldPath(output.into()))
         } else {
             Err(errors)
         }
@@ -171,7 +184,7 @@ impl<'m> Compiler<'m> {
         &self,
         parent_def_id: DefId,
         field_name: &str,
-    ) -> Result<(RelationshipId, DefId), ()> {
+    ) -> Result<(PropertyId, DefId), ()> {
         let Some(literal_def_id) = self.defs.text_literals.get(field_name) else {
             debug!("order field: no text literal for {field_name}");
             return Err(());
@@ -186,7 +199,7 @@ impl<'m> Compiler<'m> {
             let meta = self.defs.relationship_meta(property_id.relationship_id);
 
             if meta.relationship.relation_def_id == *literal_def_id {
-                return Ok((property_id.relationship_id, meta.relationship.object.0));
+                return Ok((*property_id, meta.relationship.object.0));
             }
         }
 

@@ -474,6 +474,7 @@ impl<'m> Compiler<'m> {
                 direction_relationship: self.primitives.relations.direction,
             })
             .union_variants(ontology_union_variants)
+            .extended_entity_info(self.entities.entities)
             .lib(self.codegen_tasks.result_lib)
             .docs(docs)
             .const_procs(self.codegen_tasks.result_const_procs)

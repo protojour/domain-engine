@@ -49,7 +49,8 @@ map feed(
                 ..@match db.Article(
                     'author': db.User (
                         'username': username,
-                    )
+                    ),
+                    order: db.by_date()
                 )
             }
         )

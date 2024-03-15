@@ -1,4 +1,5 @@
 use std::{
+    cmp::Ordering,
     collections::HashMap,
     fmt::{Debug, Display},
     ops::Index,
@@ -211,6 +212,24 @@ impl PartialEq for Value {
             (Self::ChronoDate(a, _), Self::ChronoDate(b, _)) => a == b,
             (Self::ChronoTime(a, _), Self::ChronoTime(b, _)) => a == b,
             _ => false,
+        }
+    }
+}
+
+impl PartialOrd for Value {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (self, other) {
+            (Self::Unit(_), Self::Unit(_)) => Some(Ordering::Equal),
+            (Self::I64(a, _), Self::I64(b, _)) => Some(a.cmp(b)),
+            (Self::F64(a, _), Self::F64(b, _)) => a.partial_cmp(b),
+            (Self::Rational(a, _), Self::Rational(b, _)) => a.partial_cmp(b),
+            (Self::Text(a, _), Self::Text(b, _)) => Some(a.cmp(b)),
+            (Self::OctetSequence(a, _), Self::OctetSequence(b, _)) => Some(a.cmp(b)),
+            (Self::Serial(a, _), Self::Serial(b, _)) => Some(a.0.cmp(&b.0)),
+            (Self::ChronoDateTime(a, _), Self::ChronoDateTime(b, _)) => Some(a.cmp(b)),
+            (Self::ChronoDate(a, _), Self::ChronoDate(b, _)) => Some(a.cmp(b)),
+            (Self::ChronoTime(a, _), Self::ChronoTime(b, _)) => Some(a.cmp(b)),
+            _ => None,
         }
     }
 }

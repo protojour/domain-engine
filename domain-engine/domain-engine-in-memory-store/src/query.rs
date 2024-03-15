@@ -18,6 +18,7 @@ use domain_engine_core::{DomainError, DomainResult};
 use crate::{
     core::{find_data_relationship, DbContext},
     filter::FilterVal,
+    sort::sort_props_vec,
 };
 
 use super::core::{DynamicKey, EntityKey, InMemoryStore};
@@ -91,6 +92,8 @@ impl InMemoryStore {
             }
             vec
         };
+
+        sort_props_vec(&mut raw_props_vec, struct_select.def_id, filter, ctx)?;
 
         let total_size = raw_props_vec.len();
 
