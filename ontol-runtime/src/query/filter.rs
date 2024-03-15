@@ -14,7 +14,7 @@ use super::{condition::Condition, order::Direction};
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub struct Filter {
     condition: Condition,
-    order: Option<Value>,
+    order: Vec<Value>,
     direction: Option<Direction>,
 }
 
@@ -25,7 +25,7 @@ impl Filter {
         &self.condition
     }
 
-    pub fn order(&self) -> Option<&Value> {
+    pub fn order(&self) -> &[Value] {
         self.order.as_ref()
     }
 
@@ -38,7 +38,10 @@ impl Filter {
     }
 
     pub fn set_order(&mut self, order: Value) {
-        self.order = Some(order);
+        self.order = match order {
+            Value::Sequence(seq, _) => seq.attrs.into_iter().map(|attr| attr.val).collect(),
+            other => vec![other],
+        };
     }
 
     pub fn set_direction(
@@ -70,8 +73,12 @@ impl Debug for Filter {
 impl Display for Filter {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.condition)?;
-        if let Some(order) = &self.order {
-            writeln!(f, "(order {})", ValueDebug(order))?;
+        if !self.order.is_empty() {
+            write!(f, "(order")?;
+            for order in &self.order {
+                write!(f, " {}", ValueDebug(order))?;
+            }
+            writeln!(f, ")")?;
         }
         if let Some(direction) = &self.direction {
             writeln!(f, "(direction {:?})", direction)?;

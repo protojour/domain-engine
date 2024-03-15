@@ -3,6 +3,7 @@ use std::cmp::Ordering;
 use anyhow::anyhow;
 use domain_engine_core::{DomainError, DomainResult};
 use fnv::FnvHashMap;
+use itertools::Itertools;
 use ontol_runtime::{
     ontology::domain::EntityOrder,
     property::PropertyId,
@@ -21,23 +22,29 @@ pub(super) fn sort_props_vec(
     filter: &Filter,
     ctx: &DbContext,
 ) -> DomainResult<()> {
-    let Some(order_symbol) = filter.order() else {
+    let order_symbols = filter.order();
+
+    if order_symbols.is_empty() {
         return Ok(());
-    };
+    }
 
     let info = ctx.ontology.extended_entity_info(def_id).unwrap();
-    let entity_order = info.order_table.get(&order_symbol.type_def_id()).unwrap();
-    let direction = entity_order.direction.chain(filter.direction());
+    let entity_orders = order_symbols
+        .iter()
+        .map(|sym| info.order_table.get(&sym.type_def_id()).unwrap())
+        .collect_vec();
 
     let mut cmp_error: Option<DomainError> = None;
 
-    raw_props_slice.sort_by(|(_, a), (_, b)| match compare(a, b, entity_order) {
-        Ok(ordering) => direction.reorder(ordering),
-        Err(error) => {
-            cmp_error.get_or_insert(error);
-            Ordering::Equal
-        }
-    });
+    raw_props_slice.sort_by(
+        |(_, a), (_, b)| match compare_order_tuple(a, b, &entity_orders) {
+            Ok(ordering) => filter.direction().reorder(ordering),
+            Err(error) => {
+                cmp_error.get_or_insert(error);
+                Ordering::Equal
+            }
+        },
+    );
 
     if let Some(error) = cmp_error {
         Err(error)
@@ -46,7 +53,26 @@ pub(super) fn sort_props_vec(
     }
 }
 
-fn compare(a: &Attrs, b: &Attrs, order: &EntityOrder) -> DomainResult<Ordering> {
+/// Compare by potentially a tuple of `order` relations
+fn compare_order_tuple(
+    a: &Attrs,
+    b: &Attrs,
+    entity_orders: &[&EntityOrder],
+) -> DomainResult<Ordering> {
+    for entity_order in entity_orders {
+        match compare_entity_order(a, b, entity_order)? {
+            Ordering::Equal => {
+                continue;
+            }
+            unequal => return Ok(entity_order.direction.reorder(unequal)),
+        }
+    }
+
+    Ok(Ordering::Equal)
+}
+
+/// Compare by one `order` relation (which can include a tuple of fields)
+fn compare_entity_order(a: &Attrs, b: &Attrs, order: &EntityOrder) -> DomainResult<Ordering> {
     for field_path in order.tuple.iter() {
         let first = value_by_path(a, &field_path.0)?;
         let second = value_by_path(b, &field_path.0)?;

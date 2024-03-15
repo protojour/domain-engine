@@ -289,7 +289,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         property_id: PropertyId::subject(RelationshipId(
                             self.primitives.relations.order,
                         )),
-                        cardinality: (PropertyCardinality::Optional, ValueCardinality::One),
+                        cardinality: (PropertyCardinality::Optional, ValueCardinality::Many),
                         rel_params_def: None,
                         value_def: order_union_def_id,
                         mentioned: false,

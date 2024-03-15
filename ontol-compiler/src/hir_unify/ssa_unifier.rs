@@ -409,8 +409,8 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             (ExprMode::Expr { .. }, PropVariant::Value(Attribute { rel, val })) => {
                 let free_vars = scan_immediate_free_vars(self.expr_arena, [*rel, *val]);
                 self.maybe_apply_catch_block(free_vars, meta.span, &|zelf| {
-                    let rel = zelf.write_one_expr(*rel, mode)?;
-                    let val = zelf.write_one_expr(*val, mode)?;
+                    let rel = zelf.write_one_expr(*rel, applied_mode)?;
+                    let val = zelf.write_one_expr(*val, applied_mode)?;
 
                     Ok(smallvec![zelf.mk_node(
                         Kind::Prop(
@@ -433,9 +433,9 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 let unit_meta = Meta::new(&UNIT_TYPE, meta.span);
                 let mut body = Nodes::default();
                 let (rel_term, _rel_meta, rel_nodes) =
-                    self.write_cond_term(*rel, match_var, mode, &mut body)?;
+                    self.write_cond_term(*rel, match_var, applied_mode, &mut body)?;
                 let (val_term, _val_meta, val_nodes) =
-                    self.write_cond_term(*val, match_var, mode, &mut body)?;
+                    self.write_cond_term(*val, match_var, applied_mode, &mut body)?;
 
                 let set_var = self.alloc_var();
                 let let_cond_var = self.mk_let_cond_var(set_var, match_var, meta.span);
@@ -516,7 +516,11 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                         Meta::new(&UNIT_TYPE, meta.span),
                     ));
 
-                    body.extend(zelf.write_expr(*node, None, mode.match_set(set_cond_var))?);
+                    body.extend(zelf.write_expr(
+                        *node,
+                        None,
+                        applied_mode.match_set(set_cond_var),
+                    )?);
                     Ok(body)
                 })
             }

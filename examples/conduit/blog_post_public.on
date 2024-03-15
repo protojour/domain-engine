@@ -38,7 +38,7 @@ map posts(
             'author': @match db.User(
                 'username'?: by
             ),
-            order: db.by_date()
+            order: { db.by_date() }
         )
     }
 )
