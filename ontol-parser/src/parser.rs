@@ -23,9 +23,10 @@ use super::{
 };
 
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
-enum UnitOrSet {
+enum RawCardinality {
     Unit,
     Set,
+    List,
 }
 
 /// AstParser parses Tokens into AST nodes.
@@ -122,14 +123,14 @@ fn rel_statement(
     stmt_parser: impl AstParser<Spanned<Statement>> + 'static,
 ) -> impl AstParser<RelStatement> {
     let object_type_or_pattern =
-        with_unit_or_set(spanned_named_or_anonymous_type_or_dot(stmt_parser.clone()))
+        with_raw_cardinality(spanned_named_or_anonymous_type_or_dot(stmt_parser.clone()))
             .map(|(unit_or_seq, (opt_ty, span))| {
                 (unit_or_seq, (opt_ty.map_right(TypeOrPattern::Type), span))
             })
             .or(
                 sigil('=').ignore_then(spanned(any_pattern()).map(|(pat, span)| {
                     (
-                        UnitOrSet::Unit,
+                        RawCardinality::Unit,
                         (Either::Right(TypeOrPattern::Pattern(pat)), span),
                     )
                 })),
@@ -138,9 +139,9 @@ fn rel_statement(
     doc_comments()
         .then(keyword(Token::Rel))
         // subject:
-        .then(with_unit_or_set(spanned_named_or_anonymous_type_or_dot(
-            stmt_parser.clone(),
-        )))
+        .then(with_raw_cardinality(
+            spanned_named_or_anonymous_type_or_dot(stmt_parser.clone()),
+        ))
         // forward relations:
         .then(
             forward_relation(stmt_parser)
@@ -201,13 +202,15 @@ fn rel_statement(
 
 fn compose_cardinality(
     cardinality: Option<Cardinality>,
-    unit_or_seq: UnitOrSet,
+    raw: RawCardinality,
 ) -> Option<Cardinality> {
-    match (cardinality, unit_or_seq) {
-        (None, UnitOrSet::Unit) => None,
-        (None, UnitOrSet::Set) => Some(Cardinality::Many),
-        (Some(_), UnitOrSet::Unit) => Some(Cardinality::Optional),
-        (Some(_), UnitOrSet::Set) => Some(Cardinality::OptionalMany),
+    match (cardinality, raw) {
+        (None, RawCardinality::Unit) => None,
+        (None, RawCardinality::Set) => Some(Cardinality::Set),
+        (None, RawCardinality::List) => Some(Cardinality::List),
+        (Some(_), RawCardinality::Unit) => Some(Cardinality::Optional),
+        (Some(_), RawCardinality::Set) => Some(Cardinality::OptionalSet),
+        (Some(_), RawCardinality::List) => Some(Cardinality::OptionalList),
     }
 }
 
@@ -275,10 +278,19 @@ fn fmt_statement() -> impl AstParser<FmtStatement> {
         })
 }
 
-fn with_unit_or_set<T>(inner: impl AstParser<T> + Clone) -> impl AstParser<(UnitOrSet, T)> {
-    inner.clone().map(|unit| (UnitOrSet::Unit, unit)).or(inner
-        .delimited_by(open('{'), close('}'))
-        .map(|seq| (UnitOrSet::Set, seq)))
+fn with_raw_cardinality<T>(
+    inner: impl AstParser<T> + Clone,
+) -> impl AstParser<(RawCardinality, T)> {
+    inner
+        .clone()
+        .map(|unit| (RawCardinality::Unit, unit))
+        .or(inner
+            .clone()
+            .delimited_by(open('{'), close('}'))
+            .map(|val| (RawCardinality::Set, val)))
+        .or(inner
+            .delimited_by(open('['), close(']'))
+            .map(|val| (RawCardinality::List, val)))
 }
 
 fn map_statement() -> impl AstParser<MapStatement> {

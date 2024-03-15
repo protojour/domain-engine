@@ -581,8 +581,8 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     // warn!("Skipping match-struct for now");
 
                     let value_cardinality = match ty {
-                        Type::Seq(..) => ValueCardinality::Many,
-                        _ => ValueCardinality::One,
+                        Type::Seq(..) => ValueCardinality::OrderedSet,
+                        _ => ValueCardinality::Unit,
                     };
 
                     let condition_local = block.op(

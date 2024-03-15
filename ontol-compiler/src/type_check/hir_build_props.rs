@@ -289,7 +289,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         property_id: PropertyId::subject(RelationshipId(
                             self.primitives.relations.order,
                         )),
-                        cardinality: (PropertyCardinality::Optional, ValueCardinality::Many),
+                        cardinality: (PropertyCardinality::Optional, ValueCardinality::OrderedSet),
                         rel_params_def: None,
                         value_def: order_union_def_id,
                         mentioned: false,
@@ -303,7 +303,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     property_id: PropertyId::subject(RelationshipId(
                         self.primitives.relations.direction,
                     )),
-                    cardinality: (PropertyCardinality::Optional, ValueCardinality::One),
+                    cardinality: (PropertyCardinality::Optional, ValueCardinality::Unit),
                     rel_params_def: None,
                     value_def: self.primitives.direction_union,
                     mentioned: false,
@@ -403,7 +403,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 debug!("value_ty: {value_ty:?}");
 
                 let prop_variant = match match_attribute.cardinality.1 {
-                    ValueCardinality::One => {
+                    ValueCardinality::Unit => {
                         let val_node = self.build_node(
                             val,
                             NodeInfo {
@@ -417,7 +417,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             val: val_node,
                         })
                     }
-                    ValueCardinality::Many => match &val.kind {
+                    ValueCardinality::OrderedSet | ValueCardinality::List => match &val.kind {
                         PatternKind::Set { elements, .. } => {
                             let mut hir_set_elements = smallvec![];
                             let seq_ty = self.types.intern(Type::Seq(rel_params_ty, value_ty));
@@ -516,7 +516,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 if flags.rel_optional()
                     && !flags.pat_optional()
-                    && !matches!(match_attribute.cardinality.1, ValueCardinality::Many)
+                    && !matches!(
+                        match_attribute.cardinality.1,
+                        ValueCardinality::OrderedSet | ValueCardinality::List
+                    )
                 {
                     self.check_can_construct_default(rel_params_ty, prop_span);
                     self.check_can_construct_default(value_ty, prop_span);
@@ -548,27 +551,32 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 let prop_variant: ontol_hir::PropVariant =
                     match (match_attribute.cardinality.1, operator) {
-                        (ValueCardinality::One, SetBinaryOperator::ElementIn) => {
+                        (ValueCardinality::Unit, SetBinaryOperator::ElementIn) => {
                             ontol_hir::PropVariant::Predicate(SetOperator::ElementIn, set_node)
                         }
-                        (ValueCardinality::Many, SetBinaryOperator::ElementIn) => {
+                        (
+                            ValueCardinality::OrderedSet | ValueCardinality::List,
+                            SetBinaryOperator::ElementIn,
+                        ) => {
                             self.error(
                                 CompileError::TODO("property must be a scalar".into()),
                                 &prop_span,
                             );
                             return None;
                         }
-                        (ValueCardinality::Many, operator) => ontol_hir::PropVariant::Predicate(
-                            match operator {
-                                SetBinaryOperator::ElementIn => unreachable!(),
-                                SetBinaryOperator::AllIn => SetOperator::SubsetOf,
-                                SetBinaryOperator::ContainsAll => SetOperator::SupersetOf,
-                                SetBinaryOperator::Intersects => SetOperator::SetIntersects,
-                                SetBinaryOperator::SetEquals => SetOperator::SetEquals,
-                            },
-                            set_node,
-                        ),
-                        (ValueCardinality::One, _) => {
+                        (ValueCardinality::OrderedSet, operator) => {
+                            ontol_hir::PropVariant::Predicate(
+                                match operator {
+                                    SetBinaryOperator::ElementIn => unreachable!(),
+                                    SetBinaryOperator::AllIn => SetOperator::SubsetOf,
+                                    SetBinaryOperator::ContainsAll => SetOperator::SupersetOf,
+                                    SetBinaryOperator::Intersects => SetOperator::SetIntersects,
+                                    SetBinaryOperator::SetEquals => SetOperator::SetEquals,
+                                },
+                                set_node,
+                            )
+                        }
+                        _ => {
                             self.error(
                                 CompileError::TODO("property must be a set".into()),
                                 &prop_span,
@@ -730,7 +738,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     if target_properties.identified_by.is_some()
                         && matches!(
                             cardinality,
-                            (PropertyCardinality::Optional, _) | (_, ValueCardinality::Many)
+                            (PropertyCardinality::Optional, _) | (_, ValueCardinality::OrderedSet)
                         )
                     {
                         continue;
@@ -800,7 +808,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             self.collect_named_match_attributes(property_set, &mut match_attributes);
 
             for (_, match_attribute) in match_attributes {
-                if let (PropertyCardinality::Mandatory, ValueCardinality::One) =
+                if let (PropertyCardinality::Mandatory, ValueCardinality::Unit) =
                     match_attribute.cardinality
                 {
                     return false;

@@ -183,7 +183,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         let default_modifier = SerdeModifier::json_default() | cross_def_modifier;
 
         match cardinality.1 {
-            ValueCardinality::One => (
+            ValueCardinality::Unit => (
                 cardinality.0,
                 self.gen_addr_lazy(SerdeKey::Def(SerdeDef {
                     def_id: type_def_id,
@@ -191,7 +191,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 }))
                 .expect("no property operator"),
             ),
-            ValueCardinality::Many => (
+            ValueCardinality::OrderedSet | ValueCardinality::List => (
                 cardinality.0,
                 self.gen_addr_lazy(SerdeKey::Def(SerdeDef {
                     def_id: type_def_id,
@@ -521,7 +521,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 } else {
                     let (requirement, inner_addr) = self.get_property_operator(
                         *def_id,
-                        (PropertyCardinality::Mandatory, ValueCardinality::One),
+                        (PropertyCardinality::Mandatory, ValueCardinality::Unit),
                         def.modifier.cross_def_flags(),
                     );
 
@@ -768,7 +768,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
             let (requirement, inner_addr) = self.get_property_operator(
                 value_def,
-                (PropertyCardinality::Mandatory, ValueCardinality::One),
+                (PropertyCardinality::Mandatory, ValueCardinality::Unit),
                 def.modifier.cross_def_flags(),
             );
 

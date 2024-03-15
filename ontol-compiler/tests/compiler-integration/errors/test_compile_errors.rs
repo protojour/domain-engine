@@ -542,7 +542,7 @@ fn error_ambiguous_number_resolution() {
 }
 
 #[test]
-fn error_order() {
+fn error_order_relation() {
     "
     def struct (
         rel . // ERROR relation subject must be an entity
@@ -580,6 +580,21 @@ fn error_order() {
 
     def by_text_bug (rel .is: text)
     def @symbol by_text()
+    "
+    .compile_fail();
+}
+
+#[test]
+fn error_entity_list_relation() {
+    "
+    def foo(
+        rel .'id'|id: (rel .is: text)
+        rel .'bars': [bar] // ERROR entity relationships must be sets instead of lists. Use `{}` syntax.
+    )
+    def bar(
+        rel .'id'|id: (rel .is: text)
+        rel .'field': text
+    )
     "
     .compile_fail();
 }

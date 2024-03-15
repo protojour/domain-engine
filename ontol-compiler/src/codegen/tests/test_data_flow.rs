@@ -18,9 +18,9 @@ use crate::{
 const MOCK_RELATIONSHIP: Relationship = Relationship {
     relation_def_id: DefId::unit(),
     subject: (DefId::unit(), NO_SPAN),
-    subject_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
+    subject_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Unit),
     object: (DefId::unit(), NO_SPAN),
-    object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
+    object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Unit),
     object_prop: None,
     rel_params: RelParams::Unit,
 };
@@ -75,7 +75,7 @@ fn child_of(prop: &str) -> PropertyFlowData {
 }
 
 const fn default_cardinality() -> PropertyFlowData {
-    PropertyFlowData::Cardinality((PropertyCardinality::Mandatory, ValueCardinality::One))
+    PropertyFlowData::Cardinality((PropertyCardinality::Mandatory, ValueCardinality::Unit))
 }
 
 const fn default_type() -> PropertyFlowData {

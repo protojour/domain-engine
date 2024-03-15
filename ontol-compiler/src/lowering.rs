@@ -380,7 +380,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             subject: (subject.0, self.src.span(subject.1)),
             subject_cardinality: subject_cardinality
                 .map(convert_cardinality)
-                .unwrap_or((PropertyCardinality::Mandatory, ValueCardinality::One)),
+                .unwrap_or((PropertyCardinality::Mandatory, ValueCardinality::Unit)),
             object: (object.0, self.src.span(object.1)),
             object_cardinality: object_cardinality
                 .map(convert_cardinality)
@@ -388,11 +388,11 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     if has_object_prop {
                         // i.e. no syntax sugar: The object prop is explicit,
                         // therefore the object cardinality is explicit.
-                        (PropertyCardinality::Mandatory, ValueCardinality::One)
+                        (PropertyCardinality::Mandatory, ValueCardinality::Unit)
                     } else {
                         // The syntactic sugar case, which is the default behaviour:
                         // Many incoming edges to the same object:
-                        (PropertyCardinality::Optional, ValueCardinality::Many)
+                        (PropertyCardinality::Optional, ValueCardinality::OrderedSet)
                     }
                 }),
             object_prop,
@@ -516,9 +516,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
             DefKind::Relationship(Relationship {
                 relation_def_id,
                 subject: (from.0, self.src.span(from.1)),
-                subject_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
+                subject_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::OrderedSet),
                 object: (to.0, self.src.span(to.1)),
-                object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
+                object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::OrderedSet),
                 object_prop: None,
                 rel_params: RelParams::Unit,
             }),
@@ -1300,11 +1300,14 @@ impl<'s, 'm> Lowering<'s, 'm> {
                         subject: (def_id, span),
                         subject_cardinality: (
                             PropertyCardinality::Mandatory,
-                            ValueCardinality::One,
+                            ValueCardinality::Unit,
                         ),
                         object: (ident_literal, span),
                         object_prop: None,
-                        object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
+                        object_cardinality: (
+                            PropertyCardinality::Mandatory,
+                            ValueCardinality::Unit,
+                        ),
                         rel_params: RelParams::Unit,
                     }),
                     &symbol_span,
@@ -1439,9 +1442,13 @@ fn convert_cardinality(
     ast_cardinality: ast::Cardinality,
 ) -> (PropertyCardinality, ValueCardinality) {
     match ast_cardinality {
-        ast::Cardinality::Optional => (PropertyCardinality::Optional, ValueCardinality::One),
-        ast::Cardinality::Many => (PropertyCardinality::Mandatory, ValueCardinality::Many),
-        ast::Cardinality::OptionalMany => (PropertyCardinality::Optional, ValueCardinality::Many),
+        ast::Cardinality::Optional => (PropertyCardinality::Optional, ValueCardinality::Unit),
+        ast::Cardinality::Set => (PropertyCardinality::Mandatory, ValueCardinality::OrderedSet),
+        ast::Cardinality::OptionalSet => {
+            (PropertyCardinality::Optional, ValueCardinality::OrderedSet)
+        }
+        ast::Cardinality::List => (PropertyCardinality::Mandatory, ValueCardinality::List),
+        ast::Cardinality::OptionalList => (PropertyCardinality::Optional, ValueCardinality::List),
     }
 }
 

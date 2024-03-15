@@ -85,8 +85,10 @@ pub enum RelType {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Cardinality {
     Optional,
-    Many,
-    OptionalMany,
+    Set,
+    OptionalSet,
+    List,
+    OptionalList,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]

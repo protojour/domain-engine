@@ -140,9 +140,9 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                     }
 
                     let value_cardinality = if flags.is_iter {
-                        ValueCardinality::Many
+                        ValueCardinality::OrderedSet
                     } else {
-                        ValueCardinality::One
+                        ValueCardinality::Unit
                     };
 
                     let relationship = Relationship {
@@ -154,7 +154,10 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                             (PropertyCardinality::Mandatory, value_cardinality)
                         },
                         object: (var_relationship.val_def_id, pattern.span),
-                        object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::One),
+                        object_cardinality: (
+                            PropertyCardinality::Mandatory,
+                            ValueCardinality::Unit,
+                        ),
                         object_prop: None,
                         rel_params: RelParams::Unit,
                     };

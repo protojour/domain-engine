@@ -176,12 +176,12 @@ impl InMemoryStore {
             let attrs = self.sub_query_attributes(*property_id, subselect, entity_key, ctx)?;
 
             match data_relationship.cardinality_by_role(property_id.role).1 {
-                ValueCardinality::One => {
+                ValueCardinality::Unit => {
                     if let Some(attribute) = attrs.into_iter().next() {
                         properties.insert(*property_id, attribute);
                     }
                 }
-                ValueCardinality::Many => {
+                ValueCardinality::OrderedSet | ValueCardinality::List => {
                     properties.insert(
                         *property_id,
                         Value::Sequence(

@@ -50,7 +50,7 @@ def Point (
 /// positions.
 def MultiPoint (
     rel .'type': 'MultiPoint'
-    rel .'coordinates': {position}
+    rel .'coordinates': [position]
 )
 
 /// For type "LineString", the "coordinates" member is an array of two or
@@ -64,7 +64,7 @@ def LineString (
 /// LineString coordinate arrays.
 def MultiLineString (
     rel . 'type': 'MultiLineString'
-    rel . 'coordinates': {position-list}
+    rel . 'coordinates': [position-list]
 )
 
 /// For type "Polygon", the "coordinates" member MUST be an array of
@@ -78,7 +78,7 @@ def Polygon (
 /// Polygon coordinate arrays.
 def MultiPolygon (
     rel .'type': 'MultiPolygon'
-    rel .'coordinates': {position-ring}
+    rel .'coordinates': [position-ring]
 )
 
 /// LeafGeometry is a union of geometries that does not include `GeometryCollection`.
@@ -98,7 +98,7 @@ def LeafGeometry (
 /// GeoJSON Geometry object.  It is possible for this array to be empty.
 def GeometryCollection (
     rel .'type': 'GeometryCollection'
-    rel .'geometries': {LeafGeometry}
+    rel .'geometries': [LeafGeometry]
 )
 
 /// A Geometry object represents points, curves, and surfaces in
@@ -141,5 +141,5 @@ def @private Feature (
 /// is possible for this array to be empty.
 def @private FeatureCollection (
     rel .'type': 'FeatureCollection'
-    rel .'features': {Feature}
+    rel .'features': [Feature]
 )

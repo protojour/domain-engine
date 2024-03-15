@@ -119,6 +119,12 @@ impl PropertyCardinality {
     Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, Debug, OntolDebug,
 )]
 pub enum ValueCardinality {
-    One,
-    Many,
+    /// The property supports at most one defined value
+    Unit,
+    /// The property supports a set of values.
+    ///
+    /// The set is insertion-ordered.
+    OrderedSet,
+    /// The property supports a list of values, duplicates are allowed.
+    List,
 }

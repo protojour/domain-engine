@@ -46,12 +46,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let mut actions = vec![];
 
-        for (property_id, cardinality) in table {
-            trace!("check pre-repr {def_id:?} {property_id:?} {cardinality:?}");
+        for (prop_id, property) in table {
+            trace!("check pre-repr {def_id:?} {prop_id:?} {property:?}");
 
-            match property_id.role {
+            match prop_id.role {
                 Role::Subject => {
-                    let meta = self.defs.relationship_meta(property_id.relationship_id);
+                    let meta = self.defs.relationship_meta(prop_id.relationship_id);
 
                     let object_properties = self
                         .relations
@@ -65,12 +65,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         if id_meta.relationship.object.0 == def_id {
                             debug!(
                                 "redefine as primary id: {id_relationship_id:?} <-> inherent {:?}",
-                                property_id.relationship_id
+                                prop_id.relationship_id
                             );
 
                             actions.push(Action::RedefineAsPrimaryId {
                                 def_id,
-                                inherent_property_id: *property_id,
+                                inherent_property_id: *prop_id,
                                 identifies_relationship_id: id_relationship_id,
                             });
                         }
@@ -95,22 +95,18 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let mut actions = vec![];
         let mut subject_relation_set: FnvHashSet<DefId> = Default::default();
 
-        for (property_id, cardinality) in table {
-            trace!("check post-repr {def_id:?} {property_id:?} {cardinality:?}");
+        for (prop_id, property) in table {
+            trace!("check post-repr {def_id:?} {prop_id:?} {property:?}");
 
-            match property_id.role {
+            match prop_id.role {
                 Role::Subject => {
-                    let meta = self.defs.relationship_meta(property_id.relationship_id);
+                    let meta = self.defs.relationship_meta(prop_id.relationship_id);
 
                     // Check that the same relation_def_id is not reused for subject properties
                     if !subject_relation_set.insert(meta.relationship.relation_def_id) {
-                        let spanned_relationship_def = self
-                            .defs
-                            .get_spanned_def_kind(meta.relationship_id.0)
-                            .unwrap();
+                        let span = self.defs.def_span(meta.relationship_id.0);
                         self.errors.push(
-                            CompileError::UnionInNamedRelationshipNotSupported
-                                .spanned(spanned_relationship_def.span),
+                            CompileError::UnionInNamedRelationshipNotSupported.spanned(&span),
                         );
                     }
 
@@ -122,19 +118,22 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     if properties.identified_by.is_some()
                         && object_properties.identified_by.is_some()
                     {
-                        actions.push(Action::AdjustEntityPropertyCardinality(
-                            def_id,
-                            *property_id,
-                        ));
+                        if matches!(property.cardinality.1, ValueCardinality::List) {
+                            let span = self.defs.def_span(meta.relationship_id.0);
+                            self.errors
+                                .push(CompileError::EntityRelationshipCannotBeAList.spanned(&span));
+                        }
+
+                        actions.push(Action::AdjustEntityPropertyCardinality(def_id, *prop_id));
                     }
 
                     if let Some((generator_def_id, gen_span)) = self
                         .relations
                         .value_generators_unchecked
-                        .remove(&property_id.relationship_id)
+                        .remove(&prop_id.relationship_id)
                     {
                         actions.push(Action::CheckValueGenerator {
-                            relationship_id: property_id.relationship_id,
+                            relationship_id: prop_id.relationship_id,
                             generator_def_id,
                             object_def_id: meta.relationship.object.0,
                             span: gen_span,
@@ -147,7 +146,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             // it is illegal to specify an object property to something that is not an entity (has no id)
                             actions.push(Action::ReportNonEntityInObjectRelationship(
                                 def_id,
-                                property_id.relationship_id,
+                                prop_id.relationship_id,
                             ));
                         }
 
@@ -158,7 +157,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 panic!("No table in value union");
                             };
 
-                            assert!(table.get(property_id).is_some());
+                            assert!(table.get(prop_id).is_some());
 
                             let all_entities = thesaurus_entries
                                 .iter()
@@ -172,23 +171,19 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                             if all_entities {
                                 actions.push(Action::AdjustEntityPropertyCardinality(
-                                    def_id,
-                                    *property_id,
+                                    def_id, *prop_id,
                                 ));
                             }
                         }
                     } else {
-                        let meta = self.defs.relationship_meta(property_id.relationship_id);
+                        let meta = self.defs.relationship_meta(prop_id.relationship_id);
                         let subject_properties = self
                             .relations
                             .properties_by_def_id(meta.relationship.subject.0)
                             .unwrap();
 
                         if subject_properties.identified_by.is_some() {
-                            actions.push(Action::AdjustEntityPropertyCardinality(
-                                def_id,
-                                *property_id,
-                            ));
+                            actions.push(Action::AdjustEntityPropertyCardinality(def_id, *prop_id));
                         }
                     }
                 }
@@ -234,7 +229,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             Property {
                                 cardinality: (
                                     PropertyCardinality::Mandatory,
-                                    ValueCardinality::One,
+                                    ValueCardinality::Unit,
                                 ),
                                 is_entity_id: true,
                             },
@@ -358,7 +353,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 }
 
 fn adjust_entity_prop_cardinality(property: &mut Property) {
-    if let ValueCardinality::Many = property.cardinality.1 {
+    if let ValueCardinality::OrderedSet = property.cardinality.1 {
         property.cardinality.0 = PropertyCardinality::Optional;
     }
 }

@@ -377,8 +377,8 @@ impl DomainEngine {
                         MaybeSelect::Skip(def_id) => {
                             debug!("skipping selection");
                             match value_cardinality {
-                                ValueCardinality::One => Ok(Value::unit()),
-                                ValueCardinality::Many => {
+                                ValueCardinality::Unit => Ok(Value::unit()),
+                                ValueCardinality::OrderedSet | ValueCardinality::List => {
                                     Ok(Value::Sequence(Sequence::default(), def_id))
                                 }
                             }
@@ -504,11 +504,13 @@ impl DomainEngine {
         };
 
         match value_cardinality {
-            ValueCardinality::One => match edge_seq.attrs.into_iter().next() {
+            ValueCardinality::Unit => match edge_seq.attrs.into_iter().next() {
                 Some(attribute) => Ok(attribute.val),
                 None => Ok(Value::unit()),
             },
-            ValueCardinality::Many => Ok(Value::Sequence(edge_seq, DefId::unit())),
+            ValueCardinality::OrderedSet | ValueCardinality::List => {
+                Ok(Value::Sequence(edge_seq, DefId::unit()))
+            }
         }
     }
 }

@@ -40,7 +40,7 @@ fn test_map_match_scalar_key() {
             .with_mock_yielder(
                 YielderMock::yield_match
                     .next_call(matching!(
-                        eq!(&ValueCardinality::One),
+                        eq!(&ValueCardinality::Unit),
                         eq!(&Literal(indoc! { r#"
                             (root $a)
                             (is-entity $a def@1:2)
@@ -83,7 +83,7 @@ fn test_map_match_parameterless_query() {
             .with_mock_yielder(
                 YielderMock::yield_match
                     .next_call(matching!(
-                        eq!(&ValueCardinality::Many),
+                        eq!(&ValueCardinality::OrderedSet),
                         eq!(&Literal(indoc! { "
                             (root $a)
                             (is-entity $a def@1:2)
@@ -133,7 +133,7 @@ fn test_map_match_query_mandatory_properties() {
             .with_mock_yielder(
                 YielderMock::yield_match
                     .next_call(matching!(
-                        eq!(&ValueCardinality::Many),
+                        eq!(&ValueCardinality::OrderedSet),
                         eq!(&Literal(indoc! { r#"
                             (root $a)
                             (is-entity $a def@1:2)
@@ -186,7 +186,7 @@ fn test_map_match_query_optional_property() {
             .with_mock_yielder(
                 YielderMock::yield_match
                     .next_call(matching!(
-                        eq!(&ValueCardinality::Many),
+                        eq!(&ValueCardinality::OrderedSet),
                         eq!(&Literal(indoc! { r#"
                             (root $a)
                             (is-entity $a def@1:2)
@@ -207,7 +207,7 @@ fn test_map_match_query_optional_property() {
             .with_mock_yielder(
                 YielderMock::yield_match
                     .next_call(matching!(
-                        eq!(&ValueCardinality::Many),
+                        eq!(&ValueCardinality::OrderedSet),
                         eq!(&Literal(indoc! { r#"
                             (root $a)
                             (is-entity $a def@1:2)
@@ -256,7 +256,7 @@ fn test_map_match_anonymous_with_translation() {
             .with_mock_yielder(
                 YielderMock::yield_match
                     .next_call(matching!(
-                        eq!(&ValueCardinality::Many),
+                        eq!(&ValueCardinality::OrderedSet),
                         eq!(&Literal(indoc! { r#"
                             (root $a)
                             (is-entity $a def@1:2)
@@ -301,7 +301,7 @@ fn test_map_match_sequence_filter_in_set() {
             .with_mock_yielder(
                 YielderMock::yield_match
                     .next_call(matching!(
-                        eq!(&ValueCardinality::Many),
+                        eq!(&ValueCardinality::OrderedSet),
                         eq!(&Literal(indoc! { r#"
                             (root $a)
                             (is-entity $a def@1:2)
@@ -364,7 +364,7 @@ mod match_contains_all {
             .with_mock_yielder(
                 YielderMock::yield_match
                     .next_call(matching!(
-                        eq!(&ValueCardinality::Many),
+                        eq!(&ValueCardinality::OrderedSet),
                         eq!(&Literal(indoc! { r#"
                                 (root $a)
                                 (is-entity $a def@1:1)
@@ -391,7 +391,7 @@ mod match_contains_all {
             .with_mock_yielder(
                 YielderMock::yield_match
                     .next_call(matching!(
-                        eq!(&ValueCardinality::Many),
+                        eq!(&ValueCardinality::OrderedSet),
                         eq!(&Literal(indoc! { r#"
                             (root $a)
                             (is-entity $a def@1:1)
@@ -437,7 +437,7 @@ fn test_map_match_in_sub_multi_edge() {
             .with_mock_yielder(
                 YielderMock::yield_match
                     .next_call(matching!(
-                        eq!(&ValueCardinality::Many),
+                        eq!(&ValueCardinality::OrderedSet),
                         eq!(&Literal(indoc! { r#"
                             (root $a)
                             (is-entity $a def@1:1)
@@ -492,7 +492,7 @@ fn test_map_with_order() {
             .with_mock_yielder(
                 YielderMock::yield_match
                     .next_call(matching!(
-                        eq!(&ValueCardinality::Many),
+                        eq!(&ValueCardinality::OrderedSet),
                         eq!(&Literal(indoc! { r#"
                             (root $a)
                             (is-entity $a def@1:1)

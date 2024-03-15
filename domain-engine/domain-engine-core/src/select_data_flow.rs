@@ -261,7 +261,7 @@ impl<'on> SelectFlowProcessor<'on> {
                 }
                 PropertyFlowData::Cardinality((
                     PropertyCardinality::Mandatory,
-                    ValueCardinality::One,
+                    ValueCardinality::Unit,
                 )) if is_dep.0 => {
                     is_required = true;
                 }

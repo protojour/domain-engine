@@ -590,7 +590,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             }
         };
 
-        let field_data = if matches!(value_cardinality, ValueCardinality::One) {
+        let field_data = if matches!(value_cardinality, ValueCardinality::Unit) {
             let modifier = TypeModifier::new_unit(Optionality::from_optional(matches!(
                 prop_cardinality,
                 PropertyCardinality::Optional

@@ -86,7 +86,7 @@ impl InMemoryStore {
                 }
                 DataRelationshipKind::EntityGraph { .. } => {
                     match data_relationship.cardinality_by_role(property_id.role).1 {
-                        ValueCardinality::One => {
+                        ValueCardinality::Unit => {
                             self.insert_entity_relationship(
                                 type_info.def_id,
                                 &dynamic_key,
@@ -96,41 +96,43 @@ impl InMemoryStore {
                                 ctx,
                             )?;
                         }
-                        ValueCardinality::Many => match attribute.val {
-                            Value::Sequence(_sequence, _) => {
-                                return Err(DomainError::DataStore(anyhow!(
-                                    "Multi-relation overwrite not yet implemented"
-                                )));
-                            }
-                            Value::Patch(patch_attributes, _) => {
-                                for attribute in patch_attributes {
-                                    if matches!(attribute.rel, Value::DeleteRelationship(_)) {
-                                        self.delete_entity_relationship(
-                                            type_info.def_id,
-                                            &dynamic_key,
-                                            property_id,
-                                            attribute.val,
-                                            data_relationship,
-                                            ctx,
-                                        )?;
-                                    } else {
-                                        self.insert_entity_relationship(
-                                            type_info.def_id,
-                                            &dynamic_key,
-                                            (property_id, None),
-                                            attribute,
-                                            data_relationship,
-                                            ctx,
-                                        )?;
+                        ValueCardinality::OrderedSet | ValueCardinality::List => {
+                            match attribute.val {
+                                Value::Sequence(_sequence, _) => {
+                                    return Err(DomainError::DataStore(anyhow!(
+                                        "Multi-relation overwrite not yet implemented"
+                                    )));
+                                }
+                                Value::Patch(patch_attributes, _) => {
+                                    for attribute in patch_attributes {
+                                        if matches!(attribute.rel, Value::DeleteRelationship(_)) {
+                                            self.delete_entity_relationship(
+                                                type_info.def_id,
+                                                &dynamic_key,
+                                                property_id,
+                                                attribute.val,
+                                                data_relationship,
+                                                ctx,
+                                            )?;
+                                        } else {
+                                            self.insert_entity_relationship(
+                                                type_info.def_id,
+                                                &dynamic_key,
+                                                (property_id, None),
+                                                attribute,
+                                                data_relationship,
+                                                ctx,
+                                            )?;
+                                        }
                                     }
                                 }
+                                _ => {
+                                    return Err(DomainError::DataStoreBadRequest(anyhow!(
+                                        "Invalid input for multi-relation write"
+                                    )));
+                                }
                             }
-                            _ => {
-                                return Err(DomainError::DataStoreBadRequest(anyhow!(
-                                    "Invalid input for multi-relation write"
-                                )));
-                            }
-                        },
+                        }
                     }
                 }
             }
@@ -240,7 +242,7 @@ impl InMemoryStore {
                 }
                 DataRelationshipKind::EntityGraph { .. } => {
                     match data_relationship.cardinality_by_role(property_id.role).1 {
-                        ValueCardinality::One => {
+                        ValueCardinality::Unit => {
                             self.insert_entity_relationship(
                                 type_info.def_id,
                                 &entity_key,
@@ -250,7 +252,7 @@ impl InMemoryStore {
                                 ctx,
                             )?;
                         }
-                        ValueCardinality::Many => {
+                        ValueCardinality::OrderedSet | ValueCardinality::List => {
                             let Value::Sequence(seq, _) = attribute.val else {
                                 return Err(DomainError::DataStoreBadRequest(anyhow!(
                                     "Expected sequence for ValueCardinality::Many"
@@ -596,11 +598,14 @@ fn enforce_cardinality_pre_insert(
     from_key: &EntityKey,
     to_key: &EntityKey,
 ) {
-    if matches!(edge_collection.subject_cardinality.1, ValueCardinality::One) {
+    if matches!(
+        edge_collection.subject_cardinality.1,
+        ValueCardinality::Unit
+    ) {
         edge_collection.edges.retain(|edge| &edge.from != from_key);
     }
 
-    if matches!(edge_collection.object_cardinality.1, ValueCardinality::One) {
+    if matches!(edge_collection.object_cardinality.1, ValueCardinality::Unit) {
         edge_collection.edges.retain(|edge| &edge.to != to_key);
     }
 }

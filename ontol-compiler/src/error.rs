@@ -72,6 +72,7 @@ pub enum CompileError {
     CannotConvertMissingMapping { input: String, output: String },
     NonEntityInReverseRelationship,
     RelationSubjectMustBeEntity,
+    EntityRelationshipCannotBeAList,
     EntityOrderMustBeSymbolInThisDomain,
     EntityOrderMustSpecifyParameters,
     OverlappingSequenceIndexes,
@@ -219,6 +220,12 @@ impl std::fmt::Display for CompileError {
             }
             Self::RelationSubjectMustBeEntity => {
                 write!(f, "relation subject must be an entity")
+            }
+            Self::EntityRelationshipCannotBeAList => {
+                write!(
+                    f,
+                    "entity relationships must be sets instead of lists. Use `{{}}` syntax."
+                )
             }
             Self::EntityOrderMustBeSymbolInThisDomain => {
                 write!(f, "order identifier must be a symbol in this domain")
