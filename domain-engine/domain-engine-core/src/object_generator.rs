@@ -48,7 +48,7 @@ impl<'e> ObjectGenerator<'e> {
                 }
             }
             Value::Sequence(seq, _) => {
-                for attribute in &mut seq.attrs {
+                for attribute in seq.attrs_mut() {
                     self.generate_objects(&mut attribute.rel);
                     self.generate_objects(&mut attribute.val);
                 }

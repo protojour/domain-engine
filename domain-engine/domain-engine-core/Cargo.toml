@@ -22,10 +22,10 @@ chrono.workspace = true
 smallvec.workspace = true
 bit-set.workspace = true
 thin-vec.workspace = true
+ordered-float.workspace = true
 serde = "1"
 serde_json = "1"
 unimock = "0.5"
-ordered-float = "4"
 anyhow = "1"
 
 [dev-dependencies]

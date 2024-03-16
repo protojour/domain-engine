@@ -265,7 +265,7 @@ impl<'v> AttributeType<'v> {
                     None => {
                         let empty = Attribute {
                             rel: Value::unit(),
-                            val: Value::Sequence(Sequence::new([]), DefId::unit()),
+                            val: Value::Sequence(Sequence::default(), DefId::unit()),
                         };
 
                         resolve_schema_type_field(
@@ -328,8 +328,7 @@ impl<'v> AttributeType<'v> {
                 executor,
             ),
             (Value::Sequence(seq, _), FieldKind::TotalCount) => Ok(seq
-                .sub_seq
-                .as_deref()
+                .sub()
                 .and_then(SubSequence::total_len)
                 .serialize(JuniperValueSerializer)?),
             (Value::Unit(_), FieldKind::Property(_)) => Ok(juniper::Value::Null),

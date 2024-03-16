@@ -1,6 +1,6 @@
 use std::{
     cmp::Ordering,
-    collections::HashMap,
+    collections::BTreeMap,
     fmt::{Debug, Display},
     ops::Index,
 };
@@ -17,6 +17,7 @@ use crate::{
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Value {
+    /// Unit value for DefIds that have only one possible value
     Unit(DefId),
     /// Void represents the absence of value - used in error detection and try mechanism
     Void(DefId),
@@ -38,7 +39,7 @@ pub enum Value {
     StructUpdate(Box<FnvHashMap<PropertyId, Attribute<Self>>>, DefId),
 
     /// A collection of arbitrary values keyed by strings.
-    Dict(Box<HashMap<String, Value>>, DefId),
+    Dict(Box<BTreeMap<String, Value>>, DefId),
 
     /// A sequence of attributes.
     ///
@@ -73,18 +74,19 @@ impl Value {
     }
 
     pub fn sequence_of(values: impl IntoIterator<Item = Value>) -> Self {
-        let attrs: Vec<_> = values
+        let sequence: Sequence = values
             .into_iter()
             .map(|val| Attribute {
                 rel: Self::unit(),
                 val,
             })
             .collect();
-        let type_def_id = attrs
+        let type_def_id = sequence
+            .attrs()
             .first()
             .map(|attr| attr.val.type_def_id())
             .unwrap_or(DefId::unit());
-        Self::Sequence(Sequence::new(attrs), type_def_id)
+        Self::Sequence(sequence, type_def_id)
     }
 
     #[inline]
@@ -234,7 +236,7 @@ impl PartialOrd for Value {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Serial(pub u64);
 
 pub struct FormatValueAsText<'d, 'o> {
@@ -371,7 +373,7 @@ impl<'v> Display for ValueDebug<'v> {
             }
             Value::Sequence(seq, _) => {
                 write!(f, "[")?;
-                let mut iter = seq.attrs.iter().peekable();
+                let mut iter = seq.attrs().iter().peekable();
                 while let Some(attr) = iter.next() {
                     write!(f, "{}", AttrDebug(attr),)?;
 

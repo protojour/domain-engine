@@ -27,9 +27,9 @@ impl<'v> juniper::GraphQLValue<GqlScalar> for SequenceType<'v> {
             .list_contents()
             .expect("Current type is not a list type")
             .is_non_null();
-        let mut result = Vec::with_capacity(self.seq.attrs.len());
+        let mut result = Vec::with_capacity(self.seq.attrs().len());
 
-        for attr in &self.seq.attrs {
+        for attr in self.seq.attrs() {
             let val = executor.resolve::<AttributeType>(info, &AttributeType { attr })?;
             if stop_on_null && val.is_null() {
                 return Ok(val);

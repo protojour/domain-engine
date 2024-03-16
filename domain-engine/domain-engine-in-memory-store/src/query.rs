@@ -112,27 +112,27 @@ impl InMemoryStore {
             raw_props_vec = raw_props_vec.into_iter().take(limit).collect();
         }
 
-        let mut entity_sequence = Sequence::new_with_capacity(raw_props_vec.len());
-
-        entity_sequence.sub_seq = Some(Box::new(SubSequence {
-            end_cursor: if limit > 0 {
-                Some(
-                    bincode::serialize(&Cursor {
-                        offset: start_offset + limit - 1,
-                    })
-                    .unwrap()
-                    .into(),
-                )
-            } else {
-                after_cursor.map(|after_cursor| bincode::serialize(&after_cursor).unwrap().into())
-            },
-            has_next: start_offset + limit < total_size,
-            total_len: if include_total_len {
-                Some(total_size)
-            } else {
-                None
-            },
-        }));
+        let mut entity_sequence =
+            Sequence::with_capacity(raw_props_vec.len()).with_sub(SubSequence {
+                end_cursor: if limit > 0 {
+                    Some(
+                        bincode::serialize(&Cursor {
+                            offset: start_offset + limit - 1,
+                        })
+                        .unwrap()
+                        .into(),
+                    )
+                } else {
+                    after_cursor
+                        .map(|after_cursor| bincode::serialize(&after_cursor).unwrap().into())
+                },
+                has_next: start_offset + limit < total_size,
+                total_len: if include_total_len {
+                    Some(total_size)
+                } else {
+                    None
+                },
+            });
 
         for (entity_key, properties) in raw_props_vec {
             let value = self.apply_struct_select(
@@ -144,7 +144,7 @@ impl InMemoryStore {
                 ctx,
             )?;
 
-            entity_sequence.attrs.push(value.into());
+            entity_sequence.push(value.into());
         }
 
         Ok(entity_sequence)
@@ -185,7 +185,7 @@ impl InMemoryStore {
                     properties.insert(
                         *property_id,
                         Value::Sequence(
-                            Sequence::new(attrs),
+                            Sequence::from_iter(attrs),
                             match data_relationship.target {
                                 DataRelationshipTarget::Unambiguous(def_id) => def_id,
                                 DataRelationshipTarget::Union(union_def_id) => union_def_id,

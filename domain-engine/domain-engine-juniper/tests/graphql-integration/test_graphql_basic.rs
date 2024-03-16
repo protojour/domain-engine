@@ -383,14 +383,11 @@ async fn test_graphql_basic_pagination() {
                         assert_eq!(entity_select.limit, 42);
                         assert_eq!(entity_select.after_cursor.as_deref().unwrap(), &['1' as u8]);
 
-                        Ok(Response::Query(Sequence::new_sub(
-                            [],
-                            SubSequence {
-                                end_cursor: Some(Box::new(['2' as u8])),
-                                has_next: true,
-                                total_len: Some(42),
-                            },
-                        )))
+                        Ok(Response::Query(Sequence::default().with_sub(SubSequence {
+                            end_cursor: Some(Box::new(['2' as u8])),
+                            has_next: true,
+                            total_len: Some(42),
+                        })))
                     })
             ),
         )
@@ -431,14 +428,11 @@ async fn test_graphql_basic_pagination() {
                         assert_eq!(entity_select.limit, 1);
                         assert_eq!(entity_select.after_cursor, None);
 
-                        Ok(Response::Query(Sequence::new_sub(
-                            [],
-                            SubSequence {
-                                end_cursor: Some(vec!['1' as u8].into_boxed_slice()),
-                                has_next: true,
-                                total_len: Some(42),
-                            },
-                        )))
+                        Ok(Response::Query(Sequence::default().with_sub(SubSequence {
+                            end_cursor: Some(vec!['1' as u8].into_boxed_slice()),
+                            has_next: true,
+                            total_len: Some(42),
+                        })))
                     })
             ),
         )
@@ -471,7 +465,7 @@ async fn test_graphql_nodes() {
     let [foo] = test.bind(["foo"]);
     let query_mock = DataStoreAPIMock::execute
         .next_call(matching!(Request::Query(_), _))
-        .returns(Ok(Response::Query(Sequence::new([foo
+        .returns(Ok(Response::Query(Sequence::from_iter([foo
             .entity_builder(json!("id"), json!({}))
             .into()]))));
 
@@ -706,7 +700,7 @@ async fn test_graphql_artist_and_instrument_connections() {
                 root(),
                 DataStoreAPIMock::execute
                     .next_call(matching!(Request::Query(_), _session))
-                    .returns(Ok(Response::Query(Sequence::new([ziggy.clone()]))))
+                    .returns(Ok(Response::Query(Sequence::from_iter([ziggy.clone()]))))
             )
         )
         .await,
@@ -1060,7 +1054,7 @@ async fn test_graphql_guitar_synth_union_selection() {
 
     let query_mock = DataStoreAPIMock::execute
         .next_call(matching!(Request::Query(_), _session))
-        .returns(Ok(Response::Query(Sequence::new([artist
+        .returns(Ok(Response::Query(Sequence::from_iter([artist
             .entity_builder(
                 json!("artist/88832e20-8c6e-46b4-af79-27b19b889a58"),
                 json!({
@@ -1346,7 +1340,7 @@ async fn test_graphql_municipalities_named_query() {
 
     let query_mock = DataStoreAPIMock::execute
         .next_call(matching!(Request::Query(_), _session))
-        .returns(Ok(Response::Query(Sequence::new([municipality
+        .returns(Ok(Response::Query(Sequence::from_iter([municipality
             .entity_builder(
                 json!("OSL"),
                 json!({

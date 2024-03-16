@@ -154,16 +154,16 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                     .unwrap()
             }
             SerdeOperator::DynamicSequence => {
-                return Ok(Value::Sequence(Sequence::new([]), DefId::unit()).into());
+                return Ok(Value::Sequence(Sequence::default(), DefId::unit()).into());
             }
             SerdeOperator::RelationSequence(seq_op) => {
                 return if processor.level().current_global_level() > SENSIBLE_RECURSION_LEVEL {
-                    Ok(Value::Sequence(Sequence::new([]), seq_op.def.def_id).into())
+                    Ok(Value::Sequence(Sequence::default(), seq_op.def.def_id).into())
                 } else {
                     let variant = &seq_op.ranges[0];
                     let attr = self.fake_attribute(processor.narrow(variant.addr))?;
 
-                    Ok(Value::Sequence(Sequence::new([attr]), seq_op.def.def_id).into())
+                    Ok(Value::Sequence(Sequence::from_iter([attr]), seq_op.def.def_id).into())
                 }
             }
             SerdeOperator::ConstructorSequence(seq_op) => {
@@ -179,7 +179,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
                     }
                 }
 
-                Value::Sequence(Sequence::new(attrs), seq_op.def.def_id)
+                Value::Sequence(Sequence::from_iter(attrs), seq_op.def.def_id)
             }
             SerdeOperator::Alias(alias_op) => {
                 return self.fake_attribute(processor.narrow(alias_op.inner_addr));

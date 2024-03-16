@@ -202,7 +202,7 @@ async fn mutation(
             for entity_mutation in entity_mutations {
                 let values = entity_mutation
                     .inputs
-                    .attrs
+                    .into_attrs()
                     .into_iter()
                     .map(|attr| attr.val)
                     .collect();
@@ -224,14 +224,12 @@ async fn mutation(
             for batch_write_response in batch_write_responses {
                 match batch_write_response {
                     BatchWriteResponse::Inserted(values) | BatchWriteResponse::Updated(values) => {
-                        output_sequence
-                            .attrs
-                            .extend(values.into_iter().map(Into::into));
+                        output_sequence.extend(values.into_iter().map(Into::into));
                     }
                     BatchWriteResponse::Deleted(bools) => {
                         let bool_type = schema_ctx.ontology.ontol_domain_meta().bool;
 
-                        output_sequence.attrs.extend(
+                        output_sequence.extend(
                             bools
                                 .into_iter()
                                 .map(|bool| Value::I64(if bool { 1 } else { 0 }, bool_type).into()),

@@ -167,7 +167,7 @@ impl InMemoryStore {
                     ctx,
                 )?;
 
-                for attr in entity_seq.attrs {
+                for attr in entity_seq.into_attrs() {
                     let id = find_inherent_entity_id(&attr.val, &ctx.ontology)?;
                     if let Some(id) = id {
                         let dynamic_key = Self::extract_dynamic_key(&id)?;
@@ -259,7 +259,7 @@ impl InMemoryStore {
                                 )));
                             };
 
-                            for attribute in seq.attrs {
+                            for attribute in seq.into_attrs() {
                                 self.insert_entity_relationship(
                                     type_info.def_id,
                                     &entity_key,

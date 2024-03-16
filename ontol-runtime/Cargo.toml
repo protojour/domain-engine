@@ -24,6 +24,7 @@ bit-set.workspace = true
 thin-vec.workspace = true
 regex-automata.workspace = true
 arcstr.workspace = true
+ordered-float.workspace = true
 num = { version = "0.4", features = ["serde"] }
 serde-value = "0.7"
 time = { version = "0.3", features = ["serde-well-known"] }
@@ -34,6 +35,7 @@ thiserror = "1"
 documented = "0.3.0"
 strum = { version = "0.26.1", features = ["derive"] }
 strum_macros = "0.26.1"
+ahash = "0.8"
 
 [dev-dependencies]
 tracing-subscriber.workspace = true

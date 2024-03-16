@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
@@ -34,7 +34,7 @@ pub struct Struct {
     pub attributes: FnvHashMap<PropertyId, Attribute>,
     pub id: Option<Value>,
     pub rel_params: Value,
-    open_dict: HashMap<String, Value>,
+    open_dict: BTreeMap<String, Value>,
     observed_required_count: usize,
 }
 
@@ -84,7 +84,7 @@ impl Default for Struct {
             attributes: FnvHashMap::default(),
             id: None,
             rel_params: Value::unit(),
-            open_dict: HashMap::default(),
+            open_dict: BTreeMap::default(),
             observed_required_count: 0,
         }
     }

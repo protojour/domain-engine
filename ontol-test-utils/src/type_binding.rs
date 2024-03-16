@@ -288,6 +288,6 @@ pub trait ToSequence {
 
 impl ToSequence for Vec<Attribute> {
     fn to_sequence_attribute(self, ty: &TypeBinding) -> Attribute {
-        Value::Sequence(Sequence::new(self), ty.type_info.def_id).to_attr(Value::unit())
+        Value::Sequence(Sequence::from_iter(self), ty.type_info.def_id).to_attr(Value::unit())
     }
 }

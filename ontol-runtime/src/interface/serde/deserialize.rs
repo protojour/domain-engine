@@ -4,6 +4,7 @@ use serde::{
     Deserializer,
 };
 use smartstring::alias::String;
+use thin_vec::ThinVec;
 use tracing::trace;
 
 use crate::{
@@ -12,7 +13,6 @@ use crate::{
         deserialize_matcher::MapMatchResult,
         deserialize_struct::{StructDeserializer, StructVisitor},
     },
-    sequence::Sequence,
     value::{Attribute, Serial, Value},
 };
 
@@ -310,7 +310,7 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
             .match_sequence()
             .map_err(|_| Error::invalid_type(Unexpected::Seq, &self))?;
 
-        let mut attrs = vec![];
+        let mut attrs = ThinVec::with_capacity(seq.size_hint().unwrap_or(0));
 
         loop {
             let processor = match sequence_matcher.match_next_seq_element() {
@@ -320,9 +320,7 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
                 None => {
                     // note: if there are more elements to deserialize,
                     // serde will automatically generate a 'trailing characters' error after returning:
-                    return Ok(
-                        Value::Sequence(Sequence::new(attrs), sequence_matcher.type_def_id).into(),
-                    );
+                    return Ok(Value::Sequence(attrs.into(), sequence_matcher.type_def_id).into());
                 }
             };
 
@@ -332,10 +330,7 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
                 }
                 None => {
                     return if sequence_matcher.match_seq_end().is_ok() {
-                        Ok(
-                            Value::Sequence(Sequence::new(attrs), sequence_matcher.type_def_id)
-                                .into(),
-                        )
+                        Ok(Value::Sequence(attrs.into(), sequence_matcher.type_def_id).into())
                     } else {
                         Err(Error::invalid_length(attrs.len(), &self))
                     };

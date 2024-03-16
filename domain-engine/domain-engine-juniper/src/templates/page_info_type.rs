@@ -27,8 +27,7 @@ impl<'v> juniper::GraphQLValue<GqlScalar> for PageInfoType<'v> {
             "hasNextPage" => {
                 let has_next_page = self
                     .seq
-                    .sub_seq
-                    .as_ref()
+                    .sub()
                     .map(|sub_seq| sub_seq.has_next)
                     .unwrap_or(false);
 
@@ -37,8 +36,7 @@ impl<'v> juniper::GraphQLValue<GqlScalar> for PageInfoType<'v> {
             "endCursor" => {
                 let end_cursor = self
                     .seq
-                    .sub_seq
-                    .as_ref()
+                    .sub()
                     .and_then(|sub_seq| sub_seq.end_cursor.as_ref());
 
                 let value = match end_cursor {

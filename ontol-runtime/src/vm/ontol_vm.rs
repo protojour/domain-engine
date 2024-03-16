@@ -287,7 +287,7 @@ impl<'o> Processor for OntolProcessor<'o> {
     }
 
     fn set_sub_seq(&mut self, target: Local, source: Local) -> VmResult<()> {
-        let sub_seq = self.sequence_local_mut(source)?.sub_seq.clone();
+        let sub_seq = self.sequence_local_mut(source)?.clone_sub();
         self.sequence_local_mut(target)?.sub_seq = sub_seq;
         Ok(())
     }
@@ -324,10 +324,7 @@ impl<'o> Processor for OntolProcessor<'o> {
                 self.ontology.ontol_domain_meta.text,
             );
             self.stack.push(Value::Sequence(
-                Sequence {
-                    attrs: attributes,
-                    sub_seq: None,
-                },
+                attributes.into(),
                 self.ontology.ontol_domain_meta.text,
             ));
         } else {
@@ -348,7 +345,7 @@ impl<'o> Processor for OntolProcessor<'o> {
 
         let text_pattern = self.ontology.get_text_pattern(pattern_id).unwrap();
 
-        let mut attrs: Vec<Attribute> = Vec::new();
+        let mut attrs: ThinVec<Attribute> = ThinVec::new();
         let text_def_id = self.ontology.ontol_domain_meta.text;
 
         for captures in text_pattern
@@ -359,16 +356,12 @@ impl<'o> Processor for OntolProcessor<'o> {
             let value_attributes =
                 extract_regex_captures(haystack, &captures, group_filter, text_def_id);
             attrs.push(Attribute::from(Value::Sequence(
-                Sequence {
-                    attrs: value_attributes,
-                    sub_seq: None,
-                },
+                value_attributes.into(),
                 text_def_id,
             )));
         }
 
-        self.stack
-            .push(Value::Sequence(Sequence::new(attrs), text_def_id));
+        self.stack.push(Value::Sequence(attrs.into(), text_def_id));
         Ok(())
     }
 
@@ -469,7 +462,7 @@ impl<'o> OntolProcessor<'o> {
                 Value::Text(a + b, result_type)
             }
             BuiltinProc::NewStruct => Value::Struct(Default::default(), result_type),
-            BuiltinProc::NewSeq => Value::Sequence(Sequence::new(vec![]), result_type),
+            BuiltinProc::NewSeq => Value::Sequence(Default::default(), result_type),
             BuiltinProc::NewUnit => Value::Unit(result_type),
             BuiltinProc::NewFilter => Value::Filter(Default::default(), result_type),
             BuiltinProc::NewVoid => Value::Void(result_type),

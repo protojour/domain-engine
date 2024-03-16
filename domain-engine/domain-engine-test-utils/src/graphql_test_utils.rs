@@ -106,7 +106,7 @@ impl Display for TestError {
 pub fn mock_data_store_query_entities_empty() -> impl unimock::Clause {
     DataStoreAPIMock::execute
         .next_call(matching!(Request::Query(_), _session))
-        .returns(Ok(Response::Query(Sequence::new([]))))
+        .returns(Ok(Response::Query(Sequence::default())))
 }
 
 pub fn gql_ctx_mock_data_store(

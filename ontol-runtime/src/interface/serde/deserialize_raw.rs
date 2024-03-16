@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use serde::{
     de::{DeserializeSeed, Error, MapAccess, SeqAccess, Visitor},
@@ -91,10 +91,7 @@ impl<'o, 'de> Visitor<'de> for RawVisitor<'o> {
     }
 
     fn visit_seq<A: SeqAccess<'de>>(self, mut seq_access: A) -> Result<Self::Value, A::Error> {
-        let mut sequence = match seq_access.size_hint() {
-            Some(cap) => Sequence::new_with_capacity(cap),
-            None => Sequence::new([]),
-        };
+        let mut sequence = Sequence::with_capacity(seq_access.size_hint().unwrap_or(0));
 
         while let Some(value) =
             seq_access.next_element_seed(self.child().map_err(RecursionLimitError::to_de_error)?)?
@@ -106,7 +103,7 @@ impl<'o, 'de> Visitor<'de> for RawVisitor<'o> {
     }
 
     fn visit_map<A: MapAccess<'de>>(self, mut map_access: A) -> Result<Self::Value, A::Error> {
-        let mut dict = HashMap::default();
+        let mut dict = BTreeMap::default();
 
         let child = self.child().map_err(RecursionLimitError::to_de_error)?;
 

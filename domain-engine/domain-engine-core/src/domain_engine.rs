@@ -114,7 +114,7 @@ impl DomainEngine {
                 .get_mapper_proc(&map_key)
                 .expect("No mapping procedure for query output");
 
-            for attr in edge_seq.attrs.iter_mut() {
+            for attr in edge_seq.attrs_mut().iter_mut() {
                 let mut vm = ontology.new_vm(procedure);
 
                 attr.val = self
@@ -504,7 +504,7 @@ impl DomainEngine {
         };
 
         match value_cardinality {
-            ValueCardinality::Unit => match edge_seq.attrs.into_iter().next() {
+            ValueCardinality::Unit => match edge_seq.into_attrs().into_iter().next() {
                 Some(attribute) => Ok(attribute.val),
                 None => Ok(Value::unit()),
             },

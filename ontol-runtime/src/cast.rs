@@ -125,14 +125,14 @@ impl Cast<Vec<Attribute>> for Value {
 
     fn cast_into(self) -> Vec<Attribute> {
         match self {
-            Value::Sequence(seq, _) => seq.attrs.into_iter().collect(),
+            Value::Sequence(seq, _) => seq.into_attrs().into_iter().collect(),
             _ => panic!("not an vector"),
         }
     }
 
     fn cast_ref(&self) -> &Self::Ref {
         match self {
-            Value::Sequence(seq, _) => seq.attrs.as_slice(),
+            Value::Sequence(seq, _) => seq.attrs(),
             _ => panic!("not a vector"),
         }
     }

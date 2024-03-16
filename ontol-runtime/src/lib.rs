@@ -17,6 +17,8 @@ pub mod value;
 pub mod var;
 pub mod vm;
 
+mod equality;
+
 extern crate self as ontol_runtime;
 
 /// Identifies one "package" of ONTOL code.
