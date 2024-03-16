@@ -48,11 +48,11 @@ const GRAPHIQL: &str = r#"
 <html>
 
 <head>
-    <title>Memoriam Domain GraphiQL</title>
+    <title>Ontool GraphiQL</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="//unpkg.com/graphiql/graphiql.min.css" />
     <link rel="shortcut icon" href="/favicon.png" />
+    <link rel="stylesheet" href="//unpkg.com/graphiql/graphiql.min.css" />
     <script crossorigin src="//unpkg.com/react/umd/react.production.min.js"></script>
     <script crossorigin src="//unpkg.com/react-dom/umd/react-dom.production.min.js"></script>
     <script crossorigin src="//unpkg.com/graphiql/graphiql.min.js"></script>
@@ -79,8 +79,7 @@ const GRAPHIQL: &str = r#"
         ReactDOM.render(
             React.createElement(GraphiQL, {
                 fetcher,
-                defaultSecondaryEditorOpen: true,
-                docExplorerOpen: true,
+                visiblePlugin: ['Documentation Explorer']
             }),
             document.getElementById('root'),
         )

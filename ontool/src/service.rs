@@ -2,7 +2,6 @@
 
 use std::{
     convert::Infallible,
-    path::PathBuf,
     sync::{Arc, Mutex},
     task::Poll,
 };
@@ -10,30 +9,14 @@ use std::{
 use crate::graphql::{graphiql_handler, graphql_handler, GraphqlService};
 
 use axum::Extension;
-use clap::Parser;
 use domain_engine_core::{DomainEngine, DomainError, DomainResult, Session};
 use domain_engine_in_memory_store::InMemoryDataStoreFactory;
 use domain_engine_juniper::CreateSchemaError;
 use ontol_runtime::{ontology::Ontology, PackageId};
-
 use tracing::info;
 
-/// This environment variable is used to control logs.
-// const LOG_ENV_VAR: &str = "LOG";
-
-#[global_allocator]
-static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
-
-#[derive(Parser)]
-#[command(author, version, about, long_about = None)]
-struct Args {
-    /// The ontology file to load
-    #[arg(short, long)]
-    ontology: PathBuf,
-}
-
 // app -> router
-pub async fn app(ontology: Ontology) -> axum::Router {
+pub async fn app(ontology: Ontology, addr: String) -> axum::Router {
     let ontology = Arc::new(ontology);
     let engine = Arc::new(
         DomainEngine::builder(ontology.clone())
@@ -58,7 +41,7 @@ pub async fn app(ontology: Ontology) -> axum::Router {
             domain_router(engine.clone(), &domain_path, *package_id).unwrap(),
         );
 
-        info!("domain {package_id:?} served under /d{domain_path}");
+        info!("Domain {package_id:?} served under http://{addr}/d{domain_path}/graphql");
     }
 
     router.layer(tower_http::trace::TraceLayer::new_for_http())

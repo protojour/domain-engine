@@ -9,7 +9,7 @@ use axum::{
     response::Response,
     routing::get,
 };
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use notify_debouncer_full::{
     new_debouncer,
     notify::{RecursiveMode, Watcher},
@@ -21,7 +21,6 @@ use ontol_compiler::{
     Compiler, SourceCodeRegistry, Sources,
 };
 use ontol_lsp::Backend;
-use ontol_parser::parse_statements;
 use ontol_runtime::{
     interface::json_schema::build_openapi_schemas,
     ontology::{
@@ -55,6 +54,9 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// This environment variable is used to control logs.
 const LOG_ENV_VAR: &str = "LOG";
 
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 /// ontool – ONTOlogy Language tool
 #[derive(Parser)]
 #[command(version, about, arg_required_else_help(true))]
@@ -67,83 +69,88 @@ struct Cli {
 enum Commands {
     /// Check ONTOL (.on) files for errors
     Check(Check),
-    /// Compile ONTOL (.on) files
+    /// Compile ONTOL (.on) files to an ontology
     Compile(Compile),
-    /// Generate schemas from ONTOL (.on) files
+    /// Generate JSON schema from ONTOL (.on) files
     Generate(Generate),
+    /// Run ontool in development server mode
+    Serve(Serve),
     /// Run ontool in language server mode
     Lsp,
-    /// Run ontool in serve mode
-    Serve(Serve),
 }
 
 #[derive(Args)]
 #[command(arg_required_else_help(true))]
 struct Check {
     /// ONTOL (.on) files to check for errors
-    files: Vec<String>,
+    files: Vec<PathBuf>,
+
+    /// Search directory for ONTOL files
+    #[arg(short('w'), long, default_value = ".")]
+    dir: PathBuf,
 }
 
 #[derive(Args)]
 #[command(arg_required_else_help(true))]
 struct Compile {
-    /// Output file (default = "ontology")
-    #[arg(short)]
-    output: Option<PathBuf>,
-
-    /// Specify a domain to be backed by a data store
-    #[arg(short('d'), long)]
-    data_store: Option<String>,
-
-    /// Specify a data store backend (e.g. "arangodb")
-    #[arg(short('b'), long)]
-    backend: Option<String>,
-
-    /// Directory of ontol files to compile
-    #[arg(short('w'), long, default_value = ".")]
-    dir: PathBuf,
-
     /// ONTOL (.on) files to compile
     files: Vec<PathBuf>,
-}
 
-#[derive(Args)]
-#[command(arg_required_else_help(true))]
-struct Serve {
-    /// Output file (default = "ontology")
-    #[arg(short)]
-    output: Option<PathBuf>,
+    /// Search directory for ONTOL files
+    #[arg(short('w'), long, default_value = ".")]
+    dir: PathBuf,
 
     /// Specify a domain to be backed by a data store
     #[arg(short('d'), long)]
     data_store: Option<String>,
 
-    /// Specify a data store backend (e.g. "arangodb")
+    /// Specify a data store backend [inmemory, arangodb, ..]
     #[arg(short('b'), long)]
     backend: Option<String>,
 
-    /// Directory of ontol files to compile
-    #[arg(short('w'), long, default_value = ".")]
-    dir: PathBuf,
-
-    /// The root files of the ontology
-    root_files: Vec<PathBuf>,
+    /// Ontology output file
+    #[arg(short, long, default_value = "ontology")]
+    output: PathBuf,
 }
 
 #[derive(Args)]
 #[command(arg_required_else_help(true))]
 struct Generate {
-    /// Generate JSON schema from public types
-    #[arg(short, long)]
-    json_schema: bool,
-    /// Generate JSON schema in YAML format from public types
-    #[arg(short, long)]
-    yaml_schema: bool,
-    /// Directory of ontol files to compile
-    #[arg(short('w'), long, default_value = ".")]
-    dir: PathBuf,
     /// ONTOL (.on) files to generate schemas from
     files: Vec<PathBuf>,
+
+    /// Search directory for ONTOL files
+    #[arg(short('w'), long, default_value = ".")]
+    dir: PathBuf,
+
+    /// Output format for JSON schema
+    #[arg(short('f'), long, default_value = "json")]
+    format: Format,
+}
+
+#[derive(Clone, ValueEnum)]
+enum Format {
+    Json,
+    Yaml,
+}
+
+#[derive(Args)]
+#[command(arg_required_else_help(true))]
+struct Serve {
+    /// Root file(s) of the ontology
+    files: Vec<PathBuf>,
+
+    /// Search directory for ONTOL files
+    #[arg(short('w'), long, default_value = ".")]
+    dir: PathBuf,
+
+    /// Specify a domain to be backed by a data store
+    #[arg(short('d'), long)]
+    data_store: Option<String>,
+
+    /// Specify a port for the server
+    #[arg(short('p'), long, default_value = "5000")]
+    port: u16,
 }
 
 #[derive(Debug, Error)]
@@ -162,129 +169,29 @@ pub enum OntoolError {
     IO(#[from] std::io::Error),
 }
 
-#[derive(Clone)]
-pub enum ChannelMessage {
-    Reload,
-}
-
-async fn ws_upgrade_handler(ws: WebSocketUpgrade, tx: Sender<ChannelMessage>) -> Response {
-    ws.on_upgrade(|socket| handle_ws(socket, tx))
-}
-
-async fn handle_ws(mut socket: WebSocket, tx: Sender<ChannelMessage>) {
-    let mut rx = tx.subscribe();
-    while let Ok(msg) = rx.recv().await {
-        match msg {
-            ChannelMessage::Reload => {
-                if socket.send(Message::Text("reload".into())).await.is_err() {
-                    return;
-                }
-            }
-        }
-    }
-}
-
 pub async fn run() -> Result<(), OntoolError> {
     let cli = Cli::parse();
 
     match cli.command {
         Some(Commands::Check(args)) => {
             init_tracing();
-            check(&args)
+
+            compile(args.dir, args.files, None, None)?;
+            println!("No errors found.");
+
+            Ok(())
         }
         Some(Commands::Compile(args)) => {
             init_tracing();
 
+            let output_file = File::create(args.output)?;
+
             let compile_output = compile(args.dir, args.files, args.data_store, args.backend)?;
-
-            let output_path = args.output.unwrap_or_else(|| PathBuf::from("ontology"));
-
-            let output_file = File::create(output_path).unwrap();
             compile_output
                 .ontology
                 .try_serialize_to_bincode(output_file)
                 .unwrap();
 
-            Ok(())
-        }
-        Some(Commands::Serve(args)) => {
-            init_tracing();
-            let (tx, rx) = std::sync::mpsc::channel();
-            let (reload_tx, _reload_rx) = broadcast::channel::<ChannelMessage>(16);
-            let mut debouncer = new_debouncer(Duration::from_secs(1), None, tx).unwrap();
-
-            debouncer
-                .watcher()
-                .watch(&args.dir, RecursiveMode::NonRecursive)
-                .unwrap();
-            let router_cell: Arc<Mutex<Option<axum::Router>>> = Arc::new(Mutex::new(None));
-            tokio::spawn({
-                let app = router_cell.clone();
-                let reload_tx = reload_tx.clone();
-                async move {
-                    const SERVER_SOCKET_ADDR: &str = "0.0.0.0:5000";
-
-                    let outer_router: axum::Router = axum::Router::new()
-                        .nest_service("/d", Detach { router: app })
-                        .route("/ws", get(|socket| ws_upgrade_handler(socket, reload_tx)));
-                    info!("Binding server to {SERVER_SOCKET_ADDR}");
-                    let _ = axum::Server::bind(&SERVER_SOCKET_ADDR.parse().unwrap())
-                        .serve(outer_router.into_make_service())
-                        .await;
-                }
-            });
-
-            let mut cancellation_token = CancellationToken::new();
-            // initial compilation
-            let compile_output = compile(
-                args.dir.clone(),
-                args.root_files.clone(),
-                args.data_store.clone(),
-                args.backend.clone(),
-            );
-            match compile_output {
-                Ok(output) => {
-                    let new_app = app(output.ontology).await;
-                    let mut lock = router_cell.lock().unwrap();
-                    *lock = Some(new_app);
-                }
-                Err(error) => println!("{:?}", error),
-            }
-
-            for res in rx {
-                match res {
-                    Ok(debounced_event_vec) => {
-                        for debounced_event in debounced_event_vec {
-                            if debounced_event.event.kind.is_modify()
-                                || debounced_event.event.kind.is_create()
-                            {
-                                cancellation_token.cancel();
-                                cancellation_token = CancellationToken::new();
-                                let compile_output = compile(
-                                    args.dir.clone(),
-                                    args.root_files.clone(),
-                                    args.data_store.clone(),
-                                    args.backend.clone(),
-                                );
-                                match compile_output {
-                                    Ok(output) => {
-                                        let new_app = app(output.ontology).await;
-                                        let mut lock = router_cell.lock().unwrap();
-                                        *lock = Some(new_app);
-                                        let _ = reload_tx.send(ChannelMessage::Reload);
-                                    }
-                                    Err(error) => {
-                                        let mut lock = router_cell.lock().unwrap();
-                                        *lock = None;
-                                        println!("{:?}", error);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    Err(error) => println!("{:?}", error),
-                }
-            }
             Ok(())
         }
         Some(Commands::Generate(args)) => {
@@ -298,20 +205,29 @@ pub async fn run() -> Result<(), OntoolError> {
             let domain = ontology.find_domain(root_package).unwrap();
             let schemas = build_openapi_schemas(&ontology, root_package, domain);
 
-            if args.json_schema {
-                let schemas_json = serde_json::to_string_pretty(&schemas)?;
-                println!("{}", schemas_json);
+            match args.format {
+                Format::Json => {
+                    let schemas_json = serde_json::to_string_pretty(&schemas)?;
+                    println!("{}", schemas_json);
+                }
+                Format::Yaml => {
+                    let schemas_yaml = serde_yaml::to_string(&schemas)?;
+                    println!("{}", schemas_yaml);
+                }
             }
 
-            if args.yaml_schema {
-                let schemas_yaml = serde_yaml::to_string(&schemas)?;
-                println!("{}", schemas_yaml);
-            }
+            Ok(())
+        }
+        Some(Commands::Serve(args)) => {
+            init_tracing();
+
+            serve(args.dir, args.files, args.data_store, args.port).await?;
 
             Ok(())
         }
         Some(Commands::Lsp) => {
             init_tracing_stderr();
+
             lsp().await
         }
         None => Ok(()),
@@ -336,37 +252,6 @@ fn init_tracing_stderr() {
         .init();
 }
 
-fn check(args: &Check) -> Result<(), OntoolError> {
-    for filename in &args.files {
-        let source = fs::read_to_string(filename)?;
-        let (_stmts, errors) = parse_statements(&source);
-
-        if errors.is_empty() {
-            println!("{}: no errors found.", filename);
-        } else {
-            let mut colors = ColorGenerator::new();
-            for error in errors {
-                let (span, message) = match error {
-                    ontol_parser::Error::Lex(err) => (err.span(), format!("lex error: {}", err)),
-                    ontol_parser::Error::Parse(err) => {
-                        (err.span(), format!("parse error: {}", err))
-                    }
-                };
-                Report::build(ReportKind::Error, filename, span.start)
-                    .with_label(
-                        Label::new((filename, span))
-                            .with_message(message)
-                            .with_color(colors.next()),
-                    )
-                    .finish()
-                    .eprint((filename, Source::from(&source)))?;
-            }
-            return Err(OntoolError::Parse);
-        }
-    }
-    Ok(())
-}
-
 struct CompileOutput {
     ontology: Ontology,
     root_package: PackageId,
@@ -374,15 +259,15 @@ struct CompileOutput {
 
 fn compile(
     root_dir: PathBuf,
-    root_paths: Vec<PathBuf>,
+    root_files: Vec<PathBuf>,
     data_store_domain: Option<String>,
     backend: Option<String>,
 ) -> Result<CompileOutput, OntoolError> {
-    if root_paths.is_empty() {
+    if root_files.is_empty() {
         return Err(OntoolError::NoInputFiles);
     }
 
-    let root_file_name = get_source_name(root_paths.first().unwrap());
+    let root_file_name = get_source_name(root_files.first().unwrap());
     let mut ontol_sources = Sources::default();
     let mut sources_by_name: HashMap<String, String> = Default::default();
     let mut paths_by_name: HashMap<String, PathBuf> = Default::default();
@@ -520,11 +405,127 @@ fn print_unified_compile_error(
     Ok(())
 }
 
+#[derive(Clone)]
+enum ChannelMessage {
+    Reload,
+}
+
+async fn serve(
+    root_dir: PathBuf,
+    root_files: Vec<PathBuf>,
+    data_store: Option<String>,
+    port: u16,
+) -> Result<(), OntoolError> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    let (reload_tx, _reload_rx) = broadcast::channel::<ChannelMessage>(16);
+    let mut debouncer = new_debouncer(Duration::from_secs(1), None, tx).unwrap();
+
+    debouncer
+        .watcher()
+        .watch(&root_dir, RecursiveMode::NonRecursive)
+        .unwrap();
+
+    let addr = format!("0.0.0.0:{}", port);
+    let router_cell: Arc<Mutex<Option<axum::Router>>> = Arc::new(Mutex::new(None));
+
+    tokio::spawn({
+        let app = router_cell.clone();
+        let addr = addr.clone();
+        let reload_tx = reload_tx.clone();
+        async move {
+            let outer_router = axum::Router::new()
+                .nest_service("/d", Detach { router: app })
+                .route("/ws", get(|socket| ws_upgrade_handler(socket, reload_tx)));
+
+            info!("Serving on http://{addr}");
+            let _ = axum::Server::bind(&addr.parse().unwrap())
+                .serve(outer_router.into_make_service())
+                .await;
+        }
+    });
+
+    // initial compilation
+    let backend = Some(String::from("inmemory"));
+    let compile_output = compile(
+        root_dir.clone(),
+        root_files.clone(),
+        data_store.clone(),
+        backend.clone(),
+    );
+    match compile_output {
+        Ok(output) => {
+            let new_app = app(output.ontology, addr.clone()).await;
+            let mut lock = router_cell.lock().unwrap();
+            *lock = Some(new_app);
+            let _ = reload_tx.send(ChannelMessage::Reload);
+        }
+        Err(error) => println!("{:?}", error),
+    }
+
+    let mut cancellation_token = CancellationToken::new();
+
+    for res in rx {
+        match res {
+            Ok(debounced_event_vec) => {
+                for debounced_event in debounced_event_vec {
+                    if debounced_event.event.kind.is_modify()
+                        || debounced_event.event.kind.is_create()
+                    {
+                        cancellation_token.cancel();
+                        cancellation_token = CancellationToken::new();
+
+                        let compile_output = compile(
+                            root_dir.clone(),
+                            root_files.clone(),
+                            data_store.clone(),
+                            backend.clone(),
+                        );
+                        match compile_output {
+                            Ok(output) => {
+                                let new_app = app(output.ontology, addr.clone()).await;
+                                let mut lock = router_cell.lock().unwrap();
+                                *lock = Some(new_app);
+                                let _ = reload_tx.send(ChannelMessage::Reload);
+                            }
+                            Err(error) => {
+                                let mut lock = router_cell.lock().unwrap();
+                                *lock = None;
+                                println!("{:?}", error);
+                            }
+                        }
+                    }
+                }
+            }
+            Err(error) => println!("{:?}", error),
+        }
+    }
+
+    Ok(())
+}
+
+async fn ws_upgrade_handler(ws: WebSocketUpgrade, tx: Sender<ChannelMessage>) -> Response {
+    ws.on_upgrade(|socket| ws_handler(socket, tx))
+}
+
+async fn ws_handler(mut socket: WebSocket, tx: Sender<ChannelMessage>) {
+    let mut rx = tx.subscribe();
+    while let Ok(msg) = rx.recv().await {
+        match msg {
+            ChannelMessage::Reload => {
+                if socket.send(Message::Text("reload".into())).await.is_err() {
+                    return;
+                }
+            }
+        }
+    }
+}
+
 async fn lsp() -> Result<(), OntoolError> {
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
 
     let (service, socket) = LspService::new(Backend::new);
     Server::new(stdin, stdout, socket).serve(service).await;
+
     Ok(())
 }
