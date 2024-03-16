@@ -17,16 +17,9 @@ def book (
 )
 ```
 
-An instance of `book` is now an _entity_. The value of the [`'id'|id`](relationship_types.md#id) property is required to be unique, and _identifies_ a unique `book`. In fact, another way to express identity is:
+An instance of `book` is now an _entity_. The value of the [`'id'|id`](relationship_types.md#id) property is required to be unique, and _identifies_ a unique `book`.
 
-```ontol
-def book (
-    rel (rel .is: serial) identifies: .
-    rel .'title': text
-)
-```
-
-Notice how we do not say `rel .'id'|id: serial` or `rel serial identifies: .`. [`serial`](primitives.md#serial) is used for all sorts of ids, not just book-identifiers. Thus, `serial` itself cannot identify a book, but an anonymous type that `is: serial` can.
+Notice how we do not say `rel .'id'|id: serial`. [`serial`](primitives.md#serial) is used for all sorts of ids, not just book-identifiers. Thus, `serial` itself cannot identify a book, but an anonymous type that `is: serial` can.
 
 Relationships between types and entities are different:
 
@@ -66,4 +59,4 @@ rel {book} 'authors'::'books_written' {author}
 
 Now, a `book` may have several `'authors'`, and an `author` may have several `'books_written'`.
 
-Entities are an important concept in [datastores](datastores.md) and [APIs](apis.md).
+Entities are an important concept in [data stores](data_stores.md) and [Interfaces](interfaces.md).

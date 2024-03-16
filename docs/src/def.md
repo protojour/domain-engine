@@ -14,7 +14,7 @@ def some_def ()
 // ...
 
 def some_def (
-    rel .'some_prop': text
+    rel . 'some_prop': text
 )
 ```
 
@@ -25,11 +25,11 @@ It is possible to use _anonymous_ `def`s. They usually appear inline in other ex
 
 ```ontol
 def some_def (
-    rel .'some_prop': (rel .is: text)
+    rel . 'some_prop': (rel .is: text)
 )
 ```
 
-`(rel .is: text)` is an anonymous `def`, separate from, but with the properties of [`text`](primitives.md#text).
+`(rel .is: text)` is an anonymous `def` "with the properties of" [`text`](primitives.md#text). More on this in the next chapter.
 
 
 ## `def` modifiers
@@ -45,7 +45,7 @@ def some_def (
 def @private private_def ()
 
 def public_def (
-    rel .'exposed': private_def
+    rel . 'exposed': private_def
 )
 ```
 
@@ -66,7 +66,13 @@ def @open all_yours ()
 `def @symbol` creates a _symbol_, an otherwise empty definition representing the definition name itself.
 
 ```ontol
-def @symbol def_label ()
+def @symbol symbolic ()
+```
+
+This is technically equivalent to:
+
+```ontol
+def symbolic (rel .is: 'symbolic')
 ```
 
 
@@ -78,46 +84,18 @@ _The details of `def @extern` are subject to change._
 
 ```ontol
 def input (
-    rel .'prop': text
+    rel . 'prop': text
 )
 
 def output (
-    rel .'prop': text
-    rel .'additional_prop': text
+    rel . 'prop': text
+    rel . 'additional_prop': text
 )
 
 def @extern hook (
-    rel .'url': 'http://localhost:8080/listener'
+    rel . 'url': 'http://localhost:8080/listener'
     map(input(), output())
 )
 ```
 
 Here, the listener, a server endpoint at the url defined in `hook` can expect to get a structure on the form of `input`, and is expected to respond with a structure corresponding to `output` – in other words, it is expected to supply the text property `'additional_prop'`.
-
-
-## Unions
-
-Unions are also defined using `def`, using conditional [`is`](relationship_types.md#is) relationships. Union variants must have a discriminator for the domain engine to tell them apart; either their primary key structure is different or some inherent property is, such as a constant:
-
-```ontol
-def type_a (
-    rel .'type': 'a'
-)
-
-def type_b (
-    rel .'type': 'b'
-)
-
-def union_ab (
-    rel .is?: type_a
-    rel .is?: type_b
-)
-```
-
-The union `union_ab` may now be used as any other type.
-
-```ontol
-def some_def (
-    rel .'a_or_b': union_ab
-)
-```
