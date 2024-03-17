@@ -117,7 +117,7 @@ pub struct FmtFinalState(pub bool);
 pub enum BuiltinRelationKind {
     /// Relates one definition to another.
     /// The subject type takes on all properties of the object type,
-    /// or binds the subject type to a [union](def.md#unions) if the `is` relation is conditional.
+    /// or binds the subject type to a [union](rel.md#unions) if the `is` relation is conditional.
     /// ```ontol
     /// rel .is: text
     /// ```
@@ -156,8 +156,10 @@ pub enum BuiltinRelationKind {
     /// ```
     Gen,
     /// A relation between an entity and an ordering.
+    /// See the chapter on [interfaces](interfaces.md#order) for more.
     Order,
-    /// A relation that expresses that something has a direction.
+    /// A relation expressing that something has a direction.
+    /// See the chapter on [interfaces](interfaces.md#order) for more.
     Direction,
     /// Gives an example value for a type, for documentation purposes.
     /// ```ontol

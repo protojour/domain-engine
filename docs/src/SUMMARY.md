@@ -17,6 +17,6 @@
   - [Primitives](./primitives.md)
   - [Relation types](./relation_types.md)
   - [Generator types](./generator_types.md)
-- [ontool](./ontool.md)
 - [Data stores](./data_stores.md)
 - [Interfaces](./interfaces.md)
+- [ontool](./ontool.md)

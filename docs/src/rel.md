@@ -19,7 +19,7 @@ rel subject 'relation_name'?: object
 ```
 
 
-## `.` or "self"
+## `.`, or "self"
 
 A common pattern is to define relationships within the block of a [`def`](def.md). In the scope of any block, the subject or object can be replaced by a `.`, meaning "self", and referring to the enclosing type. It is usually used for the subject
 
@@ -78,7 +78,6 @@ def copycat (
     rel .'name': 'ccat'
 )
 ```
-
 
 
 ## Unions
@@ -163,7 +162,6 @@ def text_tuple (
 ```
 
 A value might be expressed e.g. `['a', 'b']` and adressed by index, `text_tuple[0]`.
-
 
 
 ## `rel` relationships and edge properties

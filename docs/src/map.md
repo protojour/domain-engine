@@ -48,7 +48,7 @@ As you can see we've described how a `Person` is renamed and restructured into a
 
 ## `@match map`
 
-If one map arm is preceded by the `@match` modifier, the semantics change to a _one-way_ map, its arms allow _non-equivalence_. Creating a one-way map doesn't mean an equivalence _can't_ exist, it just describes a partial mapping.
+If one map arm is preceded by the `@match` modifier, the semantics change to a _one-way_ map, its arms allow _non-equivalence_. Creating a one-way map doesn't mean an equivalence _can't_ exist, it just describes a partial mapping which does.
 
 Let's say `Person` only had the properties `'Name'` and `'Born'`, and that a value for `'rip'` is required (maybe they're Roman citizens):
 
@@ -120,37 +120,6 @@ def a ( rel .'a': text )
 def b ( rel .'b': text )
 def c ( rel .'c': text )
 
-        'Died'?: d,
-    ),
-    citizen(
-        'name': n,
-        'life_data': life(
-            'dob': b,
-            'rip'?: d,
-        )
-    )
-)
-"#
-        .to_string(),
-    )
-    .unwrap();
-
-    let mut map = ont.types[3].clone().into_map().unwrap();
-    assert_eq!(2, map.arms.len());
-
-    // First arm is a Person
-    match &mut map.arms[0] {
-        MapArm::Map(arm) => {
-            assert_eq!("Person", arm.name);
-
-            let mut expected = vec![
-                ("Name".to_string(), "n".to_string()),
-                ("Born".to_string(), "b".to_string()),
-                ("Died".to_string(), "d".to_string()),
-            ];
-
-            for (i, prop) in arm.properties.iter().enumerate() {
-                let (name, var) = expected
 map (
     a( 'a': x ),
     b( 'b': x ),
@@ -164,8 +133,6 @@ map (
 
 Likewise if there exists a map `a <- @match b` and `b <- @match c`, there should be a transitive map `a <- @match c`.
 
-
-##
 
 ## Named maps
 
