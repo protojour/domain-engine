@@ -1,0 +1,8 @@
+def a (rel .'a': text)
+def b ()
+map(
+    a(
+        'a': /(?<dupe>\w+) (?<dupe>\w+)!/ // ERROR invalid regex: duplicate capture group name
+    ),
+    b()
+)

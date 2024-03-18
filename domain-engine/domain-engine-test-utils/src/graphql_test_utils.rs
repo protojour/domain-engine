@@ -62,7 +62,7 @@ fn compile_schemas_inner<const N: usize>(
     let schemas: [Schema; N] = source_names.map(|source_name| {
         create_graphql_schema(
             ontol_test.ontology_owned(),
-            ontol_test.get_package_id(source_name.0),
+            ontol_test.get_package_id(&source_name.0),
         )
         .unwrap()
     });
@@ -117,7 +117,7 @@ pub fn gql_ctx_mock_data_store(
     let unimock = Unimock::new(setup);
     let domain_engine = DomainEngine::builder(ontol_test.ontology_owned())
         .data_store(DataStore::new(
-            ontol_test.get_package_id(data_store_package.0),
+            ontol_test.get_package_id(&data_store_package.0),
             Box::new(unimock.clone()),
         ))
         .system(Box::new(unimock))

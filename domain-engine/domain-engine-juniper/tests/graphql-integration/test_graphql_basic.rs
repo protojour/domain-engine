@@ -13,7 +13,7 @@ use ontol_runtime::{
 };
 use ontol_test_utils::{
     examples::{ARTIST_AND_INSTRUMENT, GEOJSON, GITMESH, GUITAR_SYNTH_UNION, MUNICIPALITIES, WGS},
-    expect_eq,
+    expect_eq, src_name,
     type_binding::ToSequence,
     SrcName, TestPackages,
 };
@@ -985,7 +985,7 @@ async fn test_create_through_three_domains() {
         ",
         ),
         (
-            SrcName("player"),
+            src_name("player"),
             "
             use 'artist_and_instrument' as ai
 
@@ -1525,7 +1525,7 @@ async fn test_gitmesh_id_error() {
 async fn test_extendsion_and_member_from_foreign_domain() {
     let (_test, [_]) = TestPackages::with_static_sources([
         (
-            SrcName("entry"),
+            src_name("entry"),
             "
             use 'helper' as helper
 
@@ -1537,15 +1537,15 @@ async fn test_extendsion_and_member_from_foreign_domain() {
         ",
         ),
         (
-            SrcName("helper"),
+            src_name("helper"),
             "
             def ext (rel .'ext-field': text)
             def member (rel .'member-field': text)
             ",
         ),
     ])
-    .with_data_store(SrcName("entry"), DataStoreConfig::Default)
-    .compile_schemas([SrcName("entry")]);
+    .with_data_store(src_name("entry"), DataStoreConfig::Default)
+    .compile_schemas([src_name("entry")]);
 }
 
 #[test(tokio::test)]

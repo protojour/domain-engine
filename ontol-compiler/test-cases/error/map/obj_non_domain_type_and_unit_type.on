@@ -1,0 +1,7 @@
+def foo ()
+map (
+    number (), // ERROR expected domain type
+    foo ( // ERROR no properties expected
+        'prop': x
+    )
+)

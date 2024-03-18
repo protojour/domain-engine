@@ -1,0 +1,1 @@
+def() // ERROR parse error: found `(`, expected one of `@private`, `@open`, `@extern`, `@symbol`, identifier

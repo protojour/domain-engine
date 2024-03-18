@@ -1,0 +1,12 @@
+def outer1(rel .'a'?: inner1)
+def outer2(rel .'a'?: inner2)
+def inner1(rel .'b': text)
+def inner2(rel .'b': text)
+
+map(
+    outer1(
+        'a': // ERROR TODO: optional binding required, as a default value cannot be created
+            inner1('b': x)
+    ),
+    outer2('a': inner2('b': x)), // ERROR TODO: optional binding required, as a default value cannot be created
+)

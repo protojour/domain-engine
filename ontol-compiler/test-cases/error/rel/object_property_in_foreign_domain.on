@@ -1,0 +1,13 @@
+use 'foreign' as foreign
+
+def bar (
+    rel .'foo': foreign.foo // This is OK
+)
+
+def baz (
+    rel .'foo'::'baz'
+        foreign.foo // ERROR definition is sealed and cannot be modified
+)
+
+//@ src_name=foreign
+def foo ()

@@ -1,0 +1,10 @@
+// This tests that the eror span is correct
+
+/// A comment - don't remove this
+def union () // ERROR variants of the union have prefixes that are prefixes of other variants
+
+def a (fmt '' => 'foo' => .)
+def b (fmt '' => 'foobar' => .)
+
+rel union is?: a
+rel union is?: b

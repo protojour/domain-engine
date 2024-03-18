@@ -1,4 +1,6 @@
-mod errors;
+use ontol_test_utils::{init_tracing::init_test_tracing, SrcName, TestCompile, TestPackages};
+use std::{borrow::Cow, fs, path::PathBuf};
+
 mod examples;
 mod hir;
 mod interface;
@@ -6,6 +8,7 @@ mod serde;
 mod test_conduit;
 mod test_demo;
 mod test_entity;
+mod test_error_spans;
 mod test_faker;
 mod test_fundamentals;
 mod test_geojson;
@@ -18,3 +21,16 @@ mod test_text_patterns;
 mod unify;
 
 fn main() {}
+
+#[rstest::rstest]
+fn error(#[files("test-cases/error/**/*.on")] path: PathBuf) {
+    init_test_tracing();
+
+    let contents = fs::read_to_string(&path).unwrap();
+
+    let file_name = SrcName(Cow::Owned(
+        path.file_name().unwrap().to_str().unwrap().into(),
+    ));
+
+    TestPackages::parse_multi_ontol(file_name, &contents).compile_fail();
+}

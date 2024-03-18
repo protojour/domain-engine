@@ -1,0 +1,7 @@
+use 'dep' as dep
+def bar (
+    rel . 'foo': dep.foo // ERROR private definition
+)
+
+//@ src_name=dep
+def @private foo ()

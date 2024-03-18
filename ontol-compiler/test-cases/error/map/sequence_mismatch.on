@@ -1,0 +1,20 @@
+def foo (
+    rel .'a': {text}
+    rel .'b': {text}
+)
+
+def bar (
+    rel .'a': text
+    rel .'b': {i64}
+)
+
+map(
+    foo(
+        'a': x, // ERROR {text} variable must be enclosed in {}
+        'b': y, // ERROR {text} variable must be enclosed in {}
+    ),
+    bar(
+        'a': x,
+        'b': y, // ERROR {i64} variable must be enclosed in {}
+    ),
+)

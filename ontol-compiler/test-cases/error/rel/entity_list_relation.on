@@ -1,0 +1,8 @@
+def foo(
+    rel .'id'|id: (rel .is: text)
+    rel .'bars': [bar] // ERROR entity relationships must be sets instead of lists. Use `{}` syntax.
+)
+def bar(
+    rel .'id'|id: (rel .is: text)
+    rel .'field': text
+)

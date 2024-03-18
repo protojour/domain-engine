@@ -1,0 +1,6 @@
+def foo ()
+def bar ()
+rel // ERROR unit type `bar` cannot be part of a union
+    foo is?: bar
+rel // ERROR duplicate anonymous relationship
+    foo is?: bar

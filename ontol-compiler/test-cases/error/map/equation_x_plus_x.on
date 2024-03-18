@@ -1,0 +1,15 @@
+// TODO: It should be able to divide by 2?
+
+def foo (rel .'a': i64)
+def bar (rel .'a': i64)
+map(
+    foo(
+        'a':
+            x // ERROR unsupported variable duplication. Try to simplify the expression
+            +
+            x // ERROR unsupported variable duplication. Try to simplify the expression
+    ),
+    bar(
+        'a': x
+    )
+)

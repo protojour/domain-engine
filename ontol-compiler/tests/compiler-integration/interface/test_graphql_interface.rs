@@ -10,7 +10,7 @@ use ontol_runtime::{
 };
 use ontol_test_utils::{
     examples::ARTIST_AND_INSTRUMENT,
-    expect_eq,
+    expect_eq, src_name,
     test_extensions::{
         graphql::{ObjectDataExt, TypeDataExt, UnitTypeRefExt},
         serde::SerdeOperatorExt,
@@ -81,7 +81,7 @@ fn test_graphql_default_scalar() {
     )
     "
     .compile_then(|test| {
-        let (_schema, test) = schema_test(&test, SrcName::default().0);
+        let (_schema, test) = schema_test(&test, SrcName::default());
         let foo_type = test.type_data("foo", QueryLevel::Node);
         let foo_object = foo_type.object_data();
 
@@ -248,7 +248,7 @@ fn test_imperfect_mapping_mutation() {
             ",
         ),
         (
-            SrcName("inner"),
+            src_name("inner"),
             "
             def inner (
                 rel .'id'|id: (rel .is: text)
@@ -258,7 +258,7 @@ fn test_imperfect_mapping_mutation() {
             ",
         ),
     ])
-    .with_data_store(SrcName("inner"), DataStoreConfig::Default)
+    .with_data_store(src_name("inner"), DataStoreConfig::Default)
     .compile();
     let (_schema, test) = schema_test(&test, SrcName::default());
     let mutation_object = test.mutation_object_data();

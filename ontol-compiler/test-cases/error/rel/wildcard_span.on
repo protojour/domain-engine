@@ -1,0 +1,2 @@
+rel integer // ERROR definition is sealed and cannot be modified
+    'likes': integer

@@ -1,0 +1,4 @@
+def foo ()
+def bar ()
+
+rel foo 0[rel .is: bar]: text // ERROR cannot mix index relation identifiers and edge types

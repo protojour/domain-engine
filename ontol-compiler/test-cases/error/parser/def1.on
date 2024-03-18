@@ -1,0 +1,1 @@
+def // ERROR parse error: expected one of `@private`, `@open`, `@extern`, `@symbol`, identifier

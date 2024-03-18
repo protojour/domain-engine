@@ -1,0 +1,11 @@
+def foo ()
+def bar ()
+rel foo 'a': bar
+map(
+    foo(
+        'a': x,
+        'a': x, // ERROR duplicate property
+        'b': x, // ERROR unknown property
+    ),
+    bar()
+)

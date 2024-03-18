@@ -1,0 +1,15 @@
+def foo (
+    rel .'type': 'foo'
+)
+def bar (
+    rel .'type': 'bar'
+)
+def foobar (
+    rel .is?: foo
+    rel .is?: bar
+)
+
+map(
+    foobar(), // ERROR cannot map a union, map each variant instead
+    foo(), // ERROR missing property `type`// NOTE Consider using `match {}`
+)

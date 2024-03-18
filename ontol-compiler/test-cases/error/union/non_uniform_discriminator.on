@@ -1,0 +1,10 @@
+def foo (
+    rel .'a': 'constant'
+)
+def bar (
+    rel .'b': 'other-constant'
+)
+def u ( // ERROR no uniform discriminator found for union variants
+    rel .is?: foo
+    rel .is?: bar
+)

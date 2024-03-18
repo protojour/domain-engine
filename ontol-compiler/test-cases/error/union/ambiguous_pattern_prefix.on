@@ -1,0 +1,14 @@
+def foo (
+    fmt '' => 'foo' => uuid => .
+)
+def bar (
+    fmt '' => 'bar' => uuid => .
+)
+def barbar (
+    fmt '' => 'barbar' => uuid => .
+)
+def union ( // ERROR variants of the union have prefixes that are prefixes of other variants
+    rel .is?: foo
+    rel .is?: bar
+    rel .is?: barbar
+)

@@ -1,0 +1,1 @@
+def @hello world() // ERROR parse error: found `@hello`, expected one of `@private`, `@open`, `@extern`, `@symbol`, identifier

@@ -47,3 +47,4 @@ pretty_assertions = "1"
 indoc = "2"
 unimock = "0.5"
 serde-value = "0.7"
+rstest = { version = "0.18", default-features = false }

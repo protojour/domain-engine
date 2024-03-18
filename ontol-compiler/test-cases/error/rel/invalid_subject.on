@@ -1,0 +1,3 @@
+rel
+    'a' // ERROR subject must be a domain type
+    'b': text

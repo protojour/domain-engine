@@ -1,5 +1,5 @@
 use ontol_test_utils::{
-    serde_helper::serde_raw, test_map::AsKey, SrcName, TestCompile, TestPackages,
+    serde_helper::serde_raw, src_name, test_map::AsKey, TestCompile, TestPackages,
 };
 use serde_json::json;
 use test_log::test;
@@ -661,7 +661,7 @@ fn test_map_complex_flow() {
 fn test_map_delegation() {
     TestPackages::with_static_sources([
         (
-            SrcName("root"),
+            src_name("root"),
             "
             use 'SI' as SI
 
@@ -675,7 +675,7 @@ fn test_map_delegation() {
             ",
         ),
         (
-            SrcName("SI"),
+            src_name("SI"),
             "
             def meters (rel .is: i64)
             def millimeters (rel .is: i64)
@@ -707,7 +707,7 @@ fn test_map_delegation() {
 fn test_map_delegation_abstract_types() {
     TestPackages::with_static_sources([
         (
-            SrcName("entry"),
+            src_name("entry"),
             "
             use 'car' as c
             use 'vehicle' as v
@@ -719,7 +719,7 @@ fn test_map_delegation_abstract_types() {
             ",
         ),
         (
-            SrcName("SI"),
+            src_name("SI"),
             "
             def meters (rel .is: number)
             def millimeters (rel .is: number)
@@ -731,7 +731,7 @@ fn test_map_delegation_abstract_types() {
             ",
         ),
         (
-            SrcName("car"),
+            src_name("car"),
             "
             use 'SI' as SI
             def car (
@@ -743,7 +743,7 @@ fn test_map_delegation_abstract_types() {
             ",
         ),
         (
-            SrcName("vehicle"),
+            src_name("vehicle"),
             "
             use 'SI' as SI
             def vehicle (

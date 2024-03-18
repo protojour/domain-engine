@@ -1,0 +1,16 @@
+// TODO: This should perhaps compile?
+def foo (
+    rel .'p0': {text}
+)
+def bar (
+    rel .'p1': {text}
+)
+
+map(
+    foo(
+        'p0': {x} // ERROR pattern requires an iterated variable (`..x`)
+    ),
+    bar(
+        'p1': {x} // ERROR pattern requires an iterated variable (`..x`)
+    )
+)

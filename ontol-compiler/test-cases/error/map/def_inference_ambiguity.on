@@ -1,0 +1,11 @@
+def foo (
+    rel .'a': text
+    rel .'b': text
+)
+map(
+    (
+        'a': x, // ERROR TODO: Inference failed: Variable is mentioned more than once in the opposing arm// ERROR unknown property
+        'b': y, // ERROR TODO: Inference failed: Corresponding variable not found// ERROR unknown property
+    ),
+    foo('a': x, 'b': x)
+)

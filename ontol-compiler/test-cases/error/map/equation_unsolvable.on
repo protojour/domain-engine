@@ -1,0 +1,18 @@
+def foo (
+    rel .'a': i64
+    rel .'b': i64
+)
+def bar (
+    rel .'a': i64
+    rel .'b': i64
+)
+map(
+    foo(
+        'a': x + y, // ERROR unsolvable equation
+        'b': y * x // ERROR unsolvable equation
+    ),
+    bar(
+        'a': x,
+        'b': y
+    )
+)

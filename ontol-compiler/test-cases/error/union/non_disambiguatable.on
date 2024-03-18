@@ -1,0 +1,18 @@
+def animal_id (
+    fmt '' => text => .
+)
+def plant_id (
+    fmt '' => text => .
+)
+def animal (
+    rel .id: animal_id
+    rel .'class': 'animal'
+)
+def plant (
+    rel .id: plant_id
+    rel .'class': 'plant'
+)
+def lifeform ( // ERROR entity variants of the union are not uniquely identifiable
+    rel .is?: animal
+    rel .is?: plant
+)

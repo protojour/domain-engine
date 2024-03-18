@@ -1,0 +1,4 @@
+def u (
+    rel .is?: i64 // ERROR invalid mix of relationship type for subject
+    rel .0: text
+)

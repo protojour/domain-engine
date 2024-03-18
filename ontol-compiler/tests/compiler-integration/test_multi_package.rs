@@ -1,5 +1,5 @@
 use ontol_test_utils::{
-    assert_json_io_matches, expect_eq, serde_helper::serde_create, SrcName, TestCompile,
+    assert_json_io_matches, expect_eq, serde_helper::serde_create, src_name, TestCompile,
     TestPackages,
 };
 use test_log::test;
@@ -18,7 +18,7 @@ fn import_package_not_found_error() {
 fn load_package() {
     TestPackages::with_static_sources([
         (
-            SrcName("root"),
+            src_name("root"),
             "
             use 'pkg' as other
 
@@ -28,7 +28,7 @@ fn load_package() {
             ",
         ),
         (
-            SrcName("pkg"),
+            src_name("pkg"),
             "
             def foo (
                 rel .'prop': i64
@@ -50,7 +50,7 @@ fn load_package() {
 fn dependency_dag() {
     TestPackages::with_static_sources([
         (
-            SrcName("root"),
+            src_name("root"),
             "
             use 'a' as a
             use 'b' as b
@@ -62,7 +62,7 @@ fn dependency_dag() {
             ",
         ),
         (
-            SrcName("a"),
+            src_name("a"),
             "
             use 'c' as domain_c
             def a (
@@ -71,7 +71,7 @@ fn dependency_dag() {
             ",
         ),
         (
-            SrcName("b"),
+            src_name("b"),
             "
             use 'c' as c
             def b (
@@ -79,7 +79,7 @@ fn dependency_dag() {
             )
             ",
         ),
-        (SrcName("c"), "def c (rel .is: i64)"),
+        (src_name("c"), "def c (rel .is: i64)"),
     ])
     .compile_then(|test| {
         // four user domains, plus `ontol`:
@@ -97,27 +97,27 @@ fn dependency_dag() {
 fn multiple_roots() {
     TestPackages::with_static_sources([
         (
-            SrcName("foo"),
+            src_name("foo"),
             "
             use 'baz' as baz
             def foo ()
             ",
         ),
         (
-            SrcName("bar"),
+            src_name("bar"),
             "
             use 'baz' as baz
             def bar ()
             ",
         ),
         (
-            SrcName("baz"),
+            src_name("baz"),
             "
             def baz ()
             ",
         ),
     ])
-    .with_roots([SrcName("foo"), SrcName("bar")])
+    .with_roots([src_name("foo"), src_name("bar")])
     .compile_then(|test| {
         let _ = test.bind(["foo.foo", "bar.bar", "baz.baz"]);
     });

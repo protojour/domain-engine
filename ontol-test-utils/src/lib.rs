@@ -23,6 +23,7 @@ use type_binding::TypeBinding;
 
 pub mod diagnostics;
 pub mod examples;
+pub mod init_tracing;
 pub mod json_utils;
 pub mod serde_helper;
 pub mod test_extensions;
@@ -140,7 +141,7 @@ impl OntolTest {
     /// Get the ontol_runtime GraphQL schema
     pub fn graphql_schema(&self, source_name: impl Into<SrcName>) -> &GraphqlSchema {
         self.ontology
-            .domain_interfaces(self.get_package_id(source_name.into().0))
+            .domain_interfaces(self.get_package_id(&source_name.into().0))
             .iter()
             .map(|interface| match interface {
                 DomainInterface::GraphQL(schema) => schema,
@@ -173,23 +174,27 @@ pub trait TestCompile: Sized {
     fn compile_fail_then(self, validator: impl Fn(Vec<AnnotatedCompileError>));
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Hash)]
-pub struct SrcName(pub &'static str);
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
+pub struct SrcName(pub Cow<'static, str>);
+
+pub const fn src_name(name: &'static str) -> SrcName {
+    SrcName(Cow::Borrowed(name))
+}
 
 impl From<&'static str> for SrcName {
     fn from(value: &'static str) -> Self {
-        SrcName(value)
+        SrcName(Cow::Borrowed(value))
     }
 }
 
 impl Default for SrcName {
     fn default() -> Self {
-        SrcName("test_root.on")
+        SrcName(Cow::Borrowed("test_root.on"))
     }
 }
 
 pub struct TestPackages {
-    sources_by_name: HashMap<&'static str, Cow<'static, str>>,
+    sources_by_name: HashMap<Cow<'static, str>, Cow<'static, str>>,
     root_package_names: Vec<SrcName>,
     sources: Sources,
     source_code_registry: SourceCodeRegistry,
@@ -198,6 +203,36 @@ pub struct TestPackages {
 }
 
 impl TestPackages {
+    /// Parse a string/file with `//@` directives
+    pub fn parse_multi_ontol(default_name: SrcName, contents: &str) -> Self {
+        let mut sources_by_name: Vec<(SrcName, Cow<'static, str>)> = vec![];
+        let mut cur_name = default_name;
+        let mut cur_source = String::new();
+
+        for (line_no, line) in contents.lines().enumerate() {
+            if line.starts_with("//@") {
+                if line_no > 1 {
+                    sources_by_name.push((
+                        std::mem::take(&mut cur_name),
+                        Cow::Owned(std::mem::take(&mut cur_source)),
+                    ));
+                }
+
+                let source_name = line.strip_prefix("//@ src_name=").unwrap();
+                cur_name = SrcName(Cow::Owned(source_name.into()));
+            } else {
+                cur_source.push_str(line);
+                cur_source.push('\n');
+            }
+        }
+
+        sources_by_name.push((cur_name, Cow::Owned(cur_source)));
+
+        println!("sources by name: {sources_by_name:?}");
+
+        Self::new(sources_by_name)
+    }
+
     /// Configure with an explicit set of named sources.
     /// By default, the first one is chosen as the only root source.
     pub fn with_sources(
@@ -222,12 +257,12 @@ impl TestPackages {
     }
 
     fn new(sources_by_name: Vec<(SrcName, Cow<'static, str>)>) -> Self {
-        let default_root = sources_by_name.first().map(|(name, _)| *name);
+        let default_root = sources_by_name.first().map(|(name, _)| name.clone());
 
         Self {
             sources_by_name: sources_by_name
                 .into_iter()
-                .map(|(name, text)| (name.0, text))
+                .map(|(name, text)| (name.0.clone(), text))
                 .collect(),
             root_package_names: default_root.into_iter().collect(),
             sources: Default::default(),
@@ -254,7 +289,9 @@ impl TestPackages {
 
     fn load_topology(&mut self) -> Result<(PackageTopology, PackageId), UnifiedCompileError> {
         let mut package_graph_builder = PackageGraphBuilder::with_roots(
-            self.root_package_names.iter().map(|name| name.0.into()),
+            self.root_package_names
+                .iter()
+                .map(|name| name.0.clone().into()),
         );
         let mut root_package = None;
 

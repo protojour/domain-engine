@@ -1,0 +1,5 @@
+def foo ()
+def bar ()
+rel foo
+    uuid: // ERROR invalid relation type
+    bar

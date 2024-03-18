@@ -1,0 +1,9 @@
+def foo ( rel .'prop': text )
+def bar ( rel .'prop': text )
+
+map(
+    foo( 'prop': prop ), // ERROR missing property `here`// NOTE Consider using `match {}`
+    bar( 'prop': prop )
+)
+
+rel foo 'here': text

@@ -1,0 +1,5 @@
+def foo (
+    rel .'prop':
+        dep // ERROR namespace not found
+        .foo
+)

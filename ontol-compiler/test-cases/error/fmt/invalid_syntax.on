@@ -1,0 +1,1 @@
+fmt () => () () // ERROR parse error: found `(`, expected one of `def`, `rel`, `fmt`, `map`, `=>`

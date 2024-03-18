@@ -1,0 +1,1 @@
+; // ERROR lex error: illegal character `;`// ERROR lex error: illegal character `;`// ERROR parse error: found `/`, expected one of `use`, `def`, `rel`, `fmt`, `map`

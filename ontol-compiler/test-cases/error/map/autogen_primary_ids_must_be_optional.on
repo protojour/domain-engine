@@ -1,0 +1,6 @@
+def a(rel .'id'[rel .gen: auto]|id: (rel .is: text))
+def b(rel .'id'[rel .gen: auto]|id: (rel .is: text))
+map(
+    a('id': id), // ERROR TODO: optional binding required, as a default value cannot be created
+    b('id': id), // ERROR TODO: optional binding required, as a default value cannot be created
+)

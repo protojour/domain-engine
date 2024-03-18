@@ -1,0 +1,17 @@
+def foo (
+    rel .'prop': text
+)
+def bar (
+    rel .'prop': integer
+)
+map(
+    foo(
+        'prop': x
+    ),
+    bar(
+        'prop':
+            x
+            ;; // ERROR lex error: illegal character `;`
+            foobar // ERROR parse error: found `foobar`, expected one of `)`, `*`, `+`, `,`, `-`, `/`
+    )
+)

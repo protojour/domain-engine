@@ -1,0 +1,3 @@
+fmt () // ERROR fmt needs at least two transitions: `fmt a => b => c`
+fmt () => () // ERROR fmt needs at least two transitions: `fmt a => b => c`
+fmt () => . => 'bar' // ERROR fmt only supports `.` at the final target position

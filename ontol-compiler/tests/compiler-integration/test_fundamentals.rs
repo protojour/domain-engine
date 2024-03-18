@@ -1,8 +1,8 @@
 use ontol_compiler::package::ONTOL_PKG;
 use ontol_runtime::{interface::serde::operator::SerdeOperator, RelationshipId};
 use ontol_test_utils::{
-    assert_json_io_matches, expect_eq, serde_helper::serde_create, type_binding::TypeBinding,
-    OntolTest, SrcName, TestCompile, TestPackages,
+    assert_json_io_matches, expect_eq, serde_helper::serde_create, src_name,
+    type_binding::TypeBinding, OntolTest, TestCompile, TestPackages,
 };
 use test_log::test;
 
@@ -10,7 +10,7 @@ use test_log::test;
 fn test_relations_are_distinct_for_different_domains() {
     TestPackages::with_static_sources([
         (
-            SrcName("entry"),
+            src_name("entry"),
             "
             use 'other' as other
 
@@ -20,7 +20,7 @@ fn test_relations_are_distinct_for_different_domains() {
             ",
         ),
         (
-            SrcName("other"),
+            src_name("other"),
             "
             def foo (
                 rel .'prop': text

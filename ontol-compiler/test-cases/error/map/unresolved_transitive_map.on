@@ -1,0 +1,16 @@
+def a (rel .is?: i64)
+def b (rel .is?: i64)
+
+def c (rel .'p0': a)
+def d (rel .'p1': b)
+
+map(
+    c(
+        'p0':
+            x // ERROR cannot convert this `a` from `b`: These types are not equated.
+    ),
+    d(
+        'p1':
+            x // ERROR cannot convert this `b` from `a`: These types are not equated.
+    )
+)

@@ -2,7 +2,7 @@ use ontol_test_utils::{
     assert_error_msg, assert_json_io_matches,
     examples::{GEOJSON, WGS},
     serde_helper::*,
-    SrcName, TestCompile, TestPackages,
+    src_name, TestCompile, TestPackages,
 };
 use serde_json::json;
 use test_log::test;
@@ -67,7 +67,7 @@ fn test_geojson() {
 fn test_municipalities() {
     TestPackages::with_static_sources([
         (
-            SrcName("entry"),
+            src_name("entry"),
             "
             use 'geojson' as geojson
 

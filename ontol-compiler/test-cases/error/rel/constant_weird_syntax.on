@@ -1,0 +1,3 @@
+def foo (
+    rel .'prop' := 42 // ERROR Incompatible literal// ERROR object must be a data type
+)

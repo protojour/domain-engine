@@ -1,0 +1,12 @@
+def foo ()
+def bar ()
+rel foo 'prop': text
+rel bar 'prop': i64
+map(
+    foo('prop': x),
+    bar(
+        'prop':
+            x // ERROR type mismatch: expected `i64`, found `text`
+            * 2
+    )
+)

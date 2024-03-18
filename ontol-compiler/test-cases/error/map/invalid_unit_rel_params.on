@@ -1,0 +1,11 @@
+def foo (rel .'foo': text)
+def bar (rel .'bar': text)
+
+map(
+    foo(
+        'foo'
+            ['bug': b] // ERROR no relation parameters expected
+            : s
+    ),
+    bar('bar': s)
+)

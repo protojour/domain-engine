@@ -1,0 +1,8 @@
+def foo (
+    rel .'a': text
+    rel .'b': text
+)
+map(
+    ('a'?: x), // ERROR cardinality mismatch
+    @match foo('a': x)
+)
