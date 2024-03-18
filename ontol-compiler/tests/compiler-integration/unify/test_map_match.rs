@@ -525,13 +525,10 @@ fn test_map_with_order_variable() {
     def @symbol by_field ()
 
     map foos(
-        (
-            'order': order,
-            'dir': dir,
-        ),
+        ( 'sort': ord, 'dir': dir ),
         foo {
             ..@match foo(
-                order: order,
+                order: ord,
                 direction: dir,
             )
         }
@@ -542,12 +539,12 @@ fn test_map_with_order_variable() {
         let input = test.mapper().named_map_input_binding("foos");
 
         assert_error_msg!(
-            serde_create(&input).to_value(json!({ "order": "invalid" })),
-            "invalid type: string \"invalid\", expected \"by_field\" at line 1 column 18"
+            serde_create(&input).to_value(json!({ "sort": "bogus" })),
+            "invalid type: string \"bogus\", expected \"by_field\" at line 1 column 15"
         );
         assert_error_msg!(
-            serde_create(&input).to_value(json!({ "dir": "invalid" })),
-            "invalid type: string \"invalid\", expected `<anonymous>` (`ascending` or `descending`) at line 1 column 16"
+            serde_create(&input).to_value(json!({ "dir": "bogus" })),
+            "invalid type: string \"bogus\", expected `<anonymous>` (`ascending` or `descending`) at line 1 column 14"
         );
 
         let foo_json = json!({ "key": "k", "field": "x" });
@@ -569,6 +566,71 @@ fn test_map_with_order_variable() {
                          .value_builder(foo_json.clone())
                          .into()])),
              )
-             .assert_named_forward_map("foos", json!({ "order": "by_field", "dir": "ascending" }), json!([foo_json]));
+             .assert_named_forward_map("foos", json!({ "sort": "by_field", "dir": "ascending" }), json!([foo_json]));
+    });
+}
+
+#[test]
+fn test_map_with_order_multiset() {
+    r#"
+    def foo (
+        rel .'key'|id: (rel .is: text)
+        rel .'a': text
+        rel .'b': text
+        rel .order[
+            rel .0: 'a'
+            rel .direction: descending
+        ]: by_a
+        rel .order[
+            rel .0: 'a'
+            rel .direction: descending
+        ]: by_b
+    )
+    def @symbol by_a ()
+    def @symbol by_b ()
+
+    map foos(
+        (
+            'sort': {..ord},
+        ),
+        foo {
+            ..@match foo(
+                order: {..ord},
+            )
+        }
+    )
+    "#
+    .compile_then(|test| {
+        let [foo] = test.bind(["foo"]);
+        let input = test.mapper().named_map_input_binding("foos");
+
+        assert_error_msg!(
+            serde_create(&input).to_value(json!({ "sort": "bogus" })),
+            "invalid type: string \"bogus\", expected sequence with minimum length 0 at line 1 column 15"
+        );
+        assert_error_msg!(
+            serde_create(&input).to_value(json!({ "sort": ["bogus"] })),
+            "invalid type: string \"bogus\", expected `<anonymous>` (`by_a` or `by_b`) at line 1 column 16"
+        );
+
+        let foo_json = json!({ "key": "k", "a": "x", "b": "y" });
+
+         test.mapper()
+             .with_mock_yielder(
+                 YielderMock::yield_match
+                     .next_call(matching!(
+                         eq!(&ValueCardinality::IndexSet),
+                         eq!(&Literal(indoc! { r#"
+                             (root $a)
+                             (is-entity $a def@1:1)
+                             (order 'by_a' 'by_b')
+                         "#
+                         }))
+                     ))
+                     .returns(Value::sequence_of([foo
+                         .value_builder(foo_json.clone())
+                         .into()])),
+             )
+             .assert_named_forward_map("foos", json!({ "sort": ["by_a", "by_b"] }), json!([foo_json]));
     });
 }

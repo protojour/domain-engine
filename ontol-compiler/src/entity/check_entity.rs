@@ -52,6 +52,11 @@ impl<'m> Compiler<'m> {
                 // But before the union check!
                 self.type_check().repr_check(order_union).check_repr_root();
 
+                self.namespaces
+                    .add_anonymous(def_id.package_id(), order_union);
+
+                self.type_check().check_def(order_union);
+
                 info.order_union = Some(order_union);
             }
         }

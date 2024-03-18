@@ -342,51 +342,76 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
         (parent_def_id, parent_table): (DefId, &IndexMap<PropertyId, Property>),
         output: &mut FnvHashMap<Var, Vec<VarRelationship>>,
     ) {
-        match &pattern.kind {
-            PatternKind::Compound { .. } => {
-                self.scan_source_variables(pattern, flags, output);
-            }
-            PatternKind::Variable(pat_var) => {
-                let found = parent_table.iter().find_map(|(prop_id, _property)| {
-                    let meta = self.defs.relationship_meta(prop_id.relationship_id);
-                    if meta.relationship.relation_def_id == attr_relation_id {
-                        Some((*prop_id, meta))
-                    } else {
-                        None
-                    }
-                });
+        if attr_relation_id == self.primitives.relations.order {
+            let Some(info) = self.entity_ctx.entities.get(&parent_def_id) else {
+                return;
+            };
 
-                if let Some((prop_id, found_relationship_meta)) = found {
-                    let (val_def_id, _cardinality, _) = found_relationship_meta
-                        .relationship
-                        .by(prop_id.role.opposite());
+            let Some(order_union) = info.order_union else {
+                return;
+            };
 
-                    output
-                        .entry(*pat_var)
-                        .or_default()
-                        .push(VarRelationship { val_def_id, flags });
-                } else if attr_relation_id == self.primitives.relations.order {
-                    let Some(info) = self.entity_ctx.entities.get(&parent_def_id) else {
-                        return;
-                    };
-
-                    let Some(order_union) = info.order_union else {
-                        return;
-                    };
-
+            match &pattern.kind {
+                PatternKind::Variable(pat_var) => {
                     output.entry(*pat_var).or_default().push(VarRelationship {
                         val_def_id: order_union,
                         flags,
                     });
-                } else if attr_relation_id == self.primitives.relations.direction {
-                    output.entry(*pat_var).or_default().push(VarRelationship {
-                        val_def_id: self.primitives.direction_union,
-                        flags,
-                    });
                 }
+                PatternKind::Set { elements, .. } => {
+                    for element in elements.iter() {
+                        let mut flags = flags;
+
+                        if element.is_iter {
+                            flags.is_iter = true;
+                        }
+
+                        if let PatternKind::Variable(pat_var) = &element.val.kind {
+                            output.entry(*pat_var).or_default().push(VarRelationship {
+                                val_def_id: order_union,
+                                flags,
+                            });
+                        }
+                    }
+                }
+                _ => {}
             }
-            other => {
-                info!("Skipping a pattern: {other:?}");
+        } else if attr_relation_id == self.primitives.relations.direction {
+            if let PatternKind::Variable(pat_var) = &pattern.kind {
+                output.entry(*pat_var).or_default().push(VarRelationship {
+                    val_def_id: self.primitives.direction_union,
+                    flags,
+                });
+            }
+        } else {
+            match &pattern.kind {
+                PatternKind::Compound { .. } => {
+                    self.scan_source_variables(pattern, flags, output);
+                }
+                PatternKind::Variable(pat_var) => {
+                    let found = parent_table.iter().find_map(|(prop_id, _property)| {
+                        let meta = self.defs.relationship_meta(prop_id.relationship_id);
+                        if meta.relationship.relation_def_id == attr_relation_id {
+                            Some((*prop_id, meta))
+                        } else {
+                            None
+                        }
+                    });
+
+                    if let Some((prop_id, found_relationship_meta)) = found {
+                        let (val_def_id, _cardinality, _) = found_relationship_meta
+                            .relationship
+                            .by(prop_id.role.opposite());
+
+                        output
+                            .entry(*pat_var)
+                            .or_default()
+                            .push(VarRelationship { val_def_id, flags });
+                    }
+                }
+                other => {
+                    info!("Skipping a pattern: {other:?}");
+                }
             }
         }
     }
