@@ -581,7 +581,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     // warn!("Skipping match-struct for now");
 
                     let value_cardinality = match ty {
-                        Type::Seq(..) => ValueCardinality::OrderedSet,
+                        Type::Seq(..) => ValueCardinality::IndexSet,
                         _ => ValueCardinality::Unit,
                     };
 

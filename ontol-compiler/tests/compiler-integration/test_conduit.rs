@@ -101,7 +101,7 @@ fn test_map_match_conduit_blog_post_cond_clauses() {
         .with_mock_yielder(
             YielderMock::yield_match
                 .next_call(matching!(
-                    eq!(&ValueCardinality::OrderedSet),
+                    eq!(&ValueCardinality::IndexSet),
                     eq!(&Literal(indoc! { r#"
                         (root $a)
                         (is-entity $a def@2:5)
@@ -147,7 +147,7 @@ fn test_conduit_feed_public() {
         .with_mock_yielder((
             YielderMock::yield_match
                 .next_call(matching!(
-                    eq!(&ValueCardinality::OrderedSet),
+                    eq!(&ValueCardinality::IndexSet),
                     eq!(&Literal(indoc! { r#"
                         (root $a)
                         (is-entity $a def@2:5)

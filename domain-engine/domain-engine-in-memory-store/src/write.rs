@@ -96,7 +96,7 @@ impl InMemoryStore {
                                 ctx,
                             )?;
                         }
-                        ValueCardinality::OrderedSet | ValueCardinality::List => {
+                        ValueCardinality::IndexSet | ValueCardinality::List => {
                             match attribute.val {
                                 Value::Sequence(_sequence, _) => {
                                     return Err(DomainError::DataStore(anyhow!(
@@ -252,7 +252,7 @@ impl InMemoryStore {
                                 ctx,
                             )?;
                         }
-                        ValueCardinality::OrderedSet | ValueCardinality::List => {
+                        ValueCardinality::IndexSet | ValueCardinality::List => {
                             let Value::Sequence(seq, _) = attribute.val else {
                                 return Err(DomainError::DataStoreBadRequest(anyhow!(
                                     "Expected sequence for ValueCardinality::Many"

@@ -181,7 +181,7 @@ impl InMemoryStore {
                         properties.insert(*property_id, attribute);
                     }
                 }
-                ValueCardinality::OrderedSet | ValueCardinality::List => {
+                ValueCardinality::IndexSet | ValueCardinality::List => {
                     properties.insert(
                         *property_id,
                         Value::Sequence(

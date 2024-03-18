@@ -123,8 +123,8 @@ pub enum ValueCardinality {
     Unit,
     /// The property supports a set of values.
     ///
-    /// The set is insertion-ordered.
-    OrderedSet,
+    /// The set is indexed, i.e. remembers the order of entries.
+    IndexSet,
     /// The property supports a list of values, duplicates are allowed.
     List,
 }

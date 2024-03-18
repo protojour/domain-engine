@@ -392,7 +392,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     } else {
                         // The syntactic sugar case, which is the default behaviour:
                         // Many incoming edges to the same object:
-                        (PropertyCardinality::Optional, ValueCardinality::OrderedSet)
+                        (PropertyCardinality::Optional, ValueCardinality::IndexSet)
                     }
                 }),
             object_prop,
@@ -516,9 +516,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
             DefKind::Relationship(Relationship {
                 relation_def_id,
                 subject: (from.0, self.src.span(from.1)),
-                subject_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::OrderedSet),
+                subject_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::IndexSet),
                 object: (to.0, self.src.span(to.1)),
-                object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::OrderedSet),
+                object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::IndexSet),
                 object_prop: None,
                 rel_params: RelParams::Unit,
             }),
@@ -1443,9 +1443,9 @@ fn convert_cardinality(
 ) -> (PropertyCardinality, ValueCardinality) {
     match ast_cardinality {
         ast::Cardinality::Optional => (PropertyCardinality::Optional, ValueCardinality::Unit),
-        ast::Cardinality::Set => (PropertyCardinality::Mandatory, ValueCardinality::OrderedSet),
+        ast::Cardinality::Set => (PropertyCardinality::Mandatory, ValueCardinality::IndexSet),
         ast::Cardinality::OptionalSet => {
-            (PropertyCardinality::Optional, ValueCardinality::OrderedSet)
+            (PropertyCardinality::Optional, ValueCardinality::IndexSet)
         }
         ast::Cardinality::List => (PropertyCardinality::Mandatory, ValueCardinality::List),
         ast::Cardinality::OptionalList => (PropertyCardinality::Optional, ValueCardinality::List),

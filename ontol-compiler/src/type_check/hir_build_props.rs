@@ -289,7 +289,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         property_id: PropertyId::subject(RelationshipId(
                             self.primitives.relations.order,
                         )),
-                        cardinality: (PropertyCardinality::Optional, ValueCardinality::OrderedSet),
+                        cardinality: (PropertyCardinality::Optional, ValueCardinality::IndexSet),
                         rel_params_def: None,
                         value_def: order_union_def_id,
                         mentioned: false,
@@ -417,7 +417,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             val: val_node,
                         })
                     }
-                    ValueCardinality::OrderedSet | ValueCardinality::List => match &val.kind {
+                    ValueCardinality::IndexSet | ValueCardinality::List => match &val.kind {
                         PatternKind::Set { elements, .. } => {
                             let mut hir_set_elements = smallvec![];
                             let seq_ty = self.types.intern(Type::Seq(rel_params_ty, value_ty));
@@ -518,7 +518,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     && !flags.pat_optional()
                     && !matches!(
                         match_attribute.cardinality.1,
-                        ValueCardinality::OrderedSet | ValueCardinality::List
+                        ValueCardinality::IndexSet | ValueCardinality::List
                     )
                 {
                     self.check_can_construct_default(rel_params_ty, prop_span);
@@ -555,7 +555,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             ontol_hir::PropVariant::Predicate(SetOperator::ElementIn, set_node)
                         }
                         (
-                            ValueCardinality::OrderedSet | ValueCardinality::List,
+                            ValueCardinality::IndexSet | ValueCardinality::List,
                             SetBinaryOperator::ElementIn,
                         ) => {
                             self.error(
@@ -564,7 +564,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             );
                             return None;
                         }
-                        (ValueCardinality::OrderedSet, operator) => {
+                        (ValueCardinality::IndexSet, operator) => {
                             ontol_hir::PropVariant::Predicate(
                                 match operator {
                                     SetBinaryOperator::ElementIn => unreachable!(),
@@ -738,7 +738,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     if target_properties.identified_by.is_some()
                         && matches!(
                             cardinality,
-                            (PropertyCardinality::Optional, _) | (_, ValueCardinality::OrderedSet)
+                            (PropertyCardinality::Optional, _) | (_, ValueCardinality::IndexSet)
                         )
                     {
                         continue;

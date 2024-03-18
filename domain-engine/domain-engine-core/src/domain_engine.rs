@@ -378,7 +378,7 @@ impl DomainEngine {
                             debug!("skipping selection");
                             match value_cardinality {
                                 ValueCardinality::Unit => Ok(Value::unit()),
-                                ValueCardinality::OrderedSet | ValueCardinality::List => {
+                                ValueCardinality::IndexSet | ValueCardinality::List => {
                                     Ok(Value::Sequence(Sequence::default(), def_id))
                                 }
                             }
@@ -508,7 +508,7 @@ impl DomainEngine {
                 Some(attribute) => Ok(attribute.val),
                 None => Ok(Value::unit()),
             },
-            ValueCardinality::OrderedSet | ValueCardinality::List => {
+            ValueCardinality::IndexSet | ValueCardinality::List => {
                 Ok(Value::Sequence(edge_seq, DefId::unit()))
             }
         }

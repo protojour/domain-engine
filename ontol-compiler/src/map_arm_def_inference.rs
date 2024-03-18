@@ -140,7 +140,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                     }
 
                     let value_cardinality = if flags.is_iter {
-                        ValueCardinality::OrderedSet
+                        ValueCardinality::IndexSet
                     } else {
                         ValueCardinality::Unit
                     };

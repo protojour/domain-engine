@@ -353,7 +353,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 }
 
 fn adjust_entity_prop_cardinality(property: &mut Property) {
-    if let ValueCardinality::OrderedSet = property.cardinality.1 {
+    if let ValueCardinality::IndexSet = property.cardinality.1 {
         property.cardinality.0 = PropertyCardinality::Optional;
     }
 }

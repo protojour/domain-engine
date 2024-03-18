@@ -191,7 +191,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 }))
                 .expect("no property operator"),
             ),
-            ValueCardinality::OrderedSet | ValueCardinality::List => (
+            ValueCardinality::IndexSet | ValueCardinality::List => (
                 cardinality.0,
                 self.gen_addr_lazy(SerdeKey::Def(SerdeDef {
                     def_id: type_def_id,
