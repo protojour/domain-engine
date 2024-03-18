@@ -42,9 +42,9 @@ ontol-test-utils.path = "../ontol-test-utils"
 serde_json.workspace = true
 tracing-subscriber.workspace = true
 test-log.workspace = true
+unimock.workspace = true
 assert_matches = "1"
 pretty_assertions = "1"
 indoc = "2"
-unimock = "0.5"
 serde-value = "0.7"
 rstest = { version = "0.18", default-features = false }

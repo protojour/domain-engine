@@ -18,6 +18,6 @@ serde.workspace = true
 serde_json.workspace = true
 fnv.workspace = true
 test-log.workspace = true
+unimock.workspace = true
 jsonschema = { version = "0.17", default-features = false, features = ["draft202012"] }
-unimock = "0.5"
 serde-value = "0.7"

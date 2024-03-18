@@ -50,6 +50,7 @@ thin-vec = { version = "0.2", features = ["serde"] }
 regex-automata = "0.4"
 arcstr = { version = "1", features = ["serde"] }
 ordered-float = { version = "4", features = ["serde"] }
+unimock = "0.5"
 
 [profile.release]
 strip = true
