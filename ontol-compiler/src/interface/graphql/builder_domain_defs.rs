@@ -251,7 +251,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             });
         }
 
-        let repr_kind = self.seal_ctx.get_repr_kind(&def_id).expect("NO REPR KIND");
+        let repr_kind = self.repr_ctx.get_repr_kind(&def_id).expect("NO REPR KIND");
 
         match repr_kind {
             ReprKind::Unit | ReprKind::Struct | ReprKind::StructIntersection(_) => {
@@ -301,7 +301,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 let mut type_variants = thin_vec![];
 
                 for (variant_def_id, _) in variants {
-                    match self.seal_ctx.get_repr_kind(variant_def_id) {
+                    match self.repr_ctx.get_repr_kind(variant_def_id) {
                         Some(ReprKind::Scalar(..)) => {
                             needs_scalar = true;
                             break;
@@ -435,7 +435,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             }
         }
 
-        let repr_kind = self.seal_ctx.get_repr_kind(&def_id).expect("NO REPR KIND");
+        let repr_kind = self.repr_ctx.get_repr_kind(&def_id).expect("NO REPR KIND");
 
         if let Some(properties) = self.relations.properties_by_def_id(def_id) {
             if let Some(table) = &properties.table {
@@ -573,7 +573,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         let value_properties = self.relations.properties_by_def_id(value_def_id);
 
         let is_entity_value = {
-            let repr_kind = self.seal_ctx.get_repr_kind(&value_def_id);
+            let repr_kind = self.repr_ctx.get_repr_kind(&value_def_id);
             match repr_kind {
                 Some(ReprKind::StructUnion(variants)) => {
                     variants.iter().all(|(variant_def_id, _)| {

@@ -57,7 +57,7 @@ impl<'m> Compiler<'m> {
         }
 
         if is_entity {
-            self.entities.entities.insert(def_id, info);
+            self.entity_ctx.entities.insert(def_id, info);
         }
     }
 }

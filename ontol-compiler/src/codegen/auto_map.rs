@@ -129,7 +129,7 @@ fn autogenerate_fmt_to_transparent<'m>(
         compiler,
     )?;
 
-    let transparent_repr_kind = compiler.seal_ctx.get_repr_kind(&transparent_def_id)?;
+    let transparent_repr_kind = compiler.repr_ctx.get_repr_kind(&transparent_def_id)?;
 
     let transparent_var = match transparent_repr_kind {
         ReprKind::Scalar(scalar_def_id, ..) => *var_map.get(scalar_def_id)?,

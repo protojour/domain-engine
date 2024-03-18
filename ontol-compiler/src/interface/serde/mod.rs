@@ -37,7 +37,7 @@ impl<'m> Compiler<'m> {
             primitives: &self.primitives,
             def_types: &self.def_types,
             relations: &self.relations,
-            seal_ctx: &self.seal_ctx,
+            repr_ctx: &self.repr_ctx,
             patterns: &self.text_patterns,
             codegen_tasks: &self.codegen_tasks,
             union_member_cache,

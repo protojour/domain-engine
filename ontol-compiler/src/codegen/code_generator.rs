@@ -45,7 +45,7 @@ pub(super) fn const_codegen<'m>(
     proc_table: &mut ProcTable,
     compiler: &mut Compiler<'m>,
 ) {
-    let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs, &compiler.seal_ctx);
+    let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs, &compiler.repr_ctx);
 
     debug!("Generating const code for\n{}", expr);
 
@@ -78,7 +78,7 @@ pub(super) fn map_codegen<'m>(
     map_flags: MapFlags,
     compiler: &mut Compiler<'m>,
 ) -> MapKey {
-    let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs, &compiler.seal_ctx);
+    let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs, &compiler.repr_ctx);
 
     let body = &func.body;
     let body_span = body.data().span();

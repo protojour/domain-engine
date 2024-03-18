@@ -44,7 +44,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let union_def = self.defs.table.get(&value_union_def_id).unwrap();
 
-        let repr_kind = &self.seal_ctx.get_repr_kind(&value_union_def_id).unwrap();
+        let repr_kind = &self.repr_ctx.get_repr_kind(&value_union_def_id).unwrap();
 
         let union_variants = match repr_kind {
             ReprKind::Union(variants) => variants,
@@ -285,7 +285,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &self,
         def_id: DefId,
     ) -> Result<DomainTypeMatchData<'_>, UnionCheckError> {
-        let repr_kind = self.seal_ctx.get_repr_kind(&def_id).unwrap();
+        let repr_kind = self.repr_ctx.get_repr_kind(&def_id).unwrap();
 
         debug!("find domain type match data {def_id:?}: {repr_kind:?}");
 

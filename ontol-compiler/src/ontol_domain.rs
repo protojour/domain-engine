@@ -321,7 +321,7 @@ impl<'m> Compiler<'m> {
     }
 
     fn repr_smoke_test(&self) {
-        let repr_table = &self.seal_ctx.repr_table;
+        let repr_table = &self.repr_ctx.repr_table;
         assert!(!repr_table.contains_key(&self.primitives.number));
         assert!(!repr_table.contains_key(&self.primitives.integer));
         assert!(!repr_table.contains_key(&self.primitives.float));

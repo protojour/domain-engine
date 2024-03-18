@@ -53,7 +53,7 @@ pub fn generate_union_maps(proc_table: &mut ProcTable, compiler: &mut Compiler) 
     let mut maps_to_union_partial: FnvHashMap<DefId, FnvHashSet<DefId>> = Default::default();
 
     // populate union_data and reverse_union_map
-    for (def_id, repr) in &compiler.seal_ctx.repr_table {
+    for (def_id, repr) in &compiler.repr_ctx.repr_table {
         if let ReprKind::Union(members) | ReprKind::StructUnion(members) = &repr.kind {
             union_data.insert(
                 *def_id,

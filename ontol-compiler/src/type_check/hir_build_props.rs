@@ -70,7 +70,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let hir_meta = Meta { ty, span };
 
-        match self.seal_ctx.get_repr_kind(&type_def_id).unwrap() {
+        match self.repr_ctx.get_repr_kind(&type_def_id).unwrap() {
             ReprKind::Struct | ReprKind::Unit | ReprKind::StructIntersection(_)
                 if is_unit_binding =>
             {
@@ -282,7 +282,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let mut special_attributes: IndexMap<BuiltinRelationKind, MatchAttribute> = IndexMap::new();
 
         if self.relations.identified_by(type_def_id).is_some() {
-            if let Some(order_union_def_id) = self.entities.order_union(&type_def_id) {
+            if let Some(order_union_def_id) = self.entity_ctx.order_union(&type_def_id) {
                 special_attributes.insert(
                     BuiltinRelationKind::Order,
                     MatchAttribute {
@@ -777,7 +777,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     }
 
     fn check_can_construct_default_inner(&self, def_id: DefId) -> bool {
-        match self.seal_ctx.get_repr_kind(&def_id) {
+        match self.repr_ctx.get_repr_kind(&def_id) {
             Some(ReprKind::Struct) => self.check_relations_can_construct_default(def_id),
             Some(ReprKind::StructIntersection(members)) => {
                 if !self.check_relations_can_construct_default(def_id) {

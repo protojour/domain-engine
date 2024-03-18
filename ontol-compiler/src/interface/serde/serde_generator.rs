@@ -32,10 +32,12 @@ use crate::{
     interface::graphql::graphql_namespace::{adapt_graphql_identifier, GqlAdaptedIdent},
     primitive::{PrimitiveKind, Primitives},
     relation::{Constructor, Properties, Relations, UnionMemberCache},
-    repr::repr_model::{ReprKind, ReprScalarKind},
+    repr::{
+        repr_ctx::ReprCtx,
+        repr_model::{ReprKind, ReprScalarKind},
+    },
     strings::Strings,
     text_patterns::{TextPatternSegment, TextPatterns},
-    type_check::seal::SealCtx,
     types::{DefTypes, Type, TypeRef},
     SourceSpan,
 };
@@ -46,7 +48,7 @@ pub struct SerdeGenerator<'c, 'm> {
     pub primitives: &'c Primitives,
     pub def_types: &'c DefTypes<'m>,
     pub relations: &'c Relations,
-    pub seal_ctx: &'c SealCtx,
+    pub repr_ctx: &'c ReprCtx,
     pub patterns: &'c TextPatterns,
     pub codegen_tasks: &'c CodegenTasks<'m>,
     pub union_member_cache: &'c UnionMemberCache,
@@ -445,7 +447,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         typename: TextConstant,
         properties: Option<&'c Properties>,
     ) -> Option<OperatorAllocation> {
-        let repr = self.seal_ctx.repr_table.get(&def.def_id)?;
+        let repr = self.repr_ctx.repr_table.get(&def.def_id)?;
 
         let Some(properties) = properties else {
             return if matches!(

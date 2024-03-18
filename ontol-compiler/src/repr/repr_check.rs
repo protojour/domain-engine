@@ -20,13 +20,15 @@ use crate::{
     relation::{Constructor, Properties, Relations},
     thesaurus::Thesaurus,
     thesaurus::TypeRelation,
-    type_check::seal::SealCtx,
     types::{DefTypes, Type},
     CompileErrors, Note, SourceId, SourceSpan, SpannedCompileError, SpannedNote, NATIVE_SOURCE,
     NO_SPAN,
 };
 
-use super::repr_model::{NumberResolution, Repr, ReprBuilder, ReprKind, ReprScalarKind};
+use super::{
+    repr_ctx::ReprCtx,
+    repr_model::{NumberResolution, Repr, ReprBuilder, ReprKind, ReprScalarKind},
+};
 
 /// If there are repr problems in the ONTOL domain, turn this on.
 /// Otherwise, it's too verbose.
@@ -38,7 +40,7 @@ pub struct ReprCheck<'c, 'm> {
     pub def_types: &'c DefTypes<'m>,
     pub relations: &'c Relations,
     pub thesaurus: &'c Thesaurus,
-    pub seal_ctx: &'c mut SealCtx,
+    pub repr_ctx: &'c mut ReprCtx,
     pub primitives: &'c Primitives,
 
     #[allow(unused)]
@@ -152,7 +154,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         def_id: DefId,
         properties: Option<&Properties>,
     ) -> Result<(), ()> {
-        if self.seal_ctx.repr_table.contains_key(&def_id) {
+        if self.repr_ctx.repr_table.contains_key(&def_id) {
             return Ok(());
         }
 
@@ -194,7 +196,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 );
             }
 
-            self.seal_ctx.repr_table.insert(def_id, repr);
+            self.repr_ctx.repr_table.insert(def_id, repr);
             Ok(())
         } else {
             Err(())

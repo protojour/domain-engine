@@ -98,7 +98,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         // unify the type of variables on either side:
         self.infer_hir_unify_arms(def, &mut arm_nodes, ctx);
 
-        if let Some(key_pair) = TypeMapper::new(self.relations, self.defs, self.seal_ctx)
+        if let Some(key_pair) = TypeMapper::new(self.relations, self.defs, self.repr_ctx)
             .find_map_key_pair([arm_nodes[0].data().ty(), arm_nodes[1].data().ty()])
         {
             self.codegen_tasks.add_map_task(
@@ -209,8 +209,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let first_def_id = first_ty.get_single_def_id().unwrap();
         let second_def_id = second_ty.get_single_def_id().unwrap();
-        let first_repr = self.seal_ctx.get_repr_kind(&first_def_id).unwrap();
-        let second_repr = self.seal_ctx.get_repr_kind(&second_def_id).unwrap();
+        let first_repr = self.repr_ctx.get_repr_kind(&first_def_id).unwrap();
+        let second_repr = self.repr_ctx.get_repr_kind(&second_def_id).unwrap();
 
         match (first_repr, second_repr) {
             (

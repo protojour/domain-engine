@@ -4,13 +4,13 @@ use ontol_runtime::{smart_format, DefId};
 use crate::{
     codegen::task::CodegenTasks,
     def::Defs,
-    entity::Entities,
+    entity::entity_ctx::EntityCtx,
     error::CompileError,
     mem::Intern,
     pattern::Patterns,
     primitive::Primitives,
     relation::Relations,
-    repr::repr_check::ReprCheck,
+    repr::{repr_check::ReprCheck, repr_ctx::ReprCtx},
     strings::Strings,
     thesaurus::Thesaurus,
     types::{DefTypes, FormatType, Type, TypeRef, Types, ERROR_TYPE},
@@ -70,10 +70,11 @@ pub struct TypeCheck<'c, 'm> {
     pub errors: &'c mut CompileErrors,
     pub codegen_tasks: &'c mut CodegenTasks<'m>,
     pub patterns: &'c mut Patterns,
+    pub repr_ctx: &'c mut ReprCtx,
     pub seal_ctx: &'c mut SealCtx,
     pub strings: &'c mut Strings<'m>,
     pub defs: &'c Defs<'m>,
-    pub entities: &'c Entities,
+    pub entity_ctx: &'c EntityCtx,
     pub primitives: &'c Primitives,
 }
 
@@ -150,7 +151,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             relations: self.relations,
             thesaurus: self.thesaurus,
             primitives: self.primitives,
-            seal_ctx: self.seal_ctx,
+            repr_ctx: self.repr_ctx,
             errors: self.errors,
             state: Default::default(),
         }
@@ -180,11 +181,12 @@ impl<'m> Compiler<'m> {
             thesaurus: &mut self.thesaurus,
             codegen_tasks: &mut self.codegen_tasks,
             patterns: &mut self.patterns,
+            repr_ctx: &mut self.repr_ctx,
             seal_ctx: &mut self.seal_ctx,
             strings: &mut self.strings,
             defs: &self.defs,
             primitives: &self.primitives,
-            entities: &self.entities,
+            entity_ctx: &self.entity_ctx,
         }
     }
 }

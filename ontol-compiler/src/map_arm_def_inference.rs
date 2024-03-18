@@ -10,7 +10,7 @@ use tracing::{debug, info};
 
 use crate::{
     def::{Def, DefKind, Defs, LookupRelationshipMeta, RelParams, Relationship},
-    entity::Entities,
+    entity::entity_ctx::EntityCtx,
     pattern::{CompoundPatternAttrKind, PatId, Pattern, PatternKind, Patterns, TypePath},
     primitive::Primitives,
     relation::{Property, Relations},
@@ -43,7 +43,7 @@ pub struct MapArmDefInferencer<'c, 'm> {
     patterns: &'c Patterns,
     relations: &'c mut Relations,
     defs: &'c mut Defs<'m>,
-    entities: &'c Entities,
+    entity_ctx: &'c EntityCtx,
     primitives: &'c Primitives,
     errors: &'c mut CompileErrors,
 }
@@ -365,26 +365,24 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                         .entry(*pat_var)
                         .or_default()
                         .push(VarRelationship { val_def_id, flags });
-                } else {
-                    if attr_relation_id == self.primitives.relations.order {
-                        let Some(info) = self.entities.entities.get(&parent_def_id) else {
-                            return;
-                        };
+                } else if attr_relation_id == self.primitives.relations.order {
+                    let Some(info) = self.entity_ctx.entities.get(&parent_def_id) else {
+                        return;
+                    };
 
-                        let Some(order_union) = info.order_union else {
-                            return;
-                        };
+                    let Some(order_union) = info.order_union else {
+                        return;
+                    };
 
-                        output.entry(*pat_var).or_default().push(VarRelationship {
-                            val_def_id: order_union,
-                            flags,
-                        });
-                    } else if attr_relation_id == self.primitives.relations.direction {
-                        output.entry(*pat_var).or_default().push(VarRelationship {
-                            val_def_id: self.primitives.direction_union,
-                            flags,
-                        });
-                    }
+                    output.entry(*pat_var).or_default().push(VarRelationship {
+                        val_def_id: order_union,
+                        flags,
+                    });
+                } else if attr_relation_id == self.primitives.relations.direction {
+                    output.entry(*pat_var).or_default().push(VarRelationship {
+                        val_def_id: self.primitives.direction_union,
+                        flags,
+                    });
                 }
             }
             other => {
@@ -470,7 +468,7 @@ impl<'m> Compiler<'m> {
             patterns: &self.patterns,
             defs: &mut self.defs,
             relations: &mut self.relations,
-            entities: &self.entities,
+            entity_ctx: &self.entity_ctx,
             primitives: &self.primitives,
             errors: &mut self.errors,
         }

@@ -106,7 +106,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let first = self.check_arm(pat_ids[0]);
         let second = self.check_arm(pat_ids[1]);
 
-        if let Some(key_pair) = TypeMapper::new(self.relations, self.defs, self.seal_ctx)
+        if let Some(key_pair) = TypeMapper::new(self.relations, self.defs, self.repr_ctx)
             .find_map_key_pair([first, second])
         {
             let first_def_id = first.get_single_def_id().unwrap();

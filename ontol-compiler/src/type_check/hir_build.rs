@@ -229,7 +229,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 match expected_ty {
                     Some((Type::Infer(_), _)) => node,
                     Some((expected_ty @ (Type::Domain(def_id) | Type::Anonymous(def_id)), _)) => {
-                        match self.seal_ctx.get_repr_kind(def_id) {
+                        match self.repr_ctx.get_repr_kind(def_id) {
                             Some(ReprKind::Union(members) | ReprKind::StructUnion(members)) => {
                                 let hir_def_id = meta.ty.get_single_def_id().unwrap();
 

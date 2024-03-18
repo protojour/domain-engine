@@ -76,7 +76,7 @@ pub fn generate_graphql_schema<'c>(
     let mut builder = {
         let relations = serde_gen.relations;
         let defs = serde_gen.defs;
-        let seal_ctx = serde_gen.seal_ctx;
+        let repr_ctx = serde_gen.repr_ctx;
         SchemaBuilder {
             lazy_tasks: vec![],
             schema: &mut schema,
@@ -86,7 +86,7 @@ pub fn generate_graphql_schema<'c>(
             relations,
             defs,
             primitives,
-            seal_ctx,
+            repr_ctx,
             resolver_graph: ResolverGraph::new(codegen_tasks.result_map_proc_table.keys().map(
                 |key| {
                     (

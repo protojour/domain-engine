@@ -28,7 +28,7 @@ impl<'m> Compiler<'m> {
         let object = meta.relationship.object;
         let rel_span = *meta.relationship.span;
 
-        match self.seal_ctx.get_repr_kind(&object.0) {
+        match self.repr_ctx.get_repr_kind(&object.0) {
             Some(ReprKind::Scalar(scalar_def_id, ReprScalarKind::Text, _)) => {
                 if object.0.package_id() != package_id
                     || !matches!(self.defs.def_kind(*scalar_def_id), DefKind::TextLiteral(_))

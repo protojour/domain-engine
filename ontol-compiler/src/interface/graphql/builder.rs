@@ -33,9 +33,8 @@ use crate::{
     interface::serde::{serde_generator::SerdeGenerator, SerdeKey},
     primitive::Primitives,
     relation::{Relations, UnionMemberCache},
-    repr::repr_model::ReprKind,
+    repr::{repr_ctx::ReprCtx, repr_model::ReprKind},
     strings::Strings,
-    type_check::seal::SealCtx,
 };
 
 use super::graphql_namespace::GraphqlNamespace;
@@ -57,8 +56,8 @@ pub(super) struct SchemaBuilder<'a, 's, 'c, 'm> {
     pub defs: &'c Defs<'m>,
     /// The compiler's primitives
     pub primitives: &'c Primitives,
-    /// The compiler's sealed type information
-    pub seal_ctx: &'c SealCtx,
+    /// representation of concrete types
+    pub repr_ctx: &'c ReprCtx,
     /// A resolver graph
     pub resolver_graph: ResolverGraph,
     /// cache of which def is member of which unions
@@ -318,7 +317,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             })
             .collect();
 
-        let input_arg = match self.serde_gen.seal_ctx.get_repr_kind(&map_key.input.def_id) {
+        let input_arg = match self.serde_gen.repr_ctx.get_repr_kind(&map_key.input.def_id) {
             Some(ReprKind::Scalar(..)) => {
                 let scalar_input_name: String =
                     match self.serde_gen.defs.def_kind(map_key.input.def_id) {

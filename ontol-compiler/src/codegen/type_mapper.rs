@@ -5,8 +5,7 @@ use crate::{
     def::Defs,
     map::UndirectedMapKey,
     relation::Relations,
-    repr::repr_model::ReprKind,
-    type_check::seal::SealCtx,
+    repr::{repr_ctx::ReprCtx, repr_model::ReprKind},
     types::{Type, TypeRef},
 };
 
@@ -21,15 +20,15 @@ pub struct MapInfo {
 pub struct TypeMapper<'c, 'm> {
     pub relations: &'c Relations,
     pub defs: &'c Defs<'m>,
-    pub seal_ctx: &'c SealCtx,
+    pub repr_ctx: &'c ReprCtx,
 }
 
 impl<'c, 'm> TypeMapper<'c, 'm> {
-    pub fn new(relations: &'c Relations, defs: &'c Defs<'m>, seal_ctx: &'c SealCtx) -> Self {
+    pub fn new(relations: &'c Relations, defs: &'c Defs<'m>, repr_ctx: &'c ReprCtx) -> Self {
         Self {
             relations,
             defs,
-            seal_ctx,
+            repr_ctx,
         }
     }
 
@@ -45,7 +44,7 @@ impl<'c, 'm> TypeMapper<'c, 'm> {
 
         match ty {
             Type::Domain(def_id) | Type::Anonymous(def_id) => {
-                let repr = self.seal_ctx.get_repr_kind(def_id).unwrap();
+                let repr = self.repr_ctx.get_repr_kind(def_id).unwrap();
 
                 match repr {
                     ReprKind::Scalar(scalar_def_id, _, _) => Some(MapInfo {

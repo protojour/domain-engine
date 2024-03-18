@@ -10,7 +10,7 @@ use codegen::task::{execute_codegen_tasks, CodegenTasks};
 use def::{BuiltinRelationKind, DefKind, Defs, LookupRelationshipMeta, RelationshipMeta, TypeDef};
 
 use documented::DocumentedFields;
-use entity::Entities;
+use entity::entity_ctx::EntityCtx;
 pub use error::*;
 use fnv::FnvHashMap;
 use interface::{
@@ -43,6 +43,7 @@ use package::{PackageTopology, Packages, ParsedPackage, ONTOL_PKG};
 use pattern::Patterns;
 use primitive::Primitives;
 use relation::{Properties, Relations, UnionMemberCache};
+use repr::repr_ctx::ReprCtx;
 pub use source::*;
 use strings::Strings;
 use text_patterns::{compile_all_text_patterns, TextPatterns};
@@ -104,9 +105,10 @@ pub struct Compiler<'m> {
     pub(crate) def_types: DefTypes<'m>,
     pub(crate) relations: Relations,
     pub(crate) thesaurus: Thesaurus,
+    pub(crate) repr_ctx: ReprCtx,
     pub(crate) seal_ctx: SealCtx,
     pub(crate) text_patterns: TextPatterns,
-    pub(crate) entities: Entities,
+    pub(crate) entity_ctx: EntityCtx,
 
     pub(crate) codegen_tasks: CodegenTasks<'m>,
 
@@ -134,8 +136,9 @@ impl<'m> Compiler<'m> {
             def_types: Default::default(),
             relations: Relations::default(),
             thesaurus,
+            repr_ctx: ReprCtx::default(),
             seal_ctx: Default::default(),
-            entities: Default::default(),
+            entity_ctx: Default::default(),
             text_patterns: TextPatterns::default(),
             codegen_tasks: Default::default(),
             errors: Default::default(),
@@ -275,7 +278,7 @@ impl<'m> Compiler<'m> {
 
                 for (_, union_def_id) in &namespace.types {
                     let Some(ReprKind::StructUnion(variants)) =
-                        self.seal_ctx.get_repr_kind(union_def_id)
+                        self.repr_ctx.get_repr_kind(union_def_id)
                     else {
                         continue;
                     };
@@ -326,7 +329,7 @@ impl<'m> Compiler<'m> {
                 let def_kind = self.defs.def_kind(type_def_id);
 
                 if let Some(ReprKind::StructUnion(members)) =
-                    self.seal_ctx.get_repr_kind(&type_def_id)
+                    self.repr_ctx.get_repr_kind(&type_def_id)
                 {
                     ontology_union_variants.insert(
                         type_def_id,
@@ -459,7 +462,7 @@ impl<'m> Compiler<'m> {
                 direction_relationship: self.primitives.relations.direction,
             })
             .union_variants(ontology_union_variants)
-            .extended_entity_info(self.entities.entities)
+            .extended_entity_info(self.entity_ctx.entities)
             .lib(self.codegen_tasks.result_lib)
             .docs(docs)
             .const_procs(self.codegen_tasks.result_const_procs)
@@ -486,7 +489,7 @@ impl<'m> Compiler<'m> {
         self.add_inherent_data_relationships(type_def_id, &mut data_relationships, strings);
 
         if let Some(ReprKind::StructIntersection(members)) =
-            self.seal_ctx.get_repr_kind(&type_def_id)
+            self.repr_ctx.get_repr_kind(&type_def_id)
         {
             for (member_def_id, _) in members {
                 self.add_inherent_data_relationships(
@@ -560,7 +563,7 @@ impl<'m> Compiler<'m> {
         let Some(target_properties) = self.relations.properties_by_def_id(target_def_id) else {
             return None;
         };
-        let Some(repr_kind) = self.seal_ctx.get_repr_kind(&target_def_id) else {
+        let Some(repr_kind) = self.repr_ctx.get_repr_kind(&target_def_id) else {
             return None;
         };
 
@@ -749,7 +752,7 @@ impl<'m> Compiler<'m> {
 
             // union and extern checks
             for def_id in type_check.defs.iter_package_def_ids(package_id) {
-                match type_check.seal_ctx.get_repr_kind(&def_id) {
+                match type_check.repr_ctx.get_repr_kind(&def_id) {
                     Some(ReprKind::Union(_) | ReprKind::StructUnion(_)) => {
                         for error in type_check.check_union(def_id) {
                             type_check.errors.push(error);
@@ -775,7 +778,7 @@ impl<'m> Compiler<'m> {
                 // This simplifies later compiler stages, that can trust RelParams::Type is a type with real data in it.
                 if let RelParams::Type(rel_def_id) = &relationship.rel_params {
                     if matches!(
-                        self.seal_ctx.get_repr_kind(rel_def_id).unwrap(),
+                        self.repr_ctx.get_repr_kind(rel_def_id).unwrap(),
                         ReprKind::Unit
                     ) {
                         relationship.rel_params = RelParams::Unit;

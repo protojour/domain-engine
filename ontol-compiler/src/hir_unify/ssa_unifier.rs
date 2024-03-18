@@ -24,8 +24,7 @@ use crate::{
     mem::Intern,
     primitive::Primitives,
     relation::Relations,
-    repr::repr_model::ReprKind,
-    type_check::seal::SealCtx,
+    repr::{repr_ctx::ReprCtx, repr_model::ReprKind},
     typed_hir::{arena_import, Meta, TypedHir, TypedHirData, TypedNodeRef},
     types::{Type, Types, UNIT_TYPE},
     CompileError, CompileErrors, Compiler, SourceSpan, NO_SPAN,
@@ -45,7 +44,7 @@ pub struct SsaUnifier<'c, 'm> {
     pub(super) types: &'c mut Types<'m>,
     #[allow(unused)]
     pub(super) relations: &'c Relations,
-    pub(super) seal_ctx: &'c SealCtx,
+    pub(super) repr_ctx: &'c ReprCtx,
     pub(super) defs: &'c Defs<'m>,
     pub(super) errors: &'c mut CompileErrors,
     pub(super) primitives: &'c Primitives,
@@ -72,7 +71,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         Self {
             types: &mut compiler.types,
             relations: &compiler.relations,
-            seal_ctx: &compiler.seal_ctx,
+            repr_ctx: &compiler.repr_ctx,
             defs: &compiler.defs,
             primitives: &compiler.primitives,
             errors: &mut compiler.errors,
@@ -950,7 +949,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             };
         };
 
-        match self.seal_ctx.get_repr_kind(&def_id) {
+        match self.repr_ctx.get_repr_kind(&def_id) {
             Some(ReprKind::Struct | ReprKind::StructIntersection(_)) => {
                 let var = self.alloc_var();
                 self.mk_node(
