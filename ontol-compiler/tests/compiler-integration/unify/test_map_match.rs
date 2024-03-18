@@ -1,6 +1,8 @@
 use indoc::indoc;
 use ontol_runtime::{format_utils::Literal, property::ValueCardinality, value::Value};
-use ontol_test_utils::{test_map::YielderMock, TestCompile};
+use ontol_test_utils::{
+    assert_error_msg, serde_helper::serde_create, test_map::YielderMock, TestCompile,
+};
 use serde_json::json;
 use test_log::test;
 use unimock::{matching, MockFn};
@@ -463,7 +465,7 @@ fn test_map_match_in_sub_multi_edge() {
 }
 
 #[test]
-fn test_map_with_order() {
+fn test_map_with_order_constant() {
     r#"
     def foo (
         rel .'key'|id: (rel .is: text)
@@ -506,5 +508,67 @@ fn test_map_with_order() {
                         .into()])),
             )
             .assert_named_forward_map("foos", json!({}), json!([foo_json]));
+    });
+}
+
+#[test]
+fn test_map_with_order_variable() {
+    r#"
+    def foo (
+        rel .'key'|id: (rel .is: text)
+        rel .'field': text
+        rel .order[
+            rel .0: 'field'
+            rel .direction: descending
+        ]: by_field
+    )
+    def @symbol by_field ()
+
+    map foos(
+        (
+            'order': order,
+            'dir': dir,
+        ),
+        foo {
+            ..@match foo(
+                order: order,
+                direction: dir,
+            )
+        }
+    )
+    "#
+    .compile_then(|test| {
+        let [foo] = test.bind(["foo"]);
+        let input = test.mapper().named_map_input_binding("foos");
+
+        assert_error_msg!(
+            serde_create(&input).to_value(json!({ "order": "invalid" })),
+            "invalid type: string \"invalid\", expected \"by_field\" at line 1 column 18"
+        );
+        assert_error_msg!(
+            serde_create(&input).to_value(json!({ "dir": "invalid" })),
+            "invalid type: string \"invalid\", expected `<anonymous>` (`ascending` or `descending`) at line 1 column 16"
+        );
+
+        let foo_json = json!({ "key": "k", "field": "x" });
+
+         test.mapper()
+             .with_mock_yielder(
+                 YielderMock::yield_match
+                     .next_call(matching!(
+                         eq!(&ValueCardinality::IndexSet),
+                         eq!(&Literal(indoc! { r#"
+                             (root $a)
+                             (is-entity $a def@1:1)
+                             (order 'by_field')
+                             (direction Ascending)
+                         "#
+                         }))
+                     ))
+                     .returns(Value::sequence_of([foo
+                         .value_builder(foo_json.clone())
+                         .into()])),
+             )
+             .assert_named_forward_map("foos", json!({ "order": "by_field", "dir": "ascending" }), json!([foo_json]));
     });
 }

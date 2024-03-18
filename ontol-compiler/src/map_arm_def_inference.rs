@@ -10,7 +10,9 @@ use tracing::{debug, info};
 
 use crate::{
     def::{Def, DefKind, Defs, LookupRelationshipMeta, RelParams, Relationship},
+    entity::Entities,
     pattern::{CompoundPatternAttrKind, PatId, Pattern, PatternKind, Patterns, TypePath},
+    primitive::Primitives,
     relation::{Property, Relations},
     CompileError, CompileErrors, Compiler, SourceSpan, SpannedCompileError,
 };
@@ -41,6 +43,8 @@ pub struct MapArmDefInferencer<'c, 'm> {
     patterns: &'c Patterns,
     relations: &'c mut Relations,
     defs: &'c mut Defs<'m>,
+    entities: &'c Entities,
+    primitives: &'c Primitives,
     errors: &'c mut CompileErrors,
 }
 
@@ -272,7 +276,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                                     is_option: attr.bind_option,
                                     is_iter: false,
                                 },
-                                table,
+                                (*def_id, table),
                                 output,
                             );
                         }
@@ -292,7 +296,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                                     &element.val,
                                     attr.key.0,
                                     sub_flags,
-                                    table,
+                                    (*def_id, table),
                                     output,
                                 );
                             }
@@ -335,7 +339,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
         pattern: &Pattern,
         attr_relation_id: DefId,
         flags: VarFlags,
-        parent_table: &IndexMap<PropertyId, Property>,
+        (parent_def_id, parent_table): (DefId, &IndexMap<PropertyId, Property>),
         output: &mut FnvHashMap<Var, Vec<VarRelationship>>,
     ) {
         match &pattern.kind {
@@ -343,27 +347,45 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                 self.scan_source_variables(pattern, flags, output);
             }
             PatternKind::Variable(pat_var) => {
-                let Some((prop_id, found_relationship_meta)) =
-                    parent_table.iter().find_map(|(prop_id, _property)| {
-                        let meta = self.defs.relationship_meta(prop_id.relationship_id);
-                        if meta.relationship.relation_def_id == attr_relation_id {
-                            Some((*prop_id, meta))
-                        } else {
-                            None
-                        }
-                    })
-                else {
-                    return;
-                };
+                let found = parent_table.iter().find_map(|(prop_id, _property)| {
+                    let meta = self.defs.relationship_meta(prop_id.relationship_id);
+                    if meta.relationship.relation_def_id == attr_relation_id {
+                        Some((*prop_id, meta))
+                    } else {
+                        None
+                    }
+                });
 
-                let (val_def_id, _cardinality, _) = found_relationship_meta
-                    .relationship
-                    .by(prop_id.role.opposite());
+                if let Some((prop_id, found_relationship_meta)) = found {
+                    let (val_def_id, _cardinality, _) = found_relationship_meta
+                        .relationship
+                        .by(prop_id.role.opposite());
 
-                output
-                    .entry(*pat_var)
-                    .or_default()
-                    .push(VarRelationship { val_def_id, flags });
+                    output
+                        .entry(*pat_var)
+                        .or_default()
+                        .push(VarRelationship { val_def_id, flags });
+                } else {
+                    if attr_relation_id == self.primitives.relations.order {
+                        let Some(info) = self.entities.entities.get(&parent_def_id) else {
+                            return;
+                        };
+
+                        let Some(order_union) = info.order_union else {
+                            return;
+                        };
+
+                        output.entry(*pat_var).or_default().push(VarRelationship {
+                            val_def_id: order_union,
+                            flags,
+                        });
+                    } else if attr_relation_id == self.primitives.relations.direction {
+                        output.entry(*pat_var).or_default().push(VarRelationship {
+                            val_def_id: self.primitives.direction_union,
+                            flags,
+                        });
+                    }
+                }
             }
             other => {
                 info!("Skipping a pattern: {other:?}");
@@ -448,6 +470,8 @@ impl<'m> Compiler<'m> {
             patterns: &self.patterns,
             defs: &mut self.defs,
             relations: &mut self.relations,
+            entities: &self.entities,
+            primitives: &self.primitives,
             errors: &mut self.errors,
         }
     }

@@ -209,21 +209,6 @@ impl<'m> Compiler<'m> {
             .finish();
 
         for def_id in lowered.root_defs {
-            if lowered.map_defs.contains(&def_id) {
-                if let Some(inference_info) = self.check_map_arm_def_inference(def_id) {
-                    self.type_check().check_def(inference_info.source.1);
-                    let new_defs = self
-                        .map_arm_def_inferencer(def_id)
-                        .infer_map_arm_type(inference_info);
-
-                    for def_id in new_defs {
-                        self.type_check().check_def(def_id);
-                    }
-
-                    self.type_check().check_def(inference_info.target.1);
-                }
-            }
-
             self.type_check().check_def(def_id);
         }
 
@@ -801,12 +786,40 @@ impl<'m> Compiler<'m> {
 
         // check map statements
         {
+            let mut map_defs: Vec<DefId> = vec![];
+
+            for def_id in self.defs.iter_package_def_ids(package_id) {
+                {
+                    let Some(def) = self.defs.table.get(&def_id) else {
+                        // Can happen in error cases
+                        continue;
+                    };
+                    if matches!(&def.kind, DefKind::Mapping { .. }) {
+                        map_defs.push(def_id);
+                    } else {
+                        continue;
+                    }
+                }
+
+                // Infer anonymous types at root of named maps
+                if let Some(inference_info) = self.check_map_arm_def_inference(def_id) {
+                    self.type_check().check_def(inference_info.source.1);
+                    let new_defs = self
+                        .map_arm_def_inferencer(def_id)
+                        .infer_map_arm_type(inference_info);
+
+                    for def_id in new_defs {
+                        self.type_check().check_def(def_id);
+                    }
+
+                    self.type_check().check_def(inference_info.target.1);
+                }
+            }
+
             let mut type_check = self.type_check();
-            for def_id in type_check.defs.iter_package_def_ids(package_id) {
-                let Some(def) = type_check.defs.table.get(&def_id) else {
-                    // Can happen in error cases
-                    continue;
-                };
+
+            for def_id in map_defs {
+                let def = type_check.defs.table.get(&def_id).unwrap();
 
                 if let DefKind::Mapping {
                     ident: _,

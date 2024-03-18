@@ -155,6 +155,18 @@ impl<'on, 'p> TestMapper<'on, 'p> {
     }
 
     #[track_caller]
+    pub fn named_map_input_binding(&self, name: &str) -> TypeBinding<'on> {
+        let (package_id, name) = self.test.parse_test_ident(name);
+        let key = self
+            .test
+            .ontology
+            .find_named_forward_map_meta(package_id, name)
+            .unwrap();
+
+        TypeBinding::from_def_id(key.input.def_id, &self.test.ontology)
+    }
+
+    #[track_caller]
     pub fn assert_named_forward_map(
         &self,
         name: &str,
