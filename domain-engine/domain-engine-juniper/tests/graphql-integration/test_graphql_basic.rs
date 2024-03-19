@@ -1569,3 +1569,66 @@ async fn test_const_in_union_bug() {
     "
     .compile_single_schema_with_datastore();
 }
+
+// regression test for https://gitlab.com/protojour/memoriam/domain-engine/-/issues/109
+#[test(tokio::test)]
+async fn test_constant_index_panic() {
+    let (test, [schema]) = TestPackages::with_static_sources([
+        (
+            src_name("events"),
+            "
+            use 'events_db' as db
+
+            def event (
+                rel .'_id'[rel .gen: auto]|id: (rel .is: serial)
+                rel .'_class': 'event'
+            )
+
+            map(
+                event (
+                    '_id'?: id,
+                    '_class': class,
+                ),
+                db.event (
+                    '_id'?: id,
+                    '_class': class,
+                ),
+            )
+
+            map events (
+                (),
+                event { ..@match db.event() }
+            )
+            ",
+        ),
+        (
+            src_name("events_db"),
+            "
+            def event (
+                rel .'_id'[rel .gen: auto]|id: (rel .is: serial)
+                rel .'_class': 'event'
+            )
+            ",
+        ),
+    ])
+    .with_data_store(src_name("events_db"), DataStoreConfig::Default)
+    .compile_schemas([src_name("events")]);
+
+    let [event] = test.bind(["events_db.event"]);
+
+    let store_entity_mock = DataStoreAPIMock::execute
+        .next_call(matching!(Request::Query(_), _session))
+        .returns(Ok(Response::one_inserted(
+            event
+                .entity_builder(json!("0"), json!({ "_class": "event" }))
+                .into(),
+        )));
+
+    let _ = "{ events { nodes { _id _class } } }"
+        .exec(
+            [],
+            &schema,
+            &gql_ctx_mock_data_store(&test, src_name("events"), store_entity_mock),
+        )
+        .await;
+}

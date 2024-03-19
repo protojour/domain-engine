@@ -337,6 +337,18 @@ impl<'m> Compiler<'m> {
                 });
             }
 
+            if package_id == ONTOL_PKG {
+                for def_id in self.defs.text_literals.values().copied() {
+                    domain.add_type(TypeInfo {
+                        def_id,
+                        public: false,
+                        kind: TypeKind::Data(BasicTypeInfo { name: None }),
+                        operator_addr: None,
+                        data_relationships: Default::default(),
+                    });
+                }
+            }
+
             builder.add_domain(package_id, domain);
         }
 
