@@ -2,11 +2,11 @@ default:
     @just --list
 
 ontool:
-    cargo install --path ontool-bin --debug --force
+    cargo install --path ontool --debug --force
 
 lsp:
     #!/usr/bin/env bash
-    cargo build --manifest-path ontool-bin/Cargo.toml --release
+    cargo build --manifest-path ontool/Cargo.toml --release
     cd ontol-language
     for dest in ontol-sublime/bin/ ontol-vscode/bin/; do
         mkdir -p "$dest"  && cp ../target/release/ontool "$dest"; done

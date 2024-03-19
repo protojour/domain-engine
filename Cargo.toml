@@ -14,7 +14,6 @@ members = [
     "ontol-lsp",
     "ontol-macros",
     "ontool",
-    "ontool-bin",
     "onmap",
     "docs/ontol-documentation-preprocessor",
 ]
