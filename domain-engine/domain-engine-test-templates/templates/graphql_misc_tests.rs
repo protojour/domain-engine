@@ -19,7 +19,7 @@ use ontol_test_utils::{
         stix::{stix_bundle, STIX},
         GITMESH, GUITAR_SYNTH_UNION,
     },
-    expect_eq, TestPackages,
+    expect_eq, src_name, TestPackages,
 };
 use test_log::test;
 
@@ -795,4 +795,54 @@ async fn test_gitmesh_ownership_transfer() {
             }
         })),
     );
+}
+
+#[test(tokio::test)]
+// BUG: _class triggers index out of bounds
+#[should_panic(expected = "index out of bounds")]
+async fn test_constant_index_panic() {
+    let (test, [schema]) = TestPackages::with_static_sources([
+        (
+            src_name("events"),
+            "
+            use 'events_db' as db
+
+            def event (
+                rel .'_id'[rel .gen: auto]|id: (rel .is: serial)
+                rel .'_class': 'event'
+            )
+
+            map(
+                event (
+                    '_id'?: id,
+                    '_class': class,
+                ),
+                db.event (
+                    '_id'?: id,
+                    '_class': class,
+                ),
+            )
+
+            map events (
+                (),
+                event { ..@match db.event() }
+            )
+            ",
+        ),
+        (
+            src_name("events_db"),
+            "
+            def event (
+                rel .'_id'[rel .gen: auto]|id: (rel .is: serial)
+                rel .'_class': 'event'
+            )
+            ",
+        ),
+    ])
+    .with_data_store(src_name("events_db"), DataStoreConfig::Default)
+    .compile_schemas([src_name("events")]);
+
+    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned()).await.into();
+
+    let _ = "{ events { nodes { _id } } }".exec([], &schema, &ctx).await;
 }
