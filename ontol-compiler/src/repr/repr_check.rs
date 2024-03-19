@@ -509,7 +509,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             (Sub, Some(ReprKind::Unit), _) => {
                 builder.kind = Some(ReprKind::Union(vec![(def_id, data.rel_span)]));
             }
-            (Sub, Some(ReprKind::Struct), ReprKind::Struct) => {
+            (Sub, Some(ReprKind::Struct), ReprKind::Struct | ReprKind::Unit) => {
                 builder.kind = Some(ReprKind::StructUnion([(def_id, data.rel_span)].into()));
             }
             (Sub, Some(ReprKind::StructUnion(variants)), ReprKind::Struct) => {
