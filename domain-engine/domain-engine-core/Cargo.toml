@@ -9,7 +9,7 @@ edition = "2021"
 doctest = false
 
 [dependencies]
-ontol-runtime.path = "../../ontol-runtime"
+ontol-runtime.path = "../../ontol/ontol-runtime"
 smartstring.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
@@ -29,7 +29,7 @@ serde_json = "1"
 anyhow = "1"
 
 [dev-dependencies]
-ontol-test-utils.path = "../../ontol-test-utils"
+ontol-test-utils.path = "../../ontol/ontol-test-utils"
 domain-engine-test-utils.path = "../domain-engine-test-utils"
 test-log.workspace = true
 tracing-subscriber.workspace = true

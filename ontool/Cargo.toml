@@ -5,10 +5,10 @@ edition = "2021"
 
 [dependencies]
 domain-engine-juniper.path = "../domain-engine/domain-engine-juniper"
-ontol-compiler.path = "../ontol-compiler"
-ontol-parser.path = "../ontol-parser"
-ontol-runtime.path = "../ontol-runtime"
-ontol-lsp.path = "../ontol-lsp"
+ontol-compiler.path = "../ontol/ontol-compiler"
+ontol-parser.path = "../ontol/ontol-parser"
+ontol-runtime.path = "../ontol/ontol-runtime"
+ontol-lsp.path = "../ontol/ontol-lsp"
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true

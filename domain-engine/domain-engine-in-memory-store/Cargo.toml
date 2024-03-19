@@ -9,7 +9,7 @@ edition = "2021"
 doctest = false
 
 [dependencies]
-ontol-runtime.path = "../../ontol-runtime"
+ontol-runtime.path = "../../ontol/ontol-runtime"
 domain-engine-core.path = "../domain-engine-core"
 async-trait.workspace = true
 tokio = { workspace = true, features = ["sync"] }
@@ -26,7 +26,7 @@ anyhow = "1"
 bincode = "1"
 
 [dev-dependencies]
-ontol-test-utils.path = "../../ontol-test-utils"
+ontol-test-utils.path = "../../ontol/ontol-test-utils"
 domain-engine-test-utils.path = "../domain-engine-test-utils"
 test-log.workspace = true
 tracing-subscriber.workspace = true

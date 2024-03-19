@@ -70,7 +70,7 @@ Every feature must be properly tested and every encountered bug must have a
 regression test.
 
 Every ONTOL language feature must have a test in
-`ontol-compiler/tests/compiler-integration`.
+`ontol/ontol-compiler/tests/compiler-integration`.
 
 Tests must use the `test_log::test` attribute for proper tracing.
 
@@ -92,7 +92,7 @@ just ontool
 
 # compile and install ontol-lsp
 just lsp
-code --install-extension ontol-language/ontol-vscode/ontol.vsix
+code --install-extension ontol/ontol-language/ontol-vscode/ontol.vsix
 ```
 
 ## Documentation

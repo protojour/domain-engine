@@ -9,7 +9,7 @@ edition = "2021"
 doctest = false
 
 [dependencies]
-ontol-runtime.path = "../../ontol-runtime"
+ontol-runtime.path = "../../ontol/ontol-runtime"
 domain-engine-core.path = "../domain-engine-core"
 tracing.workspace = true
 smartstring.workspace = true
@@ -28,7 +28,7 @@ default-features = false
 features = ["schema-language", "protojour-disable-argument-type-check"]
 
 [dev-dependencies]
-ontol-test-utils.path = "../../ontol-test-utils"
+ontol-test-utils.path = "../../ontol/ontol-test-utils"
 domain-engine-in-memory-store.path = "../domain-engine-in-memory-store"
 domain-engine-test-utils.path = "../domain-engine-test-utils"
 tracing-subscriber.workspace = true
