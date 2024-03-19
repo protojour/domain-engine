@@ -141,7 +141,8 @@ pub(crate) fn find_data_relationship<'a>(
             );
 
             DomainError::DataStoreBadRequest(anyhow!(
-                "data relationship {property_id} does not exist"
+                "data relationship {def_id:?} -> {property_id} does not exist",
+                def_id = type_info.def_id
             ))
         })
 }

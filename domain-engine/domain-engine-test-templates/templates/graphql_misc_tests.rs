@@ -19,7 +19,7 @@ use ontol_test_utils::{
         stix::{stix_bundle, STIX},
         GITMESH, GUITAR_SYNTH_UNION,
     },
-    expect_eq, src_name, TestPackages,
+    expect_eq, TestPackages,
 };
 use test_log::test;
 
@@ -795,62 +795,4 @@ async fn test_gitmesh_ownership_transfer() {
             }
         })),
     );
-}
-
-#[test(tokio::test)]
-// BUG: `default` in higher-level domain not properly mapped
-async fn test_default_mapping_error() {
-    let (test, [schema]) = TestPackages::with_static_sources([
-        (
-            src_name("events"),
-            "
-            use 'events_db' as db
-
-            def event (
-                rel .'_id'[rel .gen: auto]|id: (rel .is: serial)
-                rel .'level'[rel .default := 1]: i64
-            )
-
-            map(
-                event (
-                    '_id'?: id,
-                    'level': level,
-                ),
-                db.event (
-                    '_id'?: id,
-                    'level': level,
-                ),
-            )
-
-            map events (
-                (),
-                event { ..@match db.event() }
-            )
-            ",
-        ),
-        (
-            src_name("events_db"),
-            "
-            def event (
-                rel .'_id'[rel .gen: auto]|id: (rel .is: serial)
-                rel .'level'[rel .default := 1]: i64
-            )
-            ",
-        ),
-    ])
-    .with_data_store(src_name("events_db"), DataStoreConfig::Default)
-    .compile_schemas([src_name("events")]);
-
-    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned()).await.into();
-
-    r#"mutation {
-        event(create: [{ }]) {
-            node {
-                _id
-            }
-        }
-    }"#
-    .exec([], &schema, &ctx)
-    .await
-    .expect_err("datastore bad request: data relationship S:1:8 does not exist");
 }

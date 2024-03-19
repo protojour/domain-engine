@@ -253,7 +253,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     return;
                 };
 
-                let mut attr_flags = GetAttrFlags::empty();
+                let mut attr_flags = GetAttrFlags::TAKE;
                 let mut delta = 0;
 
                 for (binding, flags) in [(rel, GetAttrFlags::REL), (val, GetAttrFlags::VAL)] {
