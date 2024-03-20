@@ -4,6 +4,7 @@ use std::ops::Index;
 
 use ::serde::{Deserialize, Serialize};
 use arcstr::ArcStr;
+use bincode::Options;
 use fnv::FnvHashMap;
 use smartstring::alias::String;
 use tracing::debug;
@@ -73,6 +74,13 @@ pub(crate) struct Data {
     property_flows: Vec<PropertyFlow>,
 }
 
+fn bincode_config() -> impl bincode::Options {
+    bincode::options()
+        .with_little_endian()
+        .with_varint_encoding()
+        .reject_trailing_bytes()
+}
+
 impl Ontology {
     /// Make a builder for building an Ontology from scratch.
     pub fn builder() -> OntologyBuilder {
@@ -82,7 +90,7 @@ impl Ontology {
     /// Deserialize an Ontology using the bincode format.
     pub fn try_from_bincode(reader: impl std::io::Read) -> Result<Self, bincode::Error> {
         let mut ontology = Ontology {
-            data: bincode::deserialize_from(reader)?,
+            data: bincode_config().deserialize_from(reader)?,
         };
         ontology.init();
 
@@ -94,7 +102,7 @@ impl Ontology {
         &self,
         writer: impl std::io::Write,
     ) -> Result<(), bincode::Error> {
-        bincode::serialize_into(writer, &self.data)
+        bincode_config().serialize_into(writer, &self.data)
     }
 
     /// Make a value debuggable using OntolDebug.
