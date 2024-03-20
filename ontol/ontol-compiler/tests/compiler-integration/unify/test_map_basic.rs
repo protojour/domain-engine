@@ -948,36 +948,6 @@ fn test_map_spread_concat() {
 }
 
 #[test]
-// BUG: inline struct in the first def is valid,
-// so this should probably be valid in map too.
-// The workaround is to extract 'inner' as an explicit def.
-fn test_explicit_struct_path() {
-    "
-    def foo (
-        rel .'inner': (
-            rel .'foo_inner': text
-        )
-    )
-
-    def bar (
-        rel .'inner': text
-    )
-
-    map (
-        foo (
-            'inner': ( // ERROR expected explicit struct path
-                'foo_inner': fi
-            )
-        ),
-        bar (
-            'inner': fi
-        )
-    )
-    "
-    .compile_fail();
-}
-
-#[test]
 fn test_map_symbol_simple() {
     "
     def @symbol a ()

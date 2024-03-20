@@ -1,0 +1,2 @@
+def foo (rel .is: number) // NOTE Type is abstract
+def bar (rel .0: foo) // ERROR type not representable// NOTE Type of field is abstract

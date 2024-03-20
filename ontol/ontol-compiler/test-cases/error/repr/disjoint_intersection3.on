@@ -1,0 +1,5 @@
+def level ( // ERROR Intersection of disjoint types
+    rel .is: 1 // NOTE Base type is int(1)
+    rel .is: 2 // NOTE Base type is int(2)
+    rel .is: 3 // NOTE Base type is int(3)
+)

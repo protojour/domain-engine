@@ -1,0 +1,10 @@
+// BUG: This should work somehow
+
+def key (rel .is: text)
+def ent (rel .id: key)
+map(
+    key(key),
+    @match ent( // ERROR no properties expected
+        id: key
+    )
+)

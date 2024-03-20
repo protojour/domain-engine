@@ -7,22 +7,6 @@ use serde_json::json;
 use test_log::test;
 use unimock::{matching, MockFn};
 
-// BUG: This should work somehow
-#[test]
-fn test_map_match_non_inherent_id() {
-    r#"
-    def key (rel .is: text)
-    def ent (rel .id: key)
-    map(
-        key(key),
-        @match ent( // ERROR no properties expected
-            id: key
-        )
-    )
-    "#
-    .compile_fail();
-}
-
 #[test]
 fn test_map_match_scalar_key() {
     r#"

@@ -1,0 +1,6 @@
+def meters (rel .is: number)
+
+def my_length ( // ERROR Intersection of disjoint types
+    rel .is: meters // NOTE Base type is number
+    rel .is: text // NOTE Base type is text
+)

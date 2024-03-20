@@ -93,35 +93,6 @@ fn ontol_domain_is_defined_in_the_namespace() {
 }
 
 #[test]
-fn cannot_redefine_ontol() {
-    "def ontol () // ERROR TODO: definition of external identifier".compile_fail();
-}
-
-#[test]
-fn can_refer_to_future_definitions() {
-    "
-    def a (rel .'b': b)
-    def b (rel .'a': a)
-    "
-    .compile();
-}
-
-#[test]
-// BUG: a doc comment expects a def, rel, fmt or map to follow,
-// but having a commented-out section at the end can occur during deveopment.
-// This can get very confusing, as the compiler doesn't know where to put the error,
-// and it's really hard to understand what's going on.
-fn trailing_comment_confusion() {
-    "
-    def foo () // ERROR parse error: expected one of `def`, `rel`, `fmt`, `map`
-
-    /// test
-    // def bar ()
-    "
-    .compile_fail();
-}
-
-#[test]
 fn ontol_domain_is_documented() {
     "".compile_then(|test| {
         let ontol_domain = test.ontology().find_domain(ONTOL_PKG).unwrap();

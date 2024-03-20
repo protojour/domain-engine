@@ -5,16 +5,6 @@ use ontol_test_utils::{
 use test_log::test;
 
 #[test]
-fn import_package_not_found_error() {
-    "
-    use
-    'pkg' // ERROR package not found
-    as foo
-    "
-    .compile_fail();
-}
-
-#[test]
 fn load_package() {
     TestPackages::with_static_sources([
         (
