@@ -6,6 +6,7 @@ use crate::{
         operator::SerdeOperatorAddr,
         processor::{ProcessorLevel, ProcessorMode},
     },
+    ontology::OntologyInit,
     DefId, PackageId,
 };
 
@@ -31,6 +32,27 @@ impl GraphqlSchema {
     pub fn type_data_by_key(&self, key: (DefId, QueryLevel)) -> Option<&TypeData> {
         let type_addr = self.type_addr_by_def.get(&key)?;
         Some(self.type_data(*type_addr))
+    }
+
+    pub(crate) fn empty() -> Self {
+        Self {
+            package_id: PackageId(0),
+            query: TypeAddr(0),
+            mutation: TypeAddr(0),
+            page_info: TypeAddr(0),
+            json_scalar: TypeAddr(0),
+            i64_custom_scalar: None,
+            types: vec![],
+            type_addr_by_def: Default::default(),
+        }
+    }
+}
+
+impl OntologyInit for GraphqlSchema {
+    fn ontology_init(&mut self, ontology: &crate::ontology::Ontology) {
+        for type_data in self.types.iter_mut() {
+            type_data.ontology_init(ontology);
+        }
     }
 }
 

@@ -16,10 +16,10 @@ use ontol_runtime::{
             SerdeModifier,
         },
     },
+    phf::PhfIndexMap,
     property::{PropertyCardinality, PropertyId, Role, ValueCardinality},
-    smart_format, DefId,
+    DefId,
 };
-use smartstring::alias::String;
 use thin_vec::thin_vec;
 use tracing::{trace, trace_span};
 
@@ -45,14 +45,15 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 let mut field_namespace = GraphqlNamespace::default();
 
                 // FIXME: what if some of the relation data's fields are called "node"
-                let fields: IndexMap<String, FieldData> = [(
-                    field_namespace.unique_literal("node"),
+                let fields: PhfIndexMap<FieldData> = PhfIndexMap::build([(
+                    self.serde_gen
+                        .strings
+                        .make_phf_key(&field_namespace.unique_literal("node")),
                     FieldData {
                         kind: FieldKind::Node,
                         field_type: TypeRef::mandatory(node_ref),
                     },
-                )]
-                .into();
+                )]);
 
                 let node_operator_addr = self
                     .serde_gen
@@ -138,9 +139,9 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         })),
                         partial_input_typename: None,
                         kind: TypeKind::Object(ObjectData {
-                            fields: [
+                            fields: PhfIndexMap::build([
                                 (
-                                    smart_format!("nodes"),
+                                    self.serde_gen.strings.make_phf_key("nodes"),
                                     FieldData {
                                         kind: FieldKind::Nodes,
                                         field_type: TypeRef::mandatory(node_ref)
@@ -148,7 +149,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                                     },
                                 ),
                                 (
-                                    smart_format!("edges"),
+                                    self.serde_gen.strings.make_phf_key("edges"),
                                     FieldData {
                                         kind: FieldKind::Edges,
                                         field_type: TypeRef::mandatory(edge_ref)
@@ -156,7 +157,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                                     },
                                 ),
                                 (
-                                    smart_format!("pageInfo"),
+                                    self.serde_gen.strings.make_phf_key("pageInfo"),
                                     FieldData {
                                         kind: FieldKind::PageInfo,
                                         field_type: TypeRef::mandatory(UnitTypeRef::Addr(
@@ -165,7 +166,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                                     },
                                 ),
                                 (
-                                    smart_format!("totalCount"),
+                                    self.serde_gen.strings.make_phf_key("totalCount"),
                                     FieldData {
                                         kind: FieldKind::TotalCount,
                                         field_type: TypeRef {
@@ -183,8 +184,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                                         },
                                     },
                                 ),
-                            ]
-                            .into(),
+                            ]),
                             kind: ObjectKind::Connection(ConnectionData { node_type_addr }),
                         }),
                     },
@@ -204,16 +204,16 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         input_typename: None,
                         partial_input_typename: None,
                         kind: TypeKind::Object(ObjectData {
-                            fields: [
+                            fields: PhfIndexMap::build([
                                 (
-                                    smart_format!("node"),
+                                    self.serde_gen.strings.make_phf_key("node"),
                                     FieldData {
                                         kind: FieldKind::Node,
                                         field_type: TypeRef::optional(node_ref),
                                     },
                                 ),
                                 (
-                                    smart_format!("deleted"),
+                                    self.serde_gen.strings.make_phf_key("deleted"),
                                     FieldData {
                                         kind: FieldKind::Deleted,
                                         field_type: TypeRef {
@@ -230,8 +230,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                                         },
                                     },
                                 ),
-                            ]
-                            .into(),
+                            ]),
                             kind: ObjectKind::MutationResult,
                         }),
                     },
@@ -427,7 +426,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
         let mut struct_flags = SerdeStructFlags::empty();
         let mut field_namespace = GraphqlNamespace::default();
-        let mut fields = vec![];
+        let mut fields: IndexMap<std::string::String, FieldData> = Default::default();
 
         if let DefKind::Type(type_def) = self.defs.def_kind(def_id) {
             if type_def.flags.contains(TypeDefFlags::OPEN) {
@@ -497,7 +496,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         }
 
         if struct_flags.contains(SerdeStructFlags::OPEN_DATA) {
-            fields.push((
+            fields.insert(
                 "_open_data".into(),
                 FieldData {
                     kind: FieldKind::OpenData,
@@ -506,7 +505,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         unit: UnitTypeRef::Addr(self.schema.json_scalar),
                     },
                 },
-            ));
+            );
         }
 
         if fields.is_empty() {
@@ -531,14 +530,24 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             }
         }
 
+        let mut fields_vec: Vec<_> = fields
+            .into_iter()
+            .map(|(key, value)| (self.serde_gen.strings.make_phf_key(&key), value))
+            .collect();
+
         // note: The sort is stable.
-        fields.sort_by(|(_, a), (_, b)| {
+        fields_vec.sort_by(|(_, a), (_, b)| {
             field_order_category(&a.kind).cmp(&field_order_category(&b.kind))
         });
 
         match &mut self.schema.types[type_addr.0 as usize].kind {
             TypeKind::Object(object_data) => {
-                object_data.fields.extend(fields);
+                let existing_fields = object_data
+                    .fields
+                    .iter()
+                    .map(|(key, data)| (key.clone(), data.clone()));
+
+                object_data.fields = PhfIndexMap::build(existing_fields.chain(fields_vec));
             }
             _ => panic!(),
         }
@@ -550,7 +559,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         property: &Property,
         property_field_producer: PropertyFieldProducer,
         field_namespace: &mut GraphqlNamespace,
-        output: &mut Vec<(String, FieldData)>,
+        output: &mut IndexMap<String, FieldData>,
     ) {
         let meta = self.defs.relationship_meta(property_id.relationship_id);
         let (_, (prop_cardinality, value_cardinality), _) = meta.relationship.by(property_id.role);
@@ -688,7 +697,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             }
         };
 
-        output.push((field_namespace.unique_literal(prop_key), field_data));
+        output.insert(field_namespace.unique_literal(prop_key).into(), field_data);
     }
 }
 

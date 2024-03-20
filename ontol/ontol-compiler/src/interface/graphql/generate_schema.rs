@@ -3,7 +3,8 @@ use indexmap::IndexMap;
 use ontol_runtime::{
     interface::graphql::{
         data::{
-            EntityData, NodeData, ObjectData, ObjectKind, TypeAddr, TypeData, TypeKind, UnitTypeRef,
+            EntityData, FieldData, NodeData, ObjectData, ObjectKind, TypeAddr, TypeData, TypeKind,
+            UnitTypeRef,
         },
         schema::GraphqlSchema,
     },
@@ -103,8 +104,11 @@ pub fn generate_graphql_schema<'c>(
         }
     };
 
+    let mut query_fields: IndexMap<String, FieldData> = Default::default();
+    let mut mutation_fields: IndexMap<String, FieldData> = Default::default();
+
     builder.register_fundamental_types();
-    builder.register_standard_queries();
+    builder.register_standard_queries(&mut query_fields);
 
     for type_info in domain.type_infos() {
         if !type_info.public {
@@ -117,7 +121,11 @@ pub fn generate_graphql_schema<'c>(
             let type_ref = builder.get_def_type_ref(type_info.def_id, QLevel::Node);
 
             if let Some(entity_data) = entity_check(builder.schema, type_ref) {
-                builder.add_entity_queries_and_mutations(entity_data, data_store_domain);
+                builder.add_entity_queries_and_mutations(
+                    entity_data,
+                    data_store_domain,
+                    &mut mutation_fields,
+                );
             }
         }
     }
@@ -125,10 +133,13 @@ pub fn generate_graphql_schema<'c>(
     for (name, map_key) in named_maps {
         let prop_flow = codegen_tasks.result_propflow_table.get(&map_key).unwrap();
 
-        builder.add_named_map_query(name, map_key, prop_flow);
+        builder.add_named_map_query(name, map_key, prop_flow, &mut query_fields);
     }
 
     builder.exec_lazy_tasks();
+
+    builder.set_object_fields(builder.schema.query, query_fields);
+    builder.set_object_fields(builder.schema.mutation, mutation_fields);
 
     Some(schema)
 }

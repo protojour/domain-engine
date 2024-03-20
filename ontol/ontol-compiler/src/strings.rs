@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fmt::Debug, ops::Index};
 
 use arcstr::ArcStr;
-use ontol_runtime::ontology::ontol::TextConstant;
+use ontol_runtime::{ontology::ontol::TextConstant, phf::PhfKey};
 
 use crate::mem::Mem;
 
@@ -87,6 +87,13 @@ impl<'m> Strings<'m> {
         self.table.insert(interned_str, Some(constant));
 
         constant
+    }
+
+    pub fn make_phf_key(&mut self, ident: &str) -> PhfKey {
+        let string = ArcStr::from(ident);
+        let constant = self.intern_constant(ident);
+
+        PhfKey { string, constant }
     }
 
     pub fn get_constant(&self, str: &str) -> Option<TextConstant> {

@@ -256,12 +256,20 @@ impl Ontology {
     /// Initialize fields that need work after deserialization
     fn init(&mut self) {
         let mut serde_operators = std::mem::take(&mut self.data.serde_operators);
+        let mut interfaces = std::mem::take(&mut self.data.domain_interfaces);
 
         for operator in serde_operators.iter_mut() {
             operator.ontology_init(self);
         }
 
+        for (_, interfaces) in interfaces.iter_mut() {
+            for interface in interfaces {
+                interface.ontology_init(self);
+            }
+        }
+
         self.data.serde_operators = serde_operators;
+        self.data.domain_interfaces = interfaces;
     }
 }
 

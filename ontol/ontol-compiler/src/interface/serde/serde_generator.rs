@@ -3,7 +3,6 @@ use std::{
     ops::RangeInclusive,
 };
 
-use arcstr::ArcStr;
 use indexmap::IndexMap;
 use ontol_runtime::{
     debug::NoFmt,
@@ -930,13 +929,13 @@ pub(super) fn insert_property(
 
         properties.insert(
             graphql_identifier.clone(),
-            (make_phf_key(&graphql_identifier, strings), property),
+            (strings.make_phf_key(&graphql_identifier), property),
         );
         adaption
     } else {
         properties.insert(
             property_name.into(),
-            (make_phf_key(property_name, strings), property),
+            (strings.make_phf_key(property_name), property),
         );
         IdentAdaption::Verbatim
     }
@@ -951,13 +950,6 @@ fn make_property_name(input: &str, modifier: SerdeModifier) -> (String, IdentAda
     } else {
         (input.into(), IdentAdaption::Verbatim)
     }
-}
-
-pub(super) fn make_phf_key(ident: &str, strings: &mut Strings) -> PhfKey {
-    let string = ArcStr::from(ident);
-    let constant = strings.intern_constant(ident);
-
-    PhfKey { string, constant }
 }
 
 pub(super) fn operator_to_leaf_discriminant(operator: &SerdeOperator) -> LeafDiscriminant {

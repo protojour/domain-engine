@@ -90,9 +90,9 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         let type_data = self.schema_ctx.schema.type_data(type_addr);
 
         if let TypeKind::Object(object) = &type_data.kind {
-            for (name, field_data) in &object.fields {
+            for (name, field_data) in object.fields.iter() {
                 let field = juniper::meta::Field {
-                    name: name.clone(),
+                    name: name.string.as_str().into(),
                     description: match &field_data.kind {
                         FieldKind::Property(property) => self
                             .schema_ctx

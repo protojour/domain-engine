@@ -165,7 +165,7 @@ impl<'a> SelectAnalyzer<'a> {
                             }
                         }
                     } else {
-                        for field in object_data.fields.values() {
+                        for (_, field) in object_data.fields.iter() {
                             if let FieldKind::Property(property_data) = &field.kind {
                                 self.analyze_map(
                                     look_ahead,

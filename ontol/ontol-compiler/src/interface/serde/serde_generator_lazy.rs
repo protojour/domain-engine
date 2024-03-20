@@ -28,7 +28,7 @@ use crate::{
 };
 
 use super::{
-    serde_generator::{insert_property, make_phf_key, SerdeGenerator},
+    serde_generator::{insert_property, SerdeGenerator},
     union_builder::UnionBuilder,
     SerdeIntersection, SerdeKey, EDGE_PROPERTY,
 };
@@ -84,7 +84,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         serde_properties.insert(
             EDGE_PROPERTY.into(),
             (
-                make_phf_key(EDGE_PROPERTY, self.strings),
+                self.strings.make_phf_key(EDGE_PROPERTY),
                 SerdeProperty {
                     property_id: PropertyId::subject(RelationshipId(DefId::unit())),
                     flags: SerdePropertyFlags::REL_PARAMS | SerdePropertyFlags::OPTIONAL,

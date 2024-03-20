@@ -1,12 +1,11 @@
 use fnv::FnvHashMap;
-use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use smartstring::alias::String;
 use thin_vec::ThinVec;
 
 use crate::{
     interface::serde::operator::SerdeOperatorAddr,
-    ontology::{ontol::TextConstant, Ontology},
+    ontology::{ontol::TextConstant, Ontology, OntologyInit},
+    phf::PhfIndexMap,
     property::PropertyId,
     var::Var,
     DefId, MapKey, RelationshipId,
@@ -163,11 +162,17 @@ impl TypeData {
         }
     }
 
-    pub fn fields(&self) -> Option<&IndexMap<String, FieldData>> {
+    pub fn fields(&self) -> Option<&PhfIndexMap<FieldData>> {
         match &self.kind {
             TypeKind::Object(obj) => Some(&obj.fields),
             _ => None,
         }
+    }
+}
+
+impl OntologyInit for TypeData {
+    fn ontology_init(&mut self, ontology: &Ontology) {
+        self.kind.ontology_init(ontology);
     }
 }
 
@@ -178,9 +183,17 @@ pub enum TypeKind {
     CustomScalar(ScalarData),
 }
 
+impl OntologyInit for TypeKind {
+    fn ontology_init(&mut self, ontology: &Ontology) {
+        if let Self::Object(object_data) = self {
+            object_data.fields.ontology_init(ontology);
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct ObjectData {
-    pub fields: IndexMap<String, FieldData>,
+    pub fields: PhfIndexMap<FieldData>,
     pub kind: ObjectKind,
 }
 
@@ -226,7 +239,7 @@ pub struct ScalarData {
     pub operator_addr: SerdeOperatorAddr,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct FieldData {
     pub kind: FieldKind,
     pub field_type: TypeRef,
@@ -241,7 +254,7 @@ impl FieldData {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum FieldKind {
     /// A normal property of a node
     Property(PropertyData),
@@ -293,13 +306,13 @@ pub enum FieldKind {
     Version,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct PropertyData {
     pub property_id: PropertyId,
     pub value_operator_addr: SerdeOperatorAddr,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct IdPropertyData {
     pub relationship_id: RelationshipId,
     pub operator_addr: SerdeOperatorAddr,

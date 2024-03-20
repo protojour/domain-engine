@@ -2034,7 +2034,6 @@ dependencies = [
  "chrono",
  "documented",
  "fnv",
- "indexmap",
  "num",
  "ontol-macros",
  "ordered-float 4.2.0",

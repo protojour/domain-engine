@@ -1,4 +1,5 @@
 use fnv::FnvHashMap;
+use indexmap::IndexMap;
 use ontol_runtime::{
     interface::serde::{
         operator::{SerdeOperator, SerdeOperatorAddr},
@@ -21,6 +22,7 @@ use ontol_runtime::{
         ontol::TextConstant,
         Ontology,
     },
+    phf::PhfIndexMap,
     property::PropertyId,
     resolve_path::{ProbeDirection, ProbeFilter, ProbeOptions, ResolverGraph},
     var::Var,
@@ -176,44 +178,46 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 }),
             });
             let data = object_data_mut(self.schema.page_info, self.schema);
-            data.fields.insert(
-                "endCursor".into(),
-                FieldData {
-                    kind: FieldKind::PageInfo,
-                    field_type: TypeRef {
-                        modifier: TypeModifier::Unit(Optionality::Optional),
-                        unit: UnitTypeRef::NativeScalar(NativeScalarRef {
-                            operator_addr: self
-                                .serde_gen
-                                .gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
-                                    self.primitives.text,
-                                    SerdeModifier::NONE,
-                                )))
-                                .unwrap(),
-                            kind: NativeScalarKind::String,
-                        }),
+            data.fields = PhfIndexMap::build([
+                (
+                    self.serde_gen.strings.make_phf_key("endCursor"),
+                    FieldData {
+                        kind: FieldKind::PageInfo,
+                        field_type: TypeRef {
+                            modifier: TypeModifier::Unit(Optionality::Optional),
+                            unit: UnitTypeRef::NativeScalar(NativeScalarRef {
+                                operator_addr: self
+                                    .serde_gen
+                                    .gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
+                                        self.primitives.text,
+                                        SerdeModifier::NONE,
+                                    )))
+                                    .unwrap(),
+                                kind: NativeScalarKind::String,
+                            }),
+                        },
                     },
-                },
-            );
-            data.fields.insert(
-                "hasNextPage".into(),
-                FieldData {
-                    kind: FieldKind::PageInfo,
-                    field_type: TypeRef {
-                        modifier: TypeModifier::Unit(Optionality::Mandatory),
-                        unit: UnitTypeRef::NativeScalar(NativeScalarRef {
-                            operator_addr: self
-                                .serde_gen
-                                .gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
-                                    self.primitives.bool,
-                                    SerdeModifier::NONE,
-                                )))
-                                .unwrap(),
-                            kind: NativeScalarKind::Boolean,
-                        }),
+                ),
+                (
+                    self.serde_gen.strings.make_phf_key("hasNextPage"),
+                    FieldData {
+                        kind: FieldKind::PageInfo,
+                        field_type: TypeRef {
+                            modifier: TypeModifier::Unit(Optionality::Mandatory),
+                            unit: UnitTypeRef::NativeScalar(NativeScalarRef {
+                                operator_addr: self
+                                    .serde_gen
+                                    .gen_addr_lazy(SerdeKey::Def(SerdeDef::new(
+                                        self.primitives.bool,
+                                        SerdeModifier::NONE,
+                                    )))
+                                    .unwrap(),
+                                kind: NativeScalarKind::Boolean,
+                            }),
+                        },
                     },
-                },
-            );
+                ),
+            ]);
         }
 
         self.schema.json_scalar = self.next_type_addr();
@@ -230,10 +234,11 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         });
     }
 
-    pub fn register_standard_queries(&mut self) {
-        let query_data = object_data_mut(self.schema.query, self.schema);
-
-        query_data.fields.insert(
+    pub fn register_standard_queries(
+        &mut self,
+        fields: &mut IndexMap<std::string::String, FieldData>,
+    ) {
+        fields.insert(
             "_version".into(),
             FieldData {
                 kind: FieldKind::Version,
@@ -293,7 +298,13 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         index
     }
 
-    pub fn add_named_map_query(&mut self, name: &str, map_key: MapKey, prop_flow: &[PropertyFlow]) {
+    pub fn add_named_map_query(
+        &mut self,
+        name: &str,
+        map_key: MapKey,
+        prop_flow: &[PropertyFlow],
+        fields: &mut IndexMap<std::string::String, FieldData>,
+    ) {
         let input_serde_key = {
             let mut serde_modifier = SerdeModifier::graphql_default();
 
@@ -399,15 +410,14 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             }
         };
 
-        object_data_mut(self.schema.query, self.schema)
-            .fields
-            .insert(name.into(), field_data);
+        fields.insert(name.into(), field_data);
     }
 
     pub fn add_entity_queries_and_mutations(
         &mut self,
         entity_data: EntityData,
         data_store_domain: Option<PackageId>,
+        fields: &mut IndexMap<std::string::String, FieldData>,
     ) {
         let Some(data_store_domain) = data_store_domain else {
             return;
@@ -455,45 +465,45 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             return;
         }
 
-        object_data_mut(self.schema.mutation, self.schema)
-            .fields
-            .insert(
-                mutation_namespace.typename(type_info, self.serde_gen.strings),
-                FieldData {
-                    kind: FieldKind::EntityMutation {
-                        def_id: type_info.def_id,
-                        create_arg: create_resolve_path.is_some().then_some(
-                            argument::EntityCreateInputsArg {
-                                type_addr: entity_data.type_addr,
-                                def_id: entity_data.node_def_id,
-                                operator_addr: entity_array_operator_addr,
-                            },
-                        ),
-                        update_arg: update_resolve_path.is_some().then_some(
-                            argument::EntityUpdateInputsArg {
-                                type_addr: entity_data.type_addr,
-                                def_id: entity_data.node_def_id,
-                                operator_addr: entity_array_operator_addr,
-                            },
-                        ),
-                        delete_arg: data_resolve_path.is_some().then_some(
-                            argument::EntityDeleteInputsArg {
-                                def_id: entity_data.id_def_id,
-                                operator_addr: self
-                                    .serde_gen
-                                    .gen_addr_lazy(gql_array_serde_key(entity_data.id_def_id))
-                                    .unwrap(),
-                            },
-                        ),
-                        field_unit_type_addr: match mutation_result_ref {
-                            UnitTypeRef::Addr(addr) => addr,
-                            UnitTypeRef::NativeScalar(_) => unreachable!(),
+        fields.insert(
+            mutation_namespace
+                .typename(type_info, self.serde_gen.strings)
+                .into(),
+            FieldData {
+                kind: FieldKind::EntityMutation {
+                    def_id: type_info.def_id,
+                    create_arg: create_resolve_path.is_some().then_some(
+                        argument::EntityCreateInputsArg {
+                            type_addr: entity_data.type_addr,
+                            def_id: entity_data.node_def_id,
+                            operator_addr: entity_array_operator_addr,
                         },
+                    ),
+                    update_arg: update_resolve_path.is_some().then_some(
+                        argument::EntityUpdateInputsArg {
+                            type_addr: entity_data.type_addr,
+                            def_id: entity_data.node_def_id,
+                            operator_addr: entity_array_operator_addr,
+                        },
+                    ),
+                    delete_arg: data_resolve_path.is_some().then_some(
+                        argument::EntityDeleteInputsArg {
+                            def_id: entity_data.id_def_id,
+                            operator_addr: self
+                                .serde_gen
+                                .gen_addr_lazy(gql_array_serde_key(entity_data.id_def_id))
+                                .unwrap(),
+                        },
+                    ),
+                    field_unit_type_addr: match mutation_result_ref {
+                        UnitTypeRef::Addr(addr) => addr,
+                        UnitTypeRef::NativeScalar(_) => unreachable!(),
                     },
-                    field_type: TypeRef::mandatory(mutation_result_ref)
-                        .to_array(Optionality::Mandatory),
                 },
-            );
+                field_type: TypeRef::mandatory(mutation_result_ref)
+                    .to_array(Optionality::Mandatory),
+            },
+        );
     }
 
     pub fn mk_typename_constant<S: AsRef<str>>(
@@ -502,6 +512,18 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
     ) -> TextConstant {
         let string = f(self.type_namespace, self.serde_gen.strings);
         self.serde_gen.strings.intern_constant(string.as_ref())
+    }
+
+    pub fn set_object_fields(
+        &mut self,
+        address: TypeAddr,
+        fields: IndexMap<std::string::String, FieldData>,
+    ) {
+        object_data_mut(address, self.schema).fields = PhfIndexMap::build(
+            fields
+                .into_iter()
+                .map(|(key, data)| (self.serde_gen.strings.make_phf_key(&key), data)),
+        );
     }
 }
 

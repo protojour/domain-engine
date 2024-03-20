@@ -3,7 +3,6 @@ use std::{
     ops::{Range, RangeInclusive},
 };
 
-use indexmap::IndexMap;
 use smallvec::SmallVec;
 
 use crate::ontology::ontol::TextConstant;
@@ -168,14 +167,6 @@ impl<A: OntolDebug, B: OntolDebug> OntolDebug for (A, B) {
         f.debug_tuple("")
             .field(&Fmt(ofmt, &self.0))
             .field(&Fmt(ofmt, &self.1))
-            .finish()
-    }
-}
-
-impl<K: OntolDebug, V: OntolDebug, S> OntolDebug for IndexMap<K, V, S> {
-    fn fmt(&self, ofmt: &dyn OntolFormatter, f: &mut Formatter<'_>) -> Result {
-        f.debug_map()
-            .entries(self.iter().map(|(k, v)| (Fmt(ofmt, k), Fmt(ofmt, v))))
             .finish()
     }
 }

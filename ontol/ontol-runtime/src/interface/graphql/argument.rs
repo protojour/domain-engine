@@ -41,7 +41,7 @@ pub enum DefaultArg {
     EmptyObject,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct MapInputArg {
     pub operator_addr: SerdeOperatorAddr,
     /// If this string is defined, there will be a single argument with this name.
@@ -112,7 +112,7 @@ impl DomainFieldArg for InputArg {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct EntityCreateInputsArg {
     pub type_addr: TypeAddr,
     pub def_id: DefId,
@@ -149,7 +149,7 @@ impl DomainFieldArg for EntityCreateInputsArg {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct EntityUpdateInputsArg {
     pub type_addr: TypeAddr,
     pub def_id: DefId,
@@ -186,7 +186,7 @@ impl DomainFieldArg for EntityUpdateInputsArg {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct EntityDeleteInputsArg {
     pub def_id: DefId,
     pub operator_addr: SerdeOperatorAddr,
@@ -216,7 +216,7 @@ impl DomainFieldArg for EntityDeleteInputsArg {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct FirstArg;
 
 impl FieldArg for FirstArg {
@@ -225,7 +225,7 @@ impl FieldArg for FirstArg {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct AfterArg;
 
 impl FieldArg for AfterArg {
