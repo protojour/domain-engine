@@ -74,7 +74,10 @@ impl Ontology {
     }
 
     pub fn try_from_bincode(reader: impl std::io::Read) -> Result<Self, bincode::Error> {
-        bincode::deserialize_from(reader)
+        let mut ontology: Self = bincode::deserialize_from(reader)?;
+        ontology.init();
+
+        Ok(ontology)
     }
 
     pub fn try_serialize_to_bincode(
@@ -209,6 +212,10 @@ impl Ontology {
         self.extern_table.get(&def_id)
     }
 
+    pub fn get_text_constant(&self, constant: TextConstant) -> &ArcStr {
+        &self.text_constants[constant.0 as usize]
+    }
+
     /// Find a text constant given its string representation.
     /// NOTE: This intentionally has linear search complexity.
     /// It's only use case should be testing.
@@ -227,6 +234,22 @@ impl Ontology {
             .get(&(package_id, text_constant))
             .cloned()
     }
+
+    /// Initialize fields that need work after deserialization
+    fn init(&mut self) {
+        let mut serde_operators = std::mem::take(&mut self.serde_operators);
+
+        for operator in serde_operators.iter_mut() {
+            operator.ontology_init(self);
+        }
+
+        self.serde_operators = serde_operators;
+    }
+}
+
+/// Things that must be done after deserialization before the ontology can be used
+pub trait OntologyInit {
+    fn ontology_init(&mut self, ontology: &Ontology);
 }
 
 impl Index<TextConstant> for Ontology {

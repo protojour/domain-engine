@@ -1,113 +1,245 @@
-use std::ops::Index;
+use std::fmt::Debug;
 
 use arcstr::ArcStr;
 use fnv::FnvHashMap;
+use phf_shared::PhfHash;
+use serde::{Deserialize, Serialize};
 
-use crate::text::TextConstant;
+use crate::{
+    debug::{OntolDebug, OntolFormatter},
+    ontology::{ontol::TextConstant, Ontology, OntologyInit},
+};
 
-#[derive(Debug)]
-struct PhfConstMap<K, V> {
+#[derive(Clone, Serialize, Deserialize)]
+pub struct PhfMap<V> {
     key: u64,
-
-    // It would be better if the map stored shallow clones of ArcStr
-    // directly, instead of needing to ask the ontology every time.
-    // But then the map wouldn't be directly deserializable anymore.
-    // There would need to be an initialization step where T<TextConstant> are
-    // converted to T<ArcStr> by doing the lookup once.
-    entries: Box<[(K, V)]>,
-
     disps: Box<[(u32, u32)]>,
+    entries: Box<[(PhfKey, V)]>,
 }
 
-impl<V> PhfConstMap<TextConstant, V> {
-    pub fn get<S>(&self, key: &str, source: &S) -> Option<&V>
-    where
-        S: Index<TextConstant, Output = str>,
-    {
-        self.get_entry(key, source).map(|(_, value)| value)
+#[derive(Clone, Serialize, Deserialize)]
+pub struct PhfIndexMap<V> {
+    map: PhfMap<V>,
+    order: Box<[usize]>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct PhfKey {
+    #[serde(skip)]
+    pub string: ArcStr,
+    pub constant: TextConstant,
+}
+
+impl PhfKey {
+    pub fn arc_str(&self) -> &ArcStr {
+        &self.string
     }
 
-    pub fn get_entry<S>(&self, key: &str, source: &S) -> Option<(TextConstant, &V)>
-    where
-        S: Index<TextConstant, Output = str>,
-    {
-        let hashes = phf_shared::hash(key, &self.key);
-        let index = phf_shared::get_index(&hashes, &self.disps, self.entries.len());
-        let entry = &self.entries[index as usize];
-        let entry_key_str = &source[entry.0];
+    pub fn constant(&self) -> TextConstant {
+        self.constant
+    }
+}
 
-        if entry_key_str == key {
-            Some((entry.0, &entry.1))
-        } else {
-            None
+impl<V> Default for PhfMap<V> {
+    fn default() -> Self {
+        Self {
+            key: 0,
+            disps: Default::default(),
+            entries: Default::default(),
         }
     }
 }
 
-impl<V> PhfConstMap<ArcStr, V> {
+impl<V> PhfMap<V> {
     pub fn get(&self, key: &str) -> Option<&V> {
         self.get_entry(key).map(|(_, value)| value)
     }
 
-    pub fn get_entry(&self, key: &str) -> Option<(&str, &V)> {
+    pub fn get_entry(&self, key: &str) -> Option<(&ArcStr, &V)> {
         let hashes = phf_shared::hash(key, &self.key);
         let index = phf_shared::get_index(&hashes, &self.disps, self.entries.len());
         let entry = &self.entries[index as usize];
+        let entry_key = &entry.0.string;
 
-        if entry.0 == key {
-            Some((&entry.0, &entry.1))
+        if entry_key == key {
+            Some((&entry.0.string, &entry.1))
         } else {
             None
         }
     }
-}
 
-impl<V> PhfConstMap<TextConstant, V> {
-    pub fn build<S>(entries: impl IntoIterator<Item = (TextConstant, V)>, source: &S) -> Self
-    where
-        S: Index<TextConstant, Output = str>,
-    {
-        // build two collections:
-        // 1. a hash map of original index to target entry
-        // 2. a vector of keys as &str
-        let (mut table, keys): (FnvHashMap<usize, (TextConstant, V)>, Vec<&str>) = entries
-            .into_iter()
-            .enumerate()
-            .map(|(index, (text_const, value))| {
-                let table_entry = (index, (text_const, value));
-                let key_str = &source[text_const];
-
-                (table_entry, key_str)
-            })
-            .unzip();
-
-        // generate the perfect hash
-        let hash = phf_generator::generate_hash(&keys);
-
-        Self {
-            key: hash.key,
-            // reorder entries according to how the perfect hash function wants it:
-            entries: hash
-                .map
-                .into_iter()
-                .map(|index| table.remove(&index).unwrap())
-                .collect(),
-            disps: hash.disps.into(),
+    pub fn iter(&self) -> MapIter<V> {
+        MapIter {
+            entry_iter: self.entries.iter(),
         }
     }
 
-    pub fn import_keys<S>(self, source: &S) -> PhfConstMap<ArcStr, V>
-    where
-        S: Index<TextConstant, Output = ArcStr>,
-    {
-        PhfConstMap {
-            key: self.key,
-            entries: Vec::from(self.entries)
-                .into_iter()
-                .map(|(key, val)| (source[key].clone(), val))
-                .collect(),
-            disps: self.disps,
+    pub fn build(entries: impl IntoIterator<Item = (PhfKey, V)>) -> Self {
+        let (map, _) = build(entries);
+        map
+    }
+}
+
+impl<V> Default for PhfIndexMap<V> {
+    fn default() -> Self {
+        Self {
+            map: Default::default(),
+            order: Default::default(),
         }
+    }
+}
+
+impl<V> PhfIndexMap<V> {
+    pub fn get(&self, key: &str) -> Option<&V> {
+        self.map.get(key)
+    }
+
+    pub fn get_entry(&self, key: &str) -> Option<(&ArcStr, &V)> {
+        self.map.get_entry(key)
+    }
+
+    pub fn iter(&self) -> IndexMapIter<V> {
+        IndexMapIter {
+            order_iter: self.order.iter(),
+            map: &self.map,
+        }
+    }
+
+    pub fn build(entries: impl IntoIterator<Item = (PhfKey, V)>) -> Self {
+        let (map, relocations) = build(entries);
+
+        // The relocation table needs to be inverted..
+        // It tells where each input item moved _to_,
+        // But the index map needs to know where it moved _from_,
+        let mut inverse_order: FnvHashMap<usize, usize> = relocations
+            .into_iter()
+            .enumerate()
+            .map(|(from, to)| (to, from))
+            .collect();
+
+        Self {
+            map,
+            order: (0..inverse_order.len())
+                .into_iter()
+                .map(|index| inverse_order.remove(&index).unwrap())
+                .collect(),
+        }
+    }
+}
+
+pub struct MapIter<'a, V> {
+    entry_iter: std::slice::Iter<'a, (PhfKey, V)>,
+}
+
+impl<'a, V> Iterator for MapIter<'a, V> {
+    type Item = (&'a PhfKey, &'a V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (key, value) = self.entry_iter.next()?;
+        Some((key, value))
+    }
+}
+
+pub struct IndexMapIter<'a, V> {
+    order_iter: std::slice::Iter<'a, usize>,
+    map: &'a PhfMap<V>,
+}
+
+impl<'a, V> Iterator for IndexMapIter<'a, V> {
+    type Item = (&'a PhfKey, &'a V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let next_index = self.order_iter.next()?;
+        let (key, value) = &self.map.entries[*next_index];
+        Some((key, value))
+    }
+}
+
+impl<V: Debug> Debug for PhfMap<V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut map = f.debug_map();
+        for (k, v) in self.iter() {
+            map.entry(&k.string, v);
+        }
+        map.finish()
+    }
+}
+
+impl<V: Debug> OntolDebug for PhfMap<V> {
+    fn fmt(&self, _: &dyn OntolFormatter, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        <Self as std::fmt::Debug>::fmt(self, f)
+    }
+}
+
+impl<V: Debug> Debug for PhfIndexMap<V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut map = f.debug_map();
+        for (k, v) in self.iter() {
+            map.entry(&k.string, v);
+        }
+        map.finish()
+    }
+}
+
+impl<V: Debug> OntolDebug for PhfIndexMap<V> {
+    fn fmt(&self, _: &dyn OntolFormatter, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        <Self as std::fmt::Debug>::fmt(self, f)
+    }
+}
+
+fn build<V>(entries: impl IntoIterator<Item = (PhfKey, V)>) -> (PhfMap<V>, Vec<usize>) {
+    // build two collections:
+    // 1. a hash map of original index to target entry
+    // 2. a vector of HashKey keys
+    let (mut table, keys): (FnvHashMap<usize, (PhfKey, V)>, Vec<HashKey>) = entries
+        .into_iter()
+        .enumerate()
+        .map(|(index, (key, value))| {
+            let hash_key = HashKey(key.string.clone());
+            let table_entry = (index, (key, value));
+
+            (table_entry, hash_key)
+        })
+        .unzip();
+
+    // generate the perfect hash
+    let state = phf_generator::generate_hash(&keys);
+
+    (
+        PhfMap {
+            key: state.key,
+            // reorder entries according to how the perfect hash function wants it:
+            entries: state
+                .map
+                .iter()
+                .map(|index| table.remove(index).unwrap())
+                .collect(),
+            disps: state.disps.into(),
+        },
+        state.map,
+    )
+}
+
+impl<V> OntologyInit for PhfMap<V> {
+    fn ontology_init(&mut self, ontology: &Ontology) {
+        for entry in self.entries.iter_mut() {
+            let key = &mut entry.0;
+            key.string = ontology.get_text_constant(key.constant).clone();
+        }
+    }
+}
+
+impl<V> OntologyInit for PhfIndexMap<V> {
+    fn ontology_init(&mut self, ontology: &Ontology) {
+        self.map.ontology_init(ontology);
+    }
+}
+
+struct HashKey(ArcStr);
+
+impl PhfHash for HashKey {
+    fn phf_hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.phf_hash(state);
     }
 }
 
@@ -117,9 +249,9 @@ mod tests {
 
     use arcstr::{literal, ArcStr};
 
-    use crate::text::TextConstant;
+    use crate::{ontology::ontol::TextConstant, phf_map::PhfIndexMap};
 
-    use super::PhfConstMap;
+    use super::{PhfKey, PhfMap};
 
     #[derive(Default)]
     struct Consts {
@@ -127,10 +259,13 @@ mod tests {
     }
 
     impl Consts {
-        fn add(&mut self, c: ArcStr) -> TextConstant {
+        fn add(&mut self, c: ArcStr) -> PhfKey {
             let tc = TextConstant(self.constants.len() as u32);
-            self.constants.push(c);
-            tc
+            self.constants.push(c.clone());
+            PhfKey {
+                constant: tc,
+                string: c,
+            }
         }
     }
 
@@ -152,52 +287,35 @@ mod tests {
         }
     }
 
-    fn test_map() -> (PhfConstMap<TextConstant, &'static str>, Consts) {
+    fn entries() -> Vec<(PhfKey, &'static str)> {
         let mut c = Consts::default();
-
-        let map = PhfConstMap::build(
-            vec![
-                (c.add(literal!("foobar")), "FOOBAR"),
-                (c.add(literal!("yo")), "YO"),
-                (c.add(literal!("foo")), "FOO"),
-                (c.add(literal!("bar")), "BAR"),
-                (c.add(literal!("a")), "A"),
-                (c.add(literal!("b")), "B"),
-                (c.add(literal!("c")), "C"),
-                (c.add(literal!("d")), "D"),
-                (c.add(literal!("e")), "E"),
-                (c.add(literal!("f")), "F"),
-                (c.add(literal!("g")), "G"),
-                (c.add(literal!("h")), "H"),
-                (c.add(literal!("i")), "I"),
-                (c.add(literal!("j")), "J"),
-                (c.add(literal!("k")), "K"),
-                (c.add(literal!("l")), "L"),
-                (c.add(literal!("m")), "M"),
-                (c.add(literal!("n")), "N"),
-                (c.add(literal!("o")), "O"),
-                (c.add(literal!("p")), "P"),
-            ],
-            &c,
-        );
-
-        (map, c)
+        vec![
+            (c.add(literal!("foobar")), "FOOBAR"),
+            (c.add(literal!("yo")), "YO"),
+            (c.add(literal!("foo")), "FOO"),
+            (c.add(literal!("bar")), "BAR"),
+            (c.add(literal!("a")), "A"),
+            (c.add(literal!("b")), "B"),
+            (c.add(literal!("c")), "C"),
+            (c.add(literal!("d")), "D"),
+            (c.add(literal!("e")), "E"),
+            (c.add(literal!("f")), "F"),
+            (c.add(literal!("g")), "G"),
+            (c.add(literal!("h")), "H"),
+            (c.add(literal!("i")), "I"),
+            (c.add(literal!("j")), "J"),
+            (c.add(literal!("k")), "K"),
+            (c.add(literal!("l")), "L"),
+            (c.add(literal!("m")), "M"),
+            (c.add(literal!("n")), "N"),
+            (c.add(literal!("o")), "O"),
+            (c.add(literal!("p")), "P"),
+        ]
     }
 
     #[test]
-    fn test_text_constant() {
-        let (map, c) = test_map();
-
-        assert_eq!(map.get("foo", &c), Some(&"FOO"));
-        assert_eq!(map.get("bar", &c), Some(&"BAR"));
-        assert_eq!(map.get("foobar", &c), Some(&"FOOBAR"));
-        assert_eq!(map.get("k", &c), Some(&"K"));
-    }
-
-    #[test]
-    fn test_arcstr() {
-        let (map, c) = test_map();
-        let map = map.import_keys(&ConstsAsArcStr(&c));
+    fn test_map() {
+        let map = PhfMap::build(entries());
 
         assert_eq!(map.get("foo"), Some(&"FOO"));
         assert_eq!(map.get("bar"), Some(&"BAR"));
@@ -206,8 +324,25 @@ mod tests {
     }
 
     #[test]
+    fn test_index_map() {
+        let map = PhfIndexMap::build(entries());
+
+        assert_eq!(map.get("foo"), Some(&"FOO"));
+        assert_eq!(map.get("bar"), Some(&"BAR"));
+        assert_eq!(map.get("foobar"), Some(&"FOOBAR"));
+        assert_eq!(map.get("k"), Some(&"K"));
+
+        println!("{map:#?}");
+
+        let mut iter = map.iter();
+
+        assert_eq!(*iter.next().unwrap().1, "FOOBAR");
+        assert_eq!(*iter.next().unwrap().1, "YO");
+    }
+
+    #[test]
     fn check_size() {
-        type CheckSize = PhfConstMap<TextConstant, u64>;
+        type CheckSize = PhfMap<u64>;
 
         assert_eq!(size_of::<CheckSize>(), 40);
     }

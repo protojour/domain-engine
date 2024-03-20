@@ -9,6 +9,7 @@ pub mod debug;
 pub mod format_utils;
 pub mod interface;
 pub mod ontology;
+pub mod phf_map;
 pub mod property;
 pub mod query;
 pub mod resolve_path;
@@ -18,7 +19,6 @@ pub mod var;
 pub mod vm;
 
 mod equality;
-mod phf_map;
 
 extern crate self as ontol_runtime;
 
