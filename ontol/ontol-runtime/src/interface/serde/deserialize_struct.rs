@@ -1,11 +1,7 @@
 use std::collections::BTreeMap;
 
 use fnv::FnvHashMap;
-use serde::{
-    de::{DeserializeSeed, Error, MapAccess, Visitor},
-    Deserializer,
-};
-use smartstring::alias::String;
+use serde::de::{DeserializeSeed, MapAccess, Visitor};
 use tracing::debug;
 
 use crate::{
@@ -16,15 +12,13 @@ use crate::{
     property::PropertyId,
     value::{Attribute, Value},
     vm::proc::{NParams, Procedure},
-    DefId, RelationshipId,
+    DefId,
 };
 
 use super::{
+    deserialize_property::{IdSingletonPropVisitor, PropKind, PropertyMapVisitor},
     operator::{SerdeOperatorAddr, SerdeProperty, SerdeStructFlags, StructOperator},
-    processor::{
-        ProcessorMode, ProcessorProfileFlags, RecursionLimitError, SerdeProcessor, SpecialProperty,
-        SubProcessorContext,
-    },
+    processor::{RecursionLimitError, SerdeProcessor, SubProcessorContext},
     utils::BufferedAttrsReader,
 };
 
@@ -34,14 +28,17 @@ pub struct Struct {
     pub attributes: FnvHashMap<PropertyId, Attribute>,
     pub id: Option<Value>,
     pub rel_params: Value,
-    open_dict: BTreeMap<String, Value>,
+    open_dict: BTreeMap<smartstring::alias::String, Value>,
     observed_required_count: usize,
 }
 
 /// A serde visitor for maps (i.e. JSON objects) that uses the [StructDeserializer] internally.
 pub struct StructVisitor<'on, 'p> {
     pub processor: SerdeProcessor<'on, 'p>,
+
+    // FIXME: Can make use of `Cow<'de, str>`?
     pub buffered_attrs: Vec<(String, serde_value::Value)>,
+
     pub struct_op: &'on StructOperator,
     pub ctx: SubProcessorContext,
     pub raw_dynamic_entity: bool,
@@ -49,33 +46,29 @@ pub struct StructVisitor<'on, 'p> {
 
 /// The struct deserializer itself.
 pub struct StructDeserializer<'on, 'p> {
-    type_def_id: DefId,
-    processor: SerdeProcessor<'on, 'p>,
-    properties: &'on PhfIndexMap<SerdeProperty>,
-    flags: SerdeStructFlags,
+    pub(super) type_def_id: DefId,
+    pub(super) processor: SerdeProcessor<'on, 'p>,
+    pub(super) flags: SerdeStructFlags,
+
+    possible_props: PossibleProps<'on>,
 
     /// The number of expected properties
     expected_required_count: usize,
 
     /// The operator address for rel_params/edge
-    rel_params_addr: Option<SerdeOperatorAddr>,
-
-    /// A hard-coded property name for ID
-    id_prop_addr: Option<(&'on str, SerdeOperatorAddr)>,
+    pub(super) rel_params_addr: Option<SerdeOperatorAddr>,
 
     /// Whether to handle "raw dynamic entity" deserialization
     /// (i.e. dynamic ID/data detection)
     raw_dynamic_entity: Option<DefId>,
 }
 
-/// The types of properties the deserializer understands.
-enum PropKind {
-    Property(SerdeProperty),
-    RelParams(SerdeOperatorAddr),
-    SingletonId(SerdeOperatorAddr),
-    OverriddenId(RelationshipId, SerdeOperatorAddr),
-    Open(String),
-    Ignored,
+pub enum PossibleProps<'on> {
+    Any(&'on PhfIndexMap<SerdeProperty>),
+    IdSingleton {
+        name: &'on str,
+        addr: SerdeOperatorAddr,
+    },
 }
 
 impl Default for Struct {
@@ -106,7 +99,7 @@ impl<'on, 'p, 'de> Visitor<'de> for StructVisitor<'on, 'p> {
         let mut struct_deserializer = StructDeserializer::new(
             self.struct_op.def.def_id,
             self.processor,
-            &self.struct_op.properties,
+            PossibleProps::Any(&self.struct_op.properties),
         )
         .with_struct_flags(self.struct_op.flags)
         .with_expected_required_count(self.struct_op.required_count(
@@ -148,16 +141,15 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
     pub fn new(
         type_def_id: DefId,
         processor: SerdeProcessor<'on, 'p>,
-        properties: &'on PhfIndexMap<SerdeProperty>,
+        possible_props: PossibleProps<'on>,
     ) -> Self {
         Self {
             type_def_id,
             processor,
-            properties,
+            possible_props,
             flags: SerdeStructFlags::empty(),
             expected_required_count: 0,
             rel_params_addr: None,
-            id_prop_addr: None,
             raw_dynamic_entity: None,
         }
     }
@@ -177,11 +169,6 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
         self
     }
 
-    pub fn with_id_property_addr(mut self, name: &'on str, addr: SerdeOperatorAddr) -> Self {
-        self.id_prop_addr = Some((name, addr));
-        self
-    }
-
     /// Perform the struct deserialization
     pub fn deserialize_struct<'de, A: MapAccess<'de>>(
         self,
@@ -190,8 +177,29 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
     ) -> Result<Struct, A::Error> {
         let mut output = Struct::default();
 
-        self.consume(BufferedAttrsReader::new(buffered_attrs), &mut output)?;
-        self.consume(map, &mut output)?;
+        let buf_reader = BufferedAttrsReader::new(buffered_attrs);
+
+        match self.possible_props {
+            PossibleProps::Any(properties) => {
+                let prop_visitor = PropertyMapVisitor {
+                    deserializer: &self,
+                    properties,
+                };
+
+                self.consume(buf_reader, prop_visitor, &mut output)?;
+                self.consume(map, prop_visitor, &mut output)?;
+            }
+            PossibleProps::IdSingleton { name, addr } => {
+                let prop_visitor = IdSingletonPropVisitor {
+                    deserializer: &self,
+                    id_prop_name: name,
+                    id_prop_addr: addr,
+                };
+
+                self.consume(buf_reader, prop_visitor, &mut output)?;
+                self.consume(map, prop_visitor, &mut output)?;
+            }
+        }
 
         match self.try_convert_to_raw_dynamic_id(output) {
             Ok(id_struct) => Ok(id_struct),
@@ -212,9 +220,10 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
     fn consume<'de, A: MapAccess<'de>>(
         &self,
         mut map: A,
+        property_visitor: impl DeserializeSeed<'de, Value = PropKind> + Copy,
         output: &mut Struct,
     ) -> Result<(), A::Error> {
-        while let Some(prop_kind) = map.next_key_seed(PropertyVisitor(self))? {
+        while let Some(prop_kind) = map.next_key_seed(property_visitor)? {
             match prop_kind {
                 PropKind::RelParams(addr) => {
                     let Attribute { val, .. } = map.next_value_seed(
@@ -281,7 +290,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                 }
                 PropKind::Open(key) => {
                     output.open_dict.insert(
-                        key,
+                        key.into(),
                         map.next_value_seed(
                             RawVisitor::new(self.processor.ontology, self.processor.level)
                                 .map_err(RecursionLimitError::to_de_error)?,
@@ -327,27 +336,29 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
             return Ok(());
         }
 
-        for (_, property) in self.properties.iter() {
-            // Only _default values_ are handled in the deserializer:
-            if let Some(ValueGenerator::DefaultProc(address)) = property.value_generator {
-                if !property.is_optional_for(self.processor.mode, &self.processor.profile.flags)
-                    && !output.attributes.contains_key(&property.property_id)
-                {
-                    let procedure = Procedure {
-                        address,
-                        n_params: NParams(0),
-                    };
-                    let value = self
-                        .processor
-                        .ontology
-                        .new_vm(procedure)
-                        .run([])
-                        .map_err(|vm_error| format!("{vm_error}"))?
-                        .unwrap();
+        if let PossibleProps::Any(properties) = &self.possible_props {
+            for (_, property) in properties.iter() {
+                // Only _default values_ are handled in the deserializer:
+                if let Some(ValueGenerator::DefaultProc(address)) = property.value_generator {
+                    if !property.is_optional_for(self.processor.mode, &self.processor.profile.flags)
+                        && !output.attributes.contains_key(&property.property_id)
+                    {
+                        let procedure = Procedure {
+                            address,
+                            n_params: NParams(0),
+                        };
+                        let value = self
+                            .processor
+                            .ontology
+                            .new_vm(procedure)
+                            .run([])
+                            .map_err(|vm_error| format!("{vm_error}"))?
+                            .unwrap();
 
-                    // BUG: No support for rel_params:
-                    output.attributes.insert(property.property_id, value.into());
-                    output.observed_required_count += 1;
+                        // BUG: No support for rel_params:
+                        output.attributes.insert(property.property_id, value.into());
+                        output.observed_required_count += 1;
+                    }
                 }
             }
         }
@@ -373,39 +384,44 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
         for attr in &output.attributes {
             debug!("    attr {:?}", attr.0);
         }
-        for prop in self.properties.iter() {
-            debug!(
-                "    prop {:?}('{}') {:?} visible={} optional={}",
-                prop.1.property_id,
-                prop.0.arc_str(),
-                prop.1.flags,
-                prop.1
-                    .filter(
-                        self.processor.mode,
-                        self.processor.ctx.parent_property_id,
-                        self.processor.profile.flags
-                    )
-                    .is_some(),
-                prop.1.is_optional()
-            );
-        }
 
-        let mut items: Vec<DoubleQuote<String>> = self
-            .properties
-            .iter()
-            .filter(|(_, property)| {
-                property
-                    .filter(
-                        self.processor.mode,
-                        self.processor.ctx.parent_property_id,
-                        self.processor.profile.flags,
-                    )
-                    .is_some()
-                    && !property.is_optional()
-                    && !output.attributes.contains_key(&property.property_id)
-            })
-            .map(|(key, _)| DoubleQuote(key.arc_str().as_str().into()))
-            .collect();
+        if let PossibleProps::Any(properties) = &self.possible_props {
+            for prop in properties.iter() {
+                debug!(
+                    "    prop {:?}('{}') {:?} visible={} optional={}",
+                    prop.1.property_id,
+                    prop.0.arc_str(),
+                    prop.1.flags,
+                    prop.1
+                        .filter(
+                            self.processor.mode,
+                            self.processor.ctx.parent_property_id,
+                            self.processor.profile.flags
+                        )
+                        .is_some(),
+                    prop.1.is_optional()
+                );
+            }
+        };
+
+        let mut items: Vec<DoubleQuote<String>> = match &self.possible_props {
+            PossibleProps::Any(properties) => properties
+                .iter()
+                .filter(|(_, property)| {
+                    property
+                        .filter(
+                            self.processor.mode,
+                            self.processor.ctx.parent_property_id,
+                            self.processor.profile.flags,
+                        )
+                        .is_some()
+                        && !property.is_optional()
+                        && !output.attributes.contains_key(&property.property_id)
+                })
+                .map(|(key, _)| DoubleQuote(key.arc_str().as_str().into()))
+                .collect(),
+            PossibleProps::IdSingleton { .. } => vec![],
+        };
 
         if self.rel_params_addr.is_some() && output.rel_params.type_def_id() == DefId::unit() {
             items.push(DoubleQuote(EDGE_PROPERTY.into()));
@@ -428,105 +444,10 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
             output.attributes.insert(
                 self.processor
                     .ontology
-                    .ontol_domain_meta
+                    .ontol_domain_meta()
                     .open_data_property_id(),
                 Value::Dict(Box::new(open_dict), DefId::unit()).into(),
             );
-        }
-    }
-}
-
-/// A visitor for properties (i.e. _keys, not their values, which are the attributes).
-/// It determines the semantics of each property, or whether it's accepted or not.
-#[derive(Clone, Copy)]
-struct PropertyVisitor<'d>(&'d StructDeserializer<'d, 'd>);
-
-impl<'a, 'de> DeserializeSeed<'de> for PropertyVisitor<'a> {
-    type Value = PropKind;
-
-    fn deserialize<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
-        deserializer.deserialize_str(self)
-    }
-}
-
-impl<'a, 'de> Visitor<'de> for PropertyVisitor<'a> {
-    type Value = PropKind;
-
-    fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "property identifier")
-    }
-
-    fn visit_str<E: Error>(self, v: &str) -> Result<PropKind, E> {
-        match v {
-            EDGE_PROPERTY => {
-                if let Some(addr) = self.0.rel_params_addr {
-                    Ok(PropKind::RelParams(addr))
-                } else {
-                    Err(Error::custom("`_edge` property not accepted here"))
-                }
-            }
-            _ => {
-                if let Some((property_name, addr)) = self.0.id_prop_addr {
-                    if v == property_name {
-                        return Ok(PropKind::SingletonId(addr));
-                    }
-                }
-
-                let Some(serde_property) = self.0.properties.get(v) else {
-                    match self.0.processor.profile.api.lookup_special_property(v) {
-                        Some(SpecialProperty::IdOverride) => {
-                            let type_info =
-                                self.0.processor.ontology.get_type_info(self.0.type_def_id);
-                            let TypeKind::Entity(entity_info) = &type_info.kind else {
-                                return Err(E::custom("not an entity"));
-                            };
-
-                            return Ok(PropKind::OverriddenId(
-                                entity_info.id_relationship_id,
-                                entity_info.id_operator_addr,
-                            ));
-                        }
-                        Some(SpecialProperty::Ignored | SpecialProperty::TypeAnnotation) => {
-                            return Ok(PropKind::Ignored);
-                        }
-                        _ => {}
-                    }
-
-                    return if self.0.flags.contains(SerdeStructFlags::OPEN_DATA)
-                        && self
-                            .0
-                            .processor
-                            .profile
-                            .flags
-                            .contains(ProcessorProfileFlags::DESERIALIZE_OPEN_DATA)
-                    {
-                        Ok(PropKind::Open(v.into()))
-                    } else {
-                        // TODO: This error message could be improved to suggest valid fields.
-                        // see OneOf in serde (this is a private struct)
-                        Err(Error::custom(format!("unknown property `{v}`")))
-                    };
-                };
-
-                if serde_property
-                    .filter(
-                        self.0.processor.mode,
-                        self.0.processor.ctx.parent_property_id,
-                        self.0.processor.profile.flags,
-                    )
-                    .is_some()
-                {
-                    Ok(PropKind::Property(*serde_property))
-                } else if serde_property.is_read_only()
-                    && !matches!(self.0.processor.mode, ProcessorMode::Read)
-                {
-                    Err(Error::custom(format!("property `{v}` is read-only")))
-                } else {
-                    Err(Error::custom(format!(
-                        "property `{v}` not available in this context"
-                    )))
-                }
-            }
         }
     }
 }

@@ -11,6 +11,7 @@ mod deserialize_id;
 mod deserialize_matcher;
 mod deserialize_option;
 mod deserialize_patch;
+mod deserialize_property;
 mod deserialize_raw;
 mod deserialize_struct;
 mod serialize;

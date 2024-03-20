@@ -321,11 +321,11 @@ impl<'o> Processor for OntolProcessor<'o> {
                 haystack,
                 &captures,
                 group_filter,
-                self.ontology.ontol_domain_meta.text,
+                self.ontology.ontol_domain_meta().text,
             );
             self.stack.push(Value::Sequence(
                 attributes.into(),
-                self.ontology.ontol_domain_meta.text,
+                self.ontology.ontol_domain_meta().text,
             ));
         } else {
             self.push_void();
@@ -346,7 +346,7 @@ impl<'o> Processor for OntolProcessor<'o> {
         let text_pattern = self.ontology.get_text_pattern(pattern_id).unwrap();
 
         let mut attrs: ThinVec<Attribute> = ThinVec::new();
-        let text_def_id = self.ontology.ontol_domain_meta.text;
+        let text_def_id = self.ontology.ontol_domain_meta().text;
 
         for captures in text_pattern
             .regex

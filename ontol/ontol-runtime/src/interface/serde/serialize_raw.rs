@@ -24,7 +24,7 @@ pub fn serialize_raw<S: Serializer>(
     match value {
         Value::Unit(_) => serializer.serialize_unit(),
         Value::I64(int, type_id) => {
-            if type_id == &ontology.ontol_domain_meta.bool {
+            if type_id == &ontology.ontol_domain_meta().bool {
                 if *int == 0 {
                     serializer.serialize_bool(false)
                 } else {

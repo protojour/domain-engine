@@ -1,7 +1,6 @@
 use std::marker::PhantomData;
 
 use serde::de::{Error, IntoDeserializer, MapAccess};
-use smartstring::alias::String;
 
 pub struct BufferedAttrsReader<E> {
     iterator: std::vec::IntoIter<(String, serde_value::Value)>,

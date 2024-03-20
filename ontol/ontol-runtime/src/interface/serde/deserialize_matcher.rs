@@ -326,7 +326,7 @@ impl<'on> ValueMatcher for CapturingTextPatternMatcher<'on> {
                             attrs.insert(property.property_id, attribute);
                         }
                         TextPatternConstantPart::AnyString { .. } => {
-                            let text_def_id = self.ontology.ontol_domain_meta.text;
+                            let text_def_id = self.ontology.ontol_domain_meta().text;
                             let property_id = PropertyId {
                                 role: Role::Subject,
                                 relationship_id: RelationshipId(text_def_id),
@@ -529,7 +529,7 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
                 }
                 LeafDiscriminant::MatchesCapturingTextPattern(def_id) => {
                     let result_type = variant.serde_def.def_id;
-                    let pattern = self.ontology.text_patterns.get(def_id).unwrap();
+                    let pattern = self.ontology.data.text_patterns.get(def_id).unwrap();
 
                     if let Ok(value) = pattern.try_capturing_match(str, result_type, self.ontology)
                     {
@@ -690,7 +690,7 @@ impl<'on, 'p> MapMatcher<'on, 'p> {
                     LeafDiscriminant::MatchesCapturingTextPattern(def_id),
                     serde_value::Value::String(value),
                 ) => {
-                    let pattern = self.ontology.text_patterns.get(def_id).unwrap();
+                    let pattern = self.ontology.data.text_patterns.get(def_id).unwrap();
                     pattern.regex.is_match(value)
                 }
                 _ => false,
@@ -803,7 +803,7 @@ fn try_deserialize_custom_string(
     def_id: DefId,
     str: &str,
 ) -> Result<Value, ParseError> {
-    match ontology.text_like_types.get(&def_id) {
+    match ontology.data.text_like_types.get(&def_id) {
         Some(custom_string_deserializer) => custom_string_deserializer.try_deserialize(def_id, str),
         None => Ok(Value::Text(str.into(), def_id)),
     }
@@ -815,6 +815,7 @@ fn expecting_custom_string(
     f: &mut std::fmt::Formatter,
 ) -> Option<std::fmt::Result> {
     ontology
+        .data
         .text_like_types
         .get(&def_id)
         .map(|custom_string_deserializer| write!(f, "`{}`", custom_string_deserializer.type_name()))

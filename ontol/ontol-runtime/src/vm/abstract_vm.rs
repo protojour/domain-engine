@@ -113,7 +113,7 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
     }
 
     pub fn pending_opcode(&self) -> &OpCode {
-        &self.ontology.lib.opcodes[self.program_counter]
+        &self.ontology.data.lib.opcodes[self.program_counter]
     }
 
     pub fn run(
@@ -121,7 +121,7 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
         processor: &mut P,
         debug: &mut dyn VmDebug<P>,
     ) -> VmResult<Option<P::Yield>> {
-        let opcodes = self.ontology.lib.opcodes.as_slice();
+        let opcodes = self.ontology.data.lib.opcodes.as_slice();
 
         loop {
             debug.tick(self, processor);
@@ -291,7 +291,7 @@ impl<'o, P: Processor> AbstractVm<'o, P> {
     }
 
     fn read_regex_capture_indexes(&mut self) -> &BitVec {
-        let opcodes = self.ontology.lib.opcodes.as_slice();
+        let opcodes = self.ontology.data.lib.opcodes.as_slice();
         self.program_counter += 1;
         let OpCode::RegexCaptureIndexes(index_filter) = &opcodes[self.program_counter] else {
             panic!("Expected capture indexes");

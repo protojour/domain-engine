@@ -12,7 +12,7 @@ use crate::{
 
 use super::key::PhfKey;
 
-/// A constant, string-keyed HashMap with using perfect hashing.
+/// A constant, string-keyed HashMap using perfect hashing.
 ///
 /// It can be used by Ontology since it is built ahead-of-time by ontol-compiler.
 ///
@@ -24,7 +24,7 @@ pub struct PhfMap<V> {
     entries: Box<[(PhfKey, V)]>,
 }
 
-/// A constant, indexed string-keyed HashMap with using perfect hashing.
+/// A constant, indexed string-keyed HashMap using perfect hashing.
 ///
 /// Indexed means that it gets iterated in deterministic/insertion order.
 ///

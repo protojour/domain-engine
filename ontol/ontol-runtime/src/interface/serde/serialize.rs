@@ -190,7 +190,12 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         pattern_def_id: DefId,
         serializer: S,
     ) -> Res<S> {
-        let pattern = &self.ontology.text_patterns.get(&pattern_def_id).unwrap();
+        let pattern = &self
+            .ontology
+            .data
+            .text_patterns
+            .get(&pattern_def_id)
+            .unwrap();
         let mut buf = String::new();
         write!(
             &mut buf,
@@ -214,7 +219,12 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
     ) -> Res<S> {
         match value {
             Value::Struct(attrs, _) => {
-                let pattern = &self.ontology.text_patterns.get(&pattern_def_id).unwrap();
+                let pattern = &self
+                    .ontology
+                    .data
+                    .text_patterns
+                    .get(&pattern_def_id)
+                    .unwrap();
                 let mut pattern_property = None;
 
                 for part in &pattern.constant_parts {

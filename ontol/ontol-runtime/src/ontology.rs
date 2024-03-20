@@ -40,9 +40,14 @@ pub mod domain;
 pub mod map;
 pub mod ontol;
 
-/// The Ontology is the model of an ONTOL runtime environment.
-#[derive(Serialize, Deserialize)]
+/// The Ontology is the model of a single ONTOL runtime environment.
 pub struct Ontology {
+    pub(crate) data: Data,
+}
+
+/// All of the information that makes an Ontology.
+#[derive(Serialize, Deserialize)]
+pub(crate) struct Data {
     pub(crate) const_proc_table: FnvHashMap<DefId, Procedure>,
     pub(crate) map_meta_table: FnvHashMap<MapKey, MapMeta>,
     pub(crate) named_forward_maps: FnvHashMap<(PackageId, TextConstant), MapKey>,
@@ -50,7 +55,6 @@ pub struct Ontology {
     pub(crate) text_patterns: FnvHashMap<DefId, TextPattern>,
     pub(crate) extern_table: FnvHashMap<DefId, Extern>,
     pub(crate) lib: Lib,
-    pub(crate) ontol_domain_meta: OntolDomainMeta,
 
     /// The text constants are stored using ArcStr because it's only one word wide,
     /// (length is stored on the heap) and which makes the vector as dense as possible:
@@ -58,6 +62,7 @@ pub struct Ontology {
 
     domain_table: FnvHashMap<PackageId, Domain>,
     extended_entity_table: FnvHashMap<DefId, ExtendedEntityInfo>,
+    ontol_domain_meta: OntolDomainMeta,
     union_variants: FnvHashMap<DefId, Box<[DefId]>>,
     domain_interfaces: FnvHashMap<PackageId, Vec<DomainInterface>>,
     package_config_table: FnvHashMap<PackageId, PackageConfig>,
@@ -69,24 +74,30 @@ pub struct Ontology {
 }
 
 impl Ontology {
+    /// Make a builder for building an Ontology from scratch.
     pub fn builder() -> OntologyBuilder {
         builder::new_builder()
     }
 
+    /// Deserialize an Ontology using the bincode format.
     pub fn try_from_bincode(reader: impl std::io::Read) -> Result<Self, bincode::Error> {
-        let mut ontology: Self = bincode::deserialize_from(reader)?;
+        let mut ontology = Ontology {
+            data: bincode::deserialize_from(reader)?,
+        };
         ontology.init();
 
         Ok(ontology)
     }
 
+    /// Serialize an ontology to bincode.
     pub fn try_serialize_to_bincode(
         &self,
         writer: impl std::io::Write,
     ) -> Result<(), bincode::Error> {
-        bincode::serialize_into(writer, self)
+        bincode::serialize_into(writer, &self.data)
     }
 
+    /// Make a value debuggable using OntolDebug.
     pub fn debug<'a, T: ?Sized>(&'a self, value: &'a T) -> debug::Fmt<'a, &'a T> {
         debug::Fmt(self, value)
     }
@@ -105,7 +116,7 @@ impl Ontology {
     }
 
     pub fn get_docs(&self, def_id: DefId) -> Option<std::string::String> {
-        let docs = self.docs.get(&def_id)?;
+        let docs = self.data.docs.get(&def_id)?;
         if docs.is_empty() {
             None
         } else {
@@ -114,68 +125,73 @@ impl Ontology {
     }
 
     pub fn get_text_pattern(&self, def_id: DefId) -> Option<&TextPattern> {
-        self.text_patterns.get(&def_id)
+        self.data.text_patterns.get(&def_id)
     }
 
     pub fn get_text_like_type(&self, def_id: DefId) -> Option<TextLikeType> {
-        self.text_like_types.get(&def_id).cloned()
+        self.data.text_like_types.get(&def_id).cloned()
     }
 
     pub fn domains(&self) -> impl Iterator<Item = (&PackageId, &Domain)> {
-        self.domain_table.iter()
+        self.data.domain_table.iter()
     }
 
     pub fn ontol_domain_meta(&self) -> &OntolDomainMeta {
-        &self.ontol_domain_meta
+        &self.data.ontol_domain_meta
     }
 
     pub fn find_domain(&self, package_id: PackageId) -> Option<&Domain> {
-        self.domain_table.get(&package_id)
+        self.data.domain_table.get(&package_id)
     }
 
     /// Get the members of a given union.
     /// Returns an empty slice if it's not a union.
     pub fn union_variants(&self, union_def_id: DefId) -> &[DefId] {
-        self.union_variants
+        self.data
+            .union_variants
             .get(&union_def_id)
             .map(|slice| slice.as_ref())
             .unwrap_or(&[])
     }
 
     pub fn extended_entity_info(&self, def_id: DefId) -> Option<&ExtendedEntityInfo> {
-        self.extended_entity_table.get(&def_id)
+        self.data.extended_entity_table.get(&def_id)
     }
 
     pub fn get_package_config(&self, package_id: PackageId) -> Option<&PackageConfig> {
-        self.package_config_table.get(&package_id)
+        self.data.package_config_table.get(&package_id)
     }
 
     pub fn domain_interfaces(&self, package_id: PackageId) -> &[DomainInterface] {
-        self.domain_interfaces
+        self.data
+            .domain_interfaces
             .get(&package_id)
             .map(|interfaces| interfaces.as_slice())
             .unwrap_or(&[])
     }
 
     pub fn get_const_proc(&self, const_id: DefId) -> Option<Procedure> {
-        self.const_proc_table.get(&const_id).cloned()
+        self.data.const_proc_table.get(&const_id).cloned()
     }
 
     pub fn iter_map_meta(&self) -> impl Iterator<Item = (MapKey, &MapMeta)> + '_ {
-        self.map_meta_table.iter().map(|(key, proc)| (*key, proc))
+        self.data
+            .map_meta_table
+            .iter()
+            .map(|(key, proc)| (*key, proc))
     }
 
     pub fn get_map_meta(&self, key: &MapKey) -> Option<&MapMeta> {
-        self.map_meta_table.get(key)
+        self.data.map_meta_table.get(key)
     }
 
     pub fn get_prop_flow_slice(&self, map_meta: &MapMeta) -> Option<&[PropertyFlow]> {
         let range = map_meta.propflow_range.as_ref()?;
-        Some(&self.property_flows[range.start as usize..range.end as usize])
+        Some(&self.data.property_flows[range.start as usize..range.end as usize])
     }
 
     pub fn get_mapper_proc(&self, key: &MapKey) -> Option<Procedure> {
-        self.map_meta_table.get(key).map(|map_info| {
+        self.data.map_meta_table.get(key).map(|map_info| {
             debug!(
                 "get_mapper_proc ({:?}) => {:?}",
                 key.def_ids(),
@@ -191,7 +207,7 @@ impl Ontology {
         mode: ProcessorMode,
     ) -> SerdeProcessor {
         SerdeProcessor {
-            value_operator: &self.serde_operators[value_addr.0 as usize],
+            value_operator: &self.data.serde_operators[value_addr.0 as usize],
             ctx: Default::default(),
             level: ProcessorLevel::new_root(),
             ontology: self,
@@ -201,26 +217,27 @@ impl Ontology {
     }
 
     pub fn dynamic_sequence_operator_addr(&self) -> SerdeOperatorAddr {
-        self.dynamic_sequence_operator_addr
+        self.data.dynamic_sequence_operator_addr
     }
 
     pub fn get_value_generator(&self, relationship_id: RelationshipId) -> Option<&ValueGenerator> {
-        self.value_generators.get(&relationship_id)
+        self.data.value_generators.get(&relationship_id)
     }
 
     pub fn get_extern(&self, def_id: DefId) -> Option<&Extern> {
-        self.extern_table.get(&def_id)
+        self.data.extern_table.get(&def_id)
     }
 
     pub fn get_text_constant(&self, constant: TextConstant) -> &ArcStr {
-        &self.text_constants[constant.0 as usize]
+        &self.data.text_constants[constant.0 as usize]
     }
 
     /// Find a text constant given its string representation.
     /// NOTE: This intentionally has linear search complexity.
     /// It's only use case should be testing.
     pub fn find_text_constant(&self, str: &str) -> Option<TextConstant> {
-        self.text_constants
+        self.data
+            .text_constants
             .iter()
             .enumerate()
             .find(|(_, arcstr)| arcstr.as_str() == str)
@@ -230,20 +247,21 @@ impl Ontology {
     /// This primarily exists for testing only.
     pub fn find_named_forward_map_meta(&self, package_id: PackageId, name: &str) -> Option<MapKey> {
         let text_constant = self.find_text_constant(name)?;
-        self.named_forward_maps
+        self.data
+            .named_forward_maps
             .get(&(package_id, text_constant))
             .cloned()
     }
 
     /// Initialize fields that need work after deserialization
     fn init(&mut self) {
-        let mut serde_operators = std::mem::take(&mut self.serde_operators);
+        let mut serde_operators = std::mem::take(&mut self.data.serde_operators);
 
         for operator in serde_operators.iter_mut() {
             operator.ontology_init(self);
         }
 
-        self.serde_operators = serde_operators;
+        self.data.serde_operators = serde_operators;
     }
 }
 
@@ -256,7 +274,7 @@ impl Index<TextConstant> for Ontology {
     type Output = str;
 
     fn index(&self, index: TextConstant) -> &Self::Output {
-        &self.text_constants[index.0 as usize]
+        &self.data.text_constants[index.0 as usize]
     }
 }
 
@@ -264,7 +282,7 @@ impl Index<SerdeOperatorAddr> for Ontology {
     type Output = SerdeOperator;
 
     fn index(&self, index: SerdeOperatorAddr) -> &Self::Output {
-        &self.serde_operators[index.0 as usize]
+        &self.data.serde_operators[index.0 as usize]
     }
 }
 

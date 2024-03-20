@@ -2,7 +2,6 @@ use serde::{
     de::{DeserializeSeed, Error, MapAccess, SeqAccess, Unexpected, Visitor},
     Deserializer,
 };
-use smartstring::alias::String;
 use thin_vec::ThinVec;
 use tracing::trace;
 
@@ -10,9 +9,8 @@ use crate::{
     interface::serde::{
         deserialize_id::IdSingletonStructVisitor,
         deserialize_matcher::MapMatchResult,
-        deserialize_struct::{StructDeserializer, StructVisitor},
+        deserialize_struct::{PossibleProps, StructDeserializer, StructVisitor},
     },
-    phf::PhfIndexMap,
     value::{Attribute, Serial, Value},
 };
 
@@ -155,7 +153,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
             ),
             (SerdeOperator::TextPattern(def_id), _) => deserializer.deserialize_str(
                 TextPatternMatcher {
-                    pattern: self.ontology.text_patterns.get(def_id).unwrap(),
+                    pattern: self.ontology.data.text_patterns.get(def_id).unwrap(),
                     def_id: *def_id,
                     ontology: self.ontology,
                 }
@@ -164,7 +162,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
             (SerdeOperator::CapturingTextPattern(def_id), scalar_format) => deserializer
                 .deserialize_str(
                     CapturingTextPatternMatcher {
-                        pattern: self.ontology.text_patterns.get(def_id).unwrap(),
+                        pattern: self.ontology.data.text_patterns.get(def_id).unwrap(),
                         def_id: *def_id,
                         ontology: self.ontology,
                         scalar_format,
@@ -348,10 +346,10 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
 
         // Because serde is stream-oriented, we need to start storing attributes
         // into a buffer until the type can be properly recognized
-        let mut buffered_attrs: Vec<(String, serde_value::Value)> = Default::default();
+        let mut buffered_attrs: Vec<(std::string::String, serde_value::Value)> = Default::default();
 
         let map_match = loop {
-            let property = match map.next_key::<String>()? {
+            let property = match map.next_key::<std::string::String>()? {
                 Some(property) => property,
                 None => match matcher.match_fallback() {
                     MapMatchResult::Match(map_match) => {
@@ -406,11 +404,17 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
             }
             .visit_map(map),
             MapMatchMode::EntityId(entity_id, name_constant, addr) => {
-                let output =
-                    StructDeserializer::new(entity_id, self.processor, &PhfIndexMap::default())
-                        .with_rel_params_addr(map_match.ctx.rel_params_addr)
-                        .with_id_property_addr(&self.processor.ontology[name_constant], addr)
-                        .deserialize_struct(buffered_attrs, map)?;
+                let output = StructDeserializer::new(
+                    entity_id,
+                    self.processor,
+                    PossibleProps::IdSingleton {
+                        name: &self.processor.ontology[name_constant],
+                        addr,
+                    },
+                )
+                .with_rel_params_addr(map_match.ctx.rel_params_addr)
+                .deserialize_struct(buffered_attrs, map)?;
+
                 let id = output
                     .id
                     .ok_or_else(|| Error::custom("missing identifier attribute".to_string()))?;
