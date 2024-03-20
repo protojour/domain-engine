@@ -41,7 +41,7 @@ use thiserror::Error;
 use tokio::sync::broadcast::{self, Sender};
 use tokio_util::sync::CancellationToken;
 use tower_lsp::{LspService, Server};
-use tracing::{info, level_filters::LevelFilter};
+use tracing::{info, level_filters::LevelFilter, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::service::Detach;
@@ -419,6 +419,10 @@ async fn serve(
     let (tx, rx) = std::sync::mpsc::channel();
     let (reload_tx, _reload_rx) = broadcast::channel::<ChannelMessage>(16);
     let mut debouncer = new_debouncer(Duration::from_secs(1), None, tx).unwrap();
+
+    if data_store.is_none() {
+        warn!("No datastore domain set!");
+    }
 
     debouncer
         .watcher()
