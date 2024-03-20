@@ -14,7 +14,7 @@ use crate::{
         ontol::{TextConstant, ValueGenerator},
         OntologyInit,
     },
-    phf_map::{PhfIndexMap, PhfKey},
+    phf::{PhfIndexMap, PhfKey},
     property::PropertyId,
     DefId,
 };

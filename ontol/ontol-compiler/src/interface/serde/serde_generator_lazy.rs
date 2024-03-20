@@ -15,7 +15,7 @@ use ontol_runtime::{
         },
     },
     ontology::ontol::{TextConstant, ValueGenerator},
-    phf_map::{PhfIndexMap, PhfKey},
+    phf::{PhfIndexMap, PhfKey},
     property::{PropertyId, Role},
     DefId,
 };

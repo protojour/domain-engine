@@ -7,9 +7,16 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     debug::{OntolDebug, OntolFormatter},
-    ontology::{ontol::TextConstant, Ontology, OntologyInit},
+    ontology::{Ontology, OntologyInit},
 };
 
+use super::key::PhfKey;
+
+/// A constant, string-keyed HashMap with using perfect hashing.
+///
+/// It can be used by Ontology since it is built ahead-of-time by ontol-compiler.
+///
+/// This version is iterated in non-deterministic order (based on the hash function).
 #[derive(Clone, Serialize, Deserialize)]
 pub struct PhfMap<V> {
     key: u64,
@@ -17,27 +24,15 @@ pub struct PhfMap<V> {
     entries: Box<[(PhfKey, V)]>,
 }
 
+/// A constant, indexed string-keyed HashMap with using perfect hashing.
+///
+/// Indexed means that it gets iterated in deterministic/insertion order.
+///
+/// It can be used by Ontology since it is built ahead-of-time by ontol-compiler.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct PhfIndexMap<V> {
     map: PhfMap<V>,
     order: Box<[usize]>,
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct PhfKey {
-    #[serde(skip)]
-    pub string: ArcStr,
-    pub constant: TextConstant,
-}
-
-impl PhfKey {
-    pub fn arc_str(&self) -> &ArcStr {
-        &self.string
-    }
-
-    pub fn constant(&self) -> TextConstant {
-        self.constant
-    }
 }
 
 impl<V> Default for PhfMap<V> {
@@ -217,7 +212,7 @@ fn build<V>(entries: impl IntoIterator<Item = (PhfKey, V)>) -> (PhfMap<V>, Vec<u
         })
         .unzip();
 
-    // generate the perfect hash
+    // generate the perfect hash function
     let state = phf_generator::generate_hash(&keys);
 
     (
@@ -260,13 +255,12 @@ impl PhfHash for HashKey {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use std::{mem::size_of, ops::Index};
 
     use arcstr::{literal, ArcStr};
 
-    use crate::{ontology::ontol::TextConstant, phf_map::PhfIndexMap};
-
-    use super::{PhfKey, PhfMap};
+    use crate::ontology::ontol::TextConstant;
 
     #[derive(Default)]
     struct Consts {

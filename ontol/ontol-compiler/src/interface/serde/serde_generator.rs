@@ -18,7 +18,7 @@ use ontol_runtime::{
         serde::{operator::SerdeStructFlags, SerdeDef, SerdeModifier},
     },
     ontology::ontol::TextConstant,
-    phf_map::PhfKey,
+    phf::PhfKey,
     property::{Cardinality, PropertyCardinality, ValueCardinality},
     smart_format, DefId,
 };

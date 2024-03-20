@@ -12,7 +12,7 @@ use crate::{
     format_utils::{DoubleQuote, LogicOp, Missing},
     interface::serde::{deserialize_raw::RawVisitor, EDGE_PROPERTY},
     ontology::{domain::TypeKind, ontol::ValueGenerator},
-    phf_map::PhfIndexMap,
+    phf::PhfIndexMap,
     property::PropertyId,
     value::{Attribute, Value},
     vm::proc::{NParams, Procedure},

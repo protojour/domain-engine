@@ -12,7 +12,7 @@ use crate::{
         deserialize_matcher::MapMatchResult,
         deserialize_struct::{StructDeserializer, StructVisitor},
     },
-    phf_map::PhfIndexMap,
+    phf::PhfIndexMap,
     value::{Attribute, Serial, Value},
 };
 

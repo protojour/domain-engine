@@ -9,7 +9,7 @@ pub mod debug;
 pub mod format_utils;
 pub mod interface;
 pub mod ontology;
-pub mod phf_map;
+pub mod phf;
 pub mod property;
 pub mod query;
 pub mod resolve_path;
