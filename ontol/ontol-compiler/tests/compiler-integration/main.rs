@@ -5,6 +5,7 @@ mod examples;
 mod hir;
 mod interface;
 mod serde;
+mod test_bugs;
 mod test_conduit;
 mod test_demo;
 mod test_entity;
