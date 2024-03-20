@@ -201,7 +201,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
             }
             SerdeOperator::Struct(struct_op) => {
                 let mut attrs = HashMap::default();
-                for (_, property) in &struct_op.properties {
+                for (_, property) in struct_op.properties.iter() {
                     let attr = self.fake_attribute(processor.new_child(property.value_addr)?)?;
                     attrs.insert(property.property_id, attr);
                 }

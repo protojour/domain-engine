@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 
 use fnv::FnvHashMap;
-use indexmap::IndexMap;
 use serde::{
     de::{DeserializeSeed, Error, MapAccess, Visitor},
     Deserializer,
@@ -13,6 +12,7 @@ use crate::{
     format_utils::{DoubleQuote, LogicOp, Missing},
     interface::serde::{deserialize_raw::RawVisitor, EDGE_PROPERTY},
     ontology::{domain::TypeKind, ontol::ValueGenerator},
+    phf_map::PhfIndexMap,
     property::PropertyId,
     value::{Attribute, Value},
     vm::proc::{NParams, Procedure},
@@ -51,7 +51,7 @@ pub struct StructVisitor<'on, 'p> {
 pub struct StructDeserializer<'on, 'p> {
     type_def_id: DefId,
     processor: SerdeProcessor<'on, 'p>,
-    properties: &'on IndexMap<String, SerdeProperty>,
+    properties: &'on PhfIndexMap<SerdeProperty>,
     flags: SerdeStructFlags,
 
     /// The number of expected properties
@@ -148,7 +148,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
     pub fn new(
         type_def_id: DefId,
         processor: SerdeProcessor<'on, 'p>,
-        properties: &'on IndexMap<String, SerdeProperty>,
+        properties: &'on PhfIndexMap<SerdeProperty>,
     ) -> Self {
         Self {
             type_def_id,
@@ -327,7 +327,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
             return Ok(());
         }
 
-        for (_, property) in self.properties {
+        for (_, property) in self.properties.iter() {
             // Only _default values_ are handled in the deserializer:
             if let Some(ValueGenerator::DefaultProc(address)) = property.value_generator {
                 if !property.is_optional_for(self.processor.mode, &self.processor.profile.flags)
@@ -373,11 +373,11 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
         for attr in &output.attributes {
             debug!("    attr {:?}", attr.0);
         }
-        for prop in self.properties {
+        for prop in self.properties.iter() {
             debug!(
                 "    prop {:?}('{}') {:?} visible={} optional={}",
                 prop.1.property_id,
-                prop.0,
+                prop.0.arc_str(),
                 prop.1.flags,
                 prop.1
                     .filter(
@@ -404,7 +404,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                     && !property.is_optional()
                     && !output.attributes.contains_key(&property.property_id)
             })
-            .map(|(key, _)| DoubleQuote(key.clone()))
+            .map(|(key, _)| DoubleQuote(key.arc_str().as_str().into()))
             .collect();
 
         if self.rel_params_addr.is_some() && output.rel_params.type_def_id() == DefId::unit() {

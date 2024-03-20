@@ -42,20 +42,28 @@ impl PhfKey {
 
 impl<V> Default for PhfMap<V> {
     fn default() -> Self {
-        Self {
-            key: 0,
-            disps: Default::default(),
-            entries: Default::default(),
-        }
+        Self::build([])
     }
 }
 
 impl<V> PhfMap<V> {
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn contains_key(&self, key: &str) -> bool {
+        self.get_entry(key).is_some()
+    }
+
     pub fn get(&self, key: &str) -> Option<&V> {
         self.get_entry(key).map(|(_, value)| value)
     }
 
     pub fn get_entry(&self, key: &str) -> Option<(&ArcStr, &V)> {
+        if self.disps.is_empty() {
+            return None;
+        }
+
         let hashes = phf_shared::hash(key, &self.key);
         let index = phf_shared::get_index(&hashes, &self.disps, self.entries.len());
         let entry = &self.entries[index as usize];
@@ -90,6 +98,14 @@ impl<V> Default for PhfIndexMap<V> {
 }
 
 impl<V> PhfIndexMap<V> {
+    pub fn is_empty(&self) -> bool {
+        self.map.entries.is_empty()
+    }
+
+    pub fn contains_key(&self, key: &str) -> bool {
+        self.get_entry(key).is_some()
+    }
+
     pub fn get(&self, key: &str) -> Option<&V> {
         self.map.get(key)
     }
@@ -120,7 +136,6 @@ impl<V> PhfIndexMap<V> {
         Self {
             map,
             order: (0..inverse_order.len())
-                .into_iter()
                 .map(|index| inverse_order.remove(&index).unwrap())
                 .collect(),
         }
@@ -311,6 +326,16 @@ mod tests {
             (c.add(literal!("o")), "O"),
             (c.add(literal!("p")), "P"),
         ]
+    }
+
+    #[test]
+    fn empty_map() {
+        let map: PhfMap<()> = PhfMap::build([]);
+
+        assert_eq!(map.get("foo"), None);
+        assert_eq!(map.get("bar"), None);
+        assert_eq!(map.get("foobar"), None);
+        assert_eq!(map.get("k"), None);
     }
 
     #[test]

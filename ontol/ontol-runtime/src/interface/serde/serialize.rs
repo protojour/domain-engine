@@ -331,7 +331,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
             .api
             .find_special_property_name(SpecialProperty::IdOverride);
 
-        for (name, serde_prop) in
+        for (phf_key, serde_prop) in
             struct_op.filter_properties(self.mode, self.ctx.parent_property_id, self.profile.flags)
         {
             let unit_attr = UNIT_ATTR;
@@ -355,7 +355,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                             _ => {
                                 panic!(
                                     "While serializing value {:?} with `{}`, property `{}` was not found.",
-                                    value, &self.ontology[struct_op.typename], name
+                                    value, &self.ontology[struct_op.typename], phf_key.arc_str()
                                 )
                             }
                         }
@@ -367,7 +367,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 
             let name = match (is_entity_id, overridden_id_property_key) {
                 (true, Some(id_key)) => id_key,
-                _ => name.as_str(),
+                _ => phf_key.arc_str().as_str(),
             };
 
             map.serialize_entry(

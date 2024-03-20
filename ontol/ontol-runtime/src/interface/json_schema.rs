@@ -641,13 +641,13 @@ struct MapProperties<'e> {
 impl<'e> Serialize for MapProperties<'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut map = serializer.serialize_map(None)?;
-        for (key, property) in &self.map_type.properties {
+        for (key, property) in self.map_type.properties.iter() {
             let docs = self
                 .ctx
                 .ontology
                 .get_docs(property.property_id.relationship_id.0);
             map.serialize_entry(
-                key,
+                key.arc_str().as_str(),
                 &self
                     .ctx
                     .with_rel_params(property.rel_params_addr)
@@ -667,9 +667,9 @@ struct RequiredMapProperties<'e> {
 impl<'e> Serialize for RequiredMapProperties<'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut seq = serializer.serialize_seq(None)?;
-        for (key, property) in &self.map_type.properties {
+        for (key, property) in self.map_type.properties.iter() {
             if !property.is_optional() {
-                seq.serialize_element(key)?;
+                seq.serialize_element(key.arc_str().as_str())?;
             }
         }
         seq.end()
@@ -803,7 +803,7 @@ impl SchemaGraphBuilder {
             SerdeOperator::Struct(struct_op) => {
                 self.add_to_graph(struct_op.def, addr);
 
-                for (_, property) in &struct_op.properties {
+                for (_, property) in struct_op.properties.iter() {
                     self.visit(property.value_addr, ontology);
                     if let Some(addr) = &property.rel_params_addr {
                         self.visit(*addr, ontology);

@@ -345,8 +345,10 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     SerdeOperator::Struct(struct_op) => {
                         hidden = struct_op.properties.is_empty();
 
-                        let all_optional =
-                            struct_op.properties.values().all(|prop| prop.is_optional());
+                        let all_optional = struct_op
+                            .properties
+                            .iter()
+                            .all(|(_, prop)| prop.is_optional());
 
                         if all_optional {
                             Some(DefaultArg::EmptyObject)

@@ -70,7 +70,7 @@ impl<'e> ObjectGenerator<'e> {
 
         match operator {
             SerdeOperator::Struct(struct_op) => {
-                for (key, property) in &struct_op.properties {
+                for (key, property) in struct_op.properties.iter() {
                     if !property.is_read_only() || matches!(property.property_id.role, Role::Object)
                     {
                         continue;
@@ -125,7 +125,7 @@ impl<'e> ObjectGenerator<'e> {
                             );
                         }
                         None => {
-                            panic!("No generator for {key}")
+                            panic!("No generator for {key}", key = key.arc_str())
                         }
                     }
                 }

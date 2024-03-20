@@ -138,7 +138,8 @@ fn test_graphql_serde_renaming() {
         let fields: Vec<_> = test.ontology()[foo_node.operator_addr]
             .struct_op()
             .properties
-            .keys()
+            .iter()
+            .map(|(key, _)| key.arc_str())
             .collect();
 
         expect_eq!(

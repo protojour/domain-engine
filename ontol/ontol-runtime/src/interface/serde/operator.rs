@@ -4,15 +4,17 @@ use std::{
 };
 
 use ::serde::{Deserialize, Serialize};
-use indexmap::IndexMap;
 use ontol_macros::OntolDebug;
 use smallvec::SmallVec;
-use smartstring::alias::String;
 
 use crate::{
     impl_ontol_debug,
     interface::discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
-    ontology::ontol::{TextConstant, ValueGenerator},
+    ontology::{
+        ontol::{TextConstant, ValueGenerator},
+        OntologyInit,
+    },
+    phf_map::{PhfIndexMap, PhfKey},
     property::PropertyId,
     DefId,
 };
@@ -76,6 +78,14 @@ pub enum SerdeOperator {
 
     /// A map with one property: The ID of an entity.
     IdSingletonStruct(DefId, TextConstant, SerdeOperatorAddr),
+}
+
+impl OntologyInit for SerdeOperator {
+    fn ontology_init(&mut self, ontology: &crate::ontology::Ontology) {
+        if let Self::Struct(struct_op) = self {
+            struct_op.properties.ontology_init(ontology);
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, OntolDebug)]
@@ -294,7 +304,7 @@ pub struct StructOperator {
     pub typename: TextConstant,
     pub def: SerdeDef,
     pub flags: SerdeStructFlags,
-    pub properties: IndexMap<String, SerdeProperty>,
+    pub properties: PhfIndexMap<SerdeProperty>,
 }
 
 impl StructOperator {
@@ -303,7 +313,7 @@ impl StructOperator {
         mode: ProcessorMode,
         parent_property_id: Option<PropertyId>,
         profile_flags: ProcessorProfileFlags,
-    ) -> impl Iterator<Item = (&String, &SerdeProperty)> {
+    ) -> impl Iterator<Item = (&PhfKey, &SerdeProperty)> {
         self.properties.iter().filter(move |(_, property)| {
             property
                 .filter(mode, parent_property_id, profile_flags)
@@ -327,7 +337,7 @@ impl StructOperator {
     }
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, OntolDebug)]
+#[derive(Clone, Copy, Serialize, Deserialize, OntolDebug, Debug)]
 pub struct SerdeProperty {
     /// The ID of this property
     pub property_id: PropertyId,

@@ -126,7 +126,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             SerdeOperator::Struct(struct_op) => {
                 let (mode, _) = typing_purpose.mode_and_level();
 
-                for (name, property) in
+                for (key, property) in
                     struct_op.filter_properties(mode, None, ProcessorProfileFlags::default())
                 {
                     if property.is_read_only()
@@ -138,12 +138,12 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         continue;
                     }
 
-                    if !filter.filter_property(name, Some(property.property_id), output) {
+                    if !filter.filter_property(key.arc_str(), Some(property.property_id), output) {
                         continue;
                     }
 
                     let mut argument = self.get_operator_argument(
-                        name,
+                        key.arc_str(),
                         property.value_addr,
                         property.rel_params_addr,
                         property.flags,

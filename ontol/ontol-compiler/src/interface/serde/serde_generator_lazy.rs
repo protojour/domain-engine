@@ -15,6 +15,7 @@ use ontol_runtime::{
         },
     },
     ontology::ontol::{TextConstant, ValueGenerator},
+    phf_map::{PhfIndexMap, PhfKey},
     property::{PropertyId, Role},
     DefId,
 };
@@ -39,7 +40,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         def: SerdeDef,
         properties: &'c Properties,
     ) {
-        let mut serde_properties = Default::default();
+        let mut serde_properties: IndexMap<String, (PhfKey, SerdeProperty)> = Default::default();
 
         let mut struct_flags = SerdeStructFlags::default();
 
@@ -83,17 +84,17 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         let SerdeOperator::Struct(struct_op) = &mut self.operators_by_addr[addr.0 as usize] else {
             panic!();
         };
-        struct_op.properties = serde_properties;
+        struct_op.properties = PhfIndexMap::build(serde_properties.into_values());
         struct_op.flags.extend(struct_flags);
     }
 
-    pub(super) fn add_struct_op_property(
+    fn add_struct_op_property(
         &mut self,
         property_id: PropertyId,
         property: &Property,
         modifier: SerdeModifier,
         struct_flags: &mut SerdeStructFlags,
-        output: &mut IndexMap<String, SerdeProperty>,
+        output: &mut IndexMap<String, (PhfKey, SerdeProperty)>,
     ) {
         let meta = self.defs.relationship_meta(property_id.relationship_id);
         let (value_type_def_id, ..) = meta.relationship.by(property_id.role.opposite());
@@ -183,6 +184,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 rel_params_addr,
             },
             modifier,
+            self.strings,
         );
     }
 
@@ -196,13 +198,17 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         let mut new_operator = match intersection.main {
             Some(main_def) => self
                 .lookup_addr_by_key(&SerdeKey::Def(main_def))
-                .and_then(|addr| self.find_unambiguous_struct_operator(*addr).ok())
+                .and_then(|addr| {
+                    find_unambiguous_struct_operator(*addr, &self.operators_by_addr).ok()
+                })
                 .cloned()
                 .unwrap(),
             None => loop {
                 if let Some(next_def) = iterator.next() {
                     let origin_addr = self.lookup_addr_by_key(&SerdeKey::Def(*next_def)).unwrap();
-                    if let Ok(operator) = self.find_unambiguous_struct_operator(*origin_addr) {
+                    if let Ok(operator) =
+                        find_unambiguous_struct_operator(*origin_addr, &self.operators_by_addr)
+                    {
                         break operator.clone();
                     }
                 } else {
@@ -216,8 +222,15 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         // the types are members,
         let mut dedup: FnvHashSet<PropertyId> = Default::default();
 
-        for serde_property in new_operator.properties.values() {
+        for (_, serde_property) in new_operator.properties.iter() {
             dedup.insert(serde_property.property_id);
+        }
+
+        let mut properties: IndexMap<String, (PhfKey, SerdeProperty)> = Default::default();
+        for (phf_key, val) in new_operator.properties.iter() {
+            let string = &self.strings[phf_key.constant()];
+
+            properties.insert(string.into(), (phf_key.clone(), *val));
         }
 
         for next_def in iterator {
@@ -231,59 +244,26 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 .lookup_addr_by_key(&SerdeKey::Def(*next_def))
                 .expect("should be preregisted");
 
-            if let Ok(next_map_type) = self.find_unambiguous_struct_operator(*next_addr) {
-                for (key, serde_property) in &next_map_type.properties {
+            if let Ok(next_map_type) =
+                find_unambiguous_struct_operator(*next_addr, &self.operators_by_addr)
+            {
+                for (key, serde_property) in next_map_type.properties.iter() {
                     if dedup.insert(serde_property.property_id) {
                         insert_property(
-                            &mut new_operator.properties,
-                            key,
+                            &mut properties,
+                            key.arc_str().as_str(),
                             *serde_property,
                             next_def.modifier,
+                            self.strings,
                         );
                     }
                 }
             }
         }
+
+        new_operator.properties = PhfIndexMap::build(properties.into_values());
 
         self.operators_by_addr[addr.0 as usize] = SerdeOperator::Struct(new_operator);
-    }
-
-    fn find_unambiguous_struct_operator(
-        &self,
-        addr: SerdeOperatorAddr,
-    ) -> Result<&StructOperator, &SerdeOperator> {
-        let operator = &self.operators_by_addr[addr.0 as usize];
-        match operator {
-            SerdeOperator::Struct(struct_op) => Ok(struct_op),
-            SerdeOperator::Union(union_op) => {
-                let mut map_count = 0;
-                let mut result = Err(operator);
-
-                for discriminator in union_op.unfiltered_variants() {
-                    if let Ok(map_type) = self.find_unambiguous_struct_operator(discriminator.addr)
-                    {
-                        result = Ok(map_type);
-                        map_count += 1;
-                    } else {
-                        let operator = &self.operators_by_addr[discriminator.addr.0 as usize];
-                        debug!(
-                            "SKIPPED SOMETHING: {operator:?}\n\n",
-                            operator = NoFmt(operator)
-                        );
-                    }
-                }
-
-                if map_count > 1 {
-                    Err(operator)
-                } else {
-                    result
-                }
-            }
-            SerdeOperator::Alias(value_op) => {
-                self.find_unambiguous_struct_operator(value_op.inner_addr)
-            }
-            _ => Err(operator),
-        }
     }
 
     pub(super) fn populate_union_repr_operator(
@@ -415,6 +395,45 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         self.operators_by_addr[addr.0 as usize] =
             SerdeOperator::Union(UnionOperator::new(typename, def, variants));
+    }
+}
+
+fn find_unambiguous_struct_operator(
+    addr: SerdeOperatorAddr,
+    operators_by_addr: &[SerdeOperator],
+) -> Result<&StructOperator, &SerdeOperator> {
+    let operator = &operators_by_addr[addr.0 as usize];
+    match operator {
+        SerdeOperator::Struct(struct_op) => Ok(struct_op),
+        SerdeOperator::Union(union_op) => {
+            let mut map_count = 0;
+            let mut result = Err(operator);
+
+            for discriminator in union_op.unfiltered_variants() {
+                if let Ok(map_type) =
+                    find_unambiguous_struct_operator(discriminator.addr, operators_by_addr)
+                {
+                    result = Ok(map_type);
+                    map_count += 1;
+                } else {
+                    let operator = &operators_by_addr[discriminator.addr.0 as usize];
+                    debug!(
+                        "SKIPPED SOMETHING: {operator:?}\n\n",
+                        operator = NoFmt(operator)
+                    );
+                }
+            }
+
+            if map_count > 1 {
+                Err(operator)
+            } else {
+                result
+            }
+        }
+        SerdeOperator::Alias(value_op) => {
+            find_unambiguous_struct_operator(value_op.inner_addr, operators_by_addr)
+        }
+        _ => Err(operator),
     }
 }
 

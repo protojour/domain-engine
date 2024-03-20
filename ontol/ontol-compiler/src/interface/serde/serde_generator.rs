@@ -3,6 +3,7 @@ use std::{
     ops::RangeInclusive,
 };
 
+use arcstr::ArcStr;
 use indexmap::IndexMap;
 use ontol_runtime::{
     debug::NoFmt,
@@ -17,6 +18,7 @@ use ontol_runtime::{
         serde::{operator::SerdeStructFlags, SerdeDef, SerdeModifier},
     },
     ontology::ontol::TextConstant,
+    phf_map::PhfKey,
     property::{Cardinality, PropertyCardinality, ValueCardinality},
     smart_format, DefId,
 };
@@ -906,10 +908,11 @@ pub enum IdentAdaption {
 }
 
 pub(super) fn insert_property(
-    properties: &mut IndexMap<String, SerdeProperty>,
+    properties: &mut IndexMap<String, (PhfKey, SerdeProperty)>,
     property_name: &str,
     property: SerdeProperty,
     modifier: SerdeModifier,
+    strings: &mut Strings,
 ) -> IdentAdaption {
     if modifier.contains(SerdeModifier::GRAPHQL) {
         let (mut graphql_identifier, adaption) = make_property_name(property_name, modifier);
@@ -925,10 +928,16 @@ pub(super) fn insert_property(
             graphql_identifier = smart_format!("{graphql_identifier}_");
         }
 
-        properties.insert(graphql_identifier, property);
+        properties.insert(
+            graphql_identifier.clone(),
+            (make_phf_key(&graphql_identifier, strings), property),
+        );
         adaption
     } else {
-        properties.insert(property_name.into(), property);
+        properties.insert(
+            property_name.into(),
+            (make_phf_key(property_name, strings), property),
+        );
         IdentAdaption::Verbatim
     }
 }
@@ -942,6 +951,13 @@ fn make_property_name(input: &str, modifier: SerdeModifier) -> (String, IdentAda
     } else {
         (input.into(), IdentAdaption::Verbatim)
     }
+}
+
+fn make_phf_key(ident: &str, strings: &mut Strings) -> PhfKey {
+    let string = ArcStr::from(ident);
+    let constant = strings.intern_constant(ident);
+
+    PhfKey { string, constant }
 }
 
 pub(super) fn operator_to_leaf_discriminant(operator: &SerdeOperator) -> LeafDiscriminant {

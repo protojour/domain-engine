@@ -1,4 +1,3 @@
-use indexmap::IndexMap;
 use serde::{
     de::{DeserializeSeed, Error, MapAccess, SeqAccess, Unexpected, Visitor},
     Deserializer,
@@ -13,6 +12,7 @@ use crate::{
         deserialize_matcher::MapMatchResult,
         deserialize_struct::{StructDeserializer, StructVisitor},
     },
+    phf_map::PhfIndexMap,
     value::{Attribute, Serial, Value},
 };
 
@@ -407,7 +407,7 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
             .visit_map(map),
             MapMatchMode::EntityId(entity_id, name_constant, addr) => {
                 let output =
-                    StructDeserializer::new(entity_id, self.processor, &IndexMap::default())
+                    StructDeserializer::new(entity_id, self.processor, &PhfIndexMap::default())
                         .with_rel_params_addr(map_match.ctx.rel_params_addr)
                         .with_id_property_addr(&self.processor.ontology[name_constant], addr)
                         .deserialize_struct(buffered_attrs, map)?;

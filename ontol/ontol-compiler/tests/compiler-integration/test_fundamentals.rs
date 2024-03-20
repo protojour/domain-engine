@@ -53,7 +53,8 @@ fn test_relations_are_distinct_for_different_domains() {
                 SerdeOperator::Struct(struct_op) => {
                     struct_op
                         .properties
-                        .values()
+                        .iter()
+                        .map(|(_key, value)| value)
                         .next()
                         .unwrap()
                         .property_id
