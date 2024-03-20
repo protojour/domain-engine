@@ -27,6 +27,9 @@ pub struct OntolDomainMeta {
     pub open_data_relationship: DefId,
     pub order_relationship: DefId,
     pub direction_relationship: DefId,
+
+    /// Serde-related: The constant name of the "_edge" property used to deserialize relation parameters
+    pub edge_property: String,
 }
 
 impl OntolDomainMeta {
@@ -50,6 +53,7 @@ impl Default for OntolDomainMeta {
             open_data_relationship: DefId::unit(),
             order_relationship: DefId::unit(),
             direction_relationship: DefId::unit(),
+            edge_property: String::new(),
         }
     }
 }

@@ -22,7 +22,7 @@ use super::{
     operator::{SequenceRange, SerdeOperator, SerdeStructFlags},
     processor::{ProcessorProfileFlags, SerdeProcessor, SpecialProperty, SubProcessorContext},
     serialize_raw::RawProxy,
-    StructOperator, EDGE_PROPERTY,
+    StructOperator,
 };
 
 type Res<S> = Result<<S as serde::Serializer>::Ok, <S as serde::Serializer>::Error>;
@@ -153,7 +153,11 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                             .map_err(RecursionLimitError::to_ser_error)?,
                     },
                 )?;
-                self.serialize_rel_params::<S>(rel_params, &mut map)?;
+                self.serialize_rel_params::<S>(
+                    &self.ontology.ontol_domain_meta().edge_property,
+                    rel_params,
+                    &mut map,
+                )?;
 
                 map.end()
             }
@@ -344,63 +348,65 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         for (phf_key, serde_prop) in
             struct_op.filter_properties(self.mode, self.ctx.parent_property_id, self.profile.flags)
         {
-            let unit_attr = UNIT_ATTR;
-            let attribute = match attributes.get(&serde_prop.property_id) {
-                Some(value) => value,
-                None => {
-                    if serde_prop.is_optional_for(self.mode, &self.profile.flags) {
-                        continue;
-                    } else {
-                        match &self.ontology[serde_prop.value_addr] {
-                            SerdeOperator::Struct(struct_op) => {
-                                if struct_op.properties.is_empty() {
-                                    &unit_attr
-                                } else {
-                                    panic!(
+            if serde_prop.is_rel_params() {
+                self.serialize_rel_params::<S>(phf_key.arc_str(), rel_params, &mut map)?;
+            } else {
+                let unit_attr = UNIT_ATTR;
+                let attribute = match attributes.get(&serde_prop.property_id) {
+                    Some(value) => value,
+                    None => {
+                        if serde_prop.is_optional_for(self.mode, &self.profile.flags) {
+                            continue;
+                        } else {
+                            match &self.ontology[serde_prop.value_addr] {
+                                SerdeOperator::Struct(struct_op) => {
+                                    if struct_op.is_struct_properties_empty() {
+                                        &unit_attr
+                                    } else {
+                                        panic!(
                                         "While serializing value {:?} with `{}`, the expected value was a non-empty struct, but found unit",
                                         value, &self.ontology[struct_op.typename]
                                     )
+                                    }
                                 }
-                            }
-                            _ => {
-                                panic!(
+                                _ => {
+                                    panic!(
                                     "While serializing value {:?} with `{}`, property `{}` was not found.",
                                     value, &self.ontology[struct_op.typename], phf_key.arc_str()
                                 )
+                                }
                             }
                         }
                     }
-                }
-            };
+                };
 
-            let is_entity_id = serde_prop.is_entity_id();
+                let is_entity_id = serde_prop.is_entity_id();
 
-            let name = match (is_entity_id, overridden_id_property_key) {
-                (true, Some(id_key)) => id_key,
-                _ => phf_key.arc_str().as_str(),
-            };
+                let name = match (is_entity_id, overridden_id_property_key) {
+                    (true, Some(id_key)) => id_key,
+                    _ => phf_key.arc_str().as_str(),
+                };
 
-            map.serialize_entry(
-                name,
-                &Proxy {
-                    value: &attribute.val,
-                    rel_params: attribute.rel.filter_non_unit(),
-                    processor: self
-                        .new_child_with_context(
-                            serde_prop.value_addr,
-                            SubProcessorContext {
-                                is_update: false,
-                                parent_property_id: Some(serde_prop.property_id),
-                                parent_property_flags: serde_prop.flags,
-                                rel_params_addr: serde_prop.rel_params_addr,
-                            },
-                        )
-                        .map_err(RecursionLimitError::to_ser_error)?,
-                },
-            )?;
+                map.serialize_entry(
+                    name,
+                    &Proxy {
+                        value: &attribute.val,
+                        rel_params: attribute.rel.filter_non_unit(),
+                        processor: self
+                            .new_child_with_context(
+                                serde_prop.value_addr,
+                                SubProcessorContext {
+                                    is_update: false,
+                                    parent_property_id: Some(serde_prop.property_id),
+                                    parent_property_flags: serde_prop.flags,
+                                    rel_params_addr: serde_prop.rel_params_addr,
+                                },
+                            )
+                            .map_err(RecursionLimitError::to_ser_error)?,
+                    },
+                )?;
+            }
         }
-
-        self.serialize_rel_params::<S>(rel_params, &mut map)?;
 
         if struct_op.flags.contains(SerdeStructFlags::OPEN_DATA)
             && self
@@ -435,6 +441,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
 
     fn serialize_rel_params<S: Serializer>(
         &self,
+        property_name: &str,
         rel_params: Option<&Value>,
         map: &mut <S as Serializer>::SerializeMap,
     ) -> Result<(), <S as Serializer>::Error> {
@@ -442,7 +449,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
             (None, None) => {}
             (Some(rel_params), Some(addr)) => {
                 map.serialize_entry(
-                    EDGE_PROPERTY,
+                    property_name,
                     &Proxy {
                         value: rel_params,
                         rel_params: None,

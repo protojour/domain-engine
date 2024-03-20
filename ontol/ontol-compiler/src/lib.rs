@@ -15,7 +15,7 @@ pub use error::*;
 use fnv::FnvHashMap;
 use interface::{
     graphql::generate_schema::generate_graphql_schema,
-    serde::{serde_generator::SerdeGenerator, SerdeKey},
+    serde::{serde_generator::SerdeGenerator, SerdeKey, EDGE_PROPERTY},
 };
 use mem::Mem;
 use namespace::{Namespaces, Space};
@@ -425,6 +425,7 @@ impl<'m> Compiler<'m> {
                 open_data_relationship: self.primitives.open_data_relationship,
                 order_relationship: self.primitives.relations.order,
                 direction_relationship: self.primitives.relations.direction,
+                edge_property: EDGE_PROPERTY.into(),
             })
             .union_variants(ontology_union_variants)
             .extended_entity_info(self.entity_ctx.entities)

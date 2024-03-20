@@ -8,9 +8,8 @@ use crate::{ontology::domain::TypeKind, phf::PhfIndexMap, RelationshipId};
 
 use super::{
     deserialize_struct::StructDeserializer,
-    operator::{SerdeOperatorAddr, SerdeProperty, SerdeStructFlags},
+    operator::{SerdeOperatorAddr, SerdeProperty, SerdePropertyFlags, SerdeStructFlags},
     processor::{ProcessorMode, ProcessorProfileFlags, SpecialProperty},
-    EDGE_PROPERTY,
 };
 
 /// The types of properties the deserializer understands.
@@ -47,41 +46,38 @@ impl<'a, 'de> Visitor<'de> for PropertyMapVisitor<'a> {
     }
 
     fn visit_str<E: Error>(self, v: &str) -> Result<PropKind, E> {
-        match v {
-            // FIXME: The RelParams thing should be added to each property map in the compiler
-            // (with a SerdePropertyFlag that it's RelParams),
-            // and not be a constant pre-check here!
-            EDGE_PROPERTY => {
-                if let Some(addr) = self.deserializer.rel_params_addr {
-                    Ok(PropKind::RelParams(addr))
-                } else {
-                    Err(Error::custom("`_edge` property not accepted here"))
-                }
-            }
-            _ => {
-                let Some(serde_property) = self.properties.get(v) else {
-                    return fallback(v, self.deserializer);
-                };
+        let Some(serde_property) = self.properties.get(v) else {
+            return fallback(v, self.deserializer);
+        };
 
-                if serde_property
-                    .filter(
-                        self.deserializer.processor.mode,
-                        self.deserializer.processor.ctx.parent_property_id,
-                        self.deserializer.processor.profile.flags,
-                    )
-                    .is_some()
-                {
-                    Ok(PropKind::Property(*serde_property))
-                } else if serde_property.is_read_only()
-                    && !matches!(self.deserializer.processor.mode, ProcessorMode::Read)
-                {
-                    Err(Error::custom(format!("property `{v}` is read-only")))
-                } else {
-                    Err(Error::custom(format!(
-                        "property `{v}` not available in this context"
-                    )))
-                }
-            }
+        if serde_property
+            .flags
+            .contains(SerdePropertyFlags::REL_PARAMS)
+        {
+            return if let Some(addr) = self.deserializer.rel_params_addr {
+                Ok(PropKind::RelParams(addr))
+            } else {
+                Err(Error::custom(format!("`{}` property not accepted here", v)))
+            };
+        }
+
+        if serde_property
+            .filter(
+                self.deserializer.processor.mode,
+                self.deserializer.processor.ctx.parent_property_id,
+                self.deserializer.processor.profile.flags,
+            )
+            .is_some()
+        {
+            Ok(PropKind::Property(*serde_property))
+        } else if serde_property.is_read_only()
+            && !matches!(self.deserializer.processor.mode, ProcessorMode::Read)
+        {
+            Err(Error::custom(format!("property `{v}` is read-only")))
+        } else {
+            Err(Error::custom(format!(
+                "property `{v}` not available in this context"
+            )))
         }
     }
 }
@@ -109,14 +105,21 @@ impl<'a, 'de> Visitor<'de> for IdSingletonPropVisitor<'a> {
     }
 
     fn visit_str<E: Error>(self, v: &str) -> Result<PropKind, E> {
-        if v == EDGE_PROPERTY {
+        if v == self.id_prop_name {
+            Ok(PropKind::SingletonId(self.id_prop_addr))
+        } else if v
+            == self
+                .deserializer
+                .processor
+                .ontology
+                .ontol_domain_meta()
+                .edge_property
+        {
             if let Some(addr) = self.deserializer.rel_params_addr {
                 Ok(PropKind::RelParams(addr))
             } else {
                 Err(Error::custom("`_edge` property not accepted here"))
             }
-        } else if v == self.id_prop_name {
-            Ok(PropKind::SingletonId(self.id_prop_addr))
         } else {
             fallback(v, self.deserializer)
         }

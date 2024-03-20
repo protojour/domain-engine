@@ -24,8 +24,6 @@ pub mod processor;
 pub use deserialize_raw::deserialize_raw;
 pub use serialize_raw::serialize_raw;
 
-const EDGE_PROPERTY: &str = "_edge";
-
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct SerdeDef {
     pub def_id: DefId,

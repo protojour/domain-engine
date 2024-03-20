@@ -308,6 +308,17 @@ pub struct StructOperator {
 }
 
 impl StructOperator {
+    /// Are the struct properties empty (save the special _edge property)
+    pub fn is_struct_properties_empty(&self) -> bool {
+        self.struct_properties().next().is_none()
+    }
+
+    pub fn struct_properties(&self) -> impl Iterator<Item = (&PhfKey, &SerdeProperty)> {
+        self.properties
+            .iter()
+            .filter(|(_, property)| !property.is_rel_params())
+    }
+
     pub fn filter_properties(
         &self,
         mode: ProcessorMode,
@@ -358,6 +369,12 @@ impl SerdeProperty {
     #[inline]
     pub fn is_optional(&self) -> bool {
         self.flags.contains(SerdePropertyFlags::OPTIONAL)
+    }
+
+    /// Is it the special rel_params / "_edge" property?
+    #[inline]
+    pub fn is_rel_params(&self) -> bool {
+        self.flags.contains(SerdePropertyFlags::REL_PARAMS)
     }
 
     #[inline]
@@ -430,10 +447,12 @@ bitflags::bitflags! {
     #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Serialize, Deserialize, Debug)]
     pub struct SerdePropertyFlags: u8 {
         const OPTIONAL        = 0b00000001;
-        const READ_ONLY       = 0b00000010;
-        const ENTITY_ID       = 0b00000100;
+        /// Property represents parameters to a relation: e.g. "_edge"
+        const REL_PARAMS      = 0b00000010;
+        const READ_ONLY       = 0b00000100;
+        const ENTITY_ID       = 0b00001000;
         /// Property is part of the entity graph
-        const IN_ENTITY_GRAPH = 0b00001000;
+        const IN_ENTITY_GRAPH = 0b00010000;
     }
 }
 

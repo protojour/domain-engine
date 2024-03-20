@@ -953,7 +953,7 @@ fn make_property_name(input: &str, modifier: SerdeModifier) -> (String, IdentAda
     }
 }
 
-fn make_phf_key(ident: &str, strings: &mut Strings) -> PhfKey {
+pub(super) fn make_phf_key(ident: &str, strings: &mut Strings) -> PhfKey {
     let string = ArcStr::from(ident);
     let constant = strings.intern_constant(ident);
 

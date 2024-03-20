@@ -54,7 +54,8 @@ fn test_relations_are_distinct_for_different_domains() {
                     struct_op
                         .properties
                         .iter()
-                        .map(|(_key, value)| value)
+                        .map(|(_key, property)| property)
+                        .filter(|property| !property.is_rel_params())
                         .next()
                         .unwrap()
                         .property_id

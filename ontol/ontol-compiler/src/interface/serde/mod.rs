@@ -13,6 +13,8 @@ mod sequence_range_builder;
 mod serde_generator_lazy;
 mod union_builder;
 
+pub const EDGE_PROPERTY: &str = "_edge";
+
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum SerdeKey {
     Def(SerdeDef),

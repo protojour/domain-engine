@@ -17,7 +17,7 @@ use ontol_runtime::{
     ontology::ontol::{TextConstant, ValueGenerator},
     phf::{PhfIndexMap, PhfKey},
     property::{PropertyId, Role},
-    DefId,
+    DefId, RelationshipId,
 };
 use smartstring::alias::String;
 use tracing::{debug, debug_span, warn};
@@ -28,9 +28,9 @@ use crate::{
 };
 
 use super::{
-    serde_generator::{insert_property, SerdeGenerator},
+    serde_generator::{insert_property, make_phf_key, SerdeGenerator},
     union_builder::UnionBuilder,
-    SerdeIntersection, SerdeKey,
+    SerdeIntersection, SerdeKey, EDGE_PROPERTY,
 };
 
 impl<'c, 'm> SerdeGenerator<'c, 'm> {
@@ -80,6 +80,20 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 }
             }
         }
+
+        serde_properties.insert(
+            EDGE_PROPERTY.into(),
+            (
+                make_phf_key(EDGE_PROPERTY, self.strings),
+                SerdeProperty {
+                    property_id: PropertyId::subject(RelationshipId(DefId::unit())),
+                    flags: SerdePropertyFlags::REL_PARAMS | SerdePropertyFlags::OPTIONAL,
+                    value_addr: SerdeOperatorAddr(0),
+                    rel_params_addr: None,
+                    value_generator: None,
+                },
+            ),
+        );
 
         let SerdeOperator::Struct(struct_op) = &mut self.operators_by_addr[addr.0 as usize] else {
             panic!();

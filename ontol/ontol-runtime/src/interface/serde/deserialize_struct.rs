@@ -6,7 +6,7 @@ use tracing::debug;
 
 use crate::{
     format_utils::{DoubleQuote, LogicOp, Missing},
-    interface::serde::{deserialize_raw::RawVisitor, EDGE_PROPERTY},
+    interface::serde::deserialize_raw::RawVisitor,
     ontology::{domain::TypeKind, ontol::ValueGenerator},
     phf::PhfIndexMap,
     property::PropertyId,
@@ -424,7 +424,13 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
         };
 
         if self.rel_params_addr.is_some() && output.rel_params.type_def_id() == DefId::unit() {
-            items.push(DoubleQuote(EDGE_PROPERTY.into()));
+            items.push(DoubleQuote(
+                self.processor
+                    .ontology
+                    .ontol_domain_meta()
+                    .edge_property
+                    .clone(),
+            ));
         }
 
         debug!("    items len: {}", items.len());

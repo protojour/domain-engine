@@ -144,7 +144,7 @@ fn test_graphql_serde_renaming() {
 
         expect_eq!(
             actual = fields.as_slice(),
-            expected = &["must_rewrite", "must_rewrite_"]
+            expected = &["must_rewrite", "must_rewrite_", "_edge"]
         );
     });
 }

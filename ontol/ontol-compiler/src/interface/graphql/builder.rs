@@ -343,7 +343,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
                 let default_arg = match self.serde_gen.get_operator(input_operator_addr) {
                     SerdeOperator::Struct(struct_op) => {
-                        hidden = struct_op.properties.is_empty();
+                        hidden = struct_op.is_struct_properties_empty();
 
                         let all_optional = struct_op
                             .properties

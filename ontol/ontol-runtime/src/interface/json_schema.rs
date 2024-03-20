@@ -439,7 +439,7 @@ fn serialize_schema_inline<S: Serializer>(
                 "properties",
                 &MapProperties {
                     ctx: ctx.with_rel_params(None),
-                    map_type: struct_op,
+                    struct_op,
                 },
             )?;
 
@@ -635,13 +635,13 @@ impl<'e> Serialize for ArrayItemsRefLinks<'e> {
 // properties in { "type": "object", "properties": _ }
 struct MapProperties<'e> {
     ctx: SchemaCtx<'e>,
-    map_type: &'e StructOperator,
+    struct_op: &'e StructOperator,
 }
 
 impl<'e> Serialize for MapProperties<'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut map = serializer.serialize_map(None)?;
-        for (key, property) in self.map_type.properties.iter() {
+        for (key, property) in self.struct_op.struct_properties() {
             let docs = self
                 .ctx
                 .ontology

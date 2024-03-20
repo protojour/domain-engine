@@ -129,6 +129,10 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 for (key, property) in
                     struct_op.filter_properties(mode, None, ProcessorProfileFlags::default())
                 {
+                    if property.is_rel_params() {
+                        continue;
+                    }
+
                     if property.is_read_only()
                         && matches!(
                             typing_purpose,
