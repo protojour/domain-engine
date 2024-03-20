@@ -290,7 +290,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                 }
                 PropKind::Open(key) => {
                     output.open_dict.insert(
-                        key.into(),
+                        key,
                         map.next_value_seed(
                             RawVisitor::new(self.processor.ontology, self.processor.level)
                                 .map_err(RecursionLimitError::to_de_error)?,

@@ -150,7 +150,7 @@ fn fallback<E: Error>(v: &str, deserializer: &StructDeserializer) -> Result<Prop
         _ => {}
     }
 
-    return if deserializer.flags.contains(SerdeStructFlags::OPEN_DATA)
+    if deserializer.flags.contains(SerdeStructFlags::OPEN_DATA)
         && deserializer
             .processor
             .profile
@@ -162,5 +162,5 @@ fn fallback<E: Error>(v: &str, deserializer: &StructDeserializer) -> Result<Prop
         // TODO: This error message could be improved to suggest valid fields.
         // see OneOf in serde (this is a private struct)
         Err(Error::custom(format!("unknown property `{v}`")))
-    };
+    }
 }
