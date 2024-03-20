@@ -24,6 +24,19 @@ mod unify;
 fn main() {}
 
 #[rstest::rstest]
+fn compile(#[files("test-cases/compile/**/*.on")] path: PathBuf) {
+    init_test_tracing();
+
+    let contents = fs::read_to_string(&path).unwrap();
+
+    let file_name = SrcName(Cow::Owned(
+        path.file_name().unwrap().to_str().unwrap().into(),
+    ));
+
+    TestPackages::parse_multi_ontol(file_name, &contents).compile();
+}
+
+#[rstest::rstest]
 fn error(#[files("test-cases/error/**/*.on")] path: PathBuf) {
     init_test_tracing();
 

@@ -1,0 +1,19 @@
+use 'other' as other
+
+def foo (
+    rel .'bar': 'constant'
+)
+
+map(
+    foo(
+        'bar': b
+    ),
+    other.foo(
+        'bar': b
+    )
+)
+
+//@ src_name=other
+def foo (
+    rel .'bar'?: 'constant'
+)

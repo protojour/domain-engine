@@ -16,7 +16,7 @@ use thin_vec::thin_vec;
 use tracing::debug;
 
 use crate::{
-    def::Defs,
+    def::{DefKind, Defs},
     hir_unify::{
         regex_interpolation::RegexStringInterpolator,
         ssa_util::{scan_immediate_free_vars, NodesExt},
@@ -24,7 +24,10 @@ use crate::{
     mem::Intern,
     primitive::Primitives,
     relation::Relations,
-    repr::{repr_ctx::ReprCtx, repr_model::ReprKind},
+    repr::{
+        repr_ctx::ReprCtx,
+        repr_model::{ReprKind, ReprScalarKind},
+    },
     typed_hir::{arena_import, Meta, TypedHir, TypedHirData, TypedNodeRef},
     types::{Type, Types, UNIT_TYPE},
     CompileError, CompileErrors, Compiler, SourceSpan, NO_SPAN,
@@ -962,7 +965,27 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 )
             }
             Some(ReprKind::Unit) => self.mk_node(Kind::Unit, Meta::new(&UNIT_TYPE, meta.span)),
-            other => todo!("{other:?}"),
+            Some(ReprKind::Scalar(scalar_def_id, ReprScalarKind::Text, _)) => {
+                match self.defs.def_kind(*scalar_def_id) {
+                    DefKind::TextLiteral(str) => self.mk_node(Kind::Text((*str).into()), meta),
+                    _ => {
+                        self.errors.error(
+                            CompileError::TODO(smart_format!(
+                                "cannot create a constant out of any `text`"
+                            )),
+                            &meta.span,
+                        );
+                        self.mk_node(Kind::Unit, meta)
+                    }
+                }
+            }
+            _ => {
+                self.errors.error(
+                    CompileError::TODO(smart_format!("create constant")),
+                    &meta.span,
+                );
+                self.mk_node(Kind::Unit, meta)
+            }
         }
     }
 
