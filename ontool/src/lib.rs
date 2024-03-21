@@ -10,6 +10,10 @@ use axum::{
     routing::get,
 };
 use clap::{Args, Parser, Subcommand, ValueEnum};
+use crossterm::{
+    cursor, queue,
+    terminal::{Clear, ClearType},
+};
 use notify_debouncer_full::{
     new_debouncer,
     notify::{RecursiveMode, Watcher},
@@ -33,6 +37,7 @@ use service::app;
 use std::{
     collections::HashMap,
     fs::{self, read_dir, File},
+    io::{stdout, Stdout, Write},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
     time::Duration,
@@ -410,16 +415,22 @@ enum ChannelMessage {
     Reload,
 }
 
+fn clear_term(stdout: &mut Stdout) {
+    queue!(stdout, Clear(ClearType::All), cursor::MoveTo(0, 0))
+        .expect("Terminal should be able to be cleared");
+    stdout.flush().unwrap();
+}
 async fn serve(
     root_dir: PathBuf,
     root_files: Vec<PathBuf>,
     data_store: Option<String>,
     port: u16,
 ) -> Result<(), OntoolError> {
+    let mut stdout = stdout();
     let (tx, rx) = std::sync::mpsc::channel();
     let (reload_tx, _reload_rx) = broadcast::channel::<ChannelMessage>(16);
     let mut debouncer = new_debouncer(Duration::from_secs(1), None, tx).unwrap();
-
+    clear_term(&mut stdout);
     if data_store.is_none() {
         warn!("No datastore domain set!");
     }
@@ -477,6 +488,7 @@ async fn serve(
                     {
                         cancellation_token.cancel();
                         cancellation_token = CancellationToken::new();
+                        clear_term(&mut stdout);
 
                         let compile_output = compile(
                             root_dir.clone(),
