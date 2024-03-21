@@ -13,6 +13,7 @@ use domain_engine_core::{DomainEngine, DomainError, DomainResult, Session};
 use domain_engine_in_memory_store::InMemoryDataStoreFactory;
 use domain_engine_juniper::CreateSchemaError;
 use ontol_runtime::{ontology::Ontology, PackageId};
+use reqwest::header::HeaderName;
 use tracing::info;
 
 // app -> router
@@ -20,7 +21,7 @@ pub async fn app(ontology: Ontology, addr: String) -> axum::Router {
     let ontology = Arc::new(ontology);
     let engine = Arc::new(
         DomainEngine::builder(ontology.clone())
-            .system(Box::new(System))
+            .system(Box::new(System::new()))
             .build(InMemoryDataStoreFactory, Session::default())
             .await
             .unwrap(),
@@ -47,7 +48,29 @@ pub async fn app(ontology: Ontology, addr: String) -> axum::Router {
     router.layer(tower_http::trace::TraceLayer::new_for_http())
 }
 
-struct System;
+struct State {
+    http_client: reqwest::Client,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self {
+            http_client: reqwest::Client::new(),
+        }
+    }
+}
+
+struct System {
+    state: State,
+}
+
+impl System {
+    fn new() -> Self {
+        Self {
+            state: State::default(),
+        }
+    }
+}
 
 #[async_trait::async_trait]
 impl domain_engine_core::system::SystemAPI for System {
@@ -55,8 +78,47 @@ impl domain_engine_core::system::SystemAPI for System {
         domain_engine_core::system::current_time()
     }
 
-    async fn call_http_json_hook(&self, _: &str, _: Session, _: Vec<u8>) -> DomainResult<Vec<u8>> {
-        Err(DomainError::NotImplemented)
+    async fn call_http_json_hook(
+        &self,
+        url: &str,
+        _session: Session,
+        input: Vec<u8>,
+    ) -> DomainResult<Vec<u8>> {
+        let output_bytes = self
+            .state
+            .http_client
+            .post(url)
+            .header(
+                HeaderName::from_lowercase(b"content-type").unwrap(),
+                "application/json",
+            )
+            .header(
+                HeaderName::from_lowercase(b"accept").unwrap(),
+                "application/json",
+            )
+            .body(input)
+            .send()
+            .await
+            .map_err(|err| {
+                info!("json hook network error: {err}");
+
+                DomainError::DeserializationFailed
+            })?
+            .error_for_status()
+            .map_err(|err| {
+                info!("json hook HTTP error: {err}");
+
+                DomainError::DeserializationFailed
+            })?
+            .bytes()
+            .await
+            .map_err(|err| {
+                info!("json hook response error: {err}");
+
+                DomainError::DeserializationFailed
+            })?;
+
+        Ok(output_bytes.into())
     }
 }
 
