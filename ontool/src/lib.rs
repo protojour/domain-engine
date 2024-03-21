@@ -432,7 +432,7 @@ async fn serve(
     let mut debouncer = new_debouncer(Duration::from_secs(1), None, tx).unwrap();
     clear_term(&mut stdout);
     if data_store.is_none() {
-        warn!("No datastore domain set!");
+        warn!("No datastore domain set. No mutations will be generated and the GraphQL schema will be invalid!");
     }
 
     debouncer
