@@ -20,7 +20,7 @@ Options:
   -V, --version  Print version
 ```
 
-`ontool` can check and compile ONTOL (.on) files into an _ontology_, generate schemas, run a GraphQL development server or as an ONTOL language server.
+`ontool` can [check](#ontool-check) ONTOL (.on) files, [compile](#ontool-compile) an _ontology_, [generate](#ontool-generate) schemas for testing, run as a GraphQL [development server](#ontool-serve) or as an ONTOL [language server](#ontool-lsp).
 
 
 ## `ontool check`
@@ -37,7 +37,7 @@ Options:
   -w, --dir <DIR>  Search directory for ONTOL files [default: .]
 ```
 
-`ontool check` is mostly self-explanatory. The parser and compiler will check the given file(s) for errors.
+`ontool check` checks the given file(s) for errors.
 
 Note that this command, and all others, will try to follow [`use`](use.md) statements and resolve imports in the given search directory (`-w`, `--dir`). As such, it is not necessary to specify every single ONTOL file in your project.
 
@@ -61,7 +61,7 @@ Options:
   -o, --output <OUTPUT>          Ontology output file [default: ontology]
 ```
 
-`ontool compile` compiles the given file(s) into an ontology. This is a binary file which can be loaded and used in the domain engine.
+`ontool compile` compiles the given file(s) into an ontology. This is a binary file which can be loaded and used in the domain engine. It is not necessary to `check` files before a `compile`.
 
 The data store (`-d`, `--data-store`) option is used to specify which domain, if any, is to be backed by the data store. Use the filename of the domain without extension.
 
@@ -108,9 +108,7 @@ Options:
 
 `ontool serve` compiles the given ONTOL file(s) and starts a hot-reloading GraphQL development server using an `inmemory` data store.
 
-Changes to the any of the source files given or indirectly imported will cause the server to recompile the ontology, and (if successful) reload the server and the GraphQL schema.
-
-Errors are output to `stderr`, but does not stop the server.
+Changes to any root file or indirectly imported file will cause the server to recompile the ontology, and (on successful compilation) reload the server and GraphQL schema. Errors are output to `stderr`.
 
 See [`ontool compile`](compile.md) above for information on the data store option.
 

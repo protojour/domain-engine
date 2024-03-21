@@ -211,7 +211,16 @@ impl<'m> Compiler<'m> {
 
                         // TODO: Structured documentation of `is`-relations.
                         // Then a prose-based documentation string will probably be superfluous?
-                        docs.insert(def_id, vec![smart_format!("The symbol `'{}'`", ident)]);
+                        docs.insert(
+                            def_id,
+                            vec![
+                                smart_format!("The [symbol](def.md#symbol) `'{ident}'`."),
+                                "Used in [ordering](interfaces.md#ordering).".into(),
+                                "```ontol".into(),
+                                smart_format!("direction: {ident}"),
+                                "```".into(),
+                            ],
+                        );
                     } else if let Some(slt) = self.defs.string_like_types.get(&def_id) {
                         let name = slt.as_ref();
                         if let Ok(field_docs) = TextLikeType::get_field_docs(name) {

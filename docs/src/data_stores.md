@@ -1,6 +1,6 @@
 # Data stores
 
-Typically, one [domain](domains.md) in your ontology is backed by a _data store_, through which the domain engine may create, read from, update and delete entities and entity relationships in a database.
+Typically, one [domain](domains.md) in your ontology is backed by a ***data store***, through which the domain engine may create, read from, update and delete entities and entity relationships in a database.
 
 Other domains may [`map`](map.md) to the data domain through any number of layers. The simplest setups will only have one domain, which serves both as the data store-backed domain and an [interface](interfaces.md). But databases tend to get messy and technical, and you might not want to present its raw face to the world.
 
@@ -70,10 +70,11 @@ Here, the value of `_id` would be formatted e.g. `"book/123"`. The `123` part is
 
 ### Collection names
 
-The ArangoDB integration uses the names of entities in the data domain (verbatim) as collection names. These get resolved first, and cannot collide.
+The ArangoDB integration uses the names of entities in the data domain (verbatim, case sensitive) as _collection names_. These get resolved first, and cannot collide, as `def` names are required to be unique within a domain.
 
-_Edge collections_ are named according to the subject's name for an entity relationship. Collisions may occur, and is solved by prefixing with the subject.
+_Edge collections_ are named according to the subject's name for an entity relationship. Collisions may occur here, and are solved by prefixing the relation name with its subject.
 
+This domain will generate or require three collections:
 
 ```ontol
 def Book (
@@ -88,11 +89,11 @@ def Author (
 )
 ```
 
-In other words, in this domain, there are three collections:
-
 - `Book`
 - `Author`
 - `author` (edge collection)
+
+If we used lowercase `def` names:
 
 ```ontol
 def book (
@@ -107,16 +108,14 @@ def author (
 )
 ```
 
-And in this domain, we have:
-
 - `book`
 - `author`
-- `bookauthor` (edge collection)
+- `bookauthor` (edge collection, prefixed due to collision with `author`)
 
 
 ### Indexing
 
-Indexes are sat up automatically from your ontology...
+...
 
 
 ## Migrations

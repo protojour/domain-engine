@@ -59,4 +59,4 @@ rel {book} 'authors'::'books_written' {author}
 
 Now, a `book` may have several `'authors'`, and an `author` may have several `'books_written'`.
 
-Entities are an important concept in [data stores](data_stores.md) and [Interfaces](interfaces.md).
+Entities are an important concept in [data stores](data_stores.md) and [interfaces](interfaces.md).

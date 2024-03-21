@@ -2,7 +2,7 @@
 
 A `map` statement describes how one [`def`](def.md) maps to another (and sometimes vice versa) — how data flows between them.
 
-They are often used for expressing transformations, or in _domain translation_, i.e. how a `def` imported from a foreign domain maps to a `def` in the current domain, and ultimately describe how data can be flow from [data stores](data_stores.md) to [interfaces](interfaces.md) and back again.
+They are often used for expressing transformations, or in _domain translation_, i.e. how a `def` imported from a foreign domain maps to a `def` in the current domain, and ultimately how data can flow from [data stores](data_stores.md) to [interfaces](interfaces.md) and back again.
 
 The `map` statement has two arms, each containing a `def` identifer. For mapping values between one arm and another, we use variables. Variable names can be anything, you can make them up as you go along.
 
@@ -134,6 +134,39 @@ map (
 Likewise if there exists a map `a <- @match b` and `b <- @match c`, there should be a transitive map `a <- @match c`.
 
 
+## `map` arithmetic
+
+
+## `map` with regular expressions
+
+Regular expressions have a powerful use in `map` expressions, using _named groups_. The name of a named group becomes a variable that must be used in the opposing map arm. This can be used to extract patterns from `text` fields
+
+```ontol
+def Person (
+    rel .'FullName': text
+)
+
+def user (
+    rel .'first_name': text
+    rel .'last_name': text
+)
+
+map (
+    Person(
+        'FullName': /(?<first>\w+) (?<last>\w+)/,
+    ),
+    user(
+        'first_name': first,
+        'last_name': last
+    )
+)
+```
+
+(Note: Please don't do this, real-world names are much more complex!)
+
+In a two-way map, all characters should be accounted for by named groups or constant characters, so an unambiguous inverse mapping can be found. `@match` expressions, of course, are less restrictive.
+
+
 ## Named maps
 
-Named `map` statements are used to express _queries_, and are further explored in the chapter on [_interfaces_}(interfaces.md).
+Named `map` statements are used to express _queries_, and are further explored in the chapter on [interfaces](interfaces.md).

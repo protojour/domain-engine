@@ -1,31 +1,44 @@
 # `fmt`
 
-...
+The `fmt` statement is used for building pattern matching expressions. These are similar to (and may even include) regular expressions. The main difference is that `fmt` can include ONTOL types, and have uses beyond text patterns (TBD).
 
-## From an empty string
-
-Starting from an empty string `''`, the `fmt` statement builds a string matching pattern. The pattern below describes a string consisting of the string `'prefix/'` plus a [`uuid`](primitives.md#uuid).
+Starting from an empty text literal `''`, the `fmt` statement builds a text matching pattern, with segments linked by the arrow operator `=>`. The final segment binds the pattern to a type.
 
 ```ontol
-fmt '' => 'prefix/' => uuid
+fmt '' => 'prefix/' => uuid => prefixed_uuid
 ```
 
-## From an empty set
+This describes a pattern consisting of the text literal `'prefix/'` plus any [`uuid`](primitives.md#uuid), and binds it to the type `prefixed_uuid`.
 
-Starting from an empty set `{}`, the `fmt` statement builds a set matching pattern. The pattern below describes a set of three consecutive strings.
-
-```ontol
-fmt {} => text => text => text
-```
-
-## Usage
-
-A `fmt` statement is not very useful without context, it should refer to something. We do this by adding a final arrow `=>` operator and an identifier. A common pattern would be using the `fmt` statement as part of a [`def`](def.md):
+We may also use the `.` operator, and bind to the enclosing scope:
 
 ```ontol
-def some_def (
+def prefixed_uuid (
     fmt '' => 'prefix/' => uuid => .
 )
 ```
 
-We use the `.` operator to refer to the scope's context, similar to "self" or "this". Now `some_def` is a string consisting of the string `'prefix/'` plus a [`uuid`](primitives.md#uuid).
+Or, as an [anonymous `def`](def.md#anonymous-defs):
+
+```ontol
+(fmt '' => 'prefix/' => uuid => .)
+```
+
+`fmt` expressions using `serial` or `uuid` as the variable part may also be used with used with [`gen: auto`](generator_types.md#auto), which ensures only the variable part gets generated:
+
+```ontol
+rel some_def '_id'[rel .gen: auto]|id: (fmt '' => 'prefix/' => uuid => .)
+```
+
+
+## Regular expressions
+
+Regular expressions can be used in a similar way to `fmt` expressions, but are limited to text, and their value cannot be generated. Used as a field value, they have a base type of `text`, but impose constraints on its contents.
+
+```ontol
+def prefixed_text (
+    rel .is: /prefix--.*/
+)
+```
+
+Regular expressions can be used in [`map`](map.md) expressions, which are detailed in the next chapter.

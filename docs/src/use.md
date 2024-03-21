@@ -3,16 +3,19 @@
 The `use` keyword is used to ***import*** another [domain](domains.md). A local namespace alias for the imported domain is required.
 
 ```ontol
-use 'domain' as dom
+use 'domain' as other
 ```
 
-Public (non-`private`) [`def`](def.md)s from the domain `'domain'` are now available under the `dom` namespace:
+Public (non-`@private`) [`def`](def.md)s from the domain `'domain'` are now available under the `other` namespace:
 
 ```ontol
 def some_def (
-    rel .'domain_def_a': dom.def_a
+    rel .'domain_def_a': other.def_a
 )
 ```
+
+
+## Extending imported definitions
 
 Imported definitions cannot be extended in the same way as `def`s in the current domain.
 
@@ -26,4 +29,4 @@ def some_def (
 )
 ```
 
-`some_def` now takes on all properties of `foreign.thing`, and can be extended (or refined).
+`some_def` now inherits all properties of `foreign.thing`, and can be extended (or refined).

@@ -8,7 +8,7 @@
 - [Definitions (`def`)](./def.md)
 - [Relationships (`rel`)](./rel.md)
 - [Imports (`use`)](./use.md)
-- [Patterns (`fmt`)](./fmt.md)
+- [Patterns (`fmt` and regex)](./fmt.md)
 - [Mappings (`map`)](./map.md)
 - [Comments](./comments.md)
 - [Entities](./entities.md)

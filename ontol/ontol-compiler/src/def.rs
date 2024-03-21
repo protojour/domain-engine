@@ -155,11 +155,15 @@ pub enum BuiltinRelationKind {
     /// rel .'id'[rel .gen: auto]|id: (rel .is: uuid)
     /// ```
     Gen,
-    /// A relation between an entity and an ordering.
-    /// See the chapter on [interfaces](interfaces.md#order) for more.
+    /// A relation between an entity and an [ordering](interfaces.md#ordering).
+    /// ```ontol
+    /// order: 'some_field'
+    /// ```
     Order,
-    /// A relation expressing that something has a direction.
-    /// See the chapter on [interfaces](interfaces.md#order) for more.
+    /// A relation expressing that something has a direction. Used in [ordering](interfaces.md#ordering).
+    /// ```ontol
+    /// direction: ascending
+    /// ```
     Direction,
     /// Gives an example value for a type, for documentation purposes.
     /// ```ontol

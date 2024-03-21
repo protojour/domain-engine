@@ -63,7 +63,7 @@ def @open all_yours ()
 
 ### `@symbol`
 
-`def @symbol` creates a _symbol_, an otherwise empty definition representing the definition name itself.
+`def @symbol` creates a _symbol_, an otherwise empty definition representing the definition name itself. Symbols are used in [_ordering_](interfaces.md#ordering)
 
 ```ontol
 def @symbol symbolic ()
@@ -78,7 +78,7 @@ def symbolic (rel .is: 'symbolic')
 
 ### `@extern` (unstable)
 
-_The details of `def @extern` are subject to change._
+***Note:*** _The details of `def @extern` are subject to change._
 
 `def @extern` defines an _external_ hook, and must include an `'url'` property and a [`map`](map.md) statement.
 

@@ -2,6 +2,9 @@
 
 ***Generator types*** are used with the [`gen`](relationship_types.md#gen) relationship type and indicate relations whose target value may be generated if no other value is given.
 
+The following generator types are defined in the `'ontol'` domain:
+
+
 ## `auto`
 
 Automatically generates a value if no value is given. Often used inline in a property relationship.
@@ -12,6 +15,7 @@ Automatically generates a value if no value is given. Often used inline in a pro
 rel .'id'[rel .gen: auto]|id?: (rel .is: uuid)
 ```
 
+
 ## `create_time`
 
 Generates a [`datetime`](primitives.md#datetime) **once**, when an entity is created.
@@ -20,6 +24,7 @@ Often used inline in a property relationship.
 ```ontol
 rel .'created'[rel .gen: create_time]?: datetime
 ```
+
 
 ## `update_time`
 
