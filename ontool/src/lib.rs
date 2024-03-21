@@ -420,6 +420,26 @@ fn clear_term(stdout: &mut Stdout) {
         .expect("Terminal should be able to be cleared");
     stdout.flush().unwrap();
 }
+
+fn check_datastore_domain_has_entities(data_store: &Option<String>, ontology: &Ontology) {
+    if let Some(data_store) = &data_store {
+        let mut entities_exist = false;
+        for domain in ontology.domains() {
+            if &ontology[domain.1.unique_name()] == data_store {
+                for type_info in domain.1.type_infos() {
+                    if type_info.entity_info().is_some() {
+                        entities_exist = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if !entities_exist {
+            warn!("There are no entities in the datastore domain. No mutations will be generated and the GraphQL schema will be invalid!");
+        }
+    }
+}
+
 async fn serve(
     root_dir: PathBuf,
     root_files: Vec<PathBuf>,
@@ -469,6 +489,7 @@ async fn serve(
     );
     match compile_output {
         Ok(output) => {
+            check_datastore_domain_has_entities(&data_store, &output.ontology);
             let new_app = app(output.ontology, addr.clone()).await;
             let mut lock = router_cell.lock().unwrap();
             *lock = Some(new_app);
@@ -498,6 +519,7 @@ async fn serve(
                         );
                         match compile_output {
                             Ok(output) => {
+                                check_datastore_domain_has_entities(&data_store, &output.ontology);
                                 let new_app = app(output.ontology, addr.clone()).await;
                                 let mut lock = router_cell.lock().unwrap();
                                 *lock = Some(new_app);
