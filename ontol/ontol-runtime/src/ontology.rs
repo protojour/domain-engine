@@ -48,7 +48,7 @@ pub struct Ontology {
 
 /// All of the information that makes an Ontology.
 #[derive(Serialize, Deserialize)]
-pub(crate) struct Data {
+pub struct Data {
     pub(crate) const_proc_table: FnvHashMap<DefId, Procedure>,
     pub(crate) map_meta_table: FnvHashMap<MapKey, MapMeta>,
     pub(crate) named_forward_maps: FnvHashMap<(PackageId, TextConstant), MapKey>,
@@ -89,12 +89,8 @@ impl Ontology {
 
     /// Deserialize an Ontology using the bincode format.
     pub fn try_from_bincode(reader: impl std::io::Read) -> Result<Self, bincode::Error> {
-        let mut ontology = Ontology {
-            data: bincode_config().deserialize_from(reader)?,
-        };
-        ontology.init();
-
-        Ok(ontology)
+        let data: Data = bincode_config().deserialize_from(reader)?;
+        Ok(Self::from(data))
     }
 
     /// Serialize an ontology to bincode.
@@ -103,6 +99,12 @@ impl Ontology {
         writer: impl std::io::Write,
     ) -> Result<(), bincode::Error> {
         bincode_config().serialize_into(writer, &self.data)
+    }
+
+    /// Access the ontology's [Data].
+    /// The data is a serializable value.
+    pub fn data(&self) -> &Data {
+        &self.data
     }
 
     /// Make a value debuggable using OntolDebug.
@@ -260,24 +262,29 @@ impl Ontology {
             .get(&(package_id, text_constant))
             .cloned()
     }
+}
 
-    /// Initialize fields that need work after deserialization
-    fn init(&mut self) {
-        let mut serde_operators = std::mem::take(&mut self.data.serde_operators);
-        let mut interfaces = std::mem::take(&mut self.data.domain_interfaces);
+impl From<Data> for Ontology {
+    fn from(value: Data) -> Self {
+        let mut ontology = Ontology { data: value };
+
+        let mut serde_operators = std::mem::take(&mut ontology.data.serde_operators);
+        let mut interfaces = std::mem::take(&mut ontology.data.domain_interfaces);
 
         for operator in serde_operators.iter_mut() {
-            operator.ontology_init(self);
+            operator.ontology_init(&ontology);
         }
 
         for (_, interfaces) in interfaces.iter_mut() {
             for interface in interfaces {
-                interface.ontology_init(self);
+                interface.ontology_init(&ontology);
             }
         }
 
-        self.data.serde_operators = serde_operators;
-        self.data.domain_interfaces = interfaces;
+        ontology.data.serde_operators = serde_operators;
+        ontology.data.domain_interfaces = interfaces;
+
+        ontology
     }
 }
 
