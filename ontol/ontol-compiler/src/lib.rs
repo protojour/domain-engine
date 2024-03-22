@@ -535,12 +535,8 @@ impl<'m> Compiler<'m> {
         let DefKind::TextLiteral(subject_name) = meta.relation_def_kind.value else {
             return None;
         };
-        let Some(target_properties) = self.relations.properties_by_def_id(target_def_id) else {
-            return None;
-        };
-        let Some(repr_kind) = self.repr_ctx.get_repr_kind(&target_def_id) else {
-            return None;
-        };
+        let target_properties = self.relations.properties_by_def_id(target_def_id)?;
+        let repr_kind = self.repr_ctx.get_repr_kind(&target_def_id)?;
 
         let graph_rel_params = match meta.relationship.rel_params {
             RelParams::Type(def_id) => Some(def_id),
