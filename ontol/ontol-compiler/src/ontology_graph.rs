@@ -126,7 +126,7 @@ impl<'m> State<'m> {
         }
     }
 }
-
+#[allow(dead_code)]
 struct Nodes<'graph, 'm>(&'graph State<'m>, &'graph Compiler<'m>);
 struct Edges<'graph, 'm>(&'graph State<'m>, &'graph Compiler<'m>);
 struct Node<'g, 'm> {
