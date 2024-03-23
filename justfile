@@ -1,6 +1,11 @@
 default:
     @just --list
 
+docs:
+    cargo install mdbook mdbook-pdf
+    pipx install mdbook-pdf-outline
+    mdbook build docs
+
 ontool:
     cargo install --path ontool --debug --force
 
