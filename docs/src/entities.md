@@ -17,9 +17,17 @@ def book (
 )
 ```
 
-An instance of `book` is now an _entity_. The value of the [`'id'|id`](relationship_types.md#id) property is required to be unique, and _identifies_ a unique `book`.
+An instance of `book` is now an ***entity***.
 
-Notice how we do not say `rel .'id'|id: serial`. [`serial`](primitives.md#serial) is used for all sorts of ids, not just book-identifiers. Thus, `serial` itself cannot identify a book, but an anonymous type that `is: serial` can.
+The value of the [`'id'|id`](relation_types.md#id) property is required to be unique, and _identifies_ a unique `book`.
+
+Notice how we do not say `rel .'id'|id: serial`. The base type [`serial`](primitives.md#serial) is used for all sorts of ids, not just book-identifiers. Thus, `serial` itself cannot identify a book, but an anonymous type that inherits from it, `is: serial` can.
+
+It may be wise to give your id types names, as they often need to be referred to in [interfaces](interfaces.md):
+
+```ontol
+def book_id (rel .is: serial)
+```
 
 Relationships between types and entities are different:
 
@@ -38,15 +46,16 @@ Here, the structure of `author` becomes part of the tree-structure `book`, which
 
 ```ontol
 def book (
-    rel .'id'|id: (rel .is: serial)
+    rel .'id'|id: book_id
     rel .'title': text
-    rel {.}'author': author
 )
 
 def author (
-    rel .'id'|id: (rel .is: serial)
+    rel .'id'|id: author_id
     rel .'name': text
 )
+
+rel {book} 'author': author
 ```
 
 Expressing both as entities make them part of a graph. Here, a `book` has only one `author`, but an `author` may have written many `book`s.

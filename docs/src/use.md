@@ -1,6 +1,8 @@
 # `use`
 
-The `use` keyword is used to ***import*** another [domain](domains.md). A local namespace alias for the imported domain is required.
+The `use` keyword is used to ***import*** and access `def`s from another [domain](domains.md).
+
+A local namespace alias for the imported domain is required.
 
 ```ontol
 use 'domain' as other
@@ -19,7 +21,7 @@ def some_def (
 
 Imported definitions cannot be extended in the same way as `def`s in the current domain.
 
-For extending foreign `def`s, use [`is`](relationship_types.md#is) relationships:
+For extending foreign `def`s, use [`is`](relation_types.md#is) relationships:
 
 ```ontol
 use 'foreign_domain' as foreign

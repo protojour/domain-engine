@@ -110,7 +110,7 @@ Options:
 
 Changes to any root file or indirectly imported file will cause the server to recompile the ontology, and (on successful compilation) reload the server and GraphQL schema. Errors are output to `stderr`.
 
-See [`ontool compile`](compile.md) above for information on the data store option.
+See [`ontool compile`](#ontool-compile) above for information on the data store option.
 
 
 ## `ontool lsp`

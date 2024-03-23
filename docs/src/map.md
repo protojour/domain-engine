@@ -1,12 +1,14 @@
 # `map`
 
-A `map` statement describes how one [`def`](def.md) maps to another (and sometimes vice versa) — how data flows between them.
+A `map` statement describes how one [`def`](def.md) ***maps*** to another (and sometimes vice versa) — how data flows between them.
 
 They are often used for expressing transformations, or in _domain translation_, i.e. how a `def` imported from a foreign domain maps to a `def` in the current domain, and ultimately how data can flow from [data stores](data_stores.md) to [interfaces](interfaces.md) and back again.
 
-The `map` statement has two arms, each containing a `def` identifer. For mapping values between one arm and another, we use variables. Variable names can be anything, you can make them up as you go along.
+The `map` statement has two arms, each containing a `def` identifer. For mapping values between one arm and another, we use variables.
 
-The simplest map statements define an _equivalence_ between two `def`s; this is a _bijective_ function, or simply a _two-way_ map.
+Variable names can be anything, you can make them up as you go along.
+
+The simplest map statements define an _equivalence_ between two `def`s; a _bijective_ function, or simply a _two-way_ map.
 
 In a two-way mapping, all leaf properties (properties with a value) must be accounted for, all variables mentioned must be present in both arms.
 
@@ -134,9 +136,6 @@ map (
 Likewise if there exists a map `a <- @match b` and `b <- @match c`, there should be a transitive map `a <- @match c`.
 
 
-## `map` arithmetic
-
-
 ## `map` with regular expressions
 
 Regular expressions have a powerful use in `map` expressions, using _named groups_. The name of a named group becomes a variable that must be used in the opposing map arm. This can be used to extract patterns from `text` fields
@@ -162,11 +161,57 @@ map (
 )
 ```
 
-(Note: Please don't do this, real-world names are much more complex!)
+_(**Note:** Please don't do this, real-world names are much more complex!)_
 
 In a two-way map, all characters should be accounted for by named groups or constant characters, so an unambiguous inverse mapping can be found. `@match` expressions, of course, are less restrictive.
 
 
-## Named maps
+## `map` arithmetic
+
+ONTOL also allows (limited, for now) arithmetic on numeric types, allowing built-in conversion of... well... you'll find a use for it!
+
+These examples are fairly self-explanatory:
+
+```ontol
+def fahrenheit (rel .is: f64)
+def celsius (rel .is: f64)
+map (
+    fahrenheit(x * 9 / 5 + 32),
+    celsius(x),
+)
+
+def seconds (rel .is: i64)
+def years (rel .is: i64)
+map (
+    seconds(y * 60 * 60 * 24 * 365),
+    years(y)
+)
+```
+
+ONTOL automatically figures out the inverse function for two-way mapping. This also works when indirectly converting units.
+
+
+```ontol
+def meters (rel .is: i64)
+def millimeters (rel .is: i64)
+map (
+    meters(m),
+    millimeters(m * 1000),
+)
+
+def car (
+    rel .'length': meters
+)
+def vehicle (
+    rel .'length': millimeters
+)
+map (
+    car('length': l),
+    vehicle('length': l),
+)
+```
+
+
+## Named `map`s
 
 Named `map` statements are used to express _queries_, and are further explored in the chapter on [interfaces](interfaces.md).

@@ -1,8 +1,8 @@
 # Generator types
 
-***Generator types*** are used with the [`gen`](relationship_types.md#gen) relationship type and indicate relations whose target value may be generated if no other value is given.
+***Generator types*** are used with the [`gen`](relation_types.md#gen) relationship type and arew used in relations whose target value may be automatically generated if no other value is given.
 
-The following generator types are defined in the `'ontol'` domain:
+The following generator types are defined in the `ontol` domain:
 
 
 ## `auto`

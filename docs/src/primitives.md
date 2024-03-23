@@ -1,8 +1,8 @@
 # Primitives
 
-***Primitives*** are base scalar (non-composite) types defined within the `'ontol'` domain. They may be used directly, or be used as the basis for other types using inheritance through [`is` relationships](rel.md#is-relationships).
+***Primitives*** are base scalar (non-composite) types defined within the `ontol` domain. They may be used directly, or be used as the basis for other types using inheritance through [`is` relationships](rel.md#is-relationships).
 
-Some primitives are ***abstract***, meaning they are fine for defining types as long as they are not used in [data store](data_stores.md)-backed domains or [interfaces](interfaces.md). A type may e.g. inherit from `number`, but in order to be serialized or deserialized to a data store or interface, it needs to be _representable_ in a numeric format; it needs to have a concrete type, such as `i64` or `f64`.
+Some primitives are _abstract_, meaning they are fine for defining types as long as they are not used in [data store](data_stores.md)-backed domains or [interfaces](interfaces.md). A type may e.g. inherit from `number`, but in order to be serialized or deserialized to a data store or interface, it needs to be _representable_ in a numeric format; it needs to have a concrete type, such as `i64` or `f64`.
 
 ***Literals*** are any constant value, part of the language itself.
 

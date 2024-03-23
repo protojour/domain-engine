@@ -1,6 +1,8 @@
 # `fmt`
 
-The `fmt` statement is used for building pattern matching expressions. These are similar to (and may even include) regular expressions. The main difference is that `fmt` can include ONTOL types, and have uses beyond text patterns (TBD).
+The `fmt` statement is used for building ***pattern matching expressions***.
+
+These are similar to (and may even include) regular expressions. The main difference is that `fmt` can include ONTOL types, and have uses beyond text patterns (TBD).
 
 Starting from an empty text literal `''`, the `fmt` statement builds a text matching pattern, with segments linked by the arrow operator `=>`. The final segment binds the pattern to a type.
 

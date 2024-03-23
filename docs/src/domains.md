@@ -2,16 +2,18 @@
 
 A collection of related concepts is known as a ***domain***.
 
-Every ONTOL (`.on`) file describes a single domain. Domains may depend on other domains through [`use` imports](use.md).
+Every ONTOL (`.on`) file describes a single domain. Domains may depend on other domains through [`use` imports](use.md). Some domains may be wholly abstract or define the axioms of the universe, some are concrete, pragmatic, or built purely for data processing, others again may be full of utility structures and help keep your core domains clean.
 
 Here's a simple example domain:
 
 ```ontol
+use 'world' as world
+
 def book (
     rel .'id'|id: (rel .is: serial)
     rel .'title': text
-    rel {.}'author': {author}
     rel .'editions': {edition}
+    rel {.} 'author': {author}
 )
 
 def author (
@@ -39,7 +41,9 @@ def publisher (
 
 Notice how `world.country` and `world.city` are borrowed from a different domain. We wouldn't want to include _every_ tangentially related concept in our "books" domain, as countries and cities have very little to do with books.
 
-A domain is reusable, and gets better the more you work on it. Remember to document the domain using [doc comments](comments.md#doc-comments).
+Domains are reusable, shareable, exchangable, and get better the more you work on them.
+
+Remember to document the domain using [doc comments](comments.md#doc-comments).
 
 
 ## Ontologies

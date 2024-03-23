@@ -23,7 +23,7 @@ In other words some `def subject` has a property called `'relation_name'`, which
 
 ## Optionality
 
-A relation may be _optional_, denoted by a `?` in the relation:
+A relation may be _optional_, denoted by a `?` in the relation (before the `:`):
 
 ```ontol
 rel subject 'property'?: object
@@ -76,7 +76,7 @@ def textlike (
 
 `textlike` is now a _subtype_ of `text` – in ontology terms `textlike` _is-a_ `text`.
 
-`textlike` has `text` as a _base type_, and behaves the same way, but may take on additional characteristics (properties, [doc comments](comments.md#doc-comments), etc.), as long as they are compatible.
+`textlike` has `text` as its _base type_, and will behave the same way for now, but it may also take on additional characteristics (properties, [doc comments](comments.md#doc-comments), etc.), as long as they are compatible.
 
 `is` relationships have many uses, from field and structure re-use, inheritance and composition, to [unions](#unions) (below):
 
@@ -101,7 +101,9 @@ def copycat (
 
 _Unions_ can be defined using conditional `is?` relationships.
 
-Union variants must have a discriminant so ONTOL can tell them apart; either their primary key structure is different or some inherent property is, such as a constant:
+A union type behaves as any other type, but represents one of several choices, its _variants_.
+
+Union variants must have some discriminant, so that ONTOL can tell them apart; either their primary key structure is different or some inherent property is, such as a constant:
 
 ```ontol
 def type_a (
@@ -126,7 +128,7 @@ def some_def (
 )
 ```
 
-Unions of primitives or of literals (enumerations) are also possible, but union members all have to be of the same base type:
+Unions of primitives or of literals (_enumerations_) are also possible, but union members all have to be of the same base type:
 
 ```ontol
 def symbol_union (
@@ -137,7 +139,7 @@ def symbol_union (
 
 ## Sequences
 
-Both the subject and the object of a relationship may have multiple members, expressed as sequences.
+Both the subject and the object of a relationship may have multiple members, expressed as _sequences_.
 
 
 ### Sets
@@ -198,7 +200,7 @@ def some_def (
 )
 ```
 
-Tuples members can be of any type, but if its members are homogenous, its defintion can be simplified using a _range_:
+Tuples members can be of any type, but if its members are homogenous, its defintion can be simplified using a _range_ as shown below:
 
 ```ontol
 def text_tuple (
@@ -206,14 +208,14 @@ def text_tuple (
 )
 ```
 
-A tuple's value might be expressed e.g. `['a', 'b']` and its contents are adressed by index, `text_tuple[0]`.
+Ranges are A tuple's value might be expressed e.g. `['a', 'b']` and its contents are adressed by index, `text_tuple[0]`.
 
 
 ## Entity relationships
 
 `rel` statements always describe relationships between `def`s, from subject to object. The subject and object are types, either primitives, structs, or certain special types.
 
-If both the subject and object is an [entity](entities.md) (i.e. an identifiable type), the relationship is an ***entity relationship***, and the relationship between them are represented by edges in a graph.
+If both the subject and object is an [entity](entities.md) (i.e. an identifiable type), their relationship is an ***entity relationship***, and the relationship between them are represented by edges in a graph.
 
 ```ontol
 rel def_a 'relation': def_b
@@ -244,7 +246,7 @@ def def_a (
 
 ### One-to-many entity relationships
 
-_Cardinality_ is indicated by expressing the subject and/or object as a [set](#sets):
+_Cardinality_ is indicated by wrapping the subject and/or object as a [set](#sets):
 
 ```ontol
 rel def_a 'DefBs'::'DefA' {def_b}
@@ -264,7 +266,7 @@ Here, `def_a` has a property called `'DefBs'`, which is a relationship to one or
 
 ## `rel` relationships and edge properties
 
-A relation itself may have relationships of its own, indicated by a body delimited by square brackets `[]` within the relation parameter (before the `:`).
+A relation may have relationships of its own, indicated by a body delimited by square brackets `[]` within the relation parameter (before the `:`).
 
 If there's only one `rel` statement, this is usually added inline, such as for [`default`](relation_types.md#default) and other relation types:
 

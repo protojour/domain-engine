@@ -3,7 +3,7 @@
 - [Introduction](./introduction.md)
 - [Theory and background](./theory_and_background.md)
 
-# ONTOL reference
+# The ONTOL reference guide
 
 - [Definitions (`def`)](./def.md)
 - [Relationships (`rel`)](./rel.md)
