@@ -1,12 +1,16 @@
 [book]
+title = "ONTOL Documentation"
 authors = ["Protojour dev team <devs@protojour.com>"]
 language = "en"
 multilingual = false
 src = "src"
-title = "ONTOL Documentation"
 
 [preprocessor.ontol-documentation]
 command = "cargo run -p ontol-documentation-preprocessor"
 
 [output.html]
-additional-js = ["theme/ontol-highlight.js"]
+additional-js = [
+    "theme/highlight-ontol.js",
+    "theme/highlight-graphql.js"
+]
+

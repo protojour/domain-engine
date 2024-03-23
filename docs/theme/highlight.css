@@ -22,6 +22,7 @@ pre code.hljs {
   color: #f8f8f2;
 }
 
+.hljs-punctuation,
 .hljs-strong,
 .hljs-emphasis {
   color: #a8a8a2;
@@ -47,10 +48,12 @@ pre code.hljs {
   font-weight: bold;
 }
 
+.hljs-gql-input,
 .hljs-emphasis {
   font-style: italic;
 }
 
+.hljs-gql-input,
 .hljs-keyword,
 .hljs-selector-tag,
 .hljs-name,
