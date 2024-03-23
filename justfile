@@ -7,13 +7,13 @@ ontool:
 lsp:
     #!/usr/bin/env bash
     cargo build --manifest-path ontool/Cargo.toml --release
-    cd ontol-language
+    cd ontol/ontol-language
     for dest in ontol-sublime/bin/ ontol-vscode/bin/; do
-        mkdir -p "$dest"  && cp ../target/release/ontool "$dest"; done
+        mkdir -p "$dest"  && cp ../../target/release/ontool "$dest"; done
     npx js-yaml ontol.tmLanguage.yaml > ontol.tmLanguage.json
     cp ontol.tmLanguage.yaml ontol-sublime/
     cp ontol.tmLanguage.json ontol.tmSnippet.json ontol-vscode/
     cd ontol-vscode
     npm run build && \
     npm run package
-    cd ../..
+    cd ../../..

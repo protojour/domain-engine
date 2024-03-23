@@ -106,8 +106,8 @@ patterns:
 
   - comment: regex literal
     name: string.regexp.ontol
-    begin: \s/[^/\s]
-    end: '[^\\]/'
+    begin: /[^/]
+    end: '[^\\]?/'
     patterns:
       - include: source.js.regexp
 
