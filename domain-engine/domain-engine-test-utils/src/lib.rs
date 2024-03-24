@@ -136,7 +136,7 @@ impl domain_engine_core::FindEntitySelect for TestFindQuery {
 }
 
 pub mod system {
-    use std::sync::Mutex;
+    use std::sync::{Arc, Mutex};
 
     use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
     use domain_engine_core::system::SystemApiMock;
@@ -149,7 +149,7 @@ pub mod system {
 
         SystemApiMock::current_time
             .each_call(matching!())
-            .answers(move |_| {
+            .answers_arc(Arc::new(move |_| {
                 let year = {
                     let mut lock = year_counter.lock().unwrap();
                     let year = *lock;
@@ -164,6 +164,6 @@ pub mod system {
                     ),
                     Utc,
                 )
-            })
+            }))
     }
 }

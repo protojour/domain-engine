@@ -811,7 +811,7 @@ async fn test_graphql_conduit_feed_public_no_query_selection() {
                 _,
                 _
             ))
-            .answers(|(_, _, input)| {
+            .answers(&|_, _, _, input| {
                 // The query does not select `items` in the channel,
                 // so that query output ("items") should be empty, even if the datastore contains
                 // an article for "teh_user":
@@ -863,7 +863,7 @@ async fn test_graphql_conduit_feed_public_with_items_query() {
                 _,
                 _
             ))
-            .answers(|(_, _, input)| {
+            .answers(&|_, _, _, input| {
                 // Assert that there is at least one item (from the datastore),
                 // and there is one if the JSON contains "guid"
                 assert!(input.windows(6).any(|subslice| subslice == b"\"guid\""));

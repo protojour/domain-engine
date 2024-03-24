@@ -375,7 +375,7 @@ async fn test_graphql_basic_pagination() {
                 root(),
                 DataStoreAPIMock::execute
                     .next_call(matching!(Request::Query(_), _session))
-                    .answers(|(request, _)| {
+                    .answers(&|_, request, _| {
                         let Request::Query(entity_select) = request else {
                             panic!();
                         };
@@ -420,7 +420,7 @@ async fn test_graphql_basic_pagination() {
                 root(),
                 DataStoreAPIMock::execute
                     .next_call(matching!(Request::Query(_), _session))
-                    .answers(|(request, _)| {
+                    .answers(&|_, request, _| {
                         let Request::Query(entity_select) = request else {
                             panic!();
                         };

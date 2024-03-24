@@ -1253,6 +1253,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
+name = "higher-kinded-types"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "561985554c8b8d4808605c90a5f1979cc6c31a5d20b78465cd59501233c6678e"
+dependencies = [
+ "never-say-never",
+]
+
+[[package]]
 name = "html5ever"
 version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1871,6 +1880,12 @@ dependencies = [
  "security-framework-sys",
  "tempfile",
 ]
+
+[[package]]
+name = "never-say-never"
+version = "6.6.666"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf5a574dadd7941adeaa71823ecba5e28331b8313fb2e1c6a5c7e5981ea53ad6"
 
 [[package]]
 name = "new_debug_unreachable"
@@ -2596,9 +2611,13 @@ checksum = "d231b230927b5e4ad203db57bbcbee2802f6bce620b1e4a9024a07d94e2907ec"
 
 [[package]]
 name = "polonius-the-crab"
-version = "0.3.1"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0119ad75060c93b2017796396280ab9c1870738bf3b66a8cb20deb3c9075426"
+checksum = "96d9b0ba45e2c294fcd0795bc51e45c12746758e9954bb1190f97603ec9a3e91"
+dependencies = [
+ "higher-kinded-types",
+ "never-say-never",
+]
 
 [[package]]
 name = "powerfmt"
@@ -3750,9 +3769,9 @@ checksum = "e51733f11c9c4f72aa0c160008246859e340b00807569a0da0e7a1079b27ba85"
 
 [[package]]
 name = "unimock"
-version = "0.5.8"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60037e09e4f37a8cd9ca89d80087f00fb05e0a16be56fbcb7b1e4a5e1a7f96bc"
+checksum = "ad7fbd30d2524b5cca18458b2dd9083f16d6d3138fd2a9b9759eb2e80d7ffbae"
 dependencies = [
  "once_cell",
  "polonius-the-crab",
@@ -3762,9 +3781,9 @@ dependencies = [
 
 [[package]]
 name = "unimock_macros"
-version = "0.5.8"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "effccfa1b87aa82833dc7d7d2a3e8b05000797f0590b29f5bd001d2e0c0382e4"
+checksum = "529e203eb2dfc0584af39727767936f3b26efa3c0cf90844c0d7c9cbef52afaa"
 dependencies = [
  "proc-macro2",
  "quote",

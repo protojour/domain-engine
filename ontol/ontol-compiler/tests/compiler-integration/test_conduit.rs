@@ -163,7 +163,7 @@ fn test_conduit_feed_public() {
                 .returns(article_return_value.clone()),
             YielderMock::yield_call_extern_http_json
                 .next_call(matching!("http://localhost:8080/map_channel", _json))
-                .answers(move |(_url, json)| {
+                .answers(&|_, _url, json| {
                     let json_obj = json.as_object().unwrap();
 
                     json!({
