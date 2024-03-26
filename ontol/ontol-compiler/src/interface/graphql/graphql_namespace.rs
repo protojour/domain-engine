@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use convert_case::{Case, Casing};
+use heck::{AsLowerCamelCase, AsSnakeCase};
 use ontol_runtime::{
     ontology::{domain::TypeInfo, Ontology},
     smart_format, DefId, PackageId,
@@ -248,9 +248,9 @@ pub fn adapt_graphql_identifier(input: &str) -> GqlAdaptedIdent {
     if is_valid_graphql_identifier(input) {
         GqlAdaptedIdent::Valid(input)
     } else if input.contains('-') {
-        GqlAdaptedIdent::Adapted(input.to_case(Case::Snake).into())
+        GqlAdaptedIdent::Adapted(smart_format!("{}", AsSnakeCase(input)))
     } else {
-        GqlAdaptedIdent::Adapted(input.to_case(Case::Camel).into())
+        GqlAdaptedIdent::Adapted(smart_format!("{}", AsLowerCamelCase(input)))
     }
 }
 

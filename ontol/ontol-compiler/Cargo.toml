@@ -32,10 +32,10 @@ ena = "0.14"
 bumpalo = "3"
 regex-syntax = "0.8"
 patricia_tree = "0.8"
-convert_case = "0.6"
 documented = "0.3.0"
 strum = { version = "0.26.1", features = ["derive"] }
 strum_macros = "0.26.1"
+heck = "0.5"
 
 [dev-dependencies]
 ontol-test-utils.path = "../ontol-test-utils"
