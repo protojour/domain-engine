@@ -3760,9 +3760,9 @@ checksum = "e51733f11c9c4f72aa0c160008246859e340b00807569a0da0e7a1079b27ba85"
 
 [[package]]
 name = "unimock"
-version = "0.6.0"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad7fbd30d2524b5cca18458b2dd9083f16d6d3138fd2a9b9759eb2e80d7ffbae"
+checksum = "75f4848379d721ca8b1747b65f6b5aae1298f1ee924963959e1bede3877551b7"
 dependencies = [
  "once_cell",
  "polonius-the-crab",
@@ -3772,9 +3772,9 @@ dependencies = [
 
 [[package]]
 name = "unimock_macros"
-version = "0.6.0"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "529e203eb2dfc0584af39727767936f3b26efa3c0cf90844c0d7c9cbef52afaa"
+checksum = "3fa2b420c51dbc3011399d843eb5e91568bd9a1249aa277fa3dd3c07c49cdc82"
 dependencies = [
  "proc-macro2",
  "quote",

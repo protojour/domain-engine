@@ -105,11 +105,51 @@ impl SubSequence {
     }
 }
 
-/// Builder for insertion-ordered sets of attributes,
+pub trait SequenceBuilder: Index<usize, Output = Attribute> {
+    fn try_push(&mut self, attr: Attribute<Value>) -> Result<(), DuplicateError>;
+
+    fn build(self) -> Sequence;
+}
+
+pub struct ListBuilder {
+    attrs: ThinVec<Attribute>,
+}
+
+impl ListBuilder {
+    pub fn with_capacity(cap: usize) -> Self {
+        Self {
+            attrs: ThinVec::with_capacity(cap),
+        }
+    }
+}
+
+impl SequenceBuilder for ListBuilder {
+    fn try_push(&mut self, attr: Attribute<Value>) -> Result<(), DuplicateError> {
+        self.attrs.push(attr);
+        Ok(())
+    }
+
+    fn build(self) -> Sequence {
+        Sequence {
+            attrs: self.attrs,
+            sub_seq: None,
+        }
+    }
+}
+
+impl Index<usize> for ListBuilder {
+    type Output = Attribute;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.attrs[index]
+    }
+}
+
+/// Builder for insertion-ordered sets of attributes
 ///
 /// Duplicates will not be appended.
 #[derive(Default)]
-pub struct OrderedSetBuilder {
+pub struct IndexSetBuilder {
     /// Length cached outside the ThinVec
     attrs: ThinVec<Attribute>,
     /// Length cached outside the ThinVec
@@ -122,7 +162,7 @@ pub struct OrderedSetBuilder {
     hash_builder: ahash::RandomState,
 }
 
-impl OrderedSetBuilder {
+impl IndexSetBuilder {
     pub fn with_capacity(cap: usize) -> Self {
         Self {
             attrs: ThinVec::with_capacity(cap),
@@ -131,8 +171,10 @@ impl OrderedSetBuilder {
             hash_builder: Default::default(),
         }
     }
+}
 
-    pub fn try_push(&mut self, attr: Attribute<Value>) -> Result<(), DuplicateError> {
+impl SequenceBuilder for IndexSetBuilder {
+    fn try_push(&mut self, attr: Attribute<Value>) -> Result<(), DuplicateError> {
         let hash = {
             let mut hasher = self.hash_builder.build_hasher();
             attr.ontol_hash(&mut hasher, &self.hash_builder);
@@ -158,6 +200,7 @@ impl OrderedSetBuilder {
                         if attr.ontol_equals(other_attr) {
                             return Err(DuplicateError {
                                 attr,
+                                index: self.len,
                                 equals_index: next_chain.index,
                             });
                         }
@@ -180,7 +223,7 @@ impl OrderedSetBuilder {
         Ok(())
     }
 
-    pub fn build(self) -> Sequence {
+    fn build(self) -> Sequence {
         Sequence {
             attrs: self.attrs,
             sub_seq: None,
@@ -188,7 +231,7 @@ impl OrderedSetBuilder {
     }
 }
 
-impl Index<usize> for OrderedSetBuilder {
+impl Index<usize> for IndexSetBuilder {
     type Output = Attribute;
 
     fn index(&self, index: usize) -> &Self::Output {
@@ -196,9 +239,10 @@ impl Index<usize> for OrderedSetBuilder {
     }
 }
 
-/// Error saying that a duplicate has been found in the [OrderedSetBuilder]
+/// Error saying that a duplicate has been found in the [IndexSetBuilder]
 pub struct DuplicateError {
     pub attr: Attribute<Value>,
+    pub index: usize,
     pub equals_index: usize,
 }
 
@@ -238,7 +282,7 @@ mod tests {
 
     #[test]
     fn dedup_typed_unit() {
-        let mut builder = OrderedSetBuilder::default();
+        let mut builder = IndexSetBuilder::default();
 
         assert!(builder.try_push(Value::unit().into()).is_ok());
         assert!(builder.try_push(Value::unit().into()).is_err());
@@ -249,7 +293,7 @@ mod tests {
 
     #[test]
     fn dedup_text() {
-        let mut builder = OrderedSetBuilder::default();
+        let mut builder = IndexSetBuilder::default();
 
         assert!(builder.try_push(text("a").into()).is_ok());
         assert!(builder.try_push(text("a").into()).is_err());
@@ -259,7 +303,7 @@ mod tests {
 
     #[test]
     fn dedup_i64() {
-        let mut builder = OrderedSetBuilder::default();
+        let mut builder = IndexSetBuilder::default();
 
         assert!(builder.try_push(Value::I64(42, def(2)).into()).is_ok());
         assert!(builder.try_push(Value::I64(42, def(2)).into()).is_err());
@@ -268,7 +312,7 @@ mod tests {
 
     #[test]
     fn dedup_f64_zero() {
-        let mut builder = OrderedSetBuilder::default();
+        let mut builder = IndexSetBuilder::default();
 
         assert!(builder.try_push(Value::F64(0.0, def(4)).into()).is_ok());
         assert!(builder.try_push(Value::F64(-0.0, def(4)).into()).is_err());
@@ -278,7 +322,7 @@ mod tests {
     // OntolEquals or not
     #[test]
     fn dedup_f64_nan_can_duplicate() {
-        let mut builder = OrderedSetBuilder::default();
+        let mut builder = IndexSetBuilder::default();
 
         let nan = Value::F64(f64::NAN, def(3));
 
@@ -289,7 +333,7 @@ mod tests {
 
     #[test]
     fn dedup_struct_empty() {
-        let mut builder = OrderedSetBuilder::default();
+        let mut builder = IndexSetBuilder::default();
 
         assert!(builder.try_push(struct_value([]).into()).is_ok());
         assert!(builder.try_push(struct_value([]).into()).is_err());
@@ -297,7 +341,7 @@ mod tests {
 
     #[test]
     fn dedup_big_structs_different_iteration_order() {
-        let mut builder = OrderedSetBuilder::default();
+        let mut builder = IndexSetBuilder::default();
 
         // structs with different insertion order
         assert!(builder

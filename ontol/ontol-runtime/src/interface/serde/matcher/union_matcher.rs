@@ -15,8 +15,10 @@ use crate::{
 };
 
 use super::{
-    map_matchers::MapMatcher, primitive_matchers::u64_to_i64,
-    sequence_matchers::SequenceRangesMatcher, text_matchers::try_deserialize_custom_string,
+    map_matchers::MapMatcher,
+    primitive_matchers::u64_to_i64,
+    sequence_matcher::{SequenceKind, SequenceRangesMatcher},
+    text_matchers::try_deserialize_custom_string,
     ValueMatcher,
 };
 
@@ -126,6 +128,7 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
                     SerdeOperator::RelationList(seq_op) => {
                         return Ok(SequenceRangesMatcher::new(
                             slice::from_ref(&seq_op.range),
+                            SequenceKind::List,
                             seq_op.def.def_id,
                             self.ctx,
                         ))
@@ -133,6 +136,7 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
                     SerdeOperator::ConstructorSequence(seq_op) => {
                         return Ok(SequenceRangesMatcher::new(
                             &seq_op.ranges,
+                            SequenceKind::List,
                             seq_op.def.def_id,
                             self.ctx,
                         ))

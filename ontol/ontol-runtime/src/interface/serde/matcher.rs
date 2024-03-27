@@ -2,11 +2,11 @@ use std::{fmt::Display, ops::RangeInclusive};
 
 use crate::value::Value;
 
-use self::{map_matchers::MapMatcher, sequence_matchers::SequenceRangesMatcher};
+use self::{map_matchers::MapMatcher, sequence_matcher::SequenceRangesMatcher};
 
 pub mod map_matchers;
 pub mod primitive_matchers;
-pub mod sequence_matchers;
+pub mod sequence_matcher;
 pub mod text_matchers;
 pub mod union_matcher;
 

@@ -19,8 +19,15 @@ pub struct SequenceRangesMatcher<'on> {
     range_cursor: usize,
     repetition_cursor: u16,
 
+    pub kind: SequenceKind,
     pub type_def_id: DefId,
     pub ctx: SubProcessorContext,
+}
+
+#[derive(Clone, Copy)]
+pub enum SequenceKind {
+    IndexSet,
+    List,
 }
 
 impl<'on> ValueMatcher for SequenceRangesMatcher<'on> {
@@ -49,11 +56,17 @@ impl<'on> ValueMatcher for SequenceRangesMatcher<'on> {
 }
 
 impl<'on> SequenceRangesMatcher<'on> {
-    pub fn new(ranges: &'on [SequenceRange], type_def_id: DefId, ctx: SubProcessorContext) -> Self {
+    pub fn new(
+        ranges: &'on [SequenceRange],
+        kind: SequenceKind,
+        type_def_id: DefId,
+        ctx: SubProcessorContext,
+    ) -> Self {
         Self {
             ranges,
             range_cursor: 0,
             repetition_cursor: 0,
+            kind,
             type_def_id,
             ctx,
         }
@@ -107,24 +120,6 @@ impl<'on> SequenceRangesMatcher<'on> {
             }
         } else {
             Ok(())
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct IndexSetMatcher<'on> {
-    range: &'on SequenceRange,
-
-    pub type_def_id: DefId,
-    pub ctx: SubProcessorContext,
-}
-
-impl<'on> IndexSetMatcher<'on> {
-    pub fn new(range: &'on SequenceRange, type_def_id: DefId, ctx: SubProcessorContext) -> Self {
-        Self {
-            range,
-            type_def_id,
-            ctx,
         }
     }
 }

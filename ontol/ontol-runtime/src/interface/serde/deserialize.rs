@@ -4,7 +4,6 @@ use serde::{
     de::{DeserializeSeed, Error, MapAccess, SeqAccess, Unexpected, Visitor},
     Deserializer,
 };
-use thin_vec::ThinVec;
 use tracing::trace;
 
 use crate::{
@@ -13,6 +12,7 @@ use crate::{
         deserialize_struct::{PossibleProps, StructDeserializer, StructVisitor},
         matcher::map_matchers::{MapMatchMode, MapMatchResult},
     },
+    sequence::{IndexSetBuilder, ListBuilder, SequenceBuilder},
     value::{Attribute, Serial, Value},
 };
 
@@ -20,7 +20,7 @@ use super::{
     deserialize_patch::GraphqlPatchVisitor,
     matcher::{
         primitive_matchers::{BooleanMatcher, NumberMatcher, UnitMatcher},
-        sequence_matchers::SequenceRangesMatcher,
+        sequence_matcher::{SequenceKind, SequenceRangesMatcher},
         text_matchers::{
             CapturingTextPatternMatcher, ConstantStringMatcher, StringMatcher, TextPatternMatcher,
         },
@@ -192,6 +192,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                 _ => deserializer.deserialize_seq(
                     SequenceRangesMatcher::new(
                         slice::from_ref(&seq_op.range),
+                        SequenceKind::List,
                         seq_op.def.def_id,
                         self.ctx,
                     )
@@ -212,6 +213,7 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                 _ => deserializer.deserialize_seq(
                     SequenceRangesMatcher::new(
                         slice::from_ref(&seq_op.range),
+                        SequenceKind::IndexSet,
                         seq_op.def.def_id,
                         self.ctx,
                     )
@@ -219,8 +221,13 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
                 ),
             },
             (SerdeOperator::ConstructorSequence(seq_op), _) => deserializer.deserialize_seq(
-                SequenceRangesMatcher::new(&seq_op.ranges, seq_op.def.def_id, self.ctx)
-                    .into_visitor(self),
+                SequenceRangesMatcher::new(
+                    &seq_op.ranges,
+                    SequenceKind::List,
+                    seq_op.def.def_id,
+                    self.ctx,
+                )
+                .into_visitor(self),
             ),
             (SerdeOperator::Alias(value_op), _) => {
                 let mut typed_attribute =
@@ -332,39 +339,27 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
             .into())
     }
 
-    fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+    fn visit_seq<A: SeqAccess<'de>>(self, seq: A) -> Result<Self::Value, A::Error> {
         let mut sequence_matcher = self
             .matcher
             .match_sequence()
             .map_err(|_| Error::invalid_type(Unexpected::Seq, &self))?;
 
-        let mut attrs = ThinVec::with_capacity(seq.size_hint().unwrap_or(0));
+        let cap = seq.size_hint().unwrap_or(0);
+        let sequence = match sequence_matcher.kind {
+            SequenceKind::IndexSet => self.deserialize_sequence(
+                seq,
+                &mut sequence_matcher,
+                IndexSetBuilder::with_capacity(cap),
+            )?,
+            SequenceKind::List => self.deserialize_sequence(
+                seq,
+                &mut sequence_matcher,
+                ListBuilder::with_capacity(cap),
+            )?,
+        };
 
-        loop {
-            let processor = match sequence_matcher.match_next_seq_element() {
-                Some(element_match) => self
-                    .processor
-                    .narrow_with_context(element_match.element_addr, element_match.ctx),
-                None => {
-                    // note: if there are more elements to deserialize,
-                    // serde will automatically generate a 'trailing characters' error after returning:
-                    return Ok(Value::Sequence(attrs.into(), sequence_matcher.type_def_id).into());
-                }
-            };
-
-            match seq.next_element_seed(processor)? {
-                Some(attribute) => {
-                    attrs.push(attribute);
-                }
-                None => {
-                    return if sequence_matcher.match_seq_end().is_ok() {
-                        Ok(Value::Sequence(attrs.into(), sequence_matcher.type_def_id).into())
-                    } else {
-                        Err(Error::invalid_length(attrs.len(), &self))
-                    };
-                }
-            }
-        }
+        Ok(sequence.into())
     }
 
     fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
@@ -453,6 +448,57 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
                     rel: output.rel_params,
                     val: id,
                 })
+            }
+        }
+    }
+}
+
+impl<'on, 'p, 'de, M: ValueMatcher> MatcherVisitor<'on, 'p, M> {
+    fn deserialize_sequence<A: SeqAccess<'de>>(
+        &self,
+        mut seq: A,
+        sequence_matcher: &mut SequenceRangesMatcher<'on>,
+        mut sequence_builder: impl SequenceBuilder,
+    ) -> Result<Value, A::Error> {
+        loop {
+            let processor = match sequence_matcher.match_next_seq_element() {
+                Some(element_match) => self
+                    .processor
+                    .narrow_with_context(element_match.element_addr, element_match.ctx),
+                None => {
+                    // note: if there are more elements to deserialize,
+                    // serde will automatically generate a 'trailing characters' error after returning:
+                    return Ok(Value::Sequence(
+                        sequence_builder.build(),
+                        sequence_matcher.type_def_id,
+                    ));
+                }
+            };
+
+            match seq.next_element_seed(processor)? {
+                Some(attribute) => {
+                    sequence_builder
+                        .try_push(attribute)
+                        .map_err(|duplicate_error| {
+                            Error::custom(format!(
+                                "index set duplication error: attribute[{}] equals attribute[{}]",
+                                duplicate_error.index, duplicate_error.equals_index
+                            ))
+                        })?
+                }
+                None => {
+                    return if sequence_matcher.match_seq_end().is_ok() {
+                        Ok(Value::Sequence(
+                            sequence_builder.build(),
+                            sequence_matcher.type_def_id,
+                        ))
+                    } else {
+                        Err(Error::invalid_length(
+                            sequence_builder.build().attrs.len(),
+                            self,
+                        ))
+                    };
+                }
             }
         }
     }
