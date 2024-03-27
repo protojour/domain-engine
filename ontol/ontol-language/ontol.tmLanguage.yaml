@@ -45,7 +45,7 @@ patterns:
 
   - comment: modifier
     name: variable.parameter.ontol
-    match: (@(private|open|extern|match|in|all_in|contains_all|intersects|equals))\s
+    match: (@(private|open|symbol|extern|match|in|all_in|contains_all|intersects|equals))\s
 
   - comment: ontol defs
     name: storage.type.ontol
