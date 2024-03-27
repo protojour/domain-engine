@@ -555,7 +555,7 @@ fn test_map_with_order_variable() {
 }
 
 #[test]
-fn test_map_with_order_multiset() {
+fn test_map_with_order_indexset() {
     r#"
     def foo (
         rel .'key'|id: (rel .is: text)
@@ -595,6 +595,10 @@ fn test_map_with_order_multiset() {
         assert_error_msg!(
             serde_create(&input).to_value(json!({ "sort": ["bogus"] })),
             "invalid type: string \"bogus\", expected `<anonymous>` (`by_a` or `by_b`) at line 1 column 16"
+        );
+        assert_error_msg!(
+            serde_create(&input).to_value(json!({ "sort": ["by_a", "by_b", "by_a"] })),
+            "invalid index-set: attribute[2] equals attribute[0] at line 1 column 30"
         );
 
         let foo_json = json!({ "key": "k", "a": "x", "b": "y" });

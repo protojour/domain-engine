@@ -481,7 +481,7 @@ impl<'on, 'p, 'de, M: ValueMatcher> MatcherVisitor<'on, 'p, M> {
                         .try_push(attribute)
                         .map_err(|duplicate_error| {
                             Error::custom(format!(
-                                "index set duplication error: attribute[{}] equals attribute[{}]",
+                                "invalid index-set: attribute[{}] equals attribute[{}]",
                                 duplicate_error.index, duplicate_error.equals_index
                             ))
                         })?

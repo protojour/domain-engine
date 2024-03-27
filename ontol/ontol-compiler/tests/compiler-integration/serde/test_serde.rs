@@ -250,7 +250,7 @@ fn test_serde_index_set_cardinality() {
         assert_json_io_matches!(serde_create(&foo), { "s": ["a", "b"] });
         assert_error_msg!(
             serde_create(&foo).to_value(json!({ "s": ["a", "b", "a"] })),
-            "index set duplication error: attribute[2] equals attribute[0] at line 1 column 18"
+            "invalid index-set: attribute[2] equals attribute[0] at line 1 column 18"
         );
     });
 }
