@@ -620,7 +620,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b42b6fa04a440b495c8b04d0e71b707c585f83cb9cb28cf8cd0d976c315e31b4"
 dependencies = [
  "powerfmt",
- "serde",
 ]
 
 [[package]]
@@ -2121,6 +2120,8 @@ dependencies = [
  "ontol-test-utils",
  "ordered-float 4.2.0",
  "patricia_tree",
+ "phf_generator 0.11.2",
+ "phf_shared 0.11.2",
  "pretty_assertions",
  "regex-automata 0.4.5",
  "regex-syntax 0.8.2",
@@ -2241,8 +2242,6 @@ dependencies = [
  "num",
  "ontol-macros",
  "ordered-float 4.2.0",
- "phf 0.11.2",
- "phf_generator 0.11.2",
  "phf_shared 0.11.2",
  "regex-automata 0.4.5",
  "serde",
@@ -2255,7 +2254,6 @@ dependencies = [
  "test-log",
  "thin-vec",
  "thiserror",
- "time",
  "tracing",
  "tracing-subscriber",
  "urlencoding",
@@ -3425,7 +3423,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8248b6521bb14bc45b4067159b9b6ad792e2d6d754d6c41fb50e29fefe38749"
 dependencies = [
  "deranged",
- "itoa",
  "num-conv",
  "powerfmt",
  "serde",

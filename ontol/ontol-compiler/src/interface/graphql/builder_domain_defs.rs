@@ -26,6 +26,7 @@ use tracing::{trace, trace_span};
 use crate::{
     def::{DefKind, LookupRelationshipMeta, RelParams, TypeDefFlags},
     interface::serde::{serde_generator::SerdeGenerator, SerdeKey},
+    phf_build::build_phf_index_map,
     relation::Property,
     repr::repr_model::{ReprKind, ReprScalarKind},
 };
@@ -45,7 +46,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 let mut field_namespace = GraphqlNamespace::default();
 
                 // FIXME: what if some of the relation data's fields are called "node"
-                let fields: PhfIndexMap<FieldData> = PhfIndexMap::build([(
+                let fields: PhfIndexMap<FieldData> = build_phf_index_map([(
                     self.serde_gen
                         .strings
                         .make_phf_key(&field_namespace.unique_literal("node")),
@@ -139,7 +140,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         })),
                         partial_input_typename: None,
                         kind: TypeKind::Object(ObjectData {
-                            fields: PhfIndexMap::build([
+                            fields: build_phf_index_map([
                                 (
                                     self.serde_gen.strings.make_phf_key("nodes"),
                                     FieldData {
@@ -204,7 +205,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         input_typename: None,
                         partial_input_typename: None,
                         kind: TypeKind::Object(ObjectData {
-                            fields: PhfIndexMap::build([
+                            fields: build_phf_index_map([
                                 (
                                     self.serde_gen.strings.make_phf_key("node"),
                                     FieldData {
@@ -266,7 +267,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 });
 
                 let type_kind = TypeKind::Object(ObjectData {
-                    fields: Default::default(),
+                    fields: build_phf_index_map([]),
                     kind: ObjectKind::Node(NodeData {
                         def_id: type_info.def_id,
                         entity_id: type_info
@@ -547,7 +548,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     .iter()
                     .map(|(key, data)| (key.clone(), data.clone()));
 
-                object_data.fields = PhfIndexMap::build(existing_fields.chain(fields_vec));
+                object_data.fields = build_phf_index_map(existing_fields.chain(fields_vec));
             }
             _ => panic!(),
         }

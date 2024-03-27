@@ -77,6 +77,7 @@ mod map_arm_def_inference;
 mod namespace;
 mod ontol_domain;
 mod pattern;
+mod phf_build;
 mod regex_util;
 mod relation;
 mod repr;

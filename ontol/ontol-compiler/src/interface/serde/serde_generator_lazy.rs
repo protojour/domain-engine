@@ -15,7 +15,7 @@ use ontol_runtime::{
         },
     },
     ontology::ontol::{TextConstant, ValueGenerator},
-    phf::{PhfIndexMap, PhfKey},
+    phf::PhfKey,
     property::{PropertyId, Role},
     DefId, RelationshipId,
 };
@@ -24,6 +24,7 @@ use tracing::{debug, debug_span, warn};
 
 use crate::{
     def::{DefKind, LookupRelationshipMeta, RelParams},
+    phf_build::build_phf_index_map,
     relation::{Properties, Property},
 };
 
@@ -98,7 +99,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         let SerdeOperator::Struct(struct_op) = &mut self.operators_by_addr[addr.0 as usize] else {
             panic!();
         };
-        struct_op.properties = PhfIndexMap::build(serde_properties.into_values());
+        struct_op.properties = build_phf_index_map(serde_properties.into_values());
         struct_op.flags.extend(struct_flags);
     }
 
@@ -275,7 +276,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             }
         }
 
-        new_operator.properties = PhfIndexMap::build(properties.into_values());
+        new_operator.properties = build_phf_index_map(properties.into_values());
 
         self.operators_by_addr[addr.0 as usize] = SerdeOperator::Struct(new_operator);
     }

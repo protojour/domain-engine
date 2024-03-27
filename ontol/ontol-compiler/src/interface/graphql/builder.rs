@@ -22,7 +22,6 @@ use ontol_runtime::{
         ontol::TextConstant,
         Ontology,
     },
-    phf::PhfIndexMap,
     property::PropertyId,
     resolve_path::{ProbeDirection, ProbeFilter, ProbeOptions, ResolverGraph},
     var::Var,
@@ -33,6 +32,7 @@ use smartstring::alias::String;
 use crate::{
     def::{DefKind, Defs},
     interface::serde::{serde_generator::SerdeGenerator, SerdeKey},
+    phf_build::build_phf_index_map,
     primitive::Primitives,
     relation::{Relations, UnionMemberCache},
     repr::{repr_ctx::ReprCtx, repr_model::ReprKind},
@@ -150,7 +150,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             input_typename: None,
             partial_input_typename: None,
             kind: TypeKind::Object(ObjectData {
-                fields: Default::default(),
+                fields: build_phf_index_map([]),
                 kind: ObjectKind::Query,
             }),
         });
@@ -161,7 +161,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             input_typename: None,
             partial_input_typename: None,
             kind: TypeKind::Object(ObjectData {
-                fields: Default::default(),
+                fields: build_phf_index_map([]),
                 kind: ObjectKind::Mutation,
             }),
         });
@@ -173,12 +173,12 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 input_typename: None,
                 partial_input_typename: None,
                 kind: TypeKind::Object(ObjectData {
-                    fields: Default::default(),
+                    fields: build_phf_index_map([]),
                     kind: ObjectKind::PageInfo,
                 }),
             });
             let data = object_data_mut(self.schema.page_info, self.schema);
-            data.fields = PhfIndexMap::build([
+            data.fields = build_phf_index_map([
                 (
                     self.serde_gen.strings.make_phf_key("endCursor"),
                     FieldData {
@@ -519,7 +519,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         address: TypeAddr,
         fields: IndexMap<std::string::String, FieldData>,
     ) {
-        object_data_mut(address, self.schema).fields = PhfIndexMap::build(
+        object_data_mut(address, self.schema).fields = build_phf_index_map(
             fields
                 .into_iter()
                 .map(|(key, data)| (self.serde_gen.strings.make_phf_key(&key), data)),
