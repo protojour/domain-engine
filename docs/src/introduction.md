@@ -7,22 +7,24 @@ ONTOL is not a general-purpose programming language, but has powerful features f
 What does it look like? Here's a small subset representation of [GeoJSON](https://en.wikipedia.org/wiki/GeoJSON) to illustrate:
 
 ```ontol
+/// Longitude lines run north-south. They converge at the poles.
+/// Values range between -180 and +180 degrees, with 0 at Greenwich.
+/// Positive values are east, negative values are west
+def longitude (
+    rel .is: number
+    rel .min: -180
+    rel .max: 180
+)
+
 /// Latitude lines run east-west and are parallel to each other.
-/// If you go north, latitude values increase.
-/// Finally, latitude values (Y-values) range between -90 and +90 degrees.
+/// Values range between -90 and +90 degrees, with 0 at the equator.
+/// Positive values are north, negative values are south.
 def latitude (
     rel .is: number
     rel .min: -90
     rel .max: 90
 )
 
-/// Longitude lines run north-south. They converge at the poles.
-/// Its X-coordinates are between -180 and +180 degrees.
-def longitude (
-    rel .is: number
-    rel .min: -180
-    rel .max: 180
-)
 
 /// A position is the fundamental geometry construct, represented as a tuple.
 def position (
@@ -37,4 +39,6 @@ def Point (
 )
 ```
 
-Fundamental constructs and concepts in ONTOL are gradually introduced in the **ONTOL Reference**, starting with [_definitions_](def.md) (`def`, above). You might want to read up on some [theory and background](theory_and_background.md) in the next chapter first.
+Fundamental constructs and concepts in ONTOL are gradually introduced in the **ONTOL Reference**, starting with [_definitions_](def.md) (`def`, above).
+
+You might want to read up on some [theory and background](theory_and_background.md) in the next chapter first.

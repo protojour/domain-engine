@@ -8,10 +8,9 @@ It requires a body, enclosed by `()` parentheses, which may be empty.
 
 ```ontol
 def some_def ()
-def PascalCaseDef ()
 ```
 
-Expressions within the body of a statement are usually related to that statement. A definition may be also be extended freely further along in the same domain.
+Expressions within the body of a statement are usually related to that statement. A definition may be also be extended freely further along in the same domain with additional def statements.
 
 ```ontol
 def some_def ()

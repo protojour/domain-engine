@@ -43,7 +43,7 @@ The `book` query matches a `Book`, and uses the `book_id` type to address a spec
 
 The `books` query matches a set of `Book`s (the `..` operator indicates looping over a set). The query will potentially return all `Book`s however the query will have cursor pagination parameters `first` (the number of results to return, e.g. "return the first 100" Books) and `after` (a cursor id).
 
-`maps` arms may also be wrapped using local defs. This is what we already see
+`maps` arms may also be wrapped using local defs. This is what we already see with `book`, using `book_id`.
 
 ```ontol
 map book (
@@ -138,7 +138,15 @@ map books (
 
 ### Ordering
 
-An _ordering_ is a relationship where the subject is an entity, the relation is the [`order`](relation_types.md#order) relation type, and the object is a [symbol](def.md#symbol). The relation must have relationships of its own, defined as tuple members referencing field names on the subject, and may have a relationship
+An _ordering_ is a relationship where the subject is an entity, the relation is the [`order`](relation_types.md#order) relation type, and the object is a [symbol](def.md#symbol).
+
+```ontol
+def entity ()
+def @symbol symbol ()
+rel entity order[...]: symbol
+```
+
+The relation should have tuple relationships referencing one or more field names on the subject, and may have a [`direction`](relation_types.md#direction) relationship to either [`ascending`](primitives.md#ascending) (default) or [`descending`](primitives.md#descending).
 
 ```ontol
 def book_id (rel .is: serial)
@@ -147,22 +155,35 @@ def Book (
     rel .'title': text
 )
 
-def @symbol by_name ()
-
-/// order Book by 'title'
+def @symbol by_title ()
 rel Book order[
     rel .0: 'title'
-    rel .direction: ascending
-]: by_name
+    rel .direction: ascending  // default, redundant
+]: by_title
 ```
 
-This will associate an ordering with `Book` entities, and makes the order accessible by the symbol `by_name`. This ordering and symbol may then be used in queries:
+This will associate an ordering with `Book` entities, and makes the order accessible by the symbol `by_title`.
+
+The ordering and symbol may then be used in queries, to return `Book` entities ordered by `title`:
+
+```ontol
+map books_by_title (
+    (),
+    {..@match Book(
+        order: by_title()
+    )}
+)
+```
+
+Choosing an available ordering at the API level is also possible:
 
 ```ontol
 map books_by_name (
-    (),
+    (
+        'order': order
+    ),
     {..@match Book(
-        order: by_name()
+        order: order
     )}
 )
 ```
