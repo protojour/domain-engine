@@ -178,7 +178,7 @@ map books_by_title (
 Choosing an available ordering at the API level is also possible:
 
 ```ontol
-map books_by_name (
+map books_ordered (
     (
         'order': order
     ),
