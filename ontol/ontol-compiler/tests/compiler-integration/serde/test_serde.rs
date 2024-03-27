@@ -238,7 +238,7 @@ fn test_serde_noop_intersection() {
 }
 
 #[test]
-fn test_serde_many_cardinality() {
+fn test_serde_index_set_cardinality() {
     "
     def foo (
         rel .'s': {text}
@@ -248,6 +248,20 @@ fn test_serde_many_cardinality() {
         let [foo] = test.bind(["foo"]);
         assert_json_io_matches!(serde_create(&foo), { "s": []});
         assert_json_io_matches!(serde_create(&foo), { "s": ["a", "b"]});
+    });
+}
+
+#[test]
+fn test_serde_index_list_cardinality() {
+    "
+    def foo (
+        rel .'s': [text]
+    )
+    "
+    .compile_then(|test| {
+        let [foo] = test.bind(["foo"]);
+        assert_json_io_matches!(serde_create(&foo), { "s": []});
+        assert_json_io_matches!(serde_create(&foo), { "s": ["a", "b", "a"]});
     });
 }
 

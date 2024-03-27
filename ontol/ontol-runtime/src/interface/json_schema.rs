@@ -215,7 +215,7 @@ impl<'e> SchemaCtx<'e> {
         if serde_def.modifier.contains(SerdeModifier::UNION) {
             modifier.push_str("_union");
         }
-        if serde_def.modifier.contains(SerdeModifier::ARRAY) {
+        if serde_def.modifier.contains(SerdeModifier::LIST) {
             modifier.push_str("_array");
         }
 
@@ -280,7 +280,7 @@ impl Display for Key {
         if variant.modifier.contains(SerdeModifier::UNION) {
             write!(f, "_union")?;
         }
-        if variant.modifier.contains(SerdeModifier::ARRAY) {
+        if variant.modifier.contains(SerdeModifier::LIST) {
             write!(f, "_array")?;
         }
 
@@ -370,15 +370,14 @@ fn serialize_schema_inline<S: Serializer>(
                 map.serialize_entry("description", docs)?;
             }
         }
-        SerdeOperator::RelationSequence(seq_op) => {
+        SerdeOperator::RelationList(seq_op) | SerdeOperator::RelationIndexSet(seq_op) => {
             map.serialize_entry("type", "array")?;
             if let Some(docs) = ctx.docs {
                 map.serialize_entry("description", docs)?;
             }
 
-            let range = &seq_op.ranges[0];
             // normal array: all items are uniform
-            map.serialize_entry("items", &ctx.reference(range.addr))?;
+            map.serialize_entry("items", &ctx.reference(seq_op.range.addr))?;
         }
         SerdeOperator::ConstructorSequence(seq_op) => {
             map.serialize_entry("type", "array")?;
@@ -493,7 +492,7 @@ impl<'d, 'e> Serialize for SchemaReference<'d, 'e> {
                 serialize_schema_inline::<S>(&self.ctx, value_operator, self.def_map, &mut map)?;
                 map.end()
             }
-            SerdeOperator::RelationSequence(_seq_op) => {
+            SerdeOperator::RelationList(_seq_op) | SerdeOperator::RelationIndexSet(_seq_op) => {
                 let mut map = serializer.serialize_map(None)?;
                 serialize_schema_inline::<S>(&self.ctx, value_operator, self.def_map, &mut map)?;
                 map.end()
@@ -780,10 +779,8 @@ impl SchemaGraphBuilder {
                     self.visit(range.addr, ontology);
                 }
             }
-            SerdeOperator::RelationSequence(seq_op) => {
-                for range in &seq_op.ranges {
-                    self.visit(range.addr, ontology);
-                }
+            SerdeOperator::RelationList(seq_op) | SerdeOperator::RelationIndexSet(seq_op) => {
+                self.visit(seq_op.range.addr, ontology);
             }
             SerdeOperator::Alias(value_op) => {
                 self.add_to_graph(value_op.def, addr);

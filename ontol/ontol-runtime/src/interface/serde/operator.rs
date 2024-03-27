@@ -61,7 +61,12 @@ pub enum SerdeOperator {
 
     /// A sequence representing a relationship between one subject and many objects.
     /// This is simple and does not support any tuples.
-    RelationSequence(RelationSequenceOperator),
+    RelationList(RelationSequenceOperator),
+
+    /// A sequence representing a relationship between one subject and many objects,
+    /// where duplicates are disallowed.
+    /// This is simple and does not support any tuples.
+    RelationIndexSet(RelationSequenceOperator),
 
     /// A sequence for constructing a value.
     /// This may include tuple-like sequences.
@@ -90,8 +95,8 @@ impl OntologyInit for SerdeOperator {
 
 #[derive(Serialize, Deserialize, OntolDebug)]
 pub struct RelationSequenceOperator {
-    // note: This is constant size array so that it can produce a dynamic slice
-    pub ranges: [SequenceRange; 1],
+    /// A singleton range
+    pub range: SequenceRange,
     pub def: SerdeDef,
     pub to_entity: bool,
 }

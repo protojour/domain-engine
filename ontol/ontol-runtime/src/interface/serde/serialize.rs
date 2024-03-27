@@ -3,7 +3,7 @@ use serde::{
     Serializer,
 };
 use smartstring::alias::String;
-use std::fmt::Write;
+use std::{fmt::Write, slice};
 use tracing::{trace, warn};
 
 use crate::{
@@ -104,8 +104,12 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                 Value::Sequence(seq, _) => self.serialize_dynamic_sequence(&seq.attrs, serializer),
                 _ => panic!("Not a sequence"),
             },
-            (SerdeOperator::RelationSequence(seq_op), _) => {
-                self.serialize_sequence(cast_ref::<Vec<_>>(value), &seq_op.ranges, serializer)
+            (SerdeOperator::RelationList(seq_op) | SerdeOperator::RelationIndexSet(seq_op), _) => {
+                self.serialize_sequence(
+                    cast_ref::<Vec<_>>(value),
+                    slice::from_ref(&seq_op.range),
+                    serializer,
+                )
             }
             (SerdeOperator::ConstructorSequence(seq_op), _) => {
                 self.serialize_sequence(cast_ref::<Vec<_>>(value), &seq_op.ranges, serializer)

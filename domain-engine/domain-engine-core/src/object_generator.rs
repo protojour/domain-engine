@@ -162,7 +162,7 @@ impl<'e> ObjectGenerator<'e> {
             | SerdeOperator::TextPattern(def_id)
             | SerdeOperator::CapturingTextPattern(def_id) => *def_id,
             SerdeOperator::DynamicSequence => panic!("DynamicSequence"),
-            SerdeOperator::RelationSequence(_) => panic!(),
+            SerdeOperator::RelationList(_) | SerdeOperator::RelationIndexSet(_) => panic!(),
             SerdeOperator::ConstructorSequence(seq_op) => seq_op.def.def_id,
             SerdeOperator::Alias(alias_op) => alias_op.def.def_id,
             SerdeOperator::Union(union_op) => union_op.union_def().def_id,

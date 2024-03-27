@@ -309,7 +309,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 self.modified_arg::<String>(name, modifier, &())
             }
             SerdeOperator::DynamicSequence => panic!("No dynamic sequence expected here"),
-            SerdeOperator::RelationSequence(seq_op) => {
+            SerdeOperator::RelationList(seq_op) | SerdeOperator::RelationIndexSet(seq_op) => {
                 if seq_op.to_entity && matches!(typing_purpose, TypingPurpose::PartialInput) {
                     let type_addr = self
                         .schema_ctx
@@ -344,7 +344,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         ),
                         None => self.get_operator_argument(
                             name,
-                            seq_op.ranges[0].addr,
+                            seq_op.range.addr,
                             rel_params,
                             property_flags,
                             array_modifier,

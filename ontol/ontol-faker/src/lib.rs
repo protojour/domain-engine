@@ -156,12 +156,11 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
             SerdeOperator::DynamicSequence => {
                 return Ok(Value::Sequence(Sequence::default(), DefId::unit()).into());
             }
-            SerdeOperator::RelationSequence(seq_op) => {
+            SerdeOperator::RelationList(seq_op) | SerdeOperator::RelationIndexSet(seq_op) => {
                 return if processor.level().current_global_level() > SENSIBLE_RECURSION_LEVEL {
                     Ok(Value::Sequence(Sequence::default(), seq_op.def.def_id).into())
                 } else {
-                    let variant = &seq_op.ranges[0];
-                    let attr = self.fake_attribute(processor.narrow(variant.addr))?;
+                    let attr = self.fake_attribute(processor.narrow(seq_op.range.addr))?;
 
                     Ok(Value::Sequence(Sequence::from_iter([attr]), seq_op.def.def_id).into())
                 }

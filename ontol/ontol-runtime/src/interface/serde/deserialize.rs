@@ -1,3 +1,5 @@
+use std::slice;
+
 use serde::{
     de::{DeserializeSeed, Error, MapAccess, SeqAccess, Unexpected, Visitor},
     Deserializer,
@@ -8,19 +10,23 @@ use tracing::trace;
 use crate::{
     interface::serde::{
         deserialize_id::IdSingletonStructVisitor,
-        deserialize_matcher::MapMatchResult,
         deserialize_struct::{PossibleProps, StructDeserializer, StructVisitor},
+        matcher::map_matchers::{MapMatchMode, MapMatchResult},
     },
     value::{Attribute, Serial, Value},
 };
 
 use super::{
-    deserialize_matcher::{
-        BooleanMatcher, CapturingTextPatternMatcher, ConstantStringMatcher, ExpectingMatching,
-        MapMatchMode, NumberMatcher, SequenceMatcher, StringMatcher, TextPatternMatcher,
-        UnionMatcher, UnitMatcher, ValueMatcher,
-    },
     deserialize_patch::GraphqlPatchVisitor,
+    matcher::{
+        primitive_matchers::{BooleanMatcher, NumberMatcher, UnitMatcher},
+        sequence_matchers::SequenceRangesMatcher,
+        text_matchers::{
+            CapturingTextPatternMatcher, ConstantStringMatcher, StringMatcher, TextPatternMatcher,
+        },
+        union_matcher::UnionMatcher,
+        ExpectingMatching, ValueMatcher,
+    },
     operator::{AppliedVariants, SerdeOperator},
     processor::{ProcessorMode, ScalarFormat, SerdeProcessor},
 };
@@ -172,24 +178,48 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
             (SerdeOperator::DynamicSequence, _) => {
                 Err(Error::custom("Cannot deserialize dynamic sequence"))
             }
-            (SerdeOperator::RelationSequence(seq_op), _) => match (self.mode, seq_op.to_entity) {
+            (SerdeOperator::RelationList(seq_op), _) => match (self.mode, seq_op.to_entity) {
                 (ProcessorMode::GraphqlUpdate, true)
                     if !self.level.is_global_root() && self.level.is_local_root() =>
                 {
                     deserializer.deserialize_map(GraphqlPatchVisitor {
                         entity_sequence_processor: self,
-                        inner_addr: seq_op.ranges[0].addr,
+                        inner_addr: seq_op.range.addr,
                         type_def_id: seq_op.def.def_id,
                         ctx: self.ctx,
                     })
                 }
                 _ => deserializer.deserialize_seq(
-                    SequenceMatcher::new(&seq_op.ranges, seq_op.def.def_id, self.ctx)
-                        .into_visitor(self),
+                    SequenceRangesMatcher::new(
+                        slice::from_ref(&seq_op.range),
+                        seq_op.def.def_id,
+                        self.ctx,
+                    )
+                    .into_visitor(self),
+                ),
+            },
+            (SerdeOperator::RelationIndexSet(seq_op), _) => match (self.mode, seq_op.to_entity) {
+                (ProcessorMode::GraphqlUpdate, true)
+                    if !self.level.is_global_root() && self.level.is_local_root() =>
+                {
+                    deserializer.deserialize_map(GraphqlPatchVisitor {
+                        entity_sequence_processor: self,
+                        inner_addr: seq_op.range.addr,
+                        type_def_id: seq_op.def.def_id,
+                        ctx: self.ctx,
+                    })
+                }
+                _ => deserializer.deserialize_seq(
+                    SequenceRangesMatcher::new(
+                        slice::from_ref(&seq_op.range),
+                        seq_op.def.def_id,
+                        self.ctx,
+                    )
+                    .into_visitor(self),
                 ),
             },
             (SerdeOperator::ConstructorSequence(seq_op), _) => deserializer.deserialize_seq(
-                SequenceMatcher::new(&seq_op.ranges, seq_op.def.def_id, self.ctx)
+                SequenceRangesMatcher::new(&seq_op.ranges, seq_op.def.def_id, self.ctx)
                     .into_visitor(self),
             ),
             (SerdeOperator::Alias(value_op), _) => {

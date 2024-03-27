@@ -677,7 +677,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
             let value_operator_addr = self
                 .serde_gen
-                .gen_addr_lazy(gql_array_serde_key(value_def_id))
+                .gen_addr_lazy(gql_list_serde_key(value_def_id))
                 .unwrap();
 
             trace!("Array value operator addr: {value_operator_addr:?}");
@@ -726,7 +726,8 @@ pub(super) fn get_native_scalar_kind(
         op @ (SerdeOperator::Union(_)
         | SerdeOperator::Struct(_)
         | SerdeOperator::DynamicSequence
-        | SerdeOperator::RelationSequence(_)
+        | SerdeOperator::RelationList(_)
+        | SerdeOperator::RelationIndexSet(_)
         | SerdeOperator::ConstructorSequence(_)) => panic!("not a native scalar: {:?}", NoFmt(op)),
     }
 }

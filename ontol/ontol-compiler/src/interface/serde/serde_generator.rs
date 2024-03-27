@@ -194,11 +194,19 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 }))
                 .expect("no property operator"),
             ),
-            ValueCardinality::IndexSet | ValueCardinality::List => (
+            ValueCardinality::IndexSet => (
                 cardinality.0,
                 self.gen_addr_lazy(SerdeKey::Def(SerdeDef {
                     def_id: type_def_id,
-                    modifier: default_modifier | SerdeModifier::ARRAY,
+                    modifier: default_modifier | SerdeModifier::INDEX_SET,
+                }))
+                .expect("no property operator"),
+            ),
+            ValueCardinality::List => (
+                cardinality.0,
+                self.gen_addr_lazy(SerdeKey::Def(SerdeDef {
+                    def_id: type_def_id,
+                    modifier: default_modifier | SerdeModifier::LIST,
                 }))
                 .expect("no property operator"),
             ),
@@ -289,31 +297,51 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     ))
                 }
             }
-            SerdeKey::Def(def) if def.modifier.contains(SerdeModifier::ARRAY) => {
-                let element_addr =
-                    self.gen_addr_lazy(SerdeKey::Def(def.remove_modifier(SerdeModifier::ARRAY)))?;
-
-                // FIXME: What about unions?
-                let to_entity = self
-                    .relations
-                    .properties_by_def_id(def.def_id)
-                    .map(|properties| properties.identified_by.is_some())
-                    .unwrap_or(false);
-
+            SerdeKey::Def(def) if def.modifier.contains(SerdeModifier::INDEX_SET) => {
+                let (addr, seq_op) = self.alloc_sequence_operator(key, def)?;
                 Some(OperatorAllocation::Allocated(
-                    self.alloc_addr_for_key(&key),
-                    SerdeOperator::RelationSequence(RelationSequenceOperator {
-                        ranges: [SequenceRange {
-                            addr: element_addr,
-                            finite_repetition: None,
-                        }],
-                        def,
-                        to_entity,
-                    }),
+                    addr,
+                    SerdeOperator::RelationIndexSet(seq_op),
+                ))
+            }
+            SerdeKey::Def(def) if def.modifier.contains(SerdeModifier::LIST) => {
+                let (addr, seq_op) = self.alloc_sequence_operator(key, def)?;
+                Some(OperatorAllocation::Allocated(
+                    addr,
+                    SerdeOperator::RelationList(seq_op),
                 ))
             }
             SerdeKey::Def(def) => self.alloc_def_type_operator(def),
         }
+    }
+
+    fn alloc_sequence_operator(
+        &mut self,
+        key: SerdeKey,
+        def: SerdeDef,
+    ) -> Option<(SerdeOperatorAddr, RelationSequenceOperator)> {
+        let element_addr = self.gen_addr_lazy(SerdeKey::Def(
+            def.remove_modifier(SerdeModifier::LIST | SerdeModifier::INDEX_SET),
+        ))?;
+
+        // FIXME: What about unions?
+        let to_entity = self
+            .relations
+            .properties_by_def_id(def.def_id)
+            .map(|properties| properties.identified_by.is_some())
+            .unwrap_or(false);
+
+        Some((
+            self.alloc_addr_for_key(&key),
+            RelationSequenceOperator {
+                range: SequenceRange {
+                    addr: element_addr,
+                    finite_repetition: None,
+                },
+                def,
+                to_entity,
+            },
+        ))
     }
 
     fn alloc_def_type_operator(&mut self, def: SerdeDef) -> Option<OperatorAllocation> {
@@ -422,7 +450,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 todo!("not sure if this should be handled here")
             }
             Type::Seq(..) => {
-                panic!("Array not handled here")
+                panic!("Sequence not handled here")
             }
             Type::Option(_) => {
                 panic!("Option not handled here")
@@ -958,7 +986,7 @@ pub(super) fn operator_to_leaf_discriminant(operator: &SerdeOperator) -> LeafDis
             LeafDiscriminant::MatchesCapturingTextPattern(*def_id)
         }
         SerdeOperator::I64(..) | SerdeOperator::I32(..) => LeafDiscriminant::IsInt,
-        SerdeOperator::DynamicSequence | SerdeOperator::RelationSequence(_) => {
+        SerdeOperator::DynamicSequence | SerdeOperator::RelationList(_) => {
             LeafDiscriminant::IsSequence
         }
         other => {

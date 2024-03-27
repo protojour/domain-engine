@@ -309,7 +309,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             let mut serde_modifier = SerdeModifier::graphql_default();
 
             if map_key.input.flags.contains(MapDefFlags::SEQUENCE) {
-                serde_modifier.insert(SerdeModifier::ARRAY);
+                serde_modifier.insert(SerdeModifier::LIST);
             }
 
             SerdeKey::Def(SerdeDef::new(map_key.input.def_id, serde_modifier))
@@ -435,7 +435,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
         let entity_array_operator_addr = self
             .serde_gen
-            .gen_addr_lazy(gql_array_serde_key(entity_data.node_def_id))
+            .gen_addr_lazy(gql_list_serde_key(entity_data.node_def_id))
             .unwrap();
 
         let [data_resolve_path, create_resolve_path, update_resolve_path] = [
@@ -491,7 +491,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                             def_id: entity_data.id_def_id,
                             operator_addr: self
                                 .serde_gen
-                                .gen_addr_lazy(gql_array_serde_key(entity_data.id_def_id))
+                                .gen_addr_lazy(gql_list_serde_key(entity_data.id_def_id))
                                 .unwrap(),
                         },
                     ),
@@ -539,9 +539,9 @@ pub(super) fn gql_serde_key(def_id: DefId) -> SerdeKey {
     SerdeKey::Def(SerdeDef::new(def_id, SerdeModifier::graphql_default()))
 }
 
-pub(super) fn gql_array_serde_key(def_id: DefId) -> SerdeKey {
+pub(super) fn gql_list_serde_key(def_id: DefId) -> SerdeKey {
     SerdeKey::Def(SerdeDef::new(
         def_id,
-        SerdeModifier::graphql_default() | SerdeModifier::ARRAY,
+        SerdeModifier::graphql_default() | SerdeModifier::LIST,
     ))
 }

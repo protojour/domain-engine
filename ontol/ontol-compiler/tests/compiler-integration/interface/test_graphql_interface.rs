@@ -113,7 +113,7 @@ fn test_graphql_scalar_array() {
         assert_matches!(native.kind, NativeScalarKind::String);
 
         let operator = &test.test.ontology()[native.operator_addr];
-        if !matches!(operator, SerdeOperator::RelationSequence(_)) {
+        if !matches!(operator, SerdeOperator::RelationList(_)) {
             panic!("{:?} was not RelationSequence", NoFmt(operator));
         }
     });

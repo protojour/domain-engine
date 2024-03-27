@@ -415,8 +415,11 @@ impl<'on, 'p> Display for SerdeProcessor<'on, 'p> {
             SerdeOperator::DynamicSequence => {
                 write!(f, "[?..]")
             }
-            SerdeOperator::RelationSequence(seq_op) => {
-                write!(f, "[{}..]", self.narrow(seq_op.ranges[0].addr))
+            SerdeOperator::RelationList(seq_op) => {
+                write!(f, "[{}..]", self.narrow(seq_op.range.addr))
+            }
+            SerdeOperator::RelationIndexSet(seq_op) => {
+                write!(f, "{{{}..}}", self.narrow(seq_op.range.addr))
             }
             SerdeOperator::ConstructorSequence(seq_op) => {
                 let mut processors = vec![];

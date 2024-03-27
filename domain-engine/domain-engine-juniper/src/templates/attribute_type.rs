@@ -398,11 +398,11 @@ impl<'v> AttributeType<'v> {
                 type_ref.modifier,
                 &schema_ctx.ontology[scalar_ref.operator_addr],
             ) {
-                (TypeModifier::Array { .. }, SerdeOperator::RelationSequence(operator)) => {
+                (TypeModifier::Array { .. }, SerdeOperator::RelationList(operator)) => {
                     let attributes = attribute.val.cast_ref::<Vec<_>>();
                     let processor = schema_ctx
                         .ontology
-                        .new_serde_processor(operator.ranges[0].addr, ProcessorMode::Read);
+                        .new_serde_processor(operator.range.addr, ProcessorMode::Read);
 
                     let graphql_values: Vec<juniper::Value<GqlScalar>> = attributes
                         .iter()

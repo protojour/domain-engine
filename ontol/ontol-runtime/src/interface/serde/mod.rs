@@ -4,16 +4,16 @@ use ::serde::{Deserialize, Serialize};
 
 use crate::{impl_ontol_debug, DefId};
 
-use self::operator::{SerdeOperatorAddr, StructOperator};
+use self::operator::StructOperator;
 
 mod deserialize;
 mod deserialize_id;
-mod deserialize_matcher;
 mod deserialize_option;
 mod deserialize_patch;
 mod deserialize_property;
 mod deserialize_raw;
 mod deserialize_struct;
+mod matcher;
 mod serialize;
 mod serialize_raw;
 mod utils;
@@ -64,18 +64,20 @@ bitflags::bitflags! {
     pub struct SerdeModifier: u32 {
         /// No modifiers
         const NONE           = 0b00000000;
-        /// Make an array of the DefId
-        const ARRAY          = 0b00000001;
+        /// Make an index set of the DefId
+        const INDEX_SET      = 0b00000001;
+        /// Make a list of the DefId
+        const LIST           = 0b00000010;
         /// Include Repr union of DefId
-        const UNION          = 0b00000010;
+        const UNION          = 0b00000100;
         /// Include Repr intersection of DefId
-        const INTERSECTION   = 0b00000100;
+        const INTERSECTION   = 0b00001000;
         /// Include the primary ID of the entity
-        const PRIMARY_ID     = 0b00001000;
+        const PRIMARY_ID     = 0b00010000;
         /// Include inherent properties
-        const INHERENT_PROPS = 0b00010000;
+        const INHERENT_PROPS = 0b00100000;
         /// Apply GraphQL field renaming
-        const GRAPHQL        = 0b00100000;
+        const GRAPHQL        = 0b01000000;
     }
 }
 
