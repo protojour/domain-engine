@@ -845,7 +845,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
     ) -> Res<CompoundPatternAttr> {
         let ast::StructPatternAttr {
             relation,
-            relation_args: relation_attrs,
+            relation_args,
             option,
             object: (object, object_span),
         } = ast_struct_attr;
@@ -887,7 +887,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         match object {
             object @ (ast::AnyPattern::Expr(_) | ast::AnyPattern::Struct(_)) => {
                 let object_pattern = self.lower_any_pattern((object, object_span), var_table)?;
-                let rel = lower_relation_attrs(self, relation_attrs, &object_pattern, var_table)?;
+                let rel = lower_relation_attrs(self, relation_args, &object_pattern, var_table)?;
 
                 Ok(CompoundPatternAttr {
                     key: (def, self.src.span(&relation.1)),
@@ -898,40 +898,52 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     },
                 })
             }
-            ast::AnyPattern::Set((mut ast, set_span)) => match ast.modifier.take() {
-                Some((modifier, _mod_span)) => {
-                    if relation_attrs.is_some() {
-                        return Err((
-                            CompileError::TODO(smart_format!("set algebra not supported here")),
-                            span.clone(),
-                        ));
+            ast::AnyPattern::Set((mut ast, set_span)) => {
+                if relation_args.is_some() {
+                    return Err((
+                        CompileError::TODO(smart_format!(
+                            "relation arguments must be associated with each element"
+                        )),
+                        span.clone(),
+                    ));
+                }
+
+                match ast.modifier.take() {
+                    Some((modifier, _mod_span)) => {
+                        if relation_args.is_some() {
+                            return Err((
+                                CompileError::TODO(smart_format!("set algebra not supported here")),
+                                span.clone(),
+                            ));
+                        }
+
+                        let kind =
+                            self.lower_set_algebra_pattern(ast, modifier, span, var_table)?;
+                        Ok(CompoundPatternAttr {
+                            key: (def, self.src.span(&relation.1)),
+                            bind_option: option.is_some(),
+                            kind,
+                        })
                     }
+                    None => {
+                        let object_pattern = self.lower_any_pattern(
+                            (ast::AnyPattern::Set((ast, set_span)), span.clone()),
+                            var_table,
+                        )?;
+                        let rel =
+                            lower_relation_attrs(self, relation_args, &object_pattern, var_table)?;
 
-                    let kind = self.lower_set_algebra_pattern(ast, modifier, span, var_table)?;
-                    Ok(CompoundPatternAttr {
-                        key: (def, self.src.span(&relation.1)),
-                        bind_option: option.is_some(),
-                        kind,
-                    })
+                        Ok(CompoundPatternAttr {
+                            key: (def, self.src.span(&relation.1)),
+                            bind_option: option.is_some(),
+                            kind: CompoundPatternAttrKind::Value {
+                                rel,
+                                val: object_pattern,
+                            },
+                        })
+                    }
                 }
-                None => {
-                    let object_pattern = self.lower_any_pattern(
-                        (ast::AnyPattern::Set((ast, set_span)), span.clone()),
-                        var_table,
-                    )?;
-                    let rel =
-                        lower_relation_attrs(self, relation_attrs, &object_pattern, var_table)?;
-
-                    Ok(CompoundPatternAttr {
-                        key: (def, self.src.span(&relation.1)),
-                        bind_option: option.is_some(),
-                        kind: CompoundPatternAttrKind::Value {
-                            rel,
-                            val: object_pattern,
-                        },
-                    })
-                }
-            },
+            }
         }
     }
 
@@ -955,12 +967,33 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
         let mut pattern_elements = Vec::with_capacity(ast_elements.len());
         for (ast_element, _element_span) in ast_elements {
+            let rel = if let Some((rel_attrs, rel_span)) = ast_element.relation_attrs {
+                let mut lowered_attrs = Vec::with_capacity(rel_attrs.len());
+                for attr in rel_attrs {
+                    lowered_attrs.push(self.lower_compound_pattern_attr(attr, var_table)?);
+                }
+
+                Some(Pattern {
+                    id: self.compiler.patterns.alloc_pat_id(),
+                    kind: PatternKind::Compound {
+                        type_path: TypePath::RelContextual,
+                        modifier: None,
+                        is_unit_binding: false,
+                        attributes: lowered_attrs.into(),
+                        spread_label: None,
+                    },
+                    span: self.src.span(&rel_span),
+                })
+            } else {
+                None
+            };
+
             let pattern =
                 self.lower_any_pattern((ast_element.pattern.0, ast_element.pattern.1), var_table)?;
             pattern_elements.push(SetPatternElement {
                 id: self.compiler.patterns.alloc_pat_id(),
                 is_iter: ast_element.spread.is_some(),
-                rel: None,
+                rel,
                 val: pattern,
             })
         }
