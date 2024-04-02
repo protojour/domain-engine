@@ -49,7 +49,8 @@ git = "https://github.com/protojour/juniper"
 branch = "protojour-mods"
 
 [dev-dependencies]
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.5", default-features = false }
+
 ontol-test-utils.path = "../ontol/ontol-test-utils"
 
 
