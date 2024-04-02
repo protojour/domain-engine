@@ -474,7 +474,6 @@ fn test_prop_union() {
 }
 
 #[test]
-// BUG: this mirrors how enums are constucted for text, should work
 fn union_integers() {
     "
     def level (

@@ -73,7 +73,6 @@ fn test_map_regex_alternation1() {
     });
 }
 
-// BUG: Unreachable code in flat_unifier when removing `match`. Should show proper error.
 #[test]
 fn test_map_regex_loop_pattern() {
     r#"
