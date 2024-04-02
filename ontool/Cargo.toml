@@ -39,3 +39,12 @@ reqwest = "0.12.0"
 [dependencies.juniper_axum]
 git = "https://github.com/protojour/juniper"
 branch = "protojour-mods"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+ontol-test-utils.path = "../ontol/ontol-test-utils"
+
+
+[[bench]]
+name = "criterion_benches"
+harness = false
