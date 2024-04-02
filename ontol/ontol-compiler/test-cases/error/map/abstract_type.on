@@ -1,0 +1,7 @@
+def meters (rel .is: number)
+def millimeters (rel .is: number)
+
+map(
+    meters(m), // ERROR cannot map an abstract type
+    millimeters(m * 1000), // ERROR cannot map an abstract type
+)
