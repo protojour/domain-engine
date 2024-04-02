@@ -349,12 +349,15 @@ fn parenthesized_struct_pattern(
 fn struct_pattern_param(
     any_pattern: impl AstParser<AnyPattern> + Clone + 'static,
 ) -> impl AstParser<StructPatternParameter> {
-    let attributes =
-        spanned(struct_pattern_attribute_kind(any_pattern.clone()).or(struct_pattern_spread()))
-            .separated_by(sigil(','))
-            .allow_trailing()
-            .at_least(1)
-            .map(StructPatternParameter::Attributes);
+    let attributes = spanned(
+        struct_pattern_attr(any_pattern.clone())
+            .map(StructPatternAttributeKind::Attr)
+            .or(struct_pattern_spread()),
+    )
+    .separated_by(sigil(','))
+    .allow_trailing()
+    .at_least(1)
+    .map(StructPatternParameter::Attributes);
     let pattern = any_pattern.map(|pat| StructPatternParameter::Pattern(Box::new(pat)));
     let nothing = close(')')
         .rewind()
@@ -363,15 +366,15 @@ fn struct_pattern_param(
     attributes.or(pattern).or(nothing)
 }
 
-fn struct_pattern_attribute_kind(
+fn struct_pattern_attr(
     any_pattern: impl AstParser<AnyPattern> + Clone + 'static,
-) -> impl AstParser<StructPatternAttributeKind> {
+) -> impl AstParser<StructPatternAttr> {
     recursive(|struct_pattern_attr| {
         spanned(named_type())
             .then(
                 spanned(
-                    spanned(struct_pattern_attr)
-                        .repeated()
+                    spanned(struct_pattern_attr.map(StructPatternAttributeKind::Attr))
+                        .separated_by(sigil(','))
                         .delimited_by(open('['), close(']')),
                 )
                 .or_not(),
@@ -380,12 +383,12 @@ fn struct_pattern_attribute_kind(
             .then_ignore(colon())
             .then(spanned(any_pattern))
             .map_with_span(|(((relation, relation_args), option), object), _span| {
-                StructPatternAttributeKind::Attr(StructPatternAttr {
+                StructPatternAttr {
                     relation,
                     relation_args,
                     option: option.map(|(_, span)| ((), span)),
                     object,
-                })
+                }
             })
     })
 }
@@ -408,14 +411,24 @@ fn set_pattern(
             .or(modifier(Modifier::Equals).to(SetPatternModifier::Equals)),
     );
 
-    let elements = spanned(spanned(dot_dot()).or_not().then(spanned(any_pattern)).map(
-        |(spread, pattern)| SetPatternElement {
-            spread: spread.map(|(_, span)| span),
-            // TODO: Support parsing relation attributes
-            relation_attrs: None,
-            pattern,
-        },
-    ))
+    let elements = spanned(
+        spanned(dot_dot())
+            .or_not()
+            .then(
+                spanned(
+                    spanned(struct_pattern_attr(any_pattern.clone()))
+                        .separated_by(sigil(','))
+                        .delimited_by(open('['), close(']')),
+                )
+                .or_not(),
+            )
+            .then(spanned(any_pattern))
+            .map(|((spread, relation_attrs), pattern)| SetPatternElement {
+                spread: spread.map(|(_, span)| span),
+                relation_attrs,
+                pattern,
+            }),
+    )
     .separated_by(sigil(','))
     .allow_trailing();
 

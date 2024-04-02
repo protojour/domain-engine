@@ -213,6 +213,72 @@ fn test_map_relation_sequence_default_fallback() {
     });
 }
 
+#[test]
+fn test_map_generate_edge() {
+    TestPackages::with_static_sources([
+        (
+            src_name("outer"),
+            "
+            use 'inner' as inner
+
+            def foo (
+                rel .'id'|id: (rel .is: text)
+                rel .'bars'[rel .'field': text]: {bar}
+            )
+            def bar (rel .'id'|id: (rel .is: text))
+
+            map(
+                inner.foo(
+                    'id': foo_id,
+                    'bars': {
+                        ..inner.bar(
+                            'id': bar_id,
+                            'field': field
+                        )
+                    }
+                ),
+                foo(
+                    'id': foo_id,
+                    'bars': {
+                        ..['field': field] bar('id': bar_id)
+                    }
+                )
+            )
+            ",
+        ),
+        (
+            src_name("inner"),
+            "
+            def foo (
+                rel .'id'|id: (rel .is: text)
+                rel .'bars': {bar}
+            )
+
+            def bar (
+                rel .'id'|id: (rel .is: text)
+                rel .'field': text
+            )
+            ",
+        ),
+    ])
+    .compile_then(|test| {
+        test.mapper().assert_map_eq(
+            ("inner.foo", "foo"),
+            json!({
+                "id": "1",
+                "bars": [{ "id": "2", "field": "F" }]
+            }),
+            json!({
+                "id": "1",
+                "bars": [{
+                    "id": "2",
+                    "_edge": { "field": "F" }
+                }]
+            }),
+        );
+    });
+}
+
 const WORK: &str = "
 def worker_id (fmt '' => 'worker/' => uuid => .)
 def tech_id (fmt '' => 'tech/' => uuid => .)

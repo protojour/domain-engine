@@ -392,18 +392,19 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         match kind {
             CompoundPatternAttrKind::Value { rel, val } => {
                 let value_ty = self.check_def(match_attribute.value_def);
-                let rel_node = self.build_rel_node_from_option(
-                    rel_params_ty,
-                    rel.as_ref(),
-                    val,
-                    prop_span,
-                    actual_struct_flags,
-                    ctx,
-                );
                 debug!("value_ty: {value_ty:?}");
 
                 let prop_variant = match match_attribute.cardinality.1 {
                     ValueCardinality::Unit => {
+                        let rel_node = self.build_rel_node_from_option(
+                            rel_params_ty,
+                            rel.as_ref(),
+                            val,
+                            prop_span,
+                            actual_struct_flags,
+                            ctx,
+                        );
+
                         let val_node = self.build_node(
                             val,
                             NodeInfo {
@@ -417,76 +418,97 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             val: val_node,
                         })
                     }
-                    ValueCardinality::IndexSet | ValueCardinality::List => match &val.kind {
-                        PatternKind::Set { elements, .. } => {
-                            let mut hir_set_elements = smallvec![];
-                            let seq_ty = self.types.intern(Type::Seq(rel_params_ty, value_ty));
+                    ValueCardinality::IndexSet | ValueCardinality::List => {
+                        match &val.kind {
+                            PatternKind::Set { elements, .. } => {
+                                let mut hir_set_elements = smallvec![];
+                                let seq_ty = self.types.intern(Type::Seq(rel_params_ty, value_ty));
 
-                            for element in elements.iter() {
-                                let val_node = self.build_node(
-                                    &element.val,
-                                    NodeInfo {
-                                        expected_ty: Some((value_ty, Strength::Strong)),
-                                        parent_struct_flags: actual_struct_flags,
-                                    },
+                                for element in elements.iter() {
+                                    let val_node = self.build_node(
+                                        &element.val,
+                                        NodeInfo {
+                                            expected_ty: Some((value_ty, Strength::Strong)),
+                                            parent_struct_flags: actual_struct_flags,
+                                        },
+                                        ctx,
+                                    );
+                                    let rel_node = self.build_rel_node_from_option(
+                                        rel_params_ty,
+                                        element.rel.as_ref(),
+                                        &element.val,
+                                        prop_span,
+                                        actual_struct_flags,
+                                        ctx,
+                                    );
+                                    hir_set_elements.push(ontol_hir::SetEntry(
+                                        if element.is_iter {
+                                            let Some(label) = ctx.label_map.get(&element.id) else {
+                                                self.error(
+                                                    CompileError::TODO(smart_format!(
+                                                        "unable to loop"
+                                                    )),
+                                                    &prop_span,
+                                                );
+                                                return None;
+                                            };
+                                            Some(TypedHirData(*label, Meta::new(seq_ty, prop_span)))
+                                        } else {
+                                            None
+                                        },
+                                        Attribute {
+                                            rel: rel_node,
+                                            val: val_node,
+                                        },
+                                    ));
+                                }
+
+                                if matches!(match_attribute.property_id.role, Role::Object) {
+                                    flags.insert(PropFlags::REL_OPTIONAL);
+                                }
+
+                                ontol_hir::PropVariant::Value(Attribute {
+                                    rel: ctx.mk_node(ontol_hir::Kind::Unit, Meta::unit(NO_SPAN)),
+                                    val: ctx.mk_node(
+                                        ontol_hir::Kind::Set(hir_set_elements),
+                                        Meta::new(seq_ty, prop_span),
+                                    ),
+                                })
+                            }
+                            _ => {
+                                let rel_node = self.build_rel_node_from_option(
+                                    rel_params_ty,
+                                    rel.as_ref(),
+                                    val,
+                                    prop_span,
+                                    actual_struct_flags,
                                     ctx,
                                 );
-                                hir_set_elements.push(ontol_hir::SetEntry(
-                                    if element.is_iter {
-                                        let Some(label) = ctx.label_map.get(&element.id) else {
-                                            self.error(
-                                                CompileError::TODO(smart_format!("unable to loop")),
-                                                &prop_span,
-                                            );
-                                            return None;
-                                        };
-                                        Some(TypedHirData(*label, Meta::new(seq_ty, prop_span)))
-                                    } else {
-                                        None
-                                    },
-                                    Attribute {
+
+                                if actual_struct_flags.contains(StructFlags::MATCH) {
+                                    // It's allowed to disregard the cardinality if a Match.
+                                    let val_node = self.build_node(
+                                        val,
+                                        NodeInfo {
+                                            expected_ty: Some((value_ty, Strength::Strong)),
+                                            parent_struct_flags: actual_struct_flags,
+                                        },
+                                        ctx,
+                                    );
+                                    ontol_hir::PropVariant::Value(Attribute {
                                         rel: rel_node,
                                         val: val_node,
-                                    },
-                                ));
-                            }
-
-                            if matches!(match_attribute.property_id.role, Role::Object) {
-                                flags.insert(PropFlags::REL_OPTIONAL);
-                            }
-
-                            ontol_hir::PropVariant::Value(Attribute {
-                                rel: ctx.mk_node(ontol_hir::Kind::Unit, Meta::unit(NO_SPAN)),
-                                val: ctx.mk_node(
-                                    ontol_hir::Kind::Set(hir_set_elements),
-                                    Meta::new(seq_ty, prop_span),
-                                ),
-                            })
-                        }
-                        _ => {
-                            if actual_struct_flags.contains(StructFlags::MATCH) {
-                                // It's allowed to disregard the cardinality if a Match.
-                                let val_node = self.build_node(
-                                    val,
-                                    NodeInfo {
-                                        expected_ty: Some((value_ty, Strength::Strong)),
-                                        parent_struct_flags: actual_struct_flags,
-                                    },
-                                    ctx,
-                                );
-                                ontol_hir::PropVariant::Value(Attribute {
-                                    rel: rel_node,
-                                    val: val_node,
-                                })
-                            } else {
-                                self.type_error(
-                                    TypeError::VariableMustBeSequenceEnclosed(value_ty),
-                                    &val.span,
-                                );
-                                return None;
+                                    })
+                                } else {
+                                    self.type_error(
+                                        TypeError::VariableMustBeSequenceEnclosed(value_ty),
+                                        &val.span,
+                                    );
+                                    return None;
+                                }
                             }
                         }
-                    },
+                    }
                 };
 
                 if matches!(match_attribute.cardinality.0, PropertyCardinality::Optional) {

@@ -7,42 +7,16 @@ src = "src"
 
 [preprocessor.ontol-documentation]
 command = "cargo run -p ontol-documentation-preprocessor"
-renderers = ["html", "pdf", "pdf-outline"]
+renderers = ["html"]
 
 [preprocessor.index]
-renderers = ["html", "pdf", "pdf-outline"]
+renderers = ["html"]
 
 [preprocessor.links]
-renderers = ["html", "pdf", "pdf-outline"]
+renderers = ["html"]
 
 [output.html]
 additional-js = [
     "theme/highlight-ontol.js",
     "theme/highlight-graphql.js"
 ]
-
-[output.pdf]
-format = "A4"
-display-header-footer = true
-generate-document-outline = true
-prefer-css-page-size = true
-print-background = true
-scale = 0.75
-
-margin-top = 0.79
-margin-bottom = 0.5925
-margin-left = 0.395
-margin-right = 0.395
-
-header-template = """
-<h3 style="font-size: 10px; width: auto; margin: 0 auto;" class="title">
-</h3>
-"""
-footer-template = """
-<p style="font-size: 10px; width: auto; margin: 0 auto;">
-    Page <span class="pageNumber"></span> of <span class="totalPages"></span>
-</p>
-"""
-
-[output.pdf-outline]
-like-wkhtmltopdf = true

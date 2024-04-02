@@ -2,9 +2,16 @@ default:
     @just --list
 
 docs:
-    cargo install mdbook mdbook-pdf
-    pipx install mdbook-pdf-outline
+    cargo install mdbook
     mdbook build docs
+
+pdf:
+    #!/usr/bin/env bash
+    cargo install mdbook-pdf
+    python -m venv docs/pdf/.venv
+    source docs/pdf/.venv/bin/activate
+    pip install mdbook-pdf-outline
+    mdbook build docs/pdf
 
 ontool:
     cargo install --path ontool --debug --force
