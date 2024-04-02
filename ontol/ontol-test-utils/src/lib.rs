@@ -228,8 +228,6 @@ impl TestPackages {
 
         sources_by_name.push((cur_name, Cow::Owned(cur_source)));
 
-        println!("sources by name: {sources_by_name:?}");
-
         Self::new(sources_by_name)
     }
 

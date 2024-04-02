@@ -70,7 +70,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let hir_meta = Meta { ty, span };
 
-        match self.repr_ctx.get_repr_kind(&type_def_id).unwrap() {
+        let Some(repr_kind) = self.repr_ctx.get_repr_kind(&type_def_id) else {
+            return self.error_node(CompileError::CannotMapAbstract, &span, ctx);
+        };
+
+        match repr_kind {
             ReprKind::Struct | ReprKind::Unit | ReprKind::StructIntersection(_)
                 if is_unit_binding =>
             {
