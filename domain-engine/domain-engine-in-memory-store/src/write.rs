@@ -575,19 +575,21 @@ impl InMemoryStore {
         value_generator: ValueGenerator,
         ctx: &DbContext,
     ) -> DomainResult<Value> {
-        match try_generate_entity_id(
+        let (generated_id, container) = try_generate_entity_id(
             id_operator_addr,
             value_generator,
             &ctx.ontology,
             ctx.system.as_ref(),
-        )? {
-            GeneratedId::Generated(value) => Ok(value),
+        )?;
+
+        Ok(container.wrap(match generated_id {
+            GeneratedId::Generated(value) => value,
             GeneratedId::AutoIncrementSerial(def_id) => {
                 let serial_value = self.serial_counter;
                 self.serial_counter += 1;
-                Ok(Value::Serial(Serial(serial_value), def_id))
+                Value::Serial(Serial(serial_value), def_id)
             }
-        }
+        }))
     }
 }
 
