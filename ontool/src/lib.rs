@@ -54,6 +54,8 @@ use crate::service::Detach;
 mod graphql;
 mod service;
 
+pub use service::System;
+
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// This environment variable is used to control logs.

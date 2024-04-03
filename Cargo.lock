@@ -2332,6 +2332,7 @@ dependencies = [
  "domain-engine-core",
  "domain-engine-in-memory-store",
  "domain-engine-juniper",
+ "domain-engine-test-utils",
  "futures",
  "juniper_axum",
  "notify-debouncer-full",

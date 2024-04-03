@@ -3,6 +3,10 @@
 use std::sync::Arc;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use domain_engine_core::{DomainEngine, Session};
+use domain_engine_in_memory_store::InMemoryDataStoreFactory;
+use domain_engine_juniper::context::ServiceCtx;
+use domain_engine_test_utils::graphql_test_utils::Exec;
 use ontol_compiler::{
     mem::Mem,
     package::{GraphState, PackageGraphBuilder, ParsedPackage},
@@ -10,17 +14,23 @@ use ontol_compiler::{
 };
 use ontol_runtime::{
     interface::serde::operator::SerdeOperatorAddr,
-    ontology::{config::PackageConfig, Ontology},
+    ontology::{
+        config::{DataStoreConfig, PackageConfig},
+        Ontology,
+    },
+    PackageId,
 };
 use ontol_test_utils::TestCompile;
+use ontool::System;
 use serde::de::DeserializeSeed;
+use tokio::runtime::Runtime;
 
 const BENCH_DOMAIN: &str = r#"
 def created (
     rel .'created'[rel .gen: create_time]?: datetime
 )
 def foo_id (
-    fmt '' => 'foos/' => text => .
+    fmt '' => 'foos/' => uuid => .
 )
 def foo (
     rel .'_id'[rel .gen: auto]|id: foo_id
@@ -51,7 +61,9 @@ fn bench_compile() -> Ontology {
                     package_graph_builder.provide_package(ParsedPackage::parse(
                         request,
                         black_box(BENCH_DOMAIN),
-                        PackageConfig::default(),
+                        PackageConfig {
+                            data_store: Some(DataStoreConfig::Default),
+                        },
                         &mut ontol_sources,
                         &mut source_code_registry,
                     ));
@@ -118,7 +130,7 @@ pub fn compile_benchmark(c: &mut Criterion) {
             ontol_runtime::interface::serde::processor::ProcessorMode::Raw,
         );
 
-        let json = r#"{"_id": "foos/foo","name": ""}"#;
+        let json = r#"{"_id": "foos/77a7c1dd-09d9-4bb1-bc3b-949d931cbdd6","name": ""}"#;
 
         let ontol_value = processor
             .deserialize(&mut serde_json::Deserializer::from_str(json))
@@ -134,6 +146,64 @@ pub fn compile_benchmark(c: &mut Criterion) {
                     &mut serde_json::Serializer::new(&mut buf),
                 )
                 .unwrap();
+        });
+    });
+
+    c.bench_function("graphql_create_schema", |b| {
+        let ontology = Arc::new(bench_compile());
+        let (package_id, _) = ontology
+            .domains()
+            .find(|domain| {
+                let name = &ontology[domain.1.unique_name()];
+                name == "bench.on"
+            })
+            .unwrap();
+        b.iter(|| {
+            domain_engine_juniper::create_graphql_schema(
+                black_box(ontology.clone()),
+                black_box(*package_id),
+            )
+            .unwrap()
+        });
+    });
+
+    c.bench_function("graphql_create_entity", |b| {
+        let ontology = Arc::new(bench_compile());
+        let rt = Runtime::new().unwrap();
+
+        let engine = rt.block_on(async {
+            Arc::new(
+                DomainEngine::builder(ontology.clone())
+                    .system(Box::<System>::default())
+                    .build(InMemoryDataStoreFactory, Session::default())
+                    .await
+                    .unwrap(),
+            )
+        });
+        let (package_id, _) = ontology
+            .domains()
+            .find(|domain| {
+                let name = &ontology[domain.1.unique_name()];
+                name == "bench.on"
+            })
+            .unwrap();
+        let schema =
+            domain_engine_juniper::create_graphql_schema(ontology.clone(), *package_id).unwrap();
+        let service_context: ServiceCtx = engine.into();
+        b.iter(|| {
+            rt.block_on(async {
+                r#"mutation {
+                    foo(create: [{name: "heihei"}]) {
+                        node {
+                            _id
+                            name
+                        }
+                    }
+                }"#
+                .exec([], &schema, &service_context)
+                .await
+                .unwrap();
+            });
         });
     });
 }

@@ -21,7 +21,7 @@ pub async fn app(ontology: Ontology, addr: String) -> axum::Router {
     let ontology = Arc::new(ontology);
     let engine = Arc::new(
         DomainEngine::builder(ontology.clone())
-            .system(Box::new(System::new()))
+            .system(Box::<System>::default())
             .build(InMemoryDataStoreFactory, Session::default())
             .await
             .unwrap(),
@@ -59,17 +59,9 @@ impl Default for State {
         }
     }
 }
-
-struct System {
+#[derive(Default)]
+pub struct System {
     state: State,
-}
-
-impl System {
-    fn new() -> Self {
-        Self {
-            state: State::default(),
-        }
-    }
 }
 
 #[async_trait::async_trait]
