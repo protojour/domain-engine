@@ -1,0 +1,46 @@
+def Tag (
+    rel .'id'|id: (rel .is: text)
+)
+
+def Book_id (rel .is: uuid)
+def Book (
+    rel .'id'|id: Book_id
+    rel .'title': text
+)
+
+def Author_id (rel .is: uuid)
+def Author (
+    rel .'id'|id: Author_id
+    rel .'name': text
+    rel .'born': datetime
+    rel .'died'?: datetime
+)
+
+def Edition_id (rel .is: uuid)
+def Edition (
+    rel .'id'|id: Edition_id
+    rel .'published': datetime
+    rel .'isbn': text
+    rel .'pages': i64
+)
+
+def Publisher_id (rel .is: uuid)
+def Publisher (
+    rel .'id'|id: Publisher_id
+    rel .'name': text
+)
+
+def User_id (rel .is: uuid)
+def User (
+    rel .'id'|id: User_id
+    rel .'username': text
+    rel .'email': text
+)
+
+rel Book 'editions'::'edition_of' {Edition}
+rel {Book} 'author'::'authored' {Author}
+rel {Book} 'tags'::'books' {Tag}
+rel {Author} 'tags'::'authors' {Tag}
+rel {Edition} 'publisher'::'published_editions' Publisher
+rel {User} 'favourite_books'::'favourited_by' {Book}
+rel {User} 'followed_authors'::'followed_by' {Author}
