@@ -2,6 +2,7 @@
 
 use std::{
     convert::Infallible,
+    net::SocketAddr,
     sync::{Arc, Mutex},
     task::Poll,
 };
@@ -17,7 +18,7 @@ use reqwest::header::HeaderName;
 use tracing::info;
 
 // app -> router
-pub async fn app(ontology: Ontology, addr: String) -> axum::Router {
+pub async fn app(ontology: Ontology, addr: SocketAddr) -> axum::Router {
     let ontology = Arc::new(ontology);
     let engine = Arc::new(
         DomainEngine::builder(ontology.clone())
@@ -142,11 +143,11 @@ fn domain_router(
     Ok(router)
 }
 
-pub struct Detach<B> {
-    pub router: Arc<Mutex<Option<axum::Router<(), B>>>>,
+pub struct Detach {
+    pub router: Arc<Mutex<Option<axum::Router<()>>>>,
 }
 
-impl<B> Clone for Detach<B> {
+impl Clone for Detach {
     fn clone(&self) -> Self {
         Self {
             router: self.router.clone(),
@@ -154,13 +155,14 @@ impl<B> Clone for Detach<B> {
     }
 }
 
-impl<B> tower_service::Service<axum::http::Request<B>> for Detach<B>
+impl<B> tower_service::Service<axum::http::Request<B>> for Detach
 where
-    B: axum::body::HttpBody + Send + 'static,
+    B: http_body::Body<Data = bytes::Bytes> + Send + 'static,
+    B::Error: Into<axum::BoxError>,
 {
     type Response = axum::response::Response;
     type Error = Infallible;
-    type Future = <axum::Router<(), B> as tower_service::Service<axum::http::Request<B>>>::Future;
+    type Future = <axum::Router<()> as tower_service::Service<axum::http::Request<B>>>::Future;
 
     fn poll_ready(
         &mut self,

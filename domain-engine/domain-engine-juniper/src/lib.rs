@@ -84,7 +84,7 @@ pub fn create_graphql_schema(
         ontology,
     });
 
-    let juniper_schema = Schema::new_with_info(
+    let mut juniper_schema = Schema::new_with_info(
         templates::query_type::QueryType,
         templates::mutation_type::MutationType,
         juniper::EmptySubscription::new(),
@@ -92,6 +92,7 @@ pub fn create_graphql_schema(
         schema_ctx.mutation_schema_type(),
         (),
     );
+    juniper_schema.argument_validation_disabled = true;
 
     if should_debug {
         debug!("Created schema \n{}", juniper_schema.as_sdl());

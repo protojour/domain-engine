@@ -28,14 +28,15 @@ domain-engine-in-memory-store.path = "../domain-engine/domain-engine-in-memory-s
 chrono.workspace = true
 smartstring.workspace = true
 async-trait.workspace = true
-axum = { version = "0.6", features = ["ws"] }
+axum = { version = "0.7", features = ["ws"] }
+http-body = "1"
+bytes = "1"
 anyhow = "1"
-tower-http = { version = "0.4", features = ["trace"] }
+tower-http = { version = "0.5", features = ["trace"] }
 tikv-jemallocator = "0.5"
 tower-service = "0.3.2"
 crossterm = "0.27.0"
-reqwest = { version = "0.11", default-features = false, features = [
-  "rustls",
+reqwest = { version = "0.12", default-features = false, features = [
   "json",
   "brotli",
   "gzip",

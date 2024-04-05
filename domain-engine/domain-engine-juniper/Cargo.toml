@@ -25,7 +25,7 @@ hex = "0.4"
 git = "https://github.com/protojour/juniper"
 branch = "protojour-mods"
 default-features = false
-features = ["schema-language", "protojour-disable-argument-type-check"]
+features = ["schema-language"]
 
 [dev-dependencies]
 ontol-test-utils.path = "../../ontol/ontol-test-utils"

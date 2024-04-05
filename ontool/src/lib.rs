@@ -38,6 +38,7 @@ use std::{
     collections::HashMap,
     fs::{self, read_dir, File},
     io::{stdout, Stdout, Write},
+    net::SocketAddr,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
     time::Duration,
@@ -462,12 +463,11 @@ async fn serve(
         .watch(&root_dir, RecursiveMode::NonRecursive)
         .unwrap();
 
-    let addr = format!("0.0.0.0:{}", port);
+    let addr: SocketAddr = format!("0.0.0.0:{}", port).parse().unwrap();
     let router_cell: Arc<Mutex<Option<axum::Router>>> = Arc::new(Mutex::new(None));
 
     tokio::spawn({
         let app = router_cell.clone();
-        let addr = addr.clone();
         let reload_tx = reload_tx.clone();
         async move {
             let outer_router = axum::Router::new()
@@ -475,9 +475,9 @@ async fn serve(
                 .route("/ws", get(|socket| ws_upgrade_handler(socket, reload_tx)));
 
             info!("Serving on http://{addr}");
-            let _ = axum::Server::bind(&addr.parse().unwrap())
-                .serve(outer_router.into_make_service())
-                .await;
+
+            let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
+            axum::serve(listener, outer_router).await.unwrap();
         }
     });
 
@@ -492,7 +492,7 @@ async fn serve(
     match compile_output {
         Ok(output) => {
             check_datastore_domain_has_entities(&data_store, &output.ontology);
-            let new_app = app(output.ontology, addr.clone()).await;
+            let new_app = app(output.ontology, addr).await;
             let mut lock = router_cell.lock().unwrap();
             *lock = Some(new_app);
             let _ = reload_tx.send(ChannelMessage::Reload);
@@ -522,7 +522,7 @@ async fn serve(
                         match compile_output {
                             Ok(output) => {
                                 check_datastore_domain_has_entities(&data_store, &output.ontology);
-                                let new_app = app(output.ontology, addr.clone()).await;
+                                let new_app = app(output.ontology, addr).await;
                                 let mut lock = router_cell.lock().unwrap();
                                 *lock = Some(new_app);
                                 let _ = reload_tx.send(ChannelMessage::Reload);
