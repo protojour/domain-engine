@@ -33,7 +33,7 @@ use ontol_runtime::{
     },
     PackageId,
 };
-use service::app;
+use service::{domains_router, ontology_router};
 use std::{
     collections::HashMap,
     fs::{self, read_dir, File},
@@ -53,6 +53,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use crate::service::Detach;
 
 mod graphql;
+mod ontology_schema;
 mod service;
 
 pub use service::System;
@@ -464,16 +465,26 @@ async fn serve(
         .unwrap();
 
     let addr: SocketAddr = format!("0.0.0.0:{}", port).parse().unwrap();
-    let router_cell: Arc<Mutex<Option<axum::Router>>> = Arc::new(Mutex::new(None));
+    let domains_router_cell: Arc<Mutex<Option<axum::Router>>> = Arc::new(Mutex::new(None));
+    let ontology_router_cell: Arc<Mutex<Option<axum::Router>>> = Arc::new(Mutex::new(None));
 
     tokio::spawn({
-        let app = router_cell.clone();
         let reload_tx = reload_tx.clone();
+        let outer_router = axum::Router::new()
+            .nest_service(
+                "/d",
+                Detach {
+                    router: domains_router_cell.clone(),
+                },
+            )
+            .nest_service(
+                "/o",
+                Detach {
+                    router: ontology_router_cell.clone(),
+                },
+            )
+            .route("/ws", get(|socket| ws_upgrade_handler(socket, reload_tx)));
         async move {
-            let outer_router = axum::Router::new()
-                .nest_service("/d", Detach { router: app })
-                .route("/ws", get(|socket| ws_upgrade_handler(socket, reload_tx)));
-
             info!("Serving on http://{addr}");
 
             let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
@@ -492,9 +503,11 @@ async fn serve(
     match compile_output {
         Ok(output) => {
             check_datastore_domain_has_entities(&data_store, &output.ontology);
-            let new_app = app(output.ontology, addr).await;
-            let mut lock = router_cell.lock().unwrap();
-            *lock = Some(new_app);
+            let ontology = Arc::new(output.ontology);
+            let new_domains_router = domains_router(ontology.clone(), addr).await;
+            let new_ontology_router = ontology_router(ontology);
+            *(domains_router_cell.lock().unwrap()) = Some(new_domains_router);
+            *(ontology_router_cell.lock().unwrap()) = Some(new_ontology_router);
             let _ = reload_tx.send(ChannelMessage::Reload);
         }
         Err(error) => println!("{:?}", error),
@@ -521,14 +534,18 @@ async fn serve(
                         );
                         match compile_output {
                             Ok(output) => {
-                                check_datastore_domain_has_entities(&data_store, &output.ontology);
-                                let new_app = app(output.ontology, addr).await;
-                                let mut lock = router_cell.lock().unwrap();
-                                *lock = Some(new_app);
+                                let ontology = Arc::new(output.ontology);
+                                check_datastore_domain_has_entities(&data_store, &ontology);
+
+                                let new_domains_router =
+                                    domains_router(ontology.clone(), addr).await;
+                                let new_ontology_router = ontology_router(ontology);
+                                *(domains_router_cell.lock().unwrap()) = Some(new_domains_router);
+                                *(ontology_router_cell.lock().unwrap()) = Some(new_ontology_router);
                                 let _ = reload_tx.send(ChannelMessage::Reload);
                             }
                             Err(error) => {
-                                let mut lock = router_cell.lock().unwrap();
+                                let mut lock = domains_router_cell.lock().unwrap();
                                 *lock = None;
                                 println!("{:?}", error);
                             }

@@ -45,6 +45,13 @@ reqwest = { version = "0.12", default-features = false, features = [
   "rustls-tls",
 ] }
 
+
+[dependencies.juniper]
+git = "https://github.com/protojour/juniper"
+branch = "protojour-mods"
+default-features = false
+features = ["schema-language"]
+
 [dependencies.juniper_axum]
 git = "https://github.com/protojour/juniper"
 branch = "protojour-mods"

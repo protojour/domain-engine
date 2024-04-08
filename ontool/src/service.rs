@@ -7,19 +7,23 @@ use std::{
     task::Poll,
 };
 
-use crate::graphql::{graphiql_handler, graphql_handler, GraphqlService};
+use crate::{
+    graphql::{graphiql_handler, graphql_handler, GraphqlService},
+    ontology_schema::{Context, Query, Schema},
+};
 
-use axum::Extension;
+use ::juniper::{EmptyMutation, EmptySubscription};
+use axum::{routing::post, Extension};
 use domain_engine_core::{DomainEngine, DomainError, DomainResult, Session};
 use domain_engine_in_memory_store::InMemoryDataStoreFactory;
-use domain_engine_juniper::CreateSchemaError;
+use domain_engine_juniper::{juniper, CreateSchemaError};
+use juniper_axum::extract::JuniperRequest;
 use ontol_runtime::{ontology::Ontology, PackageId};
 use reqwest::header::HeaderName;
 use tracing::info;
 
-// app -> router
-pub async fn app(ontology: Ontology, addr: SocketAddr) -> axum::Router {
-    let ontology = Arc::new(ontology);
+/// All the domains routed by domain name
+pub async fn domains_router(ontology: Arc<Ontology>, addr: SocketAddr) -> axum::Router {
     let engine = Arc::new(
         DomainEngine::builder(ontology.clone())
             .system(Box::<System>::default())
@@ -45,8 +49,41 @@ pub async fn app(ontology: Ontology, addr: SocketAddr) -> axum::Router {
 
         info!("Domain {package_id:?} served under http://{addr}/d{domain_path}/graphql");
     }
-
     router.layer(tower_http::trace::TraceLayer::new_for_http())
+    // let schema = ontology_schema::new(&ontology);
+}
+pub fn ontology_router(ontology: Arc<Ontology>) -> axum::Router {
+    let schema = Schema::new(
+        Query,
+        EmptyMutation::<Context>::new(),
+        EmptySubscription::<Context>::new(),
+    );
+
+    pub async fn ontology_schema_graphql_handler(
+        Extension(schema): Extension<Arc<Schema>>,
+        Extension(context): Extension<Context>,
+        JuniperRequest(req): JuniperRequest,
+    ) -> (
+        axum::http::StatusCode,
+        axum::Json<juniper::http::GraphQLBatchResponse>,
+    ) {
+        let response = req.execute(&schema, &context).await;
+
+        (
+            if response.is_ok() {
+                axum::http::StatusCode::OK
+            } else {
+                axum::http::StatusCode::BAD_REQUEST
+            },
+            axum::Json(response),
+        )
+    }
+
+    axum::Router::new()
+        .route("/graphql", post(ontology_schema_graphql_handler))
+        .layer(Extension(Arc::new(schema)))
+        .layer(Extension(Context { ontology }))
+        .layer(tower_http::trace::TraceLayer::new_for_http())
 }
 
 struct State {
