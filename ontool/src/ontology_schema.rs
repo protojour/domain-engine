@@ -1,10 +1,11 @@
-use std::{ops::Deref, sync::Arc};
+use std::{ops::Deref, str::FromStr, sync::Arc};
 
 use domain_engine_juniper::juniper::{
     self, graphql_object, graphql_value, EmptyMutation, EmptySubscription, FieldError, FieldResult,
     RootNode,
 };
 
+use ::juniper::GraphQLEnum;
 use ontol_runtime::{
     ontology::{domain::TypeKind, Ontology},
     DefId, PackageId,
@@ -12,6 +13,11 @@ use ontol_runtime::{
 
 struct Domain {
     id: PackageId,
+}
+
+struct TypeInfo {
+    id: DefId,
+    kind: TypeKindEnum,
 }
 
 struct Entity {
@@ -48,6 +54,25 @@ impl Entity {
     }
 }
 
+#[derive(GraphQLEnum, PartialEq)]
+enum TypeKindEnum {
+    Entity,
+    Data,
+    Relationship,
+    Function,
+    Domain,
+    Generator,
+}
+
+#[graphql_object]
+#[graphql(context = Context)]
+impl TypeInfo {
+    fn entity_info(&self, context: &Context) -> Option<Entity> {
+        let type_info = context.get_type_info(self.id);
+        type_info.entity_info().map(|_| Entity { id: self.id })
+    }
+}
+
 #[graphql_object]
 #[graphql(context = Context)]
 impl Domain {
@@ -66,6 +91,25 @@ impl Domain {
             }
         }
         entities
+    }
+    fn types(&self, context: &Context, kind: Option<TypeKindEnum>) -> Vec<TypeInfo> {
+        let domain = context.find_domain(self.id).unwrap();
+        let infos = domain.type_infos().map(|info| TypeInfo {
+            id: info.def_id,
+            kind: match info.kind {
+                TypeKind::Entity(_) => TypeKindEnum::Entity,
+                TypeKind::Data(_) => TypeKindEnum::Data,
+                TypeKind::Relationship(_) => TypeKindEnum::Relationship,
+                TypeKind::Function(_) => TypeKindEnum::Function,
+                TypeKind::Domain(_) => TypeKindEnum::Domain,
+                TypeKind::Generator(_) => TypeKindEnum::Generator,
+            },
+        });
+        if let Some(kind) = kind {
+            infos.filter(|info| info.kind == kind).collect()
+        } else {
+            infos.collect()
+        }
     }
 }
 
@@ -97,6 +141,28 @@ impl Query {
             domains.push(domain);
         }
         Ok(domains)
+    }
+    fn def(def_id: String, context: &Context) -> FieldResult<TypeInfo> {
+        let ontology = &context.ontology;
+        if let Ok(def_id) = DefId::from_str(&def_id) {
+            if let Some(type_info) = ontology.get_type_info_option(def_id) {
+                return Ok(TypeInfo {
+                    id: type_info.def_id,
+                    kind: match type_info.kind {
+                        TypeKind::Entity(_) => TypeKindEnum::Entity,
+                        TypeKind::Data(_) => TypeKindEnum::Data,
+                        TypeKind::Relationship(_) => TypeKindEnum::Relationship,
+                        TypeKind::Function(_) => TypeKindEnum::Function,
+                        TypeKind::Domain(_) => TypeKindEnum::Domain,
+                        TypeKind::Generator(_) => TypeKindEnum::Generator,
+                    },
+                });
+            }
+        }
+        Err(FieldError::new(
+            "TypeInfo not found",
+            graphql_value!({"internal_error": "TypeInfo not found"}),
+        ))
     }
 }
 
