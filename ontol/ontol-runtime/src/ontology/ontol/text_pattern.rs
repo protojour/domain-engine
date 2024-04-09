@@ -54,14 +54,14 @@ impl TextPattern {
             if let Some(match_) = self.regex.find(haystack) {
                 Ok(Value::Text(haystack[match_.range()].into(), type_def_id))
             } else {
-                Err(ParseError(format!("regular expression did not match")))
+                Err(ParseError("regular expression did not match".to_string()))
             }
         } else {
             let mut captures = self.regex.create_captures();
 
             self.regex.captures(haystack, &mut captures);
             if !captures.is_match() {
-                return Err(ParseError(format!("regular expression did not match")));
+                return Err(ParseError("regular expression did not match".to_string()));
             }
 
             let mut attrs = FnvHashMap::default();
