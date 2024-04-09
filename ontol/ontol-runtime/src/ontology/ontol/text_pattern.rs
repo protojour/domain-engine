@@ -3,14 +3,12 @@ use std::{fmt::Display, ops::Deref};
 use ::serde::{Deserialize, Serialize};
 use fnv::FnvHashMap;
 use serde::de::{value::StrDeserializer, DeserializeSeed};
-use smartstring::alias::String;
 use tracing::{debug, error};
 
 use crate::{
     interface::serde::processor::ProcessorMode,
     ontology::Ontology,
     property::PropertyId,
-    smart_format,
     value::{Attribute, FormatValueAsText, Value},
     DefId, RelationshipId,
 };
@@ -56,18 +54,14 @@ impl TextPattern {
             if let Some(match_) = self.regex.find(haystack) {
                 Ok(Value::Text(haystack[match_.range()].into(), type_def_id))
             } else {
-                Err(ParseError(smart_format!(
-                    "regular expression did not match"
-                )))
+                Err(ParseError(format!("regular expression did not match")))
             }
         } else {
             let mut captures = self.regex.create_captures();
 
             self.regex.captures(haystack, &mut captures);
             if !captures.is_match() {
-                return Err(ParseError(smart_format!(
-                    "regular expression did not match"
-                )));
+                return Err(ParseError(format!("regular expression did not match")));
             }
 
             let mut attrs = FnvHashMap::default();
@@ -111,7 +105,7 @@ impl TextPattern {
                         let attribute = processor
                             .deserialize(StrDeserializer::<serde_json::Error>::new(text))
                             .map_err(|err| {
-                                ParseError(smart_format!(
+                                ParseError(format!(
                                     "capture group {capture_group} failed to parse: {err}"
                                 ))
                             })?;

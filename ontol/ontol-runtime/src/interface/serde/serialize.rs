@@ -2,7 +2,6 @@ use serde::{
     ser::{Error, SerializeMap, SerializeSeq},
     Serializer,
 };
-use smartstring::alias::String;
 use std::{fmt::Write, slice};
 use tracing::{trace, warn};
 

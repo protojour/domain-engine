@@ -1,5 +1,4 @@
 use ::serde::{Deserialize, Serialize};
-use smartstring::alias::String;
 
 use crate::{ontology::Ontology, PackageId};
 
