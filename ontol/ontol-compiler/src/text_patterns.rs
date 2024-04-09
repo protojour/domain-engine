@@ -266,7 +266,7 @@ pub fn store_text_pattern_segment(
 }
 
 fn compile_regex(hir: Hir) -> Regex {
-    let mut pattern = String::new();
+    let mut pattern = std::string::String::new();
     write!(&mut pattern, "{hir}").unwrap();
 
     Regex {

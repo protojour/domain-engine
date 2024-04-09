@@ -4,14 +4,12 @@ use std::fmt::Display;
 use fnv::FnvHashSet;
 use serde::Serialize;
 use serde::{ser::SerializeMap, ser::SerializeSeq, Serializer};
-use smartstring::alias::String;
 use urlencoding::encode;
 
 use crate::interface::serde::operator::{
     SequenceRange, SerdeOperator, SerdeOperatorAddr, StructOperator, UnionOperator,
 };
 use crate::interface::serde::processor::ProcessorMode;
-use crate::smart_format;
 use crate::{
     ontology::{
         domain::{Domain, TypeInfo},
@@ -227,22 +225,22 @@ impl<'e> SchemaCtx<'e> {
             .find_domain(def_id.0)
             .and_then(|domain| domain.type_info(def_id).name())
             .map(|constant| &self.ontology[constant])
-            .map(|type_name| smart_format!("{type_name}{modifier}"))
+            .map(|type_name| format!("{type_name}{modifier}"))
     }
 
     fn format_key(&self, serde_def: SerdeDef) -> String {
         let package_id = serde_def.def_id.0;
         match self.type_name(serde_def) {
-            Some(name) => smart_format!("{}_{}", package_id.0, encode(&name)),
-            None => smart_format!("{}", Key(serde_def)),
+            Some(name) => format!("{}_{}", package_id.0, encode(&name)),
+            None => format!("{}", Key(serde_def)),
         }
     }
 
     fn format_ref_link(&self, serde_def: SerdeDef) -> String {
         let package_id = serde_def.def_id.0;
         match self.type_name(serde_def) {
-            Some(name) => smart_format!("{}{}_{}", self.link_anchor, package_id.0, encode(&name)),
-            None => smart_format!("{}{}", self.link_anchor, Key(serde_def)),
+            Some(name) => format!("{}{}_{}", self.link_anchor, package_id.0, encode(&name)),
+            None => format!("{}{}", self.link_anchor, Key(serde_def)),
         }
     }
 }

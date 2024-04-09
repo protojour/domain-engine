@@ -1,11 +1,10 @@
 use ::serde::{Deserialize, Serialize};
 use documented::DocumentedFields;
-use smartstring::alias::String;
 use strum::AsRefStr;
 use tracing::error;
 use uuid::Uuid;
 
-use crate::{smart_format, value::Value, DefId};
+use crate::{value::Value, DefId};
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize, DocumentedFields, AsRefStr)]
 pub enum TextLikeType {
@@ -38,7 +37,7 @@ impl TextLikeType {
         match self {
             Self::Uuid => {
                 let uuid =
-                    Uuid::parse_str(str).map_err(|error| ParseError(smart_format!("{}", error)))?;
+                    Uuid::parse_str(str).map_err(|error| ParseError(format!("{}", error)))?;
                 Ok(Value::OctetSequence(
                     uuid.as_bytes().iter().cloned().collect(),
                     def_id,
@@ -46,7 +45,7 @@ impl TextLikeType {
             }
             Self::DateTime => {
                 let datetime = chrono::DateTime::parse_from_rfc3339(str)
-                    .map_err(|error| ParseError(smart_format!("{}", error)))?;
+                    .map_err(|error| ParseError(format!("{}", error)))?;
                 Ok(Value::ChronoDateTime(datetime.into(), def_id))
             }
         }
