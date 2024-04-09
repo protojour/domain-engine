@@ -42,6 +42,10 @@ impl Domain {
         &self.info[def_id.1 as usize]
     }
 
+    pub fn type_info_option(&self, def_id: DefId) -> Option<&TypeInfo> {
+        self.info.get(def_id.1 as usize)
+    }
+
     pub fn type_infos(&self) -> impl Iterator<Item = &TypeInfo> {
         self.info.iter()
     }

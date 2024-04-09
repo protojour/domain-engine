@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-use std::fmt::Debug;
+use std::{fmt::Debug, str::FromStr};
 
 use ::serde::{Deserialize, Serialize};
 
@@ -49,6 +49,23 @@ impl DefId {
 impl Debug for DefId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "def@{}:{}", self.0 .0, self.1)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct ParseDefIdError;
+
+impl FromStr for DefId {
+    type Err = ParseDefIdError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (package_id, def_id) = s
+            .strip_prefix("def@")
+            .and_then(|s| s.split_once(':'))
+            .ok_or(ParseDefIdError)?;
+        let package_id = package_id.parse::<u16>().map_err(|_| ParseDefIdError)?;
+        let def_id = def_id.parse::<u16>().map_err(|_| ParseDefIdError)?;
+        Ok(DefId(PackageId(package_id), def_id))
     }
 }
 

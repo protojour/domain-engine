@@ -125,6 +125,13 @@ impl Ontology {
         }
     }
 
+    pub fn get_type_info_option(&self, def_id: DefId) -> Option<&TypeInfo> {
+        match self.find_domain(def_id.0) {
+            Some(domain) => domain.type_info_option(def_id),
+            None => None,
+        }
+    }
+
     pub fn get_docs(&self, def_id: DefId) -> Option<std::string::String> {
         let docs = self.data.docs.get(&def_id)?;
         if docs.is_empty() {
