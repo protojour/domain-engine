@@ -50,7 +50,9 @@ impl Entity {
     }
     fn doc_string(&self, context: &Context) -> Option<String> {
         let entity = context.get_type_info(self.id);
-        context.get_docs(entity.def_id)
+        context
+            .get_docs(entity.def_id)
+            .map(|docs_constant| context[docs_constant].into())
     }
 }
 
