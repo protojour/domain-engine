@@ -14,5 +14,5 @@ def bar (
     rel bar 'nullable': text
 
     // FIXME: Should this work?
-    rel .'nullable': () // ERROR union in named relationship is not supported yet. Make a union instead.
+    rel .'nullable': () // ERROR union in named relationship is not supported yet. Make a union instead
 )

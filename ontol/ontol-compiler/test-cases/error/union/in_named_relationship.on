@@ -1,4 +1,4 @@
 def foo (
     rel .'a': text
-    rel .'a': i64 // ERROR union in named relationship is not supported yet. Make a union instead.
+    rel .'a': i64 // ERROR union in named relationship is not supported yet. Make a union instead
 )

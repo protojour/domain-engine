@@ -6,6 +6,7 @@ use crate::{
     lowering::Lowering,
     package::ParsedPackage,
     repr::repr_model::ReprKind,
+    thesaurus::TypeRelation,
     CompileError, Compiler, LexError, ParseError, Src, UnifiedCompileError,
 };
 
@@ -94,6 +95,24 @@ impl<'m> Compiler<'m> {
         // generate new DefIds
         for def_id in self.defs.iter_package_def_ids(package_id) {
             self.check_entity(def_id);
+        }
+
+        // check that no types use entities as supertypes
+        for (_, is_table) in self.thesaurus.iter() {
+            for (is, span) in is_table {
+                if matches!(&is.rel, TypeRelation::Super) {
+                    let identified_by = self
+                        .relations
+                        .properties_by_def_id
+                        .get(&is.def_id)
+                        .and_then(|properties| properties.identified_by);
+
+                    if identified_by.is_some() {
+                        self.errors
+                            .push(CompileError::EntityCannotBeSupertype.spanned(span));
+                    }
+                }
+            }
         }
 
         {
