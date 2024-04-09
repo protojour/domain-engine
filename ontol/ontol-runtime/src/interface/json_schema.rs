@@ -116,11 +116,14 @@ pub struct StandaloneJsonSchema<'e> {
 
 impl<'e> Serialize for StandaloneJsonSchema<'e> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let docs = self.ontology.get_docs(self.def_id);
+        let docs = self
+            .ontology
+            .get_docs(self.def_id)
+            .map(|constant| &self.ontology[constant]);
         let ctx = SchemaCtx {
             link_anchor: LinkAnchor::Defs,
             ontology: self.ontology,
-            docs: docs.as_deref(),
+            docs,
             rel_params_operator_addr: None,
             mode: self.mode,
         };
@@ -139,10 +142,10 @@ impl<'e> Serialize for StandaloneJsonSchema<'e> {
 }
 
 #[derive(Clone, Copy)]
-struct SchemaCtx<'e> {
+struct SchemaCtx<'on> {
     link_anchor: LinkAnchor,
-    ontology: &'e Ontology,
-    docs: Option<&'e str>,
+    ontology: &'on Ontology,
+    docs: Option<&'on str>,
     rel_params_operator_addr: Option<SerdeOperatorAddr>,
     mode: ProcessorMode,
 }
@@ -644,13 +647,14 @@ impl<'e> Serialize for MapProperties<'e> {
             let docs = self
                 .ctx
                 .ontology
-                .get_docs(property.property_id.relationship_id.0);
+                .get_docs(property.property_id.relationship_id.0)
+                .map(|constant| &self.ctx.ontology[constant]);
             map.serialize_entry(
                 key.arc_str().as_str(),
                 &self
                     .ctx
                     .with_rel_params(property.rel_params_addr)
-                    .with_docs(docs.as_deref())
+                    .with_docs(docs)
                     .reference(property.value_addr),
             )?;
         }

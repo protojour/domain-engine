@@ -52,7 +52,11 @@ fn get_ontol_docs_md(ontology: &Ontology, predicate: &dyn Fn(&TypeInfo) -> bool)
         let doc = ontology.get_docs(t.def_id);
         if let Some(name) = t.name() {
             let name = &ontology[name];
-            docs.push((name.into(), doc.unwrap_or_default()));
+            docs.push((
+                name.into(),
+                doc.map(|docs_constant| ontology[docs_constant].to_string())
+                    .unwrap_or_default(),
+            ));
         }
     }
     let mut docs_string = String::from("");

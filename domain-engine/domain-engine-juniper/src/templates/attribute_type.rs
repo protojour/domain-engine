@@ -128,14 +128,14 @@ impl<'v> juniper::GraphQLType<GqlScalar> for AttributeType<'v> {
                 let fields = reg.get_fields(info.type_addr);
                 if fields.is_empty() {
                     let mut builder = registry.build_scalar_type::<InputType>(info);
-                    if let Some(description) = info.description() {
-                        builder = builder.description(&description);
+                    if let Some(docs) = info.docs_str() {
+                        builder = builder.description(docs);
                     }
                     builder.into_meta()
                 } else {
                     let mut builder = registry.build_object_type::<Self>(info, &fields);
-                    if let Some(description) = info.description() {
-                        builder = builder.description(&description);
+                    if let Some(docs) = info.docs_str() {
+                        builder = builder.description(docs);
                     }
                     builder.into_meta()
                 }
@@ -154,15 +154,15 @@ impl<'v> juniper::GraphQLType<GqlScalar> for AttributeType<'v> {
                     .collect();
 
                 let mut builder = registry.build_union_type::<Self>(info, &types);
-                if let Some(description) = info.description() {
-                    builder = builder.description(&description);
+                if let Some(docs) = info.docs_str() {
+                    builder = builder.description(docs);
                 }
                 builder.into_meta()
             }
             TypeKind::CustomScalar(_) => {
                 let mut builder = registry.build_scalar_type::<InputType>(info);
-                if let Some(description) = info.description() {
-                    builder = builder.description(&description);
+                if let Some(docs) = info.docs_str() {
+                    builder = builder.description(docs);
                 }
                 builder.into_meta()
             }
