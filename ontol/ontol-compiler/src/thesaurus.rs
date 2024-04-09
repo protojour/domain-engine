@@ -114,6 +114,10 @@ impl Thesaurus {
         }
     }
 
+    pub fn iter(&self) -> impl Iterator<Item = (DefId, &IndexMap<Is, SourceSpan>)> {
+        self.table.iter().map(|(def_id, map)| (*def_id, map))
+    }
+
     pub fn entries(&self, def_id: DefId, defs: &Defs) -> Entries<'_> {
         Entries {
             builtin_entries: match defs.def_kind(def_id) {

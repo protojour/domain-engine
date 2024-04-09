@@ -76,8 +76,8 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 .build_input_object_type::<InputType>(info, arguments)
         };
 
-        if let Some(description) = info.description() {
-            builder = builder.description(&description);
+        if let Some(docs) = info.docs_str() {
+            builder = builder.description(docs);
         }
 
         builder.into_meta()
@@ -97,7 +97,8 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         FieldKind::Property(property) => self
                             .schema_ctx
                             .ontology
-                            .get_docs(property.property_id.relationship_id.0),
+                            .get_docs(property.property_id.relationship_id.0)
+                            .map(|docs_constant| self.schema_ctx.ontology[docs_constant].into()),
                         _ => None,
                     },
                     arguments: self.get_arguments_to_field(&field_data.kind),
@@ -164,12 +165,12 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         typing_purpose,
                     );
 
-                    if let Some(description) = self
+                    if let Some(docs_constant) = self
                         .schema_ctx
                         .ontology
                         .get_docs(property.property_id.relationship_id.0)
                     {
-                        argument = argument.description(&description);
+                        argument = argument.description(&self.schema_ctx.ontology[docs_constant]);
                     }
 
                     output.push(argument);

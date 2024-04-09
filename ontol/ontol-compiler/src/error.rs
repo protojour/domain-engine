@@ -66,6 +66,7 @@ pub enum CompileError {
     MustIdentifyWithinDomain,
     NonDisjointIdsInEntityUnion,
     UnionInNamedRelationshipNotSupported,
+    EntityCannotBeSupertype,
     UnsupportedCardinality,
     InvalidCardinaltyCombinationInUnion,
     InferenceCardinalityMismatch,
@@ -203,8 +204,9 @@ impl std::fmt::Display for CompileError {
             ),
             Self::UnionInNamedRelationshipNotSupported => write!(
                 f,
-                "union in named relationship is not supported yet. Make a union instead."
+                "union in named relationship is not supported yet. Make a union instead"
             ),
+            Self::EntityCannotBeSupertype => write!(f, "entitities cannot be used as supertypes"),
             Self::UnsupportedCardinality => write!(f, "unsupported cardinality"),
             Self::InvalidCardinaltyCombinationInUnion => {
                 write!(f, "invalid cardinality combination in union")

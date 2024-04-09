@@ -44,11 +44,8 @@ impl<'m> Strings<'m> {
         self.detached = false;
     }
 
-    pub fn make_text_constants(self) -> Vec<ArcStr> {
-        self.constants
-            .iter()
-            .map(|str| ArcStr::from(*str))
-            .collect()
+    pub fn into_arcstr_vec(self) -> Vec<ArcStr> {
+        self.constants.into_iter().map(ArcStr::from).collect()
     }
 
     pub fn intern(&mut self, str: &str) -> &'m str {

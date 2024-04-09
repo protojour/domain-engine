@@ -189,7 +189,7 @@ impl<'m> Compiler<'m> {
 
         let mut namespaces = std::mem::take(&mut self.namespaces.namespaces);
         let mut package_config_table = std::mem::take(&mut self.package_config_table);
-        let mut docs = std::mem::take(&mut self.namespaces.docs);
+        let mut docs_table = std::mem::take(&mut self.namespaces.docs);
 
         for def_id in self.defs.iter_package_def_ids(ONTOL_PKG) {
             #[allow(clippy::single_match)]
@@ -197,13 +197,13 @@ impl<'m> Compiler<'m> {
                 DefKind::Primitive(kind, _ident) => {
                     let name = kind.as_ref();
                     if let Ok(field_docs) = PrimitiveKind::get_field_docs(name) {
-                        docs.insert(def_id, vec![field_docs.into()]);
+                        docs_table.insert(def_id, vec![field_docs.into()]);
                     }
                 }
                 DefKind::BuiltinRelType(kind, _ident) => {
                     let name = kind.as_ref();
                     if let Ok(field_docs) = BuiltinRelationKind::get_field_docs(name) {
-                        docs.insert(def_id, vec![field_docs.into()]);
+                        docs_table.insert(def_id, vec![field_docs.into()]);
                     }
                 }
                 DefKind::Type(type_def) => {
@@ -212,7 +212,7 @@ impl<'m> Compiler<'m> {
 
                         // TODO: Structured documentation of `is`-relations.
                         // Then a prose-based documentation string will probably be superfluous?
-                        docs.insert(
+                        docs_table.insert(
                             def_id,
                             vec![
                                 smart_format!("The [symbol](def.md#symbol) `'{ident}'`."),
@@ -225,7 +225,7 @@ impl<'m> Compiler<'m> {
                     } else if let Some(slt) = self.defs.string_like_types.get(&def_id) {
                         let name = slt.as_ref();
                         if let Ok(field_docs) = TextLikeType::get_field_docs(name) {
-                            docs.insert(def_id, vec![field_docs.into()]);
+                            docs_table.insert(def_id, vec![field_docs.into()]);
                         }
                     }
                 }
@@ -423,8 +423,19 @@ impl<'m> Compiler<'m> {
             })
             .collect();
 
+        let docs = docs_table
+            .into_iter()
+            .filter_map(|(def_id, docs_vec)| {
+                if docs_vec.is_empty() {
+                    None
+                } else {
+                    Some((def_id, strings.intern_constant(&docs_vec.join("\n"))))
+                }
+            })
+            .collect();
+
         builder
-            .text_constants(strings.make_text_constants())
+            .text_constants(strings.into_arcstr_vec())
             .ontol_domain_meta(OntolDomainMeta {
                 bool: self.primitives.bool,
                 i64: self.primitives.i64,

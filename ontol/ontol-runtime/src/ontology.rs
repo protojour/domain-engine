@@ -6,7 +6,6 @@ use ::serde::{Deserialize, Serialize};
 use arcstr::ArcStr;
 use bincode::Options;
 use fnv::FnvHashMap;
-use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{
@@ -67,7 +66,7 @@ pub struct Data {
     union_variants: FnvHashMap<DefId, Box<[DefId]>>,
     domain_interfaces: FnvHashMap<PackageId, Vec<DomainInterface>>,
     package_config_table: FnvHashMap<PackageId, PackageConfig>,
-    docs: FnvHashMap<DefId, Vec<String>>,
+    docs: FnvHashMap<DefId, TextConstant>,
     serde_operators: Vec<SerdeOperator>,
     dynamic_sequence_operator_addr: SerdeOperatorAddr,
     value_generators: FnvHashMap<RelationshipId, ValueGenerator>,
@@ -132,13 +131,8 @@ impl Ontology {
         }
     }
 
-    pub fn get_docs(&self, def_id: DefId) -> Option<std::string::String> {
-        let docs = self.data.docs.get(&def_id)?;
-        if docs.is_empty() {
-            None
-        } else {
-            Some(docs.join("\n"))
-        }
+    pub fn get_docs(&self, def_id: DefId) -> Option<TextConstant> {
+        self.data.docs.get(&def_id).copied()
     }
 
     pub fn get_text_pattern(&self, def_id: DefId) -> Option<&TextPattern> {

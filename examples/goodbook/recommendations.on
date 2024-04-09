@@ -1,0 +1,65 @@
+use 'books_db' as db
+
+map recommendations (
+    (
+        // 'user_id': id
+    ),
+    {
+        ..@match db.Book(
+            'author': {
+                ..@match db.Author(
+                    'followed_by': {
+                        ..@match db.User(
+                            'id': id
+                        )
+                    }
+                )
+            }
+        ),
+        ..@match db.Book(
+            'tags': {
+                ..@match db.Tag(
+                    'authors': {
+                        ..@match db.Author(
+                            'followed_by': {
+                                ..@match db.User(
+                                    'id': id
+                                )
+                            }
+                        )
+                    }
+                )
+            }
+        ),
+        ..@match db.Book(
+            'author': {
+                ..@match db.Author(
+                    'authored': {
+                        ..@match db.Book(
+                            'favourited_by': {
+                                ..@match db.User(
+                                    'id': id
+                                )
+                            }
+                        )
+                    }
+                )
+            }
+        ),
+        ..@match db.Book(
+            'tags': {..@match db.Tag(
+                'books': {..@match db.Book(
+                    'favourited_by': {..@match db.User(
+                        'id': id
+                    )}
+                )}
+            )}
+        ),
+    }
+)
+
+// User -[followed_authors]-> Author -[authored]-> (book:Book)
+// User -[followed_authors]-> Author -[tags]-> Tag -[books]-> (book:Book)
+// User -[favourite_books]-> Book -[authored]-> Author -[authored]-> (book:Book)
+// User -[favourite_books]-> Book -[tags]-> Tag -[books]-> (book:Book)
+// return {book}

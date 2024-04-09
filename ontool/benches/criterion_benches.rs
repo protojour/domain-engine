@@ -29,9 +29,13 @@ const BENCH_DOMAIN: &str = r#"
 def created (
     rel .'created'[rel .gen: create_time]?: datetime
 )
+
 def foo_id (
     fmt '' => 'foos/' => uuid => .
 )
+
+/// This is the documentation string for...
+/// .. foo!
 def foo (
     rel .'_id'[rel .gen: auto]|id: foo_id
     rel .is: created

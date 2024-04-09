@@ -127,7 +127,7 @@ pub struct TypeData {
 }
 
 impl TypeData {
-    pub fn description(&self, ontology: &Ontology) -> Option<std::string::String> {
+    pub fn docs(&self, ontology: &Ontology) -> Option<TextConstant> {
         match &self.kind {
             TypeKind::Object(ObjectData {
                 kind: ObjectKind::Node(nodedata),

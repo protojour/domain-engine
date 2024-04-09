@@ -13,7 +13,7 @@ use ontol_runtime::{
         },
         serde::processor::ProcessorProfileFlags,
     },
-    ontology::Ontology,
+    ontology::{ontol::TextConstant, Ontology},
     DefId,
 };
 
@@ -170,7 +170,12 @@ impl SchemaType {
         }
     }
 
-    pub(crate) fn description(&self) -> Option<String> {
-        self.type_data().description(self.ontology())
+    pub(crate) fn docs(&self) -> Option<TextConstant> {
+        self.type_data().docs(self.ontology())
+    }
+
+    pub(crate) fn docs_str(&self) -> Option<&str> {
+        self.docs()
+            .map(|docs_constant| &self.schema_ctx.ontology[docs_constant])
     }
 }

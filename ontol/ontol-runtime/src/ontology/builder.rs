@@ -1,6 +1,5 @@
 use arcstr::ArcStr;
 use fnv::FnvHashMap;
-use smartstring::alias::String;
 
 use crate::{
     interface::{
@@ -70,7 +69,7 @@ impl OntologyBuilder {
         self
     }
 
-    pub fn docs(mut self, docs: FnvHashMap<DefId, Vec<String>>) -> Self {
+    pub fn docs(mut self, docs: FnvHashMap<DefId, TextConstant>) -> Self {
         self.data().docs = docs;
         self
     }
