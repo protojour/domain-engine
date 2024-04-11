@@ -3,7 +3,7 @@ use std::{
     ops::{Range, RangeInclusive},
 };
 
-use smallvec::SmallVec;
+use thin_vec::ThinVec;
 
 use crate::ontology::ontol::TextConstant;
 
@@ -114,7 +114,7 @@ impl<T: OntolDebug> OntolDebug for Vec<T> {
     }
 }
 
-impl<T: OntolDebug> OntolDebug for SmallVec<[T; 3]> {
+impl<T: OntolDebug> OntolDebug for ThinVec<T> {
     fn fmt(&self, ofmt: &dyn OntolFormatter, f: &mut Formatter<'_>) -> Result {
         f.debug_list()
             .entries(self.iter().map(|el| Fmt(ofmt, el)))

@@ -1,13 +1,13 @@
 use ontol_runtime::interface::serde::operator::{SequenceRange, SerdeOperatorAddr};
-use smallvec::SmallVec;
+use thin_vec::ThinVec;
 
 #[derive(Default)]
 pub struct SequenceRangeBuilder {
-    ranges: SmallVec<[SequenceRange; 3]>,
+    ranges: ThinVec<SequenceRange>,
 }
 
 impl SequenceRangeBuilder {
-    pub fn build(self) -> SmallVec<[SequenceRange; 3]> {
+    pub fn build(self) -> ThinVec<SequenceRange> {
         self.ranges
     }
 

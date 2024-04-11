@@ -5,7 +5,7 @@ use std::{
 
 use ::serde::{Deserialize, Serialize};
 use ontol_macros::OntolDebug;
-use smallvec::SmallVec;
+use thin_vec::ThinVec;
 
 use crate::{
     impl_ontol_debug,
@@ -76,10 +76,10 @@ pub enum SerdeOperator {
     Alias(AliasOperator),
 
     /// A type with multiple anonymous properties, equivalent to a union of types
-    Union(UnionOperator),
+    Union(Box<UnionOperator>),
 
     /// A type with many properties
-    Struct(StructOperator),
+    Struct(Box<StructOperator>),
 
     /// A map with one property: The ID of an entity.
     IdSingletonStruct(DefId, TextConstant, SerdeOperatorAddr),
@@ -103,7 +103,7 @@ pub struct RelationSequenceOperator {
 
 #[derive(Serialize, Deserialize, OntolDebug)]
 pub struct ConstructorSequenceOperator {
-    pub ranges: SmallVec<[SequenceRange; 3]>,
+    pub ranges: ThinVec<SequenceRange>,
     pub def: SerdeDef,
 }
 

@@ -11,7 +11,6 @@ doctest = false
 [dependencies]
 ontol-macros.path = "../ontol-macros"
 smartstring = { workspace = true, features = ["serde"] }
-smallvec = { workspace = true, features = ["serde"] }
 tracing.workspace = true
 serde = { workspace = true, features = ["derive", "rc"] }
 serde_json.workspace = true

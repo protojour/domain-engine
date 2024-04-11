@@ -278,7 +278,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         new_operator.properties = build_phf_index_map(properties.into_values());
 
-        self.operators_by_addr[addr.0 as usize] = SerdeOperator::Struct(new_operator);
+        self.operators_by_addr[addr.0 as usize] = SerdeOperator::Struct(Box::new(new_operator));
     }
 
     pub(super) fn populate_union_repr_operator(
@@ -409,7 +409,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         }
 
         self.operators_by_addr[addr.0 as usize] =
-            SerdeOperator::Union(UnionOperator::new(typename, def, variants));
+            SerdeOperator::Union(Box::new(UnionOperator::new(typename, def, variants)));
     }
 }
 

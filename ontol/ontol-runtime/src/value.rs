@@ -426,7 +426,6 @@ mod tests {
 
     use super::*;
     use num::rational::BigRational;
-    use smallvec::SmallVec;
 
     #[test]
     fn rational_arithmetic() {
@@ -444,7 +443,6 @@ mod tests {
 
         assert_eq!(24, std::mem::size_of::<BTreeMap<RelationshipId, Value>>());
         assert_eq!(24, std::mem::size_of::<Vec<Value>>());
-        assert_eq!(24, std::mem::size_of::<SmallVec<[u32; 0]>>());
         assert_eq!(48, std::mem::size_of::<HashMap<RelationshipId, Value>>());
     }
 

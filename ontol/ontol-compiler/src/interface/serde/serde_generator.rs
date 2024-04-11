@@ -486,12 +486,12 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             ) {
                 Some(OperatorAllocation::Allocated(
                     self.alloc_addr(&def),
-                    SerdeOperator::Struct(StructOperator {
+                    SerdeOperator::Struct(Box::new(StructOperator {
                         typename,
                         def,
                         flags: self.struct_flags_from_def_id(def.def_id),
                         properties: build_phf_index_map([]),
-                    }),
+                    })),
                 ))
             } else {
                 Some(OperatorAllocation::Redirect(SerdeDef::new(
@@ -712,7 +712,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         Some(OperatorAllocation::Allocated(
             new_addr,
-            SerdeOperator::Union(UnionOperator::new(
+            SerdeOperator::Union(Box::new(UnionOperator::new(
                 typename,
                 def,
                 vec![
@@ -742,7 +742,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         addr: struct_properties_addr,
                     },
                 ],
-            )),
+            ))),
         ))
     }
 
@@ -899,12 +899,12 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         OperatorAllocation::Allocated(
             addr,
-            SerdeOperator::Struct(StructOperator {
+            SerdeOperator::Struct(Box::new(StructOperator {
                 typename,
                 def,
                 flags,
                 properties: build_phf_index_map([]),
-            }),
+            })),
         )
     }
 
