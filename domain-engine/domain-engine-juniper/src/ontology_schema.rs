@@ -61,6 +61,18 @@ impl DataRelationshipInfo {
         };
         TypeInfo { id: target_def_id }
     }
+    fn subject_name(&self, context: &Context) -> String {
+        let type_info = context.get_type_info(self.def_id);
+        let data_relationship = type_info.data_relationships.get(&self.property_id).unwrap();
+        context[data_relationship.subject_name].into()
+    }
+    fn object_name(&self, context: &Context) -> Option<String> {
+        let type_info = context.get_type_info(self.def_id);
+        let data_relationship = type_info.data_relationships.get(&self.property_id).unwrap();
+        data_relationship
+            .object_name
+            .map(|text_constant| context[text_constant].into())
+    }
 }
 
 #[graphql_object]
@@ -83,12 +95,12 @@ enum TypeKindEnum {
     Generator,
 }
 
-#[derive(GraphQLEnum, PartialEq)]
-enum RelationshipKindEnum {
-    Id,
-    Tree,
-    EntityGraph,
-}
+// #[derive(GraphQLEnum, PartialEq)]
+// enum RelationshipKindEnum {
+//     Id,
+//     Tree,
+//     EntityGraph,
+// }
 
 #[graphql_object]
 #[graphql(context = Context)]
