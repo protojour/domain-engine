@@ -5,7 +5,7 @@ use crate::juniper::{
     RootNode,
 };
 
-use ::juniper::GraphQLEnum;
+use ::juniper::{GraphQLEnum, GraphQLObject};
 use ontol_runtime::{
     ontology::{domain::TypeKind, Ontology},
     property::PropertyId,
@@ -27,6 +27,30 @@ struct DataRelationshipInfo {
 
 struct Entity {
     id: DefId,
+}
+
+#[derive(GraphQLEnum)]
+enum PropertyCardinality {
+    Optional,
+    Mandatory,
+}
+
+#[derive(GraphQLEnum)]
+enum ValueCardinality {
+    /// The property supports at most one defined value
+    Unit,
+    /// The property supports a set of values.
+    ///
+    /// The set is indexed, i.e. remembers the order of entries.
+    IndexSet,
+    /// The property supports a list of values, duplicates are allowed.
+    List,
+}
+
+#[derive(GraphQLObject)]
+struct Cardinality {
+    property_cardinality: PropertyCardinality,
+    value_cardinality: ValueCardinality,
 }
 
 pub struct Query;
@@ -72,6 +96,46 @@ impl DataRelationshipInfo {
         data_relationship
             .object_name
             .map(|text_constant| context[text_constant].into())
+    }
+    fn subject_cardinality(&self, context: &Context) -> Cardinality {
+        let type_info = context.get_type_info(self.def_id);
+        let data_relationship = type_info.data_relationships.get(&self.property_id).unwrap();
+        let (property_cardinality, value_cardinality) = data_relationship.subject_cardinality;
+        let property_cardinality = match property_cardinality {
+            ontol_runtime::property::PropertyCardinality::Optional => PropertyCardinality::Optional,
+            ontol_runtime::property::PropertyCardinality::Mandatory => {
+                PropertyCardinality::Mandatory
+            }
+        };
+        let value_cardinality = match value_cardinality {
+            ontol_runtime::property::ValueCardinality::Unit => ValueCardinality::Unit,
+            ontol_runtime::property::ValueCardinality::IndexSet => ValueCardinality::IndexSet,
+            ontol_runtime::property::ValueCardinality::List => ValueCardinality::List,
+        };
+        Cardinality {
+            property_cardinality,
+            value_cardinality,
+        }
+    }
+    fn object_cardinality(&self, context: &Context) -> Cardinality {
+        let type_info = context.get_type_info(self.def_id);
+        let data_relationship = type_info.data_relationships.get(&self.property_id).unwrap();
+        let (property_cardinality, value_cardinality) = data_relationship.object_cardinality;
+        let property_cardinality = match property_cardinality {
+            ontol_runtime::property::PropertyCardinality::Optional => PropertyCardinality::Optional,
+            ontol_runtime::property::PropertyCardinality::Mandatory => {
+                PropertyCardinality::Mandatory
+            }
+        };
+        let value_cardinality = match value_cardinality {
+            ontol_runtime::property::ValueCardinality::Unit => ValueCardinality::Unit,
+            ontol_runtime::property::ValueCardinality::IndexSet => ValueCardinality::IndexSet,
+            ontol_runtime::property::ValueCardinality::List => ValueCardinality::List,
+        };
+        Cardinality {
+            property_cardinality,
+            value_cardinality,
+        }
     }
 }
 
