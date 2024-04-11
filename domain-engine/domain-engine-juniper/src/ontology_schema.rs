@@ -53,6 +53,12 @@ struct Cardinality {
     value_cardinality: ValueCardinality,
 }
 
+#[derive(GraphQLEnum)]
+enum DataRelationshipSource {
+    Inherent,
+    ByUnionProxy,
+}
+
 pub struct Query;
 
 #[derive(Clone)]
@@ -75,6 +81,18 @@ impl juniper::Context for Context {}
 impl DataRelationshipInfo {
     fn property_id(&self) -> String {
         self.property_id.to_string()
+    }
+    fn source(&self, context: &Context) -> DataRelationshipSource {
+        let type_info = context.get_type_info(self.def_id);
+        let data_relationship = type_info.data_relationships.get(&self.property_id).unwrap();
+        match data_relationship.source {
+            ontol_runtime::ontology::domain::DataRelationshipSource::Inherent => {
+                DataRelationshipSource::Inherent
+            }
+            ontol_runtime::ontology::domain::DataRelationshipSource::ByUnionProxy => {
+                DataRelationshipSource::ByUnionProxy
+            }
+        }
     }
     fn target(&self, context: &Context) -> TypeInfo {
         let type_info = context.get_type_info(self.def_id);
