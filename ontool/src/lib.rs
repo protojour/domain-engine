@@ -53,7 +53,6 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use crate::service::Detach;
 
 mod graphql;
-mod ontology_schema;
 mod service;
 
 pub use service::System;

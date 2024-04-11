@@ -1,6 +1,6 @@
 use std::{ops::Deref, str::FromStr, sync::Arc};
 
-use domain_engine_juniper::juniper::{
+use crate::juniper::{
     self, graphql_object, graphql_value, EmptyMutation, EmptySubscription, FieldError, FieldResult,
     RootNode,
 };

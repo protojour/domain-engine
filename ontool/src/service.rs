@@ -7,15 +7,13 @@ use std::{
     task::Poll,
 };
 
-use crate::{
-    graphql::{graphiql_handler, graphql_handler, GraphqlService},
-    ontology_schema::{Context, Query, Schema},
-};
+use crate::graphql::{graphiql_handler, graphql_handler, GraphqlService};
 
 use ::juniper::{EmptyMutation, EmptySubscription};
 use axum::{routing::post, Extension};
 use domain_engine_core::{DomainEngine, DomainError, DomainResult, Session};
 use domain_engine_in_memory_store::InMemoryDataStoreFactory;
+use domain_engine_juniper::ontology_schema::{Context, Query, Schema};
 use domain_engine_juniper::{juniper, CreateSchemaError};
 use juniper_axum::extract::JuniperRequest;
 use ontol_runtime::{ontology::Ontology, PackageId};

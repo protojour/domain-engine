@@ -35,6 +35,7 @@ use crate::{
 pub mod context;
 pub mod cursor_util;
 pub mod gql_scalar;
+pub mod ontology_schema;
 
 mod look_ahead_utils;
 mod macros;
