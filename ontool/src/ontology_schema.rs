@@ -8,6 +8,7 @@ use domain_engine_juniper::juniper::{
 use ::juniper::GraphQLEnum;
 use ontol_runtime::{
     ontology::{domain::TypeKind, Ontology},
+    property::PropertyId,
     DefId, PackageId,
 };
 
@@ -17,7 +18,11 @@ struct Domain {
 
 struct TypeInfo {
     id: DefId,
-    kind: TypeKindEnum,
+}
+
+struct DataRelationshipInfo {
+    def_id: DefId,
+    property_id: PropertyId,
 }
 
 struct Entity {
@@ -43,16 +48,28 @@ impl juniper::Context for Context {}
 
 #[graphql_object]
 #[graphql(context = Context)]
-impl Entity {
-    fn name(&self, context: &Context) -> Option<String> {
-        let entity = context.get_type_info(self.id);
-        entity.name().map(|name| context[name].into())
+impl DataRelationshipInfo {
+    fn property_id(&self) -> String {
+        self.property_id.to_string()
     }
-    fn doc_string(&self, context: &Context) -> Option<String> {
-        let entity = context.get_type_info(self.id);
-        context
-            .get_docs(entity.def_id)
-            .map(|docs_constant| context[docs_constant].into())
+    fn target(&self, context: &Context) -> TypeInfo {
+        let type_info = context.get_type_info(self.def_id);
+        let data_relationship = type_info.data_relationships.get(&self.property_id).unwrap();
+        let target_def_id = match data_relationship.target {
+            ontol_runtime::ontology::domain::DataRelationshipTarget::Unambiguous(def_id) => def_id,
+            ontol_runtime::ontology::domain::DataRelationshipTarget::Union(def_id) => def_id,
+        };
+        TypeInfo { id: target_def_id }
+    }
+}
+
+#[graphql_object]
+#[graphql(context = Context)]
+impl Entity {
+    fn is_self_identifying(&self, context: &Context) -> bool {
+        let type_info = context.get_type_info(self.id);
+        let entity_info = type_info.entity_info().unwrap();
+        entity_info.is_self_identifying
     }
 }
 
@@ -66,12 +83,60 @@ enum TypeKindEnum {
     Generator,
 }
 
+#[derive(GraphQLEnum, PartialEq)]
+enum RelationshipKindEnum {
+    Id,
+    Tree,
+    EntityGraph,
+}
+
 #[graphql_object]
 #[graphql(context = Context)]
 impl TypeInfo {
+    fn name(&self, context: &Context) -> Option<String> {
+        let type_info = context.get_type_info(self.id);
+        type_info.name().map(|name| context[name].into())
+    }
+    fn doc_string(&self, context: &Context) -> Option<String> {
+        let type_info = context.get_type_info(self.id);
+        context
+            .get_docs(type_info.def_id)
+            .map(|docs_constant| context[docs_constant].into())
+    }
     fn entity_info(&self, context: &Context) -> Option<Entity> {
         let type_info = context.get_type_info(self.id);
         type_info.entity_info().map(|_| Entity { id: self.id })
+    }
+    fn union_variants(&self, context: &Context) -> Vec<TypeInfo> {
+        context
+            .union_variants(self.id)
+            .iter()
+            .copied()
+            .map(|id| TypeInfo { id })
+            .collect()
+    }
+    fn kind(&self, context: &Context) -> TypeKindEnum {
+        let type_info = context.get_type_info(self.id);
+        match type_info.kind {
+            TypeKind::Entity(_) => TypeKindEnum::Entity,
+            TypeKind::Data(_) => TypeKindEnum::Data,
+            TypeKind::Relationship(_) => TypeKindEnum::Relationship,
+            TypeKind::Function(_) => TypeKindEnum::Function,
+            TypeKind::Domain(_) => TypeKindEnum::Domain,
+            TypeKind::Generator(_) => TypeKindEnum::Generator,
+        }
+    }
+    fn data_relationships(&self, context: &Context) -> Vec<DataRelationshipInfo> {
+        let type_info = context.get_type_info(self.id);
+        type_info
+            .data_relationships
+            .keys()
+            .copied()
+            .map(|property_id| DataRelationshipInfo {
+                def_id: self.id,
+                property_id,
+            })
+            .collect()
     }
 }
 
@@ -96,19 +161,9 @@ impl Domain {
     }
     fn types(&self, context: &Context, kind: Option<TypeKindEnum>) -> Vec<TypeInfo> {
         let domain = context.find_domain(self.id).unwrap();
-        let infos = domain.type_infos().map(|info| TypeInfo {
-            id: info.def_id,
-            kind: match info.kind {
-                TypeKind::Entity(_) => TypeKindEnum::Entity,
-                TypeKind::Data(_) => TypeKindEnum::Data,
-                TypeKind::Relationship(_) => TypeKindEnum::Relationship,
-                TypeKind::Function(_) => TypeKindEnum::Function,
-                TypeKind::Domain(_) => TypeKindEnum::Domain,
-                TypeKind::Generator(_) => TypeKindEnum::Generator,
-            },
-        });
+        let infos = domain.type_infos().map(|info| TypeInfo { id: info.def_id });
         if let Some(kind) = kind {
-            infos.filter(|info| info.kind == kind).collect()
+            infos.filter(|info| info.kind(context) == kind).collect()
         } else {
             infos.collect()
         }
@@ -150,14 +205,6 @@ impl Query {
             if let Some(type_info) = ontology.get_type_info_option(def_id) {
                 return Ok(TypeInfo {
                     id: type_info.def_id,
-                    kind: match type_info.kind {
-                        TypeKind::Entity(_) => TypeKindEnum::Entity,
-                        TypeKind::Data(_) => TypeKindEnum::Data,
-                        TypeKind::Relationship(_) => TypeKindEnum::Relationship,
-                        TypeKind::Function(_) => TypeKindEnum::Function,
-                        TypeKind::Domain(_) => TypeKindEnum::Domain,
-                        TypeKind::Generator(_) => TypeKindEnum::Generator,
-                    },
                 });
             }
         }
