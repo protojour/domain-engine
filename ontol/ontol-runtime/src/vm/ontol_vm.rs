@@ -752,8 +752,8 @@ mod tests {
         let ontology = Ontology::builder().lib(lib).build();
         let output = OntolVm::new(&ontology, proc)
             .run([Value::sequence_of([
-                Value::I64(1, def_id(0)).into(),
-                Value::I64(2, def_id(0)).into(),
+                Value::I64(1, def_id(0)),
+                Value::I64(2, def_id(0)),
             ])])
             .unwrap()
             .unwrap();

@@ -55,8 +55,7 @@ fn test_relations_are_distinct_for_different_domains() {
                         .properties
                         .iter()
                         .map(|(_key, property)| property)
-                        .filter(|property| !property.is_rel_params())
-                        .next()
+                        .find(|property| !property.is_rel_params())
                         .unwrap()
                         .property_id
                         .relationship_id

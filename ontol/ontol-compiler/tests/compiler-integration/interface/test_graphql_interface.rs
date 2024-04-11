@@ -388,10 +388,10 @@ impl<'o> SchemaTest<'o> {
     }
 }
 
-fn schema_test<'o>(
-    test: &'o OntolTest,
+fn schema_test(
+    test: &OntolTest,
     source_name: impl Into<SrcName>,
-) -> (&'o GraphqlSchema, SchemaTest<'o>) {
+) -> (&GraphqlSchema, SchemaTest<'_>) {
     let schema = test.graphql_schema(source_name);
     (schema, SchemaTest { test, schema })
 }
