@@ -215,7 +215,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 };
 
                 let DefKind::TextLiteral(text_literal) = self.defs.def_kind(*def_id) else {
-                    panic!("at the disco");
+                    panic!("text literal expected to be registered not found!");
                 };
                 let text_constant = self.strings.intern_constant(text_literal);
                 self.relations.store_keys.insert(subject.0, text_constant);
