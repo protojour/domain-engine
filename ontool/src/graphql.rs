@@ -52,10 +52,10 @@ const GRAPHIQL: &str = r#"
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="shortcut icon" href="/favicon.png" />
-    <link rel="stylesheet" href="//unpkg.com/graphiql/graphiql.min.css" />
-    <script crossorigin src="//unpkg.com/react/umd/react.production.min.js"></script>
-    <script crossorigin src="//unpkg.com/react-dom/umd/react-dom.production.min.js"></script>
-    <script crossorigin src="//unpkg.com/graphiql/graphiql.min.js"></script>
+    <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/graphiql/graphiql.min.css" />
+    <script crossorigin src="//cdn.jsdelivr.net/npm/react/umd/react.production.min.js"></script>
+    <script crossorigin src="//cdn.jsdelivr.net/npm/react-dom/umd/react-dom.production.min.js"></script>
+    <script crossorigin src="//cdn.jsdelivr.net/npm/graphiql/graphiql.min.js"></script>
     <style>
         body {
             margin: 0;
