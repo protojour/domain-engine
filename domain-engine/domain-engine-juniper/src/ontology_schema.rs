@@ -22,7 +22,9 @@ struct TypeInfo {
 
 struct DataRelationshipInfo {
     def_id: DefId,
+    kind: RelationshipKindEnum,
     property_id: PropertyId,
+    rel_params: Option<DefId>,
 }
 
 struct Entity {
@@ -155,6 +157,13 @@ impl DataRelationshipInfo {
             value_cardinality,
         }
     }
+    fn kind(&self) -> RelationshipKindEnum {
+        self.kind
+    }
+    fn rel_params(&self) -> Option<TypeInfo> {
+        self.rel_params
+            .map(|rel_params| TypeInfo { id: rel_params })
+    }
 }
 
 #[graphql_object]
@@ -177,12 +186,12 @@ enum TypeKindEnum {
     Generator,
 }
 
-// #[derive(GraphQLEnum, PartialEq)]
-// enum RelationshipKindEnum {
-//     Id,
-//     Tree,
-//     EntityGraph,
-// }
+#[derive(GraphQLEnum, PartialEq, Clone, Copy)]
+enum RelationshipKindEnum {
+    Id,
+    Tree,
+    EntityGraph,
+}
 
 #[graphql_object]
 #[graphql(context = Context)]
@@ -224,11 +233,25 @@ impl TypeInfo {
         let type_info = context.get_type_info(self.id);
         type_info
             .data_relationships
-            .keys()
-            .copied()
-            .map(|property_id| DataRelationshipInfo {
-                def_id: self.id,
-                property_id,
+            .iter()
+            .map(|(property_id, dri)| {
+                let (kind, rel_params) = match dri.kind {
+                    ontol_runtime::ontology::domain::DataRelationshipKind::Id => {
+                        (RelationshipKindEnum::Id, None)
+                    }
+                    ontol_runtime::ontology::domain::DataRelationshipKind::Tree => {
+                        (RelationshipKindEnum::Tree, None)
+                    }
+                    ontol_runtime::ontology::domain::DataRelationshipKind::EntityGraph {
+                        rel_params,
+                    } => (RelationshipKindEnum::EntityGraph, rel_params),
+                };
+                DataRelationshipInfo {
+                    kind,
+                    def_id: self.id,
+                    rel_params,
+                    property_id: *property_id,
+                }
             })
             .collect()
     }
