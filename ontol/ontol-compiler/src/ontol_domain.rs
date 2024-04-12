@@ -25,7 +25,7 @@ impl<'m> Compiler<'m> {
         // fundamental types
         self.register_type(self.primitives.empty_sequence, Type::EmptySequence);
 
-        // Pre-processe primitive definitions
+        // pre-process primitive definitions
         let mut named_builtin_relations: Vec<(DefId, &'static str)> = vec![];
         for def_id in self.defs.iter_package_def_ids(ONTOL_PKG) {
             let def_kind = self.defs.def_kind(def_id);
@@ -115,7 +115,7 @@ impl<'m> Compiler<'m> {
             output: string_ty,
         });
 
-        // Built-in functions
+        // built-in functions
         // arithmetic
         self.def_proc("+", DefKind::Fn(BuiltinProc::Add), i64_i64_to_i64);
         self.def_proc("-", DefKind::Fn(BuiltinProc::Sub), i64_i64_to_i64);

@@ -125,6 +125,7 @@ pub enum BuiltinRelationKind {
     /// Binds an identifier to a type.
     Identifies,
     /// Binds a type to an identifier, making instances of a type unique entities.
+    /// Usually used with the `|` operator to simultaneously bind to a named property.
     /// ```ontol
     /// rel .'id'|id: some_id
     /// ```
