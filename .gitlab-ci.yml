@@ -16,4 +16,4 @@ test:
   stage: check
   image: rust:latest
   script:
-    - cargo test --benches
+    - cargo test --tests --benches

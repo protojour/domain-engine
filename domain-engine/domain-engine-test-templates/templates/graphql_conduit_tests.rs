@@ -837,12 +837,11 @@ async fn test_graphql_conduit_feed_public_no_query_selection() {
 
     expect_eq!(
         actual = "
-        {{
-            feed(input: {{ username: \"teh_user\" }}) {{
+        {
+            feed(input: { username: \"teh_user\" }) {
                 title
-            }}
-        }}"
-        .to_string()
+            }
+        }"
         .exec([], &test.feed_schema, &test.ctx())
         .await,
         expected = Ok(graphql_value!({
@@ -887,13 +886,12 @@ async fn test_graphql_conduit_feed_public_with_items_query() {
 
     expect_eq!(
         actual = "
-        {{
-            feed(input: {{ username: \"teh_user\" }}) {{
+        {
+            feed(input: { username: \"teh_user\" }) {
                 title
-                items {{ guid }}
-            }}
-        }}"
-        .to_string()
+                items { guid }
+            }
+        }"
         .exec([], &test.feed_schema, &test.ctx())
         .await,
         expected = Ok(graphql_value!({
