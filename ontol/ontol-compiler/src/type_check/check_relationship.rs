@@ -13,7 +13,7 @@ use crate::{
     sequence::Sequence,
     text_patterns::TextPatternSegment,
     thesaurus::TypeRelation,
-    types::{Type, TypeRef},
+    types::{FormatType, Type, TypeRef},
     SourceSpan,
 };
 
@@ -194,6 +194,33 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             BuiltinRelationKind::Id => {
                 panic!("This should not have been lowered");
+            }
+            BuiltinRelationKind::StoreKey => {
+                let subject_ty = self.check_def(subject.0);
+                let object_ty = self.check_def(object.0);
+
+                self.check_subject_data_type(subject_ty, &subject.1);
+
+                let Type::TextConstant(def_id) = object_ty else {
+                    return self.error(
+                        CompileError::TypeMismatch {
+                            actual: smart_format!(
+                                "{}",
+                                FormatType(object_ty, self.defs, self.primitives)
+                            ),
+                            expected: smart_format!("text constant"),
+                        },
+                        span,
+                    );
+                };
+
+                let DefKind::TextLiteral(text_literal) = self.defs.def_kind(*def_id) else {
+                    panic!("at the disco");
+                };
+                let text_constant = self.strings.intern_constant(text_literal);
+                self.relations.store_keys.insert(subject.0, text_constant);
+
+                object_ty
             }
             BuiltinRelationKind::Indexed => {
                 let subject_ty = self.check_def(subject.0);

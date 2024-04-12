@@ -69,6 +69,7 @@ impl Domain {
             def_id: DefId(type_info.def_id.0, 0),
             public: false,
             kind: TypeKind::Data(BasicTypeInfo { name: None }),
+            store_key: None,
             operator_addr: None,
             data_relationships: Default::default(),
         });
@@ -91,7 +92,7 @@ pub struct TypeInfo {
     /// The SerdeOperatorAddr used for JSON.
     /// FIXME: This should really be connected to a DomainInterface.
     pub operator_addr: Option<SerdeOperatorAddr>,
-
+    pub store_key: Option<TextConstant>,
     pub data_relationships: FnvHashMap<PropertyId, DataRelationshipInfo>,
 }
 

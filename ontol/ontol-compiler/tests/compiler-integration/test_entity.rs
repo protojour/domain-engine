@@ -1,4 +1,4 @@
-use ontol_runtime::value::Value;
+use ontol_runtime::{ontology::domain::DataRelationshipKind, value::Value, DefId, PackageId};
 use ontol_test_utils::{
     assert_error_msg, assert_json_io_matches,
     examples::{ARTIST_AND_INSTRUMENT, GUITAR_SYNTH_UNION},
@@ -496,4 +496,39 @@ fn entity_order_ok() {
     def @symbol by_name ()
     "
     .compile();
+}
+
+#[test]
+fn store_key_in_type_info() {
+    "
+    def foobar_edge (
+        rel .store_key: 'fubar'
+    )
+
+    def foo (
+        rel .'id'|id: (rel .is: text)
+        rel .store_key: 'fu'
+        rel .'bar'[rel .is: foobar_edge]: bar
+    )
+
+    def bar (
+        rel .'id'|id: (rel .is: text)
+        rel .'foo'[rel .store_key: 'baaah']: bar
+    )
+    "
+    .compile_then(|test| {
+        let ontology = test.ontology();
+
+        let foobar_def_id = DefId(PackageId(1), 1);
+        let type_info = ontology.get_type_info(foobar_def_id);
+        assert_eq!(&ontology[type_info.store_key.unwrap()], "fubar");
+
+        let foo_def_id = DefId(PackageId(1), 2);
+        let type_info = ontology.get_type_info(foo_def_id);
+        assert_eq!(&ontology[type_info.store_key.unwrap()], "fu");
+
+        let anon_def_id = DefId(PackageId(1), 18);
+        let type_info = ontology.get_type_info(anon_def_id);
+        assert_eq!(&ontology[type_info.store_key.unwrap()], "baaah");
+    });
 }

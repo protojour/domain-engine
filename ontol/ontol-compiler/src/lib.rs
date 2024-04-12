@@ -323,6 +323,13 @@ impl<'m> Compiler<'m> {
                         type_def_id,
                         SerdeModifier::json_default(),
                     ))),
+                    store_key: Some(
+                        self.relations
+                            .store_keys
+                            .get(&type_def_id)
+                            .copied()
+                            .unwrap_or(type_name_constant),
+                    ),
                     data_relationships,
                 });
             }
@@ -339,6 +346,7 @@ impl<'m> Compiler<'m> {
                         type_def_id,
                         SerdeModifier::json_default(),
                     ))),
+                    store_key: self.relations.store_keys.get(&type_def_id).copied(),
                     data_relationships: self.find_data_relationships(
                         type_def_id,
                         &union_member_cache,
@@ -354,6 +362,7 @@ impl<'m> Compiler<'m> {
                         public: false,
                         kind: TypeKind::Data(BasicTypeInfo { name: None }),
                         operator_addr: None,
+                        store_key: None,
                         data_relationships: Default::default(),
                     });
                 }

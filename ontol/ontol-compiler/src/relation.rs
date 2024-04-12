@@ -4,7 +4,7 @@ use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
     interface::discriminator::UnionDiscriminator,
-    ontology::ontol::ValueGenerator,
+    ontology::ontol::{TextConstant, ValueGenerator},
     property::{Cardinality, PropertyId},
     DefId, PackageId, RelationshipId,
 };
@@ -35,6 +35,8 @@ pub struct Relations {
     pub type_params: FnvHashMap<DefId, IndexMap<DefId, TypeParam>>,
 
     pub rel_type_constraints: FnvHashMap<DefId, RelTypeConstraints>,
+
+    pub store_keys: FnvHashMap<DefId, TextConstant>,
 }
 
 impl Relations {

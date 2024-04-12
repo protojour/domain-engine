@@ -131,6 +131,13 @@ pub enum BuiltinRelationKind {
     /// ```
     Id,
     Indexed,
+    /// Associates a data store collection name with a type.
+    /// Every named type will have an implicit `store_key` name equal to their `def` name,
+    /// but this allows overriding that name for storage purposes.
+    /// ```ontol
+    /// rel .store_key: 'specific_table'
+    /// ```
+    StoreKey,
     /// Minimum value for the subject type, which may be any `number`.
     /// ```ontol
     /// rel .is: number

@@ -128,6 +128,7 @@ pub struct OntolRelations {
     pub identifies: DefId,
     pub id: DefId,
     pub indexed: DefId,
+    pub store_key: DefId,
     pub min: DefId,
     pub max: DefId,
     pub default: DefId,
@@ -191,6 +192,8 @@ impl Primitives {
                 identifies: defs.add_builtin_relation(BuiltinRelationKind::Identifies, None),
                 id: defs.add_builtin_relation(BuiltinRelationKind::Id, Some("id")),
                 indexed: defs.add_builtin_relation(BuiltinRelationKind::Indexed, None),
+                store_key: defs
+                    .add_builtin_relation(BuiltinRelationKind::StoreKey, Some("store_key")),
                 min: defs.add_builtin_relation(BuiltinRelationKind::Min, Some("min")),
                 max: defs.add_builtin_relation(BuiltinRelationKind::Max, Some("max")),
                 default: defs.add_builtin_relation(BuiltinRelationKind::Default, Some("default")),
