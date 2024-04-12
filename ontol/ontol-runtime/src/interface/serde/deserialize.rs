@@ -382,7 +382,7 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
                     }
                     Err(_indecisive) => {
                         return Err(Error::custom(format!(
-                            "invalid map value, expected {}",
+                            "invalid type, expected {}",
                             ExpectingMatching(&self.matcher)
                         )));
                     }

@@ -7,7 +7,7 @@ use ontol_runtime::{
 use tracing::{debug, instrument, trace};
 
 use crate::{
-    def::{Def, LookupRelationshipMeta},
+    def::{Def, DefKind, LookupRelationshipMeta},
     error::CompileError,
     primitive::PrimitiveKind,
     relation::{Constructor, Property},
@@ -138,6 +138,32 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             object_def_id: meta.relationship.object.0,
                             span: gen_span,
                         });
+                    }
+
+                    if let DefKind::Type(_) = self.defs.def_kind(meta.relationship.relation_def_id)
+                    {
+                        let relation_repr_kind = self
+                            .repr_ctx
+                            .get_repr_kind(&meta.relationship.relation_def_id)
+                            .unwrap();
+
+                        if !matches!(relation_repr_kind, ReprKind::Unit) {
+                            self.errors.push(
+                                CompileError::InvalidRelationType
+                                    .spanned(&meta.relationship.relation_span),
+                            );
+                        } else {
+                            let object = meta.relationship.object;
+
+                            let object_repr_kind = self.repr_ctx.get_repr_kind(&object.0).unwrap();
+
+                            if !matches!(object_repr_kind, ReprKind::StructUnion(_)) {
+                                self.errors.push(
+                                    CompileError::FlattenedRelationshipObjectMustBeStructUnion
+                                        .spanned(&object.1),
+                                );
+                            }
+                        }
                     }
                 }
                 Role::Object => {

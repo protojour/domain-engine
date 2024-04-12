@@ -1,0 +1,9 @@
+def foo (
+    rel .is: (
+        rel .is?: bar
+        rel .is?: baz
+    )
+)
+
+def bar (rel .'type': 'bar')
+def baz (rel .'type': 'bar')

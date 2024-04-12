@@ -33,6 +33,7 @@ pub struct UnionMatcher<'on, 'p> {
 }
 
 impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
+    /// FIXME: This should probably talk more in "serde terms" than "ontol terms"?
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,

@@ -660,7 +660,7 @@ impl<'e> Serialize for MapProperties<'e> {
                             .reference(property.value_addr),
                     )?;
                 }
-                SerdePropertyKind::FlatUnionDiscriminator { variants: _ } => {
+                SerdePropertyKind::FlatUnionDiscriminator { union_addr: _ } => {
                     // FIXME
                 }
                 SerdePropertyKind::FlatUnionData => {
@@ -822,7 +822,7 @@ impl SchemaGraphBuilder {
                                 self.visit(*addr, ontology);
                             }
                         }
-                        SerdePropertyKind::FlatUnionDiscriminator { variants: _ } => {
+                        SerdePropertyKind::FlatUnionDiscriminator { union_addr: _ } => {
                             // FIXME
                         }
                         SerdePropertyKind::FlatUnionData => {}

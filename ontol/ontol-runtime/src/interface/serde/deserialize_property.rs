@@ -9,7 +9,6 @@ use super::{
     deserialize_struct::StructDeserializer,
     operator::{
         SerdeOperatorAddr, SerdeProperty, SerdePropertyFlags, SerdePropertyKind, SerdeStructFlags,
-        SerdeUnionVariant,
     },
     processor::{ProcessorMode, ProcessorProfileFlags, SpecialProperty},
 };
@@ -22,7 +21,7 @@ pub enum PropKind<'on> {
     RelParams(SerdeOperatorAddr),
     SingletonId(SerdeOperatorAddr),
     OverriddenId(RelationshipId, SerdeOperatorAddr),
-    FlatUnionDiscriminator(Box<str>, &'on SerdeProperty, &'on [SerdeUnionVariant]),
+    FlatUnionDiscriminator(Box<str>, &'on SerdeProperty, SerdeOperatorAddr),
     FlatUnionData(Box<str>),
     Open(smartstring::alias::String),
     Ignored,
@@ -79,11 +78,11 @@ impl<'a, 'de> Visitor<'de> for PropertyMapVisitor<'a> {
                 SerdePropertyKind::Plain { rel_params_addr } => {
                     PropKind::Property(serde_property, RelParamsAddr(*rel_params_addr))
                 }
-                SerdePropertyKind::FlatUnionDiscriminator { variants } => {
+                SerdePropertyKind::FlatUnionDiscriminator { union_addr } => {
                     PropKind::FlatUnionDiscriminator(
                         v.to_string().into_boxed_str(),
-                        &serde_property,
-                        variants,
+                        serde_property,
+                        *union_addr,
                     )
                 }
                 SerdePropertyKind::FlatUnionData => {

@@ -972,3 +972,66 @@ fn test_serde_gitmesh_id_union() {
         });
     });
 }
+
+#[test]
+fn test_flattened_union1() {
+    "
+    def @private anonymous ()
+
+    def @open foo (
+        rel .'foo': text
+        rel .anonymous: (
+            rel .is?: bar
+            rel .is?: baz
+        )
+    )
+
+    def bar (
+        rel .'kind': 'bar'
+        rel .'bar': text
+    )
+    def baz (
+        rel .'kind': 'baz'
+        rel .'baz0': text
+        rel .'baz1': text
+    )
+    "
+    .compile_then(|test| {
+        let [foo] = test.bind(["foo"]);
+        assert_json_io_matches!(serde_create(&foo), {
+            "foo": "x",
+            "kind": "bar",
+            "bar": "y",
+        });
+
+        // Note: The key "baz0", used as open data here, is shadowed
+        // by a flattened union variant, therefore it doesn't get serialized:
+        assert_json_io_matches!(serde_create(&foo).enable_open_data(),
+            {
+                "foo": "x",
+                "kind": "bar",
+                "bar": "y",
+                "baz0": "z",
+                "other": "æ"
+            } == {
+                "foo": "x",
+                "kind": "bar",
+                "bar": "y",
+                "other": "æ"
+            }
+        );
+
+        assert_error_msg!(
+            serde_create(&foo).to_value(json!({ "foo": "x" })),
+            "missing properties, expected \"kind\" at line 1 column 11"
+        );
+        assert_error_msg!(
+            serde_create(&foo).to_value(json!({ "foo": "x", "kind": "bogus" })),
+            "property \"kind\": invalid value, expected `<anonymous>` (`bar` or `baz`) at line 1 column 26"
+        );
+        assert_error_msg!(
+            serde_create(&foo).to_value(json!({ "foo": "x", "kind": "bar" })),
+            "missing property `bar` at line 1 column 24"
+        );
+    });
+}

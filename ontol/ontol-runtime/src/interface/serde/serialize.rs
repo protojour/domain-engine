@@ -20,9 +20,7 @@ use crate::{
 };
 
 use super::{
-    operator::{
-        PossibleVariants, SequenceRange, SerdeOperator, SerdePropertyKind, SerdeStructFlags,
-    },
+    operator::{SequenceRange, SerdeOperator, SerdePropertyKind, SerdeStructFlags},
     processor::{ProcessorProfileFlags, SerdeProcessor, SpecialProperty, SubProcessorContext},
     serialize_raw::RawProxy,
     StructOperator,
@@ -464,11 +462,12 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                             },
                         )?;
                     }
-                    SerdePropertyKind::FlatUnionDiscriminator { variants } => {
+                    SerdePropertyKind::FlatUnionDiscriminator { union_addr } => {
+                        let SerdeOperator::Union(union_op) = &self.ontology[*union_addr] else {
+                            panic!("expected union operator");
+                        };
                         let value = &attribute.val;
-                        let addr = match PossibleVariants::new(variants, self.mode, self.level)
-                            .applied()
-                        {
+                        let addr = match union_op.applied_variants(self.mode, self.level) {
                             AppliedVariants::Unambiguous(addr) => addr,
                             AppliedVariants::OneOf(possible_variants) => {
                                 possible_variants
@@ -494,8 +493,8 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                             SerdeOperator::Struct(struct_op) => {
                                 self.serialize_struct_properties::<S>(
                                     struct_op,
-                                    &value,
-                                    &flattened_attrs,
+                                    value,
+                                    flattened_attrs,
                                     None,
                                     None,
                                     map,

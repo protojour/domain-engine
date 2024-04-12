@@ -1,11 +1,11 @@
-use std::collections::HashSet;
+use std::{borrow::Cow, collections::HashSet};
 
 use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
     debug::NoFmt,
     interface::{
-        discriminator::{VariantDiscriminator, VariantPurpose},
+        discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
         serde::{
             operator::{
                 SerdeOperator, SerdeOperatorAddr, SerdeProperty, SerdePropertyFlags,
@@ -24,9 +24,10 @@ use smartstring::alias::String;
 use tracing::{debug, debug_span, warn};
 
 use crate::{
-    def::{DefKind, LookupRelationshipMeta, RelParams},
+    def::{DefKind, LookupRelationshipMeta, RelParams, RelationshipMeta},
     phf_build::build_phf_index_map,
     relation::{Properties, Property},
+    repr::repr_model::ReprKind,
 };
 
 use super::{
@@ -45,6 +46,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         let mut serde_properties: IndexMap<String, (PhfKey, SerdeProperty)> = Default::default();
 
         let mut struct_flags = SerdeStructFlags::default();
+        let mut must_flatten_unions = false;
 
         if let Some(table) = &properties.table {
             for (property_id, property) in table {
@@ -54,6 +56,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     def.modifier,
                     &mut struct_flags,
                     &mut serde_properties,
+                    &mut must_flatten_unions,
                 );
             }
         }
@@ -77,10 +80,17 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             def.modifier,
                             &mut struct_flags,
                             &mut serde_properties,
+                            &mut must_flatten_unions,
                         );
                     }
                 }
             }
+        }
+
+        if must_flatten_unions {
+            self.lazy_union_flattener_tasks
+                .push_back((addr, def, properties));
+            return;
         }
 
         serde_properties.insert(
@@ -113,22 +123,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         modifier: SerdeModifier,
         struct_flags: &mut SerdeStructFlags,
         output: &mut IndexMap<String, (PhfKey, SerdeProperty)>,
+        must_flatten_unions: &mut bool,
     ) {
         let meta = self.defs.relationship_meta(property_id.relationship_id);
         let (value_type_def_id, ..) = meta.relationship.by(property_id.role.opposite());
-        let prop_key = match property_id.role {
-            Role::Subject => {
-                let DefKind::TextLiteral(prop_key) = meta.relation_def_kind.value else {
-                    panic!("Subject property is not a string literal");
-                };
-
-                *prop_key
-            }
-            Role::Object => meta
-                .relationship
-                .object_prop
-                .expect("Object property has no name"),
-        };
 
         let (property_cardinality, value_addr) = self.get_property_operator(
             value_type_def_id,
@@ -142,6 +140,29 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             }
             RelParams::Unit => None,
             _ => todo!(),
+        };
+
+        let prop_key: Cow<str> = match property_id.role {
+            Role::Subject => match meta.relation_def_kind.value {
+                DefKind::TextLiteral(prop_key) => Cow::Borrowed(prop_key),
+                DefKind::Type(_) => {
+                    return self.add_flattened_union_properties(
+                        property_id,
+                        modifier,
+                        meta,
+                        output,
+                        must_flatten_unions,
+                    );
+                }
+                _ => {
+                    panic!("Unsupported property");
+                }
+            },
+            Role::Object => Cow::Borrowed(
+                meta.relationship
+                    .object_prop
+                    .expect("Object property has no name"),
+            ),
         };
 
         let mut value_generator: Option<ValueGenerator> = None;
@@ -193,7 +214,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         insert_property(
             output,
-            prop_key,
+            prop_key.as_ref(),
             SerdeProperty {
                 property_id,
                 value_addr,
@@ -204,6 +225,107 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             modifier,
             self.strings,
         );
+    }
+
+    fn add_flattened_union_properties(
+        &mut self,
+        property_id: PropertyId,
+        modifier: SerdeModifier,
+        meta: RelationshipMeta,
+        output: &mut IndexMap<String, (PhfKey, SerdeProperty)>,
+        must_flatten_unions: &mut bool,
+    ) {
+        let object = meta.relationship.object;
+        let ReprKind::StructUnion(_members) = self.repr_ctx.get_repr_kind(&object.0).unwrap()
+        else {
+            panic!("flattened object is not a struct union");
+        };
+
+        let default_modifier = SerdeModifier::json_default() | modifier.cross_def_flags();
+
+        let union_addr = self
+            .gen_addr_lazy(SerdeKey::Def(SerdeDef {
+                def_id: object.0,
+                modifier: default_modifier,
+            }))
+            .unwrap();
+        let SerdeOperator::Union(union_operator) = self.get_operator(union_addr) else {
+            // Need to generate union operators for all properties,
+            // then reschedule this lazy generator
+            *must_flatten_unions = true;
+            return;
+        };
+
+        let mut text_constant_set = FnvHashSet::<TextConstant>::default();
+
+        for variant in union_operator.unfiltered_variants() {
+            match &variant.discriminator.discriminant {
+                Discriminant::HasAttribute(_, text_constant, _) => {
+                    text_constant_set.insert(*text_constant);
+                }
+                _ => {
+                    panic!("must use a named attribute");
+                }
+            }
+        }
+
+        let discriminator_property_text_constant = {
+            if text_constant_set.len() > 1 {
+                panic!("ambiguous flattened entry-point/discriminator property");
+            }
+
+            text_constant_set.into_iter().next().unwrap()
+        };
+
+        let mut covered_properties: HashSet<std::string::String> = Default::default();
+
+        // detect set of all properties belonging to the union
+        for variant in union_operator.unfiltered_variants() {
+            let SerdeOperator::Struct(struct_op) = self.get_operator(variant.addr) else {
+                todo!("handle non-struct-op");
+            };
+
+            for (key, _) in struct_op.properties.iter() {
+                covered_properties.insert(key.arc_str().as_str().into());
+            }
+        }
+
+        let entrypoint_prop_name = self.strings[discriminator_property_text_constant].to_string();
+
+        insert_property(
+            output,
+            &entrypoint_prop_name.clone(),
+            SerdeProperty {
+                property_id,
+                value_addr: union_addr,
+                flags: SerdePropertyFlags::empty(),
+                value_generator: None,
+                kind: SerdePropertyKind::FlatUnionDiscriminator { union_addr },
+            },
+            modifier,
+            self.strings,
+        );
+
+        for key in covered_properties {
+            if key != entrypoint_prop_name {
+                let old = output.insert(
+                    key.as_str().into(),
+                    (
+                        self.strings.make_phf_key(&key),
+                        SerdeProperty {
+                            property_id: PropertyId::subject(RelationshipId(DefId::unit())),
+                            value_addr: SerdeOperatorAddr(0),
+                            flags: SerdePropertyFlags::OPTIONAL,
+                            value_generator: None,
+                            kind: SerdePropertyKind::FlatUnionData,
+                        },
+                    ),
+                );
+                if let Some((old_phf_key, _)) = old {
+                    warn!("property was overwritten: {:?}", old_phf_key.arc_str());
+                }
+            }
+        }
     }
 
     pub(super) fn populate_struct_intersection_operator(

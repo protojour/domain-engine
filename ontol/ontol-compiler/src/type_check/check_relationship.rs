@@ -30,8 +30,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let relation_def_kind = &self.defs.def_kind(relationship.relation_def_id);
 
         match relation_def_kind {
-            DefKind::TextLiteral(_) => {
-                self.check_string_literal_relation(relationship_id, relationship, span);
+            DefKind::TextLiteral(_) | DefKind::Type(_) => {
+                self.check_named_relation(relationship_id, relationship, span);
             }
             DefKind::BuiltinRelType(kind, _) => {
                 self.check_builtin_relation(relationship_id, relationship, kind, span);
@@ -48,8 +48,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         self.types.intern(Type::Tautology)
     }
 
-    /// This defines a property on a compound type
-    fn check_string_literal_relation(
+    /// This defines a property on a compound type.
+    /// The relation can be:
+    /// 1. a text literal, which defines a named property
+    /// 2. a domain-defined unit type, which defines a "flattened" property
+    fn check_named_relation(
         &mut self,
         relationship_id: RelationshipId,
         relationship: &Relationship,

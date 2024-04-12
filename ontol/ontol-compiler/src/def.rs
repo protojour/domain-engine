@@ -180,6 +180,7 @@ pub enum BuiltinRelationKind {
 #[derive(Debug)]
 pub struct Relationship<'m> {
     pub relation_def_id: DefId,
+    pub relation_span: SourceSpan,
 
     pub subject: (DefId, SourceSpan),
     /// The cardinality of the relationship, i.e. how many objects are related to the subject

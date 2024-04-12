@@ -59,6 +59,7 @@ pub struct SerdeGenerator<'c, 'm> {
     pub(super) lazy_struct_intersection_tasks: VecDeque<(SerdeOperatorAddr, SerdeIntersection)>,
     pub(super) lazy_union_repr_tasks:
         VecDeque<(SerdeOperatorAddr, SerdeDef, TextConstant, &'c Properties)>,
+    pub(super) lazy_union_flattener_tasks: VecDeque<(SerdeOperatorAddr, SerdeDef, &'c Properties)>,
     pub(super) task_state: DebugTaskState,
 
     pub(super) operators_by_addr: Vec<SerdeOperator>,
@@ -70,6 +71,7 @@ pub(super) enum DebugTaskState {
     Struct,
     Intersection,
     Union,
+    UnionFlatten,
 }
 
 enum OperatorAllocation {
@@ -109,6 +111,14 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
                 self.populate_union_repr_operator(addr, def, typename, properties);
             }
+
+            self.task_state = DebugTaskState::UnionFlatten;
+
+            // The lazy union flattener tasks are just consumed here and pushed again as lazy_struct_op_tasks.
+            // The point is to run again after all union operators.
+            while let Some((addr, def, properties)) = self.lazy_union_flattener_tasks.pop_front() {
+                self.lazy_struct_op_tasks.push_back((addr, def, properties));
+            }
         }
 
         self.task_state = DebugTaskState::Unlocked;
@@ -118,6 +128,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         !self.lazy_struct_op_tasks.is_empty()
             || !self.lazy_struct_intersection_tasks.is_empty()
             || !self.lazy_union_repr_tasks.is_empty()
+            || !self.lazy_union_flattener_tasks.is_empty()
     }
 
     pub fn make_dynamic_sequence_addr(&mut self) -> SerdeOperatorAddr {

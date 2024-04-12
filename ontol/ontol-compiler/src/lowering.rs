@@ -305,7 +305,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     let def_id = self.resolve_type_reference(ty, &span, Some(&mut root_defs))?;
 
                     match self.compiler.defs.def_kind(def_id) {
-                        DefKind::TextLiteral(_) => (RelationKey::Named(def_id), span.clone(), None),
+                        DefKind::TextLiteral(_) | DefKind::Type(_) => {
+                            (RelationKey::Named(def_id), span.clone(), None)
+                        }
                         DefKind::BuiltinRelType(..) => {
                             (RelationKey::Builtin(def_id), span.clone(), None)
                         }
@@ -370,6 +372,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
         let mut relationship = Relationship {
             relation_def_id,
+            relation_span: self.src.span(&ident_span),
             subject: (subject.0, self.src.span(subject.1)),
             subject_cardinality: subject_cardinality
                 .map(convert_cardinality)
@@ -396,6 +399,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         if relation_def_id == self.compiler.primitives.relations.id {
             relationship = Relationship {
                 relation_def_id: self.compiler.primitives.relations.identifies,
+                relation_span: relationship.relation_span,
                 subject: relationship.object,
                 subject_cardinality: relationship.object_cardinality,
                 object: relationship.subject,
@@ -508,6 +512,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         Ok(self.define_anonymous(
             DefKind::Relationship(Relationship {
                 relation_def_id,
+                relation_span: self.src.span(&transition.1),
                 subject: (from.0, self.src.span(from.1)),
                 subject_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::IndexSet),
                 object: (to.0, self.src.span(to.1)),
@@ -1321,6 +1326,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     relationship_id,
                     DefKind::Relationship(Relationship {
                         relation_def_id: self.compiler.primitives.relations.is,
+                        relation_span: span,
                         subject: (def_id, span),
                         subject_cardinality: (
                             PropertyCardinality::Mandatory,

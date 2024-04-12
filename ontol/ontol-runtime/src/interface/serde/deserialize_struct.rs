@@ -7,10 +7,7 @@ use tracing::debug;
 use crate::{
     format_utils::{DoubleQuote, LogicOp, Missing},
     interface::serde::deserialize_raw::RawVisitor,
-    ontology::{
-        domain::TypeKind,
-        ontol::{TextConstant, ValueGenerator},
-    },
+    ontology::{domain::TypeKind, ontol::ValueGenerator},
     phf::PhfIndexMap,
     property::PropertyId,
     value::{Attribute, Value},
@@ -27,7 +24,7 @@ use super::{
         PossibleVariants, SerdeOperator, SerdeOperatorAddr, SerdeProperty, SerdeStructFlags,
         StructOperator,
     },
-    processor::{RecursionLimitError, SerdeProcessor, SubProcessorContext},
+    processor::{ProcessorProfileFlags, RecursionLimitError, SerdeProcessor, SubProcessorContext},
     utils::BufferedAttrsReader,
 };
 
@@ -370,12 +367,16 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                         output.observed_required_count += 1;
                     }
                 }
-                PropKind::FlatUnionDiscriminator(key, serde_property, variants) => {
+                PropKind::FlatUnionDiscriminator(key, serde_property, union_addr) => {
+                    let SerdeOperator::Union(union_op) = &self.processor.ontology[union_addr]
+                    else {
+                        panic!("expected a union operator");
+                    };
                     let union_matcher = UnionMatcher {
-                        typename: TextConstant(0),
+                        typename: union_op.typename(),
                         ctx: self.processor.ctx,
                         possible_variants: PossibleVariants::new(
-                            variants,
+                            union_op.unfiltered_variants(),
                             self.processor.mode,
                             self.processor.level,
                         ),
@@ -394,7 +395,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                         .or_else(|_| map_matcher.match_fallback())
                         .map_err(|_indicisive| {
                             serde::de::Error::custom(format!(
-                                "invalid map value, expected {}",
+                                "property \"{key}\": invalid value, expected {}",
                                 ExpectingMatching(&union_matcher)
                             ))
                         })?;
@@ -409,6 +410,12 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                         .flattened_union_ops
                         .insert(serde_property.property_id, addr);
                     output.flattened_union_tmp_data.insert(key, value);
+
+                    if !serde_property
+                        .is_optional_for(self.processor.mode, &self.processor.profile.flags)
+                    {
+                        output.observed_required_count += 1;
+                    }
                 }
                 PropKind::FlatUnionData(key) => {
                     output
@@ -460,8 +467,27 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
             output.attributes.insert(property_id, ontol_value.into());
         }
 
-        // TODO/FIXME: The remaining flattened_union_tmp_data,
-        // should it be converted to open data?
+        if self.flags.contains(SerdeStructFlags::OPEN_DATA)
+            && self
+                .processor
+                .profile
+                .flags
+                .contains(ProcessorProfileFlags::DESERIALIZE_OPEN_DATA)
+        {
+            debug!(
+                "remaining flattened union tmp data: {:#?}",
+                output.flattened_union_tmp_data
+            );
+
+            for (key, serde_value) in std::mem::take(&mut output.flattened_union_tmp_data) {
+                output.open_dict.insert(
+                    key.into(),
+                    RawVisitor::new(self.processor.ontology, self.processor.level)
+                        .map_err(RecursionLimitError::to_de_error)?
+                        .deserialize(serde_value::ValueDeserializer::new(serde_value))?,
+                );
+            }
+        }
 
         Ok(())
     }

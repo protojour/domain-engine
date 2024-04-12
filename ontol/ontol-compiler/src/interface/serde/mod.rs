@@ -46,6 +46,7 @@ impl<'m> Compiler<'m> {
             lazy_struct_op_tasks: VecDeque::new(),
             lazy_struct_intersection_tasks: VecDeque::new(),
             lazy_union_repr_tasks: VecDeque::new(),
+            lazy_union_flattener_tasks: VecDeque::new(),
             task_state: DebugTaskState::Unlocked,
             operators_by_addr: Default::default(),
             operators_by_key: Default::default(),

@@ -58,7 +58,7 @@ fn test_geojson() {
         );
         assert_error_msg!(
             serde_create(&geometry).to_value_variant(json!({ "type": "bogus" })),
-            "invalid map value, expected `Geometry` (one of `Point`, `MultiPoint`, `LineString`, `MultiLineString`, `Polygon`, `MultiPolygon`, `GeometryCollection`) at line 1 column 16"
+            "invalid type, expected `Geometry` (one of `Point`, `MultiPoint`, `LineString`, `MultiLineString`, `Polygon`, `MultiPolygon`, `GeometryCollection`) at line 1 column 16"
         );
     });
 }

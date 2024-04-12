@@ -40,6 +40,7 @@ pub enum CompileError {
     DomainTypeExpected,
     InvalidRelationType,
     DuplicateAnonymousRelationship,
+    FlattenedRelationshipObjectMustBeStructUnion,
     SubjectMustBeDomainType,
     ObjectMustBeDataType,
     FmtTooFewTransitions,
@@ -134,6 +135,9 @@ impl std::fmt::Display for CompileError {
             Self::InvalidRelationType => write!(f, "invalid relation type"),
             Self::DuplicateAnonymousRelationship => {
                 write!(f, "duplicate anonymous relationship")
+            }
+            Self::FlattenedRelationshipObjectMustBeStructUnion => {
+                write!(f, "the object of a flattened relationship must be a union")
             }
             Self::SubjectMustBeDomainType => write!(f, "subject must be a domain type"),
             Self::ObjectMustBeDataType => write!(f, "object must be a data type"),

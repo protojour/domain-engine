@@ -151,6 +151,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
 
                     let relationship = Relationship {
                         relation_def_id,
+                        relation_span: pattern.span,
                         subject: (parent_def_id, pattern.span),
                         subject_cardinality: if flags.is_option {
                             (PropertyCardinality::Optional, value_cardinality)

@@ -469,9 +469,8 @@ pub enum SerdePropertyKind {
     /// The property is the entry point to a flattened union.
     /// The property itself is the flattened union's discriminating property.
     /// Interacting with the inner structure of the type requires resolving the union variant.
-    FlatUnionDiscriminator {
-        variants: ThinVec<SerdeUnionVariant>,
-    },
+    /// The union_addr must be a UnionOperator address.
+    FlatUnionDiscriminator { union_addr: SerdeOperatorAddr },
     /// A property that belongs to some flattened union variant.
     /// The full set of properties that belong to at least one flattened variant
     /// must be explicitly inlucded in the parent structure using this kind.
