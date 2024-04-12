@@ -297,7 +297,7 @@ impl ConduitBundle {
             .scalar()
             .clone();
 
-        article_id.as_string().unwrap().into()
+        article_id.as_string().unwrap()
     }
 
     async fn create_db_article_with_tag_for_teh_user(&self) {
@@ -836,13 +836,13 @@ async fn test_graphql_conduit_feed_public_no_query_selection() {
     test.create_db_article_for_teh_user("The title").await;
 
     expect_eq!(
-        actual = format!(
-            "{{
-                feed(input: {{ username: \"teh_user\" }}) {{
-                    title
-                }}
-            }}"
-        )
+        actual = "
+        {{
+            feed(input: {{ username: \"teh_user\" }}) {{
+                title
+            }}
+        }}"
+        .to_string()
         .exec([], &test.feed_schema, &test.ctx())
         .await,
         expected = Ok(graphql_value!({
@@ -886,14 +886,14 @@ async fn test_graphql_conduit_feed_public_with_items_query() {
     test.create_db_article_for_teh_user("The title").await;
 
     expect_eq!(
-        actual = format!(
-            "{{
-                feed(input: {{ username: \"teh_user\" }}) {{
-                    title
-                    items {{ guid }}
-                }}
-            }}"
-        )
+        actual = "
+        {{
+            feed(input: {{ username: \"teh_user\" }}) {{
+                title
+                items {{ guid }}
+            }}
+        }}"
+        .to_string()
         .exec([], &test.feed_schema, &test.ctx())
         .await,
         expected = Ok(graphql_value!({

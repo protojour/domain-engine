@@ -16,7 +16,7 @@ impl Lang for TestLang {
         hir
     }
 
-    fn as_hir<'m, 'a, H: Clone>(data: &'m Self::Data<'a, H>) -> &'m H {
+    fn as_hir<'m, H: Clone>(data: &'m Self::Data<'_, H>) -> &'m H {
         data
     }
 }

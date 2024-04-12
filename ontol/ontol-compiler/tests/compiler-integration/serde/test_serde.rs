@@ -423,8 +423,8 @@ fn test_f64_range_constrained() {
         assert_json_io_matches!(serde_create(&fraction), 0.5 == 0.5);
         assert_json_io_matches!(serde_create(&fraction), 1.0 == 1.0);
         assert_error_msg!(
-            serde_create(&fraction).to_value_variant(json!(3.14)),
-            r#"invalid type: floating point `3.14`, expected float in range 0..=1 at line 1 column 4"#
+            serde_create(&fraction).to_value_variant(json!(6.66)),
+            r#"invalid type: floating point `6.66`, expected float in range 0..=1 at line 1 column 4"#
         );
     });
 }
@@ -855,7 +855,7 @@ fn test_serde_open_properties() {
         assert_json_io_matches!(serde_create(&foo).enable_open_data(), {
             "closed": "A",
             "int": 2,
-            "float": 3.14,
+            "float": 6.66,
             "bool": true,
             "null": null,
             "dict": {

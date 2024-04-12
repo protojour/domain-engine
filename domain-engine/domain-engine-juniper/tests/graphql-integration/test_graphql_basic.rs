@@ -93,7 +93,7 @@ fn test_graphql_field_order() {
         .unwrap()
         .fields
         .iter()
-        .map(|field| field.name.as_ref())
+        .map(|field| field.name)
         .collect();
 
     expect_eq!(
@@ -185,7 +185,7 @@ async fn test_graphql_int_scalars() {
         .returns(Ok(Response::one_inserted(
             foo.entity_builder(
                 json!("my_id"),
-                json!({ "small": 42, "big": 112233445566778899 as i64 }),
+                json!({ "small": 42, "big": 112233445566778899_i64 }),
             )
             .into(),
         )));
@@ -379,12 +379,12 @@ async fn test_graphql_basic_pagination() {
                         let Request::Query(entity_select) = request else {
                             panic!();
                         };
-                        assert_eq!(entity_select.include_total_len, false);
+                        assert!(!entity_select.include_total_len);
                         assert_eq!(entity_select.limit, 42);
-                        assert_eq!(entity_select.after_cursor.as_deref().unwrap(), &['1' as u8]);
+                        assert_eq!(entity_select.after_cursor.as_deref().unwrap(), &[b'1']);
 
                         Ok(Response::Query(Sequence::default().with_sub(SubSequence {
-                            end_cursor: Some(Box::new(['2' as u8])),
+                            end_cursor: Some(Box::new([b'2'])),
                             has_next: true,
                             total_len: Some(42),
                         })))
@@ -424,12 +424,12 @@ async fn test_graphql_basic_pagination() {
                         let Request::Query(entity_select) = request else {
                             panic!();
                         };
-                        assert_eq!(entity_select.include_total_len, true);
+                        assert!(entity_select.include_total_len);
                         assert_eq!(entity_select.limit, 1);
                         assert_eq!(entity_select.after_cursor, None);
 
                         Ok(Response::Query(Sequence::default().with_sub(SubSequence {
-                            end_cursor: Some(vec!['1' as u8].into_boxed_slice()),
+                            end_cursor: Some(vec![b'1'].into_boxed_slice()),
                             has_next: true,
                             total_len: Some(42),
                         })))

@@ -395,7 +395,7 @@ fn test_deserialize_open_data() {
             .to_value(json!({
                 "closed": 1,
                 "int": 2,
-                "float": 3.14,
+                "float": 6.66,
                 "bool": true,
                 "null": null,
                 "dict": {
