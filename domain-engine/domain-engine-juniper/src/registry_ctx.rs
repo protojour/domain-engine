@@ -15,7 +15,10 @@ use ontol_runtime::{
         discriminator::VariantPurpose,
         graphql::argument::DefaultArg,
         serde::{
-            operator::{AppliedVariants, SerdeOperator, SerdeOperatorAddr, SerdePropertyFlags},
+            operator::{
+                AppliedVariants, SerdeOperator, SerdeOperatorAddr, SerdePropertyFlags,
+                SerdePropertyKind,
+            },
             processor::ProcessorProfileFlags,
         },
     },
@@ -150,7 +153,10 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                     let mut argument = self.get_operator_argument(
                         key.arc_str(),
                         property.value_addr,
-                        property.rel_params_addr,
+                        match &property.kind {
+                            SerdePropertyKind::Plain { rel_params_addr } => *rel_params_addr,
+                            _ => None,
+                        },
                         property.flags,
                         TypeModifier::Unit(match typing_purpose {
                             TypingPurpose::PartialInput => Optionality::Optional,

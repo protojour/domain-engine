@@ -2,36 +2,42 @@ use serde::{
     de::{DeserializeSeed, Error, Visitor},
     Deserializer,
 };
-use smartstring::alias::String;
 
 use crate::{ontology::domain::TypeKind, phf::PhfIndexMap, RelationshipId};
 
 use super::{
     deserialize_struct::StructDeserializer,
-    operator::{SerdeOperatorAddr, SerdeProperty, SerdePropertyFlags, SerdeStructFlags},
+    operator::{
+        SerdeOperatorAddr, SerdeProperty, SerdePropertyFlags, SerdePropertyKind, SerdeStructFlags,
+        SerdeUnionVariant,
+    },
     processor::{ProcessorMode, ProcessorProfileFlags, SpecialProperty},
 };
 
+pub struct RelParamsAddr(pub Option<SerdeOperatorAddr>);
+
 /// The types of properties the deserializer understands.
-pub enum PropKind {
-    Property(SerdeProperty),
+pub enum PropKind<'on> {
+    Property(&'on SerdeProperty, RelParamsAddr),
     RelParams(SerdeOperatorAddr),
     SingletonId(SerdeOperatorAddr),
     OverriddenId(RelationshipId, SerdeOperatorAddr),
-    Open(String),
+    FlatUnionDiscriminator(Box<str>, &'on SerdeProperty, &'on [SerdeUnionVariant]),
+    FlatUnionData(Box<str>),
+    Open(smartstring::alias::String),
     Ignored,
 }
 
 /// A visitor for properties (i.e. _keys, not their values, which are the attributes).
 /// It determines the semantics of each property, or whether it's accepted or not.
 #[derive(Clone, Copy)]
-pub struct PropertyMapVisitor<'d> {
-    pub deserializer: &'d StructDeserializer<'d, 'd>,
-    pub properties: &'d PhfIndexMap<SerdeProperty>,
+pub struct PropertyMapVisitor<'a> {
+    pub deserializer: &'a StructDeserializer<'a, 'a>,
+    pub properties: &'a PhfIndexMap<SerdeProperty>,
 }
 
 impl<'a, 'de> DeserializeSeed<'de> for PropertyMapVisitor<'a> {
-    type Value = PropKind;
+    type Value = PropKind<'a>;
 
     fn deserialize<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
         deserializer.deserialize_str(self)
@@ -39,13 +45,13 @@ impl<'a, 'de> DeserializeSeed<'de> for PropertyMapVisitor<'a> {
 }
 
 impl<'a, 'de> Visitor<'de> for PropertyMapVisitor<'a> {
-    type Value = PropKind;
+    type Value = PropKind<'a>;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "property identifier")
     }
 
-    fn visit_str<E: Error>(self, v: &str) -> Result<PropKind, E> {
+    fn visit_str<E: Error>(self, v: &str) -> Result<PropKind<'a>, E> {
         let Some(serde_property) = self.properties.get(v) else {
             return fallback(v, self.deserializer);
         };
@@ -69,7 +75,21 @@ impl<'a, 'de> Visitor<'de> for PropertyMapVisitor<'a> {
             )
             .is_some()
         {
-            Ok(PropKind::Property(*serde_property))
+            Ok(match &serde_property.kind {
+                SerdePropertyKind::Plain { rel_params_addr } => {
+                    PropKind::Property(serde_property, RelParamsAddr(*rel_params_addr))
+                }
+                SerdePropertyKind::FlatUnionDiscriminator { variants } => {
+                    PropKind::FlatUnionDiscriminator(
+                        v.to_string().into_boxed_str(),
+                        &serde_property,
+                        variants,
+                    )
+                }
+                SerdePropertyKind::FlatUnionData => {
+                    PropKind::FlatUnionData(v.to_string().into_boxed_str())
+                }
+            })
         } else if serde_property.is_read_only()
             && !matches!(self.deserializer.processor.mode, ProcessorMode::Read)
         {
@@ -90,7 +110,7 @@ pub struct IdSingletonPropVisitor<'d> {
 }
 
 impl<'a, 'de> DeserializeSeed<'de> for IdSingletonPropVisitor<'a> {
-    type Value = PropKind;
+    type Value = PropKind<'a>;
 
     fn deserialize<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
         deserializer.deserialize_str(self)
@@ -98,13 +118,13 @@ impl<'a, 'de> DeserializeSeed<'de> for IdSingletonPropVisitor<'a> {
 }
 
 impl<'a, 'de> Visitor<'de> for IdSingletonPropVisitor<'a> {
-    type Value = PropKind;
+    type Value = PropKind<'a>;
 
     fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "property identifier")
     }
 
-    fn visit_str<E: Error>(self, v: &str) -> Result<PropKind, E> {
+    fn visit_str<E: Error>(self, v: &str) -> Result<PropKind<'a>, E> {
         if v == self.id_prop_name {
             Ok(PropKind::SingletonId(self.id_prop_addr))
         } else if v
@@ -126,7 +146,10 @@ impl<'a, 'de> Visitor<'de> for IdSingletonPropVisitor<'a> {
     }
 }
 
-fn fallback<E: Error>(v: &str, deserializer: &StructDeserializer) -> Result<PropKind, E> {
+fn fallback<'a, E: Error>(
+    v: &str,
+    deserializer: &StructDeserializer<'a, 'a>,
+) -> Result<PropKind<'a>, E> {
     match deserializer
         .processor
         .profile

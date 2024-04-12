@@ -10,7 +10,7 @@ use crate::{
     interface::serde::{
         deserialize_id::IdSingletonStructVisitor,
         deserialize_struct::{PossibleProps, StructDeserializer, StructVisitor},
-        matcher::map_matchers::{MapMatchMode, MapMatchResult},
+        matcher::map_matchers::MapMatchMode,
     },
     sequence::{IndexSetBuilder, ListBuilder, SequenceBuilder},
     value::{Attribute, Serial, Value},
@@ -364,23 +364,23 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
 
     fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
         trace!("visit map\n");
-        let mut matcher = self
+        let map_matcher = self
             .matcher
             .match_map()
             .map_err(|_| Error::invalid_type(Unexpected::Map, &self))?;
 
         // Because serde is stream-oriented, we need to start storing attributes
         // into a buffer until the type can be properly recognized
-        let mut buffered_attrs: Vec<(std::string::String, serde_value::Value)> = Default::default();
+        let mut buffered_attrs: Vec<(Box<str>, serde_value::Value)> = Default::default();
 
         let map_match = loop {
-            let property = match map.next_key::<std::string::String>()? {
+            let property = match map.next_key::<Box<str>>()? {
                 Some(property) => property,
-                None => match matcher.match_fallback() {
-                    MapMatchResult::Match(map_match) => {
+                None => match map_matcher.match_fallback() {
+                    Ok(map_match) => {
                         break map_match;
                     }
-                    MapMatchResult::Indecisive(_) => {
+                    Err(_indecisive) => {
                         return Err(Error::custom(format!(
                             "invalid map value, expected {}",
                             ExpectingMatching(&self.matcher)
@@ -391,15 +391,13 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
 
             let value: serde_value::Value = map.next_value()?;
 
-            match matcher.match_attribute(&property, &value) {
-                MapMatchResult::Match(map_match) => {
+            match map_matcher.match_attribute(&property, &value) {
+                Ok(map_match) => {
                     trace!("matched attribute \"{property}\"");
                     buffered_attrs.push((property, value));
                     break map_match;
                 }
-                MapMatchResult::Indecisive(next_matcher) => {
-                    matcher = next_matcher;
-                }
+                Err(_indecisive) => {}
             }
 
             buffered_attrs.push((property, value));
@@ -412,7 +410,7 @@ impl<'on, 'p, 'de, M: ValueMatcher> Visitor<'de> for MatcherVisitor<'on, 'p, M> 
 
         // delegate to the real struct visitor
         match map_match.mode {
-            MapMatchMode::Struct(struct_op) => StructVisitor {
+            MapMatchMode::Struct(_, struct_op) => StructVisitor {
                 processor: self.processor,
                 buffered_attrs,
                 struct_op,

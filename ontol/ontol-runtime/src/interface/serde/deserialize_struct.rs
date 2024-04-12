@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use fnv::FnvHashMap;
 use serde::de::{DeserializeSeed, MapAccess, Visitor};
@@ -7,7 +7,10 @@ use tracing::debug;
 use crate::{
     format_utils::{DoubleQuote, LogicOp, Missing},
     interface::serde::deserialize_raw::RawVisitor,
-    ontology::{domain::TypeKind, ontol::ValueGenerator},
+    ontology::{
+        domain::TypeKind,
+        ontol::{TextConstant, ValueGenerator},
+    },
     phf::PhfIndexMap,
     property::PropertyId,
     value::{Attribute, Value},
@@ -17,7 +20,13 @@ use crate::{
 
 use super::{
     deserialize_property::{IdSingletonPropVisitor, PropKind, PropertyMapVisitor},
-    operator::{SerdeOperatorAddr, SerdeProperty, SerdeStructFlags, StructOperator},
+    matcher::{
+        map_matchers::MapMatchMode, union_matcher::UnionMatcher, ExpectingMatching, ValueMatcher,
+    },
+    operator::{
+        PossibleVariants, SerdeOperator, SerdeOperatorAddr, SerdeProperty, SerdeStructFlags,
+        StructOperator,
+    },
     processor::{RecursionLimitError, SerdeProcessor, SubProcessorContext},
     utils::BufferedAttrsReader,
 };
@@ -28,8 +37,15 @@ pub struct Struct {
     pub attributes: FnvHashMap<PropertyId, Attribute>,
     pub id: Option<Value>,
     pub rel_params: Value,
-    open_dict: BTreeMap<smartstring::alias::String, Value>,
     observed_required_count: usize,
+
+    /// Pre-discriminated flattened unions
+    flattened_union_ops: FnvHashMap<PropertyId, SerdeOperatorAddr>,
+
+    /// serde properties that may later be deserialized by the flattened unions above
+    flattened_union_tmp_data: HashMap<Box<str>, serde_value::Value>,
+
+    open_dict: BTreeMap<smartstring::alias::String, Value>,
 }
 
 /// A serde visitor for maps (i.e. JSON objects) that uses the [StructDeserializer] internally.
@@ -37,7 +53,7 @@ pub struct StructVisitor<'on, 'p> {
     pub processor: SerdeProcessor<'on, 'p>,
 
     // FIXME: Can make use of `Cow<'de, str>`?
-    pub buffered_attrs: Vec<(String, serde_value::Value)>,
+    pub buffered_attrs: Vec<(Box<str>, serde_value::Value)>,
 
     pub struct_op: &'on StructOperator,
     pub ctx: SubProcessorContext,
@@ -78,6 +94,8 @@ impl Default for Struct {
             id: None,
             rel_params: Value::unit(),
             open_dict: BTreeMap::default(),
+            flattened_union_ops: FnvHashMap::default(),
+            flattened_union_tmp_data: HashMap::default(),
             observed_required_count: 0,
         }
     }
@@ -172,7 +190,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
     /// Perform the struct deserialization
     pub fn deserialize_struct<'de, A: MapAccess<'de>>(
         self,
-        buffered_attrs: Vec<(String, serde_value::Value)>,
+        buffered_attrs: Vec<(Box<str>, serde_value::Value)>,
         map: A,
     ) -> Result<Struct, A::Error> {
         let mut output = Struct::default();
@@ -207,6 +225,8 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                 self.generate_missing_attributes(&mut output)
                     .map_err(serde::de::Error::custom)?;
 
+                self.deserialize_flattened_unions::<A::Error>(&mut output)?;
+
                 self.report_missing_attributes(&output)
                     .map_err(serde::de::Error::custom)?;
 
@@ -216,11 +236,72 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
         }
     }
 
+    /// Deserialize an inner flattened struct.
+    /// The strategy is to remove matching attributes from the passed HashMap,
+    /// so that the remaining serde attributes can be used afterwards for other
+    /// flattened structs or inherent properties.
+    fn deserialize_inner_flattened_struct<E: serde::de::Error>(
+        &self,
+        all_attrs: &mut HashMap<Box<str>, serde_value::Value>,
+    ) -> Result<Value, E> {
+        let PossibleProps::Any(properties) = &self.possible_props else {
+            panic!("expected any properties");
+        };
+
+        let mut output = Struct::default();
+
+        for (key, serde_property) in properties.iter() {
+            let property_processor = self
+                .processor
+                .new_child_with_context(
+                    serde_property.value_addr,
+                    SubProcessorContext {
+                        is_update: false,
+                        parent_property_id: Some(serde_property.property_id),
+                        parent_property_flags: serde_property.flags,
+                        rel_params_addr: None,
+                    },
+                )
+                .map_err(RecursionLimitError::to_de_error)?;
+
+            let is_optional =
+                serde_property.is_optional_for(self.processor.mode, &self.processor.profile.flags);
+
+            if let Some(serde_value) = all_attrs.remove(key.arc_str().as_str()) {
+                let attr = property_processor
+                    .deserialize(serde_value::ValueDeserializer::<E>::new(serde_value))?;
+                output.attributes.insert(serde_property.property_id, attr);
+
+                if !is_optional {
+                    output.observed_required_count += 1;
+                }
+            } else if !is_optional {
+                return Err(serde::de::Error::custom(format!(
+                    "missing property `{}`",
+                    key.arc_str()
+                )));
+            }
+        }
+
+        self.generate_missing_attributes(&mut output)
+            .map_err(serde::de::Error::custom)?;
+
+        self.report_missing_attributes(&output)
+            .map_err(serde::de::Error::custom)?;
+
+        let boxed_attrs = Box::new(output.attributes);
+        Ok(if self.processor.ctx.is_update {
+            Value::StructUpdate(boxed_attrs, self.type_def_id)
+        } else {
+            Value::Struct(boxed_attrs, self.type_def_id)
+        })
+    }
+
     /// Read from a serde MapAccess and copy resulting attributes into output
     fn consume<'de, A: MapAccess<'de>>(
         &self,
         mut map: A,
-        property_visitor: impl DeserializeSeed<'de, Value = PropKind> + Copy,
+        property_visitor: impl DeserializeSeed<'de, Value = PropKind<'on>> + Copy,
         output: &mut Struct,
     ) -> Result<(), A::Error> {
         while let Some(prop_kind) = map.next_key_seed(property_visitor)? {
@@ -258,7 +339,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                         output.observed_required_count += 1;
                     }
                 }
-                PropKind::Property(serde_property) => {
+                PropKind::Property(serde_property, rel_params_addr) => {
                     let property_processor = self
                         .processor
                         .new_child_with_context(
@@ -267,7 +348,7 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                                 is_update: false,
                                 parent_property_id: Some(serde_property.property_id),
                                 parent_property_flags: serde_property.flags,
-                                rel_params_addr: serde_property.rel_params_addr,
+                                rel_params_addr: rel_params_addr.0,
                             },
                         )
                         .map_err(RecursionLimitError::to_de_error)?;
@@ -285,8 +366,54 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                             serde_property.property_id,
                             map.next_value_seed(property_processor)?,
                         );
+
                         output.observed_required_count += 1;
                     }
+                }
+                PropKind::FlatUnionDiscriminator(key, serde_property, variants) => {
+                    let union_matcher = UnionMatcher {
+                        typename: TextConstant(0),
+                        ctx: self.processor.ctx,
+                        possible_variants: PossibleVariants::new(
+                            variants,
+                            self.processor.mode,
+                            self.processor.level,
+                        ),
+                        ontology: self.processor.ontology,
+                        profile: self.processor.profile,
+                        mode: self.processor.mode,
+                        level: self.processor.level,
+                    };
+                    let map_matcher = union_matcher
+                        .match_map()
+                        .map_err(|_| serde::de::Error::custom("unmatchable"))?;
+                    let value: serde_value::Value = map.next_value()?;
+
+                    let map_match = map_matcher
+                        .match_attribute(&key, &value)
+                        .or_else(|_| map_matcher.match_fallback())
+                        .map_err(|_indicisive| {
+                            serde::de::Error::custom(format!(
+                                "invalid map value, expected {}",
+                                ExpectingMatching(&union_matcher)
+                            ))
+                        })?;
+
+                    let MapMatchMode::Struct(addr, _) = map_match.mode else {
+                        return Err(serde::de::Error::custom(
+                            "flattened union error: not a struct",
+                        ));
+                    };
+
+                    output
+                        .flattened_union_ops
+                        .insert(serde_property.property_id, addr);
+                    output.flattened_union_tmp_data.insert(key, value);
+                }
+                PropKind::FlatUnionData(key) => {
+                    output
+                        .flattened_union_tmp_data
+                        .insert(key, map.next_value()?);
                 }
                 PropKind::Open(key) => {
                     output.open_dict.insert(
@@ -302,6 +429,39 @@ impl<'on, 'p> StructDeserializer<'on, 'p> {
                 }
             }
         }
+
+        Ok(())
+    }
+
+    fn deserialize_flattened_unions<E: serde::de::Error>(
+        &self,
+        output: &mut Struct,
+    ) -> Result<(), E> {
+        for (property_id, addr) in std::mem::take(&mut output.flattened_union_ops) {
+            let SerdeOperator::Struct(struct_op) = &self.processor.ontology[addr] else {
+                return Err(E::custom("BUG: flattened union must use a struct operator"));
+            };
+
+            let struct_deserializer = StructDeserializer::new(
+                struct_op.def.def_id,
+                self.processor,
+                PossibleProps::Any(&struct_op.properties),
+            )
+            .with_struct_flags(struct_op.flags)
+            .with_expected_required_count(struct_op.required_count(
+                self.processor.mode,
+                self.processor.ctx.parent_property_id,
+                self.processor.profile.flags,
+            ));
+
+            let ontol_value = struct_deserializer
+                .deserialize_inner_flattened_struct(&mut output.flattened_union_tmp_data)?;
+
+            output.attributes.insert(property_id, ontol_value.into());
+        }
+
+        // TODO/FIXME: The remaining flattened_union_tmp_data,
+        // should it be converted to open data?
 
         Ok(())
     }

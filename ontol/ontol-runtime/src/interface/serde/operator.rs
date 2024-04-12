@@ -191,16 +191,7 @@ impl UnionOperator {
         mode: ProcessorMode,
         level: ProcessorLevel,
     ) -> AppliedVariants<'_> {
-        let possible_variants = PossibleVariants {
-            all_variants: &self.variants,
-            mode,
-            level,
-        };
-        if let Some(certain_addr) = possible_variants.into_iter().find_unambiguous_addr() {
-            AppliedVariants::Unambiguous(certain_addr)
-        } else {
-            AppliedVariants::OneOf(possible_variants)
-        }
+        PossibleVariants::new(&self.variants, mode, level).applied()
     }
 
     pub fn unfiltered_variants(&self) -> &[SerdeUnionVariant] {
@@ -218,6 +209,28 @@ pub struct PossibleVariants<'on> {
     all_variants: &'on [SerdeUnionVariant],
     mode: ProcessorMode,
     level: ProcessorLevel,
+}
+
+impl<'on> PossibleVariants<'on> {
+    pub fn new(
+        all_variants: &'on [SerdeUnionVariant],
+        mode: ProcessorMode,
+        level: ProcessorLevel,
+    ) -> Self {
+        Self {
+            all_variants,
+            mode,
+            level,
+        }
+    }
+
+    pub fn applied(self) -> AppliedVariants<'on> {
+        if let Some(certain_addr) = self.into_iter().find_unambiguous_addr() {
+            AppliedVariants::Unambiguous(certain_addr)
+        } else {
+            AppliedVariants::OneOf(self)
+        }
+    }
 }
 
 impl<'on> IntoIterator for PossibleVariants<'on> {
@@ -353,7 +366,7 @@ impl StructOperator {
     }
 }
 
-#[derive(Clone, Copy, Serialize, Deserialize, OntolDebug, Debug)]
+#[derive(Clone, Serialize, Deserialize, OntolDebug)]
 pub struct SerdeProperty {
     /// The ID of this property
     pub property_id: PropertyId,
@@ -367,7 +380,7 @@ pub struct SerdeProperty {
     /// Value generator
     pub value_generator: Option<ValueGenerator>,
 
-    pub rel_params_addr: Option<SerdeOperatorAddr>,
+    pub kind: SerdePropertyKind,
 }
 
 impl SerdeProperty {
@@ -448,16 +461,33 @@ impl SerdeProperty {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize, OntolDebug)]
+pub enum SerdePropertyKind {
+    Plain {
+        rel_params_addr: Option<SerdeOperatorAddr>,
+    },
+    /// The property is the entry point to a flattened union.
+    /// The property itself is the flattened union's discriminating property.
+    /// Interacting with the inner structure of the type requires resolving the union variant.
+    FlatUnionDiscriminator {
+        variants: ThinVec<SerdeUnionVariant>,
+    },
+    /// A property that belongs to some flattened union variant.
+    /// The full set of properties that belong to at least one flattened variant
+    /// must be explicitly inlucded in the parent structure using this kind.
+    FlatUnionData,
+}
+
 bitflags::bitflags! {
     #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Serialize, Deserialize, Debug)]
     pub struct SerdePropertyFlags: u8 {
-        const OPTIONAL        = 0b00000001;
+        const OPTIONAL         = 0b00000001;
         /// Property represents parameters to a relation: e.g. "_edge"
-        const REL_PARAMS      = 0b00000010;
-        const READ_ONLY       = 0b00000100;
-        const ENTITY_ID       = 0b00001000;
+        const REL_PARAMS       = 0b00000010;
+        const READ_ONLY        = 0b00000100;
+        const ENTITY_ID        = 0b00001000;
         /// Property is part of the entity graph
-        const IN_ENTITY_GRAPH = 0b00010000;
+        const IN_ENTITY_GRAPH  = 0b00010000;
     }
 }
 

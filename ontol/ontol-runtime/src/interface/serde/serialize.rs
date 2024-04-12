@@ -1,3 +1,4 @@
+use fnv::FnvHashMap;
 use serde::{
     ser::{Error, SerializeMap, SerializeSeq},
     Serializer,
@@ -12,13 +13,16 @@ use crate::{
         processor::{RecursionLimitError, ScalarFormat},
     },
     ontology::ontol::text_pattern::{FormatPattern, TextPatternConstantPart},
+    property::PropertyId,
     smart_format,
     value::{Attribute, FormatValueAsText, Value},
     DefId,
 };
 
 use super::{
-    operator::{SequenceRange, SerdeOperator, SerdeStructFlags},
+    operator::{
+        PossibleVariants, SequenceRange, SerdeOperator, SerdePropertyKind, SerdeStructFlags,
+    },
     processor::{ProcessorProfileFlags, SerdeProcessor, SpecialProperty, SubProcessorContext},
     serialize_raw::RawProxy,
     StructOperator,
@@ -348,68 +352,14 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
             .api
             .find_special_property_name(SpecialProperty::IdOverride);
 
-        for (phf_key, serde_prop) in
-            struct_op.filter_properties(self.mode, self.ctx.parent_property_id, self.profile.flags)
-        {
-            if serde_prop.is_rel_params() {
-                self.serialize_rel_params::<S>(phf_key.arc_str(), rel_params, &mut map)?;
-            } else {
-                let unit_attr = UNIT_ATTR;
-                let attribute = match attributes.get(&serde_prop.property_id) {
-                    Some(value) => value,
-                    None => {
-                        if serde_prop.is_optional_for(self.mode, &self.profile.flags) {
-                            continue;
-                        } else {
-                            match &self.ontology[serde_prop.value_addr] {
-                                SerdeOperator::Struct(struct_op) => {
-                                    if struct_op.is_struct_properties_empty() {
-                                        &unit_attr
-                                    } else {
-                                        panic!(
-                                        "While serializing value {:?} with `{}`, the expected value was a non-empty struct, but found unit",
-                                        value, &self.ontology[struct_op.typename]
-                                    )
-                                    }
-                                }
-                                _ => {
-                                    panic!(
-                                    "While serializing value {:?} with `{}`, property `{}` was not found.",
-                                    value, &self.ontology[struct_op.typename], phf_key.arc_str()
-                                )
-                                }
-                            }
-                        }
-                    }
-                };
-
-                let is_entity_id = serde_prop.is_entity_id();
-
-                let name = match (is_entity_id, overridden_id_property_key) {
-                    (true, Some(id_key)) => id_key,
-                    _ => phf_key.arc_str().as_str(),
-                };
-
-                map.serialize_entry(
-                    name,
-                    &Proxy {
-                        value: &attribute.val,
-                        rel_params: attribute.rel.filter_non_unit(),
-                        processor: self
-                            .new_child_with_context(
-                                serde_prop.value_addr,
-                                SubProcessorContext {
-                                    is_update: false,
-                                    parent_property_id: Some(serde_prop.property_id),
-                                    parent_property_flags: serde_prop.flags,
-                                    rel_params_addr: serde_prop.rel_params_addr,
-                                },
-                            )
-                            .map_err(RecursionLimitError::to_ser_error)?,
-                    },
-                )?;
-            }
-        }
+        self.serialize_struct_properties::<S>(
+            struct_op,
+            value,
+            attributes,
+            rel_params,
+            overridden_id_property_key,
+            &mut map,
+        )?;
 
         if struct_op.flags.contains(SerdeStructFlags::OPEN_DATA)
             && self
@@ -440,6 +390,130 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         }
 
         map.end()
+    }
+
+    fn serialize_struct_properties<S: Serializer>(
+        &self,
+        struct_op: &StructOperator,
+        value: &Value,
+        attributes: &FnvHashMap<PropertyId, Attribute<Value>>,
+        rel_params: Option<&Value>,
+        overridden_id_property_key: Option<&str>,
+        map: &mut S::SerializeMap,
+    ) -> Result<(), S::Error> {
+        for (phf_key, serde_prop) in
+            struct_op.filter_properties(self.mode, self.ctx.parent_property_id, self.profile.flags)
+        {
+            if serde_prop.is_rel_params() {
+                self.serialize_rel_params::<S>(phf_key.arc_str(), rel_params, map)?;
+            } else {
+                let unit_attr = UNIT_ATTR;
+                let attribute = match attributes.get(&serde_prop.property_id) {
+                    Some(value) => value,
+                    None => {
+                        if serde_prop.is_optional_for(self.mode, &self.profile.flags) {
+                            continue;
+                        } else {
+                            match &self.ontology[serde_prop.value_addr] {
+                                SerdeOperator::Struct(struct_op) => {
+                                    if struct_op.is_struct_properties_empty() {
+                                        &unit_attr
+                                    } else {
+                                        panic!(
+                                            "While serializing value {:?} with `{}`, the expected value was a non-empty struct, but found unit",
+                                            value, &self.ontology[struct_op.typename]
+                                        )
+                                    }
+                                }
+                                _ => {
+                                    panic!(
+                                        "While serializing value {:?} with `{}`, property `{}` was not found.",
+                                        value, &self.ontology[struct_op.typename], phf_key.arc_str()
+                                    )
+                                }
+                            }
+                        }
+                    }
+                };
+
+                match &serde_prop.kind {
+                    SerdePropertyKind::Plain { rel_params_addr } => {
+                        let is_entity_id = serde_prop.is_entity_id();
+
+                        let name = match (is_entity_id, overridden_id_property_key) {
+                            (true, Some(id_key)) => id_key,
+                            _ => phf_key.arc_str().as_str(),
+                        };
+
+                        map.serialize_entry(
+                            name,
+                            &Proxy {
+                                value: &attribute.val,
+                                rel_params: attribute.rel.filter_non_unit(),
+                                processor: self
+                                    .new_child_with_context(
+                                        serde_prop.value_addr,
+                                        SubProcessorContext {
+                                            is_update: false,
+                                            parent_property_id: Some(serde_prop.property_id),
+                                            parent_property_flags: serde_prop.flags,
+                                            rel_params_addr: *rel_params_addr,
+                                        },
+                                    )
+                                    .map_err(RecursionLimitError::to_ser_error)?,
+                            },
+                        )?;
+                    }
+                    SerdePropertyKind::FlatUnionDiscriminator { variants } => {
+                        let value = &attribute.val;
+                        let addr = match PossibleVariants::new(variants, self.mode, self.level)
+                            .applied()
+                        {
+                            AppliedVariants::Unambiguous(addr) => addr,
+                            AppliedVariants::OneOf(possible_variants) => {
+                                possible_variants
+                                    .into_iter()
+                                    .find(|variant| value.type_def_id() == variant.serde_def.def_id)
+                                    .ok_or(serde::ser::Error::custom(
+                                        "flattened union variant not found",
+                                    ))?
+                                    .addr
+                            }
+                        };
+
+                        let flattened_attrs = match value {
+                            Value::Struct(attrs, _) | Value::StructUpdate(attrs, _) => attrs,
+                            _ => {
+                                return Err(serde::ser::Error::custom(
+                                    "flattened union variant not found",
+                                ))
+                            }
+                        };
+
+                        match &self.ontology[addr] {
+                            SerdeOperator::Struct(struct_op) => {
+                                self.serialize_struct_properties::<S>(
+                                    struct_op,
+                                    &value,
+                                    &flattened_attrs,
+                                    None,
+                                    None,
+                                    map,
+                                )?;
+                            }
+                            _ => {
+                                return Err(serde::ser::Error::custom(
+                                    "invalid flattened sub-operator",
+                                ))
+                            }
+                        }
+                    }
+                    SerdePropertyKind::FlatUnionData => {}
+                }
+            }
+        }
+
+        Ok(())
     }
 
     fn serialize_rel_params<S: Serializer>(

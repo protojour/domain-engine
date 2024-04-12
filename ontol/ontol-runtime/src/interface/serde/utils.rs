@@ -3,13 +3,13 @@ use std::marker::PhantomData;
 use serde::de::{Error, IntoDeserializer, MapAccess};
 
 pub struct BufferedAttrsReader<E> {
-    iterator: std::vec::IntoIter<(String, serde_value::Value)>,
+    iterator: std::vec::IntoIter<(Box<str>, serde_value::Value)>,
     next_value: Option<serde_value::Value>,
     error: PhantomData<E>,
 }
 
 impl<E> BufferedAttrsReader<E> {
-    pub fn new(buffered_attrs: Vec<(String, serde_value::Value)>) -> Self {
+    pub fn new(buffered_attrs: Vec<(Box<str>, serde_value::Value)>) -> Self {
         Self {
             iterator: buffered_attrs.into_iter(),
             next_value: None,

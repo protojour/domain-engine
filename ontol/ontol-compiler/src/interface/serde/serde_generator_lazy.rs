@@ -9,7 +9,8 @@ use ontol_runtime::{
         serde::{
             operator::{
                 SerdeOperator, SerdeOperatorAddr, SerdeProperty, SerdePropertyFlags,
-                SerdeStructFlags, SerdeUnionVariant, StructOperator, UnionOperator,
+                SerdePropertyKind, SerdeStructFlags, SerdeUnionVariant, StructOperator,
+                UnionOperator,
             },
             SerdeDef, SerdeModifier,
         },
@@ -90,8 +91,10 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                     property_id: PropertyId::subject(RelationshipId(DefId::unit())),
                     flags: SerdePropertyFlags::REL_PARAMS | SerdePropertyFlags::OPTIONAL,
                     value_addr: SerdeOperatorAddr(0),
-                    rel_params_addr: None,
                     value_generator: None,
+                    kind: SerdePropertyKind::Plain {
+                        rel_params_addr: None,
+                    },
                 },
             ),
         );
@@ -196,7 +199,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 value_addr,
                 flags,
                 value_generator,
-                rel_params_addr,
+                kind: SerdePropertyKind::Plain { rel_params_addr },
             },
             modifier,
             self.strings,
@@ -245,7 +248,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         for (phf_key, val) in new_operator.properties.iter() {
             let string = &self.strings[phf_key.constant()];
 
-            properties.insert(string.into(), (phf_key.clone(), *val));
+            properties.insert(string.into(), (phf_key.clone(), val.clone()));
         }
 
         for next_def in iterator {
@@ -267,7 +270,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         insert_property(
                             &mut properties,
                             key.arc_str().as_str(),
-                            *serde_property,
+                            serde_property.clone(),
                             next_def.modifier,
                             self.strings,
                         );

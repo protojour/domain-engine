@@ -149,7 +149,7 @@ impl<'on, 'p> ValueMatcher for UnionMatcher<'on, 'p> {
         Err(())
     }
 
-    fn match_map(&self) -> Result<MapMatcher, ()> {
+    fn match_map(&self) -> Result<MapMatcher<'on, 'p>, ()> {
         if !self.possible_variants.into_iter().any(|variant| {
             matches!(
                 &variant.discriminant,

@@ -18,6 +18,7 @@ use crate::{
     DefId, PackageId,
 };
 
+use super::serde::operator::SerdePropertyKind;
 use super::serde::processor::ProcessorProfileFlags;
 use super::serde::{SerdeDef, SerdeModifier};
 
@@ -647,14 +648,25 @@ impl<'e> Serialize for MapProperties<'e> {
                 .ontology
                 .get_docs(property.property_id.relationship_id.0)
                 .map(|constant| &self.ctx.ontology[constant]);
-            map.serialize_entry(
-                key.arc_str().as_str(),
-                &self
-                    .ctx
-                    .with_rel_params(property.rel_params_addr)
-                    .with_docs(docs)
-                    .reference(property.value_addr),
-            )?;
+
+            match &property.kind {
+                SerdePropertyKind::Plain { rel_params_addr } => {
+                    map.serialize_entry(
+                        key.arc_str().as_str(),
+                        &self
+                            .ctx
+                            .with_rel_params(*rel_params_addr)
+                            .with_docs(docs)
+                            .reference(property.value_addr),
+                    )?;
+                }
+                SerdePropertyKind::FlatUnionDiscriminator { variants: _ } => {
+                    // FIXME
+                }
+                SerdePropertyKind::FlatUnionData => {
+                    // FIXME
+                }
+            }
         }
         map.end()
     }
@@ -804,8 +816,16 @@ impl SchemaGraphBuilder {
 
                 for (_, property) in struct_op.properties.iter() {
                     self.visit(property.value_addr, ontology);
-                    if let Some(addr) = &property.rel_params_addr {
-                        self.visit(*addr, ontology);
+                    match &property.kind {
+                        SerdePropertyKind::Plain { rel_params_addr } => {
+                            if let Some(addr) = rel_params_addr {
+                                self.visit(*addr, ontology);
+                            }
+                        }
+                        SerdePropertyKind::FlatUnionDiscriminator { variants: _ } => {
+                            // FIXME
+                        }
+                        SerdePropertyKind::FlatUnionData => {}
                     }
                 }
             }
