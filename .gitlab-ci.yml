@@ -16,4 +16,4 @@ test:
   stage: check
   image: rust:latest
   script:
-    - cargo test --tests --benches
+    - cargo test --tests --benches --no-fail-fast
