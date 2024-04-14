@@ -396,6 +396,7 @@ impl<'a> SelectAnalyzer<'a> {
                             TypeKind::Object(ObjectData {
                                 kind: ObjectKind::Node(NodeData { def_id, .. }),
                                 fields,
+                                interface: _,
                             }) => (fields, *def_id),
                             _ => panic!(
                                 "Unable to extract def_id from union variant: Not an Object/Node"

@@ -195,6 +195,13 @@ impl OntologyInit for TypeKind {
 pub struct ObjectData {
     pub fields: PhfIndexMap<FieldData>,
     pub kind: ObjectKind,
+    pub interface: ObjectInterface,
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum ObjectInterface {
+    Implements(ThinVec<TypeAddr>),
+    Interface,
 }
 
 #[derive(Serialize, Deserialize)]

@@ -31,6 +31,7 @@ pub mod graphql {
 
     pub trait ObjectDataExt {
         fn node_data(&self) -> &NodeData;
+        fn field_names(&self) -> Vec<&str>;
     }
 
     pub trait UnitTypeRefExt {
@@ -62,6 +63,13 @@ pub mod graphql {
                 panic!("ObjectData is not a Node");
             };
             node_data
+        }
+
+        fn field_names(&self) -> Vec<&str> {
+            self.fields
+                .iter()
+                .map(|(key, _)| key.arc_str().as_str())
+                .collect()
         }
     }
 

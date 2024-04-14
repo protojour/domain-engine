@@ -146,7 +146,7 @@ pub fn generate_graphql_schema<'c>(
 
 fn entity_check(schema: &GraphqlSchema, type_ref: UnitTypeRef) -> Option<EntityData> {
     if let UnitTypeRef::Addr(type_addr) = type_ref {
-        let type_data = &schema.type_data(type_addr);
+        let type_data = schema.type_data(type_addr);
 
         if let TypeData {
             kind:

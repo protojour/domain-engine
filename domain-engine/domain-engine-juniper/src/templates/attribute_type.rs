@@ -5,8 +5,8 @@ use juniper::{graphql_value, FieldError};
 use ontol_runtime::{
     interface::graphql::{
         data::{
-            FieldKind, ObjectData, ObjectKind, TypeAddr, TypeData, TypeKind, TypeModifier, TypeRef,
-            UnionData,
+            FieldKind, ObjectData, ObjectInterface, ObjectKind, TypeAddr, TypeData, TypeKind,
+            TypeModifier, TypeRef, UnionData, UnitTypeRef,
         },
         schema::TypingPurpose,
     },
@@ -124,7 +124,7 @@ impl<'v> juniper::GraphQLType<GqlScalar> for AttributeType<'v> {
     {
         let mut reg = RegistryCtx::new(&info.schema_ctx, registry);
         match &info.type_data().kind {
-            TypeKind::Object(_) => {
+            TypeKind::Object(object_data) => {
                 let fields = reg.get_fields(info.type_addr);
                 if fields.is_empty() {
                     let mut builder = registry.build_scalar_type::<InputType>(info);
@@ -133,11 +133,36 @@ impl<'v> juniper::GraphQLType<GqlScalar> for AttributeType<'v> {
                     }
                     builder.into_meta()
                 } else {
-                    let mut builder = registry.build_object_type::<Self>(info, &fields);
-                    if let Some(docs) = info.docs_str() {
-                        builder = builder.description(docs);
+                    match &object_data.interface {
+                        ObjectInterface::Implements(interfaces) => {
+                            let implements_interfaces: Vec<_> = interfaces
+                                .iter()
+                                .map(|addr| {
+                                    reg.get_type::<AttributeType>(
+                                        TypeRef::mandatory(UnitTypeRef::Addr(*addr)),
+                                        TypingPurpose::Selection,
+                                    )
+                                })
+                                .collect();
+
+                            let mut builder = reg
+                                .registry
+                                .build_object_type::<Self>(info, &fields)
+                                .interfaces(&implements_interfaces);
+
+                            if let Some(docs) = info.docs_str() {
+                                builder = builder.description(docs);
+                            }
+                            builder.into_meta()
+                        }
+                        ObjectInterface::Interface => {
+                            let mut builder = registry.build_interface_type::<Self>(info, &fields);
+                            if let Some(docs) = info.docs_str() {
+                                builder = builder.description(docs);
+                            }
+                            builder.into_meta()
+                        }
                     }
-                    builder.into_meta()
                 }
             }
             TypeKind::Union(union_data) => {

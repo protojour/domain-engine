@@ -5,7 +5,10 @@ use ontol_runtime::{
         data::{FieldKind, NativeScalarKind, ObjectData, TypeData},
         schema::{GraphqlSchema, QueryLevel},
     },
-    interface::serde::operator::SerdeOperator,
+    interface::{
+        graphql::data::{ObjectInterface, TypeKind},
+        serde::operator::SerdeOperator,
+    },
     ontology::config::DataStoreConfig,
 };
 use ontol_test_utils::{
@@ -359,6 +362,68 @@ fn incompatible_edge_types_are_distinct() {
             assert_eq!(&ontology[targets_edge.typename], "_anon1_10targetEdge");
             assert!(targets_edge.fields().unwrap().contains_key("edge_field"));
         }
+    });
+}
+
+#[test]
+fn graphql_flattened_union() {
+    "
+    def kind ()
+
+    def foo (
+        rel .'id'|id: (rel .is: text)
+        rel .kind: (
+            rel .is?: bar
+            rel .is?: qux
+        )
+    )
+
+    def bar (
+        rel .'kind': 'bar'
+        rel .'data': text
+        rel .'bar': i64
+    )
+    def qux (
+        rel .'kind': 'qux'
+        rel .'data': i64
+        rel .'qux': text
+    )
+    "
+    .compile_then(|test| {
+        let (schema, schema_test) = schema_test(&test, SrcName::default());
+        let foo_interface = schema_test.type_data("foo", QueryLevel::Node).object_data();
+
+        let ObjectInterface::Interface = &foo_interface.interface else {
+            panic!("concrete")
+        };
+
+        assert_eq!(foo_interface.field_names(), vec!["id"]);
+
+        let implementations: Vec<_> = schema
+            .types
+            .iter()
+            .filter(|type_data| {
+                let TypeKind::Object(object_data) = &type_data.kind else {
+                    return false;
+                };
+                matches!(&object_data.interface, ObjectInterface::Implements(interfaces) if !interfaces.is_empty())
+            })
+            .collect();
+
+        assert_eq!(implementations.len(), 2);
+        let bar = &implementations[0];
+        let qux = &implementations[1];
+
+        assert_eq!(&test.ontology()[bar.typename], "foo_kind_bar");
+        assert_eq!(
+            bar.object_data().field_names(),
+            vec!["id", "kind", "data", "bar"]
+        );
+        assert_eq!(&test.ontology()[qux.typename], "foo_kind_qux");
+        assert_eq!(
+            qux.object_data().field_names(),
+            vec!["id", "kind", "data", "qux"]
+        );
     });
 }
 

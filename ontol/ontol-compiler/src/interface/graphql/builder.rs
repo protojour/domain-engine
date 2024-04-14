@@ -10,8 +10,8 @@ use ontol_runtime::{
             argument::{self, DefaultArg, MapInputArg},
             data::{
                 EntityData, FieldData, FieldKind, NativeScalarKind, NativeScalarRef, ObjectData,
-                ObjectKind, Optionality, PropertyData, ScalarData, TypeAddr, TypeData, TypeKind,
-                TypeModifier, TypeRef, UnitTypeRef,
+                ObjectInterface, ObjectKind, Optionality, PropertyData, ScalarData, TypeAddr,
+                TypeData, TypeKind, TypeModifier, TypeRef, UnitTypeRef,
             },
             schema::{GraphqlSchema, QueryLevel},
         },
@@ -28,6 +28,7 @@ use ontol_runtime::{
     DefId, MapDefFlags, MapKey, PackageId,
 };
 use smartstring::alias::String;
+use thin_vec::thin_vec;
 
 use crate::{
     def::{DefKind, Defs},
@@ -152,6 +153,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             kind: TypeKind::Object(ObjectData {
                 fields: build_phf_index_map([]),
                 kind: ObjectKind::Query,
+                interface: ObjectInterface::Implements(thin_vec![]),
             }),
         });
 
@@ -163,6 +165,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             kind: TypeKind::Object(ObjectData {
                 fields: build_phf_index_map([]),
                 kind: ObjectKind::Mutation,
+                interface: ObjectInterface::Implements(thin_vec![]),
             }),
         });
 
@@ -175,6 +178,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 kind: TypeKind::Object(ObjectData {
                     fields: build_phf_index_map([]),
                     kind: ObjectKind::PageInfo,
+                    interface: ObjectInterface::Implements(thin_vec![]),
                 }),
             });
             let data = object_data_mut(self.schema.page_info, self.schema);
@@ -277,12 +281,12 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         }
     }
 
-    fn next_type_addr(&self) -> TypeAddr {
+    pub(super) fn next_type_addr(&self) -> TypeAddr {
         TypeAddr(self.schema.types.len() as u32)
     }
 
     pub fn alloc_def_type_addr(&mut self, def_id: DefId, level: QLevel) -> TypeAddr {
-        let index = self.next_type_addr();
+        let addr = self.next_type_addr();
         // note: this will be overwritten later
         self.schema.types.push(TypeData {
             typename: self.serde_gen.strings.intern_constant(""),
@@ -294,8 +298,8 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         });
         self.schema
             .type_addr_by_def
-            .insert((def_id, level.as_query_level()), index);
-        index
+            .insert((def_id, level.as_query_level()), addr);
+        addr
     }
 
     pub fn add_named_map_query(
