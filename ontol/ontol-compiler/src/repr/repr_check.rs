@@ -265,6 +265,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                         // This only occurs in user domains.
                         self.merge_repr(
                             &mut builder,
+                            leaf_def_id,
                             ReprKind::Scalar(def_id, ReprScalarKind::Other, data.rel_span),
                             def_id,
                             data,
@@ -272,7 +273,13 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                     } else {
                         match kind {
                             PrimitiveKind::Unit => {
-                                self.merge_repr(&mut builder, ReprKind::Unit, def_id, data);
+                                self.merge_repr(
+                                    &mut builder,
+                                    leaf_def_id,
+                                    ReprKind::Unit,
+                                    def_id,
+                                    data,
+                                );
                             }
                             PrimitiveKind::Boolean
                             | PrimitiveKind::False
@@ -282,6 +289,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                             | PrimitiveKind::Serial => {
                                 self.merge_repr(
                                     &mut builder,
+                                    leaf_def_id,
                                     ReprKind::Scalar(def_id, ReprScalarKind::Other, data.rel_span),
                                     def_id,
                                     data,
@@ -322,6 +330,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 DefKind::TextLiteral(_) | DefKind::NumberLiteral(_) => {
                     self.merge_repr(
                         &mut builder,
+                        leaf_def_id,
                         ReprKind::Scalar(def_id, ReprScalarKind::Other, data.rel_span),
                         def_id,
                         data,
@@ -332,6 +341,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                     if self.defs.string_like_types.get(&def_id).is_some() {
                         self.merge_repr(
                             &mut builder,
+                            leaf_def_id,
                             ReprKind::Scalar(def_id, ReprScalarKind::Other, data.rel_span),
                             def_id,
                             data,
@@ -347,7 +357,13 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                                     );
                                 }
 
-                                self.merge_repr(&mut builder, ReprKind::Struct, def_id, data);
+                                self.merge_repr(
+                                    &mut builder,
+                                    leaf_def_id,
+                                    ReprKind::Struct,
+                                    def_id,
+                                    data,
+                                );
                                 has_table = true;
                             }
 
@@ -356,13 +372,20 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                                     // The type can be represented as a Unit
                                     // if there is an _empty type_ (a leaf type) somewhere in the mesh
                                     if !has_table && data.is_leaf {
-                                        self.merge_repr(&mut builder, ReprKind::Unit, def_id, data);
+                                        self.merge_repr(
+                                            &mut builder,
+                                            leaf_def_id,
+                                            ReprKind::Unit,
+                                            def_id,
+                                            data,
+                                        );
                                     }
                                 }
                                 Constructor::TextFmt(_) => {
                                     assert!(!has_table);
                                     self.merge_repr(
                                         &mut builder,
+                                        leaf_def_id,
                                         ReprKind::Scalar(
                                             def_id,
                                             ReprScalarKind::Other,
@@ -374,24 +397,37 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                                 }
                                 Constructor::Sequence(_) => {
                                     assert!(!has_table);
-                                    self.merge_repr(&mut builder, ReprKind::Seq, def_id, data);
+                                    self.merge_repr(
+                                        &mut builder,
+                                        leaf_def_id,
+                                        ReprKind::Seq,
+                                        def_id,
+                                        data,
+                                    );
                                 }
                             }
                         } else {
-                            self.merge_repr(&mut builder, ReprKind::Unit, def_id, data);
+                            self.merge_repr(
+                                &mut builder,
+                                leaf_def_id,
+                                ReprKind::Unit,
+                                def_id,
+                                data,
+                            );
                         }
                     }
                 }
                 DefKind::Regex(_) => {
                     self.merge_repr(
                         &mut builder,
+                        leaf_def_id,
                         ReprKind::Scalar(def_id, ReprScalarKind::Other, data.rel_span),
                         def_id,
                         data,
                     );
                 }
                 DefKind::Extern(_) => {
-                    self.merge_repr(&mut builder, ReprKind::Extern, def_id, data);
+                    self.merge_repr(&mut builder, leaf_def_id, ReprKind::Extern, def_id, data);
                 }
                 _ => {}
             }
@@ -447,8 +483,9 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
     fn merge_repr(
         &mut self,
         builder: &mut ReprBuilder,
+        repr_def_id: DefId,
         next: ReprKind,
-        def_id: DefId,
+        next_def_id: DefId,
         data: &IsData,
     ) {
         if self.state.do_trace {
@@ -456,7 +493,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 "    {:?} merge repr {:?}=>{:?} {next:?}",
                 self.root_def_id,
                 data.rel,
-                def_id,
+                next_def_id,
             );
         }
 
@@ -477,20 +514,20 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             }
             (Super, None | Some(ReprKind::Struct), ReprKind::Struct) => {
                 builder.kind = Some(ReprKind::StructIntersection(
-                    [(def_id, data.rel_span)].into(),
+                    [(next_def_id, data.rel_span)].into(),
                 ));
             }
             (Super, None, next) => {
                 builder.kind = Some(next);
             }
             (Super, Some(ReprKind::StructIntersection(members)), ReprKind::Struct) => {
-                members.push((def_id, data.rel_span));
+                members.push((next_def_id, data.rel_span));
             }
             (Super, Some(repr), kind) if *repr != kind => match repr {
                 ReprKind::Scalar(def0, _, span0) => {
                     builder.kind = Some(ReprKind::Intersection(vec![
                         (*def0, *span0),
-                        (def_id, data.rel_span),
+                        (next_def_id, data.rel_span),
                     ]));
                 }
                 ReprKind::Intersection(items) => {
@@ -503,33 +540,43 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             // Handle subtypes - results in unions
             (Sub, Some(ReprKind::Unit), ReprKind::Unit) => {
                 if data.is_leaf {
-                    builder.kind = Some(ReprKind::Union(vec![(def_id, data.rel_span)]));
+                    builder.kind = Some(ReprKind::Union(vec![(next_def_id, data.rel_span)]));
                 }
             }
             (Sub, Some(ReprKind::Unit), _) => {
-                builder.kind = Some(ReprKind::Union(vec![(def_id, data.rel_span)]));
+                builder.kind = Some(ReprKind::Union(vec![(next_def_id, data.rel_span)]));
             }
             (Sub, Some(ReprKind::Struct), ReprKind::Struct | ReprKind::Unit) => {
-                builder.kind = Some(ReprKind::StructUnion([(def_id, data.rel_span)].into()));
+                builder.kind = Some(ReprKind::StructUnion([(next_def_id, data.rel_span)].into()));
             }
             (Sub, Some(ReprKind::StructUnion(variants)), ReprKind::Struct) => {
-                variants.push((def_id, data.rel_span));
+                variants.push((next_def_id, data.rel_span));
+            }
+            (Sub, Some(ReprKind::StructUnion(_)), _) => {
+                self.errors.push(SpannedCompileError {
+                    error: CompileError::TypeNotRepresentable,
+                    notes: vec![SpannedNote {
+                        note: Note::CannotBePartOfStructUnion,
+                        span: self.defs.def_span(next_def_id),
+                    }],
+                    span: self.defs.def_span(repr_def_id),
+                });
             }
             (Sub, Some(ReprKind::Union(variants)), ReprKind::Struct) => {
                 let mut variants = std::mem::take(variants);
-                variants.push((def_id, data.rel_span));
+                variants.push((next_def_id, data.rel_span));
                 builder.kind = Some(ReprKind::StructUnion(variants));
             }
             (Sub, Some(ReprKind::Union(variants)), ReprKind::Unit) => {
                 if data.is_leaf {
-                    variants.push((def_id, data.rel_span));
+                    variants.push((next_def_id, data.rel_span));
                 }
             }
             (Sub, None, ReprKind::Struct) => {
-                builder.kind = Some(ReprKind::StructUnion(vec![(def_id, data.rel_span)]));
+                builder.kind = Some(ReprKind::StructUnion(vec![(next_def_id, data.rel_span)]));
             }
             (Sub, None, _) => {
-                builder.kind = Some(ReprKind::Union(vec![(def_id, data.rel_span)]));
+                builder.kind = Some(ReprKind::Union(vec![(next_def_id, data.rel_span)]));
             }
             (
                 Sub,

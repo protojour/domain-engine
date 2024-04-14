@@ -293,6 +293,8 @@ pub enum Note {
     ConsiderUsingMatch,
     #[error("Type is abstract")]
     TypeIsAbstract,
+    #[error("Type cannot be part of a struct union")]
+    CannotBePartOfStructUnion,
     #[error("Type of field is abstract")]
     FieldTypeIsAbstract,
     #[error("Base type is {0}")]

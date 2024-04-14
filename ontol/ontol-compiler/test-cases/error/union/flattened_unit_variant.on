@@ -1,11 +1,22 @@
+// Tests two variants of the same problem.
+// There are two paths leading to the bug,
+// `bar` first and `baz` first..
+
 def anonymous ()
 
 def foo (
-    rel .anonymous: (
+    rel .anonymous: ( // ERROR type not representable
         rel .is?: bar
         rel .is?: baz
     )
 )
 
 def bar (rel .'type': 'bar')
-def baz ()
+def baz () // NOTE Type cannot be part of a struct union
+
+def foo_inverted (
+    rel .anonymous: (
+        rel .is?: baz // ERROR unit type `baz` cannot be part of a union
+        rel .is?: bar
+    )
+)
