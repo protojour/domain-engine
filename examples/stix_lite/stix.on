@@ -231,7 +231,7 @@ def relationship-id (
 )
 
 def sdo_sco_identifier (
-    rel .is: sdo_identifier
+    rel .is?: sdo_identifier
 )
 
 /// Type providing the `created_by_ref` property

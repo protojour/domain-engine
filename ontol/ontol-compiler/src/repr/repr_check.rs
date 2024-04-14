@@ -5,7 +5,7 @@
 //! So the responsibility of this code is just to record the facts,
 //! and those facts are used in later compilation stages.
 
-use std::collections::hash_map::Entry;
+use std::collections::{hash_map::Entry, HashMap};
 
 use fnv::FnvHashSet;
 use indexmap::IndexMap;
@@ -19,7 +19,7 @@ use crate::{
     primitive::{PrimitiveKind, Primitives},
     relation::{Constructor, Properties, Relations},
     thesaurus::Thesaurus,
-    thesaurus::TypeRelation,
+    thesaurus::{Is, TypeRelation},
     types::{DefTypes, Type},
     CompileErrors, Note, SourceId, SourceSpan, SpannedCompileError, SpannedNote, NATIVE_SOURCE,
     NO_SPAN,
@@ -616,7 +616,16 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
     fn collect_thesaurus(&mut self, def_id: DefId) -> IndexMap<DefId, IsData> {
         let mut output = IndexMap::default();
 
-        self.traverse_thesaurus(def_id, IsRelation::Origin, 0, NO_SPAN, &mut output);
+        let mut is_path = IsPath::default();
+
+        self.traverse_thesaurus(
+            def_id,
+            IsRelation::Origin,
+            0,
+            NO_SPAN,
+            &mut is_path,
+            &mut output,
+        );
 
         if !self.state.circular_spans.is_empty() {
             let spans = std::mem::take(&mut self.state.circular_spans);
@@ -629,6 +638,21 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             })
         }
 
+        if !is_path.invalid_super_set.is_empty() {
+            self.errors.push(SpannedCompileError {
+                error: CompileError::AnonymousUnionAbstraction,
+                span: self.defs.def_span(def_id),
+                notes: is_path
+                    .invalid_super_set
+                    .values()
+                    .map(|span| SpannedNote {
+                        note: Note::UseDomainSpecificUnitType,
+                        span: *span,
+                    })
+                    .collect(),
+            });
+        }
+
         output
     }
 
@@ -638,6 +662,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         is_relation: IsRelation,
         level: u16,
         span: SourceSpan,
+        is_path: &mut IsPath,
         output: &mut IndexMap<DefId, IsData>,
     ) {
         if let Some(data) = output.get_mut(&def_id) {
@@ -671,7 +696,20 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                         // If traversing _down_ once, don't traverse _up_ again.
                         continue;
                     }
-                    _ => IsRelation::Sub,
+                    (_, TypeRelation::SubVariant) => {
+                        if let Some(super_segment) = is_path
+                            .segments
+                            .iter()
+                            .find(|segment| matches!(segment.is.rel, TypeRelation::Super))
+                            .copied()
+                        {
+                            is_path
+                                .invalid_super_set
+                                .insert(super_segment.is.def_id, super_segment.span);
+                        }
+
+                        IsRelation::Sub
+                    }
                 };
 
                 // Don't traverse built-in spans:
@@ -681,7 +719,20 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                     *next_span
                 };
 
-                self.traverse_thesaurus(is.def_id, next_relation, level + 1, next_span, output);
+                is_path.segments.push(IsPathSegment {
+                    is: *is,
+                    span: next_span,
+                });
+
+                self.traverse_thesaurus(
+                    is.def_id,
+                    next_relation,
+                    level + 1,
+                    next_span,
+                    is_path,
+                    output,
+                );
+                is_path.segments.pop();
                 was_leaf = false;
             }
 
@@ -703,4 +754,16 @@ pub(super) enum IsRelation {
     Origin,
     Super,
     Sub,
+}
+
+#[derive(Default)]
+struct IsPath {
+    segments: Vec<IsPathSegment>,
+    invalid_super_set: HashMap<DefId, SourceSpan>,
+}
+
+#[derive(Clone, Copy)]
+struct IsPathSegment {
+    is: Is,
+    span: SourceSpan,
 }

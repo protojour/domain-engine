@@ -117,8 +117,7 @@ def Geometry (
 )
 
 def @private GeometryOrNull (
-    // TODO: Not supported yet (union tree):
-    rel .is: Geometry
+    rel .is?: Geometry
     // rel _ is?: []
 )
 

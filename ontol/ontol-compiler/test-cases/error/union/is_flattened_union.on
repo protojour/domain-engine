@@ -1,5 +1,6 @@
-def foo (
-    rel .is: (
+def foo ( // ERROR anonymous union abstraction
+    rel .is: // NOTE use a domain-specific unit type instead
+    (
         rel .is?: bar
         rel .is?: baz
     )

@@ -29,7 +29,10 @@ pub enum CompileError {
     PackageNotFound(PackageReference),
     WildcardNeedsContextualBlock,
     InvalidExpression,
-    IncorrectNumberOfArguments { expected: u8, actual: u8 },
+    IncorrectNumberOfArguments {
+        expected: u8,
+        actual: u8,
+    },
     NotCallable,
     TypeNotFound,
     PrivateDefinition,
@@ -53,7 +56,10 @@ pub enum CompileError {
     NamedPropertyExpected,
     UnknownProperty,
     DuplicateProperty,
-    TypeMismatch { actual: String, expected: String },
+    TypeMismatch {
+        actual: String,
+        expected: String,
+    },
     MissingProperties(Vec<String>),
     UnboundVariable,
     VariableMustBeSequenceEnclosed(String),
@@ -71,7 +77,10 @@ pub enum CompileError {
     UnsupportedCardinality,
     InvalidCardinaltyCombinationInUnion,
     InferenceCardinalityMismatch,
-    CannotConvertMissingMapping { input: String, output: String },
+    CannotConvertMissingMapping {
+        input: String,
+        output: String,
+    },
     NonEntityInReverseRelationship,
     RelationSubjectMustBeEntity,
     EntityRelationshipCannotBeAList,
@@ -91,6 +100,10 @@ pub enum CompileError {
     IncompatibleLiteral,
     CannotGenerateValue(String),
     TypeNotRepresentable,
+    /// A type is represented using `is` -> `is?`, which is invalid.
+    /// The first `is` makes the union an anonymous member, and thus unnameable in a map.
+    /// The solution for that is to use union flattening using a domain-specific unit type.
+    AnonymousUnionAbstraction,
     MutationOfSealedDef,
     IntersectionOfDisjointTypes,
     CircularSubtypingRelation,
@@ -254,6 +267,7 @@ impl std::fmt::Display for CompileError {
             Self::IncompatibleLiteral => write!(f, "Incompatible literal"),
             Self::CannotGenerateValue(name) => write!(f, "Cannot generate a value of type {name}"),
             Self::TypeNotRepresentable => write!(f, "type not representable"),
+            Self::AnonymousUnionAbstraction => write!(f, "anonymous union abstraction"),
             Self::MutationOfSealedDef => write!(f, "definition is sealed and cannot be modified"),
             Self::IntersectionOfDisjointTypes => write!(f, "Intersection of disjoint types"),
             Self::CircularSubtypingRelation => write!(f, "Circular subtyping relation"),
@@ -303,6 +317,8 @@ pub enum Note {
     NumberTypeIsAbstract,
     #[error("defined here")]
     DefinedHere,
+    #[error("use a domain-specific unit type instead")]
+    UseDomainSpecificUnitType,
 }
 
 #[derive(Debug)]
