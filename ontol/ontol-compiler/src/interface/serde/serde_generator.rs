@@ -131,6 +131,22 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             || !self.lazy_union_flattener_tasks.is_empty()
     }
 
+    pub fn any_placeholder_addr(&self) -> SerdeOperatorAddr {
+        let index = self
+            .operators_by_addr
+            .iter()
+            .enumerate()
+            .find_map(|(index, op)| {
+                if matches!(op, SerdeOperator::AnyPlaceholder) {
+                    Some(index)
+                } else {
+                    None
+                }
+            })
+            .unwrap();
+        SerdeOperatorAddr(index as u32)
+    }
+
     pub fn make_dynamic_sequence_addr(&mut self) -> SerdeOperatorAddr {
         let addr = SerdeOperatorAddr(self.operators_by_addr.len() as u32);
         self.operators_by_addr.push(SerdeOperator::DynamicSequence);

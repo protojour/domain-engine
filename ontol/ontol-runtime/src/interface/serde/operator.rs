@@ -9,7 +9,10 @@ use thin_vec::ThinVec;
 
 use crate::{
     impl_ontol_debug,
-    interface::discriminator::{Discriminant, VariantDiscriminator, VariantPurpose},
+    interface::discriminator::{
+        Discriminant, LeafDiscriminant, LeafDiscriminantScalarUnion, VariantDiscriminator,
+        VariantPurpose,
+    },
     ontology::{
         ontol::{TextConstant, ValueGenerator},
         OntologyInit,
@@ -38,6 +41,7 @@ impl_ontol_debug!(SerdeOperatorAddr);
 
 #[derive(Serialize, Deserialize, OntolDebug)]
 pub enum SerdeOperator {
+    AnyPlaceholder,
     Unit,
     True(DefId),
     False(DefId),
@@ -192,6 +196,38 @@ impl UnionOperator {
         level: ProcessorLevel,
     ) -> AppliedVariants<'_> {
         PossibleVariants::new(&self.variants, mode, level).applied()
+    }
+
+    /// Returns the type-set of scalar matchers for HasAttribute discriminants
+    pub fn leaf_discriminant_scalar_union_for_has_attribute(&self) -> LeafDiscriminantScalarUnion {
+        let mut union = LeafDiscriminantScalarUnion::empty();
+
+        for variant in &self.variants {
+            let Discriminant::HasAttribute(_, _, leaf_discriminant) =
+                &variant.discriminator.discriminant
+            else {
+                continue;
+            };
+            match leaf_discriminant {
+                LeafDiscriminant::IsAny => {}
+                LeafDiscriminant::IsUnit => {
+                    union |= LeafDiscriminantScalarUnion::UNIT;
+                }
+                LeafDiscriminant::IsInt | LeafDiscriminant::IsIntLiteral(_) => {
+                    union |= LeafDiscriminantScalarUnion::INT;
+                }
+                LeafDiscriminant::IsText
+                | LeafDiscriminant::IsTextLiteral(_)
+                | LeafDiscriminant::MatchesCapturingTextPattern(_) => {
+                    union |= LeafDiscriminantScalarUnion::TEXT;
+                }
+                LeafDiscriminant::IsSequence => {
+                    union |= LeafDiscriminantScalarUnion::SEQUENCE;
+                }
+            }
+        }
+
+        union
     }
 
     pub fn unfiltered_variants(&self) -> &[SerdeUnionVariant] {

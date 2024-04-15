@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use ontol_runtime::interface::serde::SerdeDef;
+use ontol_runtime::interface::serde::{operator::SerdeOperator, SerdeDef};
 use serde_generator::SerdeGenerator;
 
 use crate::{relation::UnionMemberCache, strings::Strings, Compiler};
@@ -33,6 +33,8 @@ impl<'m> Compiler<'m> {
         strings: &'c mut Strings<'m>,
         union_member_cache: &'c UnionMemberCache,
     ) -> SerdeGenerator<'_, 'm> {
+        let operators_by_addr: Vec<SerdeOperator> = vec![SerdeOperator::AnyPlaceholder];
+
         SerdeGenerator {
             strings,
             defs: &self.defs,
@@ -48,7 +50,7 @@ impl<'m> Compiler<'m> {
             lazy_union_repr_tasks: VecDeque::new(),
             lazy_union_flattener_tasks: VecDeque::new(),
             task_state: DebugTaskState::Unlocked,
-            operators_by_addr: Default::default(),
+            operators_by_addr,
             operators_by_key: Default::default(),
         }
     }

@@ -149,7 +149,7 @@ impl<'e> ObjectGenerator<'e> {
 
     fn operator_def_id(&self, operator: &SerdeOperator) -> DefId {
         match operator {
-            SerdeOperator::Unit => DefId::unit(),
+            SerdeOperator::AnyPlaceholder | SerdeOperator::Unit => DefId::unit(),
             SerdeOperator::True(def_id)
             | SerdeOperator::False(def_id)
             | SerdeOperator::Boolean(def_id)

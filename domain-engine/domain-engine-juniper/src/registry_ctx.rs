@@ -12,7 +12,7 @@ use ontol_runtime::{
         schema::{QueryLevel, TypingPurpose},
     },
     interface::{
-        discriminator::VariantPurpose,
+        discriminator::{LeafDiscriminantScalarUnion, VariantPurpose},
         graphql::argument::DefaultArg,
         serde::{
             operator::{
@@ -150,26 +150,60 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         continue;
                     }
 
-                    let mut argument = self.get_operator_argument(
-                        key.arc_str(),
-                        property.value_addr,
-                        match &property.kind {
-                            SerdePropertyKind::Plain { rel_params_addr } => *rel_params_addr,
-                            _ => None,
-                        },
-                        property.flags,
-                        TypeModifier::Unit(match typing_purpose {
-                            TypingPurpose::PartialInput => Optionality::Optional,
-                            _ => {
-                                if property.is_optional() || property.value_generator.is_some() {
-                                    Optionality::Optional
-                                } else {
-                                    Optionality::Mandatory
-                                }
+                    let type_modifier = TypeModifier::Unit(match typing_purpose {
+                        TypingPurpose::PartialInput => Optionality::Optional,
+                        _ => {
+                            if property.is_optional() || property.value_generator.is_some() {
+                                Optionality::Optional
+                            } else {
+                                Optionality::Mandatory
                             }
-                        }),
-                        typing_purpose,
-                    );
+                        }
+                    });
+
+                    let mut argument = match &property.kind {
+                        SerdePropertyKind::Plain { .. } | SerdePropertyKind::FlatUnionData => self
+                            .get_operator_argument(
+                                key.arc_str(),
+                                property.value_addr,
+                                match &property.kind {
+                                    SerdePropertyKind::Plain { rel_params_addr } => {
+                                        *rel_params_addr
+                                    }
+                                    _ => None,
+                                },
+                                property.flags,
+                                type_modifier,
+                                typing_purpose,
+                            ),
+                        SerdePropertyKind::FlatUnionDiscriminator { union_addr } => {
+                            let SerdeOperator::Union(union_op) =
+                                &self.schema_ctx.ontology[*union_addr]
+                            else {
+                                continue;
+                            };
+
+                            let scalar_union =
+                                union_op.leaf_discriminant_scalar_union_for_has_attribute();
+
+                            if scalar_union == LeafDiscriminantScalarUnion::TEXT {
+                                self.modified_arg::<String>(key.arc_str(), type_modifier, &())
+                            } else if scalar_union == LeafDiscriminantScalarUnion::INT {
+                                let i64_schema_type = self.schema_ctx.get_schema_type(
+                                    self.schema_ctx.schema.i64_custom_scalar.unwrap(),
+                                    TypingPurpose::Input,
+                                );
+
+                                self.modified_arg::<InputType>(
+                                    key.arc_str(),
+                                    type_modifier,
+                                    &i64_schema_type,
+                                )
+                            } else {
+                                continue;
+                            }
+                        }
+                    };
 
                     if let Some(docs_constant) = self
                         .schema_ctx
@@ -280,7 +314,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
     ) -> juniper::meta::Argument<'r, GqlScalar> {
         let operator = &self.schema_ctx.ontology[operator_addr];
 
-        let _entered = trace_span!("arg", name = ?name).entered();
+        let _entered = trace_span!("arg", name).entered();
         trace!(
             "register argument: {:?}",
             self.schema_ctx.ontology.debug(operator)
@@ -291,6 +325,12 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         }
 
         match operator {
+            SerdeOperator::AnyPlaceholder => {
+                let json_scalar = self
+                    .schema_ctx
+                    .get_schema_type(self.schema_ctx.schema.json_scalar, typing_purpose);
+                self.modified_arg::<InputType>(name, modifier, &json_scalar)
+            }
             SerdeOperator::Unit => {
                 todo!("unit argument")
             }

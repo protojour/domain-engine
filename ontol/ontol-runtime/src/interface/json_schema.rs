@@ -311,6 +311,12 @@ fn serialize_schema_inline<S: Serializer>(
     map: &mut <S as Serializer>::SerializeMap,
 ) -> Result<(), S::Error> {
     match value_operator {
+        SerdeOperator::AnyPlaceholder => {
+            map.serialize_entry(
+                "type",
+                &["string", "number", "object", "array", "boolean", "null"],
+            )?;
+        }
         SerdeOperator::Unit => {
             map.serialize_entry("type", "object")?;
             if let Some(docs) = ctx.docs {
@@ -476,7 +482,8 @@ impl<'d, 'e> Serialize for SchemaReference<'d, 'e> {
         let value_operator = &self.ctx.ontology[self.operator_addr];
 
         match value_operator {
-            SerdeOperator::Unit
+            SerdeOperator::AnyPlaceholder
+            | SerdeOperator::Unit
             | SerdeOperator::False(_)
             | SerdeOperator::True(_)
             | SerdeOperator::Boolean(_)
@@ -774,7 +781,8 @@ impl SchemaGraphBuilder {
         let operator = &ontology[addr];
 
         match operator {
-            SerdeOperator::Unit
+            SerdeOperator::AnyPlaceholder
+            | SerdeOperator::Unit
             | SerdeOperator::False(_)
             | SerdeOperator::True(_)
             | SerdeOperator::Boolean(_)

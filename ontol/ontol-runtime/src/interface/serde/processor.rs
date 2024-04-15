@@ -370,6 +370,7 @@ impl<'on, 'p> Debug for SerdeProcessor<'on, 'p> {
 impl<'on, 'p> Display for SerdeProcessor<'on, 'p> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.value_operator {
+            SerdeOperator::AnyPlaceholder => write!(f, "any"),
             SerdeOperator::Unit => write!(f, "unit"),
             SerdeOperator::False(_) => write!(f, "false"),
             SerdeOperator::True(_) => write!(f, "true"),

@@ -4,7 +4,7 @@ use serde::{
     de::{DeserializeSeed, Error, MapAccess, SeqAccess, Unexpected, Visitor},
     Deserializer,
 };
-use tracing::trace;
+use tracing::{trace, warn};
 
 use crate::{
     interface::serde::{
@@ -79,6 +79,10 @@ impl<'on, 'p, 'de> DeserializeSeed<'de> for SerdeProcessor<'on, 'p> {
 
     fn deserialize<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
         match (self.value_operator, self.scalar_format()) {
+            (SerdeOperator::AnyPlaceholder, _) => {
+                warn!("Deserialization of AnyPlaceholder");
+                Err(Error::custom("unknown type"))
+            }
             (SerdeOperator::Unit, _) => {
                 deserializer.deserialize_unit(UnitMatcher.into_visitor_no_params(self))
             }

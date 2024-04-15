@@ -78,7 +78,7 @@ impl<'a, R: Rng> FakeGenerator<'a, R> {
     fn fake_attribute(&mut self, processor: SerdeProcessor) -> Result<Attribute, Error> {
         debug!("fake attribute {processor:?}");
         let val = match processor.value_operator {
-            SerdeOperator::Unit => Value::unit(),
+            SerdeOperator::AnyPlaceholder | SerdeOperator::Unit => Value::unit(),
             SerdeOperator::False(def_id) => Value::I64(0, *def_id),
             SerdeOperator::True(def_id) => Value::I64(1, *def_id),
             SerdeOperator::Boolean(def_id) => {

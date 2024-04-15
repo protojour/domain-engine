@@ -47,6 +47,10 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
         );
 
         match (self.value_operator, self.scalar_format()) {
+            (SerdeOperator::AnyPlaceholder, _) => {
+                warn!("serializatoin of AnyPlaceholder");
+                Err(Error::custom("unknown type"))
+            }
             (SerdeOperator::Unit, _) => {
                 cast_ref::<()>(value);
                 serializer.serialize_unit()

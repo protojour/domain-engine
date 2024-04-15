@@ -1522,7 +1522,7 @@ async fn test_gitmesh_id_error() {
 
 // A bug when using both .is and .'member' from foreign domain
 #[test(tokio::test)]
-async fn test_extendsion_and_member_from_foreign_domain() {
+async fn test_extension_and_member_from_foreign_domain() {
     let (_test, [_]) = TestPackages::with_static_sources([
         (
             src_name("entry"),
@@ -1631,4 +1631,96 @@ async fn test_constant_index_panic() {
             &gql_ctx_mock_data_store(&test, src_name("events"), store_entity_mock),
         )
         .await;
+}
+
+#[test(tokio::test)]
+async fn flattened_union_entity() {
+    let (test, [schema]) = TestPackages::with_static_sources([(
+        SrcName::default(),
+        "
+        def kind ()
+
+        def foo (
+            rel .'id'|id: (rel .is: text)
+            rel .kind: (
+                rel .is?: bar
+                rel .is?: qux
+            )
+        )
+
+        def bar (
+            rel .'kind': 'bar'
+            rel .'data': text
+            rel .'bar': i64
+        )
+        def qux (
+            rel .'kind': 'qux'
+            rel .'data': i64
+            rel .'qux': text
+        )
+        ",
+    )])
+    .with_data_store(SrcName::default(), DataStoreConfig::Default)
+    .compile_schemas([SrcName::default()]);
+
+    let document = schema.as_document();
+
+    let geometry_union_input = find_input_object_type(&document, "fooInput").unwrap();
+
+    let field_names: Vec<_> = geometry_union_input
+        .fields
+        .iter()
+        .map(FieldInfo::from)
+        .collect();
+
+    expect_eq!(
+        actual = field_names.as_slice(),
+        expected = &[
+            FieldInfo::from(("id", "ID!")),
+            FieldInfo::from(("kind", "String!")),
+            FieldInfo::from(("data", "_ontol_json")),
+            FieldInfo::from(("bar", "_ontol_i64")),
+            FieldInfo::from(("qux", "String")),
+        ]
+    );
+
+    let [foo] = test.bind(["foo"]);
+
+    let store_entity_mock = DataStoreAPIMock::execute
+        .next_call(matching!(Request::BatchWrite(_), _session))
+        .returns(Ok(Response::one_inserted(
+            foo.entity_builder(
+                json!("id"),
+                json!({ "id": "id", "kind": "bar", "data": "data", "bar": 42 }),
+            )
+            .into(),
+        )));
+
+    expect_eq!(
+        actual = r#"mutation {
+            foo(create: [{
+                id: "id",
+                kind: "bar",
+                data: "data",
+                bar: 42
+            }]) {
+                node {
+                    id
+                }
+            }
+        }"#
+        .exec(
+            [],
+            &schema,
+            &gql_ctx_mock_data_store(&test, root(), store_entity_mock)
+        )
+        .await,
+        expected = Ok(graphql_value!({
+            "foo": [{
+                "node": {
+                    "id": "id",
+                }
+            }]
+        })),
+    );
 }

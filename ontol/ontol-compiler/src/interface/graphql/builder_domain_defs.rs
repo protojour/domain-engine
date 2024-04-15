@@ -914,7 +914,8 @@ pub(super) fn get_native_scalar_kind(
             serde_generator,
             serde_generator.get_operator(alias_op.inner_addr),
         ),
-        op @ (SerdeOperator::Union(_)
+        op @ (SerdeOperator::AnyPlaceholder
+        | SerdeOperator::Union(_)
         | SerdeOperator::Struct(_)
         | SerdeOperator::DynamicSequence
         | SerdeOperator::RelationList(_)

@@ -47,3 +47,13 @@ pub enum LeafDiscriminant {
     IsSequence,
     MatchesCapturingTextPattern(DefId),
 }
+
+bitflags::bitflags! {
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
+    pub struct LeafDiscriminantScalarUnion: u8 {
+        const UNIT     = 0b00000001;
+        const INT      = 0b00000010;
+        const TEXT     = 0b00000100;
+        const SEQUENCE = 0b00001000;
+    }
+}

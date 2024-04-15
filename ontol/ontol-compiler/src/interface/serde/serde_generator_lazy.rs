@@ -277,16 +277,25 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             text_constant_set.into_iter().next().unwrap()
         };
 
-        let mut covered_properties: HashSet<std::string::String> = Default::default();
+        let mut covered_properties: IndexMap<std::string::String, FnvHashSet<SerdeOperatorAddr>> =
+            Default::default();
+
+        let mut variant_addrs: Vec<SerdeOperatorAddr> =
+            Vec::with_capacity(union_operator.unfiltered_variants().len());
 
         // detect set of all properties belonging to the union
         for variant in union_operator.unfiltered_variants() {
+            variant_addrs.push(variant.addr);
+
             let SerdeOperator::Struct(struct_op) = self.get_operator(variant.addr) else {
                 todo!("handle non-struct-op");
             };
 
-            for (key, _) in struct_op.properties.iter() {
-                covered_properties.insert(key.arc_str().as_str().into());
+            for (key, property) in struct_op.properties.iter() {
+                covered_properties
+                    .entry(key.arc_str().as_str().into())
+                    .or_default()
+                    .insert(property.value_addr);
             }
         }
 
@@ -306,15 +315,25 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             self.strings,
         );
 
-        for key in covered_properties {
+        for (key, addrs) in covered_properties {
             if key != entrypoint_prop_name {
+                // make a single address out of the addresses.
+                // This is mostly to make documentation easier.
+
+                let value_addr = if addrs.len() == 1 {
+                    // unambiguous
+                    addrs.iter().copied().next().unwrap()
+                } else {
+                    self.any_placeholder_addr()
+                };
+
                 let old = output.insert(
                     key.as_str().into(),
                     (
                         self.strings.make_phf_key(&key),
                         SerdeProperty {
                             property_id: PropertyId::subject(RelationshipId(DefId::unit())),
-                            value_addr: SerdeOperatorAddr(0),
+                            value_addr,
                             flags: SerdePropertyFlags::OPTIONAL,
                             value_generator: None,
                             kind: SerdePropertyKind::FlatUnionData,
