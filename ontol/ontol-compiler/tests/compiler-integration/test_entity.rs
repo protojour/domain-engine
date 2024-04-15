@@ -1,4 +1,4 @@
-use ontol_runtime::{ontology::domain::DataRelationshipKind, value::Value, DefId, PackageId};
+use ontol_runtime::{value::Value, DefId, PackageId};
 use ontol_test_utils::{
     assert_error_msg, assert_json_io_matches,
     examples::{ARTIST_AND_INSTRUMENT, GUITAR_SYNTH_UNION},
