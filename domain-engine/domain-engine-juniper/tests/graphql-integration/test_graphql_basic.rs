@@ -1696,7 +1696,7 @@ async fn flattened_union_entity() {
         .returns(Ok(Response::one_inserted(
             foo.entity_builder(
                 json!("id"),
-                json!({ "id": "id", "kind": "bar", "data": "data", "bar": 42 }),
+                json!({ "id": "id", "kind": "bar", "data": "value", "bar": 1337 }),
             )
             .into(),
         )));
@@ -1711,6 +1711,16 @@ async fn flattened_union_entity() {
             }]) {
                 node {
                     id
+                    ...on foo_kind_bar {
+                        kind
+                        textData: data
+                        bar
+                    }
+                    ...on foo_kind_qux {
+                        kind
+                        intData: data
+                        qux
+                    }
                 }
             }
         }"#
@@ -1724,6 +1734,9 @@ async fn flattened_union_entity() {
             "foo": [{
                 "node": {
                     "id": "id",
+                    "kind": "bar",
+                    "textData": "value",
+                    "bar": 1337
                 }
             }]
         })),

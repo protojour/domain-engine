@@ -185,5 +185,6 @@ fn new_schema_with_capacity(package_id: PackageId, cap: usize) -> GraphqlSchema 
         json_scalar: TypeAddr(0),
         types: Vec::with_capacity(cap),
         type_addr_by_def: FnvHashMap::with_capacity_and_hasher(cap, Default::default()),
+        interface_implementors: Default::default(),
     }
 }

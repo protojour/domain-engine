@@ -22,6 +22,14 @@ pub struct GraphqlSchema {
     pub i64_custom_scalar: Option<TypeAddr>,
     pub types: Vec<TypeData>,
     pub type_addr_by_def: FnvHashMap<(DefId, QueryLevel), TypeAddr>,
+    pub interface_implementors: FnvHashMap<TypeAddr, Vec<InterfaceImplementor>>,
+}
+
+/// Only used for the "flattened union" case for now
+#[derive(Serialize, Deserialize)]
+pub struct InterfaceImplementor {
+    pub addr: TypeAddr,
+    pub attribute_predicate: Vec<(DefId, DefId)>,
 }
 
 impl GraphqlSchema {
@@ -44,6 +52,7 @@ impl GraphqlSchema {
             i64_custom_scalar: None,
             types: vec![],
             type_addr_by_def: Default::default(),
+            interface_implementors: Default::default(),
         }
     }
 }

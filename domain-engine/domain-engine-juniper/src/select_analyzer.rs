@@ -19,7 +19,7 @@ use ontol_runtime::{
     var::Var,
     DefId, MapKey, RelationshipId,
 };
-use tracing::{debug, trace};
+use tracing::{debug, trace, warn};
 
 use crate::{
     context::SchemaCtx, cursor_util::GraphQLCursor, gql_scalar::GqlScalar,
@@ -441,7 +441,11 @@ impl<'a> SelectAnalyzer<'a> {
 
                 for field_look_ahead in look_ahead_children {
                     let field_name = field_look_ahead.field_original_name();
-                    let field_data = object_data.fields.get(field_name).unwrap();
+                    let Some(field_data) = object_data.fields.get(field_name) else {
+                        assert!(field_look_ahead.applies_for().is_some());
+                        warn!("Flattened union fields not analyzed yet.");
+                        continue;
+                    };
 
                     if let Some(selection) = self.analyze_selection(field_look_ahead, field_data)? {
                         properties.insert(selection.key, selection.select);

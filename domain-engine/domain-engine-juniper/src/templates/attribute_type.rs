@@ -6,7 +6,7 @@ use ontol_runtime::{
     interface::graphql::{
         data::{
             FieldKind, ObjectData, ObjectInterface, ObjectKind, TypeAddr, TypeData, TypeKind,
-            TypeModifier, TypeRef, UnionData, UnitTypeRef,
+            TypeModifier, TypeRef, UnitTypeRef,
         },
         schema::TypingPurpose,
     },
@@ -18,7 +18,7 @@ use ontol_runtime::{
     property::PropertyId,
     sequence::{Sequence, SubSequence},
     value::{Attribute, Value},
-    DefId,
+    DefId, RelationshipId,
 };
 use serde::Serialize;
 use tracing::trace_span;
@@ -58,15 +58,8 @@ impl<'v> ::juniper::GraphQLValue<GqlScalar> for AttributeType<'v> {
     }
 
     fn concrete_type_name(&self, context: &ServiceCtx, info: &SchemaType) -> String {
-        match &info.type_data().kind {
-            TypeKind::Union(union_data) => {
-                let (_, variant_data) = self.find_union_variant(union_data, &info.schema_ctx);
-                context.domain_engine.ontology()[variant_data.typename].to_string()
-            }
-            _ => panic!(
-                "should not need concrete type name for other things than unions or interfaces"
-            ),
-        }
+        let (_, type_data) = self.resolve_to_concrete_type_data(info);
+        context.domain_engine.ontology()[type_data.typename].to_string()
     }
 
     fn resolve_into_type(
@@ -76,19 +69,14 @@ impl<'v> ::juniper::GraphQLValue<GqlScalar> for AttributeType<'v> {
         selection_set: Option<&[juniper::Selection<GqlScalar>]>,
         executor: &juniper::Executor<Self::Context, GqlScalar>,
     ) -> juniper::ExecutionResult<GqlScalar> {
-        match &info.type_data().kind {
-            TypeKind::Union(union_data) => {
-                let (variant_type_addr, _) = self.find_union_variant(union_data, &info.schema_ctx);
-                self.resolve(
-                    &info
-                        .schema_ctx
-                        .get_schema_type(variant_type_addr, TypingPurpose::Selection),
-                    selection_set,
-                    executor,
-                )
-            }
-            _ => panic!("BUG: resolve_into_type called for non-union"),
-        }
+        let (type_addr, _) = self.resolve_to_concrete_type_data(info);
+        self.resolve(
+            &info
+                .schema_ctx
+                .get_schema_type(type_addr, TypingPurpose::Selection),
+            selection_set,
+            executor,
+        )
     }
 
     fn resolve_field(
@@ -156,6 +144,21 @@ impl<'v> juniper::GraphQLType<GqlScalar> for AttributeType<'v> {
                             builder.into_meta()
                         }
                         ObjectInterface::Interface => {
+                            if let Some(implementors) = reg
+                                .schema_ctx
+                                .schema
+                                .interface_implementors
+                                .get(&info.type_addr)
+                            {
+                                for implementor in implementors {
+                                    // ensure instantiation of all implementors
+                                    reg.get_type::<AttributeType>(
+                                        TypeRef::mandatory(UnitTypeRef::Addr(implementor.addr)),
+                                        TypingPurpose::Selection,
+                                    );
+                                }
+                            }
+
                             let mut builder = registry.build_interface_type::<Self>(info, &fields);
                             if let Some(docs) = info.docs_str() {
                                 builder = builder.description(docs);
@@ -217,31 +220,72 @@ impl<'v> juniper::GraphQLValueAsync<GqlScalar> for IndexedType<'v> {
 */
 
 impl<'v> AttributeType<'v> {
-    fn find_union_variant<'s>(
-        &self,
-        union_data: &'s UnionData,
-        ctx: &'s SchemaCtx,
-    ) -> (TypeAddr, &'s TypeData) {
-        for variant_type_addr in &union_data.variants {
-            let variant_type_data = ctx.schema.type_data(*variant_type_addr);
-            match &variant_type_data.kind {
-                TypeKind::Object(ObjectData {
-                    kind: ObjectKind::Node(node_data),
-                    ..
-                }) => {
-                    if node_data.def_id == self.attr.val.type_def_id() {
-                        return (*variant_type_addr, variant_type_data);
+    fn resolve_to_concrete_type_data<'s>(&self, info: &'s SchemaType) -> (TypeAddr, &'s TypeData) {
+        match &info.type_data().kind {
+            TypeKind::Union(union_data) => {
+                for variant_type_addr in &union_data.variants {
+                    let variant_type_data = info.schema_ctx.schema.type_data(*variant_type_addr);
+                    match &variant_type_data.kind {
+                        TypeKind::Object(ObjectData {
+                            kind: ObjectKind::Node(node_data),
+                            ..
+                        }) => {
+                            if node_data.def_id == self.attr.val.type_def_id() {
+                                return (*variant_type_addr, variant_type_data);
+                            }
+                        }
+                        _ => panic!("Unsupported union variant"),
                     }
                 }
-                _ => panic!("Unsupported union variant"),
-            }
-        }
 
-        panic!(
-            "union variant not found for ({value:?}) {variants:?}",
-            value = self.attr.val,
-            variants = union_data.variants
-        );
+                panic!(
+                    "union variant not found for ({value:?}) {variants:?}",
+                    value = self.attr.val,
+                    variants = union_data.variants
+                );
+            }
+            TypeKind::Object(object_data) => match &object_data.interface {
+                ObjectInterface::Interface => {
+                    let implementors = info
+                        .schema_ctx
+                        .schema
+                        .interface_implementors
+                        .get(&info.type_addr)
+                        .unwrap();
+                    let (Value::Struct(attrs, _) | Value::StructUpdate(attrs, _)) = &self.attr.val
+                    else {
+                        panic!("must be a struct to implement an interface");
+                    };
+
+                    for implementor in implementors {
+                        for (pred_property, pred_type) in &implementor.attribute_predicate {
+                            let Some(attr_value) =
+                                attrs.get(&PropertyId::subject(RelationshipId(*pred_property)))
+                            else {
+                                continue;
+                            };
+
+                            if attr_value.val.type_def_id() != *pred_type {
+                                continue;
+                            }
+                        }
+
+                        return (
+                            implementor.addr,
+                            info.schema_ctx.schema.type_data(implementor.addr),
+                        );
+                    }
+
+                    panic!("concrete implementation interface not found")
+                }
+                ObjectInterface::Implements(_) => {
+                    panic!("already concrete")
+                }
+            },
+            _ => panic!(
+                "should not need concrete type name for other things than unions or interfaces"
+            ),
+        }
     }
 
     fn resolve_object_field(

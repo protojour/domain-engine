@@ -12,6 +12,7 @@ use ontol_runtime::{
                 ScalarData, TypeAddr, TypeData, TypeKind, TypeModifier, TypeRef, UnionData,
                 UnitTypeRef,
             },
+            schema::InterfaceImplementor,
         },
         serde::{
             operator::{SerdeOperator, SerdeStructFlags},
@@ -553,6 +554,15 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 interface: ObjectInterface::Implements(thin_vec![interface_addr]),
             }),
         });
+
+        self.schema
+            .interface_implementors
+            .entry(interface_addr)
+            .or_default()
+            .push(InterfaceImplementor {
+                addr: permutation_addr,
+                attribute_predicate: permutations.iter().copied().collect(),
+            });
 
         let harvest_variant =
             HarvestVariant::FlattenedUnionPermutation(permutations.iter().copied().collect());
