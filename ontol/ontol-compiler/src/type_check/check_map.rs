@@ -1,12 +1,12 @@
 use ontol_hir::Label;
-use ontol_runtime::var::VarAllocator;
+use ontol_runtime::{smart_format, var::VarAllocator};
 
 use crate::{
     codegen::{
         task::{MapCodegenRequest, OntolMap},
         type_mapper::TypeMapper,
     },
-    def::Def,
+    def::{Def, DefKind},
     error::CompileError,
     map::UndirectedMapKey,
     mem::Intern,
@@ -21,6 +21,7 @@ use crate::{
 use super::{
     ena_inference::{KnownType, Strength},
     hir_build_ctx::{HirBuildCtx, ARMS},
+    hir_build_props::MatchAttributeKey,
     hir_type_inference::{HirArmTypeInference, HirVariableMapper},
     map_arm_analyze::PreAnalyzer,
     TypeCheck, TypeEquation, TypeError,
@@ -237,8 +238,29 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn report_missing_prop_errors(&mut self, ctx: &mut HirBuildCtx<'m>) {
         for (_arm, missing) in std::mem::take(&mut ctx.missing_properties) {
-            for (span, properties) in missing {
-                let error = CompileError::MissingProperties(properties);
+            for (span, attr_keys) in missing {
+                let mut formatted_properties = vec![];
+                for attr_key in attr_keys {
+                    match attr_key {
+                        MatchAttributeKey::Named(name) => {
+                            formatted_properties.push(smart_format!("`{name}`"))
+                        }
+                        MatchAttributeKey::Def(def_id) => match self.defs.def_kind(def_id) {
+                            DefKind::Type(type_def) => {
+                                if let Some(ident) = type_def.ident.as_ref() {
+                                    formatted_properties.push((*ident).into());
+                                } else {
+                                    formatted_properties.push("<anonymous>".into());
+                                }
+                            }
+                            _ => {
+                                formatted_properties.push("<anonymous>".into());
+                            }
+                        },
+                    }
+                }
+
+                let error = CompileError::MissingProperties(formatted_properties);
                 self.error_with_notes(
                     error,
                     &span,

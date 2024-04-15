@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use chumsky::{error::SimpleReason, prelude::Simple};
 use ontol_parser::Token;
-use ontol_runtime::format_utils::{Backticks, CommaSeparated, FmtMap, LogicOp, Missing};
+use ontol_runtime::format_utils::{CommaSeparated, LogicOp, Missing};
 use smartstring::alias::String;
 use thiserror::Error;
 
@@ -186,7 +186,7 @@ impl std::fmt::Display for CompileError {
                     } else {
                         "missing properties"
                     },
-                    props = CommaSeparated(FmtMap(props, Backticks))
+                    props = CommaSeparated(props)
                 )
             }
             Self::UnboundVariable => write!(f, "unbound variable"),

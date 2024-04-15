@@ -1,6 +1,5 @@
 use fnv::FnvHashMap;
 use ontol_runtime::var::{Var, VarAllocator};
-use smartstring::alias::String;
 use tracing::debug_span;
 
 use crate::{
@@ -10,7 +9,7 @@ use crate::{
     SourceSpan, NO_SPAN,
 };
 
-use super::ena_inference::Inference;
+use super::{ena_inference::Inference, hir_build_props::MatchAttributeKey};
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct CtrlFlowDepth(pub u16);
@@ -40,7 +39,7 @@ pub struct HirBuildCtx<'m> {
 
     ctrl_flow_depth: CtrlFlowDepth,
 
-    pub missing_properties: FnvHashMap<Arm, FnvHashMap<SourceSpan, Vec<String>>>,
+    pub missing_properties: FnvHashMap<Arm, FnvHashMap<SourceSpan, Vec<MatchAttributeKey<'m>>>>,
 }
 
 impl<'m> HirBuildCtx<'m> {

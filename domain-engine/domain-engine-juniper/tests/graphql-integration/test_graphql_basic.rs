@@ -1658,6 +1658,11 @@ async fn flattened_union_entity() {
             rel .'data': i64
             rel .'qux': text
         )
+
+        map foos (
+            (),
+            foo { ..@match foo() }
+        )
         ",
     )])
     .with_data_store(SrcName::default(), DataStoreConfig::Default)

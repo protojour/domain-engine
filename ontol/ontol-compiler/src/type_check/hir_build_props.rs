@@ -12,7 +12,7 @@ use smallvec::smallvec;
 use tracing::{debug, info};
 
 use crate::{
-    def::{BuiltinRelationKind, DefKind, LookupRelationshipMeta, RelParams},
+    def::{DefKind, LookupRelationshipMeta, RelParams},
     mem::Intern,
     pattern::{
         CompoundPatternAttr, CompoundPatternAttrKind, CompoundPatternModifier, Pattern,
@@ -44,6 +44,12 @@ struct MatchAttribute {
     rel_params_def: Option<DefId>,
     value_def: DefId,
     mentioned: bool,
+}
+
+#[derive(Eq, PartialEq, Hash)]
+pub enum MatchAttributeKey<'m> {
+    Named(&'m str),
+    Def(DefId),
 }
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
@@ -206,7 +212,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn collect_named_match_attributes(
         &self,
         property_set: &IndexMap<PropertyId, Property>,
-        match_attributes: &mut IndexMap<&'m str, MatchAttribute>,
+        match_attributes: &mut IndexMap<MatchAttributeKey<'m>, MatchAttribute>,
     ) {
         for (prop_id, _property) in property_set {
             self.collect_match_attribute(*prop_id, match_attributes);
@@ -216,7 +222,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn collect_membership_match_attributes(
         &self,
         def_id: DefId,
-        match_attributes: &mut IndexMap<&'m str, MatchAttribute>,
+        match_attributes: &mut IndexMap<MatchAttributeKey<'m>, MatchAttribute>,
     ) {
         let Some(memberships) = self.thesaurus.reverse_table.get(&def_id) else {
             return;
@@ -239,22 +245,22 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn collect_match_attribute(
         &self,
         prop_id: PropertyId,
-        match_attributes: &mut IndexMap<&'m str, MatchAttribute>,
+        match_attributes: &mut IndexMap<MatchAttributeKey<'m>, MatchAttribute>,
     ) {
         let meta = self.defs.relationship_meta(prop_id.relationship_id);
-        let property_name = match prop_id.role {
+        let match_key = match prop_id.role {
             Role::Subject => match meta.relation_def_kind.value {
-                DefKind::TextLiteral(lit) => Some(*lit),
-                _ => panic!("BUG: Expected named subject property"),
+                DefKind::TextLiteral(lit) => Some(MatchAttributeKey::Named(lit)),
+                _ => Some(MatchAttributeKey::Def(meta.relationship.relation_def_id)),
             },
-            Role::Object => meta.relationship.object_prop,
+            Role::Object => meta.relationship.object_prop.map(MatchAttributeKey::Named),
         };
         let (_, owner_cardinality, _) = meta.relationship.by(prop_id.role);
         let (value_def_id, _, _) = meta.relationship.by(prop_id.role.opposite());
 
-        if let Some(property_name) = property_name {
+        if let Some(match_key) = match_key {
             match_attributes.insert(
-                property_name,
+                match_key,
                 MatchAttribute {
                     property_id: prop_id,
                     cardinality: owner_cardinality,
@@ -274,7 +280,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         (type_def_id, actual_struct_flags): (DefId, StructFlags),
         pattern_attrs: &[CompoundPatternAttr],
         hir_meta: Meta<'m>,
-        mut match_attributes: IndexMap<&'m str, MatchAttribute>,
+        mut match_attributes: IndexMap<MatchAttributeKey<'m>, MatchAttribute>,
         span: SourceSpan,
         ctx: &mut HirBuildCtx<'m>,
     ) -> ontol_hir::Node {
@@ -283,12 +289,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let mut hir_props = Vec::with_capacity(pattern_attrs.len());
 
-        let mut special_attributes: IndexMap<BuiltinRelationKind, MatchAttribute> = IndexMap::new();
-
         if self.relations.identified_by(type_def_id).is_some() {
             if let Some(order_union_def_id) = self.entity_ctx.order_union(&type_def_id) {
-                special_attributes.insert(
-                    BuiltinRelationKind::Order,
+                match_attributes.insert(
+                    MatchAttributeKey::Def(self.primitives.relations.order),
                     MatchAttribute {
                         property_id: PropertyId::subject(RelationshipId(
                             self.primitives.relations.order,
@@ -301,8 +305,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 );
             }
 
-            special_attributes.insert(
-                BuiltinRelationKind::Direction,
+            match_attributes.insert(
+                MatchAttributeKey::Def(self.primitives.relations.direction),
                 MatchAttribute {
                     property_id: PropertyId::subject(RelationshipId(
                         self.primitives.relations.direction,
@@ -321,7 +325,6 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 struct_binder.hir().var,
                 pattern_attr,
                 &mut match_attributes,
-                &mut special_attributes,
                 actual_struct_flags,
                 ctx,
             );
@@ -354,8 +357,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &mut self,
         struct_binder_var: Var,
         attr: &CompoundPatternAttr,
-        match_attributes: &mut IndexMap<&'m str, MatchAttribute>,
-        special_attributes: &mut IndexMap<BuiltinRelationKind, MatchAttribute>,
+        match_attributes: &mut IndexMap<MatchAttributeKey<'m>, MatchAttribute>,
         actual_struct_flags: StructFlags,
         ctx: &mut HirBuildCtx<'m>,
     ) -> Option<ontol_hir::Node> {
@@ -370,9 +372,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
 
         let match_attribute = match self.defs.def_kind(def_id) {
-            DefKind::TextLiteral(name) => match_attributes.get_mut(name),
-            DefKind::BuiltinRelType(kind, _) => special_attributes.get_mut(kind),
-            _ => None,
+            DefKind::TextLiteral(name) => match_attributes.get_mut(&MatchAttributeKey::Named(name)),
+            _ => match_attributes.get_mut(&MatchAttributeKey::Def(def_id)),
         };
         let Some(match_attribute) = match_attribute else {
             self.error(CompileError::UnknownProperty, &prop_span);
@@ -689,7 +690,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         &mut self,
         struct_binder_var: Var,
         struct_span: SourceSpan,
-        match_attributes: IndexMap<&'m str, MatchAttribute>,
+        match_attributes: IndexMap<MatchAttributeKey<'m>, MatchAttribute>,
         hir_props: &mut Vec<ontol_hir::Node>,
         ctx: &mut HirBuildCtx<'m>,
     ) {
