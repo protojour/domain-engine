@@ -1,12 +1,14 @@
-use ontol_runtime::{DefId, PackageId};
+use fnv::FnvHashSet;
+use ontol_runtime::{ontology::ontol::TextConstant, DefId, PackageId};
 use tracing::debug;
 
 use crate::{
     def::{DefKind, RelParams},
     lowering::Lowering,
     package::ParsedPackage,
+    relation::Relations,
     repr::repr_model::ReprKind,
-    thesaurus::TypeRelation,
+    thesaurus::{Thesaurus, TypeRelation},
     CompileError, Compiler, LexError, ParseError, Src, UnifiedCompileError,
 };
 
@@ -144,9 +146,16 @@ impl<'m> Compiler<'m> {
             if let DefKind::Relationship(relationship) = &mut def.kind {
                 // Reset RelParams::Type back to RelParams::Unit if its representation is ReprKind::Unit.
                 // This simplifies later compiler stages, that can trust RelParams::Type is a type with real data in it.
-                if let RelParams::Type(rel_def_id) = &relationship.rel_params {
+                if let RelParams::Type(rel_params_def_id) = &relationship.rel_params {
+                    copy_relationship_store_key(
+                        *rel_params_def_id,
+                        def_id,
+                        &mut self.relations,
+                        &self.thesaurus,
+                    );
+
                     if matches!(
-                        self.repr_ctx.get_repr_kind(rel_def_id).unwrap(),
+                        self.repr_ctx.get_repr_kind(rel_params_def_id).unwrap(),
                         ReprKind::Unit
                     ) {
                         relationship.rel_params = RelParams::Unit;
@@ -214,5 +223,52 @@ impl<'m> Compiler<'m> {
         }
 
         self.seal_ctx.mark_domain_sealed(package_id);
+    }
+}
+
+/// Copies a store key registered for a set of rel_params,
+/// which may be reset to RelParams::Unit if no named parameters are present,
+/// and makes the store key available via a RelationshipId (DefId) instead.
+fn copy_relationship_store_key(
+    rel_params_def_id: DefId,
+    rel_def_id: DefId,
+    relations: &mut Relations,
+    thesaurus: &Thesaurus,
+) {
+    fn recurse_search(
+        def_id: DefId,
+        relations: &mut Relations,
+        thesaurus: &Thesaurus,
+        result: &mut Option<TextConstant>,
+        visited: &mut FnvHashSet<DefId>,
+    ) {
+        if !visited.insert(def_id) {
+            return;
+        }
+
+        if let Some(text_constant) = relations.store_keys.get(&def_id) {
+            *result = Some(*text_constant);
+            return;
+        }
+
+        for entry in thesaurus.entries_raw(def_id) {
+            if matches!(entry.rel, TypeRelation::Super) {
+                recurse_search(entry.def_id, relations, thesaurus, result, visited);
+            }
+        }
+    }
+
+    let mut store_key: Option<TextConstant> = None;
+
+    recurse_search(
+        rel_params_def_id,
+        relations,
+        thesaurus,
+        &mut store_key,
+        &mut Default::default(),
+    );
+
+    if let Some(store_key) = store_key {
+        relations.store_keys.insert(rel_def_id, store_key);
     }
 }

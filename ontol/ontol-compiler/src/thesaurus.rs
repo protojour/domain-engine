@@ -128,6 +128,15 @@ impl Thesaurus {
         }
     }
 
+    pub fn entries_raw(&self, def_id: DefId) -> Vec<Is> {
+        self.table
+            .get(&def_id)
+            .iter()
+            .flat_map(|map| map.keys())
+            .copied()
+            .collect()
+    }
+
     pub fn insert_domain_is(
         &mut self,
         subject: DefId,

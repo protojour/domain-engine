@@ -622,10 +622,11 @@ impl<'m> Compiler<'m> {
                 .relationship
                 .object_prop
                 .map(|prop| strings.intern_constant(prop)),
-            store_key: match graph_rel_params {
-                Some(def_id) => self.relations.store_keys.get(&def_id).copied(),
-                None => None,
-            },
+            store_key: self
+                .relations
+                .store_keys
+                .get(&property_id.relationship_id.0)
+                .copied(),
             source,
             target,
         })
