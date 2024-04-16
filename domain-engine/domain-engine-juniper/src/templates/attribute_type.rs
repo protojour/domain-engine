@@ -18,10 +18,10 @@ use ontol_runtime::{
     property::PropertyId,
     sequence::{Sequence, SubSequence},
     value::{Attribute, Value},
-    DefId, RelationshipId,
+    DefId,
 };
 use serde::Serialize;
-use tracing::trace_span;
+use tracing::{trace_span, warn};
 
 use crate::{
     context::{SchemaCtx, SchemaType},
@@ -246,37 +246,14 @@ impl<'v> AttributeType<'v> {
             }
             TypeKind::Object(object_data) => match &object_data.interface {
                 ObjectInterface::Interface => {
-                    let implementors = info
+                    let implementor = info
                         .schema_ctx
-                        .schema
-                        .interface_implementors
-                        .get(&info.type_addr)
-                        .unwrap();
-                    let (Value::Struct(attrs, _) | Value::StructUpdate(attrs, _)) = &self.attr.val
-                    else {
-                        panic!("must be a struct to implement an interface");
-                    };
-
-                    for implementor in implementors {
-                        for (pred_property, pred_type) in &implementor.attribute_predicate {
-                            let Some(attr_value) =
-                                attrs.get(&PropertyId::subject(RelationshipId(*pred_property)))
-                            else {
-                                continue;
-                            };
-
-                            if attr_value.val.type_def_id() != *pred_type {
-                                continue;
-                            }
-                        }
-
-                        return (
-                            implementor.addr,
-                            info.schema_ctx.schema.type_data(implementor.addr),
-                        );
-                    }
-
-                    panic!("concrete implementation interface not found")
+                        .downcast_interface(info.type_addr, &self.attr.val)
+                        .expect("concrete implementation interface not found");
+                    (
+                        implementor.addr,
+                        info.schema_ctx.schema.type_data(implementor.addr),
+                    )
                 }
                 ObjectInterface::Implements(_) => {
                     panic!("already concrete")
@@ -311,14 +288,11 @@ impl<'v> AttributeType<'v> {
                 executor,
             ),
             (Value::Unit(_), FieldKind::Node) => Ok(juniper::Value::Null),
-            (Value::Struct(attrs, _), FieldKind::Property(property_data)) => {
-                Self::resolve_property(
-                    attrs,
-                    property_data.property_id,
-                    field_type,
-                    schema_ctx,
-                    executor,
-                )
+            (Value::Struct(attrs, _), FieldKind::Property { id, .. }) => {
+                resolve_property(attrs, *id, field_type, schema_ctx, executor)
+            }
+            (Value::Struct(attrs, _), FieldKind::FlattenedProperty { proxy, id, .. }) => {
+                resolve_flattened_property(attrs, *proxy, *id, field_type, schema_ctx, executor)
             }
             (Value::Struct(attrs, _), FieldKind::ConnectionProperty { property_id, .. }) => {
                 let type_info = schema_ctx
@@ -345,7 +319,7 @@ impl<'v> AttributeType<'v> {
                     }
                 }
             }
-            (Value::Struct(attrs, _), FieldKind::Id(id_property_data)) => Self::resolve_property(
+            (Value::Struct(attrs, _), FieldKind::Id(id_property_data)) => resolve_property(
                 attrs,
                 PropertyId::subject(id_property_data.relationship_id),
                 field_type,
@@ -400,11 +374,16 @@ impl<'v> AttributeType<'v> {
                 .sub()
                 .and_then(SubSequence::total_len)
                 .serialize(JuniperValueSerializer)?),
-            (Value::Unit(_), FieldKind::Property(_)) => Ok(juniper::Value::Null),
-            (_, FieldKind::EdgeProperty(property_data)) => match &self.attr.rel {
-                Value::Struct(rel_attrs, _) => Self::resolve_property(
+            (Value::Unit(_), FieldKind::Property { .. }) => Ok(juniper::Value::Null),
+            (
+                _,
+                FieldKind::EdgeProperty {
+                    id: property_id, ..
+                },
+            ) => match &self.attr.rel {
+                Value::Struct(rel_attrs, _) => resolve_property(
                     rel_attrs.as_ref(),
-                    property_data.property_id,
+                    *property_id,
                     field_type,
                     schema_ctx,
                     executor,
@@ -422,75 +401,89 @@ impl<'v> AttributeType<'v> {
             other => panic!("BUG: unhandled combination: {other:#?}"),
         }
     }
+}
 
-    fn resolve_property(
-        map: &FnvHashMap<PropertyId, Attribute>,
-        property_id: PropertyId,
-        type_ref: TypeRef,
-        schema_ctx: &Arc<SchemaCtx>,
-        executor: &juniper::Executor<ServiceCtx, crate::gql_scalar::GqlScalar>,
-    ) -> juniper::ExecutionResult<crate::gql_scalar::GqlScalar> {
-        let attribute = match map.get(&property_id) {
-            Some(attribute) => attribute,
-            None => {
-                return Ok(graphql_value!(None));
-            }
-        };
+fn resolve_property(
+    map: &FnvHashMap<PropertyId, Attribute>,
+    property_id: PropertyId,
+    type_ref: TypeRef,
+    schema_ctx: &Arc<SchemaCtx>,
+    executor: &juniper::Executor<ServiceCtx, crate::gql_scalar::GqlScalar>,
+) -> juniper::ExecutionResult<crate::gql_scalar::GqlScalar> {
+    let attribute = match map.get(&property_id) {
+        Some(attribute) => attribute,
+        None => {
+            return Ok(graphql_value!(None));
+        }
+    };
 
-        match schema_ctx.lookup_type_by_addr(type_ref.unit) {
-            Ok(type_addr) => {
-                let schema_type = schema_ctx.get_schema_type(type_addr, TypingPurpose::Selection);
-                match &schema_ctx.type_data(schema_type.type_addr).kind {
-                    TypeKind::CustomScalar(scalar_data) => Ok(schema_ctx
-                        .ontology
-                        .new_serde_processor(scalar_data.operator_addr, ProcessorMode::Read)
-                        .serialize_value(&attribute.val, None, JuniperValueSerializer)?),
-                    TypeKind::Object(_) | TypeKind::Union(_) => {
-                        match (type_ref.modifier, &attribute.val) {
-                            (TypeModifier::Array { .. }, Value::Sequence(seq, _)) => {
-                                resolve_schema_type_field(
-                                    SequenceType { seq },
-                                    schema_type,
-                                    executor,
-                                )
-                            }
-                            _ => resolve_schema_type_field(
-                                AttributeType { attr: attribute },
-                                schema_type,
-                                executor,
-                            ),
+    match schema_ctx.lookup_type_by_addr(type_ref.unit) {
+        Ok(type_addr) => {
+            let schema_type = schema_ctx.get_schema_type(type_addr, TypingPurpose::Selection);
+            match &schema_ctx.type_data(schema_type.type_addr).kind {
+                TypeKind::CustomScalar(scalar_data) => Ok(schema_ctx
+                    .ontology
+                    .new_serde_processor(scalar_data.operator_addr, ProcessorMode::Read)
+                    .serialize_value(&attribute.val, None, JuniperValueSerializer)?),
+                TypeKind::Object(_) | TypeKind::Union(_) => {
+                    match (type_ref.modifier, &attribute.val) {
+                        (TypeModifier::Array { .. }, Value::Sequence(seq, _)) => {
+                            resolve_schema_type_field(SequenceType { seq }, schema_type, executor)
                         }
+                        _ => resolve_schema_type_field(
+                            AttributeType { attr: attribute },
+                            schema_type,
+                            executor,
+                        ),
                     }
                 }
             }
-            Err(scalar_ref) => match (
-                type_ref.modifier,
-                &schema_ctx.ontology[scalar_ref.operator_addr],
-            ) {
-                (TypeModifier::Array { .. }, SerdeOperator::RelationList(operator)) => {
-                    let attributes = attribute.val.cast_ref::<Vec<_>>();
-                    let processor = schema_ctx
-                        .ontology
-                        .new_serde_processor(operator.range.addr, ProcessorMode::Read);
-
-                    let graphql_values: Vec<juniper::Value<GqlScalar>> = attributes
-                        .iter()
-                        .map(|attr| -> juniper::ExecutionResult<GqlScalar> {
-                            Ok(processor.serialize_value(
-                                &attr.val,
-                                None,
-                                JuniperValueSerializer,
-                            )?)
-                        })
-                        .collect::<Result<_, _>>()?;
-
-                    Ok(juniper::Value::List(graphql_values))
-                }
-                _ => Ok(schema_ctx
-                    .ontology
-                    .new_serde_processor(scalar_ref.operator_addr, ProcessorMode::Read)
-                    .serialize_value(&attribute.val, None, JuniperValueSerializer)?),
-            },
         }
+        Err(scalar_ref) => match (
+            type_ref.modifier,
+            &schema_ctx.ontology[scalar_ref.operator_addr],
+        ) {
+            (TypeModifier::Array { .. }, SerdeOperator::RelationList(operator)) => {
+                let attributes = attribute.val.cast_ref::<Vec<_>>();
+                let processor = schema_ctx
+                    .ontology
+                    .new_serde_processor(operator.range.addr, ProcessorMode::Read);
+
+                let graphql_values: Vec<juniper::Value<GqlScalar>> = attributes
+                    .iter()
+                    .map(|attr| -> juniper::ExecutionResult<GqlScalar> {
+                        Ok(processor.serialize_value(&attr.val, None, JuniperValueSerializer)?)
+                    })
+                    .collect::<Result<_, _>>()?;
+
+                Ok(juniper::Value::List(graphql_values))
+            }
+            _ => Ok(schema_ctx
+                .ontology
+                .new_serde_processor(scalar_ref.operator_addr, ProcessorMode::Read)
+                .serialize_value(&attribute.val, None, JuniperValueSerializer)?),
+        },
     }
+}
+
+fn resolve_flattened_property(
+    map: &FnvHashMap<PropertyId, Attribute>,
+    proxy_property_id: PropertyId,
+    property_id: PropertyId,
+    type_ref: TypeRef,
+    schema_ctx: &Arc<SchemaCtx>,
+    executor: &juniper::Executor<ServiceCtx, crate::gql_scalar::GqlScalar>,
+) -> juniper::ExecutionResult<crate::gql_scalar::GqlScalar> {
+    let attribute = match map.get(&proxy_property_id) {
+        Some(attribute) => attribute,
+        None => {
+            return Ok(graphql_value!(None));
+        }
+    };
+    let Value::Struct(attrs, _) = &attribute.val else {
+        warn!("flattened property not found through proxy");
+        return Ok(graphql_value!(None));
+    };
+
+    resolve_property(attrs, property_id, type_ref, schema_ctx, executor)
 }

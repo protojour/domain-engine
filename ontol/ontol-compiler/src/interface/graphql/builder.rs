@@ -10,8 +10,8 @@ use ontol_runtime::{
             argument::{self, DefaultArg, MapInputArg},
             data::{
                 EntityData, FieldData, FieldKind, NativeScalarKind, NativeScalarRef, ObjectData,
-                ObjectInterface, ObjectKind, Optionality, PropertyData, ScalarData, TypeAddr,
-                TypeData, TypeKind, TypeModifier, TypeRef, UnitTypeRef,
+                ObjectInterface, ObjectKind, Optionality, ScalarData, TypeAddr, TypeData, TypeKind,
+                TypeModifier, TypeRef, UnitTypeRef,
             },
             schema::{GraphqlSchema, QueryLevel},
         },
@@ -78,14 +78,26 @@ pub(super) enum LazyTask {
 #[derive(Clone, Copy)]
 pub(super) enum PropertyFieldProducer {
     Property,
+    FlattenedProperty(PropertyId),
     EdgeProperty,
 }
 
 impl PropertyFieldProducer {
-    pub fn make_property(&self, data: PropertyData) -> FieldKind {
+    pub fn make_property(&self, property_id: PropertyId, addr: SerdeOperatorAddr) -> FieldKind {
         match self {
-            Self::Property => FieldKind::Property(data),
-            Self::EdgeProperty => FieldKind::EdgeProperty(data),
+            Self::Property => FieldKind::Property {
+                id: property_id,
+                addr,
+            },
+            Self::FlattenedProperty(proxy_id) => FieldKind::FlattenedProperty {
+                proxy: *proxy_id,
+                id: property_id,
+                addr,
+            },
+            Self::EdgeProperty => FieldKind::EdgeProperty {
+                id: property_id,
+                addr,
+            },
         }
     }
 }

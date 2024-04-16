@@ -9,13 +9,16 @@ use ontol_runtime::{
     interface::{
         graphql::{
             data::{NativeScalarRef, TypeAddr, TypeData, TypeKind, UnitTypeRef},
-            schema::{GraphqlSchema, QueryLevel, TypingPurpose},
+            schema::{GraphqlSchema, InterfaceImplementor, QueryLevel, TypingPurpose},
         },
         serde::processor::ProcessorProfileFlags,
     },
     ontology::{ontol::TextConstant, Ontology},
+    property::PropertyId,
+    value::Value,
     DefId,
 };
+use tracing::debug;
 
 /// ServiceCtx represents the "backend" of the GraphQL schema.
 ///
@@ -123,6 +126,30 @@ impl SchemaCtx {
             .type_addr_by_def
             .get(&(def_id, query_level))
             .cloned()
+    }
+
+    pub fn downcast_interface(
+        &self,
+        interface_addr: TypeAddr,
+        value: &Value,
+    ) -> Option<&InterfaceImplementor> {
+        let implementors = self.schema.interface_implementors.get(&interface_addr)?;
+        let (Value::Struct(attrs, _) | Value::StructUpdate(attrs, _)) = value else {
+            debug!("Must be a struct in order to implement an interface");
+            return None;
+        };
+
+        implementors.iter().find(|implementor| {
+            implementor
+                .attribute_predicate
+                .iter()
+                .all(|(pred_relationship, pred_type)| {
+                    attrs
+                        .get(&PropertyId::subject(*pred_relationship))
+                        .map(|attr| attr.val.type_def_id() == *pred_type)
+                        .unwrap_or(false)
+                })
+        })
     }
 }
 

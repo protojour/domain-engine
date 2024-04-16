@@ -8,9 +8,8 @@ use ontol_runtime::{
             argument,
             data::{
                 ConnectionData, EdgeData, FieldData, FieldKind, NativeScalarKind, NativeScalarRef,
-                NodeData, ObjectData, ObjectInterface, ObjectKind, Optionality, PropertyData,
-                ScalarData, TypeAddr, TypeData, TypeKind, TypeModifier, TypeRef, UnionData,
-                UnitTypeRef,
+                NodeData, ObjectData, ObjectInterface, ObjectKind, Optionality, ScalarData,
+                TypeAddr, TypeData, TypeKind, TypeModifier, TypeRef, UnionData, UnitTypeRef,
             },
             schema::InterfaceImplementor,
         },
@@ -21,7 +20,7 @@ use ontol_runtime::{
     },
     phf::PhfIndexMap,
     property::{PropertyCardinality, PropertyId, Role, ValueCardinality},
-    DefId,
+    DefId, RelationshipId,
 };
 use thin_vec::thin_vec;
 use tracing::{trace, trace_span};
@@ -430,7 +429,8 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         def_id: DefId,
         property_field_producer: PropertyFieldProducer,
     ) {
-        let mut interface_variants: Vec<(DefId, Vec<DefId>)> = Default::default();
+        let mut interface_variants: Vec<(RelationshipId, RelationId, Vec<DefId>)> =
+            Default::default();
 
         // See if it should be an interface of flattened unions
         if let Some(table) = self.relations.properties_table_by_def_id(def_id) {
@@ -448,7 +448,8 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     };
 
                     interface_variants.push((
-                        meta.relationship.relation_def_id,
+                        property_id.relationship_id,
+                        RelationId(meta.relationship.relation_def_id),
                         members.iter().map(|(def_id, _)| *def_id).collect(),
                     ));
                 }
@@ -486,14 +487,15 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         interface_addr: TypeAddr,
         interface_def_id: DefId,
         property_field_producer: PropertyFieldProducer,
-        interface_variants: &[(DefId, Vec<DefId>)],
+        interface_variants: &[(RelationshipId, RelationId, Vec<DefId>)],
         interface_variant_index: usize,
-        permutations: &mut Vec<(DefId, DefId)>,
+        permutations: &mut Vec<(RelationshipId, RelationId, DefId)>,
     ) {
         if interface_variant_index < interface_variants.len() {
-            let (key, variants) = &interface_variants[interface_variant_index];
+            let (relationship_id, relation_id, variants) =
+                &interface_variants[interface_variant_index];
             for variant in variants {
-                permutations.push((*key, *variant));
+                permutations.push((*relationship_id, *relation_id, *variant));
                 self.harvest_interface_implementation_permutations(
                     interface_addr,
                     interface_def_id,
@@ -524,18 +526,28 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         };
 
         // Generate typename variant
-        for (unit_type, variant) in permutations.iter() {
-            let key_type_info = self.partial_ontology.get_type_info(*unit_type);
+        for (_, relation_id, variant) in permutations.iter() {
+            let relation_type_info = self.partial_ontology.get_type_info(relation_id.0);
             let variant_type_info = self.partial_ontology.get_type_info(*variant);
 
-            if let Some(name) = key_type_info.name() {
-                typename.push('_');
-                typename.push_str(&self.serde_gen.strings[name]);
+            fn typename_append(output: &mut std::string::String, name: &str) {
+                if name
+                    .chars()
+                    .next()
+                    .map(|char| char.is_lowercase())
+                    .unwrap_or(true)
+                {
+                    output.push('_');
+                }
+                output.push_str(name);
             }
 
-            if let Some(name) = variant_type_info.name() {
-                typename.push('_');
-                typename.push_str(&self.serde_gen.strings[name]);
+            if let Some(relation_name) = relation_type_info.name() {
+                typename_append(&mut typename, &self.serde_gen.strings[relation_name]);
+            }
+
+            if let Some(variant_name) = variant_type_info.name() {
+                typename_append(&mut typename, &self.serde_gen.strings[variant_name]);
             }
         }
 
@@ -561,11 +573,20 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             .or_default()
             .push(InterfaceImplementor {
                 addr: permutation_addr,
-                attribute_predicate: permutations.iter().copied().collect(),
+                attribute_predicate: permutations
+                    .iter()
+                    .copied()
+                    .map(|(relationship_id, _, type_def_id)| (relationship_id, type_def_id))
+                    .collect(),
             });
 
-        let harvest_variant =
-            HarvestVariant::FlattenedUnionPermutation(permutations.iter().copied().collect());
+        let harvest_variant = HarvestVariant::FlattenedUnionPermutation(
+            permutations
+                .iter()
+                .copied()
+                .map(|(relationship_id, _, type_def_id)| (relationship_id, type_def_id))
+                .collect(),
+        );
 
         self.harvest_fields_with_variant(
             permutation_addr,
@@ -679,12 +700,15 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         // Get the general category of each field, for deciding the overall order.
         fn field_order_category(field_kind: &FieldKind) -> u8 {
             match field_kind {
-                FieldKind::Property(data) | FieldKind::EdgeProperty(data) => {
-                    match data.property_id.role {
-                        Role::Subject => 0,
-                        Role::Object => 1,
-                    }
+                FieldKind::Property {
+                    id: property_id, ..
                 }
+                | FieldKind::EdgeProperty {
+                    id: property_id, ..
+                } => match property_id.role {
+                    Role::Subject => 0,
+                    Role::Object => 1,
+                },
                 // Connections are placed after "plain" fields
                 FieldKind::ConnectionProperty { property_id, .. } => match property_id.role {
                     Role::Subject => 2,
@@ -740,11 +764,10 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     if let HarvestVariant::FlattenedUnionPermutation(variant_table) =
                         harvest_variant
                     {
-                        let union_variant_def_id = variant_table
-                            .get(&meta.relationship.relation_def_id)
-                            .unwrap();
-
                         // Union flattener
+
+                        let union_variant_def_id =
+                            variant_table.get(&property_id.relationship_id).unwrap();
 
                         let Some(properties) =
                             self.relations.properties_by_def_id(*union_variant_def_id)
@@ -753,11 +776,11 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         };
 
                         if let Some(table) = &properties.table {
-                            for (property_id, property) in table {
+                            for (inner_property_id, property) in table {
                                 self.harvest_struct_field(
-                                    *property_id,
+                                    *inner_property_id,
                                     property,
-                                    property_field_producer,
+                                    PropertyFieldProducer::FlattenedProperty(property_id),
                                     field_namespace,
                                     harvest_variant,
                                     output,
@@ -841,10 +864,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             };
 
             FieldData {
-                kind: property_field_producer.make_property(PropertyData {
-                    property_id,
-                    value_operator_addr,
-                }),
+                kind: property_field_producer.make_property(property_id, value_operator_addr),
                 field_type,
             }
         } else if is_entity_value {
@@ -888,10 +908,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             }
 
             FieldData {
-                kind: property_field_producer.make_property(PropertyData {
-                    property_id,
-                    value_operator_addr,
-                }),
+                kind: property_field_producer.make_property(property_id, value_operator_addr),
                 field_type: TypeRef::mandatory(unit).to_array(Optionality::from_optional(
                     matches!(prop_cardinality, PropertyCardinality::Optional),
                 )),
@@ -937,5 +954,8 @@ pub(super) fn get_native_scalar_kind(
 enum HarvestVariant {
     Object,
     FlattenedUnionInterface,
-    FlattenedUnionPermutation(FnvHashMap<DefId, DefId>),
+    FlattenedUnionPermutation(FnvHashMap<RelationshipId, DefId>),
 }
+
+#[derive(Clone, Copy)]
+struct RelationId(DefId);

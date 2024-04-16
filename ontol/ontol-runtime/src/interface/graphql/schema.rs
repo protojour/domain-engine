@@ -7,7 +7,7 @@ use crate::{
         processor::{ProcessorLevel, ProcessorMode},
     },
     ontology::OntologyInit,
-    DefId, PackageId,
+    DefId, PackageId, RelationshipId,
 };
 
 use super::data::{TypeAddr, TypeData};
@@ -29,7 +29,7 @@ pub struct GraphqlSchema {
 #[derive(Serialize, Deserialize)]
 pub struct InterfaceImplementor {
     pub addr: TypeAddr,
-    pub attribute_predicate: Vec<(DefId, DefId)>,
+    pub attribute_predicate: Box<[(RelationshipId, DefId)]>,
 }
 
 impl GraphqlSchema {

@@ -778,7 +778,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 .or_default()
                 .entry(struct_span)
                 .or_default()
-                .push(name.into());
+                .push(name);
         }
     }
 

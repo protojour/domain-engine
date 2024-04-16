@@ -264,9 +264,21 @@ impl FieldData {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum FieldKind {
     /// A normal property of a node
-    Property(PropertyData),
+    Property {
+        id: PropertyId,
+        addr: SerdeOperatorAddr,
+    },
+    /// A flattened property accessed through a "proxy"
+    FlattenedProperty {
+        proxy: PropertyId,
+        id: PropertyId,
+        addr: SerdeOperatorAddr,
+    },
     /// The (incoming/"rel params") edge property of a node
-    EdgeProperty(PropertyData),
+    EdgeProperty {
+        id: PropertyId,
+        addr: SerdeOperatorAddr,
+    },
     /// The _id field of a node
     Id(IdPropertyData),
     /// The node inside an edge or mutation result
@@ -311,12 +323,6 @@ pub enum FieldKind {
         field_unit_type_addr: TypeAddr,
     },
     Version,
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct PropertyData {
-    pub property_id: PropertyId,
-    pub value_operator_addr: SerdeOperatorAddr,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]

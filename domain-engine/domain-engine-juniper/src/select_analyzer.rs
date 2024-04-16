@@ -152,11 +152,14 @@ impl<'a> SelectAnalyzer<'a> {
                             let field_name = child_look_ahead.field_original_name();
 
                             if let Some(field_data) = object_data.fields.get(field_name) {
-                                if let FieldKind::Property(property_data) = &field_data.kind {
+                                if let FieldKind::Property {
+                                    id: property_id, ..
+                                } = &field_data.kind
+                                {
                                     self.analyze_map(
                                         child_look_ahead,
                                         field_data,
-                                        property_data.property_id,
+                                        *property_id,
                                         input_queries,
                                         output_selects,
                                         recursion_guard,
@@ -166,11 +169,14 @@ impl<'a> SelectAnalyzer<'a> {
                         }
                     } else {
                         for (_, field) in object_data.fields.iter() {
-                            if let FieldKind::Property(property_data) = &field.kind {
+                            if let FieldKind::Property {
+                                id: property_id, ..
+                            } = &field.kind
+                            {
                                 self.analyze_map(
                                     look_ahead,
                                     field_data,
-                                    property_data.property_id,
+                                    *property_id,
                                     input_queries,
                                     output_selects,
                                     recursion_guard,
@@ -290,18 +296,24 @@ impl<'a> SelectAnalyzer<'a> {
                     select: self.analyze_data(look_ahead.children(), &type_data.kind)?,
                 }))
             }
-            (FieldKind::Property(property_data), Ok(type_data)) => {
-                Ok(Some(KeyedPropertySelection {
-                    key: property_data.property_id,
-                    select: self.analyze_data(look_ahead.children(), &type_data.kind)?,
-                }))
-            }
-            (FieldKind::Property(property_data), Err(_scalar_ref)) => {
-                Ok(Some(KeyedPropertySelection {
-                    key: property_data.property_id,
-                    select: Select::Leaf,
-                }))
-            }
+            (
+                FieldKind::Property {
+                    id: property_id, ..
+                },
+                Ok(type_data),
+            ) => Ok(Some(KeyedPropertySelection {
+                key: *property_id,
+                select: self.analyze_data(look_ahead.children(), &type_data.kind)?,
+            })),
+            (
+                FieldKind::Property {
+                    id: property_id, ..
+                },
+                Err(_scalar_ref),
+            ) => Ok(Some(KeyedPropertySelection {
+                key: *property_id,
+                select: Select::Leaf,
+            })),
             (FieldKind::Id(id_property_data), Err(_scalar_ref)) => {
                 Ok(Some(KeyedPropertySelection {
                     key: PropertyId::subject(id_property_data.relationship_id),

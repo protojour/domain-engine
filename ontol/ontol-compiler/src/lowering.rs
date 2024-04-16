@@ -1435,8 +1435,8 @@ enum Coinage {
 
 enum RelationKey {
     Named(DefId),
-    FmtTransition(DefId, FmtFinalState),
     Builtin(DefId),
+    FmtTransition(DefId, FmtFinalState),
     Indexed,
 }
 

@@ -41,7 +41,7 @@ fn test_graphql_small_range_number_becomes_int() {
         let foo_object = foo_type.object_data();
 
         let prop_field = foo_object.fields.get("prop").unwrap();
-        assert_matches!(prop_field.kind, FieldKind::Property(_));
+        assert_matches!(prop_field.kind, FieldKind::Property { .. });
 
         let native = prop_field.field_type.unit.native_scalar();
         assert_matches!(native.kind, NativeScalarKind::Int(_));
@@ -63,7 +63,7 @@ fn test_graphql_i64_custom_scalar() {
         let foo_object = foo_type.object_data();
 
         let prop_field = foo_object.fields.get("prop").unwrap();
-        assert_matches!(prop_field.kind, FieldKind::Property(_));
+        assert_matches!(prop_field.kind, FieldKind::Property { .. });
 
         let prop_type_data = schema.type_data(prop_field.field_type.unit.addr());
 
@@ -89,7 +89,7 @@ fn test_graphql_default_scalar() {
         let foo_object = foo_type.object_data();
 
         let prop_field = foo_object.fields.get("default").unwrap();
-        assert_matches!(prop_field.kind, FieldKind::Property(_));
+        assert_matches!(prop_field.kind, FieldKind::Property { .. });
 
         let native = prop_field.field_type.unit.native_scalar();
         assert_matches!(native.kind, NativeScalarKind::String);
@@ -110,7 +110,7 @@ fn test_graphql_scalar_array() {
         let foo_object = foo_type.object_data();
 
         let prop_field = foo_object.fields.get("tags").unwrap();
-        assert_matches!(prop_field.kind, FieldKind::Property(_));
+        assert_matches!(prop_field.kind, FieldKind::Property { .. });
 
         let native = prop_field.field_type.unit.native_scalar();
         assert_matches!(native.kind, NativeScalarKind::String);
@@ -390,7 +390,7 @@ fn graphql_flattened_union() {
     )
     "
     .compile_then(|test| {
-        let (schema, schema_test) = schema_test(&test, SrcName::default());
+        let (_schema, schema_test) = schema_test(&test, SrcName::default());
         let foo_interface = schema_test.type_data("foo", QueryLevel::Node).object_data();
 
         let ObjectInterface::Interface = &foo_interface.interface else {
@@ -399,20 +399,10 @@ fn graphql_flattened_union() {
 
         assert_eq!(foo_interface.field_names(), vec!["id"]);
 
-        let implementations: Vec<_> = schema
-            .types
-            .iter()
-            .filter(|type_data| {
-                let TypeKind::Object(object_data) = &type_data.kind else {
-                    return false;
-                };
-                matches!(&object_data.interface, ObjectInterface::Implements(interfaces) if !interfaces.is_empty())
-            })
-            .collect();
-
-        assert_eq!(implementations.len(), 2);
-        let bar = &implementations[0];
-        let qux = &implementations[1];
+        let implementors = schema_test.implementors();
+        assert_eq!(implementors.len(), 2);
+        let bar = &implementors[0];
+        let qux = &implementors[1];
 
         assert_eq!(&test.ontology()[bar.typename], "foo_kind_bar");
         assert_eq!(
@@ -424,6 +414,37 @@ fn graphql_flattened_union() {
             qux.object_data().field_names(),
             vec!["id", "kind", "data", "qux"]
         );
+    });
+}
+
+#[test]
+fn graphql_flattened_union_pascal_casing() {
+    "
+    def Kind ()
+
+    def Foo (
+        rel .'id'|id: (rel .is: text)
+        rel .Kind: (
+            rel .is?: Bar
+            rel .is?: Qux
+        )
+    )
+
+    def Bar (rel .'kind': 'bar')
+    def Qux (rel .'kind': 'qux')
+    "
+    .compile_then(|test| {
+        let (_schema, schema_test) = schema_test(&test, SrcName::default());
+        let foo_interface = schema_test.type_data("Foo", QueryLevel::Node).object_data();
+
+        assert_eq!(foo_interface.field_names(), vec!["id"]);
+
+        let implementors = schema_test.implementors();
+        let bar = &implementors[0];
+        let qux = &implementors[1];
+
+        assert_eq!(&test.ontology()[bar.typename], "FooKindBar");
+        assert_eq!(&test.ontology()[qux.typename], "FooKindQux");
     });
 }
 
@@ -450,6 +471,20 @@ impl<'o> SchemaTest<'o> {
         self.schema
             .type_data_by_key((binding.def_id(), query_level))
             .unwrap()
+    }
+
+    fn implementors(&self) -> Vec<&TypeData> {
+        self
+            .schema
+            .types
+            .iter()
+            .filter(|type_data| {
+                let TypeKind::Object(object_data) = &type_data.kind else {
+                    return false;
+                };
+                matches!(&object_data.interface, ObjectInterface::Implements(interfaces) if !interfaces.is_empty())
+            })
+            .collect()
     }
 }
 

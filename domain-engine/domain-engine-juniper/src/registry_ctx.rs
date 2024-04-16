@@ -97,10 +97,12 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 let field = juniper::meta::Field {
                     name: name.string.as_str().into(),
                     description: match &field_data.kind {
-                        FieldKind::Property(property) => self
+                        FieldKind::Property {
+                            id: property_id, ..
+                        } => self
                             .schema_ctx
                             .ontology
-                            .get_docs(property.property_id.relationship_id.0)
+                            .get_docs(property_id.relationship_id.0)
                             .map(|docs_constant| self.schema_ctx.ontology[docs_constant].into()),
                         _ => None,
                     },
@@ -549,8 +551,9 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 }
             }
             FieldKind::Deleted
-            | FieldKind::Property(_)
-            | FieldKind::EdgeProperty(_)
+            | FieldKind::Property { .. }
+            | FieldKind::FlattenedProperty { .. }
+            | FieldKind::EdgeProperty { .. }
             | FieldKind::Id(_)
             | FieldKind::Edges
             | FieldKind::Nodes
