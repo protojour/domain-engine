@@ -1,4 +1,4 @@
-use ontol_runtime::{value::Value, DefId, PackageId};
+use ontol_runtime::{value::Value, PackageId};
 use ontol_test_utils::{
     assert_error_msg, assert_json_io_matches,
     examples::{ARTIST_AND_INSTRUMENT, GUITAR_SYNTH_UNION},
@@ -518,17 +518,30 @@ fn store_key_in_type_info() {
     "
     .compile_then(|test| {
         let ontology = test.ontology();
+        let domain = ontology.find_domain(PackageId(1)).unwrap();
 
-        let foobar_def_id = DefId(PackageId(1), 1);
-        let type_info = ontology.get_type_info(foobar_def_id);
-        assert_eq!(&ontology[type_info.store_key.unwrap()], "fubar");
+        for type_info in domain.type_infos() {
+            if let Some(text_constant) = type_info.name() {
+                let name = &ontology[text_constant];
 
-        let foo_def_id = DefId(PackageId(1), 2);
-        let type_info = ontology.get_type_info(foo_def_id);
-        assert_eq!(&ontology[type_info.store_key.unwrap()], "fu");
+                if name == "foobar_edge" {
+                    assert_eq!(&ontology[type_info.store_key.unwrap()], "fubar");
+                }
 
-        let anon_def_id = DefId(PackageId(1), 18);
-        let type_info = ontology.get_type_info(anon_def_id);
-        assert_eq!(&ontology[type_info.store_key.unwrap()], "baaah");
+                if name == "foo" {
+                    assert_eq!(&ontology[type_info.store_key.unwrap()], "fu");
+
+                    let (_, rel_info) = type_info.entity_relationships().next().unwrap();
+                    assert_eq!(&ontology[rel_info.store_key.unwrap()], "fubar");
+                }
+
+                if name == "bar" {
+                    assert_eq!(&ontology[type_info.store_key.unwrap()], "bar");
+
+                    let (_, rel_info) = type_info.entity_relationships().next().unwrap();
+                    assert_eq!(&ontology[rel_info.store_key.unwrap()], "baaah");
+                }
+            }
+        }
     });
 }

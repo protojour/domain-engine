@@ -158,6 +158,7 @@ pub struct DataRelationshipInfo {
     pub object_cardinality: Cardinality,
     pub subject_name: TextConstant,
     pub object_name: Option<TextConstant>,
+    pub store_key: Option<TextConstant>,
     pub source: DataRelationshipSource,
     pub target: DataRelationshipTarget,
 }
