@@ -137,6 +137,35 @@ def symbol_union (
 )
 ```
 
+## Flattened unions
+
+Several union variants can be combined and flattened into a single type. This allows variants to be expressed, while preserving strong typing. To do this, an empty (unit) type
+
+```ontol
+def type ()
+
+def foo (
+    rel .'id'|id: (rel .is: text)
+    rel .type: (
+        rel .is?: type_a
+        rel .is?: type_b
+    )
+)
+
+def type_a (
+    rel .'type': 'a'
+    rel .'unique_to_a': text
+)
+
+def type_b (
+    rel .'type': 'b'
+    rel .'unique_to_b': text
+)
+```
+
+Here, the field `unique_to_a` is only allowed (and required) if `type` is `'a'`, and `unique_to_b` is only allowed (and required) if `type` is `'b'`.
+
+
 ## Sequences
 
 Both the subject and the object of a relationship may have multiple members, expressed as _sequences_.
