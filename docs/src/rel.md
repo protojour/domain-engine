@@ -139,7 +139,7 @@ def symbol_union (
 
 ## Flattened unions
 
-Several union variants can be combined and flattened into a single type. This allows variants to be expressed, while preserving strong typing. To do this, an empty (unit) type
+Several union variants can be combined and flattened into a single type. This allows variants to be expressed, while preserving strong typing. To do this, an empty (unit) type is employed to "join" the variants into the parent type. The unit type can then be used to address the union variants in [`map`](map.md) expressions.
 
 ```ontol
 def type ()
