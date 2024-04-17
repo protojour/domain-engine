@@ -109,6 +109,13 @@ impl SchemaCtx {
         &self.schema.types[type_addr.0 as usize]
     }
 
+    pub fn type_data_by_typename(&self, typename: &str) -> Option<&TypeData> {
+        self.schema
+            .type_addr_by_typename
+            .get(typename)
+            .map(|addr| self.type_data(*addr))
+    }
+
     pub fn lookup_type_by_addr(&self, type_ref: UnitTypeRef) -> Result<TypeAddr, NativeScalarRef> {
         match type_ref {
             UnitTypeRef::Addr(type_addr) => Ok(type_addr),

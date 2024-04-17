@@ -70,6 +70,16 @@ impl<V> PhfMap<V> {
     }
 }
 
+impl<V> Default for PhfMap<V> {
+    fn default() -> Self {
+        Self {
+            key: 0,
+            disps: Box::new([]),
+            entries: Box::new([]),
+        }
+    }
+}
+
 impl<V> PhfIndexMap<V> {
     pub fn is_empty(&self) -> bool {
         self.map.entries.is_empty()
@@ -91,6 +101,15 @@ impl<V> PhfIndexMap<V> {
         IndexMapIter {
             order_iter: self.order.iter(),
             map: &self.map,
+        }
+    }
+}
+
+impl<V> Default for PhfIndexMap<V> {
+    fn default() -> Self {
+        Self {
+            map: Default::default(),
+            order: Box::new([]),
         }
     }
 }
@@ -193,5 +212,26 @@ impl<V> OntologyInit for PhfMap<V> {
 impl<V> OntologyInit for PhfIndexMap<V> {
     fn ontology_init(&mut self, ontology: &Ontology) {
         self.map.ontology_init(ontology);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::phf::PhfIndexMap;
+
+    use super::PhfMap;
+
+    #[test]
+    fn phf_map_default() {
+        let map: PhfMap<i32> = Default::default();
+        assert!(map.get("").is_none());
+        assert!(map.get("a").is_none());
+    }
+
+    #[test]
+    fn phf_index_map_default() {
+        let map: PhfIndexMap<i32> = Default::default();
+        assert!(map.get("").is_none());
+        assert!(map.get("a").is_none());
     }
 }

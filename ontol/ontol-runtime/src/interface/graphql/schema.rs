@@ -7,6 +7,7 @@ use crate::{
         processor::{ProcessorLevel, ProcessorMode},
     },
     ontology::OntologyInit,
+    phf::PhfMap,
     DefId, PackageId, RelationshipId,
 };
 
@@ -22,6 +23,7 @@ pub struct GraphqlSchema {
     pub i64_custom_scalar: Option<TypeAddr>,
     pub types: Vec<TypeData>,
     pub type_addr_by_def: FnvHashMap<(DefId, QueryLevel), TypeAddr>,
+    pub type_addr_by_typename: PhfMap<TypeAddr>,
     pub interface_implementors: FnvHashMap<TypeAddr, Vec<InterfaceImplementor>>,
 }
 
@@ -42,6 +44,12 @@ impl GraphqlSchema {
         Some(self.type_data(*type_addr))
     }
 
+    pub fn push_type_data(&mut self, type_data: TypeData) -> TypeAddr {
+        let type_addr = TypeAddr(self.types.len() as u32);
+        self.types.push(type_data);
+        type_addr
+    }
+
     pub(crate) fn empty() -> Self {
         Self {
             package_id: PackageId(0),
@@ -52,6 +60,7 @@ impl GraphqlSchema {
             i64_custom_scalar: None,
             types: vec![],
             type_addr_by_def: Default::default(),
+            type_addr_by_typename: Default::default(),
             interface_implementors: Default::default(),
         }
     }
@@ -62,6 +71,8 @@ impl OntologyInit for GraphqlSchema {
         for type_data in self.types.iter_mut() {
             type_data.ontology_init(ontology);
         }
+
+        self.type_addr_by_typename.ontology_init(ontology);
     }
 }
 

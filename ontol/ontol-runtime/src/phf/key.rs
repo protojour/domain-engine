@@ -10,6 +10,10 @@ pub struct PhfKey {
 }
 
 impl PhfKey {
+    pub fn new(constant: TextConstant, string: ArcStr) -> Self {
+        Self { constant, string }
+    }
+
     pub fn arc_str(&self) -> &ArcStr {
         &self.string
     }

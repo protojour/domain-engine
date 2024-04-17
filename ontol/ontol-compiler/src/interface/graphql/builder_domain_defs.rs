@@ -49,7 +49,6 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             QLevel::Node => self.make_node_type(def_id),
             QLevel::Edge { rel_params } => {
                 let type_info = self.partial_ontology.get_type_info(def_id);
-                let edge_addr = self.alloc_def_type_addr(def_id, level);
                 let node_ref = self.get_def_type_ref(def_id, QLevel::Node);
                 let node_type_addr = node_ref.unwrap_addr();
 
@@ -79,14 +78,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         namespace.edge(Some(rel_type_info), type_info, strings)
                     });
 
-                    self.lazy_tasks.push(LazyTask::HarvestFields {
-                        type_addr: edge_addr,
-                        def_id: rel_def_id,
-                        property_field_producer: PropertyFieldProducer::EdgeProperty,
-                    });
-
-                    NewType::Addr(
-                        edge_addr,
+                    NewType::TypeData(
                         TypeData {
                             typename,
                             input_typename: Some(self.mk_typename_constant(
@@ -105,10 +97,12 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                                 interface: ObjectInterface::Implements(thin_vec![]),
                             }),
                         },
+                        NewTypeActions {
+                            harvest_fields: Some((rel_def_id, PropertyFieldProducer::EdgeProperty)),
+                        },
                     )
                 } else {
-                    NewType::Addr(
-                        edge_addr,
+                    NewType::TypeData(
                         TypeData {
                             typename: self.mk_typename_constant(|namespace, strings| {
                                 namespace.edge(None, type_info, strings)
@@ -127,12 +121,12 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                                 interface: ObjectInterface::Implements(thin_vec![]),
                             }),
                         },
+                        NewTypeActions::default(),
                     )
                 }
             }
             QLevel::Connection { rel_params } => {
                 let type_info = self.partial_ontology.get_type_info(def_id);
-                let connection_addr = self.alloc_def_type_addr(def_id, level);
                 let edge_ref = self.get_def_type_ref(def_id, QLevel::Edge { rel_params });
                 let node_ref = self.get_def_type_ref(def_id, QLevel::Node);
                 let node_type_addr = node_ref.unwrap_addr();
@@ -141,8 +135,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     self.partial_ontology.get_type_info(rel_params_def_id)
                 });
 
-                NewType::Addr(
-                    connection_addr,
+                NewType::TypeData(
                     TypeData {
                         typename: self.mk_typename_constant(|namespace, strings| {
                             namespace.connection(rel_type_info, type_info, strings)
@@ -202,15 +195,14 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                             interface: ObjectInterface::Implements(thin_vec![]),
                         }),
                     },
+                    NewTypeActions::default(),
                 )
             }
             QLevel::MutationResult => {
-                let addr = self.alloc_def_type_addr(def_id, level);
                 let type_info = self.partial_ontology.get_type_info(def_id);
                 let node_ref = self.get_def_type_ref(def_id, QLevel::Node);
 
-                NewType::Addr(
-                    addr,
+                NewType::TypeData(
                     TypeData {
                         typename: self.mk_typename_constant(|namespace, strings| {
                             namespace.mutation_result(type_info, strings)
@@ -249,6 +241,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                             interface: ObjectInterface::Implements(thin_vec![]),
                         }),
                     },
+                    NewTypeActions::default(),
                 )
             }
         }
@@ -270,18 +263,11 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         match repr_kind {
             ReprKind::Unit | ReprKind::Struct | ReprKind::StructIntersection(_) => {
                 let type_info = self.partial_ontology.get_type_info(def_id);
-                let type_addr = self.alloc_def_type_addr(def_id, QLevel::Node);
 
                 let operator_addr = self.serde_gen.gen_addr_lazy(gql_serde_key(def_id)).unwrap();
 
-                self.lazy_tasks.push(LazyTask::HarvestFields {
-                    type_addr,
-                    def_id: type_info.def_id,
-                    property_field_producer: PropertyFieldProducer::Property,
-                });
-
                 let type_kind = TypeKind::Object(ObjectData {
-                    fields: build_phf_index_map([]),
+                    fields: Default::default(),
                     kind: ObjectKind::Node(NodeData {
                         def_id: type_info.def_id,
                         entity_id: type_info
@@ -292,8 +278,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     interface: ObjectInterface::Implements(thin_vec![]),
                 });
 
-                NewType::Addr(
-                    type_addr,
+                NewType::TypeData(
                     TypeData {
                         typename: self.mk_typename_constant(|namespace, strings| {
                             namespace.typename(type_info, strings)
@@ -306,11 +291,13 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         )),
                         kind: type_kind,
                     },
+                    NewTypeActions {
+                        harvest_fields: Some((type_info.def_id, PropertyFieldProducer::Property)),
+                    },
                 )
             }
             ReprKind::Union(variants) | ReprKind::StructUnion(variants) => {
                 let type_info = self.partial_ontology.get_type_info(def_id);
-                let node_index = self.alloc_def_type_addr(def_id, QLevel::Node);
 
                 let mut needs_scalar = false;
                 let mut type_variants = thin_vec![];
@@ -335,8 +322,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
                 let operator_addr = self.serde_gen.gen_addr_lazy(gql_serde_key(def_id)).unwrap();
 
-                NewType::Addr(
-                    node_index,
+                NewType::TypeData(
                     TypeData {
                         typename: self.mk_typename_constant(|namespace, strings| {
                             namespace.typename(type_info, strings)
@@ -357,15 +343,14 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                             })
                         },
                     },
+                    NewTypeActions::default(),
                 )
             }
             ReprKind::Seq | ReprKind::Intersection(_) => {
                 let type_info = self.partial_ontology.get_type_info(def_id);
                 let operator_addr = self.serde_gen.gen_addr_lazy(gql_serde_key(def_id)).unwrap();
-                let type_addr = self.alloc_def_type_addr(def_id, QLevel::Node);
 
-                NewType::Addr(
-                    type_addr,
+                NewType::TypeData(
                     TypeData {
                         typename: self.mk_typename_constant(|namespace, strings| {
                             namespace.typename(type_info, strings)
@@ -378,6 +363,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         )),
                         kind: TypeKind::CustomScalar(ScalarData { operator_addr }),
                     },
+                    NewTypeActions::default(),
                 )
             }
             ReprKind::Scalar(scalar_def_id, ReprScalarKind::I64(range), _) => {
@@ -387,11 +373,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         kind: NativeScalarKind::Int(*scalar_def_id),
                     })
                 } else {
-                    let type_info = self.partial_ontology.get_type_info(def_id);
-                    let type_addr = self.alloc_def_type_addr(type_info.def_id, QLevel::Node);
-                    self.schema.i64_custom_scalar = Some(type_addr);
-                    NewType::Addr(
-                        type_addr,
+                    NewType::TypeData(
                         TypeData {
                             // FIXME: Must make sure that domain typenames take precedence over generated ones
                             typename: self.serde_gen.strings.intern_constant("_ontol_i64"),
@@ -404,6 +386,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                                     .unwrap(),
                             }),
                         },
+                        NewTypeActions::default(),
                     )
                 }
             }
@@ -563,13 +546,12 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             }
         }
 
-        let permutation_addr = self.next_type_addr();
-        self.schema.types.push(TypeData {
+        let permutation_addr = self.schema.push_type_data(TypeData {
             typename: self.serde_gen.strings.intern_constant(&typename),
             input_typename: None,
             partial_input_typename: None,
             kind: TypeKind::Object(ObjectData {
-                fields: build_phf_index_map([]),
+                fields: Default::default(),
                 kind: ObjectKind::Node(NodeData {
                     def_id: interface_def_id,
                     entity_id,

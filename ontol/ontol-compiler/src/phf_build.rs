@@ -1,6 +1,9 @@
 use arcstr::ArcStr;
-use fnv::FnvHashMap;
-use ontol_runtime::phf::{PhfIndexMap, PhfKey, PhfMap};
+use fnv::{FnvHashMap, FnvHashSet};
+use ontol_runtime::{
+    ontology::ontol::TextConstant,
+    phf::{PhfIndexMap, PhfKey, PhfMap},
+};
 use phf_shared::PhfHash;
 
 struct HashKey(ArcStr);
@@ -11,7 +14,6 @@ impl PhfHash for HashKey {
     }
 }
 
-#[allow(unused)]
 pub fn build_phf_map<V>(entries: impl IntoIterator<Item = (PhfKey, V)>) -> PhfMap<V> {
     build(entries).0
 }
@@ -37,15 +39,22 @@ pub fn build_phf_index_map<V>(entries: impl IntoIterator<Item = (PhfKey, V)>) ->
 }
 
 fn build<V>(entries: impl IntoIterator<Item = (PhfKey, V)>) -> (PhfMap<V>, Vec<usize>) {
+    let mut duplication_guard: FnvHashSet<TextConstant> = Default::default();
+
     // build two collections:
     // 1. a hash map of original index to target entry
     // 2. a vector of HashKey keys
     let (mut table, keys): (FnvHashMap<usize, (PhfKey, V)>, Vec<HashKey>) = entries
         .into_iter()
         .enumerate()
-        .map(|(index, (key, value))| {
-            let hash_key = HashKey(key.string.clone());
-            let table_entry = (index, (key, value));
+        .map(|(index, (phf_key, value))| {
+            let hash_key = HashKey(phf_key.string.clone());
+
+            if !duplication_guard.insert(phf_key.constant) {
+                panic!("BUG: duplicate key in phf map: {phf_key:?}");
+            }
+
+            let table_entry = (index, (phf_key, value));
 
             (table_entry, hash_key)
         })

@@ -409,18 +409,9 @@ impl<'a> SelectAnalyzer<'a> {
                     trace!("union field `{field_name}` applies for: {applies_for:?}",);
 
                     if let Some(applies_for) = applies_for {
-                        let variant_type_data = union_data
-                            .variants
-                            .iter()
-                            .find_map(|type_addr| {
-                                let type_data = self.schema_ctx.type_data(*type_addr);
-
-                                if &self.schema_ctx.ontology[type_data.typename] == applies_for {
-                                    Some(type_data)
-                                } else {
-                                    None
-                                }
-                            })
+                        let variant_type_data = self
+                            .schema_ctx
+                            .type_data_by_typename(applies_for)
                             .expect("BUG: Union variant not found");
 
                         let (fields, def_id) = match &variant_type_data.kind {
@@ -472,14 +463,20 @@ impl<'a> SelectAnalyzer<'a> {
 
                 for field_look_ahead in look_ahead_children {
                     let field_name = field_look_ahead.field_original_name();
-                    let Some(field_data) = object_data.fields.get(field_name) else {
-                        assert!(field_look_ahead.applies_for().is_some());
-                        warn!("Flattened union fields not analyzed yet.");
-                        continue;
-                    };
+                    if let Some(applies_for) = field_look_ahead.applies_for() {
+                        let _type_data = self
+                            .schema_ctx
+                            .type_data_by_typename(applies_for)
+                            .expect("BUG: interface downcast failed");
 
-                    if let Some(selection) = self.analyze_selection(field_look_ahead, field_data)? {
-                        properties.insert(selection.key, selection.select);
+                        warn!("Flattened union fields not analyzed yet.");
+                    } else {
+                        let field_data = object_data.fields.get(field_name).unwrap();
+                        if let Some(selection) =
+                            self.analyze_selection(field_look_ahead, field_data)?
+                        {
+                            properties.insert(selection.key, selection.select);
+                        }
                     }
                 }
 

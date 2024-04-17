@@ -31,7 +31,6 @@ use crate::{
     compiler_queries::GetDefType,
     def::{DefKind, Defs, LookupRelationshipMeta, TypeDef, TypeDefFlags},
     interface::graphql::graphql_namespace::{adapt_graphql_identifier, GqlAdaptedIdent},
-    phf_build::build_phf_index_map,
     primitive::{PrimitiveKind, Primitives},
     relation::{Constructor, Properties, Relations, UnionMemberCache},
     repr::{
@@ -517,7 +516,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         typename,
                         def,
                         flags: self.struct_flags_from_def_id(def.def_id),
-                        properties: build_phf_index_map([]),
+                        properties: Default::default(),
                     })),
                 ))
             } else {
@@ -930,7 +929,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 typename,
                 def,
                 flags,
-                properties: build_phf_index_map([]),
+                properties: Default::default(),
             })),
         )
     }

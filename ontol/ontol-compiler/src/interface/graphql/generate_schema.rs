@@ -9,6 +9,7 @@ use ontol_runtime::{
         schema::GraphqlSchema,
     },
     ontology::{config::data_store_backed_domains, map::MapLossiness, Ontology},
+    phf::PhfKey,
     resolve_path::ResolverGraph,
     DefId, MapKey, PackageId,
 };
@@ -17,6 +18,7 @@ use tracing::{debug_span, trace};
 use crate::{
     codegen::task::CodegenTasks,
     interface::{graphql::builder::QLevel, serde::serde_generator::SerdeGenerator},
+    phf_build::build_phf_map,
     primitive::Primitives,
     relation::UnionMemberCache,
 };
@@ -101,6 +103,7 @@ pub fn generate_graphql_schema<'c>(
                 },
             )),
             union_member_cache,
+            builtin_scalars: Default::default(),
         }
     };
 
@@ -140,6 +143,15 @@ pub fn generate_graphql_schema<'c>(
 
     builder.set_object_fields(builder.schema.query, query_fields);
     builder.set_object_fields(builder.schema.mutation, mutation_fields);
+
+    schema.type_addr_by_typename =
+        build_phf_map(schema.types.iter().enumerate().map(|(addr, data)| {
+            let constant = data.typename;
+            (
+                PhfKey::new(constant, serde_gen.strings[constant].into()),
+                TypeAddr(addr as u32),
+            )
+        }));
 
     Some(schema)
 }
@@ -185,6 +197,7 @@ fn new_schema_with_capacity(package_id: PackageId, cap: usize) -> GraphqlSchema 
         json_scalar: TypeAddr(0),
         types: Vec::with_capacity(cap),
         type_addr_by_def: FnvHashMap::with_capacity_and_hasher(cap, Default::default()),
+        type_addr_by_typename: Default::default(),
         interface_implementors: Default::default(),
     }
 }

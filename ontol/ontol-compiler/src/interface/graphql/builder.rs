@@ -66,6 +66,8 @@ pub(super) struct SchemaBuilder<'a, 's, 'c, 'm> {
     pub resolver_graph: ResolverGraph,
     /// cache of which def is member of which unions
     pub union_member_cache: &'c UnionMemberCache,
+
+    pub builtin_scalars: FnvHashMap<TextConstant, TypeAddr>,
 }
 
 pub(super) enum LazyTask {
@@ -104,8 +106,13 @@ impl PropertyFieldProducer {
 }
 
 pub(super) enum NewType {
-    Addr(TypeAddr, TypeData),
+    TypeData(TypeData, NewTypeActions),
     NativeScalar(NativeScalarRef),
+}
+
+#[derive(Default)]
+pub(super) struct NewTypeActions {
+    pub harvest_fields: Option<(DefId, PropertyFieldProducer)>,
 }
 
 /// An extension of QueryLevel used only inside the generator
@@ -158,38 +165,35 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
     }
 
     pub fn register_fundamental_types(&mut self) {
-        self.schema.query = self.next_type_addr();
-        self.schema.types.push(TypeData {
+        self.schema.query = self.schema.push_type_data(TypeData {
             typename: self.serde_gen.strings.intern_constant("Query"),
             input_typename: None,
             partial_input_typename: None,
             kind: TypeKind::Object(ObjectData {
-                fields: build_phf_index_map([]),
+                fields: Default::default(),
                 kind: ObjectKind::Query,
                 interface: ObjectInterface::Implements(thin_vec![]),
             }),
         });
 
-        self.schema.mutation = self.next_type_addr();
-        self.schema.types.push(TypeData {
+        self.schema.mutation = self.schema.push_type_data(TypeData {
             typename: self.serde_gen.strings.intern_constant("Mutation"),
             input_typename: None,
             partial_input_typename: None,
             kind: TypeKind::Object(ObjectData {
-                fields: build_phf_index_map([]),
+                fields: Default::default(),
                 kind: ObjectKind::Mutation,
                 interface: ObjectInterface::Implements(thin_vec![]),
             }),
         });
 
         {
-            self.schema.page_info = self.next_type_addr();
-            self.schema.types.push(TypeData {
+            self.schema.page_info = self.schema.push_type_data(TypeData {
                 typename: self.serde_gen.strings.intern_constant("PageInfo"),
                 input_typename: None,
                 partial_input_typename: None,
                 kind: TypeKind::Object(ObjectData {
-                    fields: build_phf_index_map([]),
+                    fields: Default::default(),
                     kind: ObjectKind::PageInfo,
                     interface: ObjectInterface::Implements(thin_vec![]),
                 }),
@@ -237,8 +241,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             ]);
         }
 
-        self.schema.json_scalar = self.next_type_addr();
-        self.schema.types.push(TypeData {
+        self.schema.json_scalar = self.schema.push_type_data(TypeData {
             typename: self
                 .serde_gen
                 .strings
@@ -286,33 +289,46 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         }
 
         match self.make_def_type(def_id, level) {
-            NewType::Addr(type_addr, type_data) => {
-                self.schema.types[type_addr.0 as usize] = type_data;
+            NewType::TypeData(type_data, post_alloc) => {
+                let type_addr = match &type_data.kind {
+                    TypeKind::CustomScalar(_scalar_data) => {
+                        match self.builtin_scalars.get(&type_data.typename) {
+                            Some(type_addr) => *type_addr,
+                            None => {
+                                let typename = type_data.typename;
+                                let type_addr = self.schema.push_type_data(type_data);
+                                self.builtin_scalars.insert(typename, type_addr);
+
+                                if &self.serde_gen.strings[typename] == "_ontol_i64" {
+                                    self.schema.i64_custom_scalar = Some(type_addr);
+                                }
+
+                                type_addr
+                            }
+                        }
+                    }
+                    _ => {
+                        let type_addr = self.schema.push_type_data(type_data);
+
+                        if let Some((def_id, property_field_producer)) = post_alloc.harvest_fields {
+                            self.lazy_tasks.push(LazyTask::HarvestFields {
+                                type_addr,
+                                def_id,
+                                property_field_producer,
+                            })
+                        }
+                        type_addr
+                    }
+                };
+
+                self.schema
+                    .type_addr_by_def
+                    .insert((def_id, level.as_query_level()), type_addr);
+
                 UnitTypeRef::Addr(type_addr)
             }
             NewType::NativeScalar(scalar_ref) => UnitTypeRef::NativeScalar(scalar_ref),
         }
-    }
-
-    pub(super) fn next_type_addr(&self) -> TypeAddr {
-        TypeAddr(self.schema.types.len() as u32)
-    }
-
-    pub fn alloc_def_type_addr(&mut self, def_id: DefId, level: QLevel) -> TypeAddr {
-        let addr = self.next_type_addr();
-        // note: this will be overwritten later
-        self.schema.types.push(TypeData {
-            typename: self.serde_gen.strings.intern_constant(""),
-            input_typename: None,
-            partial_input_typename: None,
-            kind: TypeKind::CustomScalar(ScalarData {
-                operator_addr: SerdeOperatorAddr(0),
-            }),
-        });
-        self.schema
-            .type_addr_by_def
-            .insert((def_id, level.as_query_level()), addr);
-        addr
     }
 
     pub fn add_named_map_query(
