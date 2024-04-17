@@ -4,7 +4,7 @@ use fnv::{FnvHashMap, FnvHashSet};
 use juniper::{FieldError, LookAheadChildren};
 use ontol_runtime::{
     interface::graphql::{
-        argument::{AfterArg, FieldArg, FirstArg},
+        argument::{AfterArg, FieldArg, FirstArg, MapInputArg},
         data::{
             ConnectionData, EdgeData, FieldData, FieldKind, NodeData, ObjectData, ObjectKind,
             TypeData, TypeKind, TypeModifier,
@@ -60,46 +60,58 @@ impl<'a> SelectAnalyzer<'a> {
         field_data: &FieldData,
     ) -> Result<AnalyzedQuery, juniper::FieldError<GqlScalar>> {
         match &field_data.kind {
-            FieldKind::MapConnection {
-                map_key,
-                input_arg,
-                queries: map_queries,
-                ..
-            }
-            | FieldKind::MapFind {
-                map_key,
-                input_arg,
-                queries: map_queries,
-            } => {
-                let input = ArgsWrapper::new(look_ahead)
-                    .deserialize_domain_field_arg_as_attribute(
-                        input_arg,
-                        (self.schema_ctx, self.service_ctx),
-                    )?
-                    .val;
-
-                debug!("field map queries: {map_queries:?}");
-
-                let mut output_selects: FnvHashMap<Var, EntitySelect> = Default::default();
-
-                self.analyze_map(
-                    look_ahead,
-                    field_data,
-                    unit_property(),
-                    map_queries,
-                    &mut output_selects,
-                    &mut Default::default(),
-                )?;
-
-                Ok(AnalyzedQuery::Map {
-                    map_key: *map_key,
-                    input,
-                    selects: output_selects,
-                })
-            }
+            FieldKind::MapConnection(field) => self.analyze_map_field(
+                look_ahead,
+                field.map_key,
+                &field.input_arg,
+                &field.queries,
+                field_data,
+            ),
+            FieldKind::MapFind(field) => self.analyze_map_field(
+                look_ahead,
+                field.map_key,
+                &field.input_arg,
+                &field.queries,
+                field_data,
+            ),
             FieldKind::Version => Ok(AnalyzedQuery::Version),
             _ => panic!(),
         }
+    }
+
+    fn analyze_map_field(
+        &self,
+        look_ahead: juniper::executor::LookAheadSelection<GqlScalar>,
+        map_key: MapKey,
+        input_arg: &MapInputArg,
+        map_queries: &FnvHashMap<PropertyId, Var>,
+        field_data: &FieldData,
+    ) -> Result<AnalyzedQuery, juniper::FieldError<GqlScalar>> {
+        let input = ArgsWrapper::new(look_ahead)
+            .deserialize_domain_field_arg_as_attribute(
+                input_arg,
+                (self.schema_ctx, self.service_ctx),
+            )?
+            .val;
+
+        debug!("field map queries: {map_queries:?}");
+
+        let mut output_selects: FnvHashMap<Var, EntitySelect> = Default::default();
+
+        self.analyze_map(
+            look_ahead,
+            field_data,
+            unit_property(),
+            map_queries,
+            &mut output_selects,
+            &mut Default::default(),
+        )?;
+
+        Ok(AnalyzedQuery::Map {
+            map_key,
+            input,
+            selects: output_selects,
+        })
     }
 
     fn analyze_map(
@@ -240,32 +252,34 @@ impl<'a> SelectAnalyzer<'a> {
                 }
             }
             (
-                FieldKind::MapConnection {
-                    first_arg,
-                    after_arg,
-                    ..
-                },
+                FieldKind::MapConnection(field),
                 Ok(TypeData {
                     kind: TypeKind::Object(object_data),
                     ..
                 }),
             ) => Ok(Some(KeyedPropertySelection {
                 key: unit_property(),
-                select: self.analyze_connection(look_ahead, first_arg, after_arg, object_data)?,
+                select: self.analyze_connection(
+                    look_ahead,
+                    &field.first_arg,
+                    &field.after_arg,
+                    object_data,
+                )?,
             })),
             (
-                FieldKind::ConnectionProperty {
-                    property_id,
-                    first_arg: first,
-                    after_arg: after,
-                },
+                FieldKind::ConnectionProperty(field),
                 Ok(TypeData {
                     kind: TypeKind::Object(object_data),
                     ..
                 }),
             ) => Ok(Some(KeyedPropertySelection {
-                key: *property_id,
-                select: self.analyze_connection(look_ahead, first, after, object_data)?,
+                key: field.property_id,
+                select: self.analyze_connection(
+                    look_ahead,
+                    &field.first_arg,
+                    &field.after_arg,
+                    object_data,
+                )?,
             })),
             (
                 FieldKind::Edges | FieldKind::EntityMutation { .. },

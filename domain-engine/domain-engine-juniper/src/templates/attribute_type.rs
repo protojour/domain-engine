@@ -327,12 +327,12 @@ impl<'v> AttributeType<'v> {
 
                 resolve_property(attrs, *id, field_type, schema_ctx, executor)
             }
-            (Value::Struct(attrs, _), FieldKind::ConnectionProperty { property_id, .. }) => {
+            (Value::Struct(attrs, _), FieldKind::ConnectionProperty(field)) => {
                 let type_info = schema_ctx
                     .find_schema_type_by_unit(field_type.unit, TypingPurpose::Selection)
                     .unwrap();
 
-                match attrs.get(property_id) {
+                match attrs.get(&field.property_id) {
                     Some(attribute) => resolve_schema_type_field(
                         AttributeType { attr: attribute },
                         type_info,

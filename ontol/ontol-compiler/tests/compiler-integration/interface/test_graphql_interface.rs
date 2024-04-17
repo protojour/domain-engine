@@ -170,11 +170,11 @@ fn test_query_map_empty_input_becomes_hidden_arg() {
 
         let query = schema.type_data(schema.query).object_data();
         let my_query = query.fields.get("my_query").unwrap();
-        let FieldKind::MapFind { input_arg, .. } = &my_query.kind else {
+        let FieldKind::MapFind(field) = &my_query.kind else {
             panic!("Incorrect field kind");
         };
 
-        assert!(input_arg.hidden);
+        assert!(field.input_arg.hidden);
     });
 }
 
@@ -267,21 +267,15 @@ fn test_imperfect_mapping_mutation() {
     let (_schema, test) = schema_test(&test, SrcName::default());
     let mutation_object = test.mutation_object_data();
     let outer_field = mutation_object.fields.get("outer").unwrap();
-    let FieldKind::EntityMutation {
-        create_arg,
-        update_arg,
-        delete_arg,
-        ..
-    } = &outer_field.kind
-    else {
+    let FieldKind::EntityMutation(field) = &outer_field.kind else {
         panic!()
     };
 
     // The outer domain cannot create entities of the inner domain because
     // of the imperfect mapping in that direction.
-    assert!(create_arg.is_none());
-    assert!(update_arg.is_some());
-    assert!(delete_arg.is_some());
+    assert!(field.create_arg.is_none());
+    assert!(field.update_arg.is_some());
+    assert!(field.delete_arg.is_some());
 }
 
 #[test]

@@ -12,7 +12,7 @@ use look_ahead_utils::ArgsWrapper;
 use ontol_runtime::{
     interface::{
         graphql::{
-            data::{FieldData, FieldKind, Optionality, TypeModifier, TypeRef},
+            data::{EntityMutationField, FieldData, FieldKind, Optionality, TypeModifier, TypeRef},
             schema::TypingPurpose,
         },
         DomainInterface,
@@ -185,13 +185,15 @@ async fn mutation(
         .unwrap();
 
     match &field_data.kind {
-        FieldKind::EntityMutation {
-            def_id,
-            create_arg,
-            update_arg,
-            delete_arg,
-            field_unit_type_addr,
-        } => {
+        FieldKind::EntityMutation(field) => {
+            let EntityMutationField {
+                def_id,
+                create_arg,
+                update_arg,
+                delete_arg,
+                field_unit_type_addr,
+            } = field.as_ref();
+
             let entity_mutations = args_wrapper.deserialize_entity_mutation_args(
                 create_arg.as_ref(),
                 update_arg.as_ref(),

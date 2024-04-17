@@ -302,33 +302,45 @@ pub enum FieldKind {
     /// The deleted predicate of a mutation result
     Deleted,
     /// A connection property of an entity node
-    ConnectionProperty {
-        property_id: PropertyId,
-        first_arg: argument::FirstArg,
-        after_arg: argument::AfterArg,
-    },
+    ConnectionProperty(Box<ConnectionPropertyField>),
     /// A connection to a map statement
-    MapConnection {
-        map_key: MapKey,
-        queries: FnvHashMap<PropertyId, Var>,
-        input_arg: argument::MapInputArg,
-        first_arg: argument::FirstArg,
-        after_arg: argument::AfterArg,
-    },
+    MapConnection(Box<MapConnectionField>),
     /// A find query from a map statement (zero or one return)
-    MapFind {
-        map_key: MapKey,
-        queries: FnvHashMap<PropertyId, Var>,
-        input_arg: argument::MapInputArg,
-    },
-    EntityMutation {
-        def_id: DefId,
-        create_arg: Option<argument::EntityCreateInputsArg>,
-        update_arg: Option<argument::EntityUpdateInputsArg>,
-        delete_arg: Option<argument::EntityDeleteInputsArg>,
-        field_unit_type_addr: TypeAddr,
-    },
+    MapFind(Box<MapFindField>),
+    EntityMutation(Box<EntityMutationField>),
     Version,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct ConnectionPropertyField {
+    pub property_id: PropertyId,
+    pub first_arg: argument::FirstArg,
+    pub after_arg: argument::AfterArg,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct MapConnectionField {
+    pub map_key: MapKey,
+    pub queries: FnvHashMap<PropertyId, Var>,
+    pub input_arg: argument::MapInputArg,
+    pub first_arg: argument::FirstArg,
+    pub after_arg: argument::AfterArg,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct MapFindField {
+    pub map_key: MapKey,
+    pub queries: FnvHashMap<PropertyId, Var>,
+    pub input_arg: argument::MapInputArg,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct EntityMutationField {
+    pub def_id: DefId,
+    pub create_arg: Option<argument::EntityCreateInputsArg>,
+    pub update_arg: Option<argument::EntityUpdateInputsArg>,
+    pub delete_arg: Option<argument::EntityDeleteInputsArg>,
+    pub field_unit_type_addr: TypeAddr,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]

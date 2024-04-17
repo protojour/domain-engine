@@ -22,6 +22,7 @@ use ontol_runtime::{
         discriminator::{
             leaf_discriminant_scalar_union_for_has_attribute, Discriminant, VariantDiscriminator,
         },
+        graphql::data::ConnectionPropertyField,
         serde::SerdeDef,
     },
     ontology::ontol::TextConstant,
@@ -723,7 +724,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     Role::Object => 1,
                 },
                 // Connections are placed after "plain" fields
-                FieldKind::ConnectionProperty { property_id, .. } => match property_id.role {
+                FieldKind::ConnectionProperty(field) => match field.property_id.role {
                     Role::Subject => 2,
                     Role::Object => 3,
                 },
@@ -987,11 +988,11 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             };
 
             FieldData::mandatory(
-                FieldKind::ConnectionProperty {
+                FieldKind::ConnectionProperty(Box::new(ConnectionPropertyField {
                     property_id,
                     first_arg: argument::FirstArg,
                     after_arg: argument::AfterArg,
-                },
+                })),
                 connection_ref,
             )
         } else if let RelParams::Type(_) = meta.relationship.rel_params {

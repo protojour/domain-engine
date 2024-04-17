@@ -9,9 +9,10 @@ use ontol_runtime::{
         graphql::{
             argument::{self, DefaultArg, MapInputArg},
             data::{
-                EntityData, FieldData, FieldKind, NativeScalarKind, NativeScalarRef, ObjectData,
-                ObjectInterface, ObjectKind, Optionality, ScalarData, TypeAddr, TypeData, TypeKind,
-                TypeModifier, TypeRef, UnitTypeRef,
+                EntityData, EntityMutationField, FieldData, FieldKind, MapConnectionField,
+                MapFindField, NativeScalarKind, NativeScalarRef, ObjectData, ObjectInterface,
+                ObjectKind, Optionality, ScalarData, TypeAddr, TypeData, TypeKind, TypeModifier,
+                TypeRef, UnitTypeRef,
             },
             schema::{GraphqlSchema, QueryLevel},
         },
@@ -397,13 +398,13 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
         let field_data = if map_key.output.flags.contains(MapDefFlags::SEQUENCE) {
             FieldData {
-                kind: FieldKind::MapConnection {
+                kind: FieldKind::MapConnection(Box::new(MapConnectionField {
                     map_key,
                     queries,
                     input_arg,
                     first_arg: argument::FirstArg,
                     after_arg: argument::AfterArg,
-                },
+                })),
                 field_type: TypeRef {
                     modifier: TypeModifier::Unit(Optionality::Mandatory),
                     unit: self.get_def_type_ref(
@@ -414,11 +415,11 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             }
         } else {
             FieldData {
-                kind: FieldKind::MapFind {
+                kind: FieldKind::MapFind(Box::new(MapFindField {
                     map_key,
                     queries,
                     input_arg,
-                },
+                })),
                 field_type: TypeRef {
                     modifier: TypeModifier::Unit(Optionality::Optional),
                     unit: self.get_def_type_ref(map_key.output.def_id, QLevel::Node),
@@ -486,7 +487,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 .typename(type_info, self.serde_gen.strings)
                 .into(),
             FieldData {
-                kind: FieldKind::EntityMutation {
+                kind: FieldKind::EntityMutation(Box::new(EntityMutationField {
                     def_id: type_info.def_id,
                     create_arg: create_resolve_path.is_some().then_some(
                         argument::EntityCreateInputsArg {
@@ -515,7 +516,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         UnitTypeRef::Addr(addr) => addr,
                         UnitTypeRef::NativeScalar(_) => unreachable!(),
                     },
-                },
+                })),
                 field_type: TypeRef::mandatory(mutation_result_ref)
                     .to_array(Optionality::Mandatory),
             },

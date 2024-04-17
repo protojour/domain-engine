@@ -510,47 +510,34 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         let mut arguments = vec![];
 
         match field_kind {
-            FieldKind::ConnectionProperty {
-                first_arg: first,
-                after_arg: after,
-                ..
-            } => {
-                arguments.extend([
-                    self.registry.arg::<Option<i32>>(first.name(ontology), &()),
-                    self.registry
-                        .arg::<Option<std::string::String>>(after.name(ontology), &()),
-                ]);
-            }
-            FieldKind::MapConnection {
-                input_arg,
-                first_arg,
-                after_arg,
-                ..
-            } => {
-                arguments.extend(self.get_domain_field_arg(input_arg));
+            FieldKind::ConnectionProperty(field) => {
                 arguments.extend([
                     self.registry
-                        .arg::<Option<i32>>(first_arg.name(ontology), &()),
+                        .arg::<Option<i32>>(field.first_arg.name(ontology), &()),
                     self.registry
-                        .arg::<Option<std::string::String>>(after_arg.name(ontology), &()),
+                        .arg::<Option<std::string::String>>(field.after_arg.name(ontology), &()),
                 ]);
             }
-            FieldKind::MapFind { input_arg, .. } => {
-                arguments.extend(self.get_domain_field_arg(input_arg));
+            FieldKind::MapConnection(field) => {
+                arguments.extend(self.get_domain_field_arg(&field.input_arg));
+                arguments.extend([
+                    self.registry
+                        .arg::<Option<i32>>(field.first_arg.name(ontology), &()),
+                    self.registry
+                        .arg::<Option<std::string::String>>(field.after_arg.name(ontology), &()),
+                ]);
             }
-            FieldKind::EntityMutation {
-                create_arg,
-                update_arg,
-                delete_arg,
-                ..
-            } => {
-                if let Some(create_arg) = create_arg {
+            FieldKind::MapFind(field) => {
+                arguments.extend(self.get_domain_field_arg(&field.input_arg));
+            }
+            FieldKind::EntityMutation(field) => {
+                if let Some(create_arg) = &field.create_arg {
                     arguments.extend(self.get_domain_field_arg(create_arg));
                 }
-                if let Some(update_arg) = update_arg {
+                if let Some(update_arg) = &field.update_arg {
                     arguments.extend(self.get_domain_field_arg(update_arg));
                 }
-                if let Some(delete_arg) = delete_arg {
+                if let Some(delete_arg) = &field.delete_arg {
                     arguments.extend(self.get_domain_field_arg(delete_arg));
                 }
             }
