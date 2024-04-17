@@ -12,7 +12,10 @@ use ontol_runtime::{
         schema::{QueryLevel, TypingPurpose},
     },
     interface::{
-        discriminator::{LeafDiscriminantScalarUnion, VariantPurpose},
+        discriminator::{
+            leaf_discriminant_scalar_union_for_has_attribute, LeafDiscriminantScalarUnion,
+            VariantPurpose,
+        },
         graphql::argument::DefaultArg,
         serde::{
             operator::{
@@ -185,8 +188,9 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                                 continue;
                             };
 
-                            let scalar_union =
-                                union_op.leaf_discriminant_scalar_union_for_has_attribute();
+                            let scalar_union = leaf_discriminant_scalar_union_for_has_attribute(
+                                union_op.unfiltered_discriminators(),
+                            );
 
                             if scalar_union == LeafDiscriminantScalarUnion::TEXT {
                                 self.modified_arg::<String>(key.arc_str(), type_modifier, &())
@@ -552,6 +556,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
             }
             FieldKind::Deleted
             | FieldKind::Property { .. }
+            | FieldKind::FlattenedPropertyDiscriminator { .. }
             | FieldKind::FlattenedProperty { .. }
             | FieldKind::EdgeProperty { .. }
             | FieldKind::Id(_)

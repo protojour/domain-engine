@@ -320,7 +320,12 @@ impl<'a> SelectAnalyzer<'a> {
                     select: Select::Leaf,
                 }))
             }
-            (FieldKind::OpenData | FieldKind::Deleted, _) => Ok(None),
+            (
+                FieldKind::OpenData
+                | FieldKind::Deleted
+                | FieldKind::FlattenedPropertyDiscriminator { .. },
+                _,
+            ) => Ok(None),
             (kind, res) => panic!("unhandled: {kind:?} res is ok: {}", res.is_ok()),
         }
     }

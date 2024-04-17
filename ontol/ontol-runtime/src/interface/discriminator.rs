@@ -15,6 +15,12 @@ pub struct VariantDiscriminator {
     pub serde_def: SerdeDef,
 }
 
+impl VariantDiscriminator {
+    pub fn def_id(&self) -> DefId {
+        self.serde_def.def_id
+    }
+}
+
 #[derive(
     Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize, OntolDebug, Debug,
 )]
@@ -56,4 +62,37 @@ bitflags::bitflags! {
         const TEXT     = 0b00000100;
         const SEQUENCE = 0b00001000;
     }
+}
+
+/// Returns the type-set of scalar matchers for HasAttribute discriminants
+pub fn leaf_discriminant_scalar_union_for_has_attribute<'a>(
+    discriminator_iterator: impl Iterator<Item = &'a VariantDiscriminator>,
+) -> LeafDiscriminantScalarUnion {
+    let mut union = LeafDiscriminantScalarUnion::empty();
+
+    for discriminator in discriminator_iterator {
+        let Discriminant::HasAttribute(_, _, leaf_discriminant) = &discriminator.discriminant
+        else {
+            continue;
+        };
+        match leaf_discriminant {
+            LeafDiscriminant::IsAny => {}
+            LeafDiscriminant::IsUnit => {
+                union |= LeafDiscriminantScalarUnion::UNIT;
+            }
+            LeafDiscriminant::IsInt | LeafDiscriminant::IsIntLiteral(_) => {
+                union |= LeafDiscriminantScalarUnion::INT;
+            }
+            LeafDiscriminant::IsText
+            | LeafDiscriminant::IsTextLiteral(_)
+            | LeafDiscriminant::MatchesCapturingTextPattern(_) => {
+                union |= LeafDiscriminantScalarUnion::TEXT;
+            }
+            LeafDiscriminant::IsSequence => {
+                union |= LeafDiscriminantScalarUnion::SEQUENCE;
+            }
+        }
+    }
+
+    union
 }

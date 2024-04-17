@@ -1711,13 +1711,12 @@ async fn flattened_union_entity() {
             }]) {
                 node {
                     id
+                    kind
                     ...on foo_kind_bar {
-                        kind
                         textData: data
                         bar
                     }
                     ...on foo_kind_qux {
-                        kind
                         intData: data
                         qux
                     }

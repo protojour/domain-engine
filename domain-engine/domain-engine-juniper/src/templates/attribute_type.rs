@@ -291,8 +291,41 @@ impl<'v> AttributeType<'v> {
             (Value::Struct(attrs, _), FieldKind::Property { id, .. }) => {
                 resolve_property(attrs, *id, field_type, schema_ctx, executor)
             }
+            (
+                Value::Struct(attrs, _),
+                FieldKind::FlattenedPropertyDiscriminator { proxy, resolvers },
+            ) => {
+                let attribute = match attrs.get(proxy) {
+                    Some(attribute) => attribute,
+                    None => {
+                        warn!("proxy attribute not found");
+                        return Ok(graphql_value!(None));
+                    }
+                };
+                let Some(property_id) = resolvers.get(&attribute.val.type_def_id()) else {
+                    return Ok(graphql_value!(None));
+                };
+                let Value::Struct(attrs, _) = &attribute.val else {
+                    warn!("flattened property not found through proxy");
+                    return Ok(graphql_value!(None));
+                };
+
+                resolve_property(attrs, *property_id, field_type, schema_ctx, executor)
+            }
             (Value::Struct(attrs, _), FieldKind::FlattenedProperty { proxy, id, .. }) => {
-                resolve_flattened_property(attrs, *proxy, *id, field_type, schema_ctx, executor)
+                let attribute = match attrs.get(proxy) {
+                    Some(attribute) => attribute,
+                    None => {
+                        warn!("proxy attribute not found");
+                        return Ok(graphql_value!(None));
+                    }
+                };
+                let Value::Struct(attrs, _) = &attribute.val else {
+                    warn!("flattened property not found through proxy");
+                    return Ok(graphql_value!(None));
+                };
+
+                resolve_property(attrs, *id, field_type, schema_ctx, executor)
             }
             (Value::Struct(attrs, _), FieldKind::ConnectionProperty { property_id, .. }) => {
                 let type_info = schema_ctx
@@ -464,26 +497,4 @@ fn resolve_property(
                 .serialize_value(&attribute.val, None, JuniperValueSerializer)?),
         },
     }
-}
-
-fn resolve_flattened_property(
-    map: &FnvHashMap<PropertyId, Attribute>,
-    proxy_property_id: PropertyId,
-    property_id: PropertyId,
-    type_ref: TypeRef,
-    schema_ctx: &Arc<SchemaCtx>,
-    executor: &juniper::Executor<ServiceCtx, crate::gql_scalar::GqlScalar>,
-) -> juniper::ExecutionResult<crate::gql_scalar::GqlScalar> {
-    let attribute = match map.get(&proxy_property_id) {
-        Some(attribute) => attribute,
-        None => {
-            return Ok(graphql_value!(None));
-        }
-    };
-    let Value::Struct(attrs, _) = &attribute.val else {
-        warn!("flattened property not found through proxy");
-        return Ok(graphql_value!(None));
-    };
-
-    resolve_property(attrs, property_id, type_ref, schema_ctx, executor)
 }

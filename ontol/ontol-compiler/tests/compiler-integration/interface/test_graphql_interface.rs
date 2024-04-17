@@ -397,7 +397,7 @@ fn graphql_flattened_union() {
             panic!("concrete")
         };
 
-        assert_eq!(foo_interface.field_names(), vec!["id"]);
+        assert_eq!(foo_interface.field_names(), vec!["id", "kind"]);
 
         let implementors = schema_test.implementors();
         assert_eq!(implementors.len(), 2);
@@ -437,7 +437,7 @@ fn graphql_flattened_union_pascal_casing() {
         let (_schema, schema_test) = schema_test(&test, SrcName::default());
         let foo_interface = schema_test.type_data("Foo", QueryLevel::Node).object_data();
 
-        assert_eq!(foo_interface.field_names(), vec!["id"]);
+        assert_eq!(foo_interface.field_names(), vec!["id", "kind"]);
 
         let implementors = schema_test.implementors();
         let bar = &implementors[0];

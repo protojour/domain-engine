@@ -1,9 +1,9 @@
-use fnv::FnvHashMap;
+use fnv::{FnvHashMap, FnvHashSet};
 use indexmap::IndexMap;
 use ontol_runtime::{
     debug::NoFmt,
-    interface::serde::SerdeDef,
     interface::{
+        discriminator::LeafDiscriminantScalarUnion,
         graphql::{
             argument,
             data::{
@@ -18,15 +18,22 @@ use ontol_runtime::{
             SerdeModifier,
         },
     },
+    interface::{
+        discriminator::{
+            leaf_discriminant_scalar_union_for_has_attribute, Discriminant, VariantDiscriminator,
+        },
+        serde::SerdeDef,
+    },
+    ontology::ontol::TextConstant,
     phf::PhfIndexMap,
     property::{PropertyCardinality, PropertyId, Role, ValueCardinality},
     DefId, RelationshipId,
 };
 use thin_vec::thin_vec;
-use tracing::{trace, trace_span};
+use tracing::{trace, trace_span, warn};
 
 use crate::{
-    def::{DefKind, LookupRelationshipMeta, RelParams, TypeDefFlags},
+    def::{DefKind, LookupRelationshipMeta, RelParams, RelationshipMeta, TypeDefFlags},
     interface::serde::{serde_generator::SerdeGenerator, SerdeKey},
     phf_build::build_phf_index_map,
     relation::Property,
@@ -429,7 +436,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         def_id: DefId,
         property_field_producer: PropertyFieldProducer,
     ) {
-        let mut interface_variants: Vec<(RelationshipId, RelationId, Vec<DefId>)> =
+        let mut interface_variants: Vec<(RelationshipId, RelationId, &[VariantDiscriminator])> =
             Default::default();
 
         // See if it should be an interface of flattened unions
@@ -441,16 +448,13 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 if let (Role::Subject, DefKind::Type(_)) =
                     (property_id.role, meta.relation_def_kind.value)
                 {
-                    let ReprKind::StructUnion(members) =
-                        self.repr_ctx.get_repr_kind(&object.0).unwrap()
-                    else {
-                        panic!("flattened object is not a struct union");
-                    };
+                    let union_discriminator =
+                        self.relations.union_discriminators.get(&object.0).unwrap();
 
                     interface_variants.push((
                         property_id.relationship_id,
                         RelationId(meta.relationship.relation_def_id),
-                        members.iter().map(|(def_id, _)| *def_id).collect(),
+                        &union_discriminator.variants,
                     ));
                 }
             }
@@ -460,7 +464,14 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             self.harvest_fields_with_variant(
                 type_addr,
                 def_id,
-                &HarvestVariant::FlattenedUnionInterface,
+                &HarvestVariant::FlattenedUnionInterface(
+                    interface_variants
+                        .iter()
+                        .map(|(relationship_id, _, discriminators)| {
+                            (*relationship_id, *discriminators)
+                        })
+                        .collect(),
+                ),
                 property_field_producer,
             );
 
@@ -487,15 +498,15 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         interface_addr: TypeAddr,
         interface_def_id: DefId,
         property_field_producer: PropertyFieldProducer,
-        interface_variants: &[(RelationshipId, RelationId, Vec<DefId>)],
+        interface_variants: &[(RelationshipId, RelationId, &'c [VariantDiscriminator])],
         interface_variant_index: usize,
-        permutations: &mut Vec<(RelationshipId, RelationId, DefId)>,
+        permutations: &mut Vec<(RelationshipId, RelationId, &'c VariantDiscriminator)>,
     ) {
         if interface_variant_index < interface_variants.len() {
-            let (relationship_id, relation_id, variants) =
+            let (relationship_id, relation_id, discriminators) =
                 &interface_variants[interface_variant_index];
-            for variant in variants {
-                permutations.push((*relationship_id, *relation_id, *variant));
+            for discriminator in discriminators.iter() {
+                permutations.push((*relationship_id, *relation_id, discriminator));
                 self.harvest_interface_implementation_permutations(
                     interface_addr,
                     interface_def_id,
@@ -526,9 +537,9 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         };
 
         // Generate typename variant
-        for (_, relation_id, variant) in permutations.iter() {
+        for (_, relation_id, discriminator) in permutations.iter() {
             let relation_type_info = self.partial_ontology.get_type_info(relation_id.0);
-            let variant_type_info = self.partial_ontology.get_type_info(*variant);
+            let variant_type_info = self.partial_ontology.get_type_info(discriminator.def_id());
 
             fn typename_append(output: &mut std::string::String, name: &str) {
                 if name
@@ -576,7 +587,9 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 attribute_predicate: permutations
                     .iter()
                     .copied()
-                    .map(|(relationship_id, _, type_def_id)| (relationship_id, type_def_id))
+                    .map(|(relationship_id, _, discriminator)| {
+                        (relationship_id, discriminator.def_id())
+                    })
                     .collect(),
             });
 
@@ -584,7 +597,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             permutations
                 .iter()
                 .copied()
-                .map(|(relationship_id, _, type_def_id)| (relationship_id, type_def_id))
+                .map(|(relationship_id, _, discriminator)| (relationship_id, discriminator))
                 .collect(),
         );
 
@@ -735,7 +748,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     .iter()
                     .map(|(key, data)| (key.clone(), data.clone()));
 
-                if matches!(harvest_variant, HarvestVariant::FlattenedUnionInterface) {
+                if matches!(harvest_variant, HarvestVariant::FlattenedUnionInterface(_)) {
                     object_data.interface = ObjectInterface::Interface;
                 }
 
@@ -755,52 +768,142 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         output: &mut IndexMap<String, FieldData>,
     ) {
         let meta = self.defs.relationship_meta(property_id.relationship_id);
+        match (
+            property_id.role,
+            meta.relation_def_kind.value,
+            harvest_variant,
+        ) {
+            (Role::Subject, DefKind::TextLiteral(prop_key), _) => self.harvest_data_struct_field(
+                (property_id, prop_key, property),
+                meta,
+                property_field_producer,
+                field_namespace,
+                output,
+            ),
+            (
+                Role::Subject,
+                DefKind::Type(_),
+                HarvestVariant::FlattenedUnionInterface(discriminator_table),
+            ) => {
+                let discriminators = discriminator_table
+                    .get(&property_id.relationship_id)
+                    .unwrap();
+
+                let mut prop_keys: FnvHashSet<TextConstant> = Default::default();
+                for discriminator in discriminators.iter() {
+                    if let Discriminant::HasAttribute(_, prop_key, _) = &discriminator.discriminant
+                    {
+                        prop_keys.insert(*prop_key);
+                    }
+                }
+
+                let scalar_union =
+                    leaf_discriminant_scalar_union_for_has_attribute(discriminators.iter());
+
+                if prop_keys.len() == 1 {
+                    let unit_type_ref = if scalar_union == LeafDiscriminantScalarUnion::TEXT {
+                        UnitTypeRef::NativeScalar(NativeScalarRef {
+                            operator_addr: self
+                                .serde_gen
+                                .gen_addr_lazy(gql_serde_key(self.primitives.text))
+                                .unwrap(),
+                            kind: NativeScalarKind::String,
+                        })
+                    } else if scalar_union == LeafDiscriminantScalarUnion::INT {
+                        self.get_def_type_ref(self.primitives.i64, QLevel::Node)
+                    } else {
+                        UnitTypeRef::Addr(self.schema.json_scalar)
+                    };
+
+                    let prop_key = &self.serde_gen.strings[prop_keys.into_iter().next().unwrap()];
+
+                    let resolvers: FnvHashMap<DefId, PropertyId> = discriminators
+                        .iter()
+                        .filter_map(|discriminator| match &discriminator.discriminant {
+                            Discriminant::HasAttribute(relationship_id, ..) => Some((
+                                discriminator.def_id(),
+                                PropertyId::subject(*relationship_id),
+                            )),
+                            _ => None,
+                        })
+                        .collect();
+
+                    output.insert(
+                        field_namespace.unique_literal(prop_key).into(),
+                        FieldData {
+                            kind: FieldKind::FlattenedPropertyDiscriminator {
+                                proxy: property_id,
+                                resolvers: Box::new(resolvers),
+                            },
+                            field_type: TypeRef::mandatory(unit_type_ref),
+                        },
+                    );
+                } else {
+                    warn!("No uniform discriminator property");
+                }
+            }
+            (
+                Role::Subject,
+                DefKind::Type(_),
+                HarvestVariant::FlattenedUnionPermutation(discriminator_table),
+            ) => {
+                // concrete type for a specific permutation of flattened union variants
+
+                let union_discriminator = discriminator_table
+                    .get(&property_id.relationship_id)
+                    .unwrap();
+
+                let Some(table) = self
+                    .relations
+                    .properties_table_by_def_id(union_discriminator.def_id())
+                else {
+                    return;
+                };
+
+                for (inner_property_id, property) in table {
+                    // don't include the discriminator property in the permuted type,
+                    // it belongs to the interface.
+                    self.harvest_struct_field(
+                        *inner_property_id,
+                        property,
+                        PropertyFieldProducer::FlattenedProperty(property_id),
+                        field_namespace,
+                        harvest_variant,
+                        output,
+                    );
+                }
+            }
+            (Role::Object, ..) => {
+                self.harvest_data_struct_field(
+                    (
+                        property_id,
+                        meta.relationship
+                            .object_prop
+                            .expect("Object property has no name"),
+                        property,
+                    ),
+                    meta,
+                    property_field_producer,
+                    field_namespace,
+                    output,
+                );
+            }
+            _ => {
+                panic!("Invalid property")
+            }
+        }
+    }
+
+    fn harvest_data_struct_field(
+        &mut self,
+        (property_id, prop_key, property): (PropertyId, &str, &Property),
+        meta: RelationshipMeta,
+        property_field_producer: PropertyFieldProducer,
+        field_namespace: &mut GraphqlNamespace,
+        output: &mut IndexMap<String, FieldData>,
+    ) {
         let (_, (prop_cardinality, value_cardinality), _) = meta.relationship.by(property_id.role);
         let (value_def_id, ..) = meta.relationship.by(property_id.role.opposite());
-        let prop_key = match property_id.role {
-            Role::Subject => match meta.relation_def_kind.value {
-                DefKind::TextLiteral(prop_key) => *prop_key,
-                DefKind::Type(_) => {
-                    if let HarvestVariant::FlattenedUnionPermutation(variant_table) =
-                        harvest_variant
-                    {
-                        // Union flattener
-
-                        let union_variant_def_id =
-                            variant_table.get(&property_id.relationship_id).unwrap();
-
-                        let Some(properties) =
-                            self.relations.properties_by_def_id(*union_variant_def_id)
-                        else {
-                            return;
-                        };
-
-                        if let Some(table) = &properties.table {
-                            for (inner_property_id, property) in table {
-                                self.harvest_struct_field(
-                                    *inner_property_id,
-                                    property,
-                                    PropertyFieldProducer::FlattenedProperty(property_id),
-                                    field_namespace,
-                                    harvest_variant,
-                                    output,
-                                );
-                            }
-                        }
-                    }
-
-                    return;
-                }
-                _ => {
-                    panic!("Invalid subject property")
-                }
-            },
-            Role::Object => meta
-                .relationship
-                .object_prop
-                .expect("Object property has no name"),
-        };
-
         trace!("    register struct field `{prop_key}`: {property_id}");
 
         let value_properties = self.relations.properties_by_def_id(value_def_id);
@@ -951,10 +1054,10 @@ pub(super) fn get_native_scalar_kind(
     }
 }
 
-enum HarvestVariant {
+enum HarvestVariant<'c> {
     Object,
-    FlattenedUnionInterface,
-    FlattenedUnionPermutation(FnvHashMap<RelationshipId, DefId>),
+    FlattenedUnionInterface(FnvHashMap<RelationshipId, &'c [VariantDiscriminator]>),
+    FlattenedUnionPermutation(FnvHashMap<RelationshipId, &'c VariantDiscriminator>),
 }
 
 #[derive(Clone, Copy)]
