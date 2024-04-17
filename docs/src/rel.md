@@ -163,7 +163,7 @@ def type_b (
 )
 ```
 
-Here, the field `unique_to_a` is only allowed (and required) if `type` is `'a'`, and `unique_to_b` is only allowed (and required) if `type` is `'b'`.
+Here, the field `'unique_to_a'` is only allowed (and required) if `'type'` is `'a'`, and `'unique_to_b'` is only allowed (and required) if `'type'` is `'b'`.
 
 
 ## Sequences
