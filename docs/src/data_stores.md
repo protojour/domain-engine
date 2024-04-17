@@ -10,7 +10,7 @@ In other words, the data domain serves (more or less) as a _database schema_. De
 
 If you've started with ONTOL, the database will follow the structure the data domain describes.
 
-If you already had a database and schema, or if you have other specific requirements, ensure the structure and relationships of these entities conform to your needs as closely as possible.
+If you already had a database and schema, or if you have other specific requirements, ensure the structure and relationships of these entities conform to your needs as closely as possible. You might want to use [`store_key`](relation_types.md#store_key) to ensure ONTOL types are stored in the correct collection/table.
 
 Ontologies also store what data store backend they are meant for. The choices in Memoriam are, for the time being, ["inmemory"](#in-memory-store) and ["arangodb"](#arangodb).
 
@@ -111,6 +111,30 @@ def author (
 - `book`
 - `author`
 - `bookauthor` (edge collection, prefixed due to collision with `author`)
+
+
+#### Using `store_key`
+
+It is possible to set explicit collection names using [`store_key`](relation_types.md#store_key):
+
+```ontol
+def book (
+    rel .store_key: 'books'
+    rel .'id'|id: (rel .is: serial)
+    rel .'title': text
+    rel {.}'author'[rel .store_key: 'has_author']: author
+)
+
+def author (
+    rel .store_key: 'authors'
+    rel .'id'|id: (rel .is: serial)
+    rel .'name': text
+)
+```
+
+- `books`
+- `authors`
+- `has_author`
 
 
 ### Indexing
