@@ -202,6 +202,15 @@ pub enum DataRelationshipTarget {
     Union(DefId),
 }
 
+impl DataRelationshipTarget {
+    pub fn def_id(&self) -> DefId {
+        match self {
+            Self::Unambiguous(def_id) => *def_id,
+            Self::Union(def_id) => *def_id,
+        }
+    }
+}
+
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub struct ExtendedEntityInfo {
     pub order_union: Option<DefId>,

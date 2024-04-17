@@ -19,7 +19,7 @@ use ontol_runtime::{
     var::Var,
     DefId, MapKey, RelationshipId,
 };
-use tracing::{debug, trace, warn};
+use tracing::{debug, error, trace};
 
 use crate::{
     context::SchemaCtx, cursor_util::GraphQLCursor, gql_scalar::GqlScalar,
@@ -320,12 +320,32 @@ impl<'a> SelectAnalyzer<'a> {
                 select: self.analyze_data(look_ahead.children(), &type_data.kind)?,
             })),
             (
+                FieldKind::FlattenedProperty {
+                    id: relationship_id,
+                    ..
+                },
+                Ok(type_data),
+            ) => Ok(Some(KeyedPropertySelection {
+                key: PropertyId::subject(*relationship_id),
+                select: self.analyze_data(look_ahead.children(), &type_data.kind)?,
+            })),
+            (
                 FieldKind::Property {
                     id: property_id, ..
                 },
                 Err(_scalar_ref),
             ) => Ok(Some(KeyedPropertySelection {
                 key: *property_id,
+                select: Select::Leaf,
+            })),
+            (
+                FieldKind::FlattenedProperty {
+                    id: relationship_id,
+                    ..
+                },
+                Err(_scalar_ref),
+            ) => Ok(Some(KeyedPropertySelection {
+                key: PropertyId::subject(*relationship_id),
                 select: Select::Leaf,
             })),
             (FieldKind::Id(id_property_data), Err(_scalar_ref)) => {
@@ -464,12 +484,59 @@ impl<'a> SelectAnalyzer<'a> {
                 for field_look_ahead in look_ahead_children {
                     let field_name = field_look_ahead.field_original_name();
                     if let Some(applies_for) = field_look_ahead.applies_for() {
-                        let _type_data = self
+                        let type_data = self
                             .schema_ctx
                             .type_data_by_typename(applies_for)
                             .expect("BUG: interface downcast failed");
+                        let TypeKind::Object(inner_object_data) = &type_data.kind else {
+                            continue;
+                        };
 
-                        warn!("Flattened union fields not analyzed yet.");
+                        let field_data = inner_object_data.fields.get(field_name).unwrap();
+
+                        let Some(selection) =
+                            self.analyze_selection(field_look_ahead, field_data)?
+                        else {
+                            continue;
+                        };
+
+                        match &field_data.kind {
+                            FieldKind::FlattenedProperty { proxy, .. }
+                            | FieldKind::FlattenedPropertyDiscriminator { proxy, .. } => {
+                                // The proxying step is handled here.
+                                // analyze_selection just looks at the inner relationship id.
+                                // proxying flattened properties means that the analysis is put
+                                // within the "abstracted" structure that logically exists in ONTOL.
+
+                                let type_info =
+                                    self.schema_ctx.ontology.get_type_info(node_data.def_id);
+                                let Some(flattened_relationship) = type_info
+                                    .data_relationships
+                                    .get(&PropertyId::subject(*proxy))
+                                else {
+                                    error!("Flattened relationship not found");
+                                    continue;
+                                };
+
+                                let Select::Struct(inner_struct_select) = properties
+                                    .entry(PropertyId::subject(*proxy))
+                                    // Make the proxied structure:
+                                    .or_insert(Select::Struct(StructSelect {
+                                        def_id: flattened_relationship.target.def_id(),
+                                        properties: Default::default(),
+                                    }))
+                                else {
+                                    panic!();
+                                };
+
+                                inner_struct_select
+                                    .properties
+                                    .insert(selection.key, selection.select);
+                            }
+                            _ => {
+                                properties.insert(selection.key, selection.select);
+                            }
+                        }
                     } else {
                         let field_data = object_data.fields.get(field_name).unwrap();
                         if let Some(selection) =

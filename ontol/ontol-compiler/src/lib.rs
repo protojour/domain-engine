@@ -553,8 +553,11 @@ impl<'m> Compiler<'m> {
         let (source_def_id, _, _) = meta.relationship.by(property_id.role);
         let (target_def_id, _, _) = meta.relationship.by(property_id.role.opposite());
 
-        let DefKind::TextLiteral(subject_name) = meta.relation_def_kind.value else {
-            return None;
+        let subject_name = match meta.relation_def_kind.value {
+            DefKind::TextLiteral(subject_name) => strings.intern_constant(subject_name),
+            // FIXME: This doesn't _really_ have a subject "name". It represents a flattened structure:
+            DefKind::Type(_) => strings.intern_constant(""),
+            _ => return None,
         };
         let target_properties = self.relations.properties_by_def_id(target_def_id)?;
         let repr_kind = self.repr_ctx.get_repr_kind(&target_def_id)?;
@@ -617,7 +620,7 @@ impl<'m> Compiler<'m> {
             kind: data_relationship_kind,
             subject_cardinality: meta.relationship.subject_cardinality,
             object_cardinality: meta.relationship.object_cardinality,
-            subject_name: strings.intern_constant(subject_name),
+            subject_name,
             object_name: meta
                 .relationship
                 .object_prop
