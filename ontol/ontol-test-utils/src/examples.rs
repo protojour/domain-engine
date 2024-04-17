@@ -42,12 +42,12 @@ pub mod conduit {
 
     pub const CONDUIT_PUBLIC: Example = (
         src_name("conduit_public"),
-        include_str!("../../../examples/conduit/conduit_public.on"),
+        include_str!("../../../examples/conduit/TODO_conduit_public.on"),
     );
 
     pub const CONDUIT_CONTRIVED_SIGNUP: Example = (
         src_name("conduit_contrived_signup"),
-        include_str!("../../../examples/conduit/conduit_contrived_signup.on"),
+        include_str!("../../../examples/conduit/TODO_conduit_contrived_signup.on"),
     );
 
     pub const BLOG_POST_PUBLIC: Example = (
