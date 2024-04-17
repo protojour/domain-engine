@@ -295,7 +295,7 @@ impl<'v> AttributeType<'v> {
                 Value::Struct(attrs, _),
                 FieldKind::FlattenedPropertyDiscriminator { proxy, resolvers },
             ) => {
-                let attribute = match attrs.get(proxy) {
+                let attribute = match attrs.get(&PropertyId::subject(*proxy)) {
                     Some(attribute) => attribute,
                     None => {
                         warn!("proxy attribute not found");
@@ -313,7 +313,7 @@ impl<'v> AttributeType<'v> {
                 resolve_property(attrs, *property_id, field_type, schema_ctx, executor)
             }
             (Value::Struct(attrs, _), FieldKind::FlattenedProperty { proxy, id, .. }) => {
-                let attribute = match attrs.get(proxy) {
+                let attribute = match attrs.get(&PropertyId::subject(*proxy)) {
                     Some(attribute) => attribute,
                     None => {
                         warn!("proxy attribute not found");
@@ -325,7 +325,13 @@ impl<'v> AttributeType<'v> {
                     return Ok(graphql_value!(None));
                 };
 
-                resolve_property(attrs, *id, field_type, schema_ctx, executor)
+                resolve_property(
+                    attrs,
+                    PropertyId::subject(*id),
+                    field_type,
+                    schema_ctx,
+                    executor,
+                )
             }
             (Value::Struct(attrs, _), FieldKind::ConnectionProperty(field)) => {
                 let type_info = schema_ctx

@@ -833,7 +833,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         field_namespace.unique_literal(prop_key).into(),
                         FieldData {
                             kind: FieldKind::FlattenedPropertyDiscriminator {
-                                proxy: property_id,
+                                proxy: property_id.relationship_id,
                                 resolvers: Box::new(resolvers),
                             },
                             field_type: TypeRef::mandatory(unit_type_ref),
@@ -867,7 +867,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     self.harvest_struct_field(
                         *inner_property_id,
                         property,
-                        PropertyFieldProducer::FlattenedProperty(property_id),
+                        PropertyFieldProducer::FlattenedProperty(property_id.relationship_id),
                         field_namespace,
                         harvest_variant,
                         output,

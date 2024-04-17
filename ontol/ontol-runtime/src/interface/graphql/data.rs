@@ -271,13 +271,13 @@ pub enum FieldKind {
     /// A flattened union property discriminator accessed through a proxy.
     /// This property is part of interfaces, since it's always present regardless of union variant.
     FlattenedPropertyDiscriminator {
-        proxy: PropertyId,
+        proxy: RelationshipId,
         resolvers: Box<FnvHashMap<DefId, PropertyId>>,
     },
     /// A flattened property accessed through a "proxy"
     FlattenedProperty {
-        proxy: PropertyId,
-        id: PropertyId,
+        proxy: RelationshipId,
+        id: RelationshipId,
         addr: SerdeOperatorAddr,
     },
     /// The (incoming/"rel params") edge property of a node

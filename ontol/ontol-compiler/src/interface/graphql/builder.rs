@@ -26,7 +26,7 @@ use ontol_runtime::{
     property::PropertyId,
     resolve_path::{ProbeDirection, ProbeFilter, ProbeOptions, ResolverGraph},
     var::Var,
-    DefId, MapDefFlags, MapKey, PackageId,
+    DefId, MapDefFlags, MapKey, PackageId, RelationshipId,
 };
 use smartstring::alias::String;
 use thin_vec::thin_vec;
@@ -79,7 +79,7 @@ pub(super) enum LazyTask {
 #[derive(Clone, Copy)]
 pub(super) enum PropertyFieldProducer {
     Property,
-    FlattenedProperty(PropertyId),
+    FlattenedProperty(RelationshipId),
     EdgeProperty,
 }
 
@@ -92,7 +92,7 @@ impl PropertyFieldProducer {
             },
             Self::FlattenedProperty(proxy_id) => FieldKind::FlattenedProperty {
                 proxy: *proxy_id,
-                id: property_id,
+                id: property_id.relationship_id,
                 addr,
             },
             Self::EdgeProperty => FieldKind::EdgeProperty {
