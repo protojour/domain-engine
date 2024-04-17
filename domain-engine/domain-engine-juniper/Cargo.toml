@@ -18,7 +18,7 @@ serde.workspace = true
 serde_json.workspace = true
 fnv.workspace = true
 thiserror.workspace = true
-base64 = "0.21"
+base64 = "0.22"
 hex = "0.4"
 
 [dependencies.juniper]

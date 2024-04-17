@@ -32,7 +32,7 @@ ena = "0.14"
 bumpalo = "3"
 regex-syntax = "0.8"
 patricia_tree = "0.8"
-documented = "0.3.0"
+documented = "0.4.1"
 strum = { version = "0.26.1", features = ["derive"] }
 strum_macros = "0.26.1"
 heck = "0.5"
@@ -49,4 +49,4 @@ assert_matches = "1"
 pretty_assertions = "1"
 indoc = "2"
 serde-value = "0.7"
-rstest = { version = "0.18", default-features = false }
+rstest = { version = "0.19", default-features = false }
