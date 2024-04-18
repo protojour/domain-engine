@@ -60,6 +60,7 @@ branch = "protojour-mods"
 criterion = { version = "0.5", default-features = false }
 ontol-test-utils.path = "../ontol/ontol-test-utils"
 domain-engine-test-utils.path = "../domain-engine/domain-engine-test-utils"
+indoc = "2"
 
 [[bench]]
 name = "criterion_benches"

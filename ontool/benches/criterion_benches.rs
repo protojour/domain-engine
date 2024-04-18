@@ -7,6 +7,7 @@ use domain_engine_core::{DomainEngine, Session};
 use domain_engine_in_memory_store::InMemoryDataStoreFactory;
 use domain_engine_juniper::context::ServiceCtx;
 use domain_engine_test_utils::graphql_test_utils::Exec;
+use indoc::indoc;
 use ontol_compiler::{
     mem::Mem,
     package::{GraphState, PackageGraphBuilder, ParsedPackage},
@@ -20,75 +21,47 @@ use ontol_runtime::{
     },
     PackageId,
 };
-use ontol_test_utils::TestCompile;
+use ontol_test_utils::{
+    examples::conduit::{BLOG_POST_PUBLIC, CONDUIT_DB, FEED_PUBLIC},
+    src_name, SrcName, TestCompile, TestPackages,
+};
 use ontool::System;
 use serde::de::DeserializeSeed;
 use tokio::runtime::Runtime;
 
-const BENCH_DOMAIN: &str = r#"
-def created (
-    rel .'created'[rel .gen: create_time]?: datetime
-)
+const TINY: (SrcName, &str) = (
+    src_name("tiny"),
+    indoc! {r#"
+        def created (
+            rel .'created'[rel .gen: create_time]?: datetime
+        )
 
-def foo_id (
-    fmt '' => 'foos/' => uuid => .
-)
+        def foo_id (
+            fmt '' => 'foos/' => uuid => .
+        )
 
-/// This is the documentation string for...
-/// .. foo!
-def foo (
-    rel .'_id'[rel .gen: auto]|id: foo_id
-    rel .is: created
-    rel .'name': text
-)
+        /// This is the documentation string for...
+        /// .. foo!
+        def foo (
+            rel .'_id'[rel .gen: auto]|id: foo_id
+            rel .is: created
+            rel .'name': text
+        )
 
-map foos (
-    (),
-    foo { ..@match foo() }
-)
-"#;
-
-fn bench_compile() -> Ontology {
-    let mut package_graph_builder = PackageGraphBuilder::with_roots(["bench.on".into()]);
-
-    let mut ontol_sources = Sources::default();
-    let mut source_code_registry = SourceCodeRegistry::default();
-
-    let topology = loop {
-        let graph_state = package_graph_builder.transition().unwrap();
-
-        match graph_state {
-            GraphState::RequestPackages { builder, requests } => {
-                package_graph_builder = builder;
-
-                for request in requests {
-                    package_graph_builder.provide_package(ParsedPackage::parse(
-                        request,
-                        black_box(BENCH_DOMAIN),
-                        PackageConfig {
-                            data_store: Some(DataStoreConfig::Default),
-                        },
-                        &mut ontol_sources,
-                        &mut source_code_registry,
-                    ));
-                }
-            }
-            GraphState::Built(topology) => break topology,
-        }
-    };
-
-    let mem = Mem::default();
-    let mut compiler = Compiler::new(&mem, ontol_sources.clone()).with_ontol();
-    compiler.compile_package_topology(topology).unwrap();
-    compiler.into_ontology()
-}
+        map foos (
+            (),
+            foo { ..@match foo() }
+        )
+        "#,
+    },
+);
 
 fn foo_operator_addr(ontology: &Ontology) -> SerdeOperatorAddr {
     let (_, domain) = ontology
         .domains()
         .find(|domain| {
             let name = &ontology[domain.1.unique_name()];
-            name == "bench.on"
+            name == TINY.0.as_str()
         })
         .unwrap();
     let type_info = domain
@@ -98,13 +71,34 @@ fn foo_operator_addr(ontology: &Ontology) -> SerdeOperatorAddr {
 }
 
 pub fn compile_benchmark(c: &mut Criterion) {
-    c.bench_function("compile", |b| b.iter(bench_compile));
+    c.bench_function("compile_tiny", |b| {
+        b.iter(|| {
+            TestPackages::with_static_sources(black_box([TINY]))
+                .with_data_store(TINY.0, DataStoreConfig::Default)
+                .bench_disable_ontology_serde()
+                .compile();
+        })
+    });
+    c.bench_function("compile_conduit", |b| {
+        b.iter(|| {
+            TestPackages::with_static_sources(black_box([
+                BLOG_POST_PUBLIC,
+                FEED_PUBLIC,
+                CONDUIT_DB,
+            ]))
+            .with_data_store(CONDUIT_DB.0, DataStoreConfig::Default)
+            .bench_disable_ontology_serde()
+            .compile();
+        })
+    });
 
     c.bench_function("serialize_ontology_bincode", |b| {
-        let ontology = bench_compile();
+        let test = TestPackages::with_static_sources(black_box([TINY]))
+            .with_data_store(TINY.0, DataStoreConfig::Default)
+            .compile();
         b.iter(|| {
             let mut binary_ontology: Vec<u8> = Vec::new();
-            ontology
+            test.ontology()
                 .try_serialize_to_bincode(&mut binary_ontology)
                 .unwrap();
             Ontology::try_from_bincode(binary_ontology.as_slice()).unwrap()
@@ -112,9 +106,9 @@ pub fn compile_benchmark(c: &mut Criterion) {
     });
 
     c.bench_function("serde_json_deserialize", |b| {
-        let ontology = bench_compile();
-        let processor = ontology.new_serde_processor(
-            foo_operator_addr(&ontology),
+        let test = TestPackages::with_static_sources(black_box([TINY])).compile();
+        let processor = test.ontology().new_serde_processor(
+            foo_operator_addr(test.ontology()),
             ontol_runtime::interface::serde::processor::ProcessorMode::Create,
         );
 
@@ -128,9 +122,9 @@ pub fn compile_benchmark(c: &mut Criterion) {
     });
 
     c.bench_function("serde_json_serialize", |b| {
-        let ontology = bench_compile();
-        let processor = ontology.new_serde_processor(
-            foo_operator_addr(&ontology),
+        let test = TestPackages::with_static_sources(black_box([TINY])).compile();
+        let processor = test.ontology().new_serde_processor(
+            foo_operator_addr(test.ontology()),
             ontol_runtime::interface::serde::processor::ProcessorMode::Raw,
         );
 
@@ -154,17 +148,18 @@ pub fn compile_benchmark(c: &mut Criterion) {
     });
 
     c.bench_function("graphql_create_schema", |b| {
-        let ontology = Arc::new(bench_compile());
-        let (package_id, _) = ontology
+        let test = TestPackages::with_static_sources(black_box([TINY])).compile();
+        let (package_id, _) = test
+            .ontology()
             .domains()
             .find(|domain| {
-                let name = &ontology[domain.1.unique_name()];
-                name == "bench.on"
+                let name = &test.ontology()[domain.1.unique_name()];
+                name == TINY.0.as_str()
             })
             .unwrap();
         b.iter(|| {
             domain_engine_juniper::create_graphql_schema(
-                black_box(ontology.clone()),
+                black_box(test.ontology_owned()),
                 black_box(*package_id),
             )
             .unwrap()
@@ -172,27 +167,31 @@ pub fn compile_benchmark(c: &mut Criterion) {
     });
 
     c.bench_function("graphql_create_entity", |b| {
-        let ontology = Arc::new(bench_compile());
+        let test = TestPackages::with_static_sources(black_box([TINY]))
+            .with_data_store(TINY.0, DataStoreConfig::Default)
+            .compile();
         let rt = Runtime::new().unwrap();
 
         let engine = rt.block_on(async {
             Arc::new(
-                DomainEngine::builder(ontology.clone())
+                DomainEngine::builder(test.ontology_owned())
                     .system(Box::<System>::default())
                     .build(InMemoryDataStoreFactory, Session::default())
                     .await
                     .unwrap(),
             )
         });
-        let (package_id, _) = ontology
+        let (package_id, _) = test
+            .ontology()
             .domains()
             .find(|domain| {
-                let name = &ontology[domain.1.unique_name()];
-                name == "bench.on"
+                let name = &test.ontology()[domain.1.unique_name()];
+                name == TINY.0.as_str()
             })
             .unwrap();
         let schema =
-            domain_engine_juniper::create_graphql_schema(ontology.clone(), *package_id).unwrap();
+            domain_engine_juniper::create_graphql_schema(test.ontology_owned(), *package_id)
+                .unwrap();
         let service_context: ServiceCtx = engine.into();
         b.iter(|| {
             rt.block_on(async {

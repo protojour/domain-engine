@@ -1,6 +1,10 @@
 #![forbid(unsafe_code)]
 
-use std::{borrow::Cow, collections::HashMap, sync::Arc};
+use std::{
+    borrow::{Borrow, Cow},
+    collections::HashMap,
+    sync::Arc,
+};
 
 use diagnostics::AnnotatedCompileError;
 use ontol_compiler::{
@@ -187,6 +191,12 @@ impl From<&'static str> for SrcName {
     }
 }
 
+impl SrcName {
+    pub fn as_str(&self) -> &str {
+        self.0.borrow()
+    }
+}
+
 impl Default for SrcName {
     fn default() -> Self {
         SrcName(Cow::Borrowed("test_root.on"))
@@ -200,6 +210,7 @@ pub struct TestPackages {
     source_code_registry: SourceCodeRegistry,
     data_store: Option<(SrcName, DataStoreConfig)>,
     packages_by_source_name: HashMap<String, PackageId>,
+    disable_ontology_serde: bool,
 }
 
 impl TestPackages {
@@ -267,6 +278,7 @@ impl TestPackages {
             source_code_registry: Default::default(),
             data_store: None,
             packages_by_source_name: Default::default(),
+            disable_ontology_serde: false,
         }
     }
 
@@ -282,6 +294,17 @@ impl TestPackages {
     /// Set data store config for one of the sources.
     pub fn with_data_store(mut self, name: SrcName, config: DataStoreConfig) -> Self {
         self.data_store = Some((name, config));
+        self
+    }
+
+    /// In normal mode, the Ontology is serialized and then deserialized again before the test
+    /// is returned. This is to increase confidence that this step indeed works.
+    /// All tests do this by default.
+    ///
+    /// This turns it off. The only plausible reason to do this is in benchmarking code,
+    /// where the cost of this serde-step might not be desirable.
+    pub fn bench_disable_ontology_serde(mut self) -> Self {
+        self.disable_ontology_serde = true;
         self
     }
 
@@ -343,14 +366,15 @@ impl TestPackages {
 
         match compiler.compile_package_topology(package_topology) {
             Ok(()) => {
-                let ontology: Ontology = {
+                let mut ontology = compiler.into_ontology();
+
+                if !self.disable_ontology_serde {
                     let mut binary_ontology: Vec<u8> = Vec::new();
-                    compiler
-                        .into_ontology()
+                    ontology
                         .try_serialize_to_bincode(&mut binary_ontology)
                         .unwrap();
-                    Ontology::try_from_bincode(binary_ontology.as_slice()).unwrap()
-                };
+                    ontology = Ontology::try_from_bincode(binary_ontology.as_slice()).unwrap();
+                }
 
                 Ok(OntolTest {
                     ontology: Arc::new(ontology),

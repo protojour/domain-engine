@@ -2435,6 +2435,7 @@ dependencies = [
  "domain-engine-test-utils",
  "futures",
  "http-body 1.0.0",
+ "indoc",
  "juniper",
  "juniper_axum",
  "notify-debouncer-full",
