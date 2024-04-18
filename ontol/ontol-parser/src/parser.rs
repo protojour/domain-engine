@@ -545,7 +545,7 @@ fn doc_comment() -> impl AstParser<Option<std::string::String>> {
 
                 let mut line_iter = lines.iter().peekable();
                 while let Some(line) = line_iter.next() {
-                    joined.push_str(&line);
+                    joined.push_str(line);
                     if line_iter.peek().is_some() {
                         joined.push('\n');
                     }

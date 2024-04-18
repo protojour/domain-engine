@@ -263,9 +263,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }
         };
 
-        let mut relation_iter = relations.into_iter().peekable();
-
-        while let Some(relation) = relation_iter.next() {
+        for relation in relations.into_iter() {
             root_defs.extend(self.def_relationship(
                 (subject_def_id, &subject_span),
                 relation,
@@ -274,6 +272,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 docs.clone(),
             )?);
         }
+
         Ok(root_defs)
     }
 
