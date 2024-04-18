@@ -330,7 +330,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 for component in components {
                     let string_push_param = match component {
                         StringInterpolationComponent::Const(string) => self.mk_node(
-                            ontol_hir::Kind::Text(string.into()),
+                            ontol_hir::Kind::Text(string),
                             Meta::unit(node_ref.meta().span),
                         ),
                         StringInterpolationComponent::Var(var, span) => self.mk_node(

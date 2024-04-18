@@ -17,7 +17,6 @@ fnv.workspace = true
 smallvec.workspace = true
 indexmap.workspace = true
 tracing.workspace = true
-bit-set.workspace = true
 itertools.workspace = true
 serde.workspace = true
 serde_json.workspace = true

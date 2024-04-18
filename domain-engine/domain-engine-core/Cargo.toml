@@ -12,16 +12,11 @@ doctest = false
 ontol-runtime.path = "../../ontol/ontol-runtime"
 thiserror.workspace = true
 tracing.workspace = true
-indexmap.workspace = true
 fnv.workspace = true
 itertools.workspace = true
 uuid = { workspace = true, features = ["v4", "v7"] }
 async-trait.workspace = true
 chrono.workspace = true
-smallvec.workspace = true
-bit-set.workspace = true
-thin-vec.workspace = true
-ordered-float.workspace = true
 unimock.workspace = true
 serde = "1"
 serde_json = "1"

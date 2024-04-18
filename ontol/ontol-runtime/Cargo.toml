@@ -10,7 +10,6 @@ doctest = false
 
 [dependencies]
 ontol-macros.path = "../ontol-macros"
-smartstring = { workspace = true, features = ["serde"] }
 tracing.workspace = true
 serde = { workspace = true, features = ["derive", "rc"] }
 serde_json.workspace = true
@@ -23,6 +22,7 @@ thin-vec.workspace = true
 regex-automata.workspace = true
 arcstr.workspace = true
 ordered-float.workspace = true
+smartstring = { version = "1", features = ["serde"] }
 num = { version = "0.4", features = ["serde"] }
 serde-value = "0.7"
 urlencoding = "2"

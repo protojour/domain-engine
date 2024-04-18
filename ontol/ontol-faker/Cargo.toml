@@ -14,7 +14,6 @@ js = ["getrandom/js"]
 [dependencies]
 ontol-runtime.path = "../ontol-runtime"
 tracing.workspace = true
-smartstring.workspace = true
 fake = { version = "2", features = ["uuid", "chrono"] }
 uuid = "1"
 rand = { version = "0.8", features = ["std_rng"] }

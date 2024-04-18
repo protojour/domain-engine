@@ -839,21 +839,16 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "bit-set",
  "chrono",
  "domain-engine-test-utils",
  "fnv",
- "indexmap",
  "itertools 0.11.0",
  "ontol-runtime",
  "ontol-test-utils",
- "ordered-float 4.2.0",
  "pretty_assertions",
  "serde",
  "serde_json",
- "smallvec",
  "test-log",
- "thin-vec",
  "thiserror",
  "tracing",
  "tracing-subscriber",
@@ -868,7 +863,6 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bincode",
- "bit-set",
  "domain-engine-core",
  "domain-engine-test-templates",
  "domain-engine-test-utils",
@@ -900,8 +894,6 @@ dependencies = [
  "domain-engine-test-utils",
  "fnv",
  "graphql-parser",
- "hex",
- "indexmap",
  "juniper",
  "ontol-runtime",
  "ontol-test-utils",
@@ -1362,12 +1354,6 @@ name = "hermit-abi"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d231dfb89cfffdbc30e7fc41579ed6066ad03abda9e567ccafae602b97ec5024"
-
-[[package]]
-name = "hex"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "higher-kinded-types"
@@ -2303,7 +2289,6 @@ dependencies = [
  "ontol-runtime",
  "rand",
  "regex_generate",
- "smartstring",
  "tracing",
  "uuid",
 ]
@@ -2317,7 +2302,6 @@ dependencies = [
  "ontol-runtime",
  "pretty_assertions",
  "smallvec",
- "smartstring",
  "test-log",
  "thin-vec",
  "tracing-subscriber",
@@ -2338,7 +2322,6 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "smartstring",
  "substring",
  "tokio",
  "tower-lsp",
@@ -2448,7 +2431,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "smartstring",
  "tempfile",
  "thiserror",
  "tikv-jemallocator",

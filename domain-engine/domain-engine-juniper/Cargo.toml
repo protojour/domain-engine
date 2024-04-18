@@ -12,14 +12,12 @@ doctest = false
 ontol-runtime.path = "../../ontol/ontol-runtime"
 domain-engine-core.path = "../domain-engine-core"
 tracing.workspace = true
-smartstring.workspace = true
-indexmap.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 fnv.workspace = true
 thiserror.workspace = true
+smartstring = { version = "1", features = ["serde"] }
 base64 = "0.22"
-hex = "0.4"
 
 [dependencies.juniper]
 git = "https://github.com/protojour/juniper"

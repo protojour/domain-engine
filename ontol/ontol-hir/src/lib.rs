@@ -12,7 +12,6 @@ use ontol_runtime::{
     DefId,
 };
 use smallvec::SmallVec;
-use smartstring::alias::String;
 use thin_vec::ThinVec;
 
 pub mod arena;

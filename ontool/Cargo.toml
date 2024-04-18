@@ -26,7 +26,6 @@ tempfile = "3.5.0"
 domain-engine-core.path = "../domain-engine/domain-engine-core"
 domain-engine-in-memory-store.path = "../domain-engine/domain-engine-in-memory-store"
 chrono.workspace = true
-smartstring.workspace = true
 async-trait.workspace = true
 axum = { version = "0.7", features = ["ws"] }
 http-body = "1"
