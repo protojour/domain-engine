@@ -192,6 +192,15 @@ impl Ontology {
             .map(|(key, proc)| (*key, proc))
     }
 
+    pub fn iter_named_forward_maps(
+        &self,
+    ) -> impl Iterator<Item = (PackageId, TextConstant, MapKey)> + '_ {
+        self.data
+            .named_forward_maps
+            .iter()
+            .map(|((package_id, text_constant), value)| (*package_id, *text_constant, *value))
+    }
+
     pub fn get_map_meta(&self, key: &MapKey) -> Option<&MapMeta> {
         self.data.map_meta_table.get(key)
     }

@@ -7,9 +7,9 @@ use crate::juniper::{
 
 use ::juniper::{GraphQLEnum, GraphQLObject};
 use ontol_runtime::{
-    ontology::{domain::TypeKind, Ontology},
+    ontology::{domain::TypeKind, map::MapMeta, ontol::TextConstant, Ontology},
     property::PropertyId,
-    DefId, PackageId,
+    DefId, MapKey, PackageId,
 };
 
 struct Domain {
@@ -18,6 +18,15 @@ struct Domain {
 
 struct TypeInfo {
     id: DefId,
+}
+
+struct NamedMap {
+    name: TextConstant,
+}
+
+struct MapEdge {
+    key: MapKey,
+    meta: MapMeta,
 }
 
 struct DataRelationshipInfo {
@@ -29,6 +38,18 @@ struct DataRelationshipInfo {
 
 struct Entity {
     id: DefId,
+}
+
+struct PropertyFlow {
+    source: PropertyId,
+    target: PropertyId,
+    kind: PropertyFlowKind,
+}
+
+#[derive(GraphQLEnum)]
+enum PropertyFlowKind {
+    ChildOf,
+    DependentOn,
 }
 
 #[derive(GraphQLEnum)]
@@ -77,6 +98,20 @@ impl Deref for Context {
 }
 
 impl juniper::Context for Context {}
+
+#[graphql_object]
+#[graphql(context = Context)]
+impl PropertyFlow {
+    fn source(&self) -> String {
+        self.source.to_string()
+    }
+    fn target(&self) -> String {
+        self.target.to_string()
+    }
+    fn kind(&self) -> &PropertyFlowKind {
+        &self.kind
+    }
+}
 
 #[graphql_object]
 #[graphql(context = Context)]
@@ -168,6 +203,55 @@ impl DataRelationshipInfo {
 
 #[graphql_object]
 #[graphql(context = Context)]
+impl NamedMap {
+    fn name(&self, context: &Context) -> String {
+        context[self.name].to_string()
+    }
+}
+
+#[graphql_object]
+#[graphql(context = Context)]
+impl MapEdge {
+    fn output(&self) -> TypeInfo {
+        TypeInfo {
+            id: self.key.output.def_id,
+        }
+    }
+    fn input(&self) -> TypeInfo {
+        TypeInfo {
+            id: self.key.input.def_id,
+        }
+    }
+
+    fn property_flows(&self, context: &Context) -> Vec<PropertyFlow> {
+        let Some(slice) = context.get_prop_flow_slice(&self.meta) else {
+            return vec![];
+        };
+        slice
+            .iter()
+            .filter_map(|flow| match flow.data {
+                ontol_runtime::ontology::map::PropertyFlowData::ChildOf(property_id) => {
+                    Some(PropertyFlow {
+                        source: flow.id,
+                        target: property_id,
+                        kind: PropertyFlowKind::ChildOf,
+                    })
+                }
+                ontol_runtime::ontology::map::PropertyFlowData::DependentOn(property_id) => {
+                    Some(PropertyFlow {
+                        source: flow.id,
+                        target: property_id,
+                        kind: PropertyFlowKind::DependentOn,
+                    })
+                }
+                _ => None,
+            })
+            .collect()
+    }
+}
+
+#[graphql_object]
+#[graphql(context = Context)]
 impl Entity {
     fn is_self_identifying(&self, context: &Context) -> bool {
         let type_info = context.get_type_info(self.id);
@@ -196,6 +280,9 @@ enum RelationshipKindEnum {
 #[graphql_object]
 #[graphql(context = Context)]
 impl TypeInfo {
+    fn id(&self) -> String {
+        format!("{:?}", self.id)
+    }
     fn name(&self, context: &Context) -> Option<String> {
         let type_info = context.get_type_info(self.id);
         type_info.name().map(|name| context[name].into())
@@ -255,6 +342,27 @@ impl TypeInfo {
             })
             .collect()
     }
+    fn maps_to(&self, context: &Context) -> Vec<MapEdge> {
+        context
+            .iter_map_meta()
+            .filter(|(map_key, _)| map_key.input.def_id == self.id)
+            .map(|(key, meta)| MapEdge {
+                key,
+                meta: meta.clone(),
+            })
+            .collect()
+    }
+
+    fn maps_from(&self, context: &Context) -> Vec<MapEdge> {
+        context
+            .iter_map_meta()
+            .filter(|(map_key, _)| map_key.output.def_id == self.id)
+            .map(|(key, meta)| MapEdge {
+                key,
+                meta: meta.clone(),
+            })
+            .collect()
+    }
 }
 
 #[graphql_object]
@@ -284,6 +392,15 @@ impl Domain {
         } else {
             infos.collect()
         }
+    }
+    fn maps(&self, context: &Context) -> Vec<NamedMap> {
+        // let domain = context.find_domain(self.id).unwrap();
+        context
+            .ontology
+            .iter_named_forward_maps()
+            .filter(|(package_id, ..)| package_id == &self.id)
+            .map(|(_, name, _)| NamedMap { name })
+            .collect()
     }
 }
 
