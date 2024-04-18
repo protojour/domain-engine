@@ -1,9 +1,17 @@
-use std::fmt::Display;
+use std::{fmt::Display, ops::Range};
 
 use chumsky::prelude::*;
+use logos::Logos;
 use smartstring::alias::String;
 
-use super::Spanned;
+use crate::Spanned;
+
+use self::escape::{escape_regex, escape_text_literal};
+
+pub(crate) mod escape;
+pub(crate) mod kind;
+
+use kind::Kind;
 
 #[allow(dead_code)]
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
@@ -86,262 +94,109 @@ impl Display for Modifier {
     }
 }
 
-#[allow(dead_code)]
-pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Simple<char>> {
-    let ident = ident().map(|ident| match ident.as_str() {
-        "use" => Token::Use,
-        "def" => Token::Def,
-        "rel" => Token::Rel,
-        "fmt" => Token::Fmt,
-        "map" => Token::Map,
-        "@private" => Token::Modifier(Modifier::Private),
-        "@open" => Token::Modifier(Modifier::Open),
-        "@extern" => Token::Modifier(Modifier::Extern),
-        "@symbol" => Token::Modifier(Modifier::Symbol),
-        "@match" => Token::Modifier(Modifier::Match),
-        "@in" => Token::Modifier(Modifier::In),
-        "@all_in" => Token::Modifier(Modifier::AllIn),
-        "@contains_all" => Token::Modifier(Modifier::ContainsAll),
-        "@intersects" => Token::Modifier(Modifier::Intersects),
-        "@equals" => Token::Modifier(Modifier::Equals),
-        _ => {
-            if ident.starts_with('@') {
-                Token::UnknownModifer(ident)
-            } else {
-                Token::Sym(ident)
+pub fn lex(input: &str) -> (Vec<Spanned<Token>>, Vec<Simple<char>>) {
+    let mut lexer = Kind::lexer(input);
+    let mut tokens: Vec<Spanned<Token>> = vec![];
+    let mut errors: Vec<Simple<char>> = vec![];
+
+    let mut error_range: Option<Range<usize>> = None;
+
+    while let Some(result) = lexer.next() {
+        match result {
+            Ok(kind) => {
+                maybe_report_invalid_span(error_range.take(), input, &mut errors);
+
+                let token: Token = match kind {
+                    Kind::Whitespace | Kind::Comment => {
+                        continue;
+                    }
+                    Kind::DocComment => {
+                        let slice = lexer.slice();
+                        let slice = slice.strip_prefix("///").unwrap();
+                        let slice = slice.trim_start();
+
+                        Token::DocComment(slice.into())
+                    }
+                    Kind::ParenOpen | Kind::CurlyOpen | Kind::SquareOpen => {
+                        Token::Open(lexer.slice().chars().next().unwrap())
+                    }
+                    Kind::ParenClose | Kind::CurlyClose | Kind::SquareClose => {
+                        Token::Close(lexer.slice().chars().next().unwrap())
+                    }
+                    Kind::Dot
+                    | Kind::Comma
+                    | Kind::Colon
+                    | Kind::Question
+                    | Kind::Underscore
+                    | Kind::Plus
+                    | Kind::Minus
+                    | Kind::Asterisk
+                    | Kind::Slash
+                    | Kind::Equals
+                    | Kind::Lt
+                    | Kind::Gt
+                    | Kind::Pipe => Token::Sigil(lexer.slice().chars().next().unwrap()),
+                    Kind::DotDot => Token::DotDot,
+                    Kind::FatArrow => Token::FatArrow,
+                    Kind::KwUse => Token::Use,
+                    Kind::KwDef => Token::Def,
+                    Kind::KwRel => Token::Rel,
+                    Kind::KwFmt => Token::Fmt,
+                    Kind::KwMap => Token::Map,
+                    Kind::Modifier => match lexer.slice() {
+                        "@private" => Token::Modifier(Modifier::Private),
+                        "@open" => Token::Modifier(Modifier::Open),
+                        "@extern" => Token::Modifier(Modifier::Extern),
+                        "@symbol" => Token::Modifier(Modifier::Symbol),
+                        "@match" => Token::Modifier(Modifier::Match),
+                        "@in" => Token::Modifier(Modifier::In),
+                        "@all_in" => Token::Modifier(Modifier::AllIn),
+                        "@contains_all" => Token::Modifier(Modifier::ContainsAll),
+                        "@intersects" => Token::Modifier(Modifier::Intersects),
+                        "@equals" => Token::Modifier(Modifier::Equals),
+                        _ => Token::UnknownModifer(lexer.slice().into()),
+                    },
+                    Kind::Number => Token::Number(lexer.slice().into()),
+                    Kind::DoubleQuoteText => {
+                        Token::TextLiteral(escape_text_literal(&lexer, kind, &mut errors))
+                    }
+                    Kind::SingleQuoteText => {
+                        Token::TextLiteral(escape_text_literal(&lexer, kind, &mut errors))
+                    }
+                    Kind::Regex => Token::Regex(escape_regex(&lexer)),
+                    Kind::Sym => Token::Sym(lexer.slice().into()),
+                };
+
+                tokens.push((token, lexer.span()));
             }
+            Err(_) => match &mut error_range {
+                Some(range) => {
+                    range.end = lexer.span().end();
+                }
+                None => {
+                    error_range = Some(lexer.span());
+                }
+            },
         }
-    });
+    }
 
-    let comment = just("//")
-        .ignore_then(filter(|c: &char| *c != '/'))
-        .ignore_then(take_until(just('\n').to(()).or(end())))
-        .padded();
+    maybe_report_invalid_span(error_range.take(), input, &mut errors);
 
-    doc_comment()
-        .or(just("=>").map(|_| Token::FatArrow))
-        .or(just("..").map(|_| Token::DotDot))
-        .or(one_of(".,:?_+*=<>|").map(Token::Sigil))
-        .or(one_of("({[").map(Token::Open))
-        .or(one_of(")}]").map(Token::Close))
-        .or(num().map(Token::Number))
-        .or(just('-').map(Token::Sigil))
-        .or(double_quote_string_literal().map(Token::TextLiteral))
-        .or(single_quote_string_literal().map(Token::TextLiteral))
-        .or(regex().map(Token::Regex))
-        .or(just('/')
-            .then_ignore(none_of("/").to(()).or(end()))
-            .map(Token::Sigil))
-        .or(ident)
-        .map_with_span(|token, span| (token, span))
-        .padded_by(comment.repeated())
-        .recover_with(skip_then_retry_until([]))
-        .padded()
-        .repeated()
-        .padded()
-        .then_ignore(end())
+    (tokens, errors)
 }
 
-fn num() -> impl Parser<char, String, Error = Simple<char>> {
-    just('-')
-        .or_not()
-        .chain::<char, Vec<_>, _>(
-            filter(|c: &char| c.is_ascii_digit() && !special_char(*c))
-                .repeated()
-                .at_least(1),
-        )
-        .chain::<char, _, _>(
-            just('.')
-                .chain(
-                    filter(|c: &char| c.is_ascii_digit() && !special_char(*c))
-                        .repeated()
-                        .at_least(1),
-                )
-                .or_not(),
-        )
-        .map(String::from_iter)
-}
-
-fn ident() -> impl Parser<char, String, Error = Simple<char>> {
-    filter(|c: &char| !c.is_whitespace() && !special_char(*c) && !c.is_ascii_digit() && *c != '_')
-        .map(Some)
-        .chain::<char, Vec<_>, _>(
-            filter(|c: &char| !c.is_whitespace() && !special_char(*c)).repeated(),
-        )
-        .map(String::from_iter)
-}
-
-fn double_quote_string_literal() -> impl Parser<char, String, Error = Simple<char>> {
-    let escape = just('\\').ignore_then(choice((
-        just('\\'),
-        just('/'),
-        just('"'),
-        just('b').to('\x08'),
-        just('f').to('\x0C'),
-        just('n').to('\n'),
-        just('r').to('\r'),
-        just('t').to('\t'),
-    )));
-
-    just('"')
-        .ignore_then(
-            filter(|c: &char| *c != '\\' && *c != '"')
-                .or(escape)
-                .repeated(),
-        )
-        .then_ignore(just('"'))
-        .map(String::from_iter)
-}
-
-fn single_quote_string_literal() -> impl Parser<char, String, Error = Simple<char>> {
-    let escape = just('\\').ignore_then(choice((
-        just('\\'),
-        just('/'),
-        just('\''),
-        just('b').to('\x08'),
-        just('f').to('\x0C'),
-        just('n').to('\n'),
-        just('r').to('\r'),
-        just('t').to('\t'),
-    )));
-
-    just('\'')
-        .ignore_then(
-            filter(|c: &char| *c != '\\' && *c != '\'')
-                .or(escape)
-                .repeated(),
-        )
-        .then_ignore(just('\''))
-        .map(String::from_iter)
-}
-
-fn regex() -> impl Parser<char, String, Error = Simple<char>> {
-    let slash_or_space_escaped = just('\\').ignore_then(one_of("/ "));
-    let slash_escaped_or_backslash = just('\\').ignore_then(just('/')).or(just('\\'));
-
-    just('/')
-        .ignore_then(slash_or_space_escaped.or(filter(|c: &char| *c != '/' && !c.is_whitespace())))
-        .chain::<char, Vec<_>, _>(
-            filter(|c: &char| *c != '\\' && *c != '/')
-                .or(slash_escaped_or_backslash)
-                .repeated(),
-        )
-        .then_ignore(just('/'))
-        .map(String::from_iter)
-}
-
-fn doc_comment() -> impl Parser<char, Token, Error = Simple<char>> {
-    just("///")
-        .ignore_then(just(' ').repeated())
-        .ignore_then(take_until(just('\n')))
-        .map(|(vec, _)| Token::DocComment(String::from_iter(vec)))
-}
-
-fn special_char(c: char) -> bool {
-    matches!(
-        c,
-        '(' | ')' | '[' | ']' | '{' | '}' | '<' | '>' | '.' | ';' | ':' | '?' | '/' | ',' | '|'
-    )
-}
-
-#[cfg(test)]
-mod tests {
-    use assert_matches::assert_matches;
-
-    use super::Token::*;
-    use super::*;
-
-    fn lex(input: &str) -> Result<Vec<Token>, Vec<Simple<char>>> {
-        let (tokens, errors) = lexer().parse_recovery(input);
-        if !errors.is_empty() {
-            Err(errors)
-        } else if let Some(tokens) = tokens {
-            Ok(tokens.into_iter().map(|(token, _)| token).collect())
+fn maybe_report_invalid_span(
+    span: Option<Range<usize>>,
+    input: &str,
+    errors: &mut Vec<Simple<char>>,
+) {
+    if let Some(span) = span {
+        let msg = if span.len() > 1 {
+            format!("illegal characters `{}`", &input[span.clone()])
         } else {
-            Err(vec![])
-        }
-    }
+            format!("illegal character `{}`", &input[span.clone()])
+        };
 
-    #[track_caller]
-    fn lex_ok(input: &str) -> Vec<Token> {
-        lex(input).unwrap()
-    }
-
-    fn number(input: &str) -> Token {
-        Token::Number(input.into())
-    }
-
-    fn sym(input: &str) -> Token {
-        Token::Sym(input.into())
-    }
-
-    fn regex(input: &str) -> Token {
-        Token::Regex(input.into())
-    }
-
-    #[test]
-    fn test_comment_at_eof() {
-        lex_ok("foobar // comment ");
-    }
-
-    // BUG: We want to support only comments
-    #[test]
-    fn standalone_comment_bug() {
-        assert!(lex("// comment").is_err());
-    }
-
-    #[test]
-    fn test_doc_comment_drops_spaces() {
-        let source = "
-        ///      Over here
-        def(pub) PubType {}
-        ";
-        let tokens = lex_ok(source);
-        let doc_comment = &tokens.first().unwrap();
-        assert_matches!(doc_comment, Token::DocComment(_))
-    }
-
-    #[test]
-    fn test_empty() {
-        assert_eq!(&lex_ok(""), &[]);
-    }
-
-    #[test]
-    fn test_integer() {
-        assert_eq!(&lex_ok("42"), &[number("42")]);
-        assert_eq!(&lex_ok("-42"), &[number("-42")]);
-        assert_eq!(&lex_ok("--42"), &[Sigil('-'), number("-42")]);
-        assert_eq!(&lex_ok("42x"), &[number("42"), sym("x")]);
-        assert_eq!(&lex_ok("42 "), &[number("42")]);
-        assert_eq!(&lex_ok("4-2"), &[number("4"), number("-2")]);
-        assert_eq!(&lex_ok("4--2"), &[number("4"), Sigil('-'), number("-2")]);
-    }
-
-    #[test]
-    fn test_decimal() {
-        assert_eq!(&lex_ok(".42"), &[Sigil('.'), number("42")]);
-        assert_eq!(&lex_ok("42."), &[number("42"), Sigil('.')]);
-        assert_eq!(&lex_ok("4.2"), &[Number("4.2".into())]);
-        assert_eq!(&lex_ok("42.42"), &[number("42.42")]);
-        assert_eq!(&lex_ok("-0.42"), &[number("-0.42")]);
-        assert_eq!(&lex_ok("-.42"), &[Sigil('-'), Sigil('.'), number("42")]);
-        assert_eq!(&lex_ok("4..2"), &[number("4"), DotDot, number("2")]);
-    }
-
-    #[test]
-    fn test_regex() {
-        assert_eq!(&lex_ok(r"/"), &[Sigil('/')]);
-        assert_eq!(&lex_ok(r"/ "), &[Sigil('/')]);
-        // BUG: comment:
-        // assert_eq!(lex("//").unwrap(), &[]);
-        assert_eq!(&lex_ok(r"/ /"), &[Sigil('/'), Sigil('/')]);
-        assert_eq!(&lex_ok(r"/\ /"), &[regex(" ")]);
-        assert_eq!(&lex_ok(r"/\  /"), &[regex("  ")]);
-        assert_eq!(&lex_ok(r"/\//"), &[regex("/")]);
-        assert_eq!(&lex_ok(r"/a/"), &[regex("a")]);
-        assert_eq!(
-            &lex_ok(r"/Hello (?<name>\w+)!/"),
-            &[regex("Hello (?<name>\\w+)!")]
-        );
+        errors.push(Simple::custom(span, msg));
     }
 }

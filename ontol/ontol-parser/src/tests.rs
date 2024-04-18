@@ -1,7 +1,7 @@
 use assert_matches::assert_matches;
 use chumsky::Stream;
 
-use crate::{lexer::lexer, parser::statement_sequence};
+use crate::{lexer::lex, parser::statement_sequence};
 
 use super::*;
 
@@ -12,7 +12,10 @@ enum Error {
 }
 
 fn parse(input: &str) -> Result<Vec<Statement>, Error> {
-    let tokens = lexer().parse(input).map_err(Error::Lex)?;
+    let (tokens, errors) = lex(input);
+    if !errors.is_empty() {
+        return Err(Error::Lex(errors));
+    }
     let len = input.len();
     let stmts = statement_sequence()
         .parse(Stream::from_iter(len..len + 1, tokens.into_iter()))

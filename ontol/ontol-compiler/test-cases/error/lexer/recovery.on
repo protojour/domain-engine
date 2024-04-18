@@ -11,7 +11,7 @@ map(
     bar(
         'prop':
             x
-            ;; // ERROR lex error: illegal character `;`
+            ;; // ERROR lex error: illegal characters `;;`
             foobar // ERROR parse error: found `foobar`, expected one of `)`, `*`, `+`, `,`, `-`, `/`
     )
 )

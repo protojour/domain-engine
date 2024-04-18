@@ -15,7 +15,7 @@ use ontol_parser::{
         AnyPattern, DefStatement, MapArm, Path, Statement, StructPattern, StructPatternParameter,
         Type, TypeOrPattern, UseStatement,
     },
-    lexer::lexer,
+    lexer::lex,
     parse_statements, Spanned, Token,
 };
 use ontol_runtime::{
@@ -157,11 +157,8 @@ impl State {
             doc.imports.clear();
             doc.defs.clear();
 
-            let (tokens, _) = lexer().parse_recovery(doc.text.as_str());
-
-            if let Some(tokens) = tokens {
-                doc.tokens = tokens;
-            }
+            let (tokens, _) = lex(doc.text.as_str());
+            doc.tokens = tokens;
 
             for (token, _) in &doc.tokens {
                 if let Token::Sym(sym) = token {
