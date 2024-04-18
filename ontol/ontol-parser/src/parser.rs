@@ -2,7 +2,6 @@ use std::ops::Range;
 
 use chumsky::prelude::*;
 use either::Either;
-use smartstring::alias::String;
 use unindent::unindent;
 
 use crate::{
@@ -541,7 +540,8 @@ fn doc_comment() -> impl AstParser<Option<std::string::String>> {
             if lines.is_empty() {
                 None
             } else {
-                let mut joined = String::from("\n");
+                let mut joined = String::with_capacity(lines.iter().map(|it| it.len()).sum());
+                joined.push('\n');
 
                 let mut line_iter = lines.iter().peekable();
                 while let Some(line) = line_iter.next() {

@@ -7,7 +7,6 @@ use ontol_runtime::{
     ontology::map::MapLossiness,
     property::{PropertyId, ValueCardinality},
     query::condition::{Clause, ClausePair},
-    smart_format,
     value::Attribute,
     var::{Var, VarSet},
     vm::proc::{
@@ -939,10 +938,8 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 "var {var} was already in scope, but span is native. scope={:?}",
                 self.scope
             );
-            self.errors.error(
-                CompileError::BUG(smart_format!("Variable already in scope")),
-                span,
-            );
+            self.errors
+                .error(CompileError::BUG("Variable already in scope"), span);
         }
     }
 
@@ -955,10 +952,8 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     !span.is_native(),
                     "var {var} was not in scope, but span is native."
                 );
-                self.errors.error(
-                    CompileError::BUG(smart_format!("Variable not in scope")),
-                    span,
-                );
+                self.errors
+                    .error(CompileError::BUG("Variable not in scope"), span);
                 Err(())
             }
         }
@@ -966,10 +961,8 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
     fn catch_dest(&mut self, hir_label: ontol_hir::Label, span: &SourceSpan) -> BlockLabel {
         let Some(fail_label) = self.catch_points.get(&hir_label).cloned() else {
-            self.errors.error(
-                CompileError::TODO(smart_format!("catch block not found")),
-                span,
-            );
+            self.errors
+                .error(CompileError::TODO("catch block not found"), span);
             return BlockLabel(Var(0));
         };
         fail_label

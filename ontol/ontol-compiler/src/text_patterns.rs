@@ -7,7 +7,6 @@ use ontol_runtime::{
     DefId,
 };
 use regex_syntax::hir::{Capture, Hir, Look};
-use smartstring::alias::String;
 use std::fmt::Write;
 use tracing::debug;
 
@@ -66,7 +65,9 @@ impl TextPatternSegment {
                 (None, segment) => {
                     prev = Some(segment);
                 }
-                (Some(Self::Literal(s1)), Self::Literal(s2)) => prev = Some(Self::Literal(s1 + s2)),
+                (Some(Self::Literal(s1)), Self::Literal(s2)) => {
+                    prev = Some(Self::Literal(format!("{s1}{s2}")))
+                }
                 (Some(Self::Regex(r1)), Self::Regex(r2)) => {
                     prev = Some(Self::Regex(Hir::concat(vec![r1, r2])));
                 }

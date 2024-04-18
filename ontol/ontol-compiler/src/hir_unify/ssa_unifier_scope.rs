@@ -3,7 +3,6 @@ use std::collections::BTreeMap;
 use chumsky::chain::Chain;
 use ontol_hir::{Binder, Binding, Kind, Label, Node, Nodes, PropVariant, SetEntry};
 use ontol_runtime::{
-    smart_format,
     value::Attribute,
     var::{Var, VarSet},
 };
@@ -276,9 +275,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                             )
                             .is_some()
                         {
-                            return Err(UnifierError::TODO(smart_format!(
-                                "fix duplicate iter scope"
-                            )));
+                            return Err(UnifierError::TODO("fix duplicate iter scope".to_string()));
                         }
 
                         if matches!(scoped, Scoped::Yes) {
@@ -362,7 +359,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                         };
                     }
                     PropVariant::Predicate(..) => {
-                        return Err(UnifierError::TODO(smart_format!("predicate prop scope")));
+                        return Err(UnifierError::TODO("predicate prop scope".to_string()));
                     }
                 }
                 lets.extend(sub_lets);
@@ -394,9 +391,9 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
 
                             for (_, vars) in variables_by_group_index {
                                 if vars.len() > 1 {
-                                    return Err(UnifierError::Unimplemented(smart_format!(
-                                        "Duplicate regex group"
-                                    )));
+                                    return Err(UnifierError::Unimplemented(
+                                        "Duplicate regex group".to_string(),
+                                    ));
                                 }
                                 let var = Var(vars.0.iter().next().unwrap() as u32);
                                 unpack.push(Binding::Binder(TypedHirData(
@@ -468,9 +465,9 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             | Kind::TryLetTup(..)
             | Kind::LetRegex(..)
             | Kind::LetRegexIter(..)
-            | Kind::LetCondVar(..) => Err(UnifierError::TODO(smart_format!(
-                "Not a scope node: {node_ref}"
-            ))),
+            | Kind::LetCondVar(..) => {
+                Err(UnifierError::TODO(format!("Not a scope node: {node_ref}")))
+            }
         }
     }
 
@@ -516,9 +513,9 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 let kind = match let_node {
                     Let::Prop(attr, var_prop) => Kind::TryLetProp(catch_label, *attr, *var_prop),
                     _ => {
-                        return Err(UnifierError::Unimplemented(smart_format!(
-                            "unhandled try let variant"
-                        )))
+                        return Err(UnifierError::Unimplemented(
+                            "unhandled try let variant".to_string(),
+                        ))
                     }
                 };
                 output.push(self.mk_node(kind, Meta::new(&UNIT_TYPE, *span)));

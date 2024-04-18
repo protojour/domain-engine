@@ -10,9 +10,7 @@ use ontol_runtime::{
             SerdeDef, SerdeModifier,
         },
     },
-    smart_format,
 };
-use smartstring::alias::String;
 use tracing::trace;
 
 use super::{
@@ -86,7 +84,7 @@ impl UnionBuilder {
 
         for (discriminant, count) in ambiguous_discriminant_debug {
             if count > 1 {
-                return Err(smart_format!("Discriminant {discriminant:?} is ambiguous:"));
+                return Err(format!("Discriminant {discriminant:?} is ambiguous:"));
             }
         }
 
@@ -175,7 +173,7 @@ impl UnionBuilder {
 
                             Ok(())
                         } else {
-                            Err(smart_format!("StructFallback without scoping"))
+                            Err("StructFallback without scoping".to_string())
                         }
                     }
                     _ => {

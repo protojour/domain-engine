@@ -3,7 +3,6 @@ use std::fmt::Display;
 use chumsky::{error::SimpleReason, prelude::Simple};
 use ontol_parser::Token;
 use ontol_runtime::format_utils::{CommaSeparated, LogicOp, Missing};
-use smartstring::alias::String;
 use thiserror::Error;
 
 use crate::{package::PackageReference, source::SourceSpan};
@@ -114,8 +113,25 @@ pub enum CompileError {
     UnsolvableEquation,
     UnsupportedVariableDuplication,
     SpreadLabelMustBeLastArgument,
-    BUG(String),
-    TODO(String),
+    /// A message regarded as a bug in the compiler
+    Bug(String),
+    /// An TODO message is an "immature" compile error, probably requires better UX design
+    /// for presenting to the user
+    Todo(String),
+}
+
+impl CompileError {
+    /// Construct a [CompileError::Todo] message
+    #[allow(non_snake_case)]
+    pub fn TODO(msg: impl Into<String>) -> Self {
+        Self::Todo(msg.into())
+    }
+
+    /// Construct a [CompileError::Bug] message
+    #[allow(non_snake_case)]
+    pub fn BUG(msg: impl Into<String>) -> Self {
+        Self::Bug(msg.into())
+    }
 }
 
 impl std::error::Error for CompileError {}
@@ -283,8 +299,8 @@ impl std::fmt::Display for CompileError {
             Self::SpreadLabelMustBeLastArgument => {
                 write!(f, "spread label must be the last argument")
             }
-            Self::BUG(msg) => write!(f, "BUG: {msg}"),
-            Self::TODO(msg) => write!(f, "TODO: {msg}"),
+            Self::Bug(msg) => write!(f, "BUG: {msg}"),
+            Self::Todo(msg) => write!(f, "TODO: {msg}"),
         }
     }
 }

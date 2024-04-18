@@ -1,5 +1,4 @@
 use ontol_runtime::{vm::VmError, DefId};
-use smartstring::alias::String;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

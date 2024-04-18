@@ -1,5 +1,5 @@
 use fnv::FnvHashMap;
-use ontol_runtime::{smart_format, DefId};
+use ontol_runtime::DefId;
 
 use crate::{
     codegen::task::CodegenTasks,
@@ -98,11 +98,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             TypeError::Propagated => self.types.intern(Type::Error),
             TypeError::Mismatch(equation) => self.error(
                 CompileError::TypeMismatch {
-                    actual: smart_format!(
+                    actual: format!(
                         "{}",
                         FormatType(equation.actual.0, self.defs, self.primitives)
                     ),
-                    expected: smart_format!(
+                    expected: format!(
                         "{}",
                         FormatType(equation.expected.0, self.defs, self.primitives)
                     ),
@@ -111,24 +111,24 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             ),
             TypeError::MustBeSequence(ty) => self.error(
                 CompileError::TypeMismatch {
-                    actual: smart_format!("{}", FormatType(ty, self.defs, self.primitives)),
-                    expected: smart_format!("{{{}}}", FormatType(ty, self.defs, self.primitives)),
+                    actual: format!("{}", FormatType(ty, self.defs, self.primitives)),
+                    expected: format!("{{{}}}", FormatType(ty, self.defs, self.primitives)),
                 },
                 span,
             ),
             TypeError::VariableMustBeSequenceEnclosed(ty) => self.error(
-                CompileError::VariableMustBeSequenceEnclosed(smart_format!(
+                CompileError::VariableMustBeSequenceEnclosed(format!(
                     "{}",
                     FormatType(ty, self.defs, self.primitives)
                 )),
                 span,
             ),
             TypeError::NotEnoughInformation => self.error(
-                CompileError::TODO(smart_format!("Not enough information to infer type")),
+                CompileError::TODO("Not enough information to infer type"),
                 span,
             ),
             TypeError::NotConvertibleFromNumber(ty) => self.error(
-                CompileError::TODO(smart_format!(
+                CompileError::TODO(format!(
                     "Type {} cannot be represented as a number",
                     FormatType(ty, self.defs, self.primitives)
                 )),

@@ -2,7 +2,7 @@ use std::collections::hash_map::Entry;
 
 use fnv::FnvHashSet;
 use ontol_hir::Label;
-use ontol_runtime::{smart_format, var::Var};
+use ontol_runtime::var::Var;
 use tracing::debug;
 
 use crate::{
@@ -177,9 +177,7 @@ impl<'c> PreAnalyzer<'c> {
                                     ctx.label_map.insert(element.id, label);
                                 } else {
                                     self.error(
-                                        CompileError::TODO(smart_format!(
-                                            "Incompatible aggregation group"
-                                        )),
+                                        CompileError::TODO("Incompatible aggregation group"),
                                         pat_span,
                                     );
                                 }
@@ -295,9 +293,7 @@ impl<'c> PreAnalyzer<'c> {
                                 debug!("Failure: {error:?}");
 
                                 self.error(
-                                    CompileError::TODO(smart_format!(
-                                        "Incompatible aggregation group"
-                                    )),
+                                    CompileError::TODO("Incompatible aggregation group"),
                                     &node.constrain_span(*full_span),
                                 );
                                 Err(error)
@@ -324,10 +320,7 @@ impl<'c> PreAnalyzer<'c> {
             if ctx.current_arm.is_first()
                 && explicit_variable.set_element_group != parent_set_element_group
             {
-                self.error(
-                    CompileError::TODO(smart_format!("Incompatible aggregation group")),
-                    span,
-                );
+                self.error(CompileError::TODO("Incompatible aggregation group"), span);
             }
 
             debug!("Join existing bound variable");

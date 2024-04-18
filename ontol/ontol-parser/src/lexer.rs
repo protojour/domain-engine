@@ -2,7 +2,6 @@ use std::{fmt::Display, ops::Range};
 
 use chumsky::prelude::*;
 use logos::Logos;
-use smartstring::alias::String;
 
 use crate::Spanned;
 

@@ -9,7 +9,7 @@ pub fn escape_text_literal(
     lexer: &Lexer<Kind>,
     kind: Kind,
     errors: &mut Vec<Simple<char>>,
-) -> smartstring::alias::String {
+) -> String {
     let slice = lexer.slice();
     let slice = &slice[1..slice.len() - 1];
     let mut out = String::with_capacity(slice.len());
@@ -45,10 +45,10 @@ pub fn escape_text_literal(
         }
     }
 
-    out.into()
+    out
 }
 
-pub fn escape_regex(lexer: &Lexer<Kind>) -> smartstring::alias::String {
+pub fn escape_regex(lexer: &Lexer<Kind>) -> String {
     let slice = lexer.slice();
     let slice = &slice[1..slice.len() - 1];
     let mut out = String::with_capacity(slice.len());
@@ -88,7 +88,7 @@ pub fn escape_regex(lexer: &Lexer<Kind>) -> smartstring::alias::String {
         }
     }
 
-    out.into()
+    out
 }
 
 fn invalid_escape_code(lexer: &Lexer<Kind>, offset: usize) -> Simple<char> {

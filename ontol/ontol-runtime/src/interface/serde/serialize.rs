@@ -14,7 +14,6 @@ use crate::{
     },
     ontology::ontol::text_pattern::{FormatPattern, TextPatternConstantPart},
     property::PropertyId,
-    smart_format,
     value::{Attribute, FormatValueAsText, Value},
     DefId,
 };
@@ -71,7 +70,7 @@ impl<'on, 'p> SerdeProcessor<'on, 'p> {
                 };
 
                 serializer.serialize_i32(int_i64.try_into().map_err(|err| {
-                    S::Error::custom(smart_format!("overflow when converting to i32: {err:?}"))
+                    S::Error::custom(format!("overflow when converting to i32: {err:?}"))
                 })?)
             }
             (SerdeOperator::F64(..), ScalarFormat::DomainTransparent) => match value {

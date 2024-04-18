@@ -1,7 +1,6 @@
 use ontol_hir::{Binder, Binding, CaptureGroup, Kind, Node, Nodes};
 use ontol_runtime::{
     property::PropertyId,
-    smart_format,
     value::Attribute,
     var::{Var, VarSet},
     vm::proc::BuiltinProc,
@@ -246,9 +245,9 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     out_binder,
                 )
             }
-            _other => Err(super::UnifierError::Unimplemented(smart_format!(
-                "cannot invert non-function"
-            ))),
+            _other => Err(super::UnifierError::Unimplemented(
+                "cannot invert non-function".to_string(),
+            )),
         }
     }
 }

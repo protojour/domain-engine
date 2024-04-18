@@ -1,7 +1,6 @@
 use std::ops::Range;
 
 use either::Either;
-use smartstring::alias::String;
 
 use super::{Span, Spanned};
 
@@ -16,12 +15,12 @@ pub enum Statement {
 
 impl Statement {
     #[allow(unused)]
-    pub fn docs(&self) -> Option<&std::string::String> {
+    pub fn docs(&self) -> Option<&str> {
         match self {
             Self::Use(_) => None,
-            Self::Def(ty) => ty.docs.as_ref(),
-            Self::Rel(rel) => rel.docs.as_ref(),
-            Self::Fmt(fmt) => fmt.docs.as_ref(),
+            Self::Def(ty) => ty.docs.as_deref(),
+            Self::Rel(rel) => rel.docs.as_deref(),
+            Self::Fmt(fmt) => fmt.docs.as_deref(),
             Self::Map(_) => None,
         }
     }

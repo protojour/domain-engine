@@ -3,7 +3,6 @@ use ontol_hir::{PropFlags, StructFlags};
 use ontol_runtime::{
     property::{Cardinality, PropertyCardinality, PropertyId, Role, ValueCardinality},
     query::condition::SetOperator,
-    smart_format,
     value::Attribute,
     var::Var,
     DefId, RelationshipId,
@@ -450,9 +449,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         if element.is_iter {
                                             let Some(label) = ctx.label_map.get(&element.id) else {
                                                 self.error(
-                                                    CompileError::TODO(smart_format!(
-                                                        "unable to loop"
-                                                    )),
+                                                    CompileError::TODO("unable to loop"),
                                                     &prop_span,
                                                 );
                                                 return None;
@@ -585,10 +582,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             ValueCardinality::IndexSet | ValueCardinality::List,
                             SetBinaryOperator::ElementIn,
                         ) => {
-                            self.error(
-                                CompileError::TODO("property must be a scalar".into()),
-                                &prop_span,
-                            );
+                            self.error(CompileError::TODO("property must be a scalar"), &prop_span);
                             return None;
                         }
                         (ValueCardinality::IndexSet, operator) => {
@@ -604,10 +598,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             )
                         }
                         _ => {
-                            self.error(
-                                CompileError::TODO("property must be a set".into()),
-                                &prop_span,
-                            );
+                            self.error(CompileError::TODO("property must be a set"), &prop_span);
                             return None;
                         }
                     };
@@ -784,18 +775,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn check_can_construct_default(&mut self, ty: TypeRef<'m>, span: SourceSpan) {
         let Some(def_id) = ty.get_single_def_id() else {
-            self.error(
-                CompileError::TODO(smart_format!("Type not found")),
-                &NO_SPAN,
-            );
+            self.error(CompileError::TODO("Type not found"), &NO_SPAN);
             return;
         };
 
         if !self.check_can_construct_default_inner(def_id) {
             self.error(
-                CompileError::TODO(smart_format!(
-                    "optional binding required, as a default value cannot be created"
-                )),
+                CompileError::TODO(
+                    "optional binding required, as a default value cannot be created",
+                ),
                 &span,
             );
         } else {

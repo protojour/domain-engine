@@ -8,7 +8,6 @@ use ontol_parser::Spanned;
 use ontol_runtime::ontology::config::PackageConfig;
 use ontol_runtime::DefId;
 use ontol_runtime::PackageId;
-use smartstring::alias::String;
 
 use crate::error::CompileError;
 use crate::error::UnifiedCompileError;

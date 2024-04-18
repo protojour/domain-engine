@@ -2,7 +2,7 @@ use fnv::FnvHashSet;
 use ontol_runtime::{
     ontology::ontol::{TextLikeType, ValueGenerator},
     property::{PropertyCardinality, PropertyId, Role, ValueCardinality},
-    smart_format, DefId, RelationshipId,
+    DefId, RelationshipId,
 };
 use tracing::{debug, instrument, trace};
 
@@ -276,7 +276,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     Err(_) => {
                         let object_ty = self.def_types.table.get(&object_def_id).unwrap();
                         self.error(
-                            CompileError::CannotGenerateValue(smart_format!(
+                            CompileError::CannotGenerateValue(format!(
                                 "{}",
                                 FormatType(object_ty, self.defs, self.primitives)
                             )),

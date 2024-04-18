@@ -10,7 +10,6 @@ use ontol_runtime::{
     vm::proc::BuiltinProc,
     DefId, PackageId, RelationshipId,
 };
-use smartstring::alias::String;
 use strum::AsRefStr;
 
 use crate::{

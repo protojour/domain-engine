@@ -2,7 +2,7 @@ use ontol_runtime::{
     ontology::domain::{EntityOrder, FieldPath},
     property::PropertyId,
     query::order::Direction,
-    smart_format, DefId, RelationshipId,
+    DefId, RelationshipId,
 };
 use tracing::{debug, info};
 
@@ -77,7 +77,7 @@ impl<'m> Compiler<'m> {
         };
         let Constructor::Sequence(sequence) = &properties.constructor else {
             self.errors.error(
-                CompileError::TODO("must specify a tuple of fields".into()),
+                CompileError::TODO("must specify a tuple of fields"),
                 &rel_span,
             );
             return None;
@@ -85,7 +85,7 @@ impl<'m> Compiler<'m> {
 
         if sequence.is_infinite() {
             self.errors.error(
-                CompileError::TODO("order tuple sequence must be finite".into()),
+                CompileError::TODO("order tuple sequence must be finite"),
                 &rel_span,
             );
             return None;
@@ -96,7 +96,7 @@ impl<'m> Compiler<'m> {
         for (_index, relationship) in sequence.elements() {
             let Some(relationship_id) = relationship else {
                 self.errors
-                    .error(CompileError::TODO("missing relationship".into()), &rel_span);
+                    .error(CompileError::TODO("missing relationship"), &rel_span);
                 continue;
             };
 
@@ -119,7 +119,7 @@ impl<'m> Compiler<'m> {
                 }
                 _ => {
                     self.errors.error(
-                        CompileError::TODO("invalid ordering field".into()),
+                        CompileError::TODO("invalid ordering field"),
                         meta.relationship.span,
                     );
                 }
@@ -135,7 +135,7 @@ impl<'m> Compiler<'m> {
                 } else {
                     let span = self.defs.def_span(rel_id.0);
                     self.errors
-                        .error(CompileError::TODO("invalid direction".into()), &span);
+                        .error(CompileError::TODO("invalid direction"), &span);
                     return None;
                 }
             }
@@ -163,7 +163,7 @@ impl<'m> Compiler<'m> {
             let Ok((property_id, next_def_id)) = self.lookup_order_field(def_id, field_segment)
             else {
                 errors.error(
-                    CompileError::TODO(smart_format!("no such field: `{field_segment}`")),
+                    CompileError::TODO(format!("no such field: `{field_segment}`")),
                     &field_span,
                 );
                 break;

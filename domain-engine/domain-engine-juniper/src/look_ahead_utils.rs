@@ -7,7 +7,6 @@ use ontol_runtime::{
         serde::processor::ProcessorProfile,
     },
     sequence::Sequence,
-    smart_format,
     value::Value,
 };
 use serde::{
@@ -52,7 +51,7 @@ impl<'a> ArgsWrapper<'a> {
                     Option::<T>::deserialize(LookAheadValueDeserializer::from(look_ahead_arg))
                         .map_err(|error| {
                             juniper::FieldError::new(
-                                smart_format!("`{name}`: {error}"),
+                                format!("`{name}`: {error}"),
                                 graphql_value!(None),
                             )
                         })?;
@@ -90,7 +89,7 @@ impl<'a> ArgsWrapper<'a> {
                         Some(DefaultArg::EmptyObject) => LookAheadValue::Object(Default::default()),
                         None => {
                             return Err(juniper::FieldError::new(
-                                smart_format!("argument `{arg_name}` is missing"),
+                                format!("argument `{arg_name}` is missing"),
                                 graphql_value!(None),
                             ))
                         }
@@ -176,12 +175,12 @@ impl<'a> ArgsWrapper<'a> {
 
 #[derive(Debug)]
 struct Error {
-    msg: smartstring::alias::String,
+    msg: String,
     start_pos: Option<juniper::parser::SourcePosition>,
 }
 
 impl Error {
-    fn new(msg: impl Into<smartstring::alias::String>) -> Self {
+    fn new(msg: impl Into<String>) -> Self {
         Self {
             msg: msg.into(),
             start_pos: None,
@@ -228,7 +227,7 @@ impl de::Error for Error {
         T: std::fmt::Display,
     {
         Self {
-            msg: smart_format!("{}", msg),
+            msg: format!("{}", msg),
             start_pos: None,
         }
     }

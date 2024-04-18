@@ -1,13 +1,12 @@
 use std::{collections::HashMap, str::Chars};
 
 use ontol_parser::Span;
-use ontol_runtime::{smart_format, DefId};
+use ontol_runtime::DefId;
 use regex_syntax::{
     ast::{Ast, GroupKind},
     hir::{Class, ClassUnicode, ClassUnicodeRange, Hir, HirKind, Literal, Look, Repetition},
     Parser,
 };
-use smartstring::alias::String;
 
 use crate::{
     def::RegexMeta,
@@ -147,7 +146,7 @@ pub fn parse_literal_regex<'m>(
         Ok(ast) => ast,
         Err(err) => {
             return Err((
-                smart_format!("{}", err.kind()),
+                format!("{}", err.kind()),
                 project_regex_span(pattern, pattern_span, err.span()),
             ))
         }
@@ -158,7 +157,7 @@ pub fn parse_literal_regex<'m>(
         Ok(hir) => hir,
         Err(err) => {
             return Err((
-                smart_format!("{}", err.kind()),
+                format!("{}", err.kind()),
                 project_regex_span(pattern, pattern_span, err.span()),
             ))
         }

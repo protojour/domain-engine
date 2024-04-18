@@ -18,10 +18,7 @@ use ontol_parser::{
     lexer::lex,
     parse_statements, Spanned, Token,
 };
-use ontol_runtime::{
-    ontology::{config::PackageConfig, domain::TypeInfo, Ontology},
-    smart_format,
-};
+use ontol_runtime::ontology::{config::PackageConfig, domain::TypeInfo, Ontology};
 use regex::Regex;
 use std::{
     collections::{HashMap, HashSet},
@@ -261,9 +258,9 @@ impl State {
         })
         .unwrap_or_else(|err| {
             let message = if let Some(message) = err.downcast_ref::<&str>() {
-                smart_format!("Caught unexpected error: {message}")
+                format!("Caught unexpected error: {message}")
             } else {
-                smart_format!("Caught unknown error.")
+                "Caught unknown error.".to_string()
             };
             Err(UnifiedCompileError {
                 errors: vec![

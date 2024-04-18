@@ -67,7 +67,7 @@ impl Backend {
                     restart = false;
                     for err in err.errors {
                         // handle caught panics
-                        if let ontol_compiler::CompileError::BUG(err) = &err.error {
+                        if let ontol_compiler::CompileError::Bug(err) = &err.error {
                             self.client.show_message(MessageType::ERROR, err).await;
                         }
 

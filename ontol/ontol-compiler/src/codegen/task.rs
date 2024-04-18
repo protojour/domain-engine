@@ -9,7 +9,6 @@ use ontol_runtime::{
         map::{MapLossiness, PropertyFlow},
         ontol::TextConstant,
     },
-    smart_format,
     vm::proc::{Address, Lib, NParams, OpCode, Procedure},
     DefId, MapDef, MapFlags, MapKey, PackageId,
 };
@@ -313,7 +312,7 @@ fn generate_explicit_map<'m>(
             }
             (Some(_), None) => {
                 compiler.errors.push(SpannedCompileError {
-                    error: CompileError::BUG(smart_format!("Failed to generate forward mapping")),
+                    error: CompileError::BUG("Failed to generate forward mapping"),
                     span,
                     notes: vec![],
                 });

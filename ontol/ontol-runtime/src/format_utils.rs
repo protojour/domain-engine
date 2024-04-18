@@ -93,28 +93,6 @@ where
     }
 }
 
-/// Macro for formatting into a SmartString instead of a std::String
-#[macro_export]
-macro_rules! smart_format {
-    ($($arg:tt)*) => {{
-        use std::fmt::Write;
-        let mut buf = ::smartstring::alias::String::new();
-        buf.write_fmt(std::format_args!($($arg)*)).unwrap();
-        buf
-    }};
-}
-
-#[cfg(test)]
-mod tests {
-    use smartstring::alias::String;
-
-    #[test]
-    fn test_smart_format() {
-        let s: String = smart_format!("a {}", 42);
-        assert_eq!(s, "a 42");
-    }
-}
-
 #[derive(Default, Clone, Copy)]
 pub struct Indent(usize);
 

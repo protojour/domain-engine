@@ -12,7 +12,6 @@ doctest = false
 logos = "0.14"
 unindent = "0.2"
 tracing.workspace = true
-smartstring.workspace = true
 chumsky.workspace = true
 either.workspace = true
 

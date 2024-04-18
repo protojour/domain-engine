@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use fnv::FnvHashSet;
 use indexmap::IndexMap;
-use ontol_runtime::{smart_format, DefId};
+use ontol_runtime::DefId;
 use ordered_float::NotNan;
 
 use crate::{
@@ -144,7 +144,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                     && !constraints.subject_set.contains(&base_def_id)
                 {
                     // self.errors.error(
-                    //     CompileError::TODO(smart_format!("Subject type constraint not satisfied")),
+                    //     CompileError::TODO(format!("Subject type constraint not satisfied")),
                     //     &type_param.span,
                     // );
                 }
@@ -178,7 +178,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 }
                 _ => {
                     self.errors.error(
-                        CompileError::TODO(smart_format!("Must be a scalar")),
+                        CompileError::TODO("Must be a scalar"),
                         &self.defs.def_span(self.root_def_id),
                     );
                 }
@@ -230,7 +230,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 let base_ty = self.def_types.table.get(&base_def).unwrap();
 
                 notes.push(SpannedNote {
-                    note: Note::BaseTypeIs(smart_format!(
+                    note: Note::BaseTypeIs(format!(
                         "{}",
                         FormatType(base_ty, self.defs, self.primitives)
                     )),

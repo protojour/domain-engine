@@ -1,15 +1,12 @@
 use std::str::FromStr;
 
 use juniper::{ParseError, ScalarToken};
-use ontol_runtime::{
-    interface::graphql::{
-        data::{
-            ConnectionData, EdgeData, ObjectData, ObjectKind, Optionality, TypeKind, TypeModifier,
-            TypeRef,
-        },
-        schema::TypingPurpose,
+use ontol_runtime::interface::graphql::{
+    data::{
+        ConnectionData, EdgeData, ObjectData, ObjectKind, Optionality, TypeKind, TypeModifier,
+        TypeRef,
     },
-    smart_format,
+    schema::TypingPurpose,
 };
 use tracing::{debug, trace_span};
 
@@ -165,7 +162,7 @@ impl juniper::ParseScalarValue<GqlScalar> for InputType {
         match value {
             ScalarToken::String(str) => Ok(GqlScalar::String(str.into())),
             ScalarToken::Float(str) => <f64 as FromStr>::from_str(str)
-                .map_err(|err| ParseError::UnexpectedToken(smart_format!("{err}")))
+                .map_err(|err| ParseError::UnexpectedToken(format!("{err}").into()))
                 .map(GqlScalar::F64),
             ScalarToken::Int(str) => {
                 <i32 as FromStr>::from_str(str)
@@ -173,7 +170,7 @@ impl juniper::ParseScalarValue<GqlScalar> for InputType {
                     .or_else(|_| {
                         <i64 as FromStr>::from_str(str)
                             .map(GqlScalar::I64)
-                            .map_err(|err| ParseError::UnexpectedToken(smart_format!("{err}")))
+                            .map_err(|err| ParseError::UnexpectedToken(format!("{err}").into()))
                     })
             }
         }

@@ -1,8 +1,7 @@
 use serde::de::Visitor;
 
 use crate::{
-    interface::serde::processor::RecursionLimitError, ontology::Ontology, smart_format,
-    value::Attribute,
+    interface::serde::processor::RecursionLimitError, ontology::Ontology, value::Attribute,
 };
 
 use super::{operator::SerdeOperatorAddr, processor::SerdeProcessor};
@@ -32,7 +31,7 @@ impl<'on, 'p, 'de> Visitor<'de> for IdSingletonStructVisitor<'on, 'p> {
         };
 
         if property != self.property_name {
-            return Err(<A::Error as serde::de::Error>::custom(smart_format!(
+            return Err(<A::Error as serde::de::Error>::custom(format!(
                 "Expected `{}` property",
                 self.property_name
             )));

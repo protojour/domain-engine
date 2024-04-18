@@ -12,10 +12,9 @@ use ontol_runtime::{
     },
     ontology::ontol::TextConstant,
     property::PropertyId,
-    smart_format, DefId, RelationshipId,
+    DefId, RelationshipId,
 };
 use patricia_tree::PatriciaMap;
-use smartstring::alias::String;
 use tracing::{debug, debug_span};
 
 use crate::{
@@ -630,7 +629,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         match union_error {
             UnionCheckError::UnitTypePartOfUnion(def_id) => {
                 let ty = self.def_types.table.get(&def_id).unwrap();
-                CompileError::UnitTypePartOfUnion(smart_format!(
+                CompileError::UnitTypePartOfUnion(format!(
                     "{}",
                     FormatType(ty, self.defs, self.primitives)
                 ))

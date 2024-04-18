@@ -20,7 +20,6 @@ use ontol_runtime::{
     property::{PropertyId, Role},
     DefId, RelationshipId,
 };
-use smartstring::alias::String;
 use tracing::{debug, debug_span, warn};
 
 use crate::{

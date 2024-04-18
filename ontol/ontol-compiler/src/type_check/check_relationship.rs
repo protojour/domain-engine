@@ -1,6 +1,6 @@
 use ontol_runtime::{
     property::{PropertyCardinality, PropertyId},
-    smart_format, DefId, RelationshipId,
+    DefId, RelationshipId,
 };
 use tracing::debug;
 
@@ -204,11 +204,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let Type::TextConstant(def_id) = object_ty else {
                     return self.error(
                         CompileError::TypeMismatch {
-                            actual: smart_format!(
+                            actual: format!(
                                 "{}",
                                 FormatType(object_ty, self.defs, self.primitives)
                             ),
-                            expected: smart_format!("text constant"),
+                            expected: "text constant".to_string(),
                         },
                         span,
                     );
@@ -266,9 +266,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }) = subject_def_kind
                 else {
                     return self.error(
-                        CompileError::TODO(smart_format!(
-                            "default not supported here, must be on a relation type"
-                        )),
+                        CompileError::TODO(
+                            "default not supported here, must be on a relation type",
+                        ),
                         span,
                     );
                 };
@@ -283,9 +283,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 let Some(object_ty) = self.def_types.table.get(&outer_object.0).cloned() else {
                     return self.error(
-                        CompileError::TODO(smart_format!(
-                            "the type of the default relation has not been checked"
-                        )),
+                        CompileError::TODO("the type of the default relation has not been checked"),
                         span,
                     );
                 };
@@ -308,10 +306,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let subject_def_kind = self.defs.def_kind(subject.0);
 
                 let Type::ValueGenerator(value_generator_def_id) = object_ty else {
-                    return self.error(
-                        CompileError::TODO(smart_format!("Not a value generator")),
-                        &object.1,
-                    );
+                    return self.error(CompileError::TODO("Not a value generator"), &object.1);
                 };
                 let DefKind::Type(TypeDef {
                     rel_type_for: Some(RelationshipId(outer_relationship_id)),
@@ -319,9 +314,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }) = subject_def_kind
                 else {
                     return self.error(
-                        CompileError::TODO(smart_format!(
-                            "gen not supported here, must be on a relation type"
-                        )),
+                        CompileError::TODO("gen not supported here, must be on a relation type"),
                         span,
                     );
                 };
@@ -335,9 +328,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 let Some(_) = self.def_types.table.get(&outer_object.0) else {
                     return self.error(
-                        CompileError::TODO(smart_format!(
-                            "the type of the gen relation has not been checked"
-                        )),
+                        CompileError::TODO("the type of the gen relation has not been checked"),
                         span,
                     );
                 };
@@ -394,7 +385,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .is_some()
                 {
                     return self.error(
-                        CompileError::TODO(smart_format!("duplicate `direction` relationship")),
+                        CompileError::TODO("duplicate `direction` relationship"),
                         span,
                     );
                 }

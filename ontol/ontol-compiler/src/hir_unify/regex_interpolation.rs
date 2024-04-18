@@ -1,6 +1,5 @@
 use ontol_runtime::var::Var;
 use regex_syntax::hir::{Class, Hir, HirKind, Literal};
-use smartstring::alias::String;
 
 use crate::{typed_hir::TypedHir, SourceSpan};
 

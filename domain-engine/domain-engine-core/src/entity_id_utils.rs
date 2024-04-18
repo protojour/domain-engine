@@ -9,7 +9,6 @@ use ontol_runtime::{
         Ontology,
     },
     property::PropertyId,
-    smart_format,
     value::Value,
     DefId,
 };
@@ -68,7 +67,7 @@ pub fn try_generate_entity_id(
     match (&ontology[id_operator_addr], value_generator) {
         (SerdeOperator::String(def_id), ValueGenerator::Uuid) => Ok((
             GeneratedId::Generated(Value::Text(
-                smart_format!("{}", system.generate_uuid()),
+                format!("{}", system.generate_uuid()).into(),
                 *def_id,
             )),
             GeneratedIdContainer::Raw,

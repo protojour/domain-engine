@@ -10,7 +10,6 @@ doctest = false
 
 [dependencies]
 ontol-runtime.path = "../../ontol/ontol-runtime"
-smartstring.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 indexmap.workspace = true

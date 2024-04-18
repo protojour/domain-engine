@@ -16,7 +16,6 @@ ontol-parser.path = "../ontol-parser"
 fnv.workspace = true
 indexmap.workspace = true
 serde.workspace = true
-smartstring.workspace = true
 smallvec.workspace = true
 thiserror.workspace = true
 tracing.workspace = true

@@ -1,6 +1,5 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{var::Var, DefId};
-use smartstring::alias::String;
 
 use crate::{source::SourceSpan, Compiler};
 
@@ -61,7 +60,7 @@ pub struct CompoundPatternAttr {
 }
 
 #[derive(Debug)]
-pub struct SpreadLabel(pub String, pub SourceSpan);
+pub struct SpreadLabel(pub std::string::String, pub SourceSpan);
 
 #[derive(Debug)]
 pub enum CompoundPatternAttrKind {

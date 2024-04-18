@@ -1,5 +1,5 @@
 use fnv::FnvHashMap;
-use ontol_runtime::{smart_format, var::Var};
+use ontol_runtime::var::Var;
 
 use crate::{
     error::CompileError,
@@ -32,7 +32,7 @@ impl<'c, 'm> HirArmTypeInference<'c, 'm> {
             Err(TypeError::Propagated) => {}
             Err(TypeError::NotEnoughInformation) => {
                 self.errors.error(
-                    CompileError::TODO(smart_format!("Not enough type information")),
+                    CompileError::TODO("Not enough type information"),
                     &data.span(),
                 );
             }

@@ -5,7 +5,6 @@ use ontol_runtime::{
     var::{Var, VarAllocator, VarSet},
     MapFlags,
 };
-use smartstring::alias::String;
 
 use crate::{
     typed_hir::{HirFunc, IntoTypedHirData, TypedHir, TypedHirData},

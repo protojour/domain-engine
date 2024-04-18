@@ -13,7 +13,6 @@ use ontol_runtime::{
     DefId, RelationshipId,
 };
 use smallvec::SmallVec;
-use smartstring::alias::String;
 use tracing::warn;
 
 use domain_engine_core::{system::ArcSystemApi, DomainError, DomainResult};
@@ -105,7 +104,7 @@ impl InMemoryStore {
                 let attribute = struct_map.iter().next().unwrap();
                 Self::extract_dynamic_key(&attribute.1.val)
             }
-            Value::Text(string, _) => Ok(DynamicKey::Text(string.clone())),
+            Value::Text(string, _) => Ok(DynamicKey::Text(string.as_str().into())),
             Value::OctetSequence(octets, _) => {
                 Ok(DynamicKey::Octets(octets.iter().cloned().collect()))
             }

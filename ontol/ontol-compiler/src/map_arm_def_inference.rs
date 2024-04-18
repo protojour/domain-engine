@@ -2,7 +2,6 @@ use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
     property::{PropertyCardinality, PropertyId, ValueCardinality},
-    smart_format,
     var::Var,
     DefId,
 };
@@ -75,20 +74,16 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
         source_vars: &FnvHashMap<Var, Vec<VarRelationship>>,
     ) {
         match &target_pat.kind {
-            PatternKind::Call(_, _) => self.error(
-                CompileError::TODO(smart_format!("Not inferrable")),
-                &target_pat.span,
-            ),
+            PatternKind::Call(_, _) => {
+                self.error(CompileError::TODO("Not inferrable"), &target_pat.span)
+            }
             PatternKind::Compound {
                 is_unit_binding,
                 attributes,
                 ..
             } => {
                 if *is_unit_binding {
-                    self.error(
-                        CompileError::TODO(smart_format!("Not inferrable")),
-                        &target_pat.span,
-                    );
+                    self.error(CompileError::TODO("Not inferrable"), &target_pat.span);
                     return;
                 }
 
@@ -130,10 +125,9 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
         source_vars: &FnvHashMap<Var, Vec<VarRelationship>>,
     ) {
         match &pattern.kind {
-            PatternKind::Call(_, _) => self.error(
-                CompileError::TODO(smart_format!("Not inferrable")),
-                &pattern.span,
-            ),
+            PatternKind::Call(_, _) => {
+                self.error(CompileError::TODO("Not inferrable"), &pattern.span)
+            }
             PatternKind::Variable(var) => {
                 if let Some(var_relationship) =
                     self.find_source_var_relationship(source_vars, *var, &pattern.span)
@@ -183,7 +177,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
             }
             PatternKind::Compound { .. } => {
                 self.error(
-                    CompileError::TODO(smart_format!("Recursive compounds not supported")),
+                    CompileError::TODO("Recursive compounds not supported"),
                     &pattern.span,
                 );
             }
@@ -217,9 +211,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
         match source_vars.get(&var) {
             None => {
                 self.error(
-                    CompileError::TODO(smart_format!(
-                        "Inference failed: Corresponding variable not found"
-                    )),
+                    CompileError::TODO("Inference failed: Corresponding variable not found"),
                     span,
                 );
                 None
@@ -227,9 +219,9 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
             Some(relationships) => {
                 if relationships.len() != 1 {
                     self.error(
-                        CompileError::TODO(smart_format!(
+                        CompileError::TODO(
                             "Inference failed: Variable is mentioned more than once in the opposing arm"
-                        )),
+                        ),
                         span,
                     );
                     None
@@ -465,7 +457,7 @@ impl<'m> Compiler<'m> {
         match statuses {
             [InfStatus::Infer(_), InfStatus::Infer(_)] => {
                 self.errors.push(SpannedCompileError {
-                    error: CompileError::TODO(smart_format!("Mutual inference")),
+                    error: CompileError::TODO("Mutual inference"),
                     span: self.defs.def_span(map_def_id),
                     notes: vec![],
                 });

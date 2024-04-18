@@ -1,8 +1,7 @@
 use ontol_runtime::{
     ontology::{map::Extern, ontol::TextConstant},
-    smart_format, DefId,
+    DefId,
 };
-use smartstring::alias::String;
 use tracing::warn;
 
 use crate::{
@@ -25,10 +24,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         warn!("check extern");
 
         let Some(table) = self.relations.properties_table_by_def_id(def_id) else {
-            self.error(
-                CompileError::TODO(smart_format!("extern has no properties")),
-                &span,
-            );
+            self.error(CompileError::TODO("extern has no properties"), &span);
             return;
         };
 
@@ -47,14 +43,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                     _ => {
                         self.errors.error(
-                            CompileError::TODO(smart_format!("unknown property name for extern")),
+                            CompileError::TODO("unknown property name for extern"),
                             meta.relationship.span,
                         );
                     }
                 },
                 _ => {
                     self.errors.error(
-                        CompileError::TODO(smart_format!("unknown property for extern")),
+                        CompileError::TODO("unknown property for extern"),
                         meta.relationship.span,
                     );
                 }
@@ -76,10 +72,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         span: SourceSpan,
     ) -> Result<Extern, ()> {
         let Some(url) = builder.url else {
-            self.errors.error(
-                CompileError::TODO(smart_format!("extern has no url")),
-                &span,
-            );
+            self.errors
+                .error(CompileError::TODO("extern has no url"), &span);
             return Err(());
         };
 
@@ -134,9 +128,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             } => {
                 if !attributes.is_empty() {
                     self.error(
-                        CompileError::TODO(smart_format!(
-                            "external mapping cannot have attributes"
-                        )),
+                        CompileError::TODO("external mapping cannot have attributes"),
                         &pattern.span,
                     );
                 }
@@ -145,7 +137,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
             _ => {
                 self.error(
-                    CompileError::TODO(smart_format!("must specify a named pattern")),
+                    CompileError::TODO("must specify a named pattern"),
                     &pattern.span,
                 );
                 self.types.intern(Type::Error)

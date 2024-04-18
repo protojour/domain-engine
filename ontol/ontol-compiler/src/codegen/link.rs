@@ -1,11 +1,9 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{
     debug::Fmt,
-    smart_format,
     vm::proc::{Address, Lib, OpCode, Procedure},
     DefId, MapDef, MapKey,
 };
-use smartstring::alias::String;
 use tracing::debug;
 
 use crate::{error::CompileError, types::FormatType, Compiler, SourceSpan};
@@ -74,8 +72,7 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
                     None => {
                         call_procedure.address = Address(0);
                         compiler.push_error(
-                            CompileError::TODO(smart_format!("Unable to link constant"))
-                                .spanned(&spans[index]),
+                            CompileError::TODO("Unable to link constant").spanned(&spans[index]),
                         );
                     }
                 },
@@ -93,5 +90,5 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
 fn format_map_def(compiler: &Compiler, map_def: MapDef) -> String {
     let ty = compiler.def_types.table.get(&map_def.def_id).unwrap();
 
-    smart_format!("{}", FormatType(ty, &compiler.defs, &compiler.primitives))
+    format!("{}", FormatType(ty, &compiler.defs, &compiler.primitives))
 }

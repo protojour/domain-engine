@@ -11,11 +11,9 @@ use ontol_runtime::{
     },
     property::{PropertyId, Role, ValueCardinality},
     query::{filter::Filter, select::Select},
-    smart_format,
     value::{Attribute, Serial, Value, ValueDebug},
     DefId,
 };
-use smartstring::alias::String;
 use tracing::{debug, warn};
 
 use domain_engine_core::{
@@ -557,7 +555,7 @@ impl InMemoryStore {
                     .unwrap();
                 String::from(std::str::from_utf8(&buf).unwrap())
             } else {
-                smart_format!("N/A")
+                "N/A".to_string()
             };
 
             return Err(DomainError::UnresolvedForeignKey(repr));

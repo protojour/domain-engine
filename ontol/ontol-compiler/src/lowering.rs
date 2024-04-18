@@ -8,12 +8,10 @@ use ontol_parser::{
 };
 use ontol_runtime::{
     property::{PropertyCardinality, ValueCardinality},
-    smart_format,
     var::{Var, VarAllocator},
     DefId, RelationshipId,
 };
 
-use smartstring::alias::String;
 use tracing::{debug, debug_span};
 
 use crate::{
@@ -141,7 +139,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }
             ast::Statement::Def(def_stmt) => {
                 let def_id = self.coin_type_definition(
-                    def_stmt.ident.0,
+                    &def_stmt.ident.0,
                     &def_stmt.ident.1,
                     Private(def_stmt.private),
                     Open(def_stmt.open),
@@ -197,7 +195,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ast::Statement::Use(_) => Ok(vec![]),
             ast::Statement::Def(def_stmt) => {
                 let def_id = self.coin_type_definition(
-                    def_stmt.ident.0,
+                    &def_stmt.ident.0,
                     &def_stmt.ident.1,
                     Private(def_stmt.private),
                     Open(def_stmt.open),
@@ -576,7 +574,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     Ok(def_id)
                 } else {
                     Err((
-                        CompileError::TODO(smart_format!("Anonymous struct not allowed here")),
+                        CompileError::TODO("Anonymous struct not allowed here"),
                         span.clone(),
                     ))
                 }
@@ -740,18 +738,12 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     AnyPattern::Struct(ast) => self.lower_struct_pattern(ast, var_table)?,
                     AnyPattern::Expr(ast) => self.lower_expr_pattern(ast, var_table)?,
                     AnyPattern::Set((_ast, span)) => {
-                        return Err((
-                            CompileError::TODO(smart_format!("set pattern not allowed here")),
-                            span,
-                        ));
+                        return Err((CompileError::TODO("set pattern not allowed here"), span));
                     }
                 };
 
                 if let Some((_modifier, span)) = ast.modifier {
-                    return Err((
-                        CompileError::TODO(smart_format!("modifier not supported here")),
-                        span,
-                    ));
+                    return Err((CompileError::TODO("modifier not supported here"), span));
                 }
                 let key = (DefId::unit(), self.src.span(&span));
 
@@ -790,7 +782,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ast::AnyPattern::Set((ast, span)) => {
                 if let Some((_modifier, span)) = ast.modifier {
                     Err((
-                        CompileError::TODO(smart_format!("set algebra not supported here")),
+                        CompileError::TODO("set algebra not supported here"),
                         span.clone(),
                     ))
                 } else {
@@ -902,9 +894,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
             ast::AnyPattern::Set((mut ast, set_span)) => {
                 if relation_args.is_some() {
                     return Err((
-                        CompileError::TODO(smart_format!(
-                            "relation arguments must be associated with each element"
-                        )),
+                        CompileError::TODO(
+                            "relation arguments must be associated with each element",
+                        ),
                         span.clone(),
                     ));
                 }
@@ -913,7 +905,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     Some((modifier, _mod_span)) => {
                         if relation_args.is_some() {
                             return Err((
-                                CompileError::TODO(smart_format!("set algebra not supported here")),
+                                CompileError::TODO("set algebra not supported here"),
                                 span.clone(),
                             ));
                         }
@@ -957,7 +949,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
     ) -> Res<Pattern> {
         if ast_elements.is_empty() {
             return Err((
-                CompileError::TODO(smart_format!("requires at least one element")),
+                CompileError::TODO("requires at least one element"),
                 span.clone(),
             ));
         }
@@ -1017,7 +1009,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
     ) -> Res<CompoundPatternAttrKind> {
         if set_pattern.elements.is_empty() {
             return Err((
-                CompileError::TODO(smart_format!("inner set must have at least one element")),
+                CompileError::TODO("inner set must have at least one element"),
                 span.clone(),
             ));
         }
@@ -1275,16 +1267,16 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
     fn coin_type_definition(
         &mut self,
-        ident: String,
+        ident: &str,
         ident_span: &Span,
         private: Private,
         open: Open,
         extern_: Extern,
         symbol: Symbol,
     ) -> Res<DefId> {
-        let (def_id, coinage) = self.named_def_id(Space::Type, &ident, ident_span)?;
+        let (def_id, coinage) = self.named_def_id(Space::Type, ident, ident_span)?;
         if matches!(coinage, Coinage::New) {
-            let ident = self.compiler.strings.intern(&ident);
+            let ident = self.compiler.strings.intern(ident);
             debug!("{def_id:?}: `{}`", ident);
 
             let kind = if extern_.0.is_some() {
@@ -1377,7 +1369,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     Ok((*occupied.get(), Coinage::Used))
                 } else {
                     Err((
-                        CompileError::TODO(smart_format!("definition of external identifier")),
+                        CompileError::TODO("definition of external identifier"),
                         span.clone(),
                     ))
                 }
@@ -1444,7 +1436,7 @@ enum BlockContext<'a> {
 
 #[derive(Default)]
 pub struct MapVarTable {
-    variables: HashMap<String, Var>,
+    variables: HashMap<std::string::String, Var>,
 }
 
 impl MapVarTable {

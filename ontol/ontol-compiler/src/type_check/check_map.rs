@@ -1,5 +1,5 @@
 use ontol_hir::Label;
-use ontol_runtime::{smart_format, var::VarAllocator};
+use ontol_runtime::var::VarAllocator;
 
 use crate::{
     codegen::{
@@ -243,7 +243,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 for attr_key in attr_keys {
                     match attr_key {
                         MatchAttributeKey::Named(name) => {
-                            formatted_properties.push(smart_format!("`{name}`"))
+                            formatted_properties.push(format!("`{name}`"))
                         }
                         MatchAttributeKey::Def(def_id) => match self.defs.def_kind(def_id) {
                             DefKind::Type(type_def) => {

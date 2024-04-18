@@ -3,9 +3,8 @@ use std::collections::HashMap;
 use heck::{AsLowerCamelCase, AsSnakeCase};
 use ontol_runtime::{
     ontology::{domain::TypeInfo, Ontology},
-    smart_format, DefId, PackageId,
+    DefId, PackageId,
 };
-use smartstring::alias::String;
 
 use crate::strings::Strings;
 
@@ -31,7 +30,7 @@ impl<'o> GraphqlNamespace<'o> {
     pub fn unique_literal(&mut self, literal: &str) -> String {
         let mut string: String = literal.into();
         while self.rewrites.contains_key(&string) {
-            string = string + "_";
+            string += "_";
         }
         self.rewrite(&string).into()
     }
@@ -211,10 +210,9 @@ impl<'a, 'm> ProcessName for Typename<'a, 'm> {
                 let strings = self.1;
                 namespace.rewrite(&strings[name])
             }
-            None => namespace.rewrite(&smart_format!(
+            None => namespace.rewrite(&format!(
                 "_anon{}_{}",
-                type_info.def_id.0 .0,
-                type_info.def_id.1
+                type_info.def_id.0 .0, type_info.def_id.1
             )),
         }
     }
@@ -248,9 +246,9 @@ pub fn adapt_graphql_identifier(input: &str) -> GqlAdaptedIdent {
     if is_valid_graphql_identifier(input) {
         GqlAdaptedIdent::Valid(input)
     } else if input.contains('-') {
-        GqlAdaptedIdent::Adapted(smart_format!("{}", AsSnakeCase(input)))
+        GqlAdaptedIdent::Adapted(format!("{}", AsSnakeCase(input)))
     } else {
-        GqlAdaptedIdent::Adapted(smart_format!("{}", AsLowerCamelCase(input)))
+        GqlAdaptedIdent::Adapted(format!("{}", AsLowerCamelCase(input)))
     }
 }
 

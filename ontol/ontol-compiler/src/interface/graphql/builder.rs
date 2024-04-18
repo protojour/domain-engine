@@ -28,7 +28,6 @@ use ontol_runtime::{
     var::Var,
     DefId, MapDefFlags, MapKey, PackageId, RelationshipId,
 };
-use smartstring::alias::String;
 use thin_vec::thin_vec;
 
 use crate::{
@@ -499,9 +498,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         }
 
         fields.insert(
-            mutation_namespace
-                .typename(type_info, self.serde_gen.strings)
-                .into(),
+            mutation_namespace.typename(type_info, self.serde_gen.strings),
             FieldData {
                 kind: FieldKind::EntityMutation(Box::new(EntityMutationField {
                     def_id: type_info.def_id,

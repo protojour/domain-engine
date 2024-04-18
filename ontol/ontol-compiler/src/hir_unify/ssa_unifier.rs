@@ -6,7 +6,6 @@ use ontol_hir::{
 use ontol_runtime::{
     property::PropertyId,
     query::condition::{Clause, ClausePair, SetOperator},
-    smart_format,
     value::Attribute,
     var::{Var, VarAllocator, VarSet},
     MapFlags,
@@ -331,7 +330,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 for component in components {
                     let string_push_param = match component {
                         StringInterpolationComponent::Const(string) => self.mk_node(
-                            ontol_hir::Kind::Text(string),
+                            ontol_hir::Kind::Text(string.into()),
                             Meta::unit(node_ref.meta().span),
                         ),
                         StringInterpolationComponent::Var(var, span) => self.mk_node(
@@ -386,7 +385,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 {
                     if match_level != 0 {
                         self.errors.error(
-                            CompileError::TODO("order/direction at incorrect location".into()),
+                            CompileError::TODO("order/direction at incorrect location"),
                             &meta.span,
                         );
 
@@ -426,7 +425,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 })
             }
             (ExprMode::Expr { .. }, PropVariant::Predicate(..)) => Err(
-                UnifierError::Unimplemented(smart_format!("predicate in non-matching expression")),
+                UnifierError::Unimplemented("predicate in non-matching expression".to_string()),
             ),
             (
                 ExprMode::MatchStruct { match_var, .. },
@@ -545,10 +544,8 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             if let Some(label) = label {
                 let label = *label.hir();
                 let Some(scope_attr) = self.iter_extended_scope_table.get(&label).cloned() else {
-                    self.errors.error(
-                        CompileError::TODO(smart_format!("no iteration source")),
-                        &seq_meta.span,
-                    );
+                    self.errors
+                        .error(CompileError::TODO("no iteration source"), &seq_meta.span);
                     return Ok(smallvec![]);
                 };
                 let free_vars = scan_immediate_free_vars(self.expr_arena, [*rel, *val]);
@@ -970,9 +967,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     DefKind::TextLiteral(str) => self.mk_node(Kind::Text((*str).into()), meta),
                     _ => {
                         self.errors.error(
-                            CompileError::TODO(smart_format!(
-                                "cannot create a constant out of any `text`"
-                            )),
+                            CompileError::TODO("cannot create a constant out of any `text`"),
                             &meta.span,
                         );
                         self.mk_node(Kind::Unit, meta)
@@ -980,10 +975,8 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 }
             }
             _ => {
-                self.errors.error(
-                    CompileError::TODO(smart_format!("create constant")),
-                    &meta.span,
-                );
+                self.errors
+                    .error(CompileError::TODO("create constant"), &meta.span);
                 self.mk_node(Kind::Unit, meta)
             }
         }

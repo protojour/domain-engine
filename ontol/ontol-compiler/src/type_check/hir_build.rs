@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use ontol_hir::{Label, StructFlags};
-use ontol_runtime::{smart_format, value::Attribute};
+use ontol_runtime::value::Attribute;
 use smallvec::SmallVec;
 use thin_vec::{thin_vec, ThinVec};
 use tracing::debug;
@@ -348,7 +348,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 if elements.len() != 1 {
                     return self.error_node(
-                        CompileError::TODO(smart_format!("Standalone set needs one element")),
+                        CompileError::TODO("Standalone set needs one element"),
                         &pattern.span,
                         ctx,
                     );
@@ -424,7 +424,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             },
             (PatternKind::ConstText(literal), Some(expected_ty)) => match expected_ty {
                 (Type::Primitive(PrimitiveKind::Text, _), _strength) => ctx.mk_node(
-                    ontol_hir::Kind::Text(literal.clone()),
+                    ontol_hir::Kind::Text(literal.into()),
                     Meta {
                         ty: expected_ty.0,
                         span: pattern.span,
@@ -432,7 +432,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 ),
                 (Type::TextConstant(def_id), _strength) => match self.defs.def_kind(*def_id) {
                     DefKind::TextLiteral(lit) if literal == lit => ctx.mk_node(
-                        ontol_hir::Kind::Text(literal.clone()),
+                        ontol_hir::Kind::Text(literal.into()),
                         Meta {
                             ty: expected_ty.0,
                             span: pattern.span,
@@ -530,7 +530,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 _ => self.error_node(CompileError::IncompatibleLiteral, &pattern.span, ctx),
             },
             (kind, ty) => self.error_node(
-                CompileError::TODO(smart_format!(
+                CompileError::TODO(format!(
                     "Not enough type information for {kind:?}, expected_ty = {ty:?}"
                 )),
                 &pattern.span,
@@ -609,16 +609,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
 
-                self.error_node(
-                    CompileError::TODO(smart_format!("Seq problem")),
-                    &prop_span,
-                    ctx,
-                )
+                self.error_node(CompileError::TODO("Seq problem"), &prop_span, ctx)
             }
             _pat => self.error_node(
-                CompileError::TODO(smart_format!(
-                    "Explicit mapping of relation parameters needed"
-                )),
+                CompileError::TODO("Explicit mapping of relation parameters needed"),
                 &prop_span,
                 ctx,
             ),

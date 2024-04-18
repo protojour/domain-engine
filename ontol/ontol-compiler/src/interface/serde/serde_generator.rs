@@ -19,9 +19,8 @@ use ontol_runtime::{
     ontology::ontol::TextConstant,
     phf::PhfKey,
     property::{Cardinality, PropertyCardinality, ValueCardinality},
-    smart_format, DefId,
+    DefId,
 };
-use smartstring::alias::String;
 use tracing::{debug, debug_span, error, trace, warn};
 
 use super::{sequence_range_builder::SequenceRangeBuilder, SerdeIntersection, SerdeKey};
@@ -979,7 +978,7 @@ pub(super) fn insert_property(
                 return IdentAdaption::Adapted;
             }
 
-            graphql_identifier = smart_format!("{graphql_identifier}_");
+            graphql_identifier = format!("{graphql_identifier}_");
         }
 
         properties.insert(

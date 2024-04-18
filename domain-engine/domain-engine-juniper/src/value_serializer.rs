@@ -1,6 +1,4 @@
-use ontol_runtime::smart_format;
 use serde::ser;
-use smartstring::alias::String;
 use std::fmt::Display;
 
 use crate::gql_scalar::GqlScalar;
@@ -28,7 +26,7 @@ impl ser::Error for SerializeError {
     where
         T: Display,
     {
-        Self(smart_format!("{}", msg))
+        Self(format!("{}", msg))
     }
 }
 
@@ -99,14 +97,14 @@ impl ser::Serializer for JuniperValueSerializer {
     fn serialize_u64(self, value: u64) -> SerResult {
         let int_i64: i64 = value
             .try_into()
-            .map_err(|_| SerializeError(smart_format!("u64 -> i64 overflow")))?;
+            .map_err(|_| SerializeError("u64 -> i64 overflow".to_string()))?;
         self.serialize_i64(int_i64)
     }
 
     fn serialize_u128(self, value: u128) -> SerResult {
         let int_i64: i64 = value
             .try_into()
-            .map_err(|_| SerializeError(smart_format!("u128 -> i64 overflow")))?;
+            .map_err(|_| SerializeError("u128 -> i64 overflow".to_string()))?;
         self.serialize_i64(int_i64)
     }
 
@@ -119,7 +117,7 @@ impl ser::Serializer for JuniperValueSerializer {
     }
 
     fn serialize_char(self, v: char) -> SerResult {
-        Ok(GqlScalar::String(smart_format!("{v}")).into())
+        Ok(GqlScalar::String(format!("{v}").into()).into())
     }
 
     fn serialize_str(self, v: &str) -> SerResult {
@@ -245,7 +243,7 @@ impl ser::SerializeSeq for JuniperListSerializer {
 }
 
 pub struct JuniperObjectSerializer {
-    pending_key: Option<String>,
+    pending_key: Option<smartstring::alias::String>,
     object: juniper::Object<GqlScalar>,
 }
 
@@ -257,7 +255,7 @@ impl ser::SerializeMap for JuniperObjectSerializer {
         let juniper::Value::Scalar(GqlScalar::String(key)) =
             key.serialize(JuniperValueSerializer)?
         else {
-            return Err(SerializeError(smart_format!("Key must be a string")));
+            return Err(SerializeError("key must be a string".to_string()));
         };
 
         self.pending_key = Some(key);

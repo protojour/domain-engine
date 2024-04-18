@@ -812,7 +812,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         .collect();
 
                     output.insert(
-                        field_namespace.unique_literal(prop_key).into(),
+                        field_namespace.unique_literal(prop_key),
                         FieldData {
                             kind: FieldKind::FlattenedPropertyDiscriminator {
                                 proxy: property_id.relationship_id,
@@ -1001,7 +1001,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             }
         };
 
-        output.insert(field_namespace.unique_literal(prop_key).into(), field_data);
+        output.insert(field_namespace.unique_literal(prop_key), field_data);
     }
 }
 
