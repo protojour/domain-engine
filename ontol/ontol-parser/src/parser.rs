@@ -3,6 +3,7 @@ use std::ops::Range;
 use chumsky::prelude::*;
 use either::Either;
 use smartstring::alias::String;
+use unindent::unindent;
 
 use crate::{
     ast::{
@@ -74,7 +75,7 @@ fn domain_statement() -> impl AstParser<Spanned<Statement>> {
 }
 
 fn def_statement(stmt_parser: impl AstParser<Spanned<Statement>>) -> impl AstParser<DefStatement> {
-    doc_comments()
+    doc_comment()
         .then(keyword(Token::Def))
         .then(
             spanned(
@@ -136,7 +137,7 @@ fn rel_statement(
                 })),
             );
 
-    doc_comments()
+    doc_comment()
         .then(keyword(Token::Rel))
         // subject:
         .then(with_raw_cardinality(
@@ -260,7 +261,7 @@ fn backward_relation() -> impl AstParser<BackwardRelation> {
 }
 
 fn fmt_statement() -> impl AstParser<FmtStatement> {
-    doc_comments()
+    doc_comment()
         .then(keyword(Token::Fmt))
         // origin
         .then(spanned(named_type()))
@@ -294,7 +295,7 @@ fn with_raw_cardinality<T>(
 }
 
 fn map_statement() -> impl AstParser<MapStatement> {
-    doc_comments()
+    doc_comment()
         .then(keyword(Token::Map))
         .then(spanned(ident()).or_not())
         .then(
@@ -533,8 +534,26 @@ fn anonymous_type(
         .map(Type::AnonymousStruct)
 }
 
-fn doc_comments() -> impl AstParser<Vec<String>> {
-    select! { Token::DocComment(comment) => comment }.repeated()
+fn doc_comment() -> impl AstParser<Option<std::string::String>> {
+    select! { Token::DocComment(comment) => comment }
+        .repeated()
+        .map(|lines| {
+            if lines.is_empty() {
+                None
+            } else {
+                let mut joined = String::from("\n");
+
+                let mut line_iter = lines.iter().peekable();
+                while let Some(line) = line_iter.next() {
+                    joined.push_str(&line);
+                    if line_iter.peek().is_some() {
+                        joined.push('\n');
+                    }
+                }
+
+                Some(unindent(&joined))
+            }
+        })
 }
 
 fn open(char: char) -> impl AstParser<Token> {

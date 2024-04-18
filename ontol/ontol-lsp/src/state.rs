@@ -455,7 +455,7 @@ impl State {
                     Statement::Def(stmt) => {
                         hover.path = format!("{}.{}", &doc.name, &stmt.ident.0);
                         hover.signature = get_signature(&doc.text, range, &self.regex);
-                        hover.docs = stmt.docs.join("\n");
+                        hover.docs = stmt.docs.as_deref().unwrap_or("").to_string();
                         break;
                     }
                     Statement::Rel(stmt) => {
@@ -483,7 +483,7 @@ impl State {
                             }
                         }
                         hover.signature = get_signature(&doc.text, range, &self.regex);
-                        hover.docs = stmt.docs.join("\n");
+                        hover.docs = stmt.docs.as_deref().unwrap_or("").to_string();
                     }
                     Statement::Fmt(stmt) => {
                         if stmt.origin.1.contains(&cursor) {
@@ -504,7 +504,7 @@ impl State {
                             }
                         }
                         hover.signature = get_signature(&doc.text, range, &self.regex);
-                        hover.docs = stmt.docs.join("\n");
+                        hover.docs = stmt.docs.as_deref().unwrap_or("").to_string();
                         break;
                     }
                     Statement::Map(stmt) => {
@@ -620,7 +620,7 @@ impl State {
             Some((stmt, range)) => Some(HoverDoc {
                 path: format!("{}.{}", doc.name, stmt.ident.0),
                 signature: get_signature(&doc.text, range, &self.regex),
-                docs: stmt.docs.join("\n"),
+                docs: stmt.docs.as_deref().unwrap_or("").to_string(),
                 ..Default::default()
             }),
             None => self.get_ontol_docs(ident),

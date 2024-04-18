@@ -59,10 +59,10 @@ pub enum Kind {
     Minus,
 
     #[token(r"*")]
-    Asterisk,
+    Star,
 
     #[token(r"/", priority = 3)]
-    Slash,
+    Div,
 
     #[token(r"=")]
     Equals,
@@ -113,7 +113,10 @@ pub enum Kind {
     Regex,
 
     #[regex(
-        r#"[^ \t\r\n@0-9_\(\)\{\}\[\]\.,+\-:\?\*=<>\|\'\"/;][^ \t\r\n\(\)\{\}\[\]\.,+:\?\*=<>\|\"\'/;]*"#,
+        // note: may not start with a number
+        // may not start with `-` or `_` or any other token that may be a sigil
+        // may contain `-` or `_` internally for kebab/snake-case naming
+        r##"[^ \t\r\n_\(\)\{\}\[\]\.+\-\?\*,=<>\|'"/:;@0-9][^ \t\r\n\(\)\{\}\[\]\.\?\*,+=<>\|"'/:;]*"##,
     )]
     Sym,
 }
@@ -253,10 +256,10 @@ mod tests {
 
     #[test]
     fn test_regex() {
-        assert_eq!(&lex_ok(r"/"), &[Slash]);
-        assert_eq!(&lex_ok(r"/ "), &[Slash, Whitespace]);
+        assert_eq!(&lex_ok(r"/"), &[Div]);
+        assert_eq!(&lex_ok(r"/ "), &[Div, Whitespace]);
         assert_eq!(&lex_ok("//"), &[Comment]);
-        assert_eq!(&lex_ok(r"/ /"), &[Slash, Whitespace, Slash]);
+        assert_eq!(&lex_ok(r"/ /"), &[Div, Whitespace, Div]);
         assert_eq!(&lex_ok(r"/\ /"), &[Regex]);
         assert_eq!(&lex_ok(r"/\  /"), &[Regex]);
         assert_eq!(&lex_ok(r"/\//"), &[Regex]);

@@ -32,7 +32,7 @@ pub enum Token {
     Sym(String),
     Modifier(Modifier),
     UnknownModifer(String),
-    DocComment(String),
+    DocComment(std::string::String),
     /// Used in error reporting only
     Expected(&'static str),
 }
@@ -113,7 +113,6 @@ pub fn lex(input: &str) -> (Vec<Spanned<Token>>, Vec<Simple<char>>) {
                     Kind::DocComment => {
                         let slice = lexer.slice();
                         let slice = slice.strip_prefix("///").unwrap();
-                        let slice = slice.trim_start();
 
                         Token::DocComment(slice.into())
                     }
@@ -130,8 +129,8 @@ pub fn lex(input: &str) -> (Vec<Spanned<Token>>, Vec<Simple<char>>) {
                     | Kind::Underscore
                     | Kind::Plus
                     | Kind::Minus
-                    | Kind::Asterisk
-                    | Kind::Slash
+                    | Kind::Star
+                    | Kind::Div
                     | Kind::Equals
                     | Kind::Lt
                     | Kind::Gt

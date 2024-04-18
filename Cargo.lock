@@ -2366,6 +2366,7 @@ dependencies = [
  "logos",
  "smartstring",
  "tracing",
+ "unindent",
 ]
 
 [[package]]
@@ -3889,6 +3890,12 @@ dependencies = [
  "quote",
  "syn 2.0.59",
 ]
+
+[[package]]
+name = "unindent"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7de7d73e1754487cb58364ee906a499937a0dfabd86bcb980fa99ec8c8fa2ce"
 
 [[package]]
 name = "unreachable"

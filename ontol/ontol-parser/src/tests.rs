@@ -39,7 +39,25 @@ fn parse_def() {
     let stmts = parse(source).unwrap();
     assert_matches!(stmts.as_slice(), [Statement::Def(_), Statement::Def(_)]);
 
-    assert_eq!(1, stmts[0].docs().len());
+    assert_eq!(1, stmts[0].docs().unwrap().lines().count());
+}
+
+#[test]
+fn doc_comment_unindent() {
+    let source = "
+    /// line 1
+    ///
+    /// line 3
+    ///   line 4
+    def foo()
+    ";
+
+    let stmts = parse(source).unwrap();
+    let Statement::Def(def) = &stmts[0] else {
+        panic!();
+    };
+
+    assert_eq!(def.docs.as_ref().unwrap(), "line 1\n\nline 3\n  line 4");
 }
 
 #[test]

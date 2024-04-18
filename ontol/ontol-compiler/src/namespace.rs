@@ -1,7 +1,6 @@
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::DefId;
-use smartstring::alias::String;
 
 use crate::PackageId;
 
@@ -45,7 +44,7 @@ impl<'m> Namespace<'m> {
 #[derive(Default)]
 pub struct Namespaces<'m> {
     pub(crate) namespaces: FnvHashMap<PackageId, Namespace<'m>>,
-    pub(crate) docs: FnvHashMap<DefId, Vec<String>>,
+    pub(crate) docs: FnvHashMap<DefId, std::string::String>,
 }
 
 impl<'m> Namespaces<'m> {

@@ -59,7 +59,7 @@ enum PreDefinedStmt {
 
 struct PreDefinedDefStmt {
     def_id: DefId,
-    docs: Vec<String>,
+    docs: Option<std::string::String>,
     block: (Vec<(ast::Statement, Span)>, Span),
 }
 
@@ -264,7 +264,6 @@ impl<'s, 'm> Lowering<'s, 'm> {
         };
 
         let mut relation_iter = relations.into_iter().peekable();
-        let mut docs = Some(docs);
 
         while let Some(relation) = relation_iter.next() {
             root_defs.extend(self.def_relationship(
@@ -272,11 +271,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 relation,
                 (object_def_id, &object_span),
                 span.clone(),
-                if relation_iter.peek().is_some() {
-                    docs.clone().unwrap()
-                } else {
-                    docs.take().unwrap()
-                },
+                docs.clone(),
             )?);
         }
         Ok(root_defs)
@@ -288,7 +283,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         ast_relation: ast::Relation,
         object: (DefId, &Span),
         span: Span,
-        docs: Vec<String>,
+        docs: Option<std::string::String>,
     ) -> Res<RootDefs> {
         let mut root_defs = RootDefs::new();
         let ast::Relation {
@@ -323,7 +318,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
         let relation_def_id = self.define_relation_if_undefined(key, &ident_span);
 
         let relationship_id = self.compiler.defs.alloc_def_id(self.src.package_id);
-        self.compiler.namespaces.docs.insert(relationship_id, docs);
+        if let Some(docs) = docs {
+            self.compiler.namespaces.docs.insert(relationship_id, docs);
+        }
 
         let rel_params = if let Some(index_range_rel_params) = index_range_rel_params {
             if let Some((_, span)) = ctx_block {
@@ -1243,7 +1240,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
     fn provide_definition(
         &mut self,
         def_id: DefId,
-        docs: Vec<String>,
+        docs: Option<std::string::String>,
         def_block: (Vec<(ast::Statement, Span)>, Span),
     ) -> Res<RootDefs> {
         self.compiler

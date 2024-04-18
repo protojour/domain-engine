@@ -16,13 +16,13 @@ pub enum Statement {
 
 impl Statement {
     #[allow(unused)]
-    pub fn docs(&self) -> &[String] {
+    pub fn docs(&self) -> Option<&std::string::String> {
         match self {
-            Self::Use(_) => &[],
-            Self::Def(ty) => &ty.docs,
-            Self::Rel(rel) => &rel.docs,
-            Self::Fmt(rel) => &rel.docs,
-            Self::Map(_) => &[],
+            Self::Use(_) => None,
+            Self::Def(ty) => ty.docs.as_ref(),
+            Self::Rel(rel) => rel.docs.as_ref(),
+            Self::Fmt(fmt) => fmt.docs.as_ref(),
+            Self::Map(_) => None,
         }
     }
 }
@@ -36,7 +36,7 @@ pub struct UseStatement {
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct DefStatement {
-    pub docs: Vec<String>,
+    pub docs: Option<std::string::String>,
     pub kw: Span,
     pub private: Option<Span>,
     pub open: Option<Span>,
@@ -48,7 +48,7 @@ pub struct DefStatement {
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct RelStatement {
-    pub docs: Vec<String>,
+    pub docs: Option<std::string::String>,
     pub kw: Span,
     pub subject: Spanned<Either<Dot, Type>>,
     pub relations: Vec<Relation>,
@@ -57,7 +57,7 @@ pub struct RelStatement {
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct FmtStatement {
-    pub docs: Vec<String>,
+    pub docs: Option<std::string::String>,
     pub kw: Span,
     pub origin: Spanned<Type>,
     pub transitions: Vec<Spanned<Either<Dot, Type>>>,
@@ -93,7 +93,7 @@ pub enum Cardinality {
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct MapStatement {
-    pub docs: Vec<String>,
+    pub docs: Option<std::string::String>,
     pub kw: Span,
     pub ident: Option<Spanned<String>>,
     pub first: Spanned<MapArm>,

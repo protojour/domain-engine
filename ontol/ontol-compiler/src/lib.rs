@@ -13,6 +13,7 @@ use documented::DocumentedFields;
 use entity::entity_ctx::EntityCtx;
 pub use error::*;
 use fnv::FnvHashMap;
+use indoc::indoc;
 use interface::{
     graphql::generate_schema::generate_graphql_schema,
     serde::{serde_generator::SerdeGenerator, SerdeKey, EDGE_PROPERTY},
@@ -35,7 +36,7 @@ use ontol_runtime::{
         Ontology,
     },
     property::PropertyId,
-    smart_format, DefId, PackageId,
+    DefId, PackageId,
 };
 use ontology_graph::OntologyGraph;
 use package::{PackageTopology, Packages, ONTOL_PKG};
@@ -197,13 +198,13 @@ impl<'m> Compiler<'m> {
                 DefKind::Primitive(kind, _ident) => {
                     let name = kind.as_ref();
                     if let Ok(field_docs) = PrimitiveKind::get_field_docs(name) {
-                        docs_table.insert(def_id, vec![field_docs.into()]);
+                        docs_table.insert(def_id, field_docs.into());
                     }
                 }
                 DefKind::BuiltinRelType(kind, _ident) => {
                     let name = kind.as_ref();
                     if let Ok(field_docs) = BuiltinRelationKind::get_field_docs(name) {
-                        docs_table.insert(def_id, vec![field_docs.into()]);
+                        docs_table.insert(def_id, field_docs.into());
                     }
                 }
                 DefKind::Type(type_def) => {
@@ -214,18 +215,22 @@ impl<'m> Compiler<'m> {
                         // Then a prose-based documentation string will probably be superfluous?
                         docs_table.insert(
                             def_id,
-                            vec![
-                                smart_format!("The [symbol](def.md#symbol) `'{ident}'`."),
-                                "Used in [ordering](interfaces.md#ordering).".into(),
-                                "```ontol".into(),
-                                smart_format!("direction: {ident}"),
-                                "```".into(),
-                            ],
+                            format!(
+                                indoc! {"
+                                    The [symbol](def.md#symbol) `'{ident}'`.
+                                    Used in [ordering](interfaces.md#ordering).
+                                    ```ontol
+                                    direction: {ident}
+                                    ```
+                                    "
+                                },
+                                ident = ident
+                            ),
                         );
                     } else if let Some(slt) = self.defs.string_like_types.get(&def_id) {
                         let name = slt.as_ref();
                         if let Ok(field_docs) = TextLikeType::get_field_docs(name) {
-                            docs_table.insert(def_id, vec![field_docs.into()]);
+                            docs_table.insert(def_id, field_docs.into());
                         }
                     }
                 }
@@ -434,13 +439,7 @@ impl<'m> Compiler<'m> {
 
         let docs = docs_table
             .into_iter()
-            .filter_map(|(def_id, docs_vec)| {
-                if docs_vec.is_empty() {
-                    None
-                } else {
-                    Some((def_id, strings.intern_constant(&docs_vec.join("\n"))))
-                }
-            })
+            .map(|(def_id, docs)| (def_id, strings.intern_constant(&docs)))
             .collect();
 
         builder
