@@ -10,7 +10,7 @@ use crate::{
         SetPatternModifier, StructPattern, StructPatternAttr, StructPatternAttributeKind,
         StructPatternModifier, StructPatternParameter, TypeOrPattern, UseStatement,
     },
-    lexer::Modifier,
+    modifier::Modifier,
 };
 
 use super::{

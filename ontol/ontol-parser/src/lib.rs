@@ -7,6 +7,7 @@ use std::ops::Range;
 
 pub mod ast;
 pub mod lexer;
+mod modifier;
 mod parser;
 
 pub type Span = Range<usize>;

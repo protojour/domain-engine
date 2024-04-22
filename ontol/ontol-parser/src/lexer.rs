@@ -1,9 +1,9 @@
-use std::{fmt::Display, ops::Range};
+use std::{fmt::Display, ops::Range, str::FromStr};
 
 use chumsky::prelude::*;
 use logos::Logos;
 
-use crate::Spanned;
+use crate::{modifier::Modifier, Spanned};
 
 use self::escape::{escape_regex, escape_text_literal};
 
@@ -59,40 +59,6 @@ impl Display for Token {
     }
 }
 
-#[allow(dead_code)]
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub enum Modifier {
-    Private,
-    Open,
-    Extern,
-    Symbol,
-    Match,
-    In,
-    AllIn,
-    ContainsAll,
-    Intersects,
-    Equals,
-}
-
-impl Display for Modifier {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let str = match self {
-            Modifier::Private => "private",
-            Modifier::Open => "open",
-            Modifier::Extern => "extern",
-            Modifier::Symbol => "symbol",
-            Modifier::Match => "match",
-            Modifier::In => "in",
-            Modifier::AllIn => "all_in",
-            Modifier::ContainsAll => "contains_all",
-            Modifier::Intersects => "intersects",
-            Modifier::Equals => "equals",
-        };
-
-        write!(f, "@{str}")
-    }
-}
-
 pub fn lex(input: &str) -> (Vec<Spanned<Token>>, Vec<Simple<char>>) {
     let mut lexer = Kind::lexer(input);
     let mut tokens: Vec<Spanned<Token>> = vec![];
@@ -141,19 +107,9 @@ pub fn lex(input: &str) -> (Vec<Spanned<Token>>, Vec<Simple<char>>) {
                     Kind::KwRel => Token::Rel,
                     Kind::KwFmt => Token::Fmt,
                     Kind::KwMap => Token::Map,
-                    Kind::Modifier => match lexer.slice() {
-                        "@private" => Token::Modifier(Modifier::Private),
-                        "@open" => Token::Modifier(Modifier::Open),
-                        "@extern" => Token::Modifier(Modifier::Extern),
-                        "@symbol" => Token::Modifier(Modifier::Symbol),
-                        "@match" => Token::Modifier(Modifier::Match),
-                        "@in" => Token::Modifier(Modifier::In),
-                        "@all_in" => Token::Modifier(Modifier::AllIn),
-                        "@contains_all" => Token::Modifier(Modifier::ContainsAll),
-                        "@intersects" => Token::Modifier(Modifier::Intersects),
-                        "@equals" => Token::Modifier(Modifier::Equals),
-                        _ => Token::UnknownModifer(lexer.slice().into()),
-                    },
+                    Kind::Modifier => Modifier::from_str(lexer.slice())
+                        .map(Token::Modifier)
+                        .unwrap_or_else(|_| Token::UnknownModifer(lexer.slice().into())),
                     Kind::Number => Token::Number(lexer.slice().into()),
                     Kind::DoubleQuoteText => {
                         Token::TextLiteral(escape_text_literal(&lexer, kind, &mut errors))
