@@ -6,9 +6,13 @@ use chumsky::{prelude::*, Stream};
 use std::ops::Range;
 
 pub mod ast;
+mod cst;
 pub mod lexer;
 mod modifier;
 mod parser;
+
+#[cfg(test)]
+mod cst_test;
 
 pub type Span = Range<usize>;
 pub type Spanned<T> = (T, Span);

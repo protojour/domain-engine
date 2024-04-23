@@ -119,6 +119,10 @@ pub enum Kind {
         r##"[^ \t\r\n_\(\)\{\}\[\]\.+\-\?\*,=<>\|'"/:;@0-9][^ \t\r\n\(\)\{\}\[\]\.\?\*,+=<>\|"'/:;]*"##,
     )]
     Sym,
+
+    Eof,
+    ExprPatternAtom,
+    ExprPatternBinary,
 }
 
 fn lex_double_quote_text(lexer: &mut Lexer<Kind>) -> Option<()> {
@@ -163,6 +167,31 @@ fn terminate<const END: char>(it: impl Iterator<Item = char>) -> Option<usize> {
         escaped = false;
     }
     None
+}
+
+#[macro_export]
+macro_rules! K {
+    [map] => {
+        Kind::KwMap
+    };
+    ['('] => {
+        Kind::ParenOpen
+    };
+    [')'] => {
+        Kind::ParenClose
+    };
+    [+] => {
+        Kind::Plus
+    };
+    [-] => {
+        Kind::Minus
+    };
+    [*] => {
+        Kind::Star
+    };
+    [/] => {
+        Kind::Div
+    }
 }
 
 #[cfg(test)]

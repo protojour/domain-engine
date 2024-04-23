@@ -59,6 +59,7 @@ impl Display for Token {
     }
 }
 
+/// The classic lexer that is the basis for the AST parser
 pub fn lex(input: &str) -> (Vec<Spanned<Token>>, Vec<Simple<char>>) {
     let mut lexer = Kind::lexer(input);
     let mut tokens: Vec<Spanned<Token>> = vec![];
@@ -72,7 +73,11 @@ pub fn lex(input: &str) -> (Vec<Spanned<Token>>, Vec<Simple<char>>) {
                 maybe_report_invalid_span(error_range.take(), input, &mut errors);
 
                 let token: Token = match kind {
-                    Kind::Whitespace | Kind::Comment => {
+                    Kind::Whitespace
+                    | Kind::Comment
+                    | Kind::Eof
+                    | Kind::ExprPatternAtom
+                    | Kind::ExprPatternBinary => {
                         continue;
                     }
                     Kind::DocComment => {

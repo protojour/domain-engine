@@ -2343,7 +2343,9 @@ dependencies = [
  "assert_matches",
  "chumsky",
  "either",
+ "indoc",
  "logos",
+ "pretty_assertions",
  "tracing",
  "unindent",
 ]
