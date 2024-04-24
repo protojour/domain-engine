@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use chumsky::primitive::Container;
+use chumsky::{primitive::Container, Span};
 use logos::Source;
 
 use crate::lexer::kind::Kind;
@@ -73,18 +73,18 @@ impl<'a> NodeView<'a> for FlatNodeView<'a> {
     fn children(&self) -> FlatChildren<'a> {
         FlatChildren {
             view: *self,
-            pos: self.pos + 1,
+            tree_pos: self.pos + 1,
         }
     }
 }
 
 impl<'a> TokenView for FlatTokenView<'a> {
     fn kind(&self) -> Kind {
-        self.tree.tokens[self.index]
+        self.tree.lex.tokens[self.index]
     }
 
     fn span(&self) -> Range<usize> {
-        self.tree.spans[self.index].clone()
+        self.tree.lex.span(self.index).clone()
     }
 
     fn slice(&self) -> &str {
@@ -94,38 +94,38 @@ impl<'a> TokenView for FlatTokenView<'a> {
 
 pub struct FlatChildren<'a> {
     view: FlatNodeView<'a>,
-    pos: usize,
+    tree_pos: usize,
 }
 
 impl<'a> Iterator for FlatChildren<'a> {
     type Item = Item<'a, FlatNodeView<'a>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.view.tree.tree.get(self.pos)? {
+        match self.view.tree.tree.get(self.tree_pos)? {
             SyntaxNode::StartPlaceholder => panic!(),
             SyntaxNode::Start { kind } => {
-                let node_index = self.pos;
+                let node_index = self.tree_pos;
 
                 // advance read position, skip over all children.
                 // now entering the subnode, but want to find the next sibling instead,
                 // so start with depth = 1
                 let mut depth = 1;
-                self.pos += 1;
+                self.tree_pos += 1;
                 loop {
-                    match self.view.tree.tree.get(self.pos) {
+                    match self.view.tree.tree.get(self.tree_pos) {
                         None => {
                             break;
                         }
                         Some(SyntaxNode::Start { .. } | SyntaxNode::StartPlaceholder) => {
                             depth += 1;
-                            self.pos += 1;
+                            self.tree_pos += 1;
                         }
                         Some(SyntaxNode::Token { .. }) => {
-                            self.pos += 1;
+                            self.tree_pos += 1;
                         }
                         Some(SyntaxNode::End) => {
                             depth -= 1;
-                            self.pos += 1;
+                            self.tree_pos += 1;
                             if depth == 0 {
                                 break;
                             }
@@ -141,10 +141,10 @@ impl<'a> Iterator for FlatChildren<'a> {
                 }))
             }
             SyntaxNode::Token { index } => {
-                let kind = self.view.tree.tokens[*index as usize];
-                let span = self.view.tree.spans[*index as usize].clone();
+                let kind = self.view.tree.lex.tokens[*index as usize];
+                let span = self.view.tree.lex.span(*index as usize).clone();
 
-                self.pos += 1;
+                self.tree_pos += 1;
 
                 Some(Item::Token(FlatTokenView {
                     index: *index as usize,

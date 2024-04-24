@@ -1,13 +1,12 @@
 use std::{fmt::Display, ops::Range};
 
-use crate::lexer::kind::Kind;
+use crate::lexer::{kind::Kind, LexedSource};
 
 use super::view::FlatNodeView;
 
 pub struct FlatSyntaxTree {
     pub(super) tree: Vec<SyntaxNode>,
-    pub(super) tokens: Vec<Kind>,
-    pub(super) spans: Vec<Range<usize>>,
+    pub(super) lex: LexedSource,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -71,7 +70,7 @@ impl<'a> Display for DebugTree<'a> {
                     for i in 0..indent {
                         write!(f, "    ")?;
                     }
-                    let kind = self.tree.tokens[*index as usize];
+                    let kind = self.tree.lex.tokens[*index as usize];
                     writeln!(f, "{kind:?}")?;
                 }
                 SyntaxNode::End => {

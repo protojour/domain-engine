@@ -65,21 +65,12 @@ pub fn lex(input: &str) -> (Vec<Spanned<Token>>, Vec<Simple<char>>) {
     let mut tokens: Vec<Spanned<Token>> = vec![];
     let mut errors: Vec<Simple<char>> = vec![];
 
-    let mut error_range: Option<Range<usize>> = None;
+    let mut error_ranges: Vec<Range<usize>> = vec![];
 
     while let Some(result) = lexer.next() {
         match result {
             Ok(kind) => {
-                maybe_report_invalid_span(error_range.take(), input, &mut errors);
-
                 let token: Token = match kind {
-                    Kind::Whitespace
-                    | Kind::Comment
-                    | Kind::Eof
-                    | Kind::ExprPatternAtom
-                    | Kind::ExprPatternBinary => {
-                        continue;
-                    }
                     Kind::DocComment => {
                         let slice = lexer.slice();
                         let slice = slice.strip_prefix("///").unwrap();
@@ -124,38 +115,135 @@ pub fn lex(input: &str) -> (Vec<Spanned<Token>>, Vec<Simple<char>>) {
                     }
                     Kind::Regex => Token::Regex(escape_regex(&lexer)),
                     Kind::Sym => Token::Sym(lexer.slice().into()),
+                    Kind::Whitespace
+                    | Kind::Comment
+                    | Kind::Eof
+                    | Kind::Error
+                    | Kind::Ontol
+                    | Kind::UseStatement
+                    | Kind::DefStatement
+                    | Kind::DefBody
+                    | Kind::RelStatement
+                    | Kind::RelSubject
+                    | Kind::RelFwdSet
+                    | Kind::RelBackwdSet
+                    | Kind::Relation
+                    | Kind::RelObject
+                    | Kind::RelParams
+                    | Kind::PropCardinality
+                    | Kind::FmtStatement
+                    | Kind::MapStatement
+                    | Kind::MapArm
+                    | Kind::UnitTypeRef
+                    | Kind::SetTypeRef
+                    | Kind::SeqTypeRef
+                    | Kind::This
+                    | Kind::Literal
+                    | Kind::Range
+                    | Kind::Location
+                    | Kind::IdentPath
+                    | Kind::PatStruct
+                    | Kind::PatSet
+                    | Kind::PatAtom
+                    | Kind::PatBinary
+                    | Kind::StructParamAttrProp
+                    | Kind::StructParamAttrUnit
+                    | Kind::Spread
+                    | Kind::StructAttrRelArgs
+                    | Kind::SetElement => {
+                        continue;
+                    }
                 };
 
                 tokens.push((token, lexer.span()));
             }
-            Err(_) => match &mut error_range {
-                Some(range) => {
-                    range.end = lexer.span().end();
-                }
-                None => {
-                    error_range = Some(lexer.span());
-                }
-            },
+            Err(_) => extend_contiguous_ranges(&mut error_ranges, lexer.span()),
         }
     }
 
-    maybe_report_invalid_span(error_range.take(), input, &mut errors);
+    let errors = error_ranges
+        .into_iter()
+        .map(|span| format_lex_error(span, input))
+        .collect();
 
     (tokens, errors)
 }
 
-fn maybe_report_invalid_span(
-    span: Option<Range<usize>>,
-    input: &str,
-    errors: &mut Vec<Simple<char>>,
-) {
-    if let Some(span) = span {
-        let msg = if span.len() > 1 {
-            format!("illegal characters `{}`", &input[span.clone()])
-        } else {
-            format!("illegal character `{}`", &input[span.clone()])
-        };
+/// Raw lexed source for the CST parser
+pub struct LexedSource {
+    pub tokens: Vec<Kind>,
+    pos: Vec<usize>,
+}
 
-        errors.push(Simple::custom(span, msg));
+impl LexedSource {
+    pub fn lex(source: &str) -> (Self, Vec<Simple<char>>) {
+        let mut tokens = vec![];
+        let mut pos: Vec<usize> = vec![];
+
+        let mut error_ranges: Vec<Range<usize>> = vec![];
+
+        let mut lexer = Kind::lexer(source);
+
+        while let Some(result) = lexer.next() {
+            pos.push(lexer.span().start);
+            match result {
+                Ok(kind) => {
+                    tokens.push(kind);
+                }
+                Err(_) => {
+                    tokens.push(Kind::Error);
+                    extend_contiguous_ranges(&mut error_ranges, lexer.span());
+                }
+            }
+        }
+
+        pos.push(source.len());
+
+        let errors = error_ranges
+            .into_iter()
+            .map(|span| format_lex_error(span, source))
+            .collect();
+
+        (Self { tokens, pos }, errors)
+    }
+
+    pub fn span(&self, index: usize) -> Range<usize> {
+        let start = self.pos[index];
+        let end = self.pos[index + 1];
+
+        start..end
+    }
+
+    pub fn opt_span(&self, index: usize) -> Option<Range<usize>> {
+        if index < self.tokens.len() {
+            Some(self.span(index))
+        } else {
+            None
+        }
+    }
+}
+
+fn format_lex_error(span: Range<usize>, source: &str) -> Simple<char> {
+    let msg = if span.len() > 1 {
+        format!("illegal characters `{}`", &source[span.clone()])
+    } else {
+        format!("illegal character `{}`", &source[span.clone()])
+    };
+
+    Simple::custom(span, msg)
+}
+
+fn extend_contiguous_ranges(ranges: &mut Vec<Range<usize>>, span: Range<usize>) {
+    match ranges.last_mut() {
+        Some(last) => {
+            if span.start() == last.end() {
+                last.end = span.end();
+            } else {
+                ranges.push(span);
+            }
+        }
+        None => {
+            ranges.push(span);
+        }
     }
 }

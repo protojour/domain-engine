@@ -120,9 +120,75 @@ pub enum Kind {
     )]
     Sym,
 
+    // Syntax-level nodes:
     Eof,
-    ExprPatternAtom,
-    ExprPatternBinary,
+    Error,
+    Ontol,
+
+    /// use statement
+    UseStatement,
+
+    /// def statement
+    DefStatement,
+    DefBody,
+
+    /// rel statement
+    RelStatement,
+    RelFwdSet,
+    RelBackwdSet,
+    Relation,
+    RelSubject,
+    RelObject,
+    RelParams,
+    PropCardinality,
+
+    /// fmt statement
+    FmtStatement,
+
+    /// map statement
+    MapStatement,
+    MapArm,
+
+    // types
+    /// `x` in `rel x 'foo': y`
+    UnitTypeRef,
+    /// `{x}` in `rel {x} 'foo': y`
+    SetTypeRef,
+    /// `[x]` in `rel [x] 'foo': y`
+    SeqTypeRef,
+    /// `.` in `rel .'foo': y`
+    This,
+    /// span of any literal value
+    Literal,
+    /// `1..2`
+    Range,
+    /// `'file'` in `use 'file' as foo`
+    Location,
+    /// `foo`, `foo.bar`
+    IdentPath,
+
+    // patterns
+    /// `struct(..)`
+    PatStruct,
+    /// `set { }`
+    PatSet,
+    /// `variable`, `42`, `'text'`, `/regex/`
+    PatAtom,
+    /// `a + b`
+    PatBinary,
+
+    // pattern elements
+    /// `'prop': x` in `struct('prop': x)`
+    StructParamAttrProp,
+    /// `unit` in `struct(unit)`
+    StructParamAttrUnit,
+    /// ['a': b] in `struct('prop'['a': b]: x)`
+    StructAttrRelArgs,
+    /// `..a` in `{ ..a }`
+    SetElement,
+
+    // container for `..`
+    Spread,
 }
 
 fn lex_double_quote_text(lexer: &mut Lexer<Kind>) -> Option<()> {
@@ -171,6 +237,18 @@ fn terminate<const END: char>(it: impl Iterator<Item = char>) -> Option<usize> {
 
 #[macro_export]
 macro_rules! K {
+    [use] => {
+        Kind::KwUse
+    };
+    [def] => {
+        Kind::KwDef
+    };
+    [rel] => {
+        Kind::KwRel
+    };
+    [fmt] => {
+        Kind::KwFmt
+    };
     [map] => {
         Kind::KwMap
     };
@@ -179,6 +257,36 @@ macro_rules! K {
     };
     [')'] => {
         Kind::ParenClose
+    };
+    ['{'] => {
+        Kind::CurlyOpen
+    };
+    ['}'] => {
+        Kind::CurlyClose
+    };
+    ['['] => {
+        Kind::SquareOpen
+    };
+    [']'] => {
+        Kind::SquareClose
+    };
+    [:] => {
+        Kind::Colon
+    };
+    [|] => {
+        Kind::Pipe
+    };
+    [.] => {
+        Kind::Dot
+    };
+    [..] => {
+        Kind::DotDot
+    };
+    [,] => {
+        Kind::Comma
+    };
+    [?] => {
+        Kind::Question
     };
     [+] => {
         Kind::Plus
@@ -191,6 +299,9 @@ macro_rules! K {
     };
     [/] => {
         Kind::Div
+    };
+    [=] => {
+        Kind::Equals
     }
 }
 
