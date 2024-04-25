@@ -31,7 +31,7 @@ fn parse_fmt_err(src: &str, parse_fn: impl Fn(&mut CstParser)) -> String {
     parse_fn(&mut parser);
     let (tree, errors) = parser.finish();
 
-    assert!(errors.len() > 0);
+    assert!(!errors.is_empty());
 
     format!("{}", tree)
 }

@@ -154,7 +154,7 @@ impl<'a> CstParser<'a> {
         let result = if matches!(next, Kind::SingleQuoteText | Kind::DoubleQuoteText) {
             true
         } else {
-            self.report_error(format!("expected text literal"));
+            self.report_error("expected text literal");
             false
         };
 

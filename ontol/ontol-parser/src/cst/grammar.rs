@@ -448,7 +448,7 @@ mod struct_pattern {
                     }
                 }
 
-                return false;
+                false
             }
 
             if lookahead_colon(p) {
