@@ -54,6 +54,7 @@ pub struct CstParser<'a> {
 
     source: &'a str,
     errors: Vec<(TokenCursor, String)>,
+    error_state: bool,
 }
 
 impl<'a> CstParser<'a> {
@@ -65,6 +66,7 @@ impl<'a> CstParser<'a> {
             cursor: TokenCursor(0),
             tree: Vec::with_capacity(cap_estimate),
             errors: vec![],
+            error_state: false,
         }
     }
 
@@ -119,13 +121,13 @@ impl<'a> CstParser<'a> {
             .unwrap_or(Kind::Eof)
     }
 
-    pub fn eat(&mut self, kind: Kind) -> Option<Kind> {
-        let next = self.at();
-        let result = if next == kind {
+    pub fn eat(&mut self, expected: Kind) -> Option<Kind> {
+        let kind = self.at();
+        let result = if kind == expected {
             self.append_token(self.cursor);
-            Some(next)
+            Some(kind)
         } else {
-            self.eat_error("invalid token");
+            self.eat_error(|kind| format!("expected {expected}, found {kind}"));
             None
         };
         self.cursor.advance();
@@ -148,10 +150,10 @@ impl<'a> CstParser<'a> {
     }
 
     pub fn eat_text_literal(&mut self) -> bool {
-        let next = self.at();
+        let kind = self.at();
         self.append_token(self.cursor);
 
-        let result = if matches!(next, Kind::SingleQuoteText | Kind::DoubleQuoteText) {
+        let result = if matches!(kind, Kind::SingleQuoteText | Kind::DoubleQuoteText) {
             true
         } else {
             self.report_error("expected text literal");
@@ -194,18 +196,35 @@ impl<'a> CstParser<'a> {
         }
     }
 
-    pub fn eat_error(&mut self, msg: impl Into<String>) {
+    pub fn eat_error(&mut self, f: impl Fn(Kind) -> String) {
+        let kind = self.at();
+
         let error = self.start(Kind::Error);
 
-        self.report_error(msg);
+        if kind != Kind::Error {
+            // If the Kind is Error, it has already been reported at the lexing stage
+            self.report_error(f(kind));
+        }
+
         self.append_token(self.cursor);
         self.cursor.advance();
 
         self.end(error);
     }
 
+    pub fn has_error_state(&self) -> bool {
+        self.error_state
+    }
+
+    pub fn clear_error_state(&mut self) {
+        self.error_state = false;
+    }
+
     fn report_error(&mut self, msg: impl Into<String>) {
-        self.errors.push((self.cursor, msg.into()));
+        if !self.error_state {
+            self.errors.push((self.cursor, msg.into()));
+            self.error_state = true;
+        }
     }
 
     pub fn syntax_cursor(&self) -> SyntaxCursor {

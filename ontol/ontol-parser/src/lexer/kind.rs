@@ -1,5 +1,8 @@
 //! A logos-based lexer.
 
+use std::fmt::Display;
+
+use crate::K;
 use logos::{Lexer, Logos};
 
 /// The Kind of token the lexer can produce.
@@ -235,6 +238,82 @@ fn terminate<const END: char>(it: impl Iterator<Item = char>) -> Option<usize> {
     None
 }
 
+impl Display for Kind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Kind::Whitespace => write!(f, "whitespace"),
+            Kind::DocComment => write!(f, "doc comment"),
+            Kind::Comment => write!(f, "comment"),
+            K!['('] => write!(f, "`(`"),
+            K![')'] => write!(f, "`)`"),
+            K!['{'] => write!(f, "`{{`"),
+            K!['}'] => write!(f, "`}}`"),
+            K!['['] => write!(f, "`[`"),
+            K![']'] => write!(f, "`]`"),
+            K![.] => write!(f, "`.`"),
+            K![,] => write!(f, "`,`"),
+            K![:] => write!(f, "`:`"),
+            K![?] => write!(f, "`?`"),
+            K![_] => write!(f, "`_`"),
+            K![+] => write!(f, "`+`"),
+            K![-] => write!(f, "`-`"),
+            K![*] => write!(f, "`*`"),
+            K![/] => write!(f, "`/`"),
+            K![=] => write!(f, "`=`"),
+            K![<] => write!(f, "`<`"),
+            K![>] => write!(f, "`>`"),
+            K![|] => write!(f, "`|`"),
+            K![..] => write!(f, "`..`"),
+            K![=>] => write!(f, "`=>`"),
+            K![use] => write!(f, "`use`"),
+            K![def] => write!(f, "`def`"),
+            K![rel] => write!(f, "`rel`"),
+            K![fmt] => write!(f, "`fmt`"),
+            K![map] => write!(f, "`map`"),
+            Kind::Modifier => write!(f, "modifier"),
+            Kind::Number => write!(f, "number"),
+            Kind::DoubleQuoteText => write!(f, "text literal"),
+            Kind::SingleQuoteText => write!(f, "text literal"),
+            Kind::Regex => write!(f, "regex"),
+            Kind::Sym => write!(f, "symbol"),
+            Kind::Eof => write!(f, "end of file"),
+            Kind::Error => write!(f, "error"),
+            Kind::Ontol => write!(f, "ontol"),
+            Kind::UseStatement => write!(f, "use statement"),
+            Kind::DefStatement => write!(f, "def statement"),
+            Kind::DefBody => write!(f, "def body"),
+            Kind::RelStatement => write!(f, "rel statement"),
+            Kind::RelFwdSet => write!(f, "rel forward set"),
+            Kind::RelBackwdSet => write!(f, "rel backward set"),
+            Kind::Relation => write!(f, "relation"),
+            Kind::RelSubject => write!(f, "subject"),
+            Kind::RelObject => write!(f, "object"),
+            Kind::RelParams => write!(f, "relation parameters"),
+            Kind::PropCardinality => write!(f, "property cardinality"),
+            Kind::FmtStatement => write!(f, "fmt statement"),
+            Kind::MapStatement => write!(f, "map statement"),
+            Kind::MapArm => write!(f, "map arm"),
+            Kind::UnitTypeRef => write!(f, "unit type reference"),
+            Kind::SetTypeRef => write!(f, "set type reference"),
+            Kind::SeqTypeRef => write!(f, "sequence type reference"),
+            Kind::This => write!(f, "this"),
+            Kind::Literal => write!(f, "literal"),
+            Kind::Range => write!(f, "range"),
+            Kind::Location => write!(f, "location"),
+            Kind::IdentPath => write!(f, "ident path"),
+            Kind::PatStruct => write!(f, "struct pattern"),
+            Kind::PatSet => write!(f, "set pattern"),
+            Kind::PatAtom => write!(f, "atom patterm"),
+            Kind::PatBinary => write!(f, "binary pattern"),
+            Kind::StructParamAttrProp => write!(f, "property attribute"),
+            Kind::StructParamAttrUnit => write!(f, "unit attribute"),
+            Kind::StructAttrRelArgs => write!(f, "relation arguments"),
+            Kind::SetElement => write!(f, "set element"),
+            Kind::Spread => write!(f, "spread"),
+        }
+    }
+}
+
 #[macro_export]
 macro_rules! K {
     [use] => {
@@ -302,7 +381,19 @@ macro_rules! K {
     };
     [=] => {
         Kind::Equals
-    }
+    };
+    [_] => {
+        Kind::Underscore
+    };
+    [<] => {
+        Kind::Lt
+    };
+    [>] => {
+        Kind::Gt
+    };
+    [=>] => {
+        Kind::FatArrow
+    };
 }
 
 #[cfg(test)]

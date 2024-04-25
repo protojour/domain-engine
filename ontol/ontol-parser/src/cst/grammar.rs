@@ -43,6 +43,21 @@ fn statement(p: &mut CstParser) {
     let mut stmt = p.start(Kind::Error);
     p.eat_trivias();
 
+    if p.has_error_state() {
+        p.eat_while(|kind| {
+            !matches!(
+                kind,
+                Kind::Eof | K![use] | K![def] | K![rel] | K![fmt] | K![map]
+            )
+        });
+
+        if p.at() == Kind::Eof {
+            return;
+        }
+
+        p.clear_error_state();
+    }
+
     let kind = match p.at() {
         K![use] => {
             use_statement(p);
@@ -65,7 +80,7 @@ fn statement(p: &mut CstParser) {
             Kind::MapStatement
         }
         kind => {
-            p.eat_error("expected keyword");
+            p.eat_error(|kind| format!("expected keyword, found {kind}"));
             Kind::Error
         }
     };
@@ -290,7 +305,7 @@ fn type_ref_inner(p: &mut CstParser, allowed: AllowedType) {
             p.end(this);
         }
         kind => {
-            p.eat_error("invalid type reference");
+            p.eat_error(|kind| format!("expected type reference, found {kind}"));
         }
     }
 }
@@ -304,7 +319,7 @@ fn fmt_statement(p: &mut CstParser) {
             p,
             AllowedType {
                 dot: true,
-                anonymous: false,
+                anonymous: true,
                 int_range: false,
             },
         );
@@ -556,7 +571,7 @@ pub mod expr_pattern {
                 expr_pattern_shunting_yard(p, Delimiter::Paren);
             }
             _ => {
-                p.eat_error("not a pattern expression");
+                p.eat_error(|kind| format!("expected expression pattern, found {kind}"));
             }
         };
     }
@@ -580,7 +595,9 @@ pub mod expr_pattern {
                 kind @ (K![-] | K![+] | K![*] | K![/]) => kind,
                 Kind::Eof | K![')'] | K!['}'] | K![']'] | K![,] => break,
                 _ => {
-                    p.eat_error("unexpected");
+                    p.eat_error(|kind| {
+                        format!("{kind} is an invalid continuation of an expression")
+                    });
                     break;
                 }
             };
