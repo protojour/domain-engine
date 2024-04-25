@@ -1,0 +1,18 @@
+foo.bar('baz': x)
+
+//@ grammar=pattern
+PatStruct
+    IdentPath
+        Sym `foo`
+        Dot `.`
+        Sym `bar`
+    ParenOpen `(`
+    StructParamAttrProp
+        UnitTypeRef
+            Literal
+                SingleQuoteText `'baz'`
+        Colon `:`
+        Whitespace
+        PatAtom
+            Sym `x`
+    ParenClose `)`

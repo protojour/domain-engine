@@ -1,0 +1,14 @@
+1+2+3
+
+//@ grammar=expr
+PatBinary
+    PatAtom
+        Number `1`
+    Plus `+`
+    PatBinary
+        PatAtom
+            Number `2`
+        Plus `+`
+        PatAtom
+            Number `3`
+        Whitespace

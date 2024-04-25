@@ -1,0 +1,29 @@
+map foo(bar(), baz(x))
+
+//@ grammar=ontol
+Ontol
+    MapStatement
+        KwMap `map`
+        Whitespace
+        IdentPath
+            Sym `foo`
+        ParenOpen `(`
+        MapArm
+            PatStruct
+                IdentPath
+                    Sym `bar`
+                ParenOpen `(`
+                ParenClose `)`
+        Comma `,`
+        Whitespace
+        MapArm
+            PatStruct
+                IdentPath
+                    Sym `baz`
+                ParenOpen `(`
+                StructParamAttrUnit
+                    PatAtom
+                        Sym `x`
+                ParenClose `)`
+        ParenClose `)`
+        Whitespace

@@ -1,0 +1,32 @@
+rel .'a'::'b'? {c}
+
+//@ grammar=ontol
+Ontol
+    RelStatement
+        KwRel `rel`
+        Whitespace
+        RelSubject
+            UnitTypeRef
+                This
+                    Dot `.`
+        RelFwdSet
+            Relation
+                UnitTypeRef
+                    Literal
+                        SingleQuoteText `'a'`
+                PropCardinality
+        Colon `:`
+        Colon `:`
+        RelBackwdSet
+            IdentPath
+                SingleQuoteText `'b'`
+            PropCardinality
+                Question `?`
+            Whitespace
+        RelObject
+            SetTypeRef
+                CurlyOpen `{`
+                IdentPath
+                    Sym `c`
+                CurlyClose `}`
+        Whitespace

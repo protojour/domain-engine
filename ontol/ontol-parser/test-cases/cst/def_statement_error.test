@@ -1,0 +1,12 @@
+def
+
+//@ grammar=ontol
+Ontol
+    DefStatement
+        KwDef `def`
+        Whitespace
+        IdentPath
+            Error
+        DefBody
+            Error
+            Error

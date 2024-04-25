@@ -1,0 +1,18 @@
+/// comment
+use 'a' as b
+
+//@ grammar=ontol
+Ontol
+    UseStatement
+        DocComment `/// comment`
+        Whitespace
+        KwUse `use`
+        Whitespace
+        Location
+            SingleQuoteText `'a'`
+        Whitespace
+        Sym `as`
+        Whitespace
+        IdentPath
+            Sym `b`
+        Whitespace

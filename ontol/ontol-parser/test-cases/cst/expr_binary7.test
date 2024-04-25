@@ -1,0 +1,29 @@
+ 1 * ( 2 + 3 ) * 5
+
+//@ grammar=expr
+Whitespace
+PatBinary
+    PatAtom
+        Number `1`
+    Whitespace
+    Star `*`
+    PatBinary
+        Whitespace
+        ParenOpen `(`
+        Whitespace
+        PatBinary
+            PatAtom
+                Number `2`
+            Whitespace
+            Plus `+`
+            Whitespace
+            PatAtom
+                Number `3`
+            Whitespace
+        ParenClose `)`
+        Whitespace
+        Star `*`
+        Whitespace
+        PatAtom
+            Number `5`
+        Whitespace

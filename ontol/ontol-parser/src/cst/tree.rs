@@ -31,26 +31,22 @@ impl FlatSyntaxTree {
             input,
         }
     }
-}
 
-impl Display for FlatSyntaxTree {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            DebugTree {
-                tree: self,
-                verify: true,
-                display_end: false,
-            }
-        )
+    pub fn debug_tree<'a>(&'a self, src: &'a str) -> DebugTree<'a> {
+        DebugTree {
+            tree: self,
+            src,
+            verify: true,
+            display_end: false,
+        }
     }
 }
 
-pub(super) struct DebugTree<'a> {
-    pub tree: &'a FlatSyntaxTree,
-    pub verify: bool,
-    pub display_end: bool,
+pub struct DebugTree<'a> {
+    tree: &'a FlatSyntaxTree,
+    src: &'a str,
+    verify: bool,
+    display_end: bool,
 }
 
 impl<'a> Display for DebugTree<'a> {
@@ -71,7 +67,16 @@ impl<'a> Display for DebugTree<'a> {
                         write!(f, "    ")?;
                     }
                     let kind = self.tree.lex.tokens[*index as usize];
-                    writeln!(f, "{kind:?}")?;
+                    let span = self.tree.lex.span(*index as usize);
+
+                    match kind {
+                        Kind::Whitespace => {
+                            writeln!(f, "{kind:?}")?;
+                        }
+                        _ => {
+                            writeln!(f, "{kind:?} `{}`", &self.src[span])?;
+                        }
+                    }
                 }
                 SyntaxNode::End => {
                     indent -= 1;

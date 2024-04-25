@@ -1,0 +1,22 @@
+a(b('c': d))
+
+//@ grammar=pattern
+PatStruct
+    IdentPath
+        Sym `a`
+    ParenOpen `(`
+    StructParamAttrUnit
+        PatStruct
+            IdentPath
+                Sym `b`
+            ParenOpen `(`
+            StructParamAttrProp
+                UnitTypeRef
+                    Literal
+                        SingleQuoteText `'c'`
+                Colon `:`
+                Whitespace
+                PatAtom
+                    Sym `d`
+            ParenClose `)`
+    ParenClose `)`

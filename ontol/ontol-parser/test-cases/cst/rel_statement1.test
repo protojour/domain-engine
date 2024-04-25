@@ -1,0 +1,59 @@
+/// comment
+rel {.} 'id'[rel .gen: auto]?|id: text
+
+//@ grammar=ontol
+Ontol
+    RelStatement
+        DocComment `/// comment`
+        Whitespace
+        KwRel `rel`
+        Whitespace
+        RelSubject
+            SetTypeRef
+                CurlyOpen `{`
+                This
+                    Dot `.`
+                CurlyClose `}`
+        RelFwdSet
+            Relation
+                Whitespace
+                UnitTypeRef
+                    Literal
+                        SingleQuoteText `'id'`
+                RelParams
+                    SquareOpen `[`
+                    RelStatement
+                        KwRel `rel`
+                        Whitespace
+                        RelSubject
+                            UnitTypeRef
+                                This
+                                    Dot `.`
+                        RelFwdSet
+                            Relation
+                                UnitTypeRef
+                                    IdentPath
+                                        Sym `gen`
+                                PropCardinality
+                        Colon `:`
+                        Whitespace
+                        RelObject
+                            UnitTypeRef
+                                IdentPath
+                                    Sym `auto`
+                    SquareClose `]`
+                PropCardinality
+                    Question `?`
+            Pipe `|`
+            Relation
+                UnitTypeRef
+                    IdentPath
+                        Sym `id`
+                PropCardinality
+        Colon `:`
+        Whitespace
+        RelObject
+            UnitTypeRef
+                IdentPath
+                    Sym `text`
+                    Whitespace

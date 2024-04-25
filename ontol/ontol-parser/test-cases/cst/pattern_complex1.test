@@ -1,0 +1,28 @@
+@match bar('baz': @in { ..x })
+
+//@ grammar=pattern
+PatStruct
+    Modifier `@match`
+    Whitespace
+    IdentPath
+        Sym `bar`
+    ParenOpen `(`
+    StructParamAttrProp
+        UnitTypeRef
+            Literal
+                SingleQuoteText `'baz'`
+        Colon `:`
+        PatSet
+            Whitespace
+            Modifier `@in`
+            Whitespace
+            CurlyOpen `{`
+            Whitespace
+            SetElement
+                Spread
+                    DotDot `..`
+                PatAtom
+                    Sym `x`
+                Whitespace
+            CurlyClose `}`
+    ParenClose `)`

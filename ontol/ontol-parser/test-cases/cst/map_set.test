@@ -1,0 +1,56 @@
+/// comment
+map foo(
+    {..@match foo(a) },
+    { a, ..b }
+)
+
+//@ grammar=ontol
+Ontol
+    MapStatement
+        DocComment `/// comment`
+        Whitespace
+        KwMap `map`
+        Whitespace
+        IdentPath
+            Sym `foo`
+        ParenOpen `(`
+        Whitespace
+        MapArm
+            PatSet
+                CurlyOpen `{`
+                SetElement
+                    Spread
+                        DotDot `..`
+                    PatStruct
+                        Modifier `@match`
+                        Whitespace
+                        IdentPath
+                            Sym `foo`
+                        ParenOpen `(`
+                        StructParamAttrUnit
+                            PatAtom
+                                Sym `a`
+                        ParenClose `)`
+                Whitespace
+                CurlyClose `}`
+        Comma `,`
+        Whitespace
+        MapArm
+            PatSet
+                CurlyOpen `{`
+                Whitespace
+                SetElement
+                    PatAtom
+                        Sym `a`
+                Comma `,`
+                Whitespace
+                SetElement
+                    Spread
+                        DotDot `..`
+                    PatAtom
+                        Sym `b`
+                    Whitespace
+                CurlyClose `}`
+        Whitespace
+        ParenClose `)`
+        Whitespace

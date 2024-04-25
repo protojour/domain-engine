@@ -1,0 +1,65 @@
+/// comment
+map foo(
+    ('a': x, 'b'?: y),
+    named (
+        'b': y
+    )
+)
+
+//@ grammar=ontol
+Ontol
+    MapStatement
+        DocComment `/// comment`
+        Whitespace
+        KwMap `map`
+        Whitespace
+        IdentPath
+            Sym `foo`
+        ParenOpen `(`
+        Whitespace
+        MapArm
+            PatStruct
+                ParenOpen `(`
+                StructParamAttrProp
+                    UnitTypeRef
+                        Literal
+                            SingleQuoteText `'a'`
+                    Colon `:`
+                    Whitespace
+                    PatAtom
+                        Sym `x`
+                Comma `,`
+                Whitespace
+                StructParamAttrProp
+                    UnitTypeRef
+                        Literal
+                            SingleQuoteText `'b'`
+                    PropCardinality
+                        Question `?`
+                    Colon `:`
+                    Whitespace
+                    PatAtom
+                        Sym `y`
+                ParenClose `)`
+        Comma `,`
+        Whitespace
+        MapArm
+            PatStruct
+                IdentPath
+                    Sym `named`
+                    Whitespace
+                ParenOpen `(`
+                Whitespace
+                StructParamAttrProp
+                    UnitTypeRef
+                        Literal
+                            SingleQuoteText `'b'`
+                    Colon `:`
+                    Whitespace
+                    PatAtom
+                        Sym `y`
+                    Whitespace
+                ParenClose `)`
+        Whitespace
+        ParenClose `)`
+        Whitespace

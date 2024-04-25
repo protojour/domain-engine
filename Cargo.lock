@@ -2346,6 +2346,7 @@ dependencies = [
  "indoc",
  "logos",
  "pretty_assertions",
+ "rstest",
  "tracing",
  "unindent",
 ]

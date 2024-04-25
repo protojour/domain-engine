@@ -1,9 +1,56 @@
+use std::{fs, path::PathBuf};
+
 use assert_matches::assert_matches;
 use chumsky::Stream;
 
-use crate::{lexer::lex, parser::statement_sequence};
+use crate::{cst::grammar, lexer::lex, parser::statement_sequence};
 
 use super::*;
+
+#[rstest::rstest]
+fn cst(#[files("test-cases/cst/*.test")] path: PathBuf) {
+    let contents = fs::read_to_string(&path).unwrap();
+
+    let mut ontol_src = String::new();
+    let mut cst_expect = String::new();
+
+    let mut lines = contents.lines();
+
+    let mut parse_fn: Option<fn(&mut CstParser)> = None;
+
+    while let Some(mut line) = lines.next() {
+        if line.starts_with("//@") {
+            line = line.strip_prefix("//@ grammar=").unwrap();
+            match line {
+                "ontol" => parse_fn = Some(grammar::ontol),
+                "pattern" => parse_fn = Some(grammar::pattern_with_expr),
+                "expr" => parse_fn = Some(grammar::expr_pattern::entry),
+                other => {
+                    panic!("unrecognized test function `{other}`");
+                }
+            }
+            break;
+        } else {
+            ontol_src.push_str(line);
+            ontol_src.push('\n');
+        }
+    }
+
+    for line in lines {
+        cst_expect.push_str(line);
+        cst_expect.push('\n');
+    }
+
+    let parse_fn = parse_fn.expect("no test function");
+
+    let (lexed, _errors) = LexedSource::lex(&ontol_src);
+    let mut parser = CstParser::from_lexed_source(&ontol_src, lexed);
+    parse_fn(&mut parser);
+
+    let (tree, _errors) = parser.finish();
+
+    pretty_assertions::assert_eq!(cst_expect, format!("{}", tree.debug_tree(&ontol_src)));
+}
 
 #[derive(Debug, PartialEq)]
 enum Error {

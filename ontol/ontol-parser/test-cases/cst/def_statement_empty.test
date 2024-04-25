@@ -1,0 +1,19 @@
+def a (
+    // empty
+)
+
+//@ grammar=ontol
+Ontol
+    DefStatement
+        KwDef `def`
+        Whitespace
+        IdentPath
+            Sym `a`
+        Whitespace
+        DefBody
+            ParenOpen `(`
+            Whitespace
+            Comment `// empty`
+            Whitespace
+            ParenClose `)`
+        Whitespace
