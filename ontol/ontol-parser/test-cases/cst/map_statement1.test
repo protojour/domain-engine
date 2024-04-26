@@ -21,7 +21,7 @@ Ontol
             PatStruct
                 ParenOpen `(`
                 StructParamAttrProp
-                    TypeRefUnit
+                    TypeModUnit
                         Literal
                             SingleQuoteText `'a'`
                     Colon `:`
@@ -31,7 +31,7 @@ Ontol
                 Comma `,`
                 Whitespace
                 StructParamAttrProp
-                    TypeRefUnit
+                    TypeModUnit
                         Literal
                             SingleQuoteText `'b'`
                     PropCardinality
@@ -51,7 +51,7 @@ Ontol
                 ParenOpen `(`
                 Whitespace
                 StructParamAttrProp
-                    TypeRefUnit
+                    TypeModUnit
                         Literal
                             SingleQuoteText `'b'`
                     Colon `:`

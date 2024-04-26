@@ -26,7 +26,8 @@ use crate::{
 };
 
 use super::context::{
-    Coinage, Extern, LoweringCtx, MapVarTable, Open, Private, RelationKey, Symbol,
+    BlockContext, Coinage, Extern, LoweringCtx, MapVarTable, Open, Private, RelationKey, RootDefs,
+    Symbol,
 };
 
 pub struct AstLowering<'c, 'm> {
@@ -41,7 +42,6 @@ pub struct Lowered {
 type LoweringError = (CompileError, Span);
 
 type Res<T> = Result<T, LoweringError>;
-type RootDefs = Vec<DefId>;
 
 /// Statement after scanning once
 enum PreDefinedStmt {
@@ -1229,12 +1229,6 @@ impl<'c, 'm> AstLowering<'c, 'm> {
             ),
         }
     }
-}
-
-#[derive(Clone, Copy)]
-enum BlockContext<'a> {
-    NoContext,
-    Context(&'a dyn Fn() -> DefId),
 }
 
 fn convert_cardinality(

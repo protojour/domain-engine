@@ -154,11 +154,11 @@ pub enum Kind {
 
     // types
     /// `x` in `rel x 'foo': y`
-    TypeRefUnit,
+    TypeModUnit,
     /// `{x}` in `rel {x} 'foo': y`
-    TypeRefSet,
+    TypeModSet,
     /// `[x]` in `rel [x] 'foo': y`
-    TypeRefSeq,
+    TypeModSeq,
     /// `.` in `rel .'foo': y`
     This,
     /// span of any literal value
@@ -293,9 +293,9 @@ impl Display for Kind {
             Kind::FmtStatement => write!(f, "fmt statement"),
             Kind::MapStatement => write!(f, "map statement"),
             Kind::MapArm => write!(f, "map arm"),
-            Kind::TypeRefUnit => write!(f, "unit type reference"),
-            Kind::TypeRefSet => write!(f, "set type reference"),
-            Kind::TypeRefSeq => write!(f, "sequence type reference"),
+            Kind::TypeModUnit => write!(f, "unit type modifier"),
+            Kind::TypeModSet => write!(f, "set type modifier"),
+            Kind::TypeModSeq => write!(f, "sequence type modifier"),
             Kind::This => write!(f, "this"),
             Kind::Literal => write!(f, "literal"),
             Kind::Range => write!(f, "range"),

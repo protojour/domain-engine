@@ -1,27 +1,32 @@
-/// comment
-rel {.} 'id'[rel .gen: auto]?|id: text
+rel .'id'|id: (rel .is: text)
 
 //@ grammar=ontol
 Ontol
     RelStatement
-        DocComment `/// comment`
-        Whitespace
         KwRel `rel`
         Whitespace
         RelSubject
-            TypeModSet
-                CurlyOpen `{`
+            TypeModUnit
                 This
                     Dot `.`
-                CurlyClose `}`
         RelFwdSet
             Relation
-                Whitespace
                 TypeModUnit
                     Literal
                         SingleQuoteText `'id'`
-                RelParams
-                    SquareOpen `[`
+                PropCardinality
+            Pipe `|`
+            Relation
+                TypeModUnit
+                    IdentPath
+                        Sym `id`
+                PropCardinality
+        Colon `:`
+        Whitespace
+        RelObject
+            TypeModUnit
+                DefBody
+                    ParenOpen `(`
                     RelStatement
                         KwRel `rel`
                         Whitespace
@@ -33,27 +38,13 @@ Ontol
                             Relation
                                 TypeModUnit
                                     IdentPath
-                                        Sym `gen`
+                                        Sym `is`
                                 PropCardinality
                         Colon `:`
                         Whitespace
                         RelObject
                             TypeModUnit
                                 IdentPath
-                                    Sym `auto`
-                    SquareClose `]`
-                PropCardinality
-                    Question `?`
-            Pipe `|`
-            Relation
-                TypeModUnit
-                    IdentPath
-                        Sym `id`
-                PropCardinality
-        Colon `:`
+                                    Sym `text`
+                    ParenClose `)`
         Whitespace
-        RelObject
-            TypeModUnit
-                IdentPath
-                    Sym `text`
-                    Whitespace

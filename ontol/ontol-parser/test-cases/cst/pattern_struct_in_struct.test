@@ -11,7 +11,7 @@ PatStruct
                 Sym `b`
             ParenOpen `(`
             StructParamAttrProp
-                TypeRefUnit
+                TypeModUnit
                     Literal
                         SingleQuoteText `'c'`
                 Colon `:`

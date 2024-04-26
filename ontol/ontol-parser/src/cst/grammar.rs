@@ -225,21 +225,21 @@ mod rel {
 
         match p.at() {
             K!['{'] => {
-                let set = p.start(Kind::TypeRefSet);
+                let set = p.start(Kind::TypeModSet);
                 p.eat(K!['{']);
                 type_ref_inner(p, allowed);
                 p.eat(K!['}']);
                 p.end(set);
             }
             K!['['] => {
-                let seq = p.start(Kind::TypeRefSeq);
+                let seq = p.start(Kind::TypeModSeq);
                 p.eat(K!['[']);
                 type_ref_inner(p, allowed);
                 p.eat(K![']']);
                 p.end(seq);
             }
             _ => {
-                let unit = p.start(Kind::TypeRefUnit);
+                let unit = p.start(Kind::TypeModUnit);
                 type_ref_inner(p, allowed);
                 p.end(unit);
             }
@@ -314,7 +314,7 @@ fn fmt_statement(p: &mut CstParser) {
     p.eat(K![fmt]);
 
     loop {
-        let type_ref = p.start(Kind::TypeRefUnit);
+        let type_ref = p.start(Kind::TypeModUnit);
         type_ref_inner(
             p,
             AllowedType {
@@ -483,7 +483,7 @@ mod struct_pattern {
         let prop = p.start(Kind::StructParamAttrProp);
 
         {
-            let type_ref = p.start(Kind::TypeRefUnit);
+            let type_ref = p.start(Kind::TypeModUnit);
             type_ref_inner(
                 p,
                 AllowedType {

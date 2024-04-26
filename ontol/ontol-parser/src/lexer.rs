@@ -140,9 +140,9 @@ pub fn ast_lex(input: &str) -> (Vec<Spanned<Token>>, Vec<Simple<char>>) {
                     | Kind::FmtStatement
                     | Kind::MapStatement
                     | Kind::MapArm
-                    | Kind::TypeRefUnit
-                    | Kind::TypeRefSet
-                    | Kind::TypeRefSeq
+                    | Kind::TypeModUnit
+                    | Kind::TypeModSet
+                    | Kind::TypeModSeq
                     | Kind::This
                     | Kind::Literal
                     | Kind::Range

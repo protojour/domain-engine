@@ -20,8 +20,8 @@ use crate::lexer::{kind::Kind, unescape::UnescapeTextResult};
 /// };
 /// ```
 macro_rules! nodes {
-    ($ident:ident { $($kind:ident),*, }) => {
-        node_enum!($ident { $($kind),*, });
+    ($ident:ident { $($kind:ident),* $(,)? }) => {
+        node_union!($ident { $($kind),*, });
 
         $(
             #[derive(Clone, Copy)]
@@ -50,8 +50,8 @@ macro_rules! nodes {
 ///     PatStruct(PatStruct<V>),
 /// }
 /// ```
-macro_rules! node_enum {
-    ($ident:ident { $($kind:ident),*, }) => {
+macro_rules! node_union {
+    ($ident:ident { $($kind:ident),* $(,)? }) => {
         pub enum $ident<V> {
             $($kind($kind<V>)),*
         }
@@ -94,9 +94,9 @@ nodes!(Node {
     FmtStatement,
     MapStatement,
     MapArm,
-    TypeRefUnit,
-    TypeRefSet,
-    TypeRefSeq,
+    TypeModUnit,
+    TypeModSet,
+    TypeModSeq,
     This,
     Literal,
     Range,
@@ -113,7 +113,7 @@ nodes!(Node {
     Spread,
 });
 
-node_enum!(Statement {
+node_union!(Statement {
     UseStatement,
     DefStatement,
     RelStatement,
@@ -121,13 +121,19 @@ node_enum!(Statement {
     MapStatement,
 });
 
-/*
-node_enum!(TypeRef {
-    TypeRefUnit,
-    TypeRefSet,
-    TypeRefSeq,
+node_union!(TypeMod {
+    TypeModUnit,
+    TypeModSet,
+    TypeModSeq,
 });
 
+node_union!(TypeRef {
+    IdentPath,
+    DefBody,
+    This,
+});
+
+/*
 node_enum!(Pattern {
     PatStruct,
     PatSet,
@@ -161,6 +167,24 @@ impl<'a, V: NodeView<'a>> DefStatement<V> {
     pub fn doc_comments(self) -> impl Iterator<Item = &'a str> {
         self.view.local_doc_comments()
     }
+
+    pub fn modifiers(self) -> impl Iterator<Item = V::Token> {
+        self.view.local_tokens_filter(Kind::Modifier)
+    }
+
+    pub fn ident_path(self) -> Option<IdentPath<V>> {
+        self.view.sub_nodes().find_map(IdentPath::from_view)
+    }
+
+    pub fn body(self) -> Option<DefBody<V>> {
+        self.view.sub_nodes().find_map(DefBody::from_view)
+    }
+}
+
+impl<'a, V: NodeView<'a> + 'a> DefBody<V> {
+    pub fn statements(self) -> impl Iterator<Item = Statement<V>> + 'a {
+        self.view.sub_nodes().filter_map(Statement::from_view)
+    }
 }
 
 impl<'a, V: NodeView<'a>> RelStatement<V> {
@@ -171,6 +195,30 @@ impl<'a, V: NodeView<'a>> RelStatement<V> {
     pub fn subject(self) -> Option<RelSubject<V>> {
         self.view.sub_nodes().find_map(RelSubject::from_view)
     }
+
+    pub fn fwd_set(self) -> Option<RelFwdSet<V>> {
+        self.view.sub_nodes().find_map(RelFwdSet::from_view)
+    }
+
+    pub fn backwd_set(self) -> Option<RelBackwdSet<V>> {
+        self.view.sub_nodes().find_map(RelBackwdSet::from_view)
+    }
+
+    pub fn object(self) -> Option<RelObject<V>> {
+        self.view.sub_nodes().find_map(RelObject::from_view)
+    }
+}
+
+impl<'a, V: NodeView<'a>> RelSubject<V> {
+    pub fn type_mod(self) -> Option<TypeMod<V>> {
+        self.view.sub_nodes().find_map(TypeMod::from_view)
+    }
+}
+
+impl<'a, V: NodeView<'a>> RelObject<V> {
+    pub fn type_mod(self) -> Option<TypeMod<V>> {
+        self.view.sub_nodes().find_map(TypeMod::from_view)
+    }
 }
 
 impl<'a, V: NodeView<'a>> FmtStatement<V> {}
@@ -178,6 +226,34 @@ impl<'a, V: NodeView<'a>> FmtStatement<V> {}
 impl<'a, V: NodeView<'a>> MapStatement<V> {
     pub fn doc_comments(self) -> impl Iterator<Item = &'a str> {
         self.view.local_doc_comments()
+    }
+}
+
+impl<'a, V: NodeView<'a>> TypeMod<V> {
+    pub fn type_ref(self) -> Option<TypeRef<V>> {
+        match self {
+            Self::TypeModUnit(t) => t.type_ref(),
+            Self::TypeModSet(t) => t.type_ref(),
+            Self::TypeModSeq(t) => t.type_ref(),
+        }
+    }
+}
+
+impl<'a, V: NodeView<'a>> TypeModUnit<V> {
+    pub fn type_ref(self) -> Option<TypeRef<V>> {
+        self.view.sub_nodes().find_map(TypeRef::from_view)
+    }
+}
+
+impl<'a, V: NodeView<'a>> TypeModSet<V> {
+    pub fn type_ref(self) -> Option<TypeRef<V>> {
+        self.view.sub_nodes().find_map(TypeRef::from_view)
+    }
+}
+
+impl<'a, V: NodeView<'a>> TypeModSeq<V> {
+    pub fn type_ref(self) -> Option<TypeRef<V>> {
+        self.view.sub_nodes().find_map(TypeRef::from_view)
     }
 }
 

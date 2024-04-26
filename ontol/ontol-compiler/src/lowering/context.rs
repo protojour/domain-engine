@@ -25,6 +25,8 @@ pub struct LoweringCtx<'c, 'm> {
     pub root_defs: Vec<DefId>,
 }
 
+pub type RootDefs = Vec<DefId>;
+
 pub enum Coinage {
     New,
     Used,
@@ -64,6 +66,12 @@ impl MapVarTable {
     pub fn into_allocator(self) -> VarAllocator {
         VarAllocator::from(Var(self.variables.len() as u32))
     }
+}
+
+#[derive(Clone, Copy)]
+pub enum BlockContext<'a> {
+    NoContext,
+    Context(&'a dyn Fn() -> DefId),
 }
 
 impl<'c, 'm> LoweringCtx<'c, 'm> {
