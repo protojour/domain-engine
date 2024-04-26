@@ -10,7 +10,7 @@ use regex_syntax::{
 
 use crate::{
     def::RegexMeta,
-    lowering_ctx::MapVarTable,
+    lowering::context::MapVarTable,
     pattern::{Patterns, RegexPattern, RegexPatternCaptureNode},
     SourceSpan, Src,
 };

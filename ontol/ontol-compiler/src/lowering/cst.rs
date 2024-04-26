@@ -12,8 +12,8 @@ use ontol_parser::{
 use ontol_runtime::DefId;
 
 use crate::{
-    lowering_ctx::LoweringCtx, namespace::Space, package::PackageReference, CompileError, Compiler,
-    SpannedCompileError, Src,
+    lowering::context::LoweringCtx, namespace::Space, package::PackageReference, CompileError,
+    Compiler, SpannedCompileError, Src,
 };
 
 pub struct CstLowering<'c, 'm, 's, V: NodeView<'s>> {

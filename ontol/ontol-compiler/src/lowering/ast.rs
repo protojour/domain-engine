@@ -15,7 +15,6 @@ use tracing::{debug, debug_span};
 use crate::{
     def::{DefKind, FmtFinalState, RelParams, Relationship, TypeDef, TypeDefFlags},
     error::CompileError,
-    lowering_ctx::{Coinage, Extern, LoweringCtx, MapVarTable, Open, Private, RelationKey, Symbol},
     namespace::Space,
     package::{PackageReference, ONTOL_PKG},
     pattern::{
@@ -26,7 +25,11 @@ use crate::{
     Compiler, Src,
 };
 
-pub struct Lowering<'c, 'm> {
+use super::context::{
+    Coinage, Extern, LoweringCtx, MapVarTable, Open, Private, RelationKey, Symbol,
+};
+
+pub struct AstLowering<'c, 'm> {
     ctx: LoweringCtx<'c, 'm>,
     src: &'c Src,
 }
@@ -54,7 +57,7 @@ struct PreDefinedDefStmt {
     block: (Vec<(ast::Statement, Span)>, Span),
 }
 
-impl<'c, 'm> Lowering<'c, 'm> {
+impl<'c, 'm> AstLowering<'c, 'm> {
     pub fn new(compiler: &'c mut Compiler<'m>, src: &'c Src) -> Self {
         Self {
             ctx: LoweringCtx {
@@ -863,7 +866,7 @@ impl<'c, 'm> Lowering<'c, 'm> {
 
         // Inherit modifier from object pattern
         fn lower_relation_attrs(
-            lowering: &mut Lowering,
+            lowering: &mut AstLowering,
             ast_relation_attrs: Option<Spanned<Vec<Spanned<ast::StructPatternAttributeKind>>>>,
             object_pattern: &Pattern,
             var_table: &mut MapVarTable,

@@ -4,9 +4,8 @@ use ontol_runtime::{ontology::ontol::TextConstant, DefId, PackageId};
 use tracing::debug;
 
 use crate::{
-    cst_lowering::CstLowering,
     def::{DefKind, RelParams},
-    lowering::Lowering,
+    lowering::{ast::AstLowering, cst::CstLowering},
     package::ParsedPackage,
     relation::Relations,
     repr::repr_model::ReprKind,
@@ -46,7 +45,7 @@ impl<'m> Compiler<'m> {
         self.package_config_table
             .insert(package.package_id, package.config);
 
-        let lowered = Lowering::new(self, &src)
+        let lowered = AstLowering::new(self, &src)
             .lower_statements(package.statements)
             .finish();
 
