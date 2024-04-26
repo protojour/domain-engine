@@ -5,10 +5,10 @@ use logos::Logos;
 
 use crate::{modifier::Modifier, Spanned};
 
-use self::escape::{escape_regex, escape_text_literal};
+use self::unescape::{unescape_regex, unescape_text_literal};
 
-pub(crate) mod escape;
 pub(crate) mod kind;
+pub(crate) mod unescape;
 
 use kind::Kind;
 
@@ -60,7 +60,7 @@ impl Display for Token {
 }
 
 /// The classic lexer that is the basis for the AST parser
-pub fn lex(input: &str) -> (Vec<Spanned<Token>>, Vec<Simple<char>>) {
+pub fn ast_lex(input: &str) -> (Vec<Spanned<Token>>, Vec<Simple<char>>) {
     let mut lexer = Kind::lexer(input);
     let mut tokens: Vec<Spanned<Token>> = vec![];
     let mut errors: Vec<Simple<char>> = vec![];
@@ -107,13 +107,19 @@ pub fn lex(input: &str) -> (Vec<Spanned<Token>>, Vec<Simple<char>>) {
                         .map(Token::Modifier)
                         .unwrap_or_else(|_| Token::UnknownModifer(lexer.slice().into())),
                     Kind::Number => Token::Number(lexer.slice().into()),
-                    Kind::DoubleQuoteText => {
-                        Token::TextLiteral(escape_text_literal(&lexer, kind, &mut errors))
+                    Kind::DoubleQuoteText | Kind::SingleQuoteText => {
+                        match unescape_text_literal(kind, lexer.slice(), lexer.span()) {
+                            Ok(string) => Token::TextLiteral(string),
+                            Err(unescape_errors) => {
+                                for error in unescape_errors {
+                                    errors.push(error.into());
+                                }
+
+                                Token::TextLiteral(String::new())
+                            }
+                        }
                     }
-                    Kind::SingleQuoteText => {
-                        Token::TextLiteral(escape_text_literal(&lexer, kind, &mut errors))
-                    }
-                    Kind::Regex => Token::Regex(escape_regex(&lexer)),
+                    Kind::Regex => Token::Regex(unescape_regex(lexer.slice())),
                     Kind::Sym => Token::Sym(lexer.slice().into()),
                     Kind::Whitespace
                     | Kind::Comment
@@ -134,9 +140,9 @@ pub fn lex(input: &str) -> (Vec<Spanned<Token>>, Vec<Simple<char>>) {
                     | Kind::FmtStatement
                     | Kind::MapStatement
                     | Kind::MapArm
-                    | Kind::UnitTypeRef
-                    | Kind::SetTypeRef
-                    | Kind::SeqTypeRef
+                    | Kind::TypeRefUnit
+                    | Kind::TypeRefSet
+                    | Kind::TypeRefSeq
                     | Kind::This
                     | Kind::Literal
                     | Kind::Range
@@ -169,44 +175,45 @@ pub fn lex(input: &str) -> (Vec<Spanned<Token>>, Vec<Simple<char>>) {
     (tokens, errors)
 }
 
+/// The new lexer for CST
+pub fn cst_lex(source: &str) -> (Lex, Vec<Simple<char>>) {
+    let mut tokens = vec![];
+    let mut pos: Vec<usize> = vec![];
+
+    let mut error_ranges: Vec<Range<usize>> = vec![];
+
+    let mut lexer = Kind::lexer(source);
+
+    while let Some(result) = lexer.next() {
+        pos.push(lexer.span().start);
+        match result {
+            Ok(kind) => {
+                tokens.push(kind);
+            }
+            Err(_) => {
+                tokens.push(Kind::Error);
+                extend_contiguous_ranges(&mut error_ranges, lexer.span());
+            }
+        }
+    }
+
+    pos.push(source.len());
+
+    let errors = error_ranges
+        .into_iter()
+        .map(|span| format_lex_error(span, source))
+        .collect();
+
+    (Lex { tokens, pos }, errors)
+}
+
 /// Raw lexed source for the CST parser
-pub struct LexedSource {
+pub struct Lex {
     pub tokens: Vec<Kind>,
     pos: Vec<usize>,
 }
 
-impl LexedSource {
-    pub fn lex(source: &str) -> (Self, Vec<Simple<char>>) {
-        let mut tokens = vec![];
-        let mut pos: Vec<usize> = vec![];
-
-        let mut error_ranges: Vec<Range<usize>> = vec![];
-
-        let mut lexer = Kind::lexer(source);
-
-        while let Some(result) = lexer.next() {
-            pos.push(lexer.span().start);
-            match result {
-                Ok(kind) => {
-                    tokens.push(kind);
-                }
-                Err(_) => {
-                    tokens.push(Kind::Error);
-                    extend_contiguous_ranges(&mut error_ranges, lexer.span());
-                }
-            }
-        }
-
-        pos.push(source.len());
-
-        let errors = error_ranges
-            .into_iter()
-            .map(|span| format_lex_error(span, source))
-            .collect();
-
-        (Self { tokens, pos }, errors)
-    }
-
+impl Lex {
     pub fn span(&self, index: usize) -> Range<usize> {
         let start = self.pos[index];
         let end = self.pos[index + 1];

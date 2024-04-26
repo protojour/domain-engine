@@ -1,22 +1,11 @@
 use std::ops::Range;
 
-use chumsky::error::Simple;
-use logos::Logos;
-
-use crate::lexer::{kind::Kind, LexedSource};
+use crate::lexer::{kind::Kind, Lex};
 
 use super::tree::{FlatSyntaxTree, SyntaxNode};
 
-struct Cursor(usize);
-
 #[derive(Clone, Copy, Debug)]
 pub struct SyntaxCursor(usize);
-
-impl SyntaxCursor {
-    fn advance(&mut self) {
-        self.0 += 1;
-    }
-}
 
 #[derive(Clone, Copy, Debug)]
 struct TokenCursor(usize);
@@ -47,7 +36,7 @@ pub struct CstParser<'a> {
     cursor: TokenCursor,
 
     /// Source of tokens
-    lex: LexedSource,
+    lex: Lex,
 
     /// The tree that the parser will produce
     tree: Vec<SyntaxNode>,
@@ -58,7 +47,7 @@ pub struct CstParser<'a> {
 }
 
 impl<'a> CstParser<'a> {
-    pub fn from_lexed_source(source: &'a str, lex: LexedSource) -> Self {
+    pub fn from_lexed_source(source: &'a str, lex: Lex) -> Self {
         let cap_estimate = lex.tokens.len();
         Self {
             source,

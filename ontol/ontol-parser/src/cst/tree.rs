@@ -1,12 +1,12 @@
-use std::{fmt::Display, ops::Range};
+use std::fmt::Display;
 
-use crate::lexer::{kind::Kind, LexedSource};
+use crate::lexer::{kind::Kind, Lex};
 
 use super::view::FlatNodeView;
 
 pub struct FlatSyntaxTree {
     pub(super) tree: Vec<SyntaxNode>,
-    pub(super) lex: LexedSource,
+    pub(super) lex: Lex,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -18,7 +18,7 @@ pub enum SyntaxNode {
 }
 
 impl FlatSyntaxTree {
-    pub fn traverse_root<'a>(&'a self, input: &'a str) -> FlatNodeView<'a> {
+    pub fn view<'a>(&'a self, src: &'a str) -> FlatNodeView<'a> {
         let root_kind = match self.tree[0] {
             SyntaxNode::Start { kind } => kind,
             _ => panic!(),
@@ -28,7 +28,7 @@ impl FlatSyntaxTree {
             tree: self,
             pos: 0,
             kind: root_kind,
-            input,
+            src,
         }
     }
 
@@ -56,14 +56,14 @@ impl<'a> Display for DebugTree<'a> {
             match syntax {
                 SyntaxNode::StartPlaceholder => panic!(),
                 SyntaxNode::Start { kind } => {
-                    for i in 0..indent {
+                    for _ in 0..indent {
                         write!(f, "    ")?;
                     }
-                    writeln!(f, "{kind:?}");
+                    writeln!(f, "{kind:?}")?;
                     indent += 1;
                 }
                 SyntaxNode::Token { index } => {
-                    for i in 0..indent {
+                    for _ in 0..indent {
                         write!(f, "    ")?;
                     }
                     let kind = self.tree.lex.tokens[*index as usize];
@@ -81,7 +81,7 @@ impl<'a> Display for DebugTree<'a> {
                 SyntaxNode::End => {
                     indent -= 1;
                     if self.display_end {
-                        for i in 0..indent {
+                        for _ in 0..indent {
                             write!(f, "    ")?;
                         }
                         writeln!(f, "End")?;

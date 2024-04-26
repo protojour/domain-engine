@@ -3,7 +3,7 @@ use std::{fs, path::PathBuf};
 use assert_matches::assert_matches;
 use chumsky::Stream;
 
-use crate::{cst::grammar, lexer::lex, parser::statement_sequence};
+use crate::{cst::grammar, lexer::ast_lex, parser::statement_sequence};
 
 use super::*;
 
@@ -43,7 +43,7 @@ fn cst(#[files("test-cases/cst/*.test")] path: PathBuf) {
 
     let parse_fn = parse_fn.expect("no test function");
 
-    let (lexed, _errors) = LexedSource::lex(&ontol_src);
+    let (lexed, _errors) = cst_lex(&ontol_src);
     let mut parser = CstParser::from_lexed_source(&ontol_src, lexed);
     parse_fn(&mut parser);
 
@@ -59,7 +59,7 @@ enum Error {
 }
 
 fn parse(input: &str) -> Result<Vec<Statement>, Error> {
-    let (tokens, errors) = lex(input);
+    let (tokens, errors) = ast_lex(input);
     if !errors.is_empty() {
         return Err(Error::Lex(errors));
     }

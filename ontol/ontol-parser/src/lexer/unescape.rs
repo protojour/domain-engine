@@ -1,20 +1,30 @@
 use std::ops::Range;
 
 use chumsky::error::Simple;
-use logos::Lexer;
 
 use crate::lexer::kind::Kind;
 
-pub fn escape_text_literal(
-    lexer: &Lexer<Kind>,
-    kind: Kind,
-    errors: &mut Vec<Simple<char>>,
-) -> String {
-    let slice = lexer.slice();
+#[derive(Debug)]
+pub struct UnescapeError {
+    pub msg: String,
+    pub span: Range<usize>,
+}
+
+pub type UnescapeTextResult = Result<String, Vec<UnescapeError>>;
+
+impl From<UnescapeError> for Simple<char> {
+    fn from(value: UnescapeError) -> Self {
+        Simple::custom(value.span, value.msg)
+    }
+}
+
+pub fn unescape_text_literal(kind: Kind, slice: &str, span: Range<usize>) -> UnescapeTextResult {
     let slice = &slice[1..slice.len() - 1];
     let mut out = String::with_capacity(slice.len());
 
     let mut chars = slice.char_indices();
+
+    let mut errors = vec![];
 
     while let Some((_idx, char)) = chars.next() {
         match char {
@@ -29,27 +39,30 @@ pub fn escape_text_literal(
                     if kind == Kind::SingleQuoteText {
                         out.push('\'');
                     } else {
-                        errors.push(invalid_escape_code(lexer, idx));
+                        errors.push(invalid_escape_code(span.start, idx));
                     }
                 }
                 (idx, '"') => {
                     if kind == Kind::DoubleQuoteText {
                         out.push('"');
                     } else {
-                        errors.push(invalid_escape_code(lexer, idx));
+                        errors.push(invalid_escape_code(span.start, idx));
                     }
                 }
-                (idx, _other) => errors.push(invalid_escape_code(lexer, idx)),
+                (idx, _other) => errors.push(invalid_escape_code(span.start, idx)),
             },
             _ => out.push(char),
         }
     }
 
-    out
+    if errors.is_empty() {
+        Ok(out)
+    } else {
+        Err(errors)
+    }
 }
 
-pub fn escape_regex(lexer: &Lexer<Kind>) -> String {
-    let slice = lexer.slice();
+pub fn unescape_regex(slice: &str) -> String {
     let slice = &slice[1..slice.len() - 1];
     let mut out = String::with_capacity(slice.len());
 
@@ -91,11 +104,12 @@ pub fn escape_regex(lexer: &Lexer<Kind>) -> String {
     out
 }
 
-fn invalid_escape_code(lexer: &Lexer<Kind>, offset: usize) -> Simple<char> {
-    Simple::custom(char_span(lexer, offset), "invalid escape code")
-}
+fn invalid_escape_code(span_start: usize, offset: usize) -> UnescapeError {
+    let start = span_start + offset;
+    let end = start + 1;
 
-fn char_span(lexer: &Lexer<Kind>, offset: usize) -> Range<usize> {
-    let start = lexer.span().start + offset;
-    start..start + 1
+    UnescapeError {
+        span: start..end,
+        msg: "invalid escape code".into(),
+    }
 }

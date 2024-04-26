@@ -3,12 +3,12 @@
 use ast::Statement;
 use chumsky::{prelude::*, Stream};
 use cst::{grammar, parser::CstParser, tree::FlatSyntaxTree};
-use lexer::LexedSource;
+use lexer::cst_lex;
 
 use std::ops::Range;
 
 pub mod ast;
-mod cst;
+pub mod cst;
 pub mod lexer;
 mod modifier;
 mod parser;
@@ -40,7 +40,7 @@ pub fn parse_statements(input: &str) -> (Vec<Spanned<Statement>>, Vec<Error>) {
     }
 
     let tokens = {
-        let (tokens, lex_errors) = lexer::lex(input);
+        let (tokens, lex_errors) = lexer::ast_lex(input);
 
         if !TEST_CST {
             for lex_error in lex_errors {
@@ -69,7 +69,7 @@ pub fn parse_statements(input: &str) -> (Vec<Spanned<Statement>>, Vec<Error>) {
 }
 
 pub fn cst_parse(source: &str) -> (FlatSyntaxTree, Vec<Error>) {
-    let (lexed, lex_errors) = LexedSource::lex(source);
+    let (lexed, lex_errors) = cst_lex(source);
 
     let mut errors = vec![];
     for lex_error in lex_errors {

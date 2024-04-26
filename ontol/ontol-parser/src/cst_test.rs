@@ -1,7 +1,7 @@
-use crate::{cst::parser::CstParser, lexer::LexedSource};
+use crate::{cst::parser::CstParser, lexer::cst_lex};
 
 fn parser(src: &str) -> CstParser {
-    let (lexed, _errors) = LexedSource::lex(src);
+    let (lexed, _errors) = cst_lex(src);
     CstParser::from_lexed_source(src, lexed)
 }
 

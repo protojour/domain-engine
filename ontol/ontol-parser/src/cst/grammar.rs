@@ -79,7 +79,7 @@ fn statement(p: &mut CstParser) {
             map_statement(p);
             Kind::MapStatement
         }
-        kind => {
+        _ => {
             p.eat_error(|kind| format!("expected keyword, found {kind}"));
             Kind::Error
         }
@@ -225,21 +225,21 @@ mod rel {
 
         match p.at() {
             K!['{'] => {
-                let set = p.start(Kind::SetTypeRef);
+                let set = p.start(Kind::TypeRefSet);
                 p.eat(K!['{']);
                 type_ref_inner(p, allowed);
                 p.eat(K!['}']);
                 p.end(set);
             }
             K!['['] => {
-                let seq = p.start(Kind::SeqTypeRef);
+                let seq = p.start(Kind::TypeRefSeq);
                 p.eat(K!['[']);
                 type_ref_inner(p, allowed);
                 p.eat(K![']']);
                 p.end(seq);
             }
             _ => {
-                let unit = p.start(Kind::UnitTypeRef);
+                let unit = p.start(Kind::TypeRefUnit);
                 type_ref_inner(p, allowed);
                 p.end(unit);
             }
@@ -304,7 +304,7 @@ fn type_ref_inner(p: &mut CstParser, allowed: AllowedType) {
             p.eat(K![.]);
             p.end(this);
         }
-        kind => {
+        _ => {
             p.eat_error(|kind| format!("expected type reference, found {kind}"));
         }
     }
@@ -314,7 +314,7 @@ fn fmt_statement(p: &mut CstParser) {
     p.eat(K![fmt]);
 
     loop {
-        let type_ref = p.start(Kind::UnitTypeRef);
+        let type_ref = p.start(Kind::TypeRefUnit);
         type_ref_inner(
             p,
             AllowedType {
@@ -376,7 +376,10 @@ fn pattern(p: &mut CstParser, allowed: AllowedPattern) {
     match lookahead_detect_pattern(p) {
         DetectedPattern::Struct => struct_pattern::entry(p),
         DetectedPattern::Set => set_pattern::entry(p),
-        DetectedPattern::Expr => expr_pattern::entry(p),
+        DetectedPattern::Expr if allowed.expr => expr_pattern::entry(p),
+        _ => {
+            p.eat_error(|kind| format!("expected pattern, found {kind}"));
+        }
     }
 }
 
@@ -386,7 +389,7 @@ fn pattern(p: &mut CstParser, allowed: AllowedPattern) {
 ///
 /// TODO: improve this algorithm?
 pub fn lookahead_detect_pattern(p: &CstParser) -> DetectedPattern {
-    let mut detected = DetectedPattern::Expr;
+    let detected = DetectedPattern::Expr;
     let mut param_open = false;
     let mut param_offset = 0;
     let mut name_before_param = false;
@@ -477,10 +480,10 @@ mod struct_pattern {
     }
 
     pub fn property(p: &mut CstParser) {
-        let mut prop = p.start(Kind::StructParamAttrProp);
+        let prop = p.start(Kind::StructParamAttrProp);
 
         {
-            let type_ref = p.start(Kind::UnitTypeRef);
+            let type_ref = p.start(Kind::TypeRefUnit);
             type_ref_inner(
                 p,
                 AllowedType {
@@ -602,7 +605,7 @@ pub mod expr_pattern {
                 }
             };
 
-            let (left_bp, right_bp) = infix_binding_power(op_kind);
+            let (left_bp, _right_bp) = infix_binding_power(op_kind);
 
             let mut push_cursor = cursor;
 

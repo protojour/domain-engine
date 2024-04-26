@@ -15,7 +15,7 @@ use ontol_parser::{
         AnyPattern, DefStatement, MapArm, Path, Statement, StructPattern, StructPatternParameter,
         Type, TypeOrPattern, UseStatement,
     },
-    lexer::lex,
+    lexer::ast_lex,
     parse_statements, Spanned, Token,
 };
 use ontol_runtime::ontology::{config::PackageConfig, domain::TypeInfo, Ontology};
@@ -154,7 +154,7 @@ impl State {
             doc.imports.clear();
             doc.defs.clear();
 
-            let (tokens, _) = lex(doc.text.as_str());
+            let (tokens, _) = ast_lex(doc.text.as_str());
             doc.tokens = tokens;
 
             for (token, _) in &doc.tokens {
