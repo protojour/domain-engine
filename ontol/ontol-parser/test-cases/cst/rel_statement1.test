@@ -9,7 +9,7 @@ Ontol
         KwRel `rel`
         Whitespace
         RelSubject
-            SetTypeRef
+            TypeRefSet
                 CurlyOpen `{`
                 This
                     Dot `.`
@@ -17,7 +17,7 @@ Ontol
         RelFwdSet
             Relation
                 Whitespace
-                UnitTypeRef
+                TypeRefUnit
                     Literal
                         SingleQuoteText `'id'`
                 RelParams
@@ -26,19 +26,19 @@ Ontol
                         KwRel `rel`
                         Whitespace
                         RelSubject
-                            UnitTypeRef
+                            TypeRefUnit
                                 This
                                     Dot `.`
                         RelFwdSet
                             Relation
-                                UnitTypeRef
+                                TypeRefUnit
                                     IdentPath
                                         Sym `gen`
                                 PropCardinality
                         Colon `:`
                         Whitespace
                         RelObject
-                            UnitTypeRef
+                            TypeRefUnit
                                 IdentPath
                                     Sym `auto`
                     SquareClose `]`
@@ -46,14 +46,14 @@ Ontol
                     Question `?`
             Pipe `|`
             Relation
-                UnitTypeRef
+                TypeRefUnit
                     IdentPath
                         Sym `id`
                 PropCardinality
         Colon `:`
         Whitespace
         RelObject
-            UnitTypeRef
+            TypeRefUnit
                 IdentPath
                     Sym `text`
                     Whitespace

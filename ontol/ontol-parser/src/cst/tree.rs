@@ -2,33 +2,81 @@ use std::fmt::Display;
 
 use crate::lexer::{kind::Kind, Lex};
 
-use super::view::FlatNodeView;
+use super::view::{Item, NodeView, TokenView};
 
+/// A raw, flat tree that is the direct output of the CstParser.
+///
+/// It's very efficient for depth-first traversal.
 pub struct FlatSyntaxTree {
-    pub(super) tree: Vec<SyntaxNode>,
+    pub(super) markers: Vec<SyntaxMarker>,
     pub(super) lex: Lex,
 }
 
+/// A more condensed syntax tree which is more efficient for breadth-first traversal.
+pub struct SyntaxTree {
+    root: Syntax,
+    lex: Lex,
+}
+
+/// Markers in the flat syntax tree
 #[derive(Clone, PartialEq, Debug)]
-pub enum SyntaxNode {
+pub enum SyntaxMarker {
+    /// Placeholder node used for building the tree.
+    /// The resulting tree should not contain this.
     StartPlaceholder,
+    /// Marks the start of a node
     Start { kind: Kind },
+    /// Marks the precense of a token
     Token { index: u32 },
+    /// Marks the end of a node
     End,
 }
 
+#[derive(Clone, PartialEq, Debug)]
+pub enum Syntax {
+    Node(SyntaxNode),
+    Token { index: u32 },
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct SyntaxNode {
+    kind: Kind,
+    children: Vec<Syntax>,
+}
+
 impl FlatSyntaxTree {
-    pub fn view<'a>(&'a self, src: &'a str) -> FlatNodeView<'a> {
-        let root_kind = match self.tree[0] {
-            SyntaxNode::Start { kind } => kind,
-            _ => panic!(),
+    /// Create a proper tree out of the flat syntax tree
+    pub fn unflatten(self) -> SyntaxTree {
+        let mut parent_stack: Vec<SyntaxNode> = vec![];
+        let mut current_node = SyntaxNode {
+            kind: Kind::Error,
+            children: vec![],
         };
 
-        FlatNodeView {
-            tree: self,
-            pos: 0,
-            kind: root_kind,
-            src,
+        for marker in self.markers.into_iter() {
+            match marker {
+                SyntaxMarker::StartPlaceholder => unreachable!(),
+                SyntaxMarker::Start { kind } => {
+                    parent_stack.push(current_node);
+                    current_node = SyntaxNode {
+                        kind,
+                        children: vec![],
+                    };
+                }
+                SyntaxMarker::Token { index } => {
+                    current_node.children.push(Syntax::Token { index });
+                }
+                SyntaxMarker::End => {
+                    let mut parent = parent_stack.pop().unwrap();
+                    parent.children.push(Syntax::Node(current_node));
+                    current_node = parent;
+                }
+            }
+        }
+
+        SyntaxTree {
+            root: current_node.children.into_iter().next().unwrap(),
+            lex: self.lex,
         }
     }
 
@@ -42,6 +90,90 @@ impl FlatSyntaxTree {
     }
 }
 
+impl SyntaxTree {
+    pub fn view<'a>(&'a self, src: &'a str) -> TreeNodeView<'a> {
+        TreeNodeView {
+            node: match &self.root {
+                Syntax::Node(node) => node,
+                Syntax::Token { .. } => unreachable!(),
+            },
+            lex: &self.lex,
+            src,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct TreeNodeView<'a> {
+    node: &'a SyntaxNode,
+    lex: &'a Lex,
+    src: &'a str,
+}
+
+#[derive(Clone, Copy)]
+pub struct TreeTokenView<'a> {
+    index: u32,
+    lex: &'a Lex,
+    src: &'a str,
+}
+
+impl<'a> NodeView<'a> for TreeNodeView<'a> {
+    type Token = TreeTokenView<'a>;
+    type Children = TreeNodeChildren<'a>;
+
+    fn kind(&self) -> Kind {
+        self.node.kind
+    }
+
+    fn children(&self) -> Self::Children {
+        TreeNodeChildren {
+            iter: self.node.children.iter(),
+            lex: self.lex,
+            src: self.src,
+        }
+    }
+}
+
+impl<'a> TokenView<'a> for TreeTokenView<'a> {
+    fn kind(&self) -> Kind {
+        self.lex.tokens[self.index as usize]
+    }
+
+    fn slice(&self) -> &'a str {
+        let span = self.span();
+        &self.src[span]
+    }
+
+    fn span(&self) -> std::ops::Range<usize> {
+        self.lex.span(self.index as usize)
+    }
+}
+
+pub struct TreeNodeChildren<'a> {
+    iter: std::slice::Iter<'a, Syntax>,
+    lex: &'a Lex,
+    src: &'a str,
+}
+
+impl<'a> Iterator for TreeNodeChildren<'a> {
+    type Item = Item<'a, TreeNodeView<'a>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(match self.iter.next()? {
+            Syntax::Node(node) => Item::Node(TreeNodeView {
+                node,
+                lex: self.lex,
+                src: self.src,
+            }),
+            Syntax::Token { index } => Item::Token(TreeTokenView {
+                index: *index,
+                lex: self.lex,
+                src: self.src,
+            }),
+        })
+    }
+}
+
 pub struct DebugTree<'a> {
     tree: &'a FlatSyntaxTree,
     src: &'a str,
@@ -52,17 +184,17 @@ pub struct DebugTree<'a> {
 impl<'a> Display for DebugTree<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut indent: i64 = 0;
-        for syntax in &self.tree.tree {
+        for syntax in &self.tree.markers {
             match syntax {
-                SyntaxNode::StartPlaceholder => panic!(),
-                SyntaxNode::Start { kind } => {
+                SyntaxMarker::StartPlaceholder => panic!(),
+                SyntaxMarker::Start { kind } => {
                     for _ in 0..indent {
                         write!(f, "    ")?;
                     }
                     writeln!(f, "{kind:?}")?;
                     indent += 1;
                 }
-                SyntaxNode::Token { index } => {
+                SyntaxMarker::Token { index } => {
                     for _ in 0..indent {
                         write!(f, "    ")?;
                     }
@@ -78,7 +210,7 @@ impl<'a> Display for DebugTree<'a> {
                         }
                     }
                 }
-                SyntaxNode::End => {
+                SyntaxMarker::End => {
                     indent -= 1;
                     if self.display_end {
                         for _ in 0..indent {

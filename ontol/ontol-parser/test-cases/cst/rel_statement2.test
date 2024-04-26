@@ -6,12 +6,12 @@ Ontol
         KwRel `rel`
         Whitespace
         RelSubject
-            UnitTypeRef
+            TypeRefUnit
                 This
                     Dot `.`
         RelFwdSet
             Relation
-                UnitTypeRef
+                TypeRefUnit
                     Literal
                         SingleQuoteText `'a'`
                 PropCardinality
@@ -24,7 +24,7 @@ Ontol
                 Question `?`
             Whitespace
         RelObject
-            SetTypeRef
+            TypeRefSet
                 CurlyOpen `{`
                 IdentPath
                     Sym `c`

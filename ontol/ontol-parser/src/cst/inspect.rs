@@ -208,7 +208,8 @@ mod tests {
         let (lex, _) = cst_lex(src);
         let mut parser = CstParser::from_lexed_source(src, lex);
         grammar::ontol(&mut parser);
-        let (tree, _) = parser.finish();
+        let (flat_tree, _) = parser.finish();
+        let tree = flat_tree.unflatten();
 
         let Node::Ontol(ontol) = tree.view(src).node() else {
             panic!()

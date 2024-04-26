@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use crate::lexer::{kind::Kind, Lex};
 
-use super::tree::{FlatSyntaxTree, SyntaxNode};
+use super::tree::{FlatSyntaxTree, SyntaxMarker};
 
 #[derive(Clone, Copy, Debug)]
 pub struct SyntaxCursor(usize);
@@ -39,7 +39,7 @@ pub struct CstParser<'a> {
     lex: Lex,
 
     /// The tree that the parser will produce
-    tree: Vec<SyntaxNode>,
+    tree: Vec<SyntaxMarker>,
 
     source: &'a str,
     errors: Vec<(TokenCursor, String)>,
@@ -61,7 +61,7 @@ impl<'a> CstParser<'a> {
 
     pub fn finish(self) -> (FlatSyntaxTree, Vec<(Range<usize>, String)>) {
         let tree = FlatSyntaxTree {
-            tree: self.tree,
+            markers: self.tree,
             lex: self.lex,
         };
         let errors = self
@@ -222,7 +222,7 @@ impl<'a> CstParser<'a> {
 
     pub fn start(&mut self, kind: Kind) -> StartNode {
         let index = self.tree.len();
-        self.tree.push(SyntaxNode::StartPlaceholder);
+        self.tree.push(SyntaxMarker::StartPlaceholder);
         StartNode {
             kind,
             cursor: SyntaxCursor(index),
@@ -230,20 +230,20 @@ impl<'a> CstParser<'a> {
     }
 
     pub fn end(&mut self, start_node: StartNode) {
-        self.tree[start_node.cursor.0] = SyntaxNode::Start {
+        self.tree[start_node.cursor.0] = SyntaxMarker::Start {
             kind: start_node.kind,
         };
-        self.tree.push(SyntaxNode::End);
+        self.tree.push(SyntaxMarker::End);
     }
 
     pub fn insert_node(&mut self, cursor: SyntaxCursor, kind: Kind) {
-        self.tree.insert(cursor.0, SyntaxNode::Start { kind });
-        self.tree.push(SyntaxNode::End);
+        self.tree.insert(cursor.0, SyntaxMarker::Start { kind });
+        self.tree.push(SyntaxMarker::End);
     }
 
     fn append_token(&mut self, cursor: TokenCursor) {
         if cursor.0 < self.lex.tokens.len() {
-            self.tree.push(SyntaxNode::Token {
+            self.tree.push(SyntaxMarker::Token {
                 index: cursor.0 as u32,
             });
         }

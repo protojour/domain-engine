@@ -67,7 +67,7 @@ pub struct ParsedPackage {
 impl ParsedPackage {
     pub fn parse(
         request: PackageRequest,
-        text: &str,
+        text_src: String,
         config: PackageConfig,
         sources: &mut Sources,
         source_code_registry: &mut SourceCodeRegistry,
@@ -79,9 +79,10 @@ impl ParsedPackage {
         };
 
         let src = sources.add_source(package_id, source_name);
-        source_code_registry.registry.insert(src.id, text.into());
 
-        let (statements, parser_errors) = ontol_parser::parse_statements(text);
+        let (statements, parser_errors) = ontol_parser::parse_statements(&text_src);
+        source_code_registry.registry.insert(src.id, text_src);
+
         Self {
             package_id: src.package_id,
             reference: request.reference,

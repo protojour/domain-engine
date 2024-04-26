@@ -343,10 +343,10 @@ impl TestPackages {
                             }
                         }
 
-                        if let Some(source_text) = self.sources_by_name.get(source_name) {
+                        if let Some(source_text) = self.sources_by_name.remove(source_name) {
                             package_graph_builder.provide_package(ParsedPackage::parse(
                                 request,
-                                source_text,
+                                source_text.into_owned(),
                                 package_config,
                                 &mut self.sources,
                                 &mut self.source_code_registry,

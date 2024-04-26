@@ -302,7 +302,7 @@ fn compile(
 
     let topology = loop {
         let graph_state = package_graph_builder.transition().map_err(|err| {
-            print_unified_compile_error(err, &ontol_sources, &sources_by_name).unwrap();
+            print_unified_compile_error(err, &ontol_sources, &source_code_registry).unwrap();
             OntoolError::Compile
         })?;
 
@@ -327,7 +327,7 @@ fn compile(
                             None => Some(DataStoreConfig::Default),
                         }
                     }
-                    if let Some(source_text) = sources_by_name.get(source_name) {
+                    if let Some(source_text) = sources_by_name.remove(source_name) {
                         package_graph_builder.provide_package(ParsedPackage::parse(
                             request,
                             source_text,
@@ -352,7 +352,7 @@ fn compile(
             root_package: root_package.expect("No root package"),
         }),
         Err(err) => {
-            print_unified_compile_error(err, &ontol_sources, &sources_by_name)?;
+            print_unified_compile_error(err, &ontol_sources, &source_code_registry)?;
             Err(OntoolError::Compile)
         }
     }
@@ -372,7 +372,7 @@ fn get_source_name(path: &Path) -> String {
 fn print_unified_compile_error(
     unified_error: UnifiedCompileError,
     ontol_sources: &Sources,
-    sources_by_name: &HashMap<String, String>,
+    source_code_registry: &SourceCodeRegistry,
 ) -> Result<(), OntoolError> {
     let mut colors = ColorGenerator::new();
     for error in unified_error.errors.iter() {
@@ -380,7 +380,10 @@ fn print_unified_compile_error(
         let message = error.error.to_string();
 
         let ontol_source = ontol_sources.get_source(error.span.source_id).unwrap();
-        let literal_source = sources_by_name.get(ontol_source.name.as_ref()).unwrap();
+        let literal_source = source_code_registry
+            .registry
+            .get(&error.span.source_id)
+            .unwrap();
 
         Report::build(ReportKind::Error, ontol_source.name(), span.start)
             .with_label(
@@ -396,7 +399,10 @@ fn print_unified_compile_error(
             let message = note.note.to_string();
 
             let ontol_source = ontol_sources.get_source(error.span.source_id).unwrap();
-            let literal_source = sources_by_name.get(ontol_source.name.as_ref()).unwrap();
+            let literal_source = source_code_registry
+                .registry
+                .get(&error.span.source_id)
+                .unwrap();
 
             Report::build(ReportKind::Advice, ontol_source.name(), span.start)
                 .with_label(

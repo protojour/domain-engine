@@ -69,6 +69,7 @@ pub mod source;
 mod codegen;
 mod compile_domain;
 mod compiler_queries;
+mod cst_lowering;
 mod def;
 mod entity;
 mod interface;

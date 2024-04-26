@@ -9,7 +9,7 @@ use super::*;
 
 #[rstest::rstest]
 fn cst(#[files("test-cases/cst/*.test")] path: PathBuf) {
-    let contents = fs::read_to_string(&path).unwrap();
+    let contents = fs::read_to_string(path).unwrap();
 
     let mut ontol_src = String::new();
     let mut cst_expect = String::new();
@@ -18,7 +18,7 @@ fn cst(#[files("test-cases/cst/*.test")] path: PathBuf) {
 
     let mut parse_fn: Option<fn(&mut CstParser)> = None;
 
-    while let Some(mut line) = lines.next() {
+    for mut line in lines.by_ref() {
         if line.starts_with("//@") {
             line = line.strip_prefix("//@ grammar=").unwrap();
             match line {

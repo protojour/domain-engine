@@ -12,6 +12,7 @@ pub mod cst;
 pub mod lexer;
 mod modifier;
 mod parser;
+pub mod syntax_source;
 
 #[cfg(test)]
 mod cst_test;
@@ -35,7 +36,9 @@ pub fn parse_statements(input: &str) -> (Vec<Spanned<Statement>>, Vec<Error>) {
     let mut errors = vec![];
 
     if TEST_CST {
-        let (_, cst_errors) = cst_parse(input);
+        let (flat_tree, cst_errors) = cst_parse(input);
+        let _ = flat_tree.unflatten();
+
         errors.extend(cst_errors);
     }
 

@@ -237,7 +237,7 @@ impl State {
                         if let Some(doc) = self.docs.get(&request_uri) {
                             let package = ParsedPackage::parse(
                                 request,
-                                &doc.text,
+                                doc.text.clone(),
                                 package_config,
                                 &mut ontol_sources,
                                 &mut source_code_registry,
