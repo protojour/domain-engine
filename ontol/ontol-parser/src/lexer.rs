@@ -221,6 +221,10 @@ impl Lex {
         start..end
     }
 
+    pub fn span_end(&self, index: usize) -> usize {
+        self.pos[index + 1]
+    }
+
     pub fn opt_span(&self, index: usize) -> Option<Range<usize>> {
         if index < self.tokens.len() {
             Some(self.span(index))

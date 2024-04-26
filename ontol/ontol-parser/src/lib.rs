@@ -32,6 +32,12 @@ pub enum Error {
     Parse(Simple<Token>),
 }
 
+#[derive(Debug)]
+pub struct UnescapeError {
+    pub msg: String,
+    pub span: Range<usize>,
+}
+
 pub fn parse_statements(input: &str) -> (Vec<Spanned<Statement>>, Vec<Error>) {
     let mut errors = vec![];
 

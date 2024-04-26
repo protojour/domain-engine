@@ -1,0 +1,313 @@
+//! utilities for lowering ontol-parser output
+
+use std::{collections::HashMap, ops::Range};
+
+use indexmap::map::Entry;
+use ontol_runtime::{
+    property::{PropertyCardinality, ValueCardinality},
+    var::{Var, VarAllocator},
+    DefId, PackageId,
+};
+use tracing::debug;
+
+use crate::{
+    def::{Def, DefKind, FmtFinalState, RelParams, Relationship, TypeDef, TypeDefFlags},
+    namespace::Space,
+    package::ONTOL_PKG,
+    pattern::{Pattern, PatternKind},
+    CompileError, Compiler, SourceId, SourceSpan,
+};
+
+pub struct LoweringCtx<'c, 'm> {
+    pub compiler: &'c mut Compiler<'m>,
+    pub package_id: PackageId,
+    pub source_id: SourceId,
+    pub root_defs: Vec<DefId>,
+}
+
+pub enum Coinage {
+    New,
+    Used,
+}
+
+pub type LoweringError = (CompileError, Range<usize>);
+
+pub struct Open(pub Option<Range<usize>>);
+pub struct Private(pub Option<Range<usize>>);
+pub struct Extern(pub Option<Range<usize>>);
+pub struct Symbol(pub Option<Range<usize>>);
+
+pub enum RelationKey {
+    Named(DefId),
+    Builtin(DefId),
+    FmtTransition(DefId, FmtFinalState),
+    Indexed,
+}
+
+#[derive(Default)]
+pub struct MapVarTable {
+    variables: HashMap<std::string::String, Var>,
+}
+
+impl MapVarTable {
+    pub fn get_or_create_var(&mut self, ident: String) -> Var {
+        let length = self.variables.len();
+
+        *self
+            .variables
+            .entry(ident)
+            .or_insert_with(|| Var(length as u32))
+    }
+
+    /// Create an allocator for allocating the successive variables
+    /// after the explicit ones
+    pub fn into_allocator(self) -> VarAllocator {
+        VarAllocator::from(Var(self.variables.len() as u32))
+    }
+}
+
+impl<'c, 'm> LoweringCtx<'c, 'm> {
+    pub fn source_span(&self, range: &Range<usize>) -> SourceSpan {
+        SourceSpan {
+            source_id: self.source_id,
+            start: range.start as u32,
+            end: range.end as u32,
+        }
+    }
+
+    pub fn lookup_ident(
+        &mut self,
+        ident: &str,
+        span: &Range<usize>,
+    ) -> Result<DefId, LoweringError> {
+        // A single ident looks in both ONTOL_PKG and the current package
+        match self
+            .compiler
+            .namespaces
+            .lookup(&[self.package_id, ONTOL_PKG], Space::Type, ident)
+        {
+            Some(def_id) => Ok(def_id),
+            None => Err((CompileError::TypeNotFound, span.clone())),
+        }
+    }
+
+    pub fn lookup_path<'s>(
+        &mut self,
+        segments: impl Iterator<Item = (&'s str, Range<usize>)>,
+        path_span: &Range<usize>,
+    ) -> Result<DefId, LoweringError> {
+        let mut segment_iter = segments.peekable();
+
+        let Some(mut current) = segment_iter.next() else {
+            return Err((CompileError::TODO("empty path"), path_span.clone()));
+        };
+
+        if segment_iter.peek().is_some() {
+            // a path is fully qualified
+
+            // a path is fully qualified
+            let mut namespace = self
+                .compiler
+                .namespaces
+                .namespaces
+                .get(&self.package_id)
+                .unwrap();
+
+            let mut def_id;
+
+            loop {
+                let segment = self.compiler.strings.intern(current.0);
+                def_id = namespace.space(Space::Type).get(segment);
+                if segment_iter.peek().is_some() {
+                    match def_id {
+                        Some(def_id) => match self.compiler.defs.def_kind(*def_id) {
+                            DefKind::Package(package_id) => {
+                                namespace =
+                                    self.compiler.namespaces.namespaces.get(package_id).unwrap();
+                            }
+                            other => {
+                                debug!("namespace not found. def kind was {other:?}");
+                                return Err((CompileError::NamespaceNotFound, current.1.clone()));
+                            }
+                        },
+                        None => return Err((CompileError::NamespaceNotFound, current.1.clone())),
+                    }
+                }
+
+                match segment_iter.next() {
+                    Some(next) => current = next,
+                    None => break,
+                }
+            }
+
+            match def_id {
+                Some(def_id) => match self.compiler.defs.def_kind(*def_id) {
+                    DefKind::Type(TypeDef { flags, .. })
+                        if !flags.contains(TypeDefFlags::PUBLIC) =>
+                    {
+                        Err((CompileError::PrivateDefinition, path_span.clone()))
+                    }
+                    _ => Ok(*def_id),
+                },
+                None => Err((CompileError::TypeNotFound, path_span.clone())),
+            }
+        } else {
+            self.lookup_ident(current.0, &current.1)
+        }
+    }
+
+    pub fn coin_type_definition(
+        &mut self,
+        ident: &str,
+        ident_span: &Range<usize>,
+        private: Private,
+        open: Open,
+        extern_: Extern,
+        symbol: Symbol,
+    ) -> Result<DefId, LoweringError> {
+        let (def_id, coinage) = self.named_def_id(Space::Type, ident, ident_span)?;
+        if matches!(coinage, Coinage::New) {
+            let ident = self.compiler.strings.intern(ident);
+            debug!("{def_id:?}: `{}`", ident);
+
+            let kind = if extern_.0.is_some() {
+                DefKind::Extern(ident)
+            } else {
+                let mut flags = TypeDefFlags::CONCRETE | TypeDefFlags::PUBLIC;
+
+                if private.0.is_some() {
+                    flags.remove(TypeDefFlags::PUBLIC);
+                }
+
+                if open.0.is_some() {
+                    flags.insert(TypeDefFlags::OPEN);
+                }
+
+                DefKind::Type(TypeDef {
+                    ident: Some(ident),
+                    rel_type_for: None,
+                    flags,
+                })
+            };
+
+            self.set_def_kind(def_id, kind, ident_span);
+
+            if let Some(symbol_span) = symbol.0 {
+                let span = self.source_span(&symbol_span);
+                let ident_literal = self
+                    .compiler
+                    .defs
+                    .def_text_literal(ident, &mut self.compiler.strings);
+
+                let relationship_id = self.compiler.defs.alloc_def_id(self.package_id);
+
+                self.set_def_kind(
+                    relationship_id,
+                    DefKind::Relationship(Relationship {
+                        relation_def_id: self.compiler.primitives.relations.is,
+                        relation_span: span,
+                        subject: (def_id, span),
+                        subject_cardinality: (
+                            PropertyCardinality::Mandatory,
+                            ValueCardinality::Unit,
+                        ),
+                        object: (ident_literal, span),
+                        object_prop: None,
+                        object_cardinality: (
+                            PropertyCardinality::Mandatory,
+                            ValueCardinality::Unit,
+                        ),
+                        rel_params: RelParams::Unit,
+                    }),
+                    &symbol_span,
+                );
+
+                self.root_defs.push(relationship_id);
+            }
+        }
+
+        Ok(def_id)
+    }
+
+    pub fn define_relation_if_undefined(&mut self, key: RelationKey, span: &Range<usize>) -> DefId {
+        match key {
+            RelationKey::Named(def_id) => def_id,
+            RelationKey::FmtTransition(def_ref, final_state) => {
+                let relation_def_id = self.compiler.defs.alloc_def_id(self.package_id);
+                self.set_def_kind(
+                    relation_def_id,
+                    DefKind::FmtTransition(def_ref, final_state),
+                    span,
+                );
+
+                relation_def_id
+            }
+            RelationKey::Builtin(def_id) => def_id,
+            RelationKey::Indexed => self.compiler.primitives.relations.indexed,
+        }
+    }
+
+    pub fn named_def_id(
+        &mut self,
+        space: Space,
+        ident: &str,
+        span: &Range<usize>,
+    ) -> Result<(DefId, Coinage), LoweringError> {
+        let ident = self.compiler.strings.intern(ident);
+        match self
+            .compiler
+            .namespaces
+            .get_namespace_mut(self.package_id, space)
+            .entry(ident)
+        {
+            Entry::Occupied(occupied) => {
+                if occupied.get().package_id() == self.package_id {
+                    Ok((*occupied.get(), Coinage::Used))
+                } else {
+                    Err((
+                        CompileError::TODO("definition of external identifier"),
+                        span.clone(),
+                    ))
+                }
+            }
+            Entry::Vacant(vacant) => {
+                let def_id = self.compiler.defs.alloc_def_id(self.package_id);
+                vacant.insert(def_id);
+                Ok((def_id, Coinage::New))
+            }
+        }
+    }
+
+    pub fn define_anonymous_type(&mut self, type_def: TypeDef<'m>, span: &Range<usize>) -> DefId {
+        let anonymous_def_id = self.compiler.defs.alloc_def_id(self.package_id);
+        self.set_def_kind(anonymous_def_id, DefKind::Type(type_def), span);
+        debug!("{anonymous_def_id:?}: <anonymous>");
+        anonymous_def_id
+    }
+
+    pub fn define_anonymous(&mut self, kind: DefKind<'m>, span: &Range<usize>) -> DefId {
+        let def_id = self.compiler.defs.alloc_def_id(self.package_id);
+        self.set_def_kind(def_id, kind, span);
+        def_id
+    }
+
+    pub fn set_def_kind(&mut self, def_id: DefId, kind: DefKind<'m>, span: &Range<usize>) {
+        self.compiler.defs.table.insert(
+            def_id,
+            Def {
+                id: def_id,
+                package: self.package_id,
+                kind,
+                span: self.source_span(span),
+            },
+        );
+    }
+
+    pub fn mk_pattern(&mut self, kind: PatternKind, span: &Range<usize>) -> Pattern {
+        Pattern {
+            id: self.compiler.patterns.alloc_pat_id(),
+            kind,
+            span: self.source_span(span),
+        }
+    }
+}

@@ -1,22 +1,21 @@
-use std::{collections::HashMap, ops::Range};
+use std::ops::Range;
 
 use either::Either;
-use indexmap::map::Entry;
 use ontol_parser::{
     ast::{self, AnyPattern, StructPatternParameter},
     Span, Spanned,
 };
 use ontol_runtime::{
     property::{PropertyCardinality, ValueCardinality},
-    var::{Var, VarAllocator},
     DefId, RelationshipId,
 };
 
 use tracing::{debug, debug_span};
 
 use crate::{
-    def::{Def, DefKind, FmtFinalState, RelParams, Relationship, TypeDef, TypeDefFlags},
+    def::{DefKind, FmtFinalState, RelParams, Relationship, TypeDef, TypeDefFlags},
     error::CompileError,
+    lowering_ctx::{Coinage, Extern, LoweringCtx, MapVarTable, Open, Private, RelationKey, Symbol},
     namespace::Space,
     package::{PackageReference, ONTOL_PKG},
     pattern::{
@@ -27,10 +26,9 @@ use crate::{
     Compiler, Src,
 };
 
-pub struct Lowering<'s, 'm> {
-    compiler: &'s mut Compiler<'m>,
-    src: &'s Src,
-    root_defs: Vec<DefId>,
+pub struct Lowering<'c, 'm> {
+    ctx: LoweringCtx<'c, 'm>,
+    src: &'c Src,
 }
 
 pub struct Lowered {
@@ -41,11 +39,6 @@ type LoweringError = (CompileError, Span);
 
 type Res<T> = Result<T, LoweringError>;
 type RootDefs = Vec<DefId>;
-
-struct Open(Option<Span>);
-struct Private(Option<Span>);
-struct Extern(Option<Span>);
-struct Symbol(Option<Span>);
 
 /// Statement after scanning once
 enum PreDefinedStmt {
@@ -61,18 +54,22 @@ struct PreDefinedDefStmt {
     block: (Vec<(ast::Statement, Span)>, Span),
 }
 
-impl<'s, 'm> Lowering<'s, 'm> {
-    pub fn new(compiler: &'s mut Compiler<'m>, src: &'s Src) -> Self {
+impl<'c, 'm> Lowering<'c, 'm> {
+    pub fn new(compiler: &'c mut Compiler<'m>, src: &'c Src) -> Self {
         Self {
-            compiler,
+            ctx: LoweringCtx {
+                compiler,
+                package_id: src.package_id,
+                source_id: src.id,
+                root_defs: Default::default(),
+            },
             src,
-            root_defs: Default::default(),
         }
     }
 
     pub fn finish(self) -> Lowered {
         Lowered {
-            root_defs: self.root_defs,
+            root_defs: self.ctx.root_defs,
         }
     }
 
@@ -96,7 +93,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         for (stmt, span) in pre_defined_statements {
             match self.pre_defined_stmt_to_def((stmt, span), BlockContext::NoContext) {
                 Ok(root_defs) => {
-                    self.root_defs.extend(root_defs);
+                    self.ctx.root_defs.extend(root_defs);
                 }
                 Err(error) => {
                     self.report_error(error);
@@ -116,6 +113,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let reference = PackageReference::Named(use_stmt.reference.0);
                 let self_package_def_id = self.src.package_id;
                 let used_package_def_id = self
+                    .ctx
                     .compiler
                     .packages
                     .loaded_packages
@@ -128,17 +126,18 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     })?;
 
                 let type_namespace = self
+                    .ctx
                     .compiler
                     .namespaces
                     .get_namespace_mut(self_package_def_id, Space::Type);
 
-                let as_ident = self.compiler.strings.intern(&use_stmt.as_ident.0);
+                let as_ident = self.ctx.compiler.strings.intern(&use_stmt.as_ident.0);
                 type_namespace.insert(as_ident, *used_package_def_id);
 
                 Ok(None)
             }
             ast::Statement::Def(def_stmt) => {
-                let def_id = self.coin_type_definition(
+                let def_id = self.ctx.coin_type_definition(
                     &def_stmt.ident.0,
                     &def_stmt.ident.1,
                     Private(def_stmt.private),
@@ -163,7 +162,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
     }
 
     fn report_error(&mut self, (error, span): (CompileError, Span)) {
-        self.compiler
+        self.ctx
+            .compiler
             .push_error(error.spanned(&self.src.span(&span)));
     }
 
@@ -194,7 +194,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         match stmt {
             ast::Statement::Use(_) => Ok(vec![]),
             ast::Statement::Def(def_stmt) => {
-                let def_id = self.coin_type_definition(
+                let def_id = self.ctx.coin_type_definition(
                     &def_stmt.ident.0,
                     &def_stmt.ident.1,
                     Private(def_stmt.private),
@@ -254,10 +254,11 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let mut var_table = MapVarTable::default();
                 let pattern =
                     self.lower_any_pattern((ast_pattern, object_span.clone()), &mut var_table)?;
-                let pat_id = self.compiler.patterns.alloc_pat_id();
-                self.compiler.patterns.table.insert(pat_id, pattern);
+                let pat_id = self.ctx.compiler.patterns.alloc_pat_id();
+                self.ctx.compiler.patterns.table.insert(pat_id, pattern);
 
-                self.define_anonymous(DefKind::Constant(pat_id), &object_span)
+                self.ctx
+                    .define_anonymous(DefKind::Constant(pat_id), &object_span)
             }
         };
 
@@ -296,7 +297,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 ast::RelType::Type((ty, span)) => {
                     let def_id = self.resolve_type_reference(ty, &span, Some(&mut root_defs))?;
 
-                    match self.compiler.defs.def_kind(def_id) {
+                    match self.ctx.compiler.defs.def_kind(def_id) {
                         DefKind::TextLiteral(_) | DefKind::Type(_) => {
                             (RelationKey::Named(def_id), span.clone(), None)
                         }
@@ -312,11 +313,15 @@ impl<'s, 'm> Lowering<'s, 'm> {
         let has_object_prop = object_prop_ident.is_some();
 
         // This syntax just defines the relation the first time it's used
-        let relation_def_id = self.define_relation_if_undefined(key, &ident_span);
+        let relation_def_id = self.ctx.define_relation_if_undefined(key, &ident_span);
 
-        let relationship_id = self.compiler.defs.alloc_def_id(self.src.package_id);
+        let relationship_id = self.ctx.compiler.defs.alloc_def_id(self.src.package_id);
         if let Some(docs) = docs {
-            self.compiler.namespaces.docs.insert(relationship_id, docs);
+            self.ctx
+                .compiler
+                .namespaces
+                .docs
+                .insert(relationship_id, docs);
         }
 
         let rel_params = if let Some(index_range_rel_params) = index_range_rel_params {
@@ -329,7 +334,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
             RelParams::IndexRange(index_range_rel_params)
         } else if let Some((ctx_block, _)) = ctx_block {
-            let rel_def_id = self.define_anonymous_type(
+            let rel_def_id = self.ctx.define_anonymous_type(
                 TypeDef {
                     ident: None,
                     rel_type_for: Some(RelationshipId(relationship_id)),
@@ -342,7 +347,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
             root_defs.push(rel_def_id);
 
             // This type needs to be part of the anonymous part of the namespace
-            self.compiler
+            self.ctx
+                .compiler
                 .namespaces
                 .add_anonymous(self.src.package_id, rel_def_id);
 
@@ -362,7 +368,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             RelParams::Unit
         };
 
-        let object_prop = object_prop_ident.map(|ident| self.compiler.strings.intern(&ident.0));
+        let object_prop = object_prop_ident.map(|ident| self.ctx.compiler.strings.intern(&ident.0));
 
         let mut relationship = Relationship {
             relation_def_id,
@@ -390,9 +396,9 @@ impl<'s, 'm> Lowering<'s, 'm> {
         };
 
         // HACK(for now): invert relationship
-        if relation_def_id == self.compiler.primitives.relations.id {
+        if relation_def_id == self.ctx.compiler.primitives.relations.id {
             relationship = Relationship {
-                relation_def_id: self.compiler.primitives.relations.identifies,
+                relation_def_id: self.ctx.compiler.primitives.relations.identifies,
                 relation_span: relationship.relation_span,
                 subject: relationship.object,
                 subject_cardinality: relationship.object_cardinality,
@@ -403,7 +409,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
             };
         }
 
-        self.set_def_kind(relationship_id, DefKind::Relationship(relationship), &span);
+        self.ctx
+            .set_def_kind(relationship_id, DefKind::Relationship(relationship), &span);
         root_defs.push(relationship_id);
 
         Ok(root_defs)
@@ -446,7 +453,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 _ => return Err((CompileError::FmtTooFewTransitions, span)),
             };
 
-            let target_def_id = self.define_anonymous_type(
+            let target_def_id = self.ctx.define_anonymous_type(
                 TypeDef {
                     ident: None,
                     rel_type_for: None,
@@ -499,11 +506,13 @@ impl<'s, 'm> Lowering<'s, 'm> {
         let relation_key = RelationKey::FmtTransition(transition_def, final_state);
 
         // This syntax just defines the relation the first time it's used
-        let relation_def_id = self.define_relation_if_undefined(relation_key, &transition.1);
+        let relation_def_id = self
+            .ctx
+            .define_relation_if_undefined(relation_key, &transition.1);
 
         debug!("{:?}: <transition>", relation_def_id.0);
 
-        Ok(self.define_anonymous(
+        Ok(self.ctx.define_anonymous(
             DefKind::Relationship(Relationship {
                 relation_def_id,
                 relation_span: self.src.span(&transition.1),
@@ -539,11 +548,11 @@ impl<'s, 'm> Lowering<'s, 'm> {
         root_defs: Option<&mut RootDefs>,
     ) -> Res<DefId> {
         match ast_ty {
-            ast::Type::Unit => Ok(self.compiler.primitives.unit),
+            ast::Type::Unit => Ok(self.ctx.compiler.primitives.unit),
             ast::Type::Path(path) => Ok(self.lookup_path(&path, span)?),
             ast::Type::AnonymousStruct((ctx_block, _block_span)) => {
                 if let Some(root_defs) = root_defs {
-                    let def_id = self.define_anonymous_type(
+                    let def_id = self.ctx.define_anonymous_type(
                         TypeDef {
                             ident: None,
                             rel_type_for: None,
@@ -553,7 +562,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     );
 
                     // This type needs to be part of the anonymous part of the namespace
-                    self.compiler
+                    self.ctx
+                        .compiler
                         .namespaces
                         .add_anonymous(self.src.package_id, def_id);
                     root_defs.push(def_id);
@@ -580,8 +590,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 }
             }
             ast::Type::NumberLiteral(lit) => {
-                let lit = self.compiler.strings.intern(&lit);
-                let def_id = self.compiler.defs.add_def(
+                let lit = self.ctx.compiler.strings.intern(&lit);
+                let def_id = self.ctx.compiler.defs.add_def(
                     DefKind::NumberLiteral(lit),
                     ONTOL_PKG,
                     self.src.span(span),
@@ -590,19 +600,21 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }
             ast::Type::TextLiteral(lit) => {
                 let def_id = match lit.as_str() {
-                    "" => self.compiler.primitives.empty_text,
+                    "" => self.ctx.compiler.primitives.empty_text,
                     _ => self
+                        .ctx
                         .compiler
                         .defs
-                        .def_text_literal(&lit, &mut self.compiler.strings),
+                        .def_text_literal(&lit, &mut self.ctx.compiler.strings),
                 };
                 Ok(def_id)
             }
             ast::Type::Regex(lit) => {
                 let def_id = self
+                    .ctx
                     .compiler
                     .defs
-                    .def_regex(&lit, span, &mut self.compiler.strings)
+                    .def_regex(&lit, span, &mut self.ctx.compiler.strings)
                     .map_err(|(compile_error, err_span)| {
                         (CompileError::InvalidRegex(compile_error), err_span)
                     })?;
@@ -631,17 +643,20 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
         let (def_id, ident) = match ident {
             Some((ident, span)) => {
-                let (def_id, coinage) = self.named_def_id(Space::Map, &ident, &span)?;
+                let (def_id, coinage) = self.ctx.named_def_id(Space::Map, &ident, &span)?;
                 if matches!(coinage, Coinage::Used) {
                     return Err((CompileError::DuplicateMapIdentifier, span.clone()));
                 }
-                let ident = self.compiler.strings.intern(&ident);
+                let ident = self.ctx.compiler.strings.intern(&ident);
                 (def_id, Some(ident))
             }
-            None => (self.compiler.defs.alloc_def_id(self.src.package_id), None),
+            None => (
+                self.ctx.compiler.defs.alloc_def_id(self.src.package_id),
+                None,
+            ),
         };
 
-        self.set_def_kind(
+        self.ctx.set_def_kind(
             def_id,
             DefKind::Mapping {
                 ident,
@@ -652,7 +667,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     BlockContext::Context(context_fn) => {
                         let context_def_id = context_fn();
                         if matches!(
-                            self.compiler.defs.def_kind(context_def_id),
+                            self.ctx.compiler.defs.def_kind(context_def_id),
                             DefKind::Extern(_)
                         ) {
                             Some(context_def_id)
@@ -682,8 +697,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
             }
         };
 
-        let pat_id = self.compiler.patterns.alloc_pat_id();
-        self.compiler.patterns.table.insert(pat_id, pattern);
+        let pat_id = self.ctx.compiler.patterns.alloc_pat_id();
+        self.ctx.compiler.patterns.table.insert(pat_id, pattern);
 
         Ok(pat_id)
     }
@@ -699,7 +714,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 span: self.src.span(&span),
             },
             None => {
-                let def_id = self.define_anonymous_type(
+                let def_id = self.ctx.define_anonymous_type(
                     TypeDef {
                         ident: None,
                         rel_type_for: None,
@@ -707,7 +722,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     },
                     &span,
                 );
-                self.compiler
+                self.ctx
+                    .compiler
                     .namespaces
                     .add_anonymous(self.src.package_id, def_id);
 
@@ -720,7 +736,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let (attrs, rest_label) =
                     self.lower_struct_pattern_attributes(params, var_table)?;
 
-                Ok(self.mk_pattern(
+                Ok(self.ctx.mk_pattern(
                     PatternKind::Compound {
                         type_path,
                         modifier: ast.modifier.map(|(modifier, _span)| match modifier {
@@ -747,7 +763,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 }
                 let key = (DefId::unit(), self.src.span(&span));
 
-                Ok(self.mk_pattern(
+                Ok(self.ctx.mk_pattern(
                     PatternKind::Compound {
                         type_path,
                         modifier: None,
@@ -865,7 +881,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
             };
 
             let (attrs, rest_label) = lowering.lower_struct_pattern_attributes(attrs, var_table)?;
-            Ok(Some(lowering.mk_pattern(
+            Ok(Some(lowering.ctx.mk_pattern(
                 PatternKind::Compound {
                     type_path: TypePath::RelContextual,
                     modifier,
@@ -967,7 +983,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 }
 
                 Some(Pattern {
-                    id: self.compiler.patterns.alloc_pat_id(),
+                    id: self.ctx.compiler.patterns.alloc_pat_id(),
                     kind: PatternKind::Compound {
                         type_path: TypePath::RelContextual,
                         modifier: None,
@@ -984,14 +1000,14 @@ impl<'s, 'm> Lowering<'s, 'm> {
             let pattern =
                 self.lower_any_pattern((ast_element.pattern.0, ast_element.pattern.1), var_table)?;
             pattern_elements.push(SetPatternElement {
-                id: self.compiler.patterns.alloc_pat_id(),
+                id: self.ctx.compiler.patterns.alloc_pat_id(),
                 is_iter: ast_element.spread.is_some(),
                 rel,
                 val: pattern,
             })
         }
 
-        Ok(self.mk_pattern(
+        Ok(self.ctx.mk_pattern(
             PatternKind::Set {
                 val_type_def: seq_type,
                 elements: pattern_elements.into_boxed_slice(),
@@ -1022,7 +1038,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 rel: match ast_element.relation_attrs {
                     Some((relation_attrs, span)) => {
                         let attrs = self.lower_struct_pattern_attrs(relation_attrs, var_table)?;
-                        Some(self.mk_pattern(
+                        Some(self.ctx.mk_pattern(
                             PatternKind::Compound {
                                 type_path: TypePath::RelContextual,
                                 modifier: None,
@@ -1070,7 +1086,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         elements
             .into_iter()
             .map(|SetElement { iter, rel, val }| SetPatternElement {
-                id: self.compiler.patterns.alloc_pat_id(),
+                id: self.ctx.compiler.patterns.alloc_pat_id(),
                 is_iter: iter,
                 rel,
                 val,
@@ -1088,20 +1104,22 @@ impl<'s, 'm> Lowering<'s, 'm> {
                 let int = int
                     .parse()
                     .map_err(|_| (CompileError::InvalidInteger, span.clone()))?;
-                Ok(self.mk_pattern(PatternKind::ConstI64(int), &span))
+                Ok(self.ctx.mk_pattern(PatternKind::ConstI64(int), &span))
             }
             ast::ExprPattern::TextLiteral(string) => {
-                Ok(self.mk_pattern(PatternKind::ConstText(string), &span))
+                Ok(self.ctx.mk_pattern(PatternKind::ConstText(string), &span))
             }
             ast::ExprPattern::RegexLiteral(regex_literal) => {
                 let regex_def_id = self
+                    .ctx
                     .compiler
                     .defs
-                    .def_regex(&regex_literal, &span, &mut self.compiler.strings)
+                    .def_regex(&regex_literal, &span, &mut self.ctx.compiler.strings)
                     .map_err(|(compile_error, err_span)| {
                         (CompileError::InvalidRegex(compile_error), err_span)
                     })?;
                 let regex_meta = self
+                    .ctx
                     .compiler
                     .defs
                     .literal_regex_meta_table
@@ -1113,7 +1131,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     &span,
                     self.src,
                     var_table,
-                    &mut self.compiler.patterns,
+                    &mut self.ctx.compiler.patterns,
                 );
 
                 regex_syntax::ast::visit(&regex_meta.ast, regex_lowerer.syntax_visitor()).unwrap();
@@ -1121,7 +1139,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
 
                 let expr_regex = regex_lowerer.into_expr(regex_def_id);
 
-                Ok(self.mk_pattern(PatternKind::Regex(expr_regex), &span))
+                Ok(self.ctx.mk_pattern(PatternKind::Regex(expr_regex), &span))
             }
             ast::ExprPattern::Binary(left, op, right) => {
                 let fn_ident = match op {
@@ -1131,15 +1149,17 @@ impl<'s, 'm> Lowering<'s, 'm> {
                     ast::BinaryOp::Div => "/",
                 };
 
-                let def_id = self.lookup_ident(fn_ident, &span)?;
+                let def_id = self.ctx.lookup_ident(fn_ident, &span)?;
 
                 let left = self.lower_expr_pattern(*left, var_table)?;
                 let right = self.lower_expr_pattern(*right, var_table)?;
 
-                Ok(self.mk_pattern(PatternKind::Call(def_id, Box::new([left, right])), &span))
+                Ok(self
+                    .ctx
+                    .mk_pattern(PatternKind::Call(def_id, Box::new([left, right])), &span))
             }
             ast::ExprPattern::BooleanLiteral(bool) => {
-                Ok(self.mk_pattern(PatternKind::ConstBool(bool), &span))
+                Ok(self.ctx.mk_pattern(PatternKind::ConstBool(bool), &span))
             }
             ast::ExprPattern::Variable(var_ident) => {
                 self.lower_map_variable(var_ident, span, var_table)
@@ -1154,78 +1174,7 @@ impl<'s, 'm> Lowering<'s, 'm> {
         var_table: &mut MapVarTable,
     ) -> Res<Pattern> {
         let var = var_table.get_or_create_var(var_ident);
-        Ok(self.mk_pattern(PatternKind::Variable(var), &span))
-    }
-
-    fn lookup_ident(&mut self, ident: &str, span: &Span) -> Result<DefId, LoweringError> {
-        // A single ident looks in both ONTOL_PKG and the current package
-        match self
-            .compiler
-            .namespaces
-            .lookup(&[self.src.package_id, ONTOL_PKG], Space::Type, ident)
-        {
-            Some(def_id) => Ok(def_id),
-            None => Err((CompileError::TypeNotFound, span.clone())),
-        }
-    }
-
-    fn lookup_path(&mut self, path: &ast::Path, span: &Span) -> Result<DefId, LoweringError> {
-        match path {
-            ast::Path::Ident(ident) => self.lookup_ident(ident, span),
-            ast::Path::Path(segments) => {
-                // a path is fully qualified
-                let mut namespace = self
-                    .compiler
-                    .namespaces
-                    .namespaces
-                    .get(&self.src.package_id)
-                    .unwrap();
-
-                let mut segment_iter = segments.iter().peekable();
-                let mut def_id = None;
-
-                while let Some((segment, segment_span)) = segment_iter.next() {
-                    let segment = self.compiler.strings.intern(segment);
-                    def_id = namespace.space(Space::Type).get(segment);
-                    if segment_iter.peek().is_some() {
-                        match def_id {
-                            Some(def_id) => match self.compiler.defs.def_kind(*def_id) {
-                                DefKind::Package(package_id) => {
-                                    namespace = self
-                                        .compiler
-                                        .namespaces
-                                        .namespaces
-                                        .get(package_id)
-                                        .unwrap();
-                                }
-                                other => {
-                                    debug!("namespace not found. def kind was {other:?}");
-                                    return Err((
-                                        CompileError::NamespaceNotFound,
-                                        segment_span.clone(),
-                                    ));
-                                }
-                            },
-                            None => {
-                                return Err((CompileError::NamespaceNotFound, segment_span.clone()))
-                            }
-                        }
-                    }
-                }
-
-                match def_id {
-                    Some(def_id) => match self.compiler.defs.def_kind(*def_id) {
-                        DefKind::Type(TypeDef { flags, .. })
-                            if !flags.contains(TypeDefFlags::PUBLIC) =>
-                        {
-                            Err((CompileError::PrivateDefinition, span.clone()))
-                        }
-                        _ => Ok(*def_id),
-                    },
-                    None => Err((CompileError::TypeNotFound, span.clone())),
-                }
-            }
-        }
+        Ok(self.ctx.mk_pattern(PatternKind::Variable(var), &span))
     }
 
     fn provide_definition(
@@ -1234,7 +1183,8 @@ impl<'s, 'm> Lowering<'s, 'm> {
         docs: Option<std::string::String>,
         def_block: (Vec<(ast::Statement, Span)>, Span),
     ) -> Res<RootDefs> {
-        self.compiler
+        self.ctx
+            .compiler
             .namespaces
             .docs
             .entry(def_id)
@@ -1265,195 +1215,23 @@ impl<'s, 'm> Lowering<'s, 'm> {
         Ok(root_defs)
     }
 
-    fn coin_type_definition(
-        &mut self,
-        ident: &str,
-        ident_span: &Span,
-        private: Private,
-        open: Open,
-        extern_: Extern,
-        symbol: Symbol,
-    ) -> Res<DefId> {
-        let (def_id, coinage) = self.named_def_id(Space::Type, ident, ident_span)?;
-        if matches!(coinage, Coinage::New) {
-            let ident = self.compiler.strings.intern(ident);
-            debug!("{def_id:?}: `{}`", ident);
-
-            let kind = if extern_.0.is_some() {
-                DefKind::Extern(ident)
-            } else {
-                let mut flags = TypeDefFlags::CONCRETE | TypeDefFlags::PUBLIC;
-
-                if private.0.is_some() {
-                    flags.remove(TypeDefFlags::PUBLIC);
-                }
-
-                if open.0.is_some() {
-                    flags.insert(TypeDefFlags::OPEN);
-                }
-
-                DefKind::Type(TypeDef {
-                    ident: Some(ident),
-                    rel_type_for: None,
-                    flags,
-                })
-            };
-
-            self.set_def_kind(def_id, kind, ident_span);
-
-            if let Some(symbol_span) = symbol.0 {
-                let span = self.src.span(&symbol_span);
-                let ident_literal = self
-                    .compiler
-                    .defs
-                    .def_text_literal(ident, &mut self.compiler.strings);
-
-                let relationship_id = self.compiler.defs.alloc_def_id(self.src.package_id);
-
-                self.set_def_kind(
-                    relationship_id,
-                    DefKind::Relationship(Relationship {
-                        relation_def_id: self.compiler.primitives.relations.is,
-                        relation_span: span,
-                        subject: (def_id, span),
-                        subject_cardinality: (
-                            PropertyCardinality::Mandatory,
-                            ValueCardinality::Unit,
-                        ),
-                        object: (ident_literal, span),
-                        object_prop: None,
-                        object_cardinality: (
-                            PropertyCardinality::Mandatory,
-                            ValueCardinality::Unit,
-                        ),
-                        rel_params: RelParams::Unit,
-                    }),
-                    &symbol_span,
-                );
-
-                self.root_defs.push(relationship_id);
-            }
-        }
-
-        Ok(def_id)
-    }
-
-    fn define_relation_if_undefined(&mut self, key: RelationKey, span: &Range<usize>) -> DefId {
-        match key {
-            RelationKey::Named(def_id) => def_id,
-            RelationKey::FmtTransition(def_ref, final_state) => {
-                let relation_def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
-                self.set_def_kind(
-                    relation_def_id,
-                    DefKind::FmtTransition(def_ref, final_state),
-                    span,
-                );
-
-                relation_def_id
-            }
-            RelationKey::Builtin(def_id) => def_id,
-            RelationKey::Indexed => self.compiler.primitives.relations.indexed,
+    fn lookup_path(&mut self, path: &ast::Path, span: &Span) -> Result<DefId, LoweringError> {
+        match path {
+            ast::Path::Ident(ident) => self.ctx.lookup_ident(ident, span),
+            ast::Path::Path(segments) => self.ctx.lookup_path(
+                segments
+                    .iter()
+                    .map(|(string, span)| (string.as_str(), span.clone())),
+                span,
+            ),
         }
     }
-
-    fn named_def_id(&mut self, space: Space, ident: &str, span: &Span) -> Res<(DefId, Coinage)> {
-        let ident = self.compiler.strings.intern(ident);
-        match self
-            .compiler
-            .namespaces
-            .get_namespace_mut(self.src.package_id, space)
-            .entry(ident)
-        {
-            Entry::Occupied(occupied) => {
-                if occupied.get().package_id() == self.src.package_id {
-                    Ok((*occupied.get(), Coinage::Used))
-                } else {
-                    Err((
-                        CompileError::TODO("definition of external identifier"),
-                        span.clone(),
-                    ))
-                }
-            }
-            Entry::Vacant(vacant) => {
-                let def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
-                vacant.insert(def_id);
-                Ok((def_id, Coinage::New))
-            }
-        }
-    }
-
-    fn define_anonymous_type(&mut self, type_def: TypeDef<'m>, span: &Span) -> DefId {
-        let anonymous_def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
-        self.set_def_kind(anonymous_def_id, DefKind::Type(type_def), span);
-        debug!("{anonymous_def_id:?}: <anonymous>");
-        anonymous_def_id
-    }
-
-    fn define_anonymous(&mut self, kind: DefKind<'m>, span: &Span) -> DefId {
-        let def_id = self.compiler.defs.alloc_def_id(self.src.package_id);
-        self.set_def_kind(def_id, kind, span);
-        def_id
-    }
-
-    fn set_def_kind(&mut self, def_id: DefId, kind: DefKind<'m>, span: &Span) {
-        self.compiler.defs.table.insert(
-            def_id,
-            Def {
-                id: def_id,
-                package: self.src.package_id,
-                kind,
-                span: self.src.span(span),
-            },
-        );
-    }
-
-    fn mk_pattern(&mut self, kind: PatternKind, span: &Span) -> Pattern {
-        Pattern {
-            id: self.compiler.patterns.alloc_pat_id(),
-            kind,
-            span: self.src.span(span),
-        }
-    }
-}
-
-enum Coinage {
-    New,
-    Used,
-}
-
-enum RelationKey {
-    Named(DefId),
-    Builtin(DefId),
-    FmtTransition(DefId, FmtFinalState),
-    Indexed,
 }
 
 #[derive(Clone, Copy)]
 enum BlockContext<'a> {
     NoContext,
     Context(&'a dyn Fn() -> DefId),
-}
-
-#[derive(Default)]
-pub struct MapVarTable {
-    variables: HashMap<std::string::String, Var>,
-}
-
-impl MapVarTable {
-    pub fn get_or_create_var(&mut self, ident: String) -> Var {
-        let length = self.variables.len();
-
-        *self
-            .variables
-            .entry(ident)
-            .or_insert_with(|| Var(length as u32))
-    }
-
-    /// Create an allocator for allocating the successive variables
-    /// after the explicit ones
-    fn into_allocator(self) -> VarAllocator {
-        VarAllocator::from(Var(self.variables.len() as u32))
-    }
 }
 
 fn convert_cardinality(

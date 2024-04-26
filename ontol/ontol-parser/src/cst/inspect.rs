@@ -15,7 +15,9 @@ use crate::lexer::{kind::Kind, unescape::UnescapeTextResult};
 ///     PatStruct(PatStruct<V>)
 /// }
 ///
-/// struct PatStruct<V>(V);
+/// struct PatStruct<V> {
+///     pub node: V,
+/// };
 /// ```
 macro_rules! nodes {
     ($ident:ident { $($kind:ident),*, }) => {
@@ -23,12 +25,14 @@ macro_rules! nodes {
 
         $(
             #[derive(Clone, Copy)]
-            pub struct $kind<V>(V);
+            pub struct $kind<V> {
+                pub view: V,
+            }
 
             impl<'a, V: NodeView<'a>> $kind<V> {
                 pub fn from_view(view: V) -> Option<Self> {
                     if view.kind() == Kind::$kind {
-                        Some(Self(view))
+                        Some(Self { view })
                     } else {
                         None
                     }
@@ -64,7 +68,7 @@ macro_rules! node_enum {
             pub(crate) fn from_view(view: V) -> Option<Self> {
                 match view.kind() {
                     $(
-                        Kind::$kind => Some(Self::$kind($kind(view)))
+                        Kind::$kind => Some(Self::$kind($kind { view }))
                     ),*,
                     _ => None
                 }
@@ -139,33 +143,33 @@ node_enum!(StructParamAttr {
 
 impl<'a, V: NodeView<'a> + 'a> Ontol<V> {
     pub fn statements(self) -> impl Iterator<Item = Statement<V>> + 'a {
-        self.0.sub_nodes().filter_map(Statement::from_view)
+        self.view.sub_nodes().filter_map(Statement::from_view)
     }
 }
 
 impl<'a, V: NodeView<'a>> UseStatement<V> {
     pub fn location(self) -> Option<Location<V>> {
-        self.0.sub_nodes().find_map(Location::from_view)
+        self.view.sub_nodes().find_map(Location::from_view)
     }
 
     pub fn ident_path(self) -> Option<IdentPath<V>> {
-        self.0.sub_nodes().find_map(IdentPath::from_view)
+        self.view.sub_nodes().find_map(IdentPath::from_view)
     }
 }
 
 impl<'a, V: NodeView<'a>> DefStatement<V> {
     pub fn doc_comments(self) -> impl Iterator<Item = &'a str> {
-        self.0.local_doc_comments()
+        self.view.local_doc_comments()
     }
 }
 
 impl<'a, V: NodeView<'a>> RelStatement<V> {
     pub fn doc_comments(self) -> impl Iterator<Item = &'a str> {
-        self.0.local_doc_comments()
+        self.view.local_doc_comments()
     }
 
     pub fn subject(self) -> Option<RelSubject<V>> {
-        self.0.sub_nodes().find_map(RelSubject::from_view)
+        self.view.sub_nodes().find_map(RelSubject::from_view)
     }
 }
 
@@ -173,19 +177,19 @@ impl<'a, V: NodeView<'a>> FmtStatement<V> {}
 
 impl<'a, V: NodeView<'a>> MapStatement<V> {
     pub fn doc_comments(self) -> impl Iterator<Item = &'a str> {
-        self.0.local_doc_comments()
+        self.view.local_doc_comments()
     }
 }
 
 impl<'a, V: NodeView<'a>> Location<V> {
     pub fn text(self) -> Option<UnescapeTextResult> {
-        self.0.local_tokens().next()?.literal_text()
+        self.view.local_tokens().next()?.literal_text()
     }
 }
 
 impl<'a, V: NodeView<'a>> IdentPath<V> {
     pub fn symbols(self) -> impl Iterator<Item = V::Token> {
-        self.0.local_tokens_filter(Kind::Sym)
+        self.view.local_tokens_filter(Kind::Sym)
     }
 }
 

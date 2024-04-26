@@ -74,6 +74,7 @@ mod def;
 mod entity;
 mod interface;
 mod lowering;
+mod lowering_ctx;
 mod map;
 mod map_arm_def_inference;
 mod namespace;

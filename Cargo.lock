@@ -2347,6 +2347,7 @@ dependencies = [
  "logos",
  "pretty_assertions",
  "rstest",
+ "thin-vec",
  "tracing",
  "unindent",
 ]

@@ -13,7 +13,20 @@ pub trait NodeView<'a>: Sized + Copy {
 
     fn kind(&self) -> Kind;
 
+    fn span_start(&self) -> usize;
+
     fn children(&self) -> Self::Children;
+
+    fn span(self) -> Range<usize> {
+        let start = self.span_start();
+        let mut span = start..start;
+
+        if let Some(token) = self.local_tokens().last() {
+            span.end = token.span().end;
+        }
+
+        span
+    }
 }
 
 pub trait NodeViewExt<'a>: NodeView<'a> {

@@ -2,13 +2,7 @@ use std::ops::Range;
 
 use chumsky::error::Simple;
 
-use crate::lexer::kind::Kind;
-
-#[derive(Debug)]
-pub struct UnescapeError {
-    pub msg: String,
-    pub span: Range<usize>,
-}
+use crate::{lexer::kind::Kind, UnescapeError};
 
 pub type UnescapeTextResult = Result<String, Vec<UnescapeError>>;
 

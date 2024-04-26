@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use thin_vec::{thin_vec, ThinVec};
+
 use crate::lexer::{kind::Kind, Lex};
 
 use super::view::{Item, NodeView, TokenView};
@@ -41,16 +43,19 @@ pub enum Syntax {
 #[derive(Clone, PartialEq, Debug)]
 pub struct SyntaxNode {
     kind: Kind,
-    children: Vec<Syntax>,
+    start: usize,
+    children: ThinVec<Syntax>,
 }
 
 impl FlatSyntaxTree {
     /// Create a proper tree out of the flat syntax tree
     pub fn unflatten(self) -> SyntaxTree {
         let mut parent_stack: Vec<SyntaxNode> = vec![];
+        let mut cursor: usize = 0;
         let mut current_node = SyntaxNode {
             kind: Kind::Error,
-            children: vec![],
+            start: 0,
+            children: thin_vec![],
         };
 
         for marker in self.markers.into_iter() {
@@ -60,11 +65,13 @@ impl FlatSyntaxTree {
                     parent_stack.push(current_node);
                     current_node = SyntaxNode {
                         kind,
-                        children: vec![],
+                        start: cursor,
+                        children: thin_vec![],
                     };
                 }
                 SyntaxMarker::Token { index } => {
                     current_node.children.push(Syntax::Token { index });
+                    cursor = self.lex.span_end(index as usize);
                 }
                 SyntaxMarker::End => {
                     let mut parent = parent_stack.pop().unwrap();
@@ -123,6 +130,10 @@ impl<'a> NodeView<'a> for TreeNodeView<'a> {
 
     fn kind(&self) -> Kind {
         self.node.kind
+    }
+
+    fn span_start(&self) -> usize {
+        self.node.start
     }
 
     fn children(&self) -> Self::Children {

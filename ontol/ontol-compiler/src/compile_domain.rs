@@ -1,8 +1,10 @@
 use fnv::FnvHashSet;
+use ontol_parser::cst::view::NodeViewExt;
 use ontol_runtime::{ontology::ontol::TextConstant, DefId, PackageId};
 use tracing::debug;
 
 use crate::{
+    cst_lowering::CstLowering,
     def::{DefKind, RelParams},
     lowering::Lowering,
     package::ParsedPackage,
@@ -58,6 +60,16 @@ impl<'m> Compiler<'m> {
             .push((package.package_id, self.strings.intern_constant(&src.name)));
 
         self.check_error()
+    }
+
+    #[allow(unused)]
+    fn lower_cst_experiment(&mut self, ontol_src: &str, src: Src) {
+        let (flat_tree, _errors) = ontol_parser::cst_parse(ontol_src);
+        let tree = flat_tree.unflatten();
+
+        let _root_defs = CstLowering::new(self, src)
+            .lower_ontol(tree.view(ontol_src).node())
+            .finish();
     }
 
     /// Do all the (remaining) checks and generations for the package/domain and seal it
