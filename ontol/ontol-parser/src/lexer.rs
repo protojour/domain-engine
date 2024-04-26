@@ -142,11 +142,13 @@ pub fn ast_lex(input: &str) -> (Vec<Spanned<Token>>, Vec<Simple<char>>) {
                     | Kind::MapArm
                     | Kind::TypeModUnit
                     | Kind::TypeModSet
-                    | Kind::TypeModSeq
+                    | Kind::TypeModList
                     | Kind::This
                     | Kind::Literal
-                    | Kind::Range
-                    | Kind::Location
+                    | Kind::NumberRange
+                    | Kind::RangeStart
+                    | Kind::RangeEnd
+                    | Kind::Name
                     | Kind::IdentPath
                     | Kind::PatStruct
                     | Kind::PatSet

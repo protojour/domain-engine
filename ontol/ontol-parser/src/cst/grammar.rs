@@ -95,7 +95,7 @@ fn use_statement(p: &mut CstParser) {
     p.eat(K![use]);
     p.eat_trivias();
 
-    let location = p.start(Kind::Location);
+    let location = p.start(Kind::Name);
     p.eat_text_literal();
     p.end(location);
 
@@ -158,12 +158,11 @@ mod rel {
         p.eat(K![:]);
 
         if matches!(p.at(), K![:]) {
+            let backwd = p.start(Kind::RelBackwdSet);
             p.eat(K![:]);
 
-            let backwd = p.start(Kind::RelBackwdSet);
-
             loop {
-                let ident = p.start(Kind::IdentPath);
+                let ident = p.start(Kind::Name);
                 p.eat_text_literal();
                 p.end(ident);
 
@@ -232,7 +231,7 @@ mod rel {
                 p.end(set);
             }
             K!['['] => {
-                let seq = p.start(Kind::TypeModSeq);
+                let seq = p.start(Kind::TypeModList);
                 p.eat(K!['[']);
                 type_ref_inner(p, allowed);
                 p.eat(K![']']);
@@ -264,23 +263,30 @@ fn type_ref_inner(p: &mut CstParser, allowed: AllowedType) {
         }
         Kind::Number => {
             let mut node = p.start(Kind::Literal);
+            let cursor = p.syntax_cursor();
             p.eat(Kind::Number);
 
             if allowed.int_range && p.at() == K![..] {
-                node.set_kind(Kind::Range);
+                p.insert_node(cursor, Kind::RangeStart);
+
+                node.set_kind(Kind::NumberRange);
                 p.eat(K![..]);
 
                 if p.at() == Kind::Number {
+                    let end = p.start(Kind::RangeEnd);
                     p.eat(Kind::Number);
+                    p.end(end);
                 }
             }
 
             p.end(node);
         }
         K![..] if allowed.int_range => {
-            let range = p.start(Kind::Range);
+            let range = p.start(Kind::NumberRange);
             p.eat(K![..]);
+            let end = p.start(Kind::RangeEnd);
             p.eat(Kind::Number);
+            p.end(end);
             p.end(range);
         }
         kind @ (Kind::DoubleQuoteText | Kind::SingleQuoteText | Kind::Regex) => {

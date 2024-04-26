@@ -21,8 +21,6 @@ use crate::lexer::{kind::Kind, unescape::UnescapeTextResult};
 /// ```
 macro_rules! nodes {
     ($ident:ident { $($kind:ident),* $(,)? }) => {
-        node_union!($ident { $($kind),*, });
-
         $(
             #[derive(Clone, Copy)]
             pub struct $kind<V> {
@@ -39,6 +37,8 @@ macro_rules! nodes {
                 }
             }
         )*
+
+        node_union!($ident { $($kind),*, });
     };
 }
 
@@ -52,8 +52,21 @@ macro_rules! nodes {
 /// ```
 macro_rules! node_union {
     ($ident:ident { $($kind:ident),* $(,)? }) => {
+        #[derive(Clone, Copy)]
         pub enum $ident<V> {
             $($kind($kind<V>)),*
+        }
+
+        impl<'a, V: NodeView<'a>> $ident<V> {
+            pub fn view(self) -> V {
+                match self {
+                    $(
+                        Self::$kind($kind { view }) => {
+                            view
+                        }
+                    )*
+                }
+            }
         }
 
         $(
@@ -65,6 +78,7 @@ macro_rules! node_union {
         )*
 
         impl<'a, V: NodeView<'a>> $ident<V> {
+            #[allow(unused)]
             pub(crate) fn from_view(view: V) -> Option<Self> {
                 match view.kind() {
                     $(
@@ -96,11 +110,13 @@ nodes!(Node {
     MapArm,
     TypeModUnit,
     TypeModSet,
-    TypeModSeq,
+    TypeModList,
     This,
     Literal,
-    Range,
-    Location,
+    NumberRange,
+    RangeStart,
+    RangeEnd,
+    Name,
     IdentPath,
     PatStruct,
     PatSet,
@@ -124,7 +140,7 @@ node_union!(Statement {
 node_union!(TypeMod {
     TypeModUnit,
     TypeModSet,
-    TypeModSeq,
+    TypeModList,
 });
 
 node_union!(TypeRef {
@@ -133,14 +149,24 @@ node_union!(TypeRef {
     This,
 });
 
-/*
-node_enum!(Pattern {
+node_union!(Pattern {
     PatStruct,
     PatSet,
     PatAtom,
     PatBinary,
 });
 
+pub enum TypeModOrPattern<V> {
+    TypeMod(TypeMod<V>),
+    Pattern(Pattern<V>),
+}
+
+pub enum TypeModOrRange<V> {
+    TypeMod(TypeMod<V>),
+    Range(NumberRange<V>),
+}
+
+/*
 node_enum!(StructParamAttr {
     StructParamAttrProp,
     StructParamAttrUnit,
@@ -154,8 +180,8 @@ impl<'a, V: NodeView<'a> + 'a> Ontol<V> {
 }
 
 impl<'a, V: NodeView<'a>> UseStatement<V> {
-    pub fn location(self) -> Option<Location<V>> {
-        self.view.sub_nodes().find_map(Location::from_view)
+    pub fn name(self) -> Option<Name<V>> {
+        self.view.sub_nodes().find_map(Name::from_view)
     }
 
     pub fn ident_path(self) -> Option<IdentPath<V>> {
@@ -216,8 +242,68 @@ impl<'a, V: NodeView<'a>> RelSubject<V> {
 }
 
 impl<'a, V: NodeView<'a>> RelObject<V> {
-    pub fn type_mod(self) -> Option<TypeMod<V>> {
-        self.view.sub_nodes().find_map(TypeMod::from_view)
+    pub fn type_mod_or_pattern(self) -> Option<TypeModOrPattern<V>> {
+        self.view.sub_nodes().find_map(|view| {
+            if let Some(type_mod) = TypeMod::from_view(view) {
+                Some(TypeModOrPattern::TypeMod(type_mod))
+            } else if let Some(pattern) = Pattern::from_view(view) {
+                Some(TypeModOrPattern::Pattern(pattern))
+            } else {
+                None
+            }
+        })
+    }
+}
+
+impl<'a, V: NodeView<'a> + 'a> RelFwdSet<V> {
+    pub fn relations(self) -> impl Iterator<Item = Relation<V>> + 'a {
+        self.view.sub_nodes().filter_map(Relation::from_view)
+    }
+}
+
+/// TODO: In the AST parser, the backward relation set can contain
+/// many things, but it's never used in examples, so it's not implemented here yet
+impl<'a, V: NodeView<'a> + 'a> RelBackwdSet<V> {
+    pub fn name(self) -> Option<Name<V>> {
+        self.view.sub_nodes().find_map(Name::from_view)
+    }
+
+    pub fn prop_cardinality(self) -> Option<PropCardinality<V>> {
+        self.view.sub_nodes().find_map(PropCardinality::from_view)
+    }
+}
+
+impl<'a, V: NodeView<'a>> Relation<V> {
+    pub fn relation_type(self) -> Option<TypeModOrRange<V>> {
+        self.view.sub_nodes().find_map(|view| {
+            if let Some(type_mod) = TypeMod::from_view(view) {
+                Some(TypeModOrRange::TypeMod(type_mod))
+            } else if let Some(range) = NumberRange::from_view(view) {
+                Some(TypeModOrRange::Range(range))
+            } else {
+                None
+            }
+        })
+    }
+
+    pub fn rel_params(self) -> Option<RelParams<V>> {
+        self.view.sub_nodes().find_map(RelParams::from_view)
+    }
+
+    pub fn prop_cardinality(self) -> Option<PropCardinality<V>> {
+        self.view.sub_nodes().find_map(PropCardinality::from_view)
+    }
+}
+
+impl<'a, V: NodeView<'a> + 'a> RelParams<V> {
+    pub fn statements(self) -> impl Iterator<Item = Statement<V>> + 'a {
+        self.view.sub_nodes().filter_map(Statement::from_view)
+    }
+}
+
+impl<'a, V: NodeView<'a>> PropCardinality<V> {
+    pub fn question(self) -> Option<V::Token> {
+        self.view.local_tokens_filter(Kind::Question).next()
     }
 }
 
@@ -234,7 +320,7 @@ impl<'a, V: NodeView<'a>> TypeMod<V> {
         match self {
             Self::TypeModUnit(t) => t.type_ref(),
             Self::TypeModSet(t) => t.type_ref(),
-            Self::TypeModSeq(t) => t.type_ref(),
+            Self::TypeModList(t) => t.type_ref(),
         }
     }
 }
@@ -251,13 +337,13 @@ impl<'a, V: NodeView<'a>> TypeModSet<V> {
     }
 }
 
-impl<'a, V: NodeView<'a>> TypeModSeq<V> {
+impl<'a, V: NodeView<'a>> TypeModList<V> {
     pub fn type_ref(self) -> Option<TypeRef<V>> {
         self.view.sub_nodes().find_map(TypeRef::from_view)
     }
 }
 
-impl<'a, V: NodeView<'a>> Location<V> {
+impl<'a, V: NodeView<'a>> Name<V> {
     pub fn text(self) -> Option<UnescapeTextResult> {
         self.view.local_tokens().next()?.literal_text()
     }
@@ -266,6 +352,24 @@ impl<'a, V: NodeView<'a>> Location<V> {
 impl<'a, V: NodeView<'a>> IdentPath<V> {
     pub fn symbols(self) -> impl Iterator<Item = V::Token> {
         self.view.local_tokens_filter(Kind::Sym)
+    }
+}
+
+impl<'a, V: NodeView<'a>> NumberRange<V> {
+    pub fn start(self) -> Option<V::Token> {
+        let start = self
+            .view
+            .sub_nodes()
+            .find(|view| view.kind() == Kind::RangeStart)?;
+        start.local_tokens_filter(Kind::Number).next()
+    }
+
+    pub fn end(self) -> Option<V::Token> {
+        let end = self
+            .view
+            .sub_nodes()
+            .find(|view| view.kind() == Kind::RangeEnd)?;
+        end.local_tokens_filter(Kind::Number).next()
     }
 }
 
@@ -302,7 +406,7 @@ mod tests {
             panic!()
         };
 
-        assert_eq!(use_stmt.location().unwrap().text().unwrap().unwrap(), "a");
+        assert_eq!(use_stmt.name().unwrap().text().unwrap().unwrap(), "a");
 
         assert_eq!(
             use_stmt

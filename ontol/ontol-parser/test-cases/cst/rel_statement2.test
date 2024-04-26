@@ -16,9 +16,9 @@ Ontol
                         SingleQuoteText `'a'`
                 PropCardinality
         Colon `:`
-        Colon `:`
         RelBackwdSet
-            IdentPath
+            Colon `:`
+            Name
                 SingleQuoteText `'b'`
             PropCardinality
                 Question `?`

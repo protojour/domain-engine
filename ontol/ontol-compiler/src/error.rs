@@ -25,6 +25,7 @@ pub struct SpannedCompileError {
 pub enum CompileError {
     Lex(LexError),
     Parse(ParseError),
+    NumberParse(String),
     PackageNotFound(PackageReference),
     WildcardNeedsContextualBlock,
     InvalidExpression,
@@ -143,6 +144,9 @@ impl std::fmt::Display for CompileError {
             Self::Lex(err) => write!(f, "lex error: {err}"),
             Self::Parse(err) => {
                 write!(f, "parse error: {err}")
+            }
+            Self::NumberParse(err) => {
+                write!(f, "number parse error: {err}")
             }
             Self::PackageNotFound(_) => write!(f, "package not found"),
             Self::WildcardNeedsContextualBlock => {

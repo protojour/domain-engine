@@ -158,15 +158,19 @@ pub enum Kind {
     /// `{x}` in `rel {x} 'foo': y`
     TypeModSet,
     /// `[x]` in `rel [x] 'foo': y`
-    TypeModSeq,
+    TypeModList,
     /// `.` in `rel .'foo': y`
     This,
     /// span of any literal value
     Literal,
     /// `1..2`
-    Range,
+    NumberRange,
+    /// `1` in `1..2`
+    RangeStart,
+    /// `2` in `1..2`
+    RangeEnd,
     /// `'file'` in `use 'file' as foo`
-    Location,
+    Name,
     /// `foo`, `foo.bar`
     IdentPath,
 
@@ -295,11 +299,13 @@ impl Display for Kind {
             Kind::MapArm => write!(f, "map arm"),
             Kind::TypeModUnit => write!(f, "unit type modifier"),
             Kind::TypeModSet => write!(f, "set type modifier"),
-            Kind::TypeModSeq => write!(f, "sequence type modifier"),
+            Kind::TypeModList => write!(f, "list type modifier"),
             Kind::This => write!(f, "this"),
             Kind::Literal => write!(f, "literal"),
-            Kind::Range => write!(f, "range"),
-            Kind::Location => write!(f, "location"),
+            Kind::NumberRange => write!(f, "number range"),
+            Kind::RangeStart => write!(f, "start of range"),
+            Kind::RangeEnd => write!(f, "end of range"),
+            Kind::Name => write!(f, "name"),
             Kind::IdentPath => write!(f, "ident path"),
             Kind::PatStruct => write!(f, "struct pattern"),
             Kind::PatSet => write!(f, "set pattern"),

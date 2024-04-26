@@ -4,6 +4,7 @@ use ast::Statement;
 use chumsky::{prelude::*, Stream};
 use cst::{grammar, parser::CstParser, tree::FlatSyntaxTree};
 use lexer::cst_lex;
+use unindent::unindent;
 
 use std::ops::Range;
 
@@ -96,4 +97,25 @@ pub fn cst_parse(source: &str) -> (FlatSyntaxTree, Vec<Error>) {
     }
 
     (tree, errors)
+}
+
+pub fn join_doc_lines<'a>(doc_lines: impl Iterator<Item = &'a str>) -> Option<String> {
+    let mut joined = "\n".to_string();
+
+    let mut line_iter = doc_lines.peekable();
+    let mut count = 0;
+
+    while let Some(line) = line_iter.next() {
+        count += 1;
+        joined.push_str(line);
+        if line_iter.peek().is_some() {
+            joined.push('\n');
+        }
+    }
+
+    if count > 0 {
+        Some(unindent(&joined))
+    } else {
+        None
+    }
 }

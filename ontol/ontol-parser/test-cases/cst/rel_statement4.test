@@ -1,0 +1,29 @@
+rel . 0..42: pos
+
+//@ grammar=ontol
+Ontol
+    RelStatement
+        KwRel `rel`
+        Whitespace
+        RelSubject
+            TypeModUnit
+                This
+                    Dot `.`
+        RelFwdSet
+            Relation
+                Whitespace
+                TypeModUnit
+                    NumberRange
+                        RangeStart
+                            Number `0`
+                        DotDot `..`
+                        RangeEnd
+                            Number `42`
+                PropCardinality
+        Colon `:`
+        Whitespace
+        RelObject
+            TypeModUnit
+                IdentPath
+                    Sym `pos`
+                    Whitespace

@@ -2,7 +2,6 @@ use std::ops::Range;
 
 use chumsky::prelude::*;
 use either::Either;
-use unindent::unindent;
 
 use crate::{
     ast::{
@@ -10,6 +9,7 @@ use crate::{
         SetPatternModifier, StructPattern, StructPatternAttr, StructPatternAttributeKind,
         StructPatternModifier, StructPatternParameter, TypeOrPattern, UseStatement,
     },
+    join_doc_lines,
     modifier::Modifier,
 };
 
@@ -536,24 +536,7 @@ fn anonymous_type(
 fn doc_comment() -> impl AstParser<Option<std::string::String>> {
     select! { Token::DocComment(comment) => comment }
         .repeated()
-        .map(|lines| {
-            if lines.is_empty() {
-                None
-            } else {
-                let mut joined = String::with_capacity(lines.iter().map(|it| it.len()).sum());
-                joined.push('\n');
-
-                let mut line_iter = lines.iter().peekable();
-                while let Some(line) = line_iter.next() {
-                    joined.push_str(line);
-                    if line_iter.peek().is_some() {
-                        joined.push('\n');
-                    }
-                }
-
-                Some(unindent(&joined))
-            }
-        })
+        .map(|lines| join_doc_lines(lines.iter().map(|line| line.as_str())))
 }
 
 fn open(char: char) -> impl AstParser<Token> {
