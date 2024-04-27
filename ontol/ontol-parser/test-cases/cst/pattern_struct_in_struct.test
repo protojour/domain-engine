@@ -1,4 +1,4 @@
-a(b('c': d))
+a(b('c'['d': e]?: f, ..g))
 
 //@ grammar=pattern
 PatStruct
@@ -14,9 +14,27 @@ PatStruct
                 TypeModUnit
                     Literal
                         SingleQuoteText `'c'`
+                RelArgs
+                    SquareOpen `[`
+                    StructParamAttrProp
+                        TypeModUnit
+                            Literal
+                                SingleQuoteText `'d'`
+                        Colon `:`
+                        Whitespace
+                        PatAtom
+                            Sym `e`
+                    SquareClose `]`
+                PropCardinality
+                    Question `?`
                 Colon `:`
                 Whitespace
                 PatAtom
-                    Sym `d`
+                    Sym `f`
+            Comma `,`
+            Whitespace
+            Spread
+                DotDot `..`
+                Sym `g`
             ParenClose `)`
     ParenClose `)`

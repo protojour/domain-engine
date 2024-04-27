@@ -1,7 +1,10 @@
 //! AST-like APIs on top of the CST
 
 use super::view::{NodeView, NodeViewExt, TokenViewExt};
-use crate::lexer::{kind::Kind, unescape::UnescapeTextResult};
+use crate::{
+    cst::view::TokenView,
+    lexer::{kind::Kind, unescape::UnescapeTextResult},
+};
 
 /// Does two things:
 /// 1. Create `enum Node` that has all the node kinds.
@@ -124,7 +127,7 @@ nodes!(Node {
     PatBinary,
     StructParamAttrProp,
     StructParamAttrUnit,
-    StructAttrRelArgs,
+    RelArgs,
     SetElement,
     Spread,
 });
@@ -156,6 +159,12 @@ node_union!(Pattern {
     PatBinary,
 });
 
+node_union!(StructParam {
+    StructParamAttrProp,
+    Spread,
+    StructParamAttrUnit,
+});
+
 pub enum TypeModOrPattern<V> {
     TypeMod(TypeMod<V>),
     Pattern(Pattern<V>),
@@ -165,13 +174,6 @@ pub enum TypeModOrRange<V> {
     TypeMod(TypeMod<V>),
     Range(NumberRange<V>),
 }
-
-/*
-node_enum!(StructParamAttr {
-    StructParamAttrProp,
-    StructParamAttrUnit,
-});
-*/
 
 impl<'a, V: NodeView<'a> + 'a> Ontol<V> {
     pub fn statements(self) -> impl Iterator<Item = Statement<V>> + 'a {
@@ -246,10 +248,8 @@ impl<'a, V: NodeView<'a>> RelObject<V> {
         self.view.sub_nodes().find_map(|view| {
             if let Some(type_mod) = TypeMod::from_view(view) {
                 Some(TypeModOrPattern::TypeMod(type_mod))
-            } else if let Some(pattern) = Pattern::from_view(view) {
-                Some(TypeModOrPattern::Pattern(pattern))
             } else {
-                None
+                Pattern::from_view(view).map(TypeModOrPattern::Pattern)
             }
         })
     }
@@ -278,10 +278,8 @@ impl<'a, V: NodeView<'a>> Relation<V> {
         self.view.sub_nodes().find_map(|view| {
             if let Some(type_mod) = TypeMod::from_view(view) {
                 Some(TypeModOrRange::TypeMod(type_mod))
-            } else if let Some(range) = NumberRange::from_view(view) {
-                Some(TypeModOrRange::Range(range))
             } else {
-                None
+                NumberRange::from_view(view).map(TypeModOrRange::Range)
             }
         })
     }
@@ -309,9 +307,23 @@ impl<'a, V: NodeView<'a>> PropCardinality<V> {
 
 impl<'a, V: NodeView<'a>> FmtStatement<V> {}
 
-impl<'a, V: NodeView<'a>> MapStatement<V> {
+impl<'a, V: NodeView<'a> + 'a> MapStatement<V> {
     pub fn doc_comments(self) -> impl Iterator<Item = &'a str> {
         self.view.local_doc_comments()
+    }
+
+    pub fn ident_path(self) -> Option<IdentPath<V>> {
+        self.view.sub_nodes().find_map(IdentPath::from_view)
+    }
+
+    pub fn arms(self) -> impl Iterator<Item = MapArm<V>> + 'a {
+        self.view.sub_nodes().filter_map(MapArm::from_view)
+    }
+}
+
+impl<'a, V: NodeView<'a>> MapArm<V> {
+    pub fn pattern(self) -> Option<Pattern<V>> {
+        self.view.sub_nodes().find_map(Pattern::from_view)
     }
 }
 
@@ -343,6 +355,93 @@ impl<'a, V: NodeView<'a>> TypeModList<V> {
     }
 }
 
+impl<'a, V: NodeView<'a> + 'a> PatStruct<V> {
+    pub fn modifiers(self) -> impl Iterator<Item = V::Token> {
+        self.view.local_tokens_filter(Kind::Modifier)
+    }
+
+    pub fn ident_path(self) -> Option<IdentPath<V>> {
+        self.view.sub_nodes().find_map(IdentPath::from_view)
+    }
+
+    pub fn params(self) -> impl Iterator<Item = StructParam<V>> + 'a {
+        self.view.sub_nodes().filter_map(StructParam::from_view)
+    }
+}
+
+impl<'a, V: NodeView<'a>> StructParamAttrProp<V> {
+    pub fn relation(self) -> Option<TypeMod<V>> {
+        self.view.sub_nodes().find_map(TypeMod::from_view)
+    }
+
+    pub fn rel_args(self) -> Option<RelArgs<V>> {
+        self.view.sub_nodes().find_map(RelArgs::from_view)
+    }
+
+    pub fn prop_cardinality(self) -> Option<PropCardinality<V>> {
+        self.view.sub_nodes().find_map(PropCardinality::from_view)
+    }
+
+    pub fn pattern(self) -> Option<Pattern<V>> {
+        self.view.sub_nodes().find_map(Pattern::from_view)
+    }
+}
+
+impl<'a, V: NodeView<'a> + 'a> RelArgs<V> {
+    pub fn params(self) -> impl Iterator<Item = StructParam<V>> + 'a {
+        self.view.sub_nodes().filter_map(StructParam::from_view)
+    }
+}
+
+impl<'a, V: NodeView<'a>> StructParamAttrUnit<V> {
+    pub fn pattern(self) -> Option<Pattern<V>> {
+        self.view.sub_nodes().find_map(Pattern::from_view)
+    }
+}
+
+impl<'a, V: NodeView<'a> + 'a> PatSet<V> {
+    pub fn modifier(self) -> Option<V::Token> {
+        self.view.local_tokens_filter(Kind::Modifier).next()
+    }
+
+    pub fn ident_path(self) -> Option<IdentPath<V>> {
+        self.view.sub_nodes().find_map(IdentPath::from_view)
+    }
+
+    pub fn elements(self) -> impl Iterator<Item = SetElement<V>> + 'a {
+        self.view.sub_nodes().filter_map(SetElement::from_view)
+    }
+}
+
+impl<'a, V: NodeView<'a> + 'a> SetElement<V> {
+    pub fn spread(self) -> Option<Spread<V>> {
+        self.view.sub_nodes().find_map(Spread::from_view)
+    }
+
+    pub fn rel_args(self) -> Option<RelArgs<V>> {
+        self.view.sub_nodes().find_map(RelArgs::from_view)
+    }
+
+    pub fn pattern(self) -> Option<Pattern<V>> {
+        self.view.sub_nodes().find_map(Pattern::from_view)
+    }
+}
+
+impl<'a, V: NodeView<'a> + 'a> PatBinary<V> {
+    pub fn operands(self) -> impl Iterator<Item = Pattern<V>> + 'a {
+        self.view.sub_nodes().filter_map(Pattern::from_view)
+    }
+
+    pub fn infix_token(self) -> Option<V::Token> {
+        self.view.local_tokens().find(|token| {
+            matches!(
+                token.kind(),
+                Kind::Plus | Kind::Minus | Kind::Star | Kind::Div
+            )
+        })
+    }
+}
+
 impl<'a, V: NodeView<'a>> Name<V> {
     pub fn text(self) -> Option<UnescapeTextResult> {
         self.view.local_tokens().next()?.literal_text()
@@ -370,6 +469,12 @@ impl<'a, V: NodeView<'a>> NumberRange<V> {
             .sub_nodes()
             .find(|view| view.kind() == Kind::RangeEnd)?;
         end.local_tokens_filter(Kind::Number).next()
+    }
+}
+
+impl<'a, V: NodeView<'a>> Spread<V> {
+    pub fn symbol(self) -> Option<V::Token> {
+        self.view.local_tokens_filter(Kind::Sym).next()
     }
 }
 

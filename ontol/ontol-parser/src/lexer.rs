@@ -7,8 +7,8 @@ use crate::{modifier::Modifier, Spanned};
 
 use self::unescape::{unescape_regex, unescape_text_literal};
 
-pub(crate) mod kind;
-pub(crate) mod unescape;
+pub mod kind;
+pub mod unescape;
 
 use kind::Kind;
 
@@ -157,7 +157,7 @@ pub fn ast_lex(input: &str) -> (Vec<Spanned<Token>>, Vec<Simple<char>>) {
                     | Kind::StructParamAttrProp
                     | Kind::StructParamAttrUnit
                     | Kind::Spread
-                    | Kind::StructAttrRelArgs
+                    | Kind::RelArgs
                     | Kind::SetElement => {
                         continue;
                     }

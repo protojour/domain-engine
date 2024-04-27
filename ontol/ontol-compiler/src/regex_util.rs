@@ -12,7 +12,7 @@ use crate::{
     def::RegexMeta,
     lowering::context::MapVarTable,
     pattern::{Patterns, RegexPattern, RegexPatternCaptureNode},
-    SourceSpan, Src,
+    SourceId, SourceSpan,
 };
 
 pub fn uuid() -> Hir {
@@ -173,7 +173,7 @@ pub struct RegexToPatternLowerer<'a> {
 
     pattern_literal: &'a str,
     pattern_span: &'a Span,
-    src: &'a Src,
+    source_id: SourceId,
     var_table: &'a mut MapVarTable,
     patterns: &'a mut Patterns,
 }
@@ -182,7 +182,7 @@ impl<'a> RegexToPatternLowerer<'a> {
     pub fn new(
         pattern_literal: &'a str,
         pattern_span: &'a Span,
-        src: &'a Src,
+        source_id: SourceId,
         var_table: &'a mut MapVarTable,
         patterns: &'a mut Patterns,
     ) -> Self {
@@ -192,7 +192,7 @@ impl<'a> RegexToPatternLowerer<'a> {
             pushback: vec![],
             pattern_literal,
             pattern_span,
-            src,
+            source_id,
             var_table,
             patterns,
         }
@@ -276,13 +276,16 @@ impl<'l, 'a> regex_syntax::ast::Visitor for RegexSyntaxVisitor<'l, 'a> {
     fn visit_pre(&mut self, ast: &Ast) -> Result<(), Self::Err> {
         if let Ast::Group(group) = ast {
             if let GroupKind::CaptureName { name, .. } = &group.kind {
+                let span =
+                    project_regex_span(self.0.pattern_literal, self.0.pattern_span, &name.span);
+
                 self.0.named_capture_spans.insert(
                     name.name.as_str().into(),
-                    self.0.src.span(&project_regex_span(
-                        self.0.pattern_literal,
-                        self.0.pattern_span,
-                        &name.span,
-                    )),
+                    SourceSpan {
+                        source_id: self.0.source_id,
+                        start: span.start as u32,
+                        end: span.end as u32,
+                    },
                 );
             }
         }

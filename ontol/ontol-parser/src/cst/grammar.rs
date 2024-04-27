@@ -501,7 +501,7 @@ mod struct_pattern {
             p.end(type_ref);
 
             if p.at() == K!['['] {
-                let rel_args = p.start(Kind::StructAttrRelArgs);
+                let rel_args = p.start(Kind::RelArgs);
                 delimited_comma_separated(p, K!['['], param, K![']']);
                 p.end(rel_args);
             }
@@ -548,7 +548,9 @@ mod set_pattern {
         }
 
         if p.at() == K!['['] {
+            let rel_params = p.start(Kind::RelArgs);
             delimited_comma_separated(p, K!['['], super::struct_pattern::property, K![']']);
+            p.end(rel_params);
         }
 
         super::pattern(p, AllowedPattern { expr: true });

@@ -27,7 +27,7 @@ use crate::{
 
 use super::context::{
     BlockContext, Coinage, Extern, LoweringCtx, MapVarTable, Open, Private, RelationKey, RootDefs,
-    Symbol,
+    SetElement, Symbol,
 };
 
 pub struct AstLowering<'c, 'm> {
@@ -1132,7 +1132,7 @@ impl<'c, 'm> AstLowering<'c, 'm> {
                 let mut regex_lowerer = RegexToPatternLowerer::new(
                     regex_meta.pattern,
                     &span,
-                    self.src,
+                    self.src.id,
                     var_table,
                     &mut self.ctx.compiler.patterns,
                 );
@@ -1243,10 +1243,4 @@ fn convert_cardinality(
         ast::Cardinality::List => (PropertyCardinality::Mandatory, ValueCardinality::List),
         ast::Cardinality::OptionalList => (PropertyCardinality::Optional, ValueCardinality::List),
     }
-}
-
-struct SetElement {
-    iter: bool,
-    rel: Option<Pattern>,
-    val: Pattern,
 }

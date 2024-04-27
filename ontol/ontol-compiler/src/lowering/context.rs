@@ -46,6 +46,12 @@ pub enum RelationKey {
     Indexed,
 }
 
+pub struct SetElement {
+    pub iter: bool,
+    pub rel: Option<Pattern>,
+    pub val: Pattern,
+}
+
 #[derive(Default)]
 pub struct MapVarTable {
     variables: HashMap<std::string::String, Var>,

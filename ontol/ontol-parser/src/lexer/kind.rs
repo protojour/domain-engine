@@ -190,7 +190,7 @@ pub enum Kind {
     /// `unit` in `struct(unit)`
     StructParamAttrUnit,
     /// ['a': b] in `struct('prop'['a': b]: x)`
-    StructAttrRelArgs,
+    RelArgs,
     /// `..a` in `{ ..a }`
     SetElement,
 
@@ -313,7 +313,7 @@ impl Display for Kind {
             Kind::PatBinary => write!(f, "binary pattern"),
             Kind::StructParamAttrProp => write!(f, "property attribute"),
             Kind::StructParamAttrUnit => write!(f, "unit attribute"),
-            Kind::StructAttrRelArgs => write!(f, "relation arguments"),
+            Kind::RelArgs => write!(f, "relation arguments"),
             Kind::SetElement => write!(f, "set element"),
             Kind::Spread => write!(f, "spread"),
         }
