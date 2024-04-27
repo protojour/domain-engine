@@ -13,7 +13,7 @@ pub mod cst;
 pub mod lexer;
 mod modifier;
 mod parser;
-pub mod syntax_source;
+pub mod syntax;
 
 #[cfg(test)]
 mod cst_test;

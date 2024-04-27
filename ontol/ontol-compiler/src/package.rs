@@ -4,7 +4,11 @@ use std::collections::HashSet;
 
 use fnv::FnvHashMap;
 use ontol_parser::ast;
-use ontol_parser::Spanned;
+use ontol_parser::cst::inspect as insp;
+use ontol_parser::cst::view::NodeView;
+use ontol_parser::cst::view::NodeViewExt;
+use ontol_parser::syntax::SyntaxKind;
+use ontol_parser::syntax::{Syntax, SyntaxSource};
 use ontol_runtime::ontology::config::PackageConfig;
 use ontol_runtime::DefId;
 use ontol_runtime::PackageId;
@@ -59,14 +63,13 @@ pub struct ParsedPackage {
     pub reference: PackageReference,
     pub config: PackageConfig,
     pub src: Src,
-    pub statements: Vec<Spanned<ast::Statement>>,
-    pub parser_errors: Vec<ontol_parser::Error>,
+    pub syntax: Syntax,
 }
 
 impl ParsedPackage {
     pub fn parse(
         request: PackageRequest,
-        src_text: &str,
+        syntax_source: SyntaxSource,
         config: PackageConfig,
         sources: &mut Sources,
     ) -> Self {
@@ -78,15 +81,14 @@ impl ParsedPackage {
 
         let src = sources.add_source(package_id, source_name);
 
-        let (statements, parser_errors) = ontol_parser::parse_statements(src_text);
+        let syntax = syntax_source.parse();
 
         Self {
             package_id: src.package_id,
             reference: request.reference,
             config,
             src,
-            statements,
-            parser_errors,
+            syntax,
         }
     }
 }
@@ -145,15 +147,45 @@ impl PackageGraphBuilder {
     pub fn provide_package(&mut self, package: ParsedPackage) {
         let mut children: HashSet<PackageReference> = HashSet::default();
 
-        for statement in &package.statements {
-            if let (ast::Statement::Use(use_stmt), _) = statement {
-                let source = PackageReference::Named(use_stmt.reference.0.clone());
+        match &package.syntax.kind {
+            SyntaxKind::Ast(statements) => {
+                for statement in statements {
+                    if let (ast::Statement::Use(use_stmt), _) = statement {
+                        let pkg_ref = PackageReference::Named(use_stmt.reference.0.clone());
 
-                self.request_package(source.clone(), package.src.span(&use_stmt.reference.1));
-                children.insert(source);
-            } else {
-                // all use statements are at the top of the source file (for now)
-                break;
+                        self.request_package(
+                            pkg_ref.clone(),
+                            package.src.span(&use_stmt.reference.1),
+                        );
+                        children.insert(pkg_ref);
+                    } else {
+                        // all use statements are at the top of the source file (for now)
+                        break;
+                    }
+                }
+            }
+            SyntaxKind::CstTree(tree, src) => {
+                if let insp::Node::Ontol(ontol) = tree.view(src).node() {
+                    for statement in ontol.statements() {
+                        if let insp::Statement::UseStatement(use_stmt) = statement {
+                            let Some(name) = use_stmt.name() else {
+                                continue;
+                            };
+                            let Some(Ok(text)) = name.text() else {
+                                continue;
+                            };
+                            let pkg_ref = PackageReference::Named(text);
+
+                            self.request_package(
+                                pkg_ref.clone(),
+                                package.src.span(&name.view.span()),
+                            );
+                            children.insert(pkg_ref);
+                        } else {
+                            break;
+                        }
+                    }
+                }
             }
         }
 

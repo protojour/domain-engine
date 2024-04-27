@@ -25,6 +25,7 @@ use ontol_compiler::{
     Compiler, SourceCodeRegistry, Sources,
 };
 use ontol_lsp::Backend;
+use ontol_parser::syntax::SyntaxSource;
 use ontol_runtime::{
     interface::json_schema::build_openapi_schemas,
     ontology::{
@@ -277,7 +278,7 @@ fn compile(
 
     let root_file_name = get_source_name(root_files.first().unwrap());
     let mut ontol_sources = Sources::default();
-    let mut sources_by_name: HashMap<String, String> = Default::default();
+    let mut sources_by_name: HashMap<String, Arc<String>> = Default::default();
     let mut paths_by_name: HashMap<String, PathBuf> = Default::default();
 
     for entry in read_dir(root_dir)? {
@@ -291,7 +292,7 @@ fn compile(
             let source = fs::read_to_string(&path)?;
             let source_name = get_source_name(&path);
 
-            sources_by_name.insert(source_name.clone(), source);
+            sources_by_name.insert(source_name.clone(), Arc::new(source));
             paths_by_name.insert(source_name, path);
         }
     }
@@ -330,7 +331,7 @@ fn compile(
                     if let Some(source_text) = sources_by_name.remove(source_name) {
                         let parsed = ParsedPackage::parse(
                             request,
-                            &source_text,
+                            SyntaxSource::TextAst(&source_text),
                             package_config,
                             &mut ontol_sources,
                         );
@@ -395,7 +396,7 @@ fn print_unified_compile_error(
                     .with_color(colors.next()),
             )
             .finish()
-            .eprint((ontol_source.name(), Source::from(&literal_source)))?;
+            .eprint((ontol_source.name(), Source::from(literal_source.as_ref())))?;
 
         for note in &error.notes {
             let span = note.span.start as usize..note.span.end as usize;
@@ -414,7 +415,7 @@ fn print_unified_compile_error(
                         .with_color(colors.next()),
                 )
                 .finish()
-                .eprint((ontol_source.name(), Source::from(&literal_source)))?;
+                .eprint((ontol_source.name(), Source::from(literal_source.as_ref())))?;
         }
     }
 

@@ -15,7 +15,9 @@ use ontol_parser::{
         Type, TypeOrPattern, UseStatement,
     },
     lexer::ast_lex,
-    parse_statements, Spanned, Token,
+    parse_statements,
+    syntax::SyntaxSource,
+    Spanned, Token,
 };
 use ontol_runtime::ontology::{config::PackageConfig, domain::TypeInfo, Ontology};
 use regex::Regex;
@@ -235,7 +237,7 @@ impl State {
                         if let Some(doc) = self.docs.get(&request_uri) {
                             let package = ParsedPackage::parse(
                                 request,
-                                &doc.text,
+                                SyntaxSource::TextAst(&doc.text),
                                 package_config,
                                 &mut ontol_sources,
                             );

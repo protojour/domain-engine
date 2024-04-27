@@ -13,6 +13,7 @@ use ontol_compiler::{
     package::{GraphState, PackageGraphBuilder, PackageReference, PackageTopology, ParsedPackage},
     Compiler, SourceCodeRegistry, Sources,
 };
+use ontol_parser::syntax::SyntaxSource;
 use ontol_runtime::{
     interface::{graphql::schema::GraphqlSchema, DomainInterface},
     ontology::{
@@ -33,6 +34,8 @@ pub mod serde_helper;
 pub mod test_extensions;
 pub mod test_map;
 pub mod type_binding;
+
+const USE_CST: bool = false;
 
 /// Workaround for `pretty_assertions::assert_eq` arguments appearing
 /// in a (slightly?) unnatural order. The _expected_ expression ideally comes first,
@@ -344,15 +347,22 @@ impl TestPackages {
                         }
 
                         if let Some(source_text) = self.sources_by_name.remove(source_name) {
+                            let arc_source = Arc::new(source_text.as_ref().to_string());
+                            let syntax_source = if USE_CST {
+                                SyntaxSource::TextCst(arc_source.clone())
+                            } else {
+                                SyntaxSource::TextAst(&arc_source)
+                            };
+
                             let parsed = ParsedPackage::parse(
                                 request,
-                                source_text.as_ref(),
+                                syntax_source,
                                 package_config,
                                 &mut self.sources,
                             );
                             self.source_code_registry
                                 .registry
-                                .insert(parsed.src.id, source_text.into_owned());
+                                .insert(parsed.src.id, arc_source);
 
                             package_graph_builder.provide_package(parsed);
                         }
