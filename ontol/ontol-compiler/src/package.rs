@@ -11,7 +11,6 @@ use ontol_runtime::PackageId;
 
 use crate::error::CompileError;
 use crate::error::UnifiedCompileError;
-use crate::SourceCodeRegistry;
 use crate::SourceSpan;
 use crate::Sources;
 use crate::SpannedCompileError;
@@ -67,10 +66,9 @@ pub struct ParsedPackage {
 impl ParsedPackage {
     pub fn parse(
         request: PackageRequest,
-        text_src: String,
+        src_text: &str,
         config: PackageConfig,
         sources: &mut Sources,
-        source_code_registry: &mut SourceCodeRegistry,
     ) -> Self {
         let package_id = request.package_id;
 
@@ -80,8 +78,7 @@ impl ParsedPackage {
 
         let src = sources.add_source(package_id, source_name);
 
-        let (statements, parser_errors) = ontol_parser::parse_statements(&text_src);
-        source_code_registry.registry.insert(src.id, text_src);
+        let (statements, parser_errors) = ontol_parser::parse_statements(src_text);
 
         Self {
             package_id: src.package_id,

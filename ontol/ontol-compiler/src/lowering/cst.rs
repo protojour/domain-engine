@@ -1149,7 +1149,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
             Ok(number) => Some(number),
             Err(error) => {
                 self.report_error((
-                    CompileError::NumberParse("unable to parse number".to_string()),
+                    CompileError::NumberParse("unable to parse integer".to_string()),
                     token.span(),
                 ));
                 None

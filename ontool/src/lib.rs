@@ -328,13 +328,16 @@ fn compile(
                         }
                     }
                     if let Some(source_text) = sources_by_name.remove(source_name) {
-                        package_graph_builder.provide_package(ParsedPackage::parse(
+                        let parsed = ParsedPackage::parse(
                             request,
-                            source_text,
+                            &source_text,
                             package_config,
                             &mut ontol_sources,
-                            &mut source_code_registry,
-                        ));
+                        );
+                        source_code_registry
+                            .registry
+                            .insert(parsed.src.id, source_text);
+                        package_graph_builder.provide_package(parsed);
                     } else {
                         eprintln!("Could not load `{source_name}`");
                     }

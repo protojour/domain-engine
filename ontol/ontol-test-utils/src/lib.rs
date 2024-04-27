@@ -344,13 +344,17 @@ impl TestPackages {
                         }
 
                         if let Some(source_text) = self.sources_by_name.remove(source_name) {
-                            package_graph_builder.provide_package(ParsedPackage::parse(
+                            let parsed = ParsedPackage::parse(
                                 request,
-                                source_text.into_owned(),
+                                source_text.as_ref(),
                                 package_config,
                                 &mut self.sources,
-                                &mut self.source_code_registry,
-                            ));
+                            );
+                            self.source_code_registry
+                                .registry
+                                .insert(parsed.src.id, source_text.into_owned());
+
+                            package_graph_builder.provide_package(parsed);
                         }
                     }
                 }

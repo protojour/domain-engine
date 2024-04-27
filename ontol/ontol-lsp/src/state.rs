@@ -7,8 +7,7 @@ use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
     package::{GraphState, PackageGraphBuilder, PackageReference, ParsedPackage, ONTOL_PKG},
-    CompileError, Compiler, SourceCodeRegistry, SourceId, SourceSpan, Sources, SpannedCompileError,
-    NO_SPAN,
+    CompileError, Compiler, SourceId, SourceSpan, Sources, SpannedCompileError, NO_SPAN,
 };
 use ontol_parser::{
     ast::{
@@ -221,7 +220,6 @@ impl State {
         let root_name = get_domain_name(filename);
 
         let mut ontol_sources = Sources::default();
-        let mut source_code_registry = SourceCodeRegistry::default();
         let mut package_graph_builder = PackageGraphBuilder::with_roots([root_name.into()]);
 
         let topology = loop {
@@ -237,10 +235,9 @@ impl State {
                         if let Some(doc) = self.docs.get(&request_uri) {
                             let package = ParsedPackage::parse(
                                 request,
-                                doc.text.clone(),
+                                &doc.text,
                                 package_config,
                                 &mut ontol_sources,
-                                &mut source_code_registry,
                             );
                             self.srcref.insert(package.src.id, request_uri);
                             package_graph_builder.provide_package(package);
