@@ -15,13 +15,13 @@ use ontol_runtime::{
     property::{PropertyCardinality, ValueCardinality},
     DefId, RelationshipId,
 };
-use tracing::debug_span;
+use tracing::{debug, debug_span};
 
 use crate::{
     def::{DefKind, RelParams, Relationship, TypeDef, TypeDefFlags},
     lowering::context::{LoweringCtx, SetElement},
     namespace::Space,
-    package::PackageReference,
+    package::{PackageReference, ONTOL_PKG},
     pattern::{
         CompoundPatternAttr, CompoundPatternAttrKind, CompoundPatternModifier, PatId, Pattern,
         PatternKind, SetBinaryOperator, SetPatternElement, SpreadLabel, TypePath,
@@ -267,7 +267,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
             }
         }
 
-        None
+        Some(root_defs)
     }
 
     fn lower_relationship(
@@ -280,11 +280,17 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
     ) -> Option<RootDefs> {
         let mut root_defs = RootDefs::new();
 
-        let (key, ident_span, index_range_rel_params): (_, _, Option<Range<Option<u16>>>) =
-            match relation.relation_type()? {
-                insp::TypeModOrRange::TypeMod(type_mod) => {
+        let (key, ident_span, index_range_rel_params): (_, _, Option<Range<Option<u16>>>) = {
+            let type_mod = relation.relation_type()?;
+            match type_mod.type_ref()? {
+                insp::TypeRef::NumberRange(range) => (
+                    RelationKey::Indexed,
+                    range.view.span(),
+                    Some(self.lower_u16_range(range)),
+                ),
+                type_ref => {
                     let def_id = self.resolve_type_reference(
-                        type_mod.type_ref()?,
+                        type_ref,
                         &BlockContext::NoContext,
                         Some(&mut root_defs),
                     )?;
@@ -295,18 +301,28 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                             (RelationKey::Named(def_id), span, None)
                         }
                         DefKind::BuiltinRelType(..) => (RelationKey::Builtin(def_id), span, None),
+                        DefKind::NumberLiteral(lit) => match lit.parse::<u16>() {
+                            Ok(int) => (
+                                RelationKey::Indexed,
+                                type_mod.view().span(),
+                                Some(Some(int)..Some(int + 1)),
+                            ),
+                            Err(_) => {
+                                self.report_error((
+                                    CompileError::NumberParse("not an integer".to_string()),
+                                    type_mod.view().span(),
+                                ));
+                                return None;
+                            }
+                        },
                         _ => {
                             self.report_error((CompileError::InvalidRelationType, span));
                             return None;
                         }
                     }
                 }
-                insp::TypeModOrRange::Range(range) => (
-                    RelationKey::Indexed,
-                    range.view.span(),
-                    Some(self.lower_u16_range(range)),
-                ),
-            };
+            }
+        };
 
         let has_object_prop = backward_relation.is_some();
 
@@ -368,7 +384,11 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
             let subject_cardinality = (
                 property_cardinality(relation.prop_cardinality())
                     .unwrap_or(PropertyCardinality::Mandatory),
-                value_cardinality(subject.1.type_mod()).unwrap_or(ValueCardinality::Unit),
+                value_cardinality(match object.1.type_mod_or_pattern() {
+                    Some(insp::TypeModOrPattern::TypeMod(type_mod)) => Some(type_mod),
+                    _ => None,
+                })
+                .unwrap_or(ValueCardinality::Unit),
             );
             let object_cardinality = {
                 let default = if has_object_prop {
@@ -385,7 +405,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                     backward_relation
                         .and_then(|rel| property_cardinality(rel.prop_cardinality()))
                         .unwrap_or(default.0),
-                    default.1,
+                    value_cardinality(subject.1.type_mod()).unwrap_or(default.1),
                 )
             };
 
@@ -538,9 +558,6 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
             }
         };
 
-        let mut attrs: Vec<CompoundPatternAttr> = vec![];
-        let mut spread_label: Option<Box<SpreadLabel>> = None;
-
         match self.lower_struct_pattern_params(pat_struct.params(), var_table)? {
             LoweredStructPatternParams::Attrs {
                 attrs,
@@ -619,7 +636,8 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
 
             match param {
                 insp::StructParam::StructParamAttrProp(attr_prop) => {
-                    if let Some(attr) = self.lower_compound_pattern_attr(attr_prop, var_table) {
+                    if let Some(attr) = self.lower_compound_pattern_attr_prop(attr_prop, var_table)
+                    {
                         attrs.push(attr);
                     }
                 }
@@ -652,7 +670,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         })
     }
 
-    fn lower_compound_pattern_attr(
+    fn lower_compound_pattern_attr_prop(
         &mut self,
         attr_prop: insp::StructParamAttrProp<V>,
         var_table: &mut MapVarTable,
@@ -661,7 +679,10 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         let relation_span = self.ctx.source_span(&relation.view().span());
         let relation_def =
             self.resolve_type_reference(relation.type_ref()?, &BlockContext::NoContext, None)?;
-        let bind_option = attr_prop.prop_cardinality()?.question().is_some();
+        let bind_option = attr_prop
+            .prop_cardinality()
+            .and_then(|pc| pc.question())
+            .is_some();
 
         match attr_prop.pattern()? {
             insp::Pattern::PatSet(pat_set) => {
@@ -783,7 +804,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                     match param {
                         insp::StructParam::StructParamAttrProp(attr_prop) => {
                             lowered_attrs
-                                .push(self.lower_compound_pattern_attr(attr_prop, var_table)?);
+                                .push(self.lower_compound_pattern_attr_prop(attr_prop, var_table)?);
                         }
                         insp::StructParam::StructParamAttrUnit(unit) => {
                             self.report_error((
@@ -1017,6 +1038,50 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                 self.report_error((CompileError::WildcardNeedsContextualBlock, this.view.span()));
                 None
             }
+            (insp::TypeRef::Literal(literal), _) => {
+                let token = literal.view.local_tokens().next()?;
+                match token.kind() {
+                    Kind::Number => {
+                        let lit = self.ctx.compiler.strings.intern(token.slice());
+                        let def_id = self.ctx.compiler.defs.add_def(
+                            DefKind::NumberLiteral(lit),
+                            ONTOL_PKG,
+                            self.ctx.source_span(&token.span()),
+                        );
+                        Some(def_id)
+                    }
+                    Kind::SingleQuoteText | Kind::DoubleQuoteText => {
+                        let unescaped = self.unescape(token.literal_text()?)?;
+                        match unescaped.as_str() {
+                            "" => Some(self.ctx.compiler.primitives.empty_text),
+                            other => Some(
+                                self.ctx
+                                    .compiler
+                                    .defs
+                                    .def_text_literal(other, &mut self.ctx.compiler.strings),
+                            ),
+                        }
+                    }
+                    Kind::Regex => {
+                        let regex_literal = unescape_regex(token.slice());
+                        match self.ctx.compiler.defs.def_regex(
+                            &regex_literal,
+                            &token.span(),
+                            &mut self.ctx.compiler.strings,
+                        ) {
+                            Ok(def_id) => Some(def_id),
+                            Err((compile_error, span)) => {
+                                self.report_error((
+                                    CompileError::InvalidRegex(compile_error),
+                                    span,
+                                ));
+                                None
+                            }
+                        }
+                    }
+                    kind => unimplemented!("literal type: {kind}"),
+                }
+            }
             (insp::TypeRef::DefBody(body), _) => {
                 if body.statements().next().is_none() {
                     return Some(self.ctx.compiler.primitives.unit);
@@ -1057,6 +1122,13 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                 }
 
                 Some(def_id)
+            }
+            (insp::TypeRef::NumberRange(range), _) => {
+                self.report_error((
+                    CompileError::TODO("number range is not a proper type"),
+                    range.view.span(),
+                ));
+                None
             }
         }
     }

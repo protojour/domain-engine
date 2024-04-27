@@ -148,8 +148,10 @@ node_union!(TypeMod {
 
 node_union!(TypeRef {
     IdentPath,
+    Literal,
     DefBody,
     This,
+    NumberRange,
 });
 
 node_union!(Pattern {
@@ -168,11 +170,6 @@ node_union!(StructParam {
 pub enum TypeModOrPattern<V> {
     TypeMod(TypeMod<V>),
     Pattern(Pattern<V>),
-}
-
-pub enum TypeModOrRange<V> {
-    TypeMod(TypeMod<V>),
-    Range(NumberRange<V>),
 }
 
 impl<'a, V: NodeView<'a> + 'a> Ontol<V> {
@@ -274,14 +271,8 @@ impl<'a, V: NodeView<'a> + 'a> RelBackwdSet<V> {
 }
 
 impl<'a, V: NodeView<'a>> Relation<V> {
-    pub fn relation_type(self) -> Option<TypeModOrRange<V>> {
-        self.view.sub_nodes().find_map(|view| {
-            if let Some(type_mod) = TypeMod::from_view(view) {
-                Some(TypeModOrRange::TypeMod(type_mod))
-            } else {
-                NumberRange::from_view(view).map(TypeModOrRange::Range)
-            }
-        })
+    pub fn relation_type(self) -> Option<TypeMod<V>> {
+        self.view.sub_nodes().find_map(TypeMod::from_view)
     }
 
     pub fn rel_params(self) -> Option<RelParams<V>> {

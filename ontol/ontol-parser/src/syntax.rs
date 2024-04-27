@@ -44,6 +44,7 @@ impl<'a> SyntaxSource<'a> {
             }
             Self::TextCst(source) => {
                 let (flat_tree, errors) = crate::cst_parse(source);
+                // println!("{}", flat_tree.debug_tree(&source));
                 Syntax {
                     kind: SyntaxKind::CstTree(flat_tree.unflatten(), source.clone()),
                     errors,
