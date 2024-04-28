@@ -47,4 +47,4 @@ Ontol
                                 IdentPath
                                     Sym `text`
                     ParenClose `)`
-        Whitespace
+    Whitespace

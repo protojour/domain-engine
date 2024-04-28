@@ -16,4 +16,4 @@ Ontol
             Comment `// empty`
             Whitespace
             ParenClose `)`
-        Whitespace
+    Whitespace

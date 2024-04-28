@@ -49,8 +49,8 @@ Ontol
                         DotDot `..`
                     PatAtom
                         Sym `b`
-                    Whitespace
+                Whitespace
                 CurlyClose `}`
         Whitespace
         ParenClose `)`
-        Whitespace
+    Whitespace

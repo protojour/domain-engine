@@ -22,11 +22,11 @@ Ontol
                 SingleQuoteText `'b'`
             PropCardinality
                 Question `?`
-            Whitespace
+        Whitespace
         RelObject
             TypeModSet
                 CurlyOpen `{`
                 IdentPath
                     Sym `c`
                 CurlyClose `}`
-        Whitespace
+    Whitespace

@@ -14,9 +14,9 @@ Ontol
                 This
                     Dot `.`
                 CurlyClose `}`
+        Whitespace
         RelFwdSet
             Relation
-                Whitespace
                 TypeModUnit
                     Literal
                         SingleQuoteText `'id'`
@@ -56,4 +56,4 @@ Ontol
             TypeModUnit
                 IdentPath
                     Sym `text`
-                    Whitespace
+    Whitespace

@@ -35,6 +35,6 @@ PatStruct
                 Whitespace
                 PatAtom
                     Sym `y`
-                Whitespace
+            Whitespace
             CurlyClose `}`
     ParenClose `)`

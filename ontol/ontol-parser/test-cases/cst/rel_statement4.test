@@ -9,9 +9,9 @@ Ontol
             TypeModUnit
                 This
                     Dot `.`
+        Whitespace
         RelFwdSet
             Relation
-                Whitespace
                 TypeModUnit
                     NumberRange
                         RangeStart
@@ -26,4 +26,4 @@ Ontol
             TypeModUnit
                 IdentPath
                     Sym `pos`
-                    Whitespace
+    Whitespace

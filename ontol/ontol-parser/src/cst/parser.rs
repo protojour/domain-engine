@@ -101,17 +101,22 @@ impl<'a> CstParser<'a> {
         false
     }
 
-    pub fn at(&mut self) -> Kind {
-        self.eat_trivias();
-        self.lex
-            .tokens
-            .get(self.cursor.0)
-            .copied()
-            .unwrap_or(Kind::Eof)
+    /// Peek at the next token that's not trivia (whitespace/comment)
+    pub fn at(&self) -> Kind {
+        for kind in self.peek_tokens() {
+            match kind {
+                Kind::Whitespace | Kind::DocComment | Kind::Comment => {}
+                _ => return *kind,
+            }
+        }
+
+        Kind::Eof
     }
 
     pub fn eat(&mut self, expected: Kind) -> Option<Kind> {
-        let kind = self.at();
+        self.eat_trivia();
+
+        let kind = self.at_exact();
         let result = if kind == expected {
             self.append_token(self.cursor);
             Some(kind)
@@ -124,7 +129,8 @@ impl<'a> CstParser<'a> {
     }
 
     pub fn eat_sym_value(&mut self, sym: &str) -> bool {
-        let next = self.at();
+        self.eat_trivia();
+        let next = self.at_exact();
         self.append_token(self.cursor);
 
         let result = if next == Kind::Sym && self.current_text() == Some(sym) {
@@ -139,7 +145,8 @@ impl<'a> CstParser<'a> {
     }
 
     pub fn eat_text_literal(&mut self) -> bool {
-        let kind = self.at();
+        self.eat_trivia();
+        let kind = self.at_exact();
         self.append_token(self.cursor);
 
         let result = if matches!(kind, Kind::SingleQuoteText | Kind::DoubleQuoteText) {
@@ -153,7 +160,7 @@ impl<'a> CstParser<'a> {
         result
     }
 
-    pub fn eat_trivias(&mut self) {
+    pub fn eat_trivia(&mut self) {
         self.eat_while(|kind| matches!(kind, Kind::Whitespace | Kind::Comment | Kind::DocComment));
     }
 
@@ -178,7 +185,7 @@ impl<'a> CstParser<'a> {
             if f(kind) {
                 self.append_token(self.cursor);
                 self.cursor.advance();
-                self.eat_trivias();
+                self.eat_trivia();
             } else {
                 return;
             }
@@ -247,6 +254,14 @@ impl<'a> CstParser<'a> {
                 index: cursor.0 as u32,
             });
         }
+    }
+
+    fn at_exact(&self) -> Kind {
+        self.lex
+            .tokens
+            .get(self.cursor.0)
+            .copied()
+            .unwrap_or(Kind::Eof)
     }
 
     fn current_text(&self) -> Option<&str> {

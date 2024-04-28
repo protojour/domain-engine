@@ -30,18 +30,20 @@ struct AllowedPattern {
 pub fn ontol(p: &mut CstParser) {
     let ontol = p.start(Kind::Ontol);
 
-    while p.not_peekforward(|_| false) {
+    while p.at() != Kind::Eof {
         statement(p);
     }
 
-    p.eat_trivias();
+    p.eat_trivia();
 
     p.end(ontol);
 }
 
 fn statement(p: &mut CstParser) {
+    p.eat_ws();
+
     let mut stmt = p.start(Kind::Error);
-    p.eat_trivias();
+    p.eat_trivia();
 
     if p.has_error_state() {
         p.eat_while(|kind| {
@@ -85,22 +87,20 @@ fn statement(p: &mut CstParser) {
         }
     };
 
-    p.eat_ws();
-
     stmt.set_kind(kind);
     p.end(stmt);
 }
 
 fn use_statement(p: &mut CstParser) {
     p.eat(K![use]);
-    p.eat_trivias();
+    p.eat_trivia();
 
     let location = p.start(Kind::Name);
     p.eat_text_literal();
     p.end(location);
 
     p.eat_sym_value("as");
-    p.eat_trivias();
+    p.eat_trivia();
 
     let path = p.start(Kind::IdentPath);
     p.eat(Kind::Sym);
@@ -111,12 +111,13 @@ fn def_statement(p: &mut CstParser) {
     p.eat(K![def]);
 
     p.eat_modifiers();
+    p.eat_trivia();
 
     let path = p.start(Kind::IdentPath);
     p.eat(Kind::Sym);
     p.end(path);
 
-    p.eat_trivias();
+    p.eat_trivia();
 
     let body = p.start(Kind::DefBody);
     p.eat(K!['(']);
@@ -135,11 +136,13 @@ mod rel {
     /// `rel` statement entrypoint
     pub fn rel(p: &mut CstParser) {
         p.eat(K![rel]);
-        p.eat_trivias();
+        p.eat_trivia();
 
         let subject = p.start(Kind::RelSubject);
         rel_type_reference(p);
         p.end(subject);
+
+        p.eat_ws();
 
         let fwd = p.start(Kind::RelFwdSet);
         loop {
@@ -178,7 +181,7 @@ mod rel {
             p.end(backwd);
         }
 
-        p.eat_trivias();
+        p.eat_trivia();
 
         {
             let object = p.start(Kind::RelObject);
@@ -195,7 +198,7 @@ mod rel {
     }
 
     fn forward_relation(p: &mut CstParser) {
-        p.eat_trivias();
+        p.eat_trivia();
         rel_type_reference(p);
 
         if p.at() == K!['['] {
@@ -210,7 +213,7 @@ mod rel {
             p.end(rel_params);
         }
 
-        p.eat_trivias();
+        p.eat_trivia();
 
         prop_cardinality(p);
     }
@@ -221,6 +224,8 @@ mod rel {
             anonymous: true,
             int_range: true,
         };
+
+        p.eat_trivia();
 
         match p.at() {
             K!['{'] => {
@@ -255,7 +260,7 @@ mod rel {
 }
 
 fn type_ref_inner(p: &mut CstParser, allowed: AllowedType) {
-    p.eat_trivias();
+    p.eat_trivia();
 
     match p.at() {
         Kind::Sym => {
@@ -320,6 +325,7 @@ fn fmt_statement(p: &mut CstParser) {
     p.eat(K![fmt]);
 
     loop {
+        p.eat_ws();
         let type_ref = p.start(Kind::TypeModUnit);
         type_ref_inner(
             p,
@@ -343,12 +349,13 @@ fn map_statement(p: &mut CstParser) {
     p.eat(K![map]);
 
     if p.at() == Kind::Sym {
+        p.eat_trivia();
         let ident = p.start(Kind::IdentPath);
         p.eat(Kind::Sym);
         p.end(ident);
     }
 
-    p.eat_trivias();
+    p.eat_trivia();
 
     {
         p.eat(K!['(']);
@@ -366,7 +373,7 @@ fn map_statement(p: &mut CstParser) {
 }
 
 fn map_arm(p: &mut CstParser) {
-    p.eat_trivias();
+    p.eat_trivia();
     let arm = p.start(Kind::MapArm);
 
     pattern(p, AllowedPattern { expr: false });
@@ -458,6 +465,7 @@ mod struct_pattern {
 
     fn param(p: &mut CstParser) {
         if p.at() == K![..] {
+            p.eat_trivia();
             let spread = p.start(Kind::Spread);
             p.eat(K![..]);
             p.eat(Kind::Sym);
@@ -486,6 +494,8 @@ mod struct_pattern {
     }
 
     pub fn property(p: &mut CstParser) {
+        p.eat_trivia();
+
         let prop = p.start(Kind::StructParamAttrProp);
 
         {
@@ -539,6 +549,8 @@ mod set_pattern {
     }
 
     fn element(p: &mut CstParser) {
+        p.eat_trivia();
+
         let element = p.start(Kind::SetElement);
 
         if p.at() == K![..] {
@@ -567,7 +579,7 @@ pub mod expr_pattern {
     }
 
     fn expr_pattern_delimited(p: &mut CstParser) {
-        p.eat_trivias();
+        p.eat_trivia();
         match p.at() {
             kind @ (Kind::Sym
             | Kind::Number
@@ -588,13 +600,14 @@ pub mod expr_pattern {
     }
 
     fn expr_pattern_shunting_yard(p: &mut CstParser, delimiter: Delimiter) {
-        p.eat_trivias();
+        p.eat_trivia();
+
+        let mut cursor = p.syntax_cursor();
+
         if matches!(delimiter, Delimiter::Paren) {
             p.eat(K!['(']);
         }
-        p.eat_trivias();
-
-        let mut cursor = p.syntax_cursor();
+        p.eat_trivia();
 
         expr_pattern_delimited(p);
 
@@ -617,7 +630,7 @@ pub mod expr_pattern {
 
             let mut push_cursor = cursor;
 
-            while left_bp < op_stack.last().copied().map(|(bp, _)| bp).unwrap_or(0) {
+            while left_bp <= op_stack.last().copied().map(|(bp, _)| bp).unwrap_or(0) {
                 let (_, stack_cursor) = op_stack.pop().unwrap();
 
                 p.insert_node(stack_cursor, Kind::PatBinary);
@@ -632,12 +645,12 @@ pub mod expr_pattern {
             expr_pattern_delimited(p);
         }
 
-        while let Some((_, stack_cursor)) = op_stack.pop() {
-            p.insert_node(stack_cursor, Kind::PatBinary);
-        }
-
         if matches!(delimiter, Delimiter::Paren) {
             p.eat(K![')']);
+        }
+
+        while let Some((_, stack_cursor)) = op_stack.pop() {
+            p.insert_node(stack_cursor, Kind::PatBinary);
         }
     }
 
@@ -651,6 +664,8 @@ pub mod expr_pattern {
 }
 
 fn ident_path(p: &mut CstParser) {
+    p.eat_trivia();
+
     let ident_path = p.start(Kind::IdentPath);
 
     p.eat(Kind::Sym);

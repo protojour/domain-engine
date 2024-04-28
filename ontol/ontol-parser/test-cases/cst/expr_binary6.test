@@ -15,4 +15,3 @@ PatBinary
         Star `*`
         PatAtom
             Number `5`
-        Whitespace

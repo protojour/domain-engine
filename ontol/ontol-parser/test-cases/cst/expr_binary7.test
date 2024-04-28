@@ -3,15 +3,15 @@
 //@ grammar=expr
 Whitespace
 PatBinary
-    PatAtom
-        Number `1`
-    Whitespace
-    Star `*`
     PatBinary
+        PatAtom
+            Number `1`
         Whitespace
-        ParenOpen `(`
+        Star `*`
         Whitespace
         PatBinary
+            ParenOpen `(`
+            Whitespace
             PatAtom
                 Number `2`
             Whitespace
@@ -20,10 +20,9 @@ PatBinary
             PatAtom
                 Number `3`
             Whitespace
-        ParenClose `)`
-        Whitespace
-        Star `*`
-        Whitespace
-        PatAtom
-            Number `5`
-        Whitespace
+            ParenClose `)`
+    Whitespace
+    Star `*`
+    Whitespace
+    PatAtom
+        Number `5`

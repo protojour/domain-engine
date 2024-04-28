@@ -2,17 +2,16 @@
 
 //@ grammar=expr
 PatBinary
-    PatAtom
-        Number `1`
-    Plus `+`
     PatBinary
+        PatAtom
+            Number `1`
+        Plus `+`
         PatBinary
             PatAtom
                 Number `2`
             Star `*`
             PatAtom
                 Number `3`
-        Plus `+`
-        PatAtom
-            Number `5`
-        Whitespace
+    Plus `+`
+    PatAtom
+        Number `5`

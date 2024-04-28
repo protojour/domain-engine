@@ -26,4 +26,4 @@ Ontol
                         Sym `x`
                 ParenClose `)`
         ParenClose `)`
-        Whitespace
+    Whitespace

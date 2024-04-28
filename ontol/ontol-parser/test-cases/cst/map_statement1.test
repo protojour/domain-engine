@@ -47,7 +47,7 @@ Ontol
             PatStruct
                 IdentPath
                     Sym `named`
-                    Whitespace
+                Whitespace
                 ParenOpen `(`
                 Whitespace
                 StructParamAttrProp
@@ -58,8 +58,8 @@ Ontol
                     Whitespace
                     PatAtom
                         Sym `y`
-                    Whitespace
+                Whitespace
                 ParenClose `)`
         Whitespace
         ParenClose `)`
-        Whitespace
+    Whitespace

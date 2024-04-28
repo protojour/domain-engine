@@ -7,4 +7,3 @@ PatBinary
     Plus `+`
     PatAtom
         Number `2`
-    Whitespace

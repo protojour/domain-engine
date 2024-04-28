@@ -1,0 +1,23 @@
+fmt a => b => .
+
+//@ grammar=ontol
+Ontol
+    FmtStatement
+        KwFmt `fmt`
+        Whitespace
+        TypeModUnit
+            IdentPath
+                Sym `a`
+        Whitespace
+        FatArrow `=>`
+        Whitespace
+        TypeModUnit
+            IdentPath
+                Sym `b`
+        Whitespace
+        FatArrow `=>`
+        Whitespace
+        TypeModUnit
+            This
+                Dot `.`
+    Whitespace
