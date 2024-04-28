@@ -118,7 +118,7 @@ impl<'a> CstParser<'a> {
 
         let kind = self.at_exact();
         let result = if kind == expected {
-            self.append_token(self.cursor);
+            self.push_current_token(kind);
             Some(kind)
         } else {
             self.eat_error(|kind| format!("expected {expected}, found {kind}"));
@@ -130,10 +130,10 @@ impl<'a> CstParser<'a> {
 
     pub fn eat_sym_value(&mut self, sym: &str) -> bool {
         self.eat_trivia();
-        let next = self.at_exact();
-        self.append_token(self.cursor);
+        let kind = self.at_exact();
+        self.push_current_token(kind);
 
-        let result = if next == Kind::Sym && self.current_text() == Some(sym) {
+        let result = if kind == Kind::Sym && self.current_text() == Some(sym) {
             true
         } else {
             self.report_error(format!("expected symbol `{sym}`"));
@@ -147,7 +147,7 @@ impl<'a> CstParser<'a> {
     pub fn eat_text_literal(&mut self) -> bool {
         self.eat_trivia();
         let kind = self.at_exact();
-        self.append_token(self.cursor);
+        self.push_current_token(kind);
 
         let result = if matches!(kind, Kind::SingleQuoteText | Kind::DoubleQuoteText) {
             true
@@ -172,7 +172,7 @@ impl<'a> CstParser<'a> {
 
     pub fn eat_ws(&mut self) {
         while self.at_exact() == Kind::Whitespace {
-            self.append_token(self.cursor);
+            self.push_current_token(Kind::Whitespace);
             self.cursor.advance();
         }
     }
@@ -181,7 +181,7 @@ impl<'a> CstParser<'a> {
         loop {
             let kind = self.at_exact();
             if f(kind) {
-                self.append_token(self.cursor);
+                self.push_current_token(kind);
                 self.cursor.advance();
                 self.eat_trivia();
             } else {
@@ -200,7 +200,7 @@ impl<'a> CstParser<'a> {
             self.report_error(f(kind));
         }
 
-        self.append_token(self.cursor);
+        self.push_current_token(self.at_exact());
         self.cursor.advance();
 
         self.end(error);
@@ -226,6 +226,11 @@ impl<'a> CstParser<'a> {
     }
 
     pub fn start(&mut self, kind: Kind) -> StartNode {
+        self.eat_ws();
+        self.start_exact(kind)
+    }
+
+    pub fn start_exact(&mut self, kind: Kind) -> StartNode {
         let index = self.tree.len();
         self.tree.push(SyntaxMarker::StartPlaceholder);
         StartNode {
@@ -246,11 +251,15 @@ impl<'a> CstParser<'a> {
         self.tree.push(SyntaxMarker::End);
     }
 
-    fn append_token(&mut self, cursor: TokenCursor) {
+    fn push_current_token(&mut self, kind: Kind) {
+        let cursor = self.cursor;
         if cursor.0 < self.lex.tokens.len() {
-            self.tree.push(SyntaxMarker::Token {
-                index: cursor.0 as u32,
-            });
+            let index = cursor.0 as u32;
+            let marker = match kind {
+                Kind::Whitespace | Kind::Comment => SyntaxMarker::Ignorable { index },
+                _ => SyntaxMarker::Token { index },
+            };
+            self.tree.push(marker);
         }
     }
 

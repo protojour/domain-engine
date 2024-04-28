@@ -28,8 +28,10 @@ pub enum SyntaxMarker {
     StartPlaceholder,
     /// Marks the start of a node
     Start { kind: Kind },
-    /// Marks the precense of a token
+    /// Marks the precense of a semantic token
     Token { index: u32 },
+    /// Marks the precense of a whitespace-like token (Whitespace or Comment)
+    Ignorable { index: u32 },
     /// Marks the end of a node
     End,
 }
@@ -48,7 +50,8 @@ pub struct SyntaxNode {
 }
 
 impl FlatSyntaxTree {
-    /// Create a proper tree out of the flat syntax tree
+    /// Create a proper tree out of the flat syntax tree.
+    /// Insignificant tokens are filtered out at this stage.
     pub fn unflatten(self) -> SyntaxTree {
         let mut parent_stack: Vec<SyntaxNode> = vec![];
         let mut cursor: usize = 0;
@@ -71,6 +74,9 @@ impl FlatSyntaxTree {
                 }
                 SyntaxMarker::Token { index } => {
                     current_node.children.push(Syntax::Token { index });
+                    cursor = self.lex.span_end(index as usize);
+                }
+                SyntaxMarker::Ignorable { index } => {
                     cursor = self.lex.span_end(index as usize);
                 }
                 SyntaxMarker::End => {
@@ -205,7 +211,7 @@ impl<'a> Display for DebugTree<'a> {
                     writeln!(f, "{kind:?}")?;
                     indent += 1;
                 }
-                SyntaxMarker::Token { index } => {
+                SyntaxMarker::Token { index } | SyntaxMarker::Ignorable { index } => {
                     for _ in 0..indent {
                         write!(f, "    ")?;
                     }

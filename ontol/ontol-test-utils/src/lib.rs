@@ -3,6 +3,7 @@
 use std::{
     borrow::{Borrow, Cow},
     collections::HashMap,
+    rc::Rc,
     sync::Arc,
 };
 
@@ -347,11 +348,11 @@ impl TestPackages {
                         }
 
                         if let Some(source_text) = self.sources_by_name.remove(source_name) {
-                            let arc_source = Arc::new(source_text.as_ref().to_string());
+                            let rc_source = Rc::new(source_text.as_ref().to_string());
                             let syntax_source = if USE_CST {
-                                SyntaxSource::TextCst(arc_source.clone())
+                                SyntaxSource::TextCst(rc_source.clone())
                             } else {
-                                SyntaxSource::TextAst(&arc_source)
+                                SyntaxSource::TextAst(&rc_source)
                             };
 
                             let parsed = ParsedPackage::parse(
@@ -362,7 +363,7 @@ impl TestPackages {
                             );
                             self.source_code_registry
                                 .registry
-                                .insert(parsed.src.id, arc_source);
+                                .insert(parsed.src.id, rc_source);
 
                             package_graph_builder.provide_package(parsed);
                         }

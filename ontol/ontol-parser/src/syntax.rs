@@ -1,6 +1,6 @@
 //! Abstracted source of ONTOL syntax
 
-use std::{ops::Range, sync::Arc};
+use std::{ops::Range, rc::Rc};
 
 use crate::{
     ast::Statement,
@@ -18,7 +18,7 @@ pub struct Syntax {
 /// NOTE: This is probably a temporary design
 pub enum SyntaxKind {
     Ast(Vec<(Statement, Range<usize>)>),
-    CstTree(SyntaxTree, Arc<String>),
+    CstTree(SyntaxTree, Rc<String>),
 }
 
 pub enum SyntaxView<'a> {
@@ -29,7 +29,7 @@ pub enum SyntaxView<'a> {
 /// Can be expanded to include LSP lossless rowan tree
 pub enum SyntaxSource<'a> {
     TextAst(&'a str),
-    TextCst(Arc<String>),
+    TextCst(Rc<String>),
 }
 
 impl<'a> SyntaxSource<'a> {

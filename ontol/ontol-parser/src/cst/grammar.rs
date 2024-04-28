@@ -28,7 +28,7 @@ struct AllowedPattern {
 }
 
 pub fn ontol(p: &mut CstParser) {
-    let ontol = p.start(Kind::Ontol);
+    let ontol = p.start_exact(Kind::Ontol);
 
     while p.at() != Kind::Eof {
         statement(p);
@@ -40,8 +40,6 @@ pub fn ontol(p: &mut CstParser) {
 }
 
 fn statement(p: &mut CstParser) {
-    p.eat_ws();
-
     let mut stmt = p.start(Kind::Error);
     p.eat_trivia();
 
@@ -141,8 +139,6 @@ mod rel {
         let subject = p.start(Kind::RelSubject);
         rel_type_reference(p);
         p.end(subject);
-
-        p.eat_ws();
 
         let fwd = p.start(Kind::RelFwdSet);
         loop {
@@ -325,7 +321,6 @@ fn fmt_statement(p: &mut CstParser) {
     p.eat(K![fmt]);
 
     loop {
-        p.eat_ws();
         let type_ref = p.start(Kind::TypeModUnit);
         type_ref_inner(
             p,
@@ -349,7 +344,6 @@ fn map_statement(p: &mut CstParser) {
     p.eat(K![map]);
 
     if p.at() == Kind::Sym {
-        p.eat_trivia();
         let ident = p.start(Kind::IdentPath);
         p.eat(Kind::Sym);
         p.end(ident);
@@ -373,7 +367,6 @@ fn map_statement(p: &mut CstParser) {
 }
 
 fn map_arm(p: &mut CstParser) {
-    p.eat_trivia();
     let arm = p.start(Kind::MapArm);
 
     pattern(p, AllowedPattern { expr: false });
@@ -386,6 +379,8 @@ pub fn pattern_with_expr(p: &mut CstParser) {
 }
 
 fn pattern(p: &mut CstParser, allowed: AllowedPattern) {
+    p.eat_ws();
+
     match lookahead_detect_pattern(p) {
         DetectedPattern::Struct => struct_pattern::entry(p),
         DetectedPattern::Set => set_pattern::entry(p),
@@ -465,7 +460,6 @@ mod struct_pattern {
 
     fn param(p: &mut CstParser) {
         if p.at() == K![..] {
-            p.eat_trivia();
             let spread = p.start(Kind::Spread);
             p.eat(K![..]);
             p.eat(Kind::Sym);
@@ -511,6 +505,7 @@ mod struct_pattern {
             p.end(type_ref);
 
             if p.at() == K!['['] {
+                p.eat_ws();
                 let rel_args = p.start(Kind::RelArgs);
                 delimited_comma_separated(p, K!['['], param, K![']']);
                 p.end(rel_args);
@@ -549,8 +544,6 @@ mod set_pattern {
     }
 
     fn element(p: &mut CstParser) {
-        p.eat_trivia();
-
         let element = p.start(Kind::SetElement);
 
         if p.at() == K![..] {
@@ -579,7 +572,6 @@ pub mod expr_pattern {
     }
 
     fn expr_pattern_delimited(p: &mut CstParser) {
-        p.eat_trivia();
         match p.at() {
             kind @ (Kind::Sym
             | Kind::Number

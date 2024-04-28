@@ -1,4 +1,4 @@
-@match bar('baz': @in { ..['a': x] y })
+@match bar('baz': @in { .. ['a': x] y })
 
 //@ grammar=pattern
 PatStruct
@@ -12,8 +12,8 @@ PatStruct
             Literal
                 SingleQuoteText `'baz'`
         Colon `:`
+        Whitespace
         PatSet
-            Whitespace
             Modifier `@in`
             Whitespace
             CurlyOpen `{`
@@ -21,6 +21,7 @@ PatStruct
             SetElement
                 Spread
                     DotDot `..`
+                Whitespace
                 RelArgs
                     SquareOpen `[`
                     StructParamAttrProp

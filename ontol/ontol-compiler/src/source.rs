@@ -1,7 +1,7 @@
 use std::{
     fmt::Debug,
     ops::{Deref, Range},
-    sync::Arc,
+    rc::Rc,
 };
 
 use fnv::FnvHashMap;
@@ -18,7 +18,7 @@ pub const NATIVE_SOURCE: SourceId = SourceId(0);
 pub struct Src {
     pub id: SourceId,
     pub package_id: PackageId,
-    pub name: Arc<String>,
+    pub name: Rc<String>,
 }
 
 impl Src {
@@ -103,7 +103,7 @@ impl<'m, T> SpannedBorrow<'m, T> {
 /// The compiler does not hold an instance of this.
 #[derive(Default)]
 pub struct SourceCodeRegistry {
-    pub registry: FnvHashMap<SourceId, Arc<String>>,
+    pub registry: FnvHashMap<SourceId, Rc<String>>,
 }
 
 /// Sources currently being compiled

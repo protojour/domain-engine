@@ -489,9 +489,9 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
             );
 
             root_defs.push(self.lower_fmt_transition(
-                (origin_def_id, &transition.view().span()),
+                (origin_def_id, transition.view().span()),
                 transition,
-                (target_def_id, &next_transition.view().span()),
+                (target_def_id, next_transition.view().span()),
                 FmtFinalState(false),
             )?);
 
@@ -503,9 +503,9 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
             self.resolve_type_reference(target.type_ref()?, &block, Some(&mut root_defs))?;
 
         root_defs.push(self.lower_fmt_transition(
-            (origin_def_id, &origin.view().span()),
+            (origin_def_id, origin.view().span()),
             transition,
-            (final_def, &target.view().span()),
+            (final_def, target.view().span()),
             FmtFinalState(true),
         )?);
 
@@ -514,9 +514,9 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
 
     fn lower_fmt_transition(
         &mut self,
-        from: (DefId, &Span),
+        from: (DefId, Span),
         transition: insp::TypeMod<V>,
-        to: (DefId, &Span),
+        to: (DefId, Span),
         final_state: FmtFinalState,
     ) -> Option<DefId> {
         let transition_def =
@@ -532,9 +532,9 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
             DefKind::Relationship(Relationship {
                 relation_def_id,
                 relation_span: self.ctx.source_span(&from.1),
-                subject: (from.0, self.ctx.source_span(from.1)),
+                subject: (from.0, self.ctx.source_span(&from.1)),
                 subject_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::IndexSet),
-                object: (to.0, self.ctx.source_span(to.1)),
+                object: (to.0, self.ctx.source_span(&to.1)),
                 object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::IndexSet),
                 object_prop: None,
                 rel_params: RelParams::Unit,

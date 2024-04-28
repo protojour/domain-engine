@@ -41,6 +41,7 @@ use std::{
     io::{stdout, Stdout, Write},
     net::SocketAddr,
     path::{Path, PathBuf},
+    rc::Rc,
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -278,7 +279,7 @@ fn compile(
 
     let root_file_name = get_source_name(root_files.first().unwrap());
     let mut ontol_sources = Sources::default();
-    let mut sources_by_name: HashMap<String, Arc<String>> = Default::default();
+    let mut sources_by_name: HashMap<String, Rc<String>> = Default::default();
     let mut paths_by_name: HashMap<String, PathBuf> = Default::default();
 
     for entry in read_dir(root_dir)? {
@@ -292,7 +293,7 @@ fn compile(
             let source = fs::read_to_string(&path)?;
             let source_name = get_source_name(&path);
 
-            sources_by_name.insert(source_name.clone(), Arc::new(source));
+            sources_by_name.insert(source_name.clone(), Rc::new(source));
             paths_by_name.insert(source_name, path);
         }
     }
