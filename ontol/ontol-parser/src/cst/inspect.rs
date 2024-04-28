@@ -296,7 +296,11 @@ impl<'a, V: NodeView<'a>> PropCardinality<V> {
     }
 }
 
-impl<'a, V: NodeView<'a>> FmtStatement<V> {}
+impl<'a, V: NodeView<'a> + 'a> FmtStatement<V> {
+    pub fn transitions(self) -> impl Iterator<Item = TypeMod<V>> + 'a {
+        self.view.sub_nodes().filter_map(TypeMod::from_view)
+    }
+}
 
 impl<'a, V: NodeView<'a> + 'a> MapStatement<V> {
     pub fn doc_comments(self) -> impl Iterator<Item = &'a str> {

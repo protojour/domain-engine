@@ -438,7 +438,9 @@ impl<'c, 'm> AstLowering<'c, 'm> {
         let mut iter = transitions.into_iter().peekable();
 
         let (mut transition, mut transition_span) = match iter.next() {
-            Some((Either::Left(_), _)) => return Err((CompileError::FmtMisplacedWildcard, span)),
+            Some((Either::Left(_dot), _)) => {
+                return Err((CompileError::FmtMisplacedWildcard, span))
+            }
             Some((Either::Right(next), span)) => (next, span),
             None => return Err((CompileError::FmtTooFewTransitions, span)),
         };
@@ -449,7 +451,7 @@ impl<'c, 'm> AstLowering<'c, 'm> {
                     // end of iterator, found the final target. Handle this outside the loop:
                     break item;
                 }
-                Some((Either::Left(_), _)) => {
+                Some((Either::Left(_dot), _)) => {
                     return Err((CompileError::FmtMisplacedWildcard, span))
                 }
                 Some((Either::Right(item), span)) => (item, span),

@@ -1,11 +1,8 @@
-#![allow(unused)]
-
 use std::{collections::hash_map::Entry, marker::PhantomData, ops::Range};
 
 use ontol_parser::{
-    ast::SetPatternModifier,
     cst::{
-        inspect::{self as insp, RelObject, RelSubject},
+        inspect::{self as insp},
         view::{NodeView, NodeViewExt, TokenView, TokenViewExt},
     },
     lexer::{kind::Kind, unescape::unescape_regex},
@@ -18,7 +15,7 @@ use ontol_runtime::{
 use tracing::{debug, debug_span};
 
 use crate::{
-    def::{DefKind, RelParams, Relationship, TypeDef, TypeDefFlags},
+    def::{DefKind, FmtFinalState, RelParams, Relationship, TypeDef, TypeDefFlags},
     lowering::context::{LoweringCtx, SetElement},
     namespace::Space,
     package::{PackageReference, ONTOL_PKG},
@@ -27,7 +24,7 @@ use crate::{
         PatternKind, SetBinaryOperator, SetPatternElement, SpreadLabel, TypePath,
     },
     regex_util::RegexToPatternLowerer,
-    CompileError, Compiler, SourceSpan, SpannedCompileError, Src,
+    CompileError, Compiler, SourceSpan, Src,
 };
 
 use super::context::{
@@ -168,7 +165,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         block_context: BlockContext,
     ) -> Option<RootDefs> {
         match statement {
-            insp::Statement::UseStatement(use_stmt) => None,
+            insp::Statement::UseStatement(_use_stmt) => None,
             insp::Statement::DefStatement(def_stmt) => {
                 let ident_token = def_stmt.ident_path()?.symbols().next()?;
                 let (private, open, extern_, symbol) =
@@ -191,7 +188,9 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
             insp::Statement::RelStatement(rel_stmt) => {
                 self.lower_rel_statement(rel_stmt, block_context)
             }
-            insp::Statement::FmtStatement(fmt_stmt) => todo!(),
+            insp::Statement::FmtStatement(fmt_stmt) => {
+                self.lower_fmt_statement(fmt_stmt, block_context)
+            }
             insp::Statement::MapStatement(map_stmt) => {
                 let def_id = self.lower_map_statement(map_stmt, block_context)?;
                 Some(vec![def_id])
@@ -230,7 +229,6 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
     ) -> Option<RootDefs> {
         let subject = stmt.subject()?;
         let fwd_set = stmt.fwd_set()?;
-        let backwd_set = stmt.backwd_set();
         let object = stmt.object()?;
 
         let mut root_defs = RootDefs::default();
@@ -255,7 +253,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
             }
         };
 
-        for (index, relation) in stmt.fwd_set()?.relations().enumerate() {
+        for (index, relation) in fwd_set.relations().enumerate() {
             if let Some(mut defs) = self.lower_relationship(
                 (subject_def_id, subject),
                 relation,
@@ -272,9 +270,9 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
 
     fn lower_relationship(
         &mut self,
-        subject: (DefId, RelSubject<V>),
+        subject: (DefId, insp::RelSubject<V>),
         relation: insp::Relation<V>,
-        object: (DefId, RelObject<V>),
+        object: (DefId, insp::RelObject<V>),
         backward_relation: Option<insp::RelBackwdSet<V>>,
         rel_stmt: insp::RelStatement<V>,
     ) -> Option<RootDefs> {
@@ -443,6 +441,106 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         root_defs.push(relationship_id);
 
         Some(root_defs)
+    }
+
+    fn lower_fmt_statement(
+        &mut self,
+        stmt: insp::FmtStatement<V>,
+        block: BlockContext,
+    ) -> Option<RootDefs> {
+        let mut root_defs = Vec::new();
+        let mut transitions = stmt.transitions().peekable();
+
+        let Some(origin) = transitions.next() else {
+            self.report_error((CompileError::TODO("missing origin"), stmt.view.span()));
+            return None;
+        };
+        let mut origin_def_id = self.resolve_type_reference(
+            origin.type_ref()?,
+            &BlockContext::NoContext,
+            Some(&mut root_defs),
+        )?;
+
+        let Some(mut transition) = transitions.next() else {
+            self.report_error((CompileError::FmtTooFewTransitions, stmt.view.span()));
+            return None;
+        };
+
+        let target = loop {
+            let next_transition = match transitions.next() {
+                Some(item) if transitions.peek().is_none() => {
+                    // end of iterator, found the final target. Handle this outside the loop:
+                    break item;
+                }
+                Some(item) => item,
+                _ => {
+                    self.report_error((CompileError::FmtTooFewTransitions, stmt.view.span()));
+                    return None;
+                }
+            };
+
+            let target_def_id = self.ctx.define_anonymous_type(
+                TypeDef {
+                    ident: None,
+                    rel_type_for: None,
+                    flags: TypeDefFlags::CONCRETE,
+                },
+                &next_transition.view().span(),
+            );
+
+            root_defs.push(self.lower_fmt_transition(
+                (origin_def_id, &transition.view().span()),
+                transition,
+                (target_def_id, &next_transition.view().span()),
+                FmtFinalState(false),
+            )?);
+
+            transition = next_transition;
+            origin_def_id = target_def_id;
+        };
+
+        let final_def =
+            self.resolve_type_reference(target.type_ref()?, &block, Some(&mut root_defs))?;
+
+        root_defs.push(self.lower_fmt_transition(
+            (origin_def_id, &origin.view().span()),
+            transition,
+            (final_def, &target.view().span()),
+            FmtFinalState(true),
+        )?);
+
+        Some(root_defs)
+    }
+
+    fn lower_fmt_transition(
+        &mut self,
+        from: (DefId, &Span),
+        transition: insp::TypeMod<V>,
+        to: (DefId, &Span),
+        final_state: FmtFinalState,
+    ) -> Option<DefId> {
+        let transition_def =
+            self.resolve_type_reference(transition.type_ref()?, &BlockContext::NoContext, None)?;
+        let relation_key = RelationKey::FmtTransition(transition_def, final_state);
+
+        // This syntax just defines the relation the first time it's used
+        let relation_def_id = self.ctx.define_relation_if_undefined(relation_key, &from.1);
+
+        debug!("{:?}: <transition>", relation_def_id.0);
+
+        Some(self.ctx.define_anonymous(
+            DefKind::Relationship(Relationship {
+                relation_def_id,
+                relation_span: self.ctx.source_span(&from.1),
+                subject: (from.0, self.ctx.source_span(from.1)),
+                subject_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::IndexSet),
+                object: (to.0, self.ctx.source_span(to.1)),
+                object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::IndexSet),
+                object_prop: None,
+                rel_params: RelParams::Unit,
+            }),
+            &to.1,
+        ))
     }
 
     fn lower_map_statement(
@@ -806,7 +904,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                             lowered_attrs
                                 .push(self.lower_compound_pattern_attr_prop(attr_prop, var_table)?);
                         }
-                        insp::StructParam::StructParamAttrUnit(unit) => {
+                        insp::StructParam::StructParamAttrUnit(_unit) => {
                             self.report_error((
                                 CompileError::TODO("unit cannot be used here"),
                                 param.view().span(),
@@ -1219,7 +1317,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
     fn token_to_u16(&mut self, token: V::Token) -> Option<u16> {
         match token.slice().parse::<u16>() {
             Ok(number) => Some(number),
-            Err(error) => {
+            Err(_error) => {
                 self.report_error((
                     CompileError::NumberParse("unable to parse integer".to_string()),
                     token.span(),
