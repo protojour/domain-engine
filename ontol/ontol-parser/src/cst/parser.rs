@@ -171,17 +171,15 @@ impl<'a> CstParser<'a> {
     }
 
     pub fn eat_ws(&mut self) {
-        self.eat_while(|kind| matches!(kind, Kind::Whitespace));
+        while self.at_exact() == Kind::Whitespace {
+            self.append_token(self.cursor);
+            self.cursor.advance();
+        }
     }
 
     pub fn eat_while(&mut self, mut f: impl FnMut(Kind) -> bool) {
         loop {
-            let kind = self
-                .lex
-                .tokens
-                .get(self.cursor.0)
-                .copied()
-                .unwrap_or(Kind::Eof);
+            let kind = self.at_exact();
             if f(kind) {
                 self.append_token(self.cursor);
                 self.cursor.advance();

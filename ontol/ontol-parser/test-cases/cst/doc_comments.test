@@ -1,0 +1,69 @@
+
+/// c1
+def a(
+    /// r1
+    rel .'a': text
+
+    /// r2
+    rel .'b': text
+)
+
+//@ grammar=ontol
+Ontol
+    Whitespace
+    DefStatement
+        DocComment `/// c1`
+        Whitespace
+        KwDef `def`
+        Whitespace
+        IdentPath
+            Sym `a`
+        DefBody
+            ParenOpen `(`
+            Whitespace
+            RelStatement
+                DocComment `/// r1`
+                Whitespace
+                KwRel `rel`
+                Whitespace
+                RelSubject
+                    TypeModUnit
+                        This
+                            Dot `.`
+                RelFwdSet
+                    Relation
+                        TypeModUnit
+                            Literal
+                                SingleQuoteText `'a'`
+                        PropCardinality
+                Colon `:`
+                Whitespace
+                RelObject
+                    TypeModUnit
+                        IdentPath
+                            Sym `text`
+            Whitespace
+            RelStatement
+                DocComment `/// r2`
+                Whitespace
+                KwRel `rel`
+                Whitespace
+                RelSubject
+                    TypeModUnit
+                        This
+                            Dot `.`
+                RelFwdSet
+                    Relation
+                        TypeModUnit
+                            Literal
+                                SingleQuoteText `'b'`
+                        PropCardinality
+                Colon `:`
+                Whitespace
+                RelObject
+                    TypeModUnit
+                        IdentPath
+                            Sym `text`
+            Whitespace
+            ParenClose `)`
+    Whitespace
