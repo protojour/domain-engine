@@ -529,6 +529,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
                 _ => self.error_node(CompileError::IncompatibleLiteral, &pattern.span, ctx),
             },
+            (PatternKind::Error, _) => self.make_error_node(&pattern.span, ctx),
             (kind, ty) => self.error_node(
                 CompileError::TODO(format!(
                     "Not enough type information for {kind:?}, expected_ty = {ty:?}"

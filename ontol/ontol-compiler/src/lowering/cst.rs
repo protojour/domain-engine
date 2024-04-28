@@ -52,6 +52,7 @@ enum LoweredStructPatternParams {
         spread_label: Option<Box<SpreadLabel>>,
     },
     Unit(Pattern),
+    Error,
 }
 
 impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
@@ -244,7 +245,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
             }
             insp::TypeModOrPattern::Pattern(pattern) => {
                 let mut var_table = MapVarTable::default();
-                let lowered = self.lower_pattern(pattern, &mut var_table)?;
+                let lowered = self.lower_pattern(pattern, &mut var_table);
                 let pat_id = self.ctx.compiler.patterns.alloc_pat_id();
                 self.ctx.compiler.patterns.table.insert(pat_id, lowered);
 
@@ -300,15 +301,11 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                         }
                         DefKind::BuiltinRelType(..) => (RelationKey::Builtin(def_id), span, None),
                         DefKind::NumberLiteral(lit) => match lit.parse::<u16>() {
-                            Ok(int) => (
-                                RelationKey::Indexed,
-                                type_mod.view().span(),
-                                Some(Some(int)..Some(int + 1)),
-                            ),
+                            Ok(int) => (RelationKey::Indexed, span, Some(Some(int)..Some(int + 1))),
                             Err(_) => {
                                 self.report_error((
                                     CompileError::NumberParse("not an integer".to_string()),
-                                    type_mod.view().span(),
+                                    span,
                                 ));
                                 return None;
                             }
@@ -409,7 +406,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
 
             Relationship {
                 relation_def_id,
-                relation_span: self.ctx.source_span(&relation.view.span()),
+                relation_span: self.ctx.source_span(&ident_span),
                 subject: (subject.0, self.ctx.source_span(&subject.1.view.span())),
                 subject_cardinality,
                 object: (object.0, self.ctx.source_span(&object.1.view.span())),
@@ -606,7 +603,10 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         arm: insp::MapArm<V>,
         var_table: &mut MapVarTable,
     ) -> Option<PatId> {
-        let pattern = self.lower_pattern(arm.pattern()?, var_table)?;
+        let pattern = match arm.pattern() {
+            Some(p) => self.lower_pattern(p, var_table),
+            None => self.mk_error_pattern(&arm.view.span()),
+        };
 
         let pat_id = self.ctx.compiler.patterns.alloc_pat_id();
         self.ctx.compiler.patterns.table.insert(pat_id, pattern);
@@ -614,15 +614,13 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         Some(pat_id)
     }
 
-    fn lower_pattern(
-        &mut self,
-        pat: insp::Pattern<V>,
-        var_table: &mut MapVarTable,
-    ) -> Option<Pattern> {
+    fn lower_pattern(&mut self, pat: insp::Pattern<V>, var_table: &mut MapVarTable) -> Pattern {
         match pat {
             insp::Pattern::PatStruct(pat) => self.lower_struct_pattern(pat, var_table),
             insp::Pattern::PatSet(pat) => self.lower_set_pattern(pat, var_table),
-            insp::Pattern::PatAtom(pat) => self.lower_atom_pattern(pat, var_table),
+            insp::Pattern::PatAtom(pat) => self
+                .lower_atom_pattern(pat, var_table)
+                .unwrap_or_else(|| self.mk_error_pattern(&pat.view.span())),
             insp::Pattern::PatBinary(pat) => self.lower_binary_pattern(pat, var_table),
         }
     }
@@ -631,12 +629,15 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         &mut self,
         pat_struct: insp::PatStruct<V>,
         var_table: &mut MapVarTable,
-    ) -> Option<Pattern> {
+    ) -> Pattern {
         let span = pat_struct.view.span();
         let type_path = match pat_struct.ident_path() {
-            Some(ident_path) => TypePath::Specified {
-                def_id: self.lookup_path(ident_path)?,
-                span: self.ctx.source_span(&ident_path.view.span()),
+            Some(ident_path) => match self.lookup_path(ident_path) {
+                Some(def_id) => TypePath::Specified {
+                    def_id,
+                    span: self.ctx.source_span(&ident_path.view.span()),
+                },
+                None => return self.ctx.mk_pattern(PatternKind::Error, &span),
             },
             None => {
                 let def_id = self.ctx.define_anonymous_type(
@@ -656,7 +657,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
             }
         };
 
-        match self.lower_struct_pattern_params(pat_struct.params(), var_table)? {
+        match self.lower_struct_pattern_params(pat_struct.params(), var_table) {
             LoweredStructPatternParams::Attrs {
                 attrs,
                 spread_label,
@@ -670,7 +671,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                     }
                 }
 
-                Some(self.ctx.mk_pattern(
+                self.ctx.mk_pattern(
                     PatternKind::Compound {
                         type_path,
                         modifier,
@@ -679,7 +680,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                         spread_label,
                     },
                     &span,
-                ))
+                )
             }
             LoweredStructPatternParams::Unit(unit_pattern) => {
                 if let Some(modifier) = pat_struct.modifiers().next() {
@@ -691,27 +692,26 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
 
                 let key = (DefId::unit(), self.ctx.source_span(&span));
 
-                Some(
-                    self.ctx.mk_pattern(
-                        PatternKind::Compound {
-                            type_path,
-                            modifier: None,
-                            is_unit_binding: true,
-                            attributes: [CompoundPatternAttr {
-                                key,
-                                bind_option: false,
-                                kind: CompoundPatternAttrKind::Value {
-                                    rel: None,
-                                    val: unit_pattern,
-                                },
-                            }]
-                            .into(),
-                            spread_label: None,
-                        },
-                        &span,
-                    ),
+                self.ctx.mk_pattern(
+                    PatternKind::Compound {
+                        type_path,
+                        modifier: None,
+                        is_unit_binding: true,
+                        attributes: [CompoundPatternAttr {
+                            key,
+                            bind_option: false,
+                            kind: CompoundPatternAttrKind::Value {
+                                rel: None,
+                                val: unit_pattern,
+                            },
+                        }]
+                        .into(),
+                        spread_label: None,
+                    },
+                    &span,
                 )
             }
+            LoweredStructPatternParams::Error => self.ctx.mk_pattern(PatternKind::Error, &span),
         }
     }
 
@@ -719,17 +719,18 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         &mut self,
         params: impl Iterator<Item = insp::StructParam<V>>,
         var_table: &mut MapVarTable,
-    ) -> Option<LoweredStructPatternParams> {
+    ) -> LoweredStructPatternParams {
         let mut attrs: Vec<CompoundPatternAttr> = vec![];
         let mut spread_label: Option<Box<SpreadLabel>> = None;
+        let mut spread_error_reported = false;
 
         for param in params {
-            if spread_label.is_some() {
+            if spread_label.is_some() && !spread_error_reported {
                 self.report_error((
                     CompileError::SpreadLabelMustBeLastArgument,
                     param.view().span(),
                 ));
-                break;
+                spread_error_reported = true;
             }
 
             match param {
@@ -740,32 +741,35 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                     }
                 }
                 insp::StructParam::Spread(spread) => {
-                    let symbol = spread.symbol()?;
+                    let Some(symbol) = spread.symbol() else {
+                        return LoweredStructPatternParams::Error;
+                    };
                     spread_label = Some(Box::new(SpreadLabel(
                         symbol.slice().to_string(),
                         self.ctx.source_span(&symbol.span()),
                     )));
                 }
                 insp::StructParam::StructParamAttrUnit(attr_unit) => {
-                    let unit_pattern = match attr_unit.pattern()? {
-                        insp::Pattern::PatSet(pat_set) => {
+                    let unit_pattern = match attr_unit.pattern() {
+                        Some(insp::Pattern::PatSet(pat_set)) => {
                             self.report_error((
                                 CompileError::TODO("set pattern not allowed here"),
                                 pat_set.view.span(),
                             ));
-                            return None;
+                            return LoweredStructPatternParams::Error;
                         }
-                        pattern => self.lower_pattern(pattern, var_table)?,
+                        None => return LoweredStructPatternParams::Error,
+                        Some(pattern) => self.lower_pattern(pattern, var_table),
                     };
-                    return Some(LoweredStructPatternParams::Unit(unit_pattern));
+                    return LoweredStructPatternParams::Unit(unit_pattern);
                 }
             }
         }
 
-        Some(LoweredStructPatternParams::Attrs {
+        LoweredStructPatternParams::Attrs {
             attrs: attrs.into_boxed_slice(),
             spread_label,
-        })
+        }
     }
 
     fn lower_compound_pattern_attr_prop(
@@ -782,7 +786,18 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
             .and_then(|pc| pc.question())
             .is_some();
 
-        match attr_prop.pattern()? {
+        let Some(cst_pattern) = attr_prop.pattern() else {
+            return Some(CompoundPatternAttr {
+                key: (relation_def, relation_span),
+                bind_option,
+                kind: CompoundPatternAttrKind::Value {
+                    rel: None,
+                    val: self.mk_error_pattern(&attr_prop.view.span()),
+                },
+            });
+        };
+
+        match cst_pattern {
             insp::Pattern::PatSet(pat_set) => {
                 if let Some(rel_args) = attr_prop.rel_args() {
                     self.report_error((
@@ -799,7 +814,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                         self.lower_set_algebra_pattern(pat_set, operator, var_table)?
                     }
                     None => {
-                        let object_pattern = self.lower_pattern(pat_set.into(), var_table)?;
+                        let object_pattern = self.lower_pattern(pat_set.into(), var_table);
 
                         CompoundPatternAttrKind::Value {
                             rel: None,
@@ -815,7 +830,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                 })
             }
             obj_pattern => {
-                let object_pattern = self.lower_pattern(obj_pattern, var_table)?;
+                let object_pattern = self.lower_pattern(obj_pattern, var_table);
                 let rel = self.lower_compound_pattern_attr_rel_args(
                     attr_prop.rel_args(),
                     &object_pattern,
@@ -852,7 +867,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
             _ => None,
         };
 
-        match self.lower_struct_pattern_params(rel_args.params(), var_table)? {
+        match self.lower_struct_pattern_params(rel_args.params(), var_table) {
             LoweredStructPatternParams::Attrs {
                 attrs,
                 spread_label,
@@ -872,6 +887,9 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                 );
                 None
             }
+            LoweredStructPatternParams::Error => {
+                Some(Some(self.mk_error_pattern(&rel_args.view.span())))
+            }
         }
     }
 
@@ -879,19 +897,17 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         &mut self,
         pat_set: insp::PatSet<V>,
         var_table: &mut MapVarTable,
-    ) -> Option<Pattern> {
+    ) -> Pattern {
         let seq_type = pat_set
             .ident_path()
             .and_then(|ident_path| self.lookup_path(ident_path));
 
         let mut pattern_elements = vec![];
         for element in pat_set.elements() {
-            let Some(pattern) = element
+            let pattern = element
                 .pattern()
-                .and_then(|pattern| self.lower_pattern(pattern, var_table))
-            else {
-                continue;
-            };
+                .map(|pattern| self.lower_pattern(pattern, var_table))
+                .unwrap_or_else(|| self.mk_error_pattern(&element.view.span()));
 
             let rel = if let Some(rel_args) = element.rel_args() {
                 let mut lowered_attrs = vec![];
@@ -901,8 +917,11 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                 for param in rel_args.params() {
                     match param {
                         insp::StructParam::StructParamAttrProp(attr_prop) => {
-                            lowered_attrs
-                                .push(self.lower_compound_pattern_attr_prop(attr_prop, var_table)?);
+                            if let Some(attr_prop) =
+                                self.lower_compound_pattern_attr_prop(attr_prop, var_table)
+                            {
+                                lowered_attrs.push(attr_prop);
+                            }
                         }
                         insp::StructParam::StructParamAttrUnit(_unit) => {
                             self.report_error((
@@ -911,11 +930,12 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                             ));
                         }
                         insp::StructParam::Spread(spread) => {
-                            let symbol = spread.symbol()?;
-                            spread_label = Some(Box::new(SpreadLabel(
-                                symbol.slice().to_string(),
-                                self.ctx.source_span(&symbol.span()),
-                            )));
+                            if let Some(symbol) = spread.symbol() {
+                                spread_label = Some(Box::new(SpreadLabel(
+                                    symbol.slice().to_string(),
+                                    self.ctx.source_span(&symbol.span()),
+                                )));
+                            }
                         }
                     }
                 }
@@ -943,13 +963,13 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
             })
         }
 
-        Some(self.ctx.mk_pattern(
+        self.ctx.mk_pattern(
             PatternKind::Set {
                 val_type_def: seq_type,
                 elements: pattern_elements.into_boxed_slice(),
             },
             &pat_set.view.span(),
-        ))
+        )
     }
 
     fn lower_set_algebra_pattern(
@@ -963,11 +983,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         for element in pat_set.elements() {
             let rel = match element.rel_args() {
                 Some(rel_args) => {
-                    let Some(params) =
-                        self.lower_struct_pattern_params(rel_args.params(), var_table)
-                    else {
-                        continue;
-                    };
+                    let params = self.lower_struct_pattern_params(rel_args.params(), var_table);
                     Some(self.ctx.mk_pattern(
                         PatternKind::Compound {
                             type_path: TypePath::RelContextual,
@@ -975,7 +991,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                             is_unit_binding: false,
                             attributes: match params {
                                 LoweredStructPatternParams::Attrs { attrs, .. } => attrs,
-                                LoweredStructPatternParams::Unit(_) => {
+                                _ => {
                                     continue;
                                 }
                             },
@@ -986,12 +1002,10 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                 }
                 None => None,
             };
-            let Some(val) = element
+            let val = element
                 .pattern()
-                .and_then(|pattern| self.lower_pattern(pattern, var_table))
-            else {
-                continue;
-            };
+                .map(|pattern| self.lower_pattern(pattern, var_table))
+                .unwrap_or_else(|| self.mk_error_pattern(&element.view.span()));
 
             elements.push(SetElement {
                 iter: element.spread().is_some(),
@@ -1093,11 +1107,17 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         &mut self,
         pat_atom: insp::PatBinary<V>,
         var_table: &mut MapVarTable,
-    ) -> Option<Pattern> {
+    ) -> Pattern {
+        let span = pat_atom.view.span();
         let mut operands = pat_atom.operands();
-        let left = self.lower_pattern(operands.next()?, var_table)?;
+        let left = operands
+            .next()
+            .map(|op| self.lower_pattern(op, var_table))
+            .unwrap_or_else(|| self.mk_error_pattern(&span));
 
-        let infix_token = pat_atom.infix_token()?;
+        let Some(infix_token) = pat_atom.infix_token() else {
+            return self.mk_error_pattern(&span);
+        };
 
         let fn_ident = match infix_token.kind() {
             Kind::Plus => "+",
@@ -1109,18 +1129,24 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                     CompileError::TODO("illegal infix operator"),
                     infix_token.span(),
                 ));
-                return None;
+                return self.mk_error_pattern(&span);
             }
         };
 
-        let right = self.lower_pattern(operands.next()?, var_table)?;
+        let Some(def_id) = self.catch(|zelf| zelf.ctx.lookup_ident(fn_ident, &infix_token.span()))
+        else {
+            return self.mk_error_pattern(&span);
+        };
 
-        let def_id = self.catch(|zelf| zelf.ctx.lookup_ident(fn_ident, &infix_token.span()))?;
+        let right = operands
+            .next()
+            .map(|op| self.lower_pattern(op, var_table))
+            .unwrap_or_else(|| self.mk_error_pattern(&span));
 
-        Some(self.ctx.mk_pattern(
+        self.ctx.mk_pattern(
             PatternKind::Call(def_id, Box::new([left, right])),
             &pat_atom.view.span(),
-        ))
+        )
     }
 
     fn resolve_type_reference(
@@ -1341,6 +1367,10 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                 occupied.get_mut().push_str(&docs);
             }
         }
+    }
+
+    fn mk_error_pattern(&mut self, span: &Range<usize>) -> Pattern {
+        self.ctx.mk_pattern(PatternKind::Error, span)
     }
 
     fn catch<T>(&mut self, f: impl FnOnce(&mut Self) -> Res<T>) -> Option<T> {

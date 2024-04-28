@@ -3,7 +3,11 @@ use std::{fs, path::PathBuf};
 use assert_matches::assert_matches;
 use chumsky::Stream;
 
-use crate::{cst::grammar, lexer::ast_lex, parser::statement_sequence};
+use crate::{
+    cst::{grammar, tree::SyntaxMarker},
+    lexer::ast_lex,
+    parser::statement_sequence,
+};
 
 use super::*;
 
@@ -48,6 +52,22 @@ fn cst(#[files("test-cases/cst/*.test")] path: PathBuf) {
     parse_fn(&mut parser);
 
     let (tree, _errors) = parser.finish();
+
+    // smoke tests
+    if parse_fn == grammar::ontol {
+        let token_marker_count = tree
+            .markers()
+            .iter()
+            .filter(|m| {
+                matches!(
+                    m,
+                    SyntaxMarker::Token { .. } | SyntaxMarker::Ignorable { .. }
+                )
+            })
+            .count();
+
+        assert_eq!(token_marker_count, tree.lex().tokens.len());
+    }
 
     pretty_assertions::assert_eq!(cst_expect, format!("{}", tree.debug_tree(&ontol_src)));
 }

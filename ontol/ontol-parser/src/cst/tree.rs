@@ -14,6 +14,16 @@ pub struct FlatSyntaxTree {
     pub(super) lex: Lex,
 }
 
+impl FlatSyntaxTree {
+    pub fn markers(&self) -> &[SyntaxMarker] {
+        &self.markers
+    }
+
+    pub fn lex(&self) -> &Lex {
+        &self.lex
+    }
+}
+
 /// A more condensed syntax tree which is more efficient for breadth-first traversal.
 pub struct SyntaxTree {
     root: Syntax,
@@ -23,9 +33,6 @@ pub struct SyntaxTree {
 /// Markers in the flat syntax tree
 #[derive(Clone, PartialEq, Debug)]
 pub enum SyntaxMarker {
-    /// Placeholder node used for building the tree.
-    /// The resulting tree should not contain this.
-    StartPlaceholder,
     /// Marks the start of a node
     Start { kind: Kind },
     /// Marks the precense of a semantic token
@@ -45,7 +52,7 @@ pub enum Syntax {
 #[derive(Clone, PartialEq, Debug)]
 pub struct SyntaxNode {
     kind: Kind,
-    start: usize,
+    span_start: usize,
     children: ThinVec<Syntax>,
 }
 
@@ -54,30 +61,29 @@ impl FlatSyntaxTree {
     /// Insignificant tokens are filtered out at this stage.
     pub fn unflatten(self) -> SyntaxTree {
         let mut parent_stack: Vec<SyntaxNode> = vec![];
-        let mut cursor: usize = 0;
+        let mut span_cursor: usize = 0;
         let mut current_node = SyntaxNode {
             kind: Kind::Error,
-            start: 0,
+            span_start: 0,
             children: thin_vec![],
         };
 
         for marker in self.markers.into_iter() {
             match marker {
-                SyntaxMarker::StartPlaceholder => unreachable!(),
                 SyntaxMarker::Start { kind } => {
                     parent_stack.push(current_node);
                     current_node = SyntaxNode {
                         kind,
-                        start: cursor,
+                        span_start: span_cursor,
                         children: thin_vec![],
                     };
                 }
                 SyntaxMarker::Token { index } => {
                     current_node.children.push(Syntax::Token { index });
-                    cursor = self.lex.span_end(index as usize);
+                    span_cursor = self.lex.span_end(index as usize);
                 }
                 SyntaxMarker::Ignorable { index } => {
-                    cursor = self.lex.span_end(index as usize);
+                    span_cursor = self.lex.span_end(index as usize);
                 }
                 SyntaxMarker::End => {
                     let mut parent = parent_stack.pop().unwrap();
@@ -139,7 +145,24 @@ impl<'a> NodeView<'a> for TreeNodeView<'a> {
     }
 
     fn span_start(&self) -> usize {
-        self.node.start
+        self.node.span_start
+    }
+
+    fn span(self) -> std::ops::Range<usize> {
+        let mut span = self.node.span_start..self.node.span_start;
+
+        if let Some(last) = self.children().last() {
+            match last {
+                Item::Node(node) => {
+                    span.end = node.span().end;
+                }
+                Item::Token(token) => {
+                    span.end = token.span().end;
+                }
+            }
+        }
+
+        span
     }
 
     fn children(&self) -> Self::Children {
@@ -203,7 +226,6 @@ impl<'a> Display for DebugTree<'a> {
         let mut indent: i64 = 0;
         for syntax in &self.tree.markers {
             match syntax {
-                SyntaxMarker::StartPlaceholder => panic!(),
                 SyntaxMarker::Start { kind } => {
                     for _ in 0..indent {
                         write!(f, "    ")?;

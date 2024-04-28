@@ -379,7 +379,7 @@ pub fn pattern_with_expr(p: &mut CstParser) {
 }
 
 fn pattern(p: &mut CstParser, allowed: AllowedPattern) {
-    p.eat_ws();
+    p.eat_space();
 
     match lookahead_detect_pattern(p) {
         DetectedPattern::Struct => struct_pattern::entry(p),
@@ -505,7 +505,7 @@ mod struct_pattern {
             p.end(type_ref);
 
             if p.at() == K!['['] {
-                p.eat_ws();
+                p.eat_space();
                 let rel_args = p.start(Kind::RelArgs);
                 delimited_comma_separated(p, K!['['], param, K![']']);
                 p.end(rel_args);

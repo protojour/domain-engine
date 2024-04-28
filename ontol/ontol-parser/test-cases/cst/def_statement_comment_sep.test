@@ -1,0 +1,27 @@
+def foo() // comment1
+def bar() // comment2
+
+//@ grammar=ontol
+Ontol
+    DefStatement
+        KwDef `def`
+        Whitespace
+        IdentPath
+            Sym `foo`
+        DefBody
+            ParenOpen `(`
+            ParenClose `)`
+    Whitespace
+    Comment `// comment1`
+    Whitespace
+    DefStatement
+        KwDef `def`
+        Whitespace
+        IdentPath
+            Sym `bar`
+        DefBody
+            ParenOpen `(`
+            ParenClose `)`
+    Whitespace
+    Comment `// comment2`
+    Whitespace

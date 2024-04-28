@@ -47,7 +47,7 @@ pub enum CompileError {
     SubjectMustBeDomainType,
     ObjectMustBeDataType,
     FmtTooFewTransitions,
-    FmtMisplacedWildcard,
+    FmtMisplacedSelf,
     InvalidMixOfRelationshipTypeForSubject,
     CannotMixIndexedRelationIdentsAndEdgeTypes,
     NoPropertiesExpected,
@@ -177,7 +177,7 @@ impl std::fmt::Display for CompileError {
             Self::FmtTooFewTransitions => {
                 write!(f, "fmt needs at least two transitions: `fmt a => b => c`")
             }
-            Self::FmtMisplacedWildcard => {
+            Self::FmtMisplacedSelf => {
                 write!(f, "fmt only supports `.` at the final target position")
             }
             Self::InvalidMixOfRelationshipTypeForSubject => {

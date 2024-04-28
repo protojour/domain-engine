@@ -39,7 +39,7 @@ pub struct CstParser<'a> {
     lex: Lex,
 
     /// The tree that the parser will produce
-    tree: Vec<SyntaxMarker>,
+    markers: Vec<SyntaxMarker>,
 
     source: &'a str,
     errors: Vec<(TokenCursor, String)>,
@@ -53,7 +53,7 @@ impl<'a> CstParser<'a> {
             source,
             lex,
             cursor: TokenCursor(0),
-            tree: Vec::with_capacity(cap_estimate),
+            markers: Vec::with_capacity(cap_estimate),
             errors: vec![],
             error_state: false,
         }
@@ -61,7 +61,7 @@ impl<'a> CstParser<'a> {
 
     pub fn finish(self) -> (FlatSyntaxTree, Vec<(Range<usize>, String)>) {
         let tree = FlatSyntaxTree {
-            markers: self.tree,
+            markers: self.markers,
             lex: self.lex,
         };
         let errors = self
@@ -160,20 +160,28 @@ impl<'a> CstParser<'a> {
         result
     }
 
+    /// Eat "trivia", which means Whitespace, Comment and DocComment.
     pub fn eat_trivia(&mut self) {
         self.eat_while(|kind| matches!(kind, Kind::Whitespace | Kind::Comment | Kind::DocComment));
+    }
+
+    /// Eat "space", which in this context means Whitespace and Comment.
+    /// It does not eat DocComment.
+    pub fn eat_space(&mut self) {
+        loop {
+            let kind = self.at_exact();
+            if matches!(kind, Kind::Whitespace | Kind::Comment) {
+                self.push_current_token(kind);
+                self.cursor.advance();
+            } else {
+                break;
+            }
+        }
     }
 
     pub fn eat_modifiers(&mut self) {
         while self.at() == Kind::Modifier {
             self.eat(Kind::Modifier);
-        }
-    }
-
-    pub fn eat_ws(&mut self) {
-        while self.at_exact() == Kind::Whitespace {
-            self.push_current_token(Kind::Whitespace);
-            self.cursor.advance();
         }
     }
 
@@ -222,17 +230,17 @@ impl<'a> CstParser<'a> {
     }
 
     pub fn syntax_cursor(&self) -> SyntaxCursor {
-        SyntaxCursor(self.tree.len())
+        SyntaxCursor(self.markers.len())
     }
 
     pub fn start(&mut self, kind: Kind) -> StartNode {
-        self.eat_ws();
+        self.eat_space();
         self.start_exact(kind)
     }
 
     pub fn start_exact(&mut self, kind: Kind) -> StartNode {
-        let index = self.tree.len();
-        self.tree.push(SyntaxMarker::StartPlaceholder);
+        let index = self.markers.len();
+        self.markers.push(SyntaxMarker::Start { kind: Kind::Error });
         StartNode {
             kind,
             cursor: SyntaxCursor(index),
@@ -240,15 +248,15 @@ impl<'a> CstParser<'a> {
     }
 
     pub fn end(&mut self, start_node: StartNode) {
-        self.tree[start_node.cursor.0] = SyntaxMarker::Start {
+        self.markers[start_node.cursor.0] = SyntaxMarker::Start {
             kind: start_node.kind,
         };
-        self.tree.push(SyntaxMarker::End);
+        self.markers.push(SyntaxMarker::End);
     }
 
     pub fn insert_node(&mut self, cursor: SyntaxCursor, kind: Kind) {
-        self.tree.insert(cursor.0, SyntaxMarker::Start { kind });
-        self.tree.push(SyntaxMarker::End);
+        self.markers.insert(cursor.0, SyntaxMarker::Start { kind });
+        self.markers.push(SyntaxMarker::End);
     }
 
     fn push_current_token(&mut self, kind: Kind) {
@@ -259,7 +267,7 @@ impl<'a> CstParser<'a> {
                 Kind::Whitespace | Kind::Comment => SyntaxMarker::Ignorable { index },
                 _ => SyntaxMarker::Token { index },
             };
-            self.tree.push(marker);
+            self.markers.push(marker);
         }
     }
 

@@ -92,6 +92,7 @@ impl<'c> PreAnalyzer<'c> {
                 )?);
             }
             PatternKind::ConstI64(_) | PatternKind::ConstText(_) | PatternKind::ConstBool(_) => {}
+            PatternKind::Error => {}
         };
 
         Ok(ArmAnalysis {

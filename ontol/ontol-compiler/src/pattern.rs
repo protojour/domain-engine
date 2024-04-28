@@ -43,6 +43,9 @@ pub enum PatternKind {
     ConstText(String),
     ConstBool(bool),
     Regex(RegexPattern),
+    /// Pattern that errored during lowering.
+    /// Should try to not generate new errors from this.
+    Error,
 }
 
 pub type OptionSpreadLabel = Option<Box<SpreadLabel>>;
