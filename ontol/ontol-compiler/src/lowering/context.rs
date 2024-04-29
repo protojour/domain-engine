@@ -78,6 +78,7 @@ impl MapVarTable {
 pub enum BlockContext<'a> {
     NoContext,
     Context(&'a dyn Fn() -> DefId),
+    FmtLeading,
 }
 
 impl<'c, 'm> LoweringCtx<'c, 'm> {

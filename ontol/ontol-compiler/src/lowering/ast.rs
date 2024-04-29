@@ -666,7 +666,7 @@ impl<'c, 'm> AstLowering<'c, 'm> {
                 arms: [first, second],
                 var_alloc,
                 extern_def_id: match block_context {
-                    BlockContext::NoContext => None,
+                    BlockContext::NoContext | BlockContext::FmtLeading => None,
                     BlockContext::Context(context_fn) => {
                         let context_def_id = context_fn();
                         if matches!(

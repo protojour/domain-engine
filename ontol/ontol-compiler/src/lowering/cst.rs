@@ -6,7 +6,7 @@ use ontol_parser::{
         view::{NodeView, NodeViewExt, TokenView, TokenViewExt},
     },
     lexer::{kind::Kind, unescape::unescape_regex},
-    Span, UnescapeError,
+    ParserError, Span,
 };
 use ontol_runtime::{
     property::{PropertyCardinality, ValueCardinality},
@@ -517,7 +517,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         final_state: FmtFinalState,
     ) -> Option<DefId> {
         let transition_def =
-            self.resolve_type_reference(transition.type_ref()?, &BlockContext::NoContext, None)?;
+            self.resolve_type_reference(transition.type_ref()?, &BlockContext::FmtLeading, None)?;
         let relation_key = RelationKey::FmtTransition(transition_def, final_state);
 
         // This syntax just defines the relation the first time it's used
@@ -578,7 +578,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                 arms: [first, second],
                 var_alloc: var_table.into_allocator(),
                 extern_def_id: match block_context {
-                    BlockContext::NoContext => None,
+                    BlockContext::NoContext | BlockContext::FmtLeading => None,
                     BlockContext::Context(context_fn) => {
                         let context_def_id = context_fn();
                         if matches!(
@@ -667,7 +667,10 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                     if m.slice() == "@match" {
                         modifier = Some(CompoundPatternModifier::Match);
                     } else {
-                        self.report_error((CompileError::TODO("invalid modifier"), m.span()));
+                        self.report_error((
+                            CompileError::TODO("invalid struct modifier"),
+                            m.span(),
+                        ));
                     }
                 }
 
@@ -1126,7 +1129,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
             Kind::Div => "/",
             _ => {
                 self.report_error((
-                    CompileError::TODO("illegal infix operator"),
+                    CompileError::TODO("invalid infix operator"),
                     infix_token.span(),
                 ));
                 return self.mk_error_pattern(&span);
@@ -1160,6 +1163,10 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
             (insp::TypeRef::This(_), BlockContext::Context(func)) => Some(func()),
             (insp::TypeRef::This(this), BlockContext::NoContext) => {
                 self.report_error((CompileError::WildcardNeedsContextualBlock, this.view.span()));
+                None
+            }
+            (insp::TypeRef::This(this), BlockContext::FmtLeading) => {
+                self.report_error((CompileError::FmtMisplacedSelf, this.view.span()));
                 None
             }
             (insp::TypeRef::Literal(literal), _) => {
@@ -1268,7 +1275,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         })
     }
 
-    fn unescape(&mut self, result: Result<String, Vec<UnescapeError>>) -> Option<String> {
+    fn unescape(&mut self, result: Result<String, Vec<ParserError>>) -> Option<String> {
         match result {
             Ok(string) => Some(string),
             Err(unescape_errors) => {
@@ -1305,7 +1312,10 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                     symbol.0 = Some(modifier.span());
                 }
                 _ => {
-                    self.report_error((CompileError::TODO("illegal modifier"), modifier.span()));
+                    self.report_error((
+                        CompileError::TODO("invalid def modifier"),
+                        modifier.span(),
+                    ));
                 }
             }
         }
@@ -1327,7 +1337,10 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
             "@intersects" => Some((SetBinaryOperator::Intersects, span)),
             "@equals" => Some((SetBinaryOperator::SetEquals, span)),
             _ => {
-                self.report_error((CompileError::TODO("invalid modifier"), modifier.span()));
+                self.report_error((
+                    CompileError::TODO("invalid set binary operator"),
+                    modifier.span(),
+                ));
                 None
             }
         }

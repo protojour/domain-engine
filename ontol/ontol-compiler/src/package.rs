@@ -168,12 +168,22 @@ impl PackageGraphBuilder {
                 if let insp::Node::Ontol(ontol) = tree.view(src).node() {
                     for statement in ontol.statements() {
                         if let insp::Statement::UseStatement(use_stmt) = statement {
+                            if use_stmt
+                                .ident_path()
+                                .and_then(|path| path.symbols().next())
+                                .is_none()
+                            {
+                                // avoid processing syntactically invalid statement
+                                continue;
+                            }
+
                             let Some(name) = use_stmt.name() else {
                                 continue;
                             };
                             let Some(Ok(text)) = name.text() else {
                                 continue;
                             };
+
                             let pkg_ref = PackageReference::Named(text);
 
                             self.request_package(

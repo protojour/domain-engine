@@ -2,12 +2,12 @@ use std::ops::Range;
 
 use chumsky::error::Simple;
 
-use crate::{lexer::kind::Kind, UnescapeError};
+use crate::{lexer::kind::Kind, ParserError};
 
-pub type UnescapeTextResult = Result<String, Vec<UnescapeError>>;
+pub type UnescapeTextResult = Result<String, Vec<ParserError>>;
 
-impl From<UnescapeError> for Simple<char> {
-    fn from(value: UnescapeError) -> Self {
+impl From<ParserError> for Simple<char> {
+    fn from(value: ParserError) -> Self {
         Simple::custom(value.span, value.msg)
     }
 }
@@ -98,11 +98,11 @@ pub fn unescape_regex(slice: &str) -> String {
     out
 }
 
-fn invalid_escape_code(span_start: usize, offset: usize) -> UnescapeError {
+fn invalid_escape_code(span_start: usize, offset: usize) -> ParserError {
     let start = span_start + offset;
     let end = start + 1;
 
-    UnescapeError {
+    ParserError {
         span: start..end,
         msg: "invalid escape code".into(),
     }

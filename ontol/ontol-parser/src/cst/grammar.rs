@@ -223,24 +223,26 @@ mod rel {
 
         p.eat_trivia();
 
+        let label = "relation type";
+
         match p.at() {
             K!['{'] => {
                 let set = p.start(Kind::TypeModSet);
                 p.eat(K!['{']);
-                type_ref_inner(p, allowed);
+                type_ref_inner(p, allowed, label);
                 p.eat(K!['}']);
                 p.end(set);
             }
             K!['['] => {
                 let seq = p.start(Kind::TypeModList);
                 p.eat(K!['[']);
-                type_ref_inner(p, allowed);
+                type_ref_inner(p, allowed, label);
                 p.eat(K![']']);
                 p.end(seq);
             }
             _ => {
                 let unit = p.start(Kind::TypeModUnit);
-                type_ref_inner(p, allowed);
+                type_ref_inner(p, allowed, label);
                 p.end(unit);
             }
         }
@@ -255,7 +257,7 @@ mod rel {
     }
 }
 
-fn type_ref_inner(p: &mut CstParser, allowed: AllowedType) {
+fn type_ref_inner(p: &mut CstParser, allowed: AllowedType, label: &'static str) {
     p.eat_trivia();
 
     match p.at() {
@@ -312,7 +314,7 @@ fn type_ref_inner(p: &mut CstParser, allowed: AllowedType) {
             p.end(this);
         }
         _ => {
-            p.eat_error(|kind| format!("expected type reference, found {kind}"));
+            p.eat_error(|kind| format!("expected {label}, found {kind}"));
         }
     }
 }
@@ -329,6 +331,7 @@ fn fmt_statement(p: &mut CstParser) {
                 anonymous: true,
                 int_range: false,
             },
+            "type",
         );
         p.end(type_ref);
 
@@ -501,6 +504,7 @@ mod struct_pattern {
                     anonymous: false,
                     int_range: false,
                 },
+                "property type",
             );
             p.end(type_ref);
 

@@ -34,7 +34,7 @@ pub enum Error {
 }
 
 #[derive(Debug)]
-pub struct UnescapeError {
+pub struct ParserError {
     pub msg: String,
     pub span: Range<usize>,
 }

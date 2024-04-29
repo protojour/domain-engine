@@ -13,26 +13,18 @@ use super::*;
 
 #[rstest::rstest]
 fn cst(#[files("test-cases/cst/*.test")] path: PathBuf) {
-    let contents = fs::read_to_string(path).unwrap();
+    let contents = fs::read_to_string(path.clone()).unwrap();
 
     let mut ontol_src = String::new();
     let mut cst_expect = String::new();
 
     let mut lines = contents.lines();
 
-    let mut parse_fn: Option<fn(&mut CstParser)> = None;
+    let mut grammar: Option<&str> = None;
 
-    for mut line in lines.by_ref() {
+    for line in lines.by_ref() {
         if line.starts_with("//@") {
-            line = line.strip_prefix("//@ grammar=").unwrap();
-            match line {
-                "ontol" => parse_fn = Some(grammar::ontol),
-                "pattern" => parse_fn = Some(grammar::pattern_with_expr),
-                "expr" => parse_fn = Some(grammar::expr_pattern::entry),
-                other => {
-                    panic!("unrecognized test function `{other}`");
-                }
-            }
+            grammar = Some(line.strip_prefix("//@ grammar=").expect("missing grammar"));
             break;
         } else {
             ontol_src.push_str(line);
@@ -45,7 +37,20 @@ fn cst(#[files("test-cases/cst/*.test")] path: PathBuf) {
         cst_expect.push('\n');
     }
 
-    let parse_fn = parse_fn.expect("no test function");
+    let mut test_token_count = false;
+
+    let parse_fn = match grammar {
+        Some("ontol") => {
+            test_token_count = true;
+            grammar::ontol
+        }
+        Some("pattern") => grammar::pattern_with_expr,
+        Some("expr") => grammar::expr_pattern::entry,
+        Some(other) => {
+            panic!("unrecognized grammar `{other}`");
+        }
+        None => panic!("missing //@ line"),
+    };
 
     let (lexed, _errors) = cst_lex(&ontol_src);
     let mut parser = CstParser::from_lexed_source(&ontol_src, lexed);
@@ -53,8 +58,7 @@ fn cst(#[files("test-cases/cst/*.test")] path: PathBuf) {
 
     let (tree, _errors) = parser.finish();
 
-    // smoke tests
-    if parse_fn == grammar::ontol {
+    if test_token_count {
         let token_marker_count = tree
             .markers()
             .iter()
@@ -69,7 +73,12 @@ fn cst(#[files("test-cases/cst/*.test")] path: PathBuf) {
         assert_eq!(token_marker_count, tree.lex().tokens.len());
     }
 
-    pretty_assertions::assert_eq!(cst_expect, format!("{}", tree.debug_tree(&ontol_src)));
+    pretty_assertions::assert_eq!(
+        cst_expect,
+        format!("{}", tree.debug_tree(&ontol_src)),
+        "test file `{path}` did not match expectation",
+        path = path.to_str().unwrap()
+    );
 }
 
 #[derive(Debug, PartialEq)]
