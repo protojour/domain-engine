@@ -1,4 +1,4 @@
 use 'fail' as f
 
 //@ src_name=fail
-! // ERROR parse error: found `!`, expected one of `use`, `def`, `rel`, `fmt`, `map`
+! // ERROR parse error: expected keyword, found symbol

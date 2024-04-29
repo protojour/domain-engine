@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 
 use fnv::FnvHashMap;
-use ontol_parser::ast;
 use ontol_parser::cst::inspect as insp;
 use ontol_parser::cst::view::NodeView;
 use ontol_parser::cst::view::NodeViewExt;
@@ -147,54 +146,36 @@ impl PackageGraphBuilder {
     pub fn provide_package(&mut self, package: ParsedPackage) {
         let mut children: HashSet<PackageReference> = HashSet::default();
 
-        match &package.syntax.kind {
-            SyntaxKind::Ast(statements) => {
-                for statement in statements {
-                    if let (ast::Statement::Use(use_stmt), _) = statement {
-                        let pkg_ref = PackageReference::Named(use_stmt.reference.0.clone());
+        let root_node = match &package.syntax.kind {
+            SyntaxKind::CstTreeRc(tree, src) => tree.view(src).node(),
+            SyntaxKind::CstTreeArc(tree, src) => tree.view(src).node(),
+        };
 
-                        self.request_package(
-                            pkg_ref.clone(),
-                            package.src.span(&use_stmt.reference.1),
-                        );
-                        children.insert(pkg_ref);
-                    } else {
-                        // all use statements are at the top of the source file (for now)
-                        break;
+        if let insp::Node::Ontol(ontol) = root_node {
+            for statement in ontol.statements() {
+                if let insp::Statement::UseStatement(use_stmt) = statement {
+                    if use_stmt
+                        .ident_path()
+                        .and_then(|path| path.symbols().next())
+                        .is_none()
+                    {
+                        // avoid processing syntactically invalid statement
+                        continue;
                     }
-                }
-            }
-            SyntaxKind::CstTree(tree, src) => {
-                if let insp::Node::Ontol(ontol) = tree.view(src).node() {
-                    for statement in ontol.statements() {
-                        if let insp::Statement::UseStatement(use_stmt) = statement {
-                            if use_stmt
-                                .ident_path()
-                                .and_then(|path| path.symbols().next())
-                                .is_none()
-                            {
-                                // avoid processing syntactically invalid statement
-                                continue;
-                            }
 
-                            let Some(name) = use_stmt.name() else {
-                                continue;
-                            };
-                            let Some(Ok(text)) = name.text() else {
-                                continue;
-                            };
+                    let Some(name) = use_stmt.name() else {
+                        continue;
+                    };
+                    let Some(Ok(text)) = name.text() else {
+                        continue;
+                    };
 
-                            let pkg_ref = PackageReference::Named(text);
+                    let pkg_ref = PackageReference::Named(text);
 
-                            self.request_package(
-                                pkg_ref.clone(),
-                                package.src.span(&name.view.span()),
-                            );
-                            children.insert(pkg_ref);
-                        } else {
-                            break;
-                        }
-                    }
+                    self.request_package(pkg_ref.clone(), package.src.span(&name.view.span()));
+                    children.insert(pkg_ref);
+                } else {
+                    break;
                 }
             }
         }

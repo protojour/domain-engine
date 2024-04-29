@@ -59,6 +59,14 @@ impl_ontol_debug!(Var);
 pub struct VarSet(pub BitSet);
 
 impl VarSet {
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     pub fn iter(&self) -> VarSetIter {
         VarSetIter(self.0.iter())
     }

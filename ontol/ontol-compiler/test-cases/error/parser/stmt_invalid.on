@@ -1,1 +1,1 @@
-foobar // ERROR parse error: found `foobar`, expected one of `use`, `def`, `rel`, `fmt`, `map`
+foobar // ERROR parse error: expected keyword, found symbol

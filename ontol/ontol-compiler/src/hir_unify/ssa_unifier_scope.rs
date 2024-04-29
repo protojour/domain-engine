@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 
-use chumsky::chain::Chain;
 use ontol_hir::{Binder, Binding, Kind, Label, Node, Nodes, PropVariant, SetEntry};
 use ontol_runtime::{
     value::Attribute,

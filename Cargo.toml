@@ -41,7 +41,6 @@ tracing-subscriber = { version = "0.3", default-features = false, features = [
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.3.4", features = ["derive"] }
 bitflags = { version = "2", features = ["serde"] }
-chumsky = "0.9"
 either = "1"
 bit-set = "0.5"
 thin-vec = { version = "0.2", features = ["serde"] }

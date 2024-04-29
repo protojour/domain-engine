@@ -1,4 +1,12 @@
 use crate::docs::{get_core_completions, get_ontol_var, COMPLETIONS};
+use crate::old_parser::{self, ast_lex, parse_statements};
+use crate::old_parser::{
+    ast::{
+        AnyPattern, DefStatement, MapArm, Path, Statement, StructPattern, StructPatternParameter,
+        Type, TypeOrPattern, UseStatement,
+    },
+    token::Token,
+};
 use chumsky::prelude::*;
 use derivative::Derivative;
 use either::Either;
@@ -9,16 +17,7 @@ use ontol_compiler::{
     package::{GraphState, PackageGraphBuilder, PackageReference, ParsedPackage, ONTOL_PKG},
     CompileError, Compiler, SourceId, SourceSpan, Sources, SpannedCompileError, NO_SPAN,
 };
-use ontol_parser::{
-    ast::{
-        AnyPattern, DefStatement, MapArm, Path, Statement, StructPattern, StructPatternParameter,
-        Type, TypeOrPattern, UseStatement,
-    },
-    lexer::ast_lex,
-    parse_statements,
-    syntax::SyntaxSource,
-    Spanned, Token,
-};
+use ontol_parser::{syntax::SyntaxSource, Spanned};
 use ontol_runtime::ontology::{config::PackageConfig, domain::TypeInfo, Ontology};
 use regex::Regex;
 use std::{
@@ -68,7 +67,7 @@ pub struct Document {
     pub name: String,
 
     /// Document text
-    pub text: String,
+    pub text: Arc<String>,
 
     /// Lexer tokens, low value
     pub tokens: Vec<Spanned<Token>>,
@@ -199,6 +198,7 @@ impl State {
             }
 
             let (mut statements, _) = parse_statements(&doc.text);
+
             let mut nested: Vec<Spanned<Statement>> = vec![];
 
             explore(&statements, &mut nested, &mut doc.imports, &mut doc.defs, 0);
@@ -237,7 +237,7 @@ impl State {
                         if let Some(doc) = self.docs.get(&request_uri) {
                             let package = ParsedPackage::parse(
                                 request,
-                                SyntaxSource::TextAst(&doc.text),
+                                SyntaxSource::TextCstArc(doc.text.clone()),
                                 package_config,
                                 &mut ontol_sources,
                             );
@@ -833,12 +833,12 @@ fn get_struct_pattern_path(s: &StructPattern, cursor: &usize) -> Option<Path> {
     if let StructPatternParameter::Attributes(attrs) = &s.param {
         for (arg, range) in attrs {
             match arg {
-                ontol_parser::ast::StructPatternAttributeKind::Attr(attr) => {
+                old_parser::ast::StructPatternAttributeKind::Attr(attr) => {
                     if in_range(range, cursor) {
                         return get_pattern_path(&attr.object.0, cursor);
                     }
                 }
-                ontol_parser::ast::StructPatternAttributeKind::Spread(_) => (),
+                old_parser::ast::StructPatternAttributeKind::Spread(_) => (),
             }
         }
     }

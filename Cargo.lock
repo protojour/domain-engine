@@ -2231,7 +2231,6 @@ dependencies = [
  "bit-set",
  "bitflags 2.5.0",
  "bumpalo",
- "chumsky",
  "documented",
  "either",
  "ena",
@@ -2315,6 +2314,7 @@ dependencies = [
  "derivative",
  "either",
  "futures-util",
+ "logos",
  "lsp-types",
  "ontol-compiler",
  "ontol-parser",
@@ -2341,7 +2341,6 @@ name = "ontol-parser"
 version = "0.1.0"
 dependencies = [
  "assert_matches",
- "chumsky",
  "either",
  "indoc",
  "logos",

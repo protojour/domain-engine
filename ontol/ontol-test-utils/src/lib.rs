@@ -36,8 +36,6 @@ pub mod test_extensions;
 pub mod test_map;
 pub mod type_binding;
 
-const USE_CST: bool = false;
-
 /// Workaround for `pretty_assertions::assert_eq` arguments appearing
 /// in a (slightly?) unnatural order. The _expected_ expression ideally comes first,
 /// in order to show the most sensible colored diff.
@@ -349,11 +347,7 @@ impl TestPackages {
 
                         if let Some(source_text) = self.sources_by_name.remove(source_name) {
                             let rc_source = Rc::new(source_text.as_ref().to_string());
-                            let syntax_source = if USE_CST {
-                                SyntaxSource::TextCst(rc_source.clone())
-                            } else {
-                                SyntaxSource::TextAst(&rc_source)
-                            };
+                            let syntax_source = SyntaxSource::TextCstRc(rc_source.clone());
 
                             let parsed = ParsedPackage::parse(
                                 request,
@@ -488,8 +482,7 @@ fn ok_validator_must_run() {
 #[test]
 #[should_panic(expected = "it works")]
 fn failure_validator_must_run() {
-    "foo // ERROR parse error: found `foo`, expected one of `use`, `def`, `rel`, `fmt`, `map`"
-        .compile_fail_then(|_| {
-            panic!("it works");
-        })
+    "foo // ERROR parse error: expected keyword, found symbol".compile_fail_then(|_| {
+        panic!("it works");
+    })
 }

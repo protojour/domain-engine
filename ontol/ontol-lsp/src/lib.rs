@@ -1,6 +1,8 @@
 #![forbid(unsafe_code)]
 
-use ontol_parser::ast::Statement;
+use std::sync::Arc;
+
+use old_parser::ast::Statement;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use state::{
@@ -13,6 +15,7 @@ use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer};
 
 mod docs;
+mod old_parser;
 mod state;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -91,7 +94,7 @@ impl Backend {
                                         uri: ref_uri.to_string(),
                                         path: path.to_string(),
                                         name: source_name.to_string(),
-                                        text,
+                                        text: Arc::new(text),
                                         ..Default::default()
                                     },
                                 );
@@ -199,7 +202,7 @@ impl LanguageServer for Backend {
                     uri: uri.to_string(),
                     path: path.to_string(),
                     name: name.to_string(),
-                    text: params.text_document.text,
+                    text: Arc::new(params.text_document.text),
                     ..Default::default()
                 },
             );
@@ -214,7 +217,7 @@ impl LanguageServer for Backend {
             let mut state = self.state.write().await;
             if let Some(doc) = state.docs.get_mut(uri) {
                 for change in params.content_changes {
-                    doc.text = change.text;
+                    doc.text = Arc::new(change.text);
                 }
                 state.parse_statements(uri);
             }

@@ -332,7 +332,7 @@ fn compile(
                     if let Some(source_text) = sources_by_name.remove(source_name) {
                         let parsed = ParsedPackage::parse(
                             request,
-                            SyntaxSource::TextAst(&source_text),
+                            SyntaxSource::TextCstRc(source_text.clone()),
                             package_config,
                             &mut ontol_sources,
                         );

@@ -1,8 +1,4 @@
-use std::fmt::Display;
-
-use chumsky::{error::SimpleReason, prelude::Simple};
-use ontol_parser::Token;
-use ontol_runtime::format_utils::{CommaSeparated, LogicOp, Missing};
+use ontol_runtime::format_utils::CommaSeparated;
 use thiserror::Error;
 
 use crate::{package::PackageReference, source::SourceSpan};
@@ -23,8 +19,8 @@ pub struct SpannedCompileError {
 
 #[derive(Debug)]
 pub enum CompileError {
-    Lex(LexError),
-    Parse(ParseError),
+    Lex(String),
+    Parse(String),
     NumberParse(String),
     PackageNotFound(PackageReference),
     WildcardNeedsContextualBlock,
@@ -339,103 +335,6 @@ pub enum Note {
     DefinedHere,
     #[error("use a domain-specific unit type instead")]
     UseDomainSpecificUnitType,
-}
-
-#[derive(Debug)]
-pub struct LexError {
-    inner: Box<Simple<char>>,
-}
-
-impl LexError {
-    pub fn new(inner: Simple<char>) -> Self {
-        Self {
-            inner: Box::new(inner),
-        }
-    }
-}
-
-impl Display for LexError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.inner.reason() {
-            SimpleReason::Unclosed { .. } => write!(f, "unclosed"),
-            SimpleReason::Unexpected => {
-                if let Some(found) = self.inner.found() {
-                    write!(f, "illegal character `{found}`")?;
-                } else {
-                    write!(f, "illegal character")?;
-                }
-
-                Ok(())
-            }
-            SimpleReason::Custom(str) => write!(f, "{str}"),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct ParseError {
-    inner: Box<Simple<Token>>,
-}
-
-impl ParseError {
-    pub fn new(inner: Simple<Token>) -> Self {
-        Self {
-            inner: Box::new(inner),
-        }
-    }
-}
-
-impl Display for ParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.inner.reason() {
-            SimpleReason::Unclosed { .. } => write!(f, "unclosed"),
-            SimpleReason::Unexpected => {
-                let mut reported = false;
-                if let Some(found) = self.inner.found() {
-                    write!(f, "found {found}")?;
-                    reported = true;
-                }
-
-                if self.inner.expected().len() > 0 {
-                    if self.inner.found().is_some() {
-                        write!(f, ", ")?;
-                    }
-
-                    let mut missing_items: Vec<_> = self
-                        .inner
-                        .expected()
-                        .filter_map(|item| item.as_ref())
-                        .collect();
-
-                    missing_items.sort();
-
-                    if !missing_items.is_empty() {
-                        let missing = Missing {
-                            items: missing_items,
-                            logic_op: LogicOp::Or,
-                        };
-
-                        write!(f, "expected {missing}")?;
-                        reported = true;
-                    }
-                } else if let Some(label) = self.inner.label() {
-                    if self.inner.found().is_some() {
-                        write!(f, ", ")?;
-                    }
-
-                    write!(f, "expected {label}")?;
-                    reported = true;
-                }
-
-                if !reported {
-                    write!(f, "unexpected end of file")?;
-                }
-
-                Ok(())
-            }
-            SimpleReason::Custom(str) => write!(f, "{str}"),
-        }
-    }
 }
 
 impl CompileError {

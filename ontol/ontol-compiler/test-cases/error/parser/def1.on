@@ -1,1 +1,1 @@
-def // ERROR parse error: expected one of `@private`, `@open`, `@extern`, `@symbol`, identifier
+def // ERROR parse error: expected symbol, found end of file

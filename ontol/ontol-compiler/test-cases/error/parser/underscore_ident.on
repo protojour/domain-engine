@@ -1,1 +1,1 @@
-def _foo // ERROR parse error: found `_`, expected one of `@private`, `@open`, `@extern`, `@symbol`, identifier
+def _foo // ERROR parse error: expected symbol, found `_`

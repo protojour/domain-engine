@@ -2,15 +2,16 @@ use std::ops::Range;
 
 use chumsky::prelude::*;
 use either::Either;
+use ontol_parser::join_doc_lines;
 
-use crate::{
+use super::{
     ast::{
         AnyPattern, Dot, ExprPattern, FmtStatement, MapArm, Path, SetPattern, SetPatternElement,
         SetPatternModifier, StructPattern, StructPatternAttr, StructPatternAttributeKind,
         StructPatternModifier, StructPatternParameter, TypeOrPattern, UseStatement,
     },
-    join_doc_lines,
     modifier::Modifier,
+    token::Token,
 };
 
 use super::{
@@ -18,7 +19,6 @@ use super::{
         BinaryOp, Cardinality, DefStatement, MapStatement, RelStatement, RelType, Relation,
         Statement, Type,
     },
-    lexer::Token,
     Span, Spanned,
 };
 

@@ -1,9 +1,0 @@
-// BUG: a doc comment expects a def, rel, fmt or map to follow, // ERROR parse error: expected one of `def`, `rel`, `fmt`, `map`
-// but having a commented-out section at the end can occur during deveopment.
-// This can get very confusing, as the compiler doesn't know where to put the error,
-// and it's really hard to understand what's going on.
-
-def foo ()
-
-/// test
-// def bar ()

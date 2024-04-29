@@ -235,6 +235,7 @@ pub struct TypeParamPattern {
     pub binding: TypeParamPatternBinding,
 }
 
+#[allow(unused)]
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum TypeParamPatternBinding {
     None,

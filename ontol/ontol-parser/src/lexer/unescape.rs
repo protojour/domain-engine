@@ -1,16 +1,8 @@
 use std::ops::Range;
 
-use chumsky::error::Simple;
-
 use crate::{lexer::kind::Kind, ParserError};
 
 pub type UnescapeTextResult = Result<String, Vec<ParserError>>;
-
-impl From<ParserError> for Simple<char> {
-    fn from(value: ParserError) -> Self {
-        Simple::custom(value.span, value.msg)
-    }
-}
 
 pub fn unescape_text_literal(kind: Kind, slice: &str, span: Range<usize>) -> UnescapeTextResult {
     let slice = &slice[1..slice.len() - 1];
