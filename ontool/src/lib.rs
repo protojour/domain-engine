@@ -434,8 +434,8 @@ fn clear_term(stdout: &mut Stdout) {
     stdout.flush().unwrap();
 }
 
-fn check_datastore_domain_has_entities(data_store: &Option<String>, ontology: &Ontology) {
-    if let Some(data_store) = &data_store {
+fn check_datastore_domain_has_entities(data_store: Option<&str>, ontology: &Ontology) {
+    if let Some(data_store) = data_store {
         let mut entities_exist = false;
         for domain in ontology.domains() {
             if &ontology[domain.1.unique_name()] == data_store {
@@ -474,8 +474,8 @@ async fn serve(
         .unwrap();
 
     let addr: SocketAddr = format!("0.0.0.0:{}", port).parse().unwrap();
-    let domains_router_cell: Arc<Mutex<Option<axum::Router>>> = Arc::new(Mutex::new(None));
-    let ontology_router_cell: Arc<Mutex<Option<axum::Router>>> = Arc::new(Mutex::new(None));
+
+    let dynamic_routers = DynamicRouters::default();
 
     tokio::spawn({
         let reload_tx = reload_tx.clone();
@@ -483,13 +483,13 @@ async fn serve(
             .nest_service(
                 "/d",
                 Detach {
-                    router: domains_router_cell.clone(),
+                    router: dynamic_routers.domains.clone(),
                 },
             )
             .nest_service(
                 "/o",
                 Detach {
-                    router: ontology_router_cell.clone(),
+                    router: dynamic_routers.ontology.clone(),
                 },
             )
             .route("/ws", get(|socket| ws_upgrade_handler(socket, reload_tx)));
@@ -511,12 +511,7 @@ async fn serve(
     );
     match compile_output {
         Ok(output) => {
-            check_datastore_domain_has_entities(&data_store, &output.ontology);
-            let ontology = Arc::new(output.ontology);
-            let new_domains_router = domains_router(ontology.clone(), addr).await;
-            let new_ontology_router = ontology_router(ontology);
-            *(domains_router_cell.lock().unwrap()) = Some(new_domains_router);
-            *(ontology_router_cell.lock().unwrap()) = Some(new_ontology_router);
+            reload_routes(output.ontology, &dynamic_routers, data_store.as_deref()).await;
             let _ = reload_tx.send(ChannelMessage::Reload);
         }
         Err(error) => println!("{:?}", error),
@@ -543,19 +538,17 @@ async fn serve(
                         );
                         match compile_output {
                             Ok(output) => {
-                                let ontology = Arc::new(output.ontology);
-                                check_datastore_domain_has_entities(&data_store, &ontology);
-
-                                let new_domains_router =
-                                    domains_router(ontology.clone(), addr).await;
-                                let new_ontology_router = ontology_router(ontology);
-                                *(domains_router_cell.lock().unwrap()) = Some(new_domains_router);
-                                *(ontology_router_cell.lock().unwrap()) = Some(new_ontology_router);
+                                reload_routes(
+                                    output.ontology,
+                                    &dynamic_routers,
+                                    data_store.as_deref(),
+                                )
+                                .await;
                                 let _ = reload_tx.send(ChannelMessage::Reload);
                             }
                             Err(error) => {
-                                let mut lock = domains_router_cell.lock().unwrap();
-                                *lock = None;
+                                dynamic_routers.domains.lock().unwrap().take();
+                                dynamic_routers.ontology.lock().unwrap().take();
                                 println!("{:?}", error);
                             }
                         }
@@ -567,6 +560,23 @@ async fn serve(
     }
 
     Ok(())
+}
+
+#[derive(Default)]
+struct DynamicRouters {
+    ontology: Arc<Mutex<Option<axum::Router>>>,
+    domains: Arc<Mutex<Option<axum::Router>>>,
+}
+
+async fn reload_routes(ontology: Ontology, dyn_routers: &DynamicRouters, data_store: Option<&str>) {
+    check_datastore_domain_has_entities(data_store, &ontology);
+
+    let ontology = Arc::new(ontology);
+    let o = ontology_router(ontology.clone());
+    let d = domains_router(ontology).await;
+
+    *(dyn_routers.ontology.lock().unwrap()) = Some(o);
+    *(dyn_routers.domains.lock().unwrap()) = Some(d);
 }
 
 async fn ws_upgrade_handler(ws: WebSocketUpgrade, tx: Sender<ChannelMessage>) -> Response {

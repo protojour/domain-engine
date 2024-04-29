@@ -2,12 +2,11 @@
 
 use std::{
     convert::Infallible,
-    net::SocketAddr,
     sync::{Arc, Mutex},
     task::Poll,
 };
 
-use crate::graphql::{graphiql_handler, graphql_handler, GraphqlService};
+use crate::graphql::{domain_graphql_handler, graphiql_handler, GraphqlService};
 
 use ::juniper::{EmptyMutation, EmptySubscription};
 use axum::{routing::post, Extension};
@@ -21,7 +20,7 @@ use reqwest::header::HeaderName;
 use tracing::info;
 
 /// All the domains routed by domain name
-pub async fn domains_router(ontology: Arc<Ontology>, addr: SocketAddr) -> axum::Router {
+pub async fn domains_router(ontology: Arc<Ontology>) -> axum::Router {
     let engine = Arc::new(
         DomainEngine::builder(ontology.clone())
             .system(Box::<System>::default())
@@ -45,7 +44,7 @@ pub async fn domains_router(ontology: Arc<Ontology>, addr: SocketAddr) -> axum::
             domain_router(engine.clone(), &domain_path, *package_id).unwrap(),
         );
 
-        info!("Domain {package_id:?} served under http://{addr}/d{domain_path}/graphql");
+        info!("Domain {package_id:?} served under /d{domain_path}/graphql");
     }
     router.layer(tower_http::trace::TraceLayer::new_for_http())
     // let schema = ontology_schema::new(&ontology);
@@ -77,8 +76,13 @@ pub fn ontology_router(ontology: Arc<Ontology>) -> axum::Router {
         )
     }
 
+    info!("Ontology schema served under /o/graphql");
+
     axum::Router::new()
-        .route("/graphql", post(ontology_schema_graphql_handler))
+        .route(
+            "/graphql",
+            post(ontology_schema_graphql_handler).get(graphiql_handler),
+        )
         .layer(Extension(Arc::new(schema)))
         .layer(Extension(Context { ontology }))
         .layer(tower_http::trace::TraceLayer::new_for_http())
@@ -165,7 +169,7 @@ fn domain_router(
             router = router
                 .route(
                     "/graphql",
-                    axum::routing::post(graphql_handler).get(graphiql_handler),
+                    post(domain_graphql_handler).get(graphiql_handler),
                 )
                 .layer(Extension(Arc::new(GraphqlService {
                     schema,

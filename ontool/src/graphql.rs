@@ -11,7 +11,7 @@ pub struct GraphqlService {
     pub endpoint_url: String,
 }
 
-pub async fn graphql_handler(
+pub async fn domain_graphql_handler(
     Extension(service): Extension<Arc<GraphqlService>>,
     JuniperRequest(batch_request): JuniperRequest<GqlScalar>,
 ) -> (
