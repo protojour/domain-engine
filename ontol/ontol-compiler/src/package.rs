@@ -6,14 +6,14 @@ use fnv::FnvHashMap;
 use ontol_parser::cst::inspect as insp;
 use ontol_parser::cst::view::NodeView;
 use ontol_parser::cst::view::NodeViewExt;
-use ontol_parser::syntax::SyntaxKind;
-use ontol_parser::syntax::{Syntax, SyntaxSource};
+use ontol_parser::U32Span;
 use ontol_runtime::ontology::config::PackageConfig;
 use ontol_runtime::DefId;
 use ontol_runtime::PackageId;
 
 use crate::error::CompileError;
 use crate::error::UnifiedCompileError;
+use crate::ontol_syntax::OntolSyntax;
 use crate::SourceSpan;
 use crate::Sources;
 use crate::SpannedCompileError;
@@ -62,13 +62,15 @@ pub struct ParsedPackage {
     pub reference: PackageReference,
     pub config: PackageConfig,
     pub src: Src,
-    pub syntax: Syntax,
+    pub syntax: Box<dyn OntolSyntax>,
+    pub parse_errors: Vec<ontol_parser::Error>,
 }
 
 impl ParsedPackage {
-    pub fn parse(
+    pub fn new(
         request: PackageRequest,
-        syntax_source: SyntaxSource,
+        syntax: Box<dyn OntolSyntax>,
+        parse_errors: Vec<ontol_parser::Error>,
         config: PackageConfig,
         sources: &mut Sources,
     ) -> Self {
@@ -80,16 +82,49 @@ impl ParsedPackage {
 
         let src = sources.add_source(package_id, source_name);
 
-        let syntax = syntax_source.parse();
-
         Self {
             package_id: src.package_id,
             reference: request.reference,
             config,
             src,
             syntax,
+            parse_errors,
         }
     }
+}
+
+pub fn extract_ontol_dependentices<V: NodeView>(ontol_view: V) -> Vec<(PackageReference, U32Span)> {
+    let mut deps: Vec<(PackageReference, U32Span)> = vec![];
+
+    if let insp::Node::Ontol(ontol) = ontol_view.node() {
+        for statement in ontol.statements() {
+            if let insp::Statement::UseStatement(use_stmt) = statement {
+                if use_stmt
+                    .ident_path()
+                    .and_then(|path| path.symbols().next())
+                    .is_none()
+                {
+                    // avoid processing syntactically invalid statement
+                    continue;
+                }
+
+                let Some(name) = use_stmt.name() else {
+                    continue;
+                };
+                let Some(Ok(text)) = name.text() else {
+                    continue;
+                };
+
+                let pkg_ref = PackageReference::Named(text);
+
+                deps.push((pkg_ref, name.0.span()));
+            } else {
+                break;
+            }
+        }
+    }
+
+    deps
 }
 
 /// Topological sort of the built package graph
@@ -146,38 +181,9 @@ impl PackageGraphBuilder {
     pub fn provide_package(&mut self, package: ParsedPackage) {
         let mut children: HashSet<PackageReference> = HashSet::default();
 
-        let root_node = match &package.syntax.kind {
-            SyntaxKind::CstTreeRc(tree, src) => tree.view(src).node(),
-            SyntaxKind::CstTreeArc(tree, src) => tree.view(src).node(),
-        };
-
-        if let insp::Node::Ontol(ontol) = root_node {
-            for statement in ontol.statements() {
-                if let insp::Statement::UseStatement(use_stmt) = statement {
-                    if use_stmt
-                        .ident_path()
-                        .and_then(|path| path.symbols().next())
-                        .is_none()
-                    {
-                        // avoid processing syntactically invalid statement
-                        continue;
-                    }
-
-                    let Some(name) = use_stmt.name() else {
-                        continue;
-                    };
-                    let Some(Ok(text)) = name.text() else {
-                        continue;
-                    };
-
-                    let pkg_ref = PackageReference::Named(text);
-
-                    self.request_package(pkg_ref.clone(), package.src.span(name.0.span()));
-                    children.insert(pkg_ref);
-                } else {
-                    break;
-                }
-            }
+        for (pkg_ref, span) in package.syntax.dependencies() {
+            self.request_package(pkg_ref.clone(), package.src.span(span));
+            children.insert(pkg_ref);
         }
 
         let node = self

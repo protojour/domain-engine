@@ -11,10 +11,11 @@ use diagnostics::AnnotatedCompileError;
 use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
+    ontol_syntax::OntolTreeSyntax,
     package::{GraphState, PackageGraphBuilder, PackageReference, PackageTopology, ParsedPackage},
     Compiler, SourceCodeRegistry, Sources,
 };
-use ontol_parser::syntax::SyntaxSource;
+use ontol_parser::cst_parse;
 use ontol_runtime::{
     interface::{graphql::schema::GraphqlSchema, DomainInterface},
     ontology::{
@@ -347,11 +348,16 @@ impl TestPackages {
 
                         if let Some(source_text) = self.sources_by_name.remove(source_name) {
                             let rc_source = Rc::new(source_text.as_ref().to_string());
-                            let syntax_source = SyntaxSource::TextCstRc(rc_source.clone());
+                            let (flat_tree, errors) = cst_parse(&rc_source);
+                            let tree = flat_tree.unflatten();
 
-                            let parsed = ParsedPackage::parse(
+                            let parsed = ParsedPackage::new(
                                 request,
-                                syntax_source,
+                                Box::new(OntolTreeSyntax {
+                                    tree,
+                                    source_text: rc_source.clone(),
+                                }),
+                                errors,
                                 package_config,
                                 &mut self.sources,
                             );

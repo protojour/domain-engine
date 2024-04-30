@@ -8,7 +8,6 @@ use std::{fmt::Debug, ops::Range};
 
 pub mod cst;
 pub mod lexer;
-pub mod syntax;
 
 #[cfg(test)]
 mod tests;

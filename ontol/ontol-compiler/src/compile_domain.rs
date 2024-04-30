@@ -1,5 +1,5 @@
 use fnv::FnvHashSet;
-use ontol_parser::{cst::view::NodeViewExt, syntax::SyntaxKind};
+use ontol_parser::cst::view::NodeViewExt;
 use ontol_runtime::{ontology::ontol::TextConstant, DefId, PackageId};
 use tracing::debug;
 
@@ -22,7 +22,7 @@ impl<'m> Compiler<'m> {
         package: ParsedPackage,
         src: Src,
     ) -> Result<(), UnifiedCompileError> {
-        for error in package.syntax.errors {
+        for error in package.parse_errors {
             self.push_error(match error {
                 ontol_parser::Error::Lex(lex_error) => {
                     let span = lex_error.span;
@@ -45,14 +45,7 @@ impl<'m> Compiler<'m> {
         self.package_config_table
             .insert(package.package_id, package.config);
 
-        let root_node = match &package.syntax.kind {
-            SyntaxKind::CstTreeRc(tree, source) => tree.view(source).node(),
-            SyntaxKind::CstTreeArc(tree, source) => tree.view(source).node(),
-        };
-
-        let root_defs = CstLowering::new(self, src.clone())
-            .lower_ontol(root_node)
-            .finish();
+        let root_defs = package.syntax.lower(src.clone(), self);
 
         for def_id in root_defs {
             self.type_check().check_def(def_id);

@@ -18,8 +18,10 @@ use interface::{
     graphql::generate_schema::generate_graphql_schema,
     serde::{serde_generator::SerdeGenerator, SerdeKey, EDGE_PROPERTY},
 };
+use lowering::cst::CstLowering;
 use mem::Mem;
 use namespace::{Namespaces, Space};
+use ontol_parser::cst::view::{NodeView, NodeViewExt};
 use ontol_runtime::{
     interface::{
         serde::{SerdeDef, SerdeModifier},
@@ -61,6 +63,7 @@ use crate::{
 pub mod error;
 pub mod hir_unify;
 pub mod mem;
+pub mod ontol_syntax;
 pub mod ontology_graph;
 pub mod package;
 pub mod primitive;
@@ -145,6 +148,13 @@ impl<'m> Compiler<'m> {
             codegen_tasks: Default::default(),
             errors: Default::default(),
         }
+    }
+
+    /// Lower the ontol syntax to populate the compiler's data structures
+    pub fn lower_ontol_syntax<V: NodeView>(&mut self, ontol_view: V, src: Src) -> Vec<DefId> {
+        CstLowering::new(self, src)
+            .lower_ontol(ontol_view.node())
+            .finish()
     }
 
     /// Entry point of all compilation: Compiles the full package topology

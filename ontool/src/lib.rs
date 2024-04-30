@@ -21,11 +21,12 @@ use notify_debouncer_full::{
 use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
+    ontol_syntax::OntolTreeSyntax,
     package::{GraphState, PackageGraphBuilder, PackageReference, ParsedPackage},
     Compiler, SourceCodeRegistry, Sources,
 };
 use ontol_lsp::Backend;
-use ontol_parser::syntax::SyntaxSource;
+use ontol_parser::cst_parse;
 use ontol_runtime::{
     interface::json_schema::build_openapi_schemas,
     ontology::{
@@ -330,9 +331,15 @@ fn compile(
                         }
                     }
                     if let Some(source_text) = sources_by_name.remove(source_name) {
-                        let parsed = ParsedPackage::parse(
+                        let (flat_tree, errors) = cst_parse(&source_text);
+
+                        let parsed = ParsedPackage::new(
                             request,
-                            SyntaxSource::TextCstRc(source_text.clone()),
+                            Box::new(OntolTreeSyntax {
+                                tree: flat_tree.unflatten(),
+                                source_text: source_text.clone(),
+                            }),
+                            errors,
                             package_config,
                             &mut ontol_sources,
                         );

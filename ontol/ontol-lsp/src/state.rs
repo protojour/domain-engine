@@ -10,13 +10,14 @@ use crate::old_parser::{
 use derivative::Derivative;
 use either::Either;
 use lsp_types::{CompletionItem, Location, MarkedString, Position, Range, Url};
+use ontol_compiler::ontol_syntax::OntolTreeSyntax;
 use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
     package::{GraphState, PackageGraphBuilder, PackageReference, ParsedPackage, ONTOL_PKG},
     CompileError, Compiler, SourceId, SourceSpan, Sources, SpannedCompileError, NO_SPAN,
 };
-use ontol_parser::syntax::SyntaxSource;
+use ontol_parser::cst_parse;
 use ontol_runtime::ontology::{config::PackageConfig, domain::TypeInfo, Ontology};
 use regex::Regex;
 use std::{
@@ -236,9 +237,15 @@ impl State {
                         let request_uri = build_uri(root_path, source_name);
 
                         if let Some(doc) = self.docs.get(&request_uri) {
-                            let package = ParsedPackage::parse(
+                            let (flat_tree, errors) = cst_parse(&doc.text);
+
+                            let package = ParsedPackage::new(
                                 request,
-                                SyntaxSource::TextCstArc(doc.text.clone()),
+                                Box::new(OntolTreeSyntax {
+                                    tree: flat_tree.unflatten(),
+                                    source_text: doc.text.clone(),
+                                }),
+                                errors,
                                 package_config,
                                 &mut ontol_sources,
                             );
