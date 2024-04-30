@@ -20,7 +20,7 @@ use reqwest::header::HeaderName;
 use tracing::info;
 
 /// All the domains routed by domain name
-pub async fn domains_router(ontology: Arc<Ontology>) -> axum::Router {
+pub async fn domains_router(ontology: Arc<Ontology>, base_url: &str) -> axum::Router {
     let engine = Arc::new(
         DomainEngine::builder(ontology.clone())
             .system(Box::<System>::default())
@@ -44,12 +44,12 @@ pub async fn domains_router(ontology: Arc<Ontology>) -> axum::Router {
             domain_router(engine.clone(), &domain_path, *package_id).unwrap(),
         );
 
-        info!("Domain {package_id:?} served under /d{domain_path}/graphql");
+        info!("Domain {package_id:?} served under {base_url}{domain_path}/graphql");
     }
     router.layer(tower_http::trace::TraceLayer::new_for_http())
     // let schema = ontology_schema::new(&ontology);
 }
-pub fn ontology_router(ontology: Arc<Ontology>) -> axum::Router {
+pub fn ontology_router(ontology: Arc<Ontology>, base_url: &str) -> axum::Router {
     let schema = Schema::new(
         Query,
         EmptyMutation::<Context>::new(),
@@ -76,7 +76,7 @@ pub fn ontology_router(ontology: Arc<Ontology>) -> axum::Router {
         )
     }
 
-    info!("Ontology schema served under /o/graphql");
+    info!("Ontology schema served under {base_url}/graphql");
 
     axum::Router::new()
         .route(

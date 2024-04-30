@@ -473,7 +473,8 @@ async fn serve(
         .watch(&root_dir, RecursiveMode::NonRecursive)
         .unwrap();
 
-    let addr: SocketAddr = format!("0.0.0.0:{}", port).parse().unwrap();
+    let bind_addr: SocketAddr = format!("0.0.0.0:{}", port).parse().unwrap();
+    let base_url = format!("http://localhost:{port}");
 
     let dynamic_routers = DynamicRouters::default();
 
@@ -493,10 +494,11 @@ async fn serve(
                 },
             )
             .route("/ws", get(|socket| ws_upgrade_handler(socket, reload_tx)));
-        async move {
-            info!("Serving on http://{addr}");
 
-            let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
+        info!("Serving on {base_url}");
+
+        async move {
+            let listener = tokio::net::TcpListener::bind(&bind_addr).await.unwrap();
             axum::serve(listener, outer_router).await.unwrap();
         }
     });
@@ -511,7 +513,13 @@ async fn serve(
     );
     match compile_output {
         Ok(output) => {
-            reload_routes(output.ontology, &dynamic_routers, data_store.as_deref()).await;
+            reload_routes(
+                output.ontology,
+                &dynamic_routers,
+                data_store.as_deref(),
+                &base_url,
+            )
+            .await;
             let _ = reload_tx.send(ChannelMessage::Reload);
         }
         Err(error) => println!("{:?}", error),
@@ -542,6 +550,7 @@ async fn serve(
                                     output.ontology,
                                     &dynamic_routers,
                                     data_store.as_deref(),
+                                    &base_url,
                                 )
                                 .await;
                                 let _ = reload_tx.send(ChannelMessage::Reload);
@@ -568,12 +577,17 @@ struct DynamicRouters {
     domains: Arc<Mutex<Option<axum::Router>>>,
 }
 
-async fn reload_routes(ontology: Ontology, dyn_routers: &DynamicRouters, data_store: Option<&str>) {
+async fn reload_routes(
+    ontology: Ontology,
+    dyn_routers: &DynamicRouters,
+    data_store: Option<&str>,
+    base_url: &str,
+) {
     check_datastore_domain_has_entities(data_store, &ontology);
 
     let ontology = Arc::new(ontology);
-    let o = ontology_router(ontology.clone());
-    let d = domains_router(ontology).await;
+    let o = ontology_router(ontology.clone(), &format!("{base_url}/o"));
+    let d = domains_router(ontology, &format!("{base_url}/d")).await;
 
     *(dyn_routers.ontology.lock().unwrap()) = Some(o);
     *(dyn_routers.domains.lock().unwrap()) = Some(d);
