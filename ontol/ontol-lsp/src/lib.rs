@@ -314,7 +314,7 @@ impl LanguageServer for Backend {
             #![allow(deprecated)]
             Some(doc) => {
                 let mut symbols = Vec::<SymbolInformation>::with_capacity(doc.statements.len());
-                for (stmt, range) in doc.statements.iter() {
+                for (stmt, span) in doc.statements.iter() {
                     let name = match stmt {
                         Statement::Use(stmt) => {
                             format!("use '{}' as {}", stmt.reference.0, stmt.as_ident.0)
@@ -327,7 +327,7 @@ impl LanguageServer for Backend {
                             (_, _, _) => format!("def {}", stmt.ident.0),
                         },
                         Statement::Rel(_) => {
-                            let sig = get_signature(&doc.text, range, &state.regex);
+                            let sig = get_signature(&doc.text, span.clone(), &state.regex);
                             let parens_stripped = state.regex.rel_parens.replace(&sig, "");
                             state
                                 .regex
@@ -335,7 +335,7 @@ impl LanguageServer for Backend {
                                 .replace(&parens_stripped, "")
                                 .to_string()
                         }
-                        Statement::Fmt(_) => get_signature(&doc.text, range, &state.regex),
+                        Statement::Fmt(_) => get_signature(&doc.text, span.clone(), &state.regex),
                         Statement::Map(stmt) => {
                             let ident = if let Some(ident) = &stmt.ident {
                                 format!("{} ", ident.0)
@@ -361,7 +361,7 @@ impl LanguageServer for Backend {
                         deprecated: None,
                         location: Location {
                             uri: params.text_document.uri.clone(),
-                            range: get_range(&doc.text, range),
+                            range: get_range(&doc.text, span),
                         },
                         container_name: None,
                     };

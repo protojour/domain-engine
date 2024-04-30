@@ -1,6 +1,9 @@
 use std::ops::Range;
 
-use crate::lexer::{kind::Kind, Lex};
+use crate::{
+    lexer::{kind::Kind, Lex},
+    ToUsizeRange, U32Span,
+};
 
 use super::tree::{FlatSyntaxTree, SyntaxMarker};
 
@@ -48,7 +51,7 @@ pub struct CstParser<'a> {
 
 impl<'a> CstParser<'a> {
     pub fn from_lexed_source(source: &'a str, lex: Lex) -> Self {
-        let cap_estimate = lex.tokens.len();
+        let cap_estimate = lex.tokens().len();
         Self {
             source,
             lex,
@@ -59,7 +62,7 @@ impl<'a> CstParser<'a> {
         }
     }
 
-    pub fn finish(self) -> (FlatSyntaxTree, Vec<(Range<usize>, String)>) {
+    pub fn finish(self) -> (FlatSyntaxTree, Vec<(U32Span, String)>) {
         let tree = FlatSyntaxTree {
             markers: self.markers,
             lex: self.lex,
@@ -71,7 +74,7 @@ impl<'a> CstParser<'a> {
                 let span = tree
                     .lex
                     .opt_span(cursor.0)
-                    .unwrap_or_else(|| self.source.len()..self.source.len());
+                    .unwrap_or_else(|| (self.source.len()..self.source.len()).into());
                 (span, msg)
             })
             .collect();
@@ -80,10 +83,10 @@ impl<'a> CstParser<'a> {
     }
 
     pub fn peek_tokens(&self) -> &[Kind] {
-        if self.cursor.0 > self.lex.tokens.len() {
+        if self.cursor.0 > self.lex.tokens().len() {
             &[]
         } else {
-            &self.lex.tokens[self.cursor.0..]
+            &self.lex.tokens()[self.cursor.0..]
         }
     }
 
@@ -261,7 +264,7 @@ impl<'a> CstParser<'a> {
 
     fn push_current_token(&mut self, kind: Kind) {
         let cursor = self.cursor;
-        if cursor.0 < self.lex.tokens.len() {
+        if cursor.0 < self.lex.tokens().len() {
             let index = cursor.0 as u32;
             let marker = match kind {
                 Kind::Whitespace | Kind::Comment => SyntaxMarker::Ignorable { index },
@@ -273,14 +276,14 @@ impl<'a> CstParser<'a> {
 
     fn at_exact(&self) -> Kind {
         self.lex
-            .tokens
+            .tokens()
             .get(self.cursor.0)
             .copied()
             .unwrap_or(Kind::Eof)
     }
 
     fn current_text(&self) -> Option<&str> {
-        let span = self.lex.opt_span(self.cursor.0)?;
+        let span: Range<usize> = self.lex.opt_span(self.cursor.0)?.to_usize_range();
         Some(&self.source[span])
     }
 }

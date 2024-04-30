@@ -659,7 +659,7 @@ pub mod expr_pattern {
     }
 }
 
-fn ident_path(p: &mut CstParser) {
+pub fn ident_path(p: &mut CstParser) {
     p.eat_trivia();
 
     let ident_path = p.start(Kind::IdentPath);

@@ -6,7 +6,7 @@ use ontol_parser::{
         view::{NodeView, NodeViewExt, TokenView, TokenViewExt},
     },
     lexer::{kind::Kind, unescape::unescape_regex},
-    ParserError, Span,
+    ParserError, U32Span,
 };
 use ontol_runtime::{
     property::{PropertyCardinality, ValueCardinality},
@@ -31,12 +31,12 @@ use super::context::{
     BlockContext, Coinage, Extern, MapVarTable, Open, Private, RelationKey, RootDefs, Symbol,
 };
 
-pub struct CstLowering<'c, 'm, 's, V: NodeView<'s>> {
+pub struct CstLowering<'c, 'm, V: NodeView> {
     ctx: LoweringCtx<'c, 'm>,
-    _phantom: PhantomData<&'s V>,
+    _phantom: PhantomData<V>,
 }
 
-type LoweringError = (CompileError, Span);
+type LoweringError = (CompileError, U32Span);
 type Res<T> = Result<T, LoweringError>;
 
 enum PreDefinedStmt<V> {
@@ -55,7 +55,7 @@ enum LoweredStructPatternParams {
     Error,
 }
 
-impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
+impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
     pub fn new(compiler: &'c mut Compiler<'m>, src: Src) -> Self {
         Self {
             ctx: LoweringCtx {
@@ -106,7 +106,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                 let Some(used_package_def_id) =
                     self.ctx.compiler.packages.loaded_packages.get(&reference)
                 else {
-                    self.report_error((CompileError::PackageNotFound(reference), name.view.span()));
+                    self.report_error((CompileError::PackageNotFound(reference), name.0.span()));
                     return None;
                 };
 
@@ -131,7 +131,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                 let def_id = self.catch(|zelf| {
                     zelf.ctx.coin_type_definition(
                         ident_token.slice(),
-                        &ident_token.span(),
+                        ident_token.span(),
                         private,
                         open,
                         extern_,
@@ -175,7 +175,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                 let def_id = self.catch(|zelf| {
                     zelf.ctx.coin_type_definition(
                         ident_token.slice(),
-                        &ident_token.span(),
+                        ident_token.span(),
                         private,
                         open,
                         extern_,
@@ -200,7 +200,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
     }
 
     fn lower_def_body(&mut self, def_id: DefId, stmt: insp::DefStatement<V>) -> Option<RootDefs> {
-        self.append_documentation(def_id, stmt.view);
+        self.append_documentation(def_id, stmt.0.clone());
 
         let mut root_defs: RootDefs = [def_id].into();
 
@@ -228,39 +228,45 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         stmt: insp::RelStatement<V>,
         block: BlockContext,
     ) -> Option<RootDefs> {
-        let subject = stmt.subject()?;
+        let rel_subject = stmt.subject()?;
         let fwd_set = stmt.fwd_set()?;
-        let object = stmt.object()?;
+        let rel_object = stmt.object()?;
 
         let mut root_defs = RootDefs::default();
 
         let subject_def_id = self.resolve_type_reference(
-            subject.type_mod()?.type_ref()?,
+            rel_subject.type_mod()?.type_ref()?,
             &block,
             Some(&mut root_defs),
         )?;
-        let object_def_id = match object.type_mod_or_pattern()? {
+        let object_def_id = match rel_object.type_mod_or_pattern()? {
             insp::TypeModOrPattern::TypeMod(type_mod) => {
                 self.resolve_type_reference(type_mod.type_ref()?, &block, Some(&mut root_defs))?
             }
             insp::TypeModOrPattern::Pattern(pattern) => {
                 let mut var_table = MapVarTable::default();
-                let lowered = self.lower_pattern(pattern, &mut var_table);
+                let lowered = self.lower_pattern(pattern.clone(), &mut var_table);
                 let pat_id = self.ctx.compiler.patterns.alloc_pat_id();
                 self.ctx.compiler.patterns.table.insert(pat_id, lowered);
 
                 self.ctx
-                    .define_anonymous(DefKind::Constant(pat_id), &pattern.view().span())
+                    .define_anonymous(DefKind::Constant(pat_id), pattern.view().span())
             }
         };
 
         for (index, relation) in fwd_set.relations().enumerate() {
             if let Some(mut defs) = self.lower_relationship(
-                (subject_def_id, subject),
+                subject_def_id,
+                rel_subject.clone(),
                 relation,
-                (object_def_id, object),
-                if index == 0 { stmt.backwd_set() } else { None },
-                stmt,
+                object_def_id,
+                rel_object.clone(),
+                if index == 0 {
+                    stmt.clone().backwd_set()
+                } else {
+                    None
+                },
+                stmt.clone(),
             ) {
                 root_defs.append(&mut defs);
             }
@@ -269,11 +275,14 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         Some(root_defs)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn lower_relationship(
         &mut self,
-        subject: (DefId, insp::RelSubject<V>),
+        subject_def: DefId,
+        rel_subject: insp::RelSubject<V>,
         relation: insp::Relation<V>,
-        object: (DefId, insp::RelObject<V>),
+        object_def: DefId,
+        rel_object: insp::RelObject<V>,
         backward_relation: Option<insp::RelBackwdSet<V>>,
         rel_stmt: insp::RelStatement<V>,
     ) -> Option<RootDefs> {
@@ -284,7 +293,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
             match type_mod.type_ref()? {
                 insp::TypeRef::NumberRange(range) => (
                     RelationKey::Indexed,
-                    range.view.span(),
+                    range.0.span(),
                     Some(self.lower_u16_range(range)),
                 ),
                 type_ref => {
@@ -322,16 +331,16 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         let has_object_prop = backward_relation.is_some();
 
         // This syntax just defines the relation the first time it's used
-        let relation_def_id = self.ctx.define_relation_if_undefined(key, &ident_span);
+        let relation_def_id = self.ctx.define_relation_if_undefined(key, ident_span);
 
         let relationship_id = self.ctx.compiler.defs.alloc_def_id(self.ctx.package_id);
-        self.append_documentation(relationship_id, rel_stmt.view);
+        self.append_documentation(relationship_id, rel_stmt.0.clone());
 
         let rel_params = if let Some(index_range_rel_params) = index_range_rel_params {
             if let Some(rp) = relation.rel_params() {
                 self.report_error((
                     CompileError::CannotMixIndexedRelationIdentsAndEdgeTypes,
-                    rp.view.span(),
+                    rp.0.span(),
                 ));
                 return None;
             }
@@ -344,7 +353,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                     rel_type_for: Some(RelationshipId(relationship_id)),
                     flags: TypeDefFlags::CONCRETE,
                 },
-                &rp.view.span(),
+                rp.0.span(),
             );
             let context_fn = || rel_def_id;
 
@@ -371,6 +380,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
 
         let mut relationship = {
             let object_prop = backward_relation
+                .clone()
                 .and_then(|rel| rel.name())
                 .and_then(|name| name.text())
                 .and_then(|result| self.unescape(result))
@@ -379,7 +389,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
             let subject_cardinality = (
                 property_cardinality(relation.prop_cardinality())
                     .unwrap_or(PropertyCardinality::Mandatory),
-                value_cardinality(match object.1.type_mod_or_pattern() {
+                value_cardinality(match rel_object.type_mod_or_pattern() {
                     Some(insp::TypeModOrPattern::TypeMod(type_mod)) => Some(type_mod),
                     _ => None,
                 })
@@ -400,16 +410,16 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                     backward_relation
                         .and_then(|rel| property_cardinality(rel.prop_cardinality()))
                         .unwrap_or(default.0),
-                    value_cardinality(subject.1.type_mod()).unwrap_or(default.1),
+                    value_cardinality(rel_subject.type_mod()).unwrap_or(default.1),
                 )
             };
 
             Relationship {
                 relation_def_id,
-                relation_span: self.ctx.source_span(&ident_span),
-                subject: (subject.0, self.ctx.source_span(&subject.1.view.span())),
+                relation_span: self.ctx.source_span(ident_span),
+                subject: (subject_def, self.ctx.source_span(rel_subject.0.span())),
                 subject_cardinality,
-                object: (object.0, self.ctx.source_span(&object.1.view.span())),
+                object: (object_def, self.ctx.source_span(rel_object.0.span())),
                 object_cardinality,
                 object_prop,
                 rel_params,
@@ -433,7 +443,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         self.ctx.set_def_kind(
             relationship_id,
             DefKind::Relationship(relationship),
-            &rel_stmt.view.span(),
+            rel_stmt.0.span(),
         );
         root_defs.push(relationship_id);
 
@@ -449,7 +459,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         let mut transitions = stmt.transitions().peekable();
 
         let Some(origin) = transitions.next() else {
-            self.report_error((CompileError::TODO("missing origin"), stmt.view.span()));
+            self.report_error((CompileError::TODO("missing origin"), stmt.0.span()));
             return None;
         };
         let mut origin_def_id = self.resolve_type_reference(
@@ -459,7 +469,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         )?;
 
         let Some(mut transition) = transitions.next() else {
-            self.report_error((CompileError::FmtTooFewTransitions, stmt.view.span()));
+            self.report_error((CompileError::FmtTooFewTransitions, stmt.0.span()));
             return None;
         };
 
@@ -471,7 +481,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                 }
                 Some(item) => item,
                 _ => {
-                    self.report_error((CompileError::FmtTooFewTransitions, stmt.view.span()));
+                    self.report_error((CompileError::FmtTooFewTransitions, stmt.0.span()));
                     return None;
                 }
             };
@@ -482,7 +492,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                     rel_type_for: None,
                     flags: TypeDefFlags::CONCRETE,
                 },
-                &next_transition.view().span(),
+                next_transition.view().span(),
             );
 
             root_defs.push(self.lower_fmt_transition(
@@ -511,9 +521,9 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
 
     fn lower_fmt_transition(
         &mut self,
-        from: (DefId, Span),
+        from: (DefId, U32Span),
         transition: insp::TypeMod<V>,
-        to: (DefId, Span),
+        to: (DefId, U32Span),
         final_state: FmtFinalState,
     ) -> Option<DefId> {
         let transition_def =
@@ -521,22 +531,22 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         let relation_key = RelationKey::FmtTransition(transition_def, final_state);
 
         // This syntax just defines the relation the first time it's used
-        let relation_def_id = self.ctx.define_relation_if_undefined(relation_key, &from.1);
+        let relation_def_id = self.ctx.define_relation_if_undefined(relation_key, from.1);
 
         debug!("{:?}: <transition>", relation_def_id.0);
 
         Some(self.ctx.define_anonymous(
             DefKind::Relationship(Relationship {
                 relation_def_id,
-                relation_span: self.ctx.source_span(&from.1),
-                subject: (from.0, self.ctx.source_span(&from.1)),
+                relation_span: self.ctx.source_span(from.1),
+                subject: (from.0, self.ctx.source_span(from.1)),
                 subject_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::IndexSet),
-                object: (to.0, self.ctx.source_span(&to.1)),
+                object: (to.0, self.ctx.source_span(to.1)),
                 object_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::IndexSet),
                 object_prop: None,
                 rel_params: RelParams::Unit,
             }),
-            &to.1,
+            to.1,
         ))
     }
 
@@ -556,7 +566,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                 let symbol = ident_path.symbols().next()?;
                 let (def_id, coinage) = self.catch(|zelf| {
                     zelf.ctx
-                        .named_def_id(Space::Map, symbol.slice(), &symbol.span())
+                        .named_def_id(Space::Map, symbol.slice(), symbol.span())
                 })?;
                 if matches!(coinage, Coinage::Used) {
                     self.report_error((CompileError::DuplicateMapIdentifier, symbol.span()));
@@ -592,7 +602,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                     }
                 },
             },
-            &stmt.view.span(),
+            stmt.0.span(),
         );
 
         Some(def_id)
@@ -605,7 +615,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
     ) -> Option<PatId> {
         let pattern = match arm.pattern() {
             Some(p) => self.lower_pattern(p, var_table),
-            None => self.mk_error_pattern(&arm.view.span()),
+            None => self.mk_error_pattern(arm.0.span()),
         };
 
         let pat_id = self.ctx.compiler.patterns.alloc_pat_id();
@@ -618,9 +628,11 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         match pat {
             insp::Pattern::PatStruct(pat) => self.lower_struct_pattern(pat, var_table),
             insp::Pattern::PatSet(pat) => self.lower_set_pattern(pat, var_table),
-            insp::Pattern::PatAtom(pat) => self
-                .lower_atom_pattern(pat, var_table)
-                .unwrap_or_else(|| self.mk_error_pattern(&pat.view.span())),
+            insp::Pattern::PatAtom(pat) => {
+                let span = pat.0.span();
+                self.lower_atom_pattern(pat, var_table)
+                    .unwrap_or_else(|| self.mk_error_pattern(span))
+            }
             insp::Pattern::PatBinary(pat) => self.lower_binary_pattern(pat, var_table),
         }
     }
@@ -630,14 +642,14 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         pat_struct: insp::PatStruct<V>,
         var_table: &mut MapVarTable,
     ) -> Pattern {
-        let span = pat_struct.view.span();
+        let span = pat_struct.0.span();
         let type_path = match pat_struct.ident_path() {
-            Some(ident_path) => match self.lookup_path(ident_path) {
+            Some(ident_path) => match self.lookup_path(&ident_path) {
                 Some(def_id) => TypePath::Specified {
                     def_id,
-                    span: self.ctx.source_span(&ident_path.view.span()),
+                    span: self.ctx.source_span(ident_path.0.span()),
                 },
-                None => return self.ctx.mk_pattern(PatternKind::Error, &span),
+                None => return self.ctx.mk_pattern(PatternKind::Error, span),
             },
             None => {
                 let def_id = self.ctx.define_anonymous_type(
@@ -646,7 +658,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                         rel_type_for: None,
                         flags: TypeDefFlags::CONCRETE | TypeDefFlags::PUBLIC,
                     },
-                    &span,
+                    span,
                 );
                 self.ctx
                     .compiler
@@ -682,7 +694,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                         attributes: attrs,
                         spread_label,
                     },
-                    &span,
+                    span,
                 )
             }
             LoweredStructPatternParams::Unit(unit_pattern) => {
@@ -693,7 +705,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                     ));
                 }
 
-                let key = (DefId::unit(), self.ctx.source_span(&span));
+                let key = (DefId::unit(), self.ctx.source_span(span));
 
                 self.ctx.mk_pattern(
                     PatternKind::Compound {
@@ -711,10 +723,10 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                         .into(),
                         spread_label: None,
                     },
-                    &span,
+                    span,
                 )
             }
-            LoweredStructPatternParams::Error => self.ctx.mk_pattern(PatternKind::Error, &span),
+            LoweredStructPatternParams::Error => self.ctx.mk_pattern(PatternKind::Error, span),
         }
     }
 
@@ -749,7 +761,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                     };
                     spread_label = Some(Box::new(SpreadLabel(
                         symbol.slice().to_string(),
-                        self.ctx.source_span(&symbol.span()),
+                        self.ctx.source_span(symbol.span()),
                     )));
                 }
                 insp::StructParam::StructParamAttrUnit(attr_unit) => {
@@ -757,7 +769,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                         Some(insp::Pattern::PatSet(pat_set)) => {
                             self.report_error((
                                 CompileError::TODO("set pattern not allowed here"),
-                                pat_set.view.span(),
+                                pat_set.0.span(),
                             ));
                             return LoweredStructPatternParams::Error;
                         }
@@ -781,7 +793,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         var_table: &mut MapVarTable,
     ) -> Option<CompoundPatternAttr> {
         let relation = attr_prop.relation()?;
-        let relation_span = self.ctx.source_span(&relation.view().span());
+        let relation_span = self.ctx.source_span(relation.view().span());
         let relation_def =
             self.resolve_type_reference(relation.type_ref()?, &BlockContext::NoContext, None)?;
         let bind_option = attr_prop
@@ -795,7 +807,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                 bind_option,
                 kind: CompoundPatternAttrKind::Value {
                     rel: None,
-                    val: self.mk_error_pattern(&attr_prop.view.span()),
+                    val: self.mk_error_pattern(attr_prop.0.span()),
                 },
             });
         };
@@ -807,7 +819,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                         CompileError::TODO(
                             "relation arguments must be associated with each element",
                         ),
-                        rel_args.view.span(),
+                        rel_args.0.span(),
                     ));
                     return None;
                 }
@@ -882,7 +894,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                     attributes: attrs,
                     spread_label,
                 },
-                &rel_args.view.span(),
+                rel_args.0.span(),
             ))),
             LoweredStructPatternParams::Unit(unit_pattern) => {
                 self.ctx.compiler.push_error(
@@ -891,7 +903,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                 None
             }
             LoweredStructPatternParams::Error => {
-                Some(Some(self.mk_error_pattern(&rel_args.view.span())))
+                Some(Some(self.mk_error_pattern(rel_args.0.span())))
             }
         }
     }
@@ -903,14 +915,14 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
     ) -> Pattern {
         let seq_type = pat_set
             .ident_path()
-            .and_then(|ident_path| self.lookup_path(ident_path));
+            .and_then(|ident_path| self.lookup_path(&ident_path));
 
         let mut pattern_elements = vec![];
         for element in pat_set.elements() {
             let pattern = element
                 .pattern()
                 .map(|pattern| self.lower_pattern(pattern, var_table))
-                .unwrap_or_else(|| self.mk_error_pattern(&element.view.span()));
+                .unwrap_or_else(|| self.mk_error_pattern(element.0.span()));
 
             let rel = if let Some(rel_args) = element.rel_args() {
                 let mut lowered_attrs = vec![];
@@ -926,17 +938,17 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                                 lowered_attrs.push(attr_prop);
                             }
                         }
-                        insp::StructParam::StructParamAttrUnit(_unit) => {
+                        insp::StructParam::StructParamAttrUnit(unit) => {
                             self.report_error((
                                 CompileError::TODO("unit cannot be used here"),
-                                param.view().span(),
+                                unit.0.span(),
                             ));
                         }
                         insp::StructParam::Spread(spread) => {
                             if let Some(symbol) = spread.symbol() {
                                 spread_label = Some(Box::new(SpreadLabel(
                                     symbol.slice().to_string(),
-                                    self.ctx.source_span(&symbol.span()),
+                                    self.ctx.source_span(symbol.span()),
                                 )));
                             }
                         }
@@ -952,7 +964,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                         attributes: lowered_attrs.into(),
                         spread_label,
                     },
-                    span: self.ctx.source_span(&rel_args.view.span()),
+                    span: self.ctx.source_span(rel_args.0.span()),
                 })
             } else {
                 None
@@ -971,7 +983,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                 val_type_def: seq_type,
                 elements: pattern_elements.into_boxed_slice(),
             },
-            &pat_set.view.span(),
+            pat_set.0.span(),
         )
     }
 
@@ -1000,7 +1012,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                             },
                             spread_label: None,
                         },
-                        &rel_args.view.span(),
+                        rel_args.0.span(),
                     ))
                 }
                 None => None,
@@ -1008,7 +1020,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
             let val = element
                 .pattern()
                 .map(|pattern| self.lower_pattern(pattern, var_table))
-                .unwrap_or_else(|| self.mk_error_pattern(&element.view.span()));
+                .unwrap_or_else(|| self.mk_error_pattern(element.0.span()));
 
             elements.push(SetElement {
                 iter: element.spread().is_some(),
@@ -1020,7 +1032,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         if elements.is_empty() {
             self.report_error((
                 CompileError::TODO("inner set must have at least one element"),
-                pat_set.view.span(),
+                pat_set.0.span(),
             ));
         }
 
@@ -1043,12 +1055,12 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         pat_atom: insp::PatAtom<V>,
         var_table: &mut MapVarTable,
     ) -> Option<Pattern> {
-        let token = pat_atom.view.local_tokens().next()?;
+        let token = pat_atom.0.local_tokens().next()?;
         let span = token.span();
 
         match token.kind() {
             Kind::Number => match token.slice().parse::<i64>() {
-                Ok(int) => Some(self.ctx.mk_pattern(PatternKind::ConstI64(int), &span)),
+                Ok(int) => Some(self.ctx.mk_pattern(PatternKind::ConstI64(int), span)),
                 Err(_) => {
                     self.report_error((CompileError::InvalidInteger, span));
                     None
@@ -1056,13 +1068,13 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
             },
             Kind::SingleQuoteText | Kind::DoubleQuoteText => {
                 let text = self.unescape(token.literal_text()?)?;
-                Some(self.ctx.mk_pattern(PatternKind::ConstText(text), &span))
+                Some(self.ctx.mk_pattern(PatternKind::ConstText(text), span))
             }
             Kind::Regex => {
                 let regex_literal = unescape_regex(token.slice());
                 let regex_def_id = match self.ctx.compiler.defs.def_regex(
                     &regex_literal,
-                    &span,
+                    span,
                     &mut self.ctx.compiler.strings,
                 ) {
                     Ok(def_id) => def_id,
@@ -1081,7 +1093,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
 
                 let mut regex_lowerer = RegexToPatternLowerer::new(
                     regex_meta.pattern,
-                    &span,
+                    span,
                     self.ctx.source_id,
                     var_table,
                     &mut self.ctx.compiler.patterns,
@@ -1092,14 +1104,14 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
 
                 let expr_regex = regex_lowerer.into_expr(regex_def_id);
 
-                Some(self.ctx.mk_pattern(PatternKind::Regex(expr_regex), &span))
+                Some(self.ctx.mk_pattern(PatternKind::Regex(expr_regex), span))
             }
             Kind::Sym => match token.slice() {
-                "true" => Some(self.ctx.mk_pattern(PatternKind::ConstBool(true), &span)),
-                "false" => Some(self.ctx.mk_pattern(PatternKind::ConstBool(false), &span)),
+                "true" => Some(self.ctx.mk_pattern(PatternKind::ConstBool(true), span)),
+                "false" => Some(self.ctx.mk_pattern(PatternKind::ConstBool(false), span)),
                 ident => {
                     let var = var_table.get_or_create_var(ident.to_string());
-                    Some(self.ctx.mk_pattern(PatternKind::Variable(var), &span))
+                    Some(self.ctx.mk_pattern(PatternKind::Variable(var), span))
                 }
             },
             _ => None,
@@ -1111,15 +1123,15 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         pat_atom: insp::PatBinary<V>,
         var_table: &mut MapVarTable,
     ) -> Pattern {
-        let span = pat_atom.view.span();
+        let span = pat_atom.0.span();
         let mut operands = pat_atom.operands();
         let left = operands
             .next()
             .map(|op| self.lower_pattern(op, var_table))
-            .unwrap_or_else(|| self.mk_error_pattern(&span));
+            .unwrap_or_else(|| self.mk_error_pattern(span));
 
         let Some(infix_token) = pat_atom.infix_token() else {
-            return self.mk_error_pattern(&span);
+            return self.mk_error_pattern(span);
         };
 
         let fn_ident = match infix_token.kind() {
@@ -1132,23 +1144,23 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                     CompileError::TODO("invalid infix operator"),
                     infix_token.span(),
                 ));
-                return self.mk_error_pattern(&span);
+                return self.mk_error_pattern(span);
             }
         };
 
-        let Some(def_id) = self.catch(|zelf| zelf.ctx.lookup_ident(fn_ident, &infix_token.span()))
+        let Some(def_id) = self.catch(|zelf| zelf.ctx.lookup_ident(fn_ident, infix_token.span()))
         else {
-            return self.mk_error_pattern(&span);
+            return self.mk_error_pattern(span);
         };
 
         let right = operands
             .next()
             .map(|op| self.lower_pattern(op, var_table))
-            .unwrap_or_else(|| self.mk_error_pattern(&span));
+            .unwrap_or_else(|| self.mk_error_pattern(span));
 
         self.ctx.mk_pattern(
             PatternKind::Call(def_id, Box::new([left, right])),
-            &pat_atom.view.span(),
+            pat_atom.0.span(),
         )
     }
 
@@ -1159,25 +1171,25 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         root_defs: Option<&mut RootDefs>,
     ) -> Option<DefId> {
         match (type_ref, block_context) {
-            (insp::TypeRef::IdentPath(path), _) => self.lookup_path(path),
+            (insp::TypeRef::IdentPath(path), _) => self.lookup_path(&path),
             (insp::TypeRef::This(_), BlockContext::Context(func)) => Some(func()),
             (insp::TypeRef::This(this), BlockContext::NoContext) => {
-                self.report_error((CompileError::WildcardNeedsContextualBlock, this.view.span()));
+                self.report_error((CompileError::WildcardNeedsContextualBlock, this.0.span()));
                 None
             }
             (insp::TypeRef::This(this), BlockContext::FmtLeading) => {
-                self.report_error((CompileError::FmtMisplacedSelf, this.view.span()));
+                self.report_error((CompileError::FmtMisplacedSelf, this.0.span()));
                 None
             }
             (insp::TypeRef::Literal(literal), _) => {
-                let token = literal.view.local_tokens().next()?;
+                let token = literal.0.local_tokens().next()?;
                 match token.kind() {
                     Kind::Number => {
                         let lit = self.ctx.compiler.strings.intern(token.slice());
                         let def_id = self.ctx.compiler.defs.add_def(
                             DefKind::NumberLiteral(lit),
                             ONTOL_PKG,
-                            self.ctx.source_span(&token.span()),
+                            self.ctx.source_span(token.span()),
                         );
                         Some(def_id)
                     }
@@ -1197,7 +1209,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                         let regex_literal = unescape_regex(token.slice());
                         match self.ctx.compiler.defs.def_regex(
                             &regex_literal,
-                            &token.span(),
+                            token.span(),
                             &mut self.ctx.compiler.strings,
                         ) {
                             Ok(def_id) => Some(def_id),
@@ -1221,7 +1233,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                 let Some(root_defs) = root_defs else {
                     self.report_error((
                         CompileError::TODO("Anonymous struct not allowed here"),
-                        body.view.span(),
+                        body.0.span(),
                     ));
                     return None;
                 };
@@ -1232,7 +1244,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
                         rel_type_for: None,
                         flags: TypeDefFlags::CONCRETE,
                     },
-                    &body.view.span(),
+                    body.0.span(),
                 );
 
                 // This type needs to be part of the anonymous part of the namespace
@@ -1257,21 +1269,17 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
             (insp::TypeRef::NumberRange(range), _) => {
                 self.report_error((
                     CompileError::TODO("number range is not a proper type"),
-                    range.view.span(),
+                    range.0.span(),
                 ));
                 None
             }
         }
     }
 
-    fn lookup_path(&mut self, ident_path: insp::IdentPath<V>) -> Option<DefId> {
+    fn lookup_path(&mut self, ident_path: &insp::IdentPath<V>) -> Option<DefId> {
         self.catch(|zelf| {
-            zelf.ctx.lookup_path(
-                ident_path
-                    .symbols()
-                    .map(|token| (token.slice(), token.span())),
-                &ident_path.view.span(),
-            )
+            zelf.ctx
+                .lookup_path::<V>(ident_path.symbols(), ident_path.0.span())
         })
     }
 
@@ -1328,7 +1336,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         modifier: Option<V::Token>,
     ) -> Option<(SetBinaryOperator, SourceSpan)> {
         let modifier = modifier?;
-        let span = self.ctx.source_span(&modifier.span());
+        let span = self.ctx.source_span(modifier.span());
 
         match modifier.slice() {
             "@in" => Some((SetBinaryOperator::ElementIn, span)),
@@ -1367,7 +1375,11 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
     }
 
     fn append_documentation(&mut self, def_id: DefId, node_view: V) {
-        let Some(docs) = ontol_parser::join_doc_lines(node_view.local_doc_comments()) else {
+        let doc_comments = node_view
+            .local_tokens_filter(Kind::DocComment)
+            .map(|token| token.slice().strip_prefix("///").unwrap().to_string());
+
+        let Some(docs) = ontol_parser::join_doc_lines(doc_comments) else {
             return;
         };
 
@@ -1382,7 +1394,7 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         }
     }
 
-    fn mk_error_pattern(&mut self, span: &Range<usize>) -> Pattern {
+    fn mk_error_pattern(&mut self, span: U32Span) -> Pattern {
         self.ctx.mk_pattern(PatternKind::Error, span)
     }
 
@@ -1396,16 +1408,14 @@ impl<'c, 'm, 's, V: NodeView<'s>> CstLowering<'c, 'm, 's, V> {
         }
     }
 
-    fn report_error(&mut self, (error, span): (CompileError, Range<usize>)) {
+    fn report_error(&mut self, (error, span): (CompileError, U32Span)) {
         self.ctx
             .compiler
-            .push_error(error.spanned(&self.ctx.source_span(&span)));
+            .push_error(error.spanned(&self.ctx.source_span(span)));
     }
 }
 
-fn value_cardinality<'a, V: NodeView<'a>>(
-    type_mod: Option<insp::TypeMod<V>>,
-) -> Option<ValueCardinality> {
+fn value_cardinality<V: NodeView>(type_mod: Option<insp::TypeMod<V>>) -> Option<ValueCardinality> {
     Some(match type_mod? {
         insp::TypeMod::TypeModUnit(_) => ValueCardinality::Unit,
         insp::TypeMod::TypeModSet(_) => ValueCardinality::IndexSet,
@@ -1413,7 +1423,7 @@ fn value_cardinality<'a, V: NodeView<'a>>(
     })
 }
 
-fn property_cardinality<'a, V: NodeView<'a>>(
+fn property_cardinality<V: NodeView>(
     prop_cardinality: Option<insp::PropCardinality<V>>,
 ) -> Option<PropertyCardinality> {
     Some(if prop_cardinality?.question().is_some() {

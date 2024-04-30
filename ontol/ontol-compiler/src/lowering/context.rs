@@ -1,8 +1,12 @@
 //! utilities for lowering ontol-parser output
 
-use std::{collections::HashMap, ops::Range};
+use std::collections::HashMap;
 
 use indexmap::map::Entry;
+use ontol_parser::{
+    cst::view::{NodeView, TokenView},
+    U32Span,
+};
 use ontol_runtime::{
     property::{PropertyCardinality, ValueCardinality},
     var::{Var, VarAllocator},
@@ -32,12 +36,12 @@ pub enum Coinage {
     Used,
 }
 
-pub type LoweringError = (CompileError, Range<usize>);
+pub type LoweringError = (CompileError, U32Span);
 
-pub struct Open(pub Option<Range<usize>>);
-pub struct Private(pub Option<Range<usize>>);
-pub struct Extern(pub Option<Range<usize>>);
-pub struct Symbol(pub Option<Range<usize>>);
+pub struct Open(pub Option<U32Span>);
+pub struct Private(pub Option<U32Span>);
+pub struct Extern(pub Option<U32Span>);
+pub struct Symbol(pub Option<U32Span>);
 
 pub enum RelationKey {
     Named(DefId),
@@ -82,19 +86,14 @@ pub enum BlockContext<'a> {
 }
 
 impl<'c, 'm> LoweringCtx<'c, 'm> {
-    pub fn source_span(&self, range: &Range<usize>) -> SourceSpan {
+    pub fn source_span(&self, span: U32Span) -> SourceSpan {
         SourceSpan {
             source_id: self.source_id,
-            start: range.start as u32,
-            end: range.end as u32,
+            span,
         }
     }
 
-    pub fn lookup_ident(
-        &mut self,
-        ident: &str,
-        span: &Range<usize>,
-    ) -> Result<DefId, LoweringError> {
+    pub fn lookup_ident(&mut self, ident: &str, span: U32Span) -> Result<DefId, LoweringError> {
         // A single ident looks in both ONTOL_PKG and the current package
         match self
             .compiler
@@ -102,19 +101,19 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
             .lookup(&[self.package_id, ONTOL_PKG], Space::Type, ident)
         {
             Some(def_id) => Ok(def_id),
-            None => Err((CompileError::TypeNotFound, span.clone())),
+            None => Err((CompileError::TypeNotFound, span)),
         }
     }
 
-    pub fn lookup_path<'s>(
+    pub fn lookup_path<V: NodeView>(
         &mut self,
-        segments: impl Iterator<Item = (&'s str, Range<usize>)>,
-        path_span: &Range<usize>,
+        segments: impl Iterator<Item = V::Token>,
+        path_span: U32Span,
     ) -> Result<DefId, LoweringError> {
         let mut segment_iter = segments.peekable();
 
         let Some(mut current) = segment_iter.next() else {
-            return Err((CompileError::TODO("empty path"), path_span.clone()));
+            return Err((CompileError::TODO("empty path"), path_span));
         };
 
         if segment_iter.peek().is_some() {
@@ -131,7 +130,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
             let mut def_id;
 
             loop {
-                let segment = self.compiler.strings.intern(current.0);
+                let segment = self.compiler.strings.intern(current.slice());
                 def_id = namespace.space(Space::Type).get(segment);
                 if segment_iter.peek().is_some() {
                     match def_id {
@@ -142,10 +141,10 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
                             }
                             other => {
                                 debug!("namespace not found. def kind was {other:?}");
-                                return Err((CompileError::NamespaceNotFound, current.1.clone()));
+                                return Err((CompileError::NamespaceNotFound, current.span()));
                             }
                         },
-                        None => return Err((CompileError::NamespaceNotFound, current.1.clone())),
+                        None => return Err((CompileError::NamespaceNotFound, current.span())),
                     }
                 }
 
@@ -160,21 +159,21 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
                     DefKind::Type(TypeDef { flags, .. })
                         if !flags.contains(TypeDefFlags::PUBLIC) =>
                     {
-                        Err((CompileError::PrivateDefinition, path_span.clone()))
+                        Err((CompileError::PrivateDefinition, path_span))
                     }
                     _ => Ok(*def_id),
                 },
-                None => Err((CompileError::TypeNotFound, path_span.clone())),
+                None => Err((CompileError::TypeNotFound, path_span)),
             }
         } else {
-            self.lookup_ident(current.0, &current.1)
+            self.lookup_ident(current.slice(), current.span())
         }
     }
 
     pub fn coin_type_definition(
         &mut self,
         ident: &str,
-        ident_span: &Range<usize>,
+        ident_span: U32Span,
         private: Private,
         open: Open,
         extern_: Extern,
@@ -208,7 +207,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
             self.set_def_kind(def_id, kind, ident_span);
 
             if let Some(symbol_span) = symbol.0 {
-                let span = self.source_span(&symbol_span);
+                let span = self.source_span(symbol_span);
                 let ident_literal = self
                     .compiler
                     .defs
@@ -234,7 +233,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
                         ),
                         rel_params: RelParams::Unit,
                     }),
-                    &symbol_span,
+                    symbol_span,
                 );
 
                 self.root_defs.push(relationship_id);
@@ -244,7 +243,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
         Ok(def_id)
     }
 
-    pub fn define_relation_if_undefined(&mut self, key: RelationKey, span: &Range<usize>) -> DefId {
+    pub fn define_relation_if_undefined(&mut self, key: RelationKey, span: U32Span) -> DefId {
         match key {
             RelationKey::Named(def_id) => def_id,
             RelationKey::FmtTransition(def_ref, final_state) => {
@@ -266,7 +265,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
         &mut self,
         space: Space,
         ident: &str,
-        span: &Range<usize>,
+        span: U32Span,
     ) -> Result<(DefId, Coinage), LoweringError> {
         let ident = self.compiler.strings.intern(ident);
         match self
@@ -281,7 +280,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
                 } else {
                     Err((
                         CompileError::TODO("definition of external identifier"),
-                        span.clone(),
+                        span,
                     ))
                 }
             }
@@ -293,20 +292,20 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
         }
     }
 
-    pub fn define_anonymous_type(&mut self, type_def: TypeDef<'m>, span: &Range<usize>) -> DefId {
+    pub fn define_anonymous_type(&mut self, type_def: TypeDef<'m>, span: U32Span) -> DefId {
         let anonymous_def_id = self.compiler.defs.alloc_def_id(self.package_id);
         self.set_def_kind(anonymous_def_id, DefKind::Type(type_def), span);
         debug!("{anonymous_def_id:?}: <anonymous>");
         anonymous_def_id
     }
 
-    pub fn define_anonymous(&mut self, kind: DefKind<'m>, span: &Range<usize>) -> DefId {
+    pub fn define_anonymous(&mut self, kind: DefKind<'m>, span: U32Span) -> DefId {
         let def_id = self.compiler.defs.alloc_def_id(self.package_id);
         self.set_def_kind(def_id, kind, span);
         def_id
     }
 
-    pub fn set_def_kind(&mut self, def_id: DefId, kind: DefKind<'m>, span: &Range<usize>) {
+    pub fn set_def_kind(&mut self, def_id: DefId, kind: DefKind<'m>, span: U32Span) {
         self.compiler.defs.table.insert(
             def_id,
             Def {
@@ -318,7 +317,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
         );
     }
 
-    pub fn mk_pattern(&mut self, kind: PatternKind, span: &Range<usize>) -> Pattern {
+    pub fn mk_pattern(&mut self, kind: PatternKind, span: U32Span) -> Pattern {
         Pattern {
             id: self.compiler.patterns.alloc_pat_id(),
             kind,

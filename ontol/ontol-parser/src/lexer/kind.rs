@@ -123,11 +123,9 @@ pub enum Kind {
     )]
     Sym,
 
+    //
     // Syntax-level nodes:
-    Eof,
-    Error,
-    Ontol,
-
+    //
     /// use statement
     UseStatement,
 
@@ -196,6 +194,14 @@ pub enum Kind {
 
     // container for `..`
     Spread,
+
+    // Synthetic token representing end of file
+    Eof,
+    // Synthetic node representing a grammatical error
+    Error,
+
+    /// The root node. This should be the last entry in the enum.
+    Ontol,
 }
 
 fn lex_double_quote_text(lexer: &mut Lexer<Kind>) -> Option<()> {

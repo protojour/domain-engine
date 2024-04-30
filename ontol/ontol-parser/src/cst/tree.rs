@@ -1,8 +1,11 @@
-use std::fmt::Display;
+use std::{fmt::Display, ops::Range};
 
 use thin_vec::{thin_vec, ThinVec};
 
-use crate::lexer::{kind::Kind, Lex};
+use crate::{
+    lexer::{kind::Kind, Lex},
+    ToUsizeRange, U32Span,
+};
 
 use super::view::{Item, NodeView, TokenView};
 
@@ -21,6 +24,10 @@ impl FlatSyntaxTree {
 
     pub fn lex(&self) -> &Lex {
         &self.lex
+    }
+
+    pub fn into_markers_and_lex(self) -> (Vec<SyntaxMarker>, Lex) {
+        (self.markers, self.lex)
     }
 }
 
@@ -52,7 +59,7 @@ pub enum Syntax {
 #[derive(Clone, PartialEq, Debug)]
 pub struct SyntaxNode {
     kind: Kind,
-    span_start: usize,
+    span_start: u32,
     children: ThinVec<Syntax>,
 }
 
@@ -61,7 +68,7 @@ impl FlatSyntaxTree {
     /// Insignificant tokens are filtered out at this stage.
     pub fn unflatten(self) -> SyntaxTree {
         let mut parent_stack: Vec<SyntaxNode> = vec![];
-        let mut span_cursor: usize = 0;
+        let mut span_cursor: u32 = 0;
         let mut current_node = SyntaxNode {
             kind: Kind::Error,
             span_start: 0,
@@ -136,7 +143,7 @@ pub struct TreeTokenView<'a> {
     src: &'a str,
 }
 
-impl<'a> NodeView<'a> for TreeNodeView<'a> {
+impl<'a> NodeView for TreeNodeView<'a> {
     type Token = TreeTokenView<'a>;
     type Children = TreeNodeChildren<'a>;
 
@@ -144,12 +151,15 @@ impl<'a> NodeView<'a> for TreeNodeView<'a> {
         self.node.kind
     }
 
-    fn span_start(&self) -> usize {
+    fn span_start(&self) -> u32 {
         self.node.span_start
     }
 
-    fn span(self) -> std::ops::Range<usize> {
-        let mut span = self.node.span_start..self.node.span_start;
+    fn span(&self) -> U32Span {
+        let mut span = U32Span {
+            start: self.node.span_start,
+            end: self.node.span_start,
+        };
 
         if let Some(last) = self.children().last() {
             match last {
@@ -174,17 +184,17 @@ impl<'a> NodeView<'a> for TreeNodeView<'a> {
     }
 }
 
-impl<'a> TokenView<'a> for TreeTokenView<'a> {
+impl<'a> TokenView for TreeTokenView<'a> {
     fn kind(&self) -> Kind {
-        self.lex.tokens[self.index as usize]
+        self.lex.kind(self.index as usize)
     }
 
     fn slice(&self) -> &'a str {
-        let span = self.span();
+        let span = self.span().to_usize_range();
         &self.src[span]
     }
 
-    fn span(&self) -> std::ops::Range<usize> {
+    fn span(&self) -> U32Span {
         self.lex.span(self.index as usize)
     }
 }
@@ -196,7 +206,7 @@ pub struct TreeNodeChildren<'a> {
 }
 
 impl<'a> Iterator for TreeNodeChildren<'a> {
-    type Item = Item<'a, TreeNodeView<'a>>;
+    type Item = Item<TreeNodeView<'a>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         Some(match self.iter.next()? {
@@ -237,7 +247,7 @@ impl<'a> Display for DebugTree<'a> {
                     for _ in 0..indent {
                         write!(f, "    ")?;
                     }
-                    let kind = self.tree.lex.tokens[*index as usize];
+                    let kind = self.tree.lex.kind(*index as usize);
                     let span = self.tree.lex.span(*index as usize);
 
                     match kind {
@@ -245,6 +255,7 @@ impl<'a> Display for DebugTree<'a> {
                             writeln!(f, "{kind:?}")?;
                         }
                         _ => {
+                            let span: Range<usize> = span.into();
                             writeln!(f, "{kind:?} `{}`", &self.src[span])?;
                         }
                     }

@@ -95,7 +95,7 @@ fn invalid_escape_code(span_start: usize, offset: usize) -> ParserError {
     let end = start + 1;
 
     ParserError {
-        span: start..end,
+        span: (start..end).into(),
         msg: "invalid escape code".into(),
     }
 }

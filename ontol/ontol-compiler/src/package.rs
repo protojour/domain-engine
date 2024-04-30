@@ -172,7 +172,7 @@ impl PackageGraphBuilder {
 
                     let pkg_ref = PackageReference::Named(text);
 
-                    self.request_package(pkg_ref.clone(), package.src.span(&name.view.span()));
+                    self.request_package(pkg_ref.clone(), package.src.span(name.0.span()));
                     children.insert(pkg_ref);
                 } else {
                     break;

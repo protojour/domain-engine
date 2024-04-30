@@ -1,28 +1,29 @@
-use std::ops::Range;
-
-use crate::lexer::{
-    kind::Kind,
-    unescape::{unescape_text_literal, UnescapeTextResult},
+use crate::{
+    lexer::{
+        kind::Kind,
+        unescape::{unescape_text_literal, UnescapeTextResult},
+    },
+    U32Span,
 };
 
 use super::inspect::Node;
 
-pub trait NodeView<'a>: Sized + Copy {
-    type Token: TokenView<'a>;
-    type Children: Iterator<Item = Item<'a, Self>>;
+pub trait NodeView: Sized + Clone {
+    type Token: TokenView;
+    type Children: Iterator<Item = Item<Self>>;
 
     fn kind(&self) -> Kind;
 
-    fn span_start(&self) -> usize;
+    fn span_start(&self) -> u32;
 
     fn children(&self) -> Self::Children;
 
-    fn span(self) -> Range<usize>;
+    fn span(&self) -> U32Span;
 }
 
-pub trait NodeViewExt<'a>: NodeView<'a> {
-    fn node(self) -> Node<Self> {
-        Node::from_view(self).unwrap()
+pub trait NodeViewExt: NodeView {
+    fn node(&self) -> Node<Self> {
+        Node::from_view(self.clone()).unwrap()
     }
 
     fn sub_nodes(self) -> impl Iterator<Item = Self> {
@@ -43,37 +44,34 @@ pub trait NodeViewExt<'a>: NodeView<'a> {
         self.local_tokens()
             .filter(move |token| token.kind() == kind)
     }
-
-    fn local_doc_comments(self) -> impl Iterator<Item = &'a str> {
-        self.local_tokens_filter(Kind::DocComment)
-            .map(|token| token.slice().strip_prefix("///").unwrap())
-    }
 }
 
-impl<'a, T> NodeViewExt<'a> for T where T: NodeView<'a> {}
+impl<T> NodeViewExt for T where T: NodeView {}
 
-pub trait TokenView<'a>: Copy {
+pub trait TokenView: Clone {
     fn kind(&self) -> Kind;
 
-    fn span(&self) -> Range<usize>;
+    fn span(&self) -> U32Span;
 
-    fn slice(&self) -> &'a str;
+    fn slice(&self) -> &str;
 }
 
-pub trait TokenViewExt<'a>: TokenView<'a> {
+pub trait TokenViewExt: TokenView {
     fn literal_text(&self) -> Option<UnescapeTextResult> {
         match self.kind() {
-            kind @ (Kind::SingleQuoteText | Kind::DoubleQuoteText) => {
-                Some(unescape_text_literal(kind, self.slice(), self.span()))
-            }
+            kind @ (Kind::SingleQuoteText | Kind::DoubleQuoteText) => Some(unescape_text_literal(
+                kind,
+                self.slice(),
+                self.span().into(),
+            )),
             _ => None,
         }
     }
 }
 
-impl<'a, T: TokenView<'a>> TokenViewExt<'a> for T {}
+impl<T: TokenView> TokenViewExt for T {}
 
-pub enum Item<'a, N: NodeView<'a>> {
+pub enum Item<N: NodeView> {
     Node(N),
     Token(N::Token),
 }

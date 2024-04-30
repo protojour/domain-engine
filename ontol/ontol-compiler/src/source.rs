@@ -1,10 +1,7 @@
-use std::{
-    fmt::Debug,
-    ops::{Deref, Range},
-    rc::Rc,
-};
+use std::{fmt::Debug, ops::Deref, rc::Rc};
 
 use fnv::FnvHashMap;
+use ontol_parser::U32Span;
 use ontol_runtime::PackageId;
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
@@ -26,11 +23,10 @@ impl Src {
         self.name.as_str()
     }
 
-    pub fn span(&self, range: &Range<usize>) -> SourceSpan {
+    pub fn span(&self, span: U32Span) -> SourceSpan {
         SourceSpan {
             source_id: self.id,
-            start: range.start as u32,
-            end: range.end as u32,
+            span,
         }
     }
 }
@@ -38,14 +34,12 @@ impl Src {
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Default)]
 pub struct SourceSpan {
     pub source_id: SourceId,
-    pub start: u32,
-    pub end: u32,
+    pub span: U32Span,
 }
 
 pub const NO_SPAN: SourceSpan = SourceSpan {
     source_id: NATIVE_SOURCE,
-    start: 0,
-    end: 0,
+    span: U32Span { start: 0, end: 0 },
 };
 
 impl SourceSpan {
@@ -56,8 +50,8 @@ impl SourceSpan {
 
 impl Debug for SourceSpan {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let len = self.end - self.start;
-        write!(f, "src@{:?}[{};{}]", self.source_id.0, self.start, len)
+        let len = self.span.end - self.span.start;
+        write!(f, "src@{:?}[{};{}]", self.source_id.0, self.span.start, len)
     }
 }
 

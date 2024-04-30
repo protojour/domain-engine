@@ -12,7 +12,7 @@ use ontol_parser::{
         kind::Kind,
         unescape::{unescape_regex, unescape_text_literal},
     },
-    Error, ParserError,
+    Error, ParserError, U32Span,
 };
 
 use self::{ast::Statement, modifier::Modifier, token::Token};
@@ -46,7 +46,7 @@ pub fn parse_statements(input: &str) -> (Vec<Spanned<Statement>>, Vec<Error>) {
         for chumsky_error in parse_errors {
             errors.push(Error::Parse(ParserError {
                 msg: format!("{}", chumsky_error),
-                span: chumsky_error.span(),
+                span: chumsky_error.span().into(),
             }));
         }
 
@@ -62,7 +62,7 @@ pub fn ast_lex(input: &str) -> (Vec<Spanned<Token>>, Vec<ParserError>) {
     let mut tokens: Vec<Spanned<Token>> = vec![];
     let mut errors: Vec<ParserError> = vec![];
 
-    let mut error_ranges: Vec<Range<usize>> = vec![];
+    let mut error_ranges: Vec<U32Span> = vec![];
 
     while let Some(result) = lexer.next() {
         match result {

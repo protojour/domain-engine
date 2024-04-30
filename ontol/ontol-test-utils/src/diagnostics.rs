@@ -97,7 +97,7 @@ pub fn diff_errors(
             ),
         };
 
-        let byte_pos = spanned_message.span.start as usize;
+        let byte_pos = spanned_message.span.span.start as usize;
 
         let diagnostics_line = builder
             .lines
@@ -184,8 +184,8 @@ pub fn diff_errors(
                     .get(&source_id)
                     .expect("no source text available");
 
-                let span_text =
-                    &text[spanned_message.span.start as usize..spanned_message.span.end as usize];
+                let span_text = &text[spanned_message.span.span.start as usize
+                    ..spanned_message.span.span.end as usize];
 
                 if let Message::Error(compile_error) = spanned_message.message {
                     annotated_errors.push(AnnotatedCompileError {

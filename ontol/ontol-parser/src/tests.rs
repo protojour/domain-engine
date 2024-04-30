@@ -63,7 +63,7 @@ fn cst(#[files("test-cases/cst/*.test")] path: PathBuf) {
             })
             .count();
 
-        assert_eq!(token_marker_count, tree.lex().tokens.len());
+        assert_eq!(token_marker_count, tree.lex().tokens().len());
     }
 
     pretty_assertions::assert_eq!(

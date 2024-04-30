@@ -26,11 +26,11 @@ impl<'m> Compiler<'m> {
             self.push_error(match error {
                 ontol_parser::Error::Lex(lex_error) => {
                     let span = lex_error.span;
-                    CompileError::Lex(lex_error.msg).spanned(&src.span(&span))
+                    CompileError::Lex(lex_error.msg).spanned(&src.span(span))
                 }
                 ontol_parser::Error::Parse(parse_error) => {
                     let span = parse_error.span;
-                    CompileError::Parse(parse_error.msg).spanned(&src.span(&span))
+                    CompileError::Parse(parse_error.msg).spanned(&src.span(span))
                 }
             });
         }

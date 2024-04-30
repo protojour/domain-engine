@@ -17,7 +17,7 @@ use crate::{
     regex_util::parse_literal_regex, source::SourceSpan, strings::Strings, types::Type, Compiler,
     SpannedBorrow, NO_SPAN,
 };
-use ontol_parser::Span;
+use ontol_parser::U32Span;
 
 /// A definition in some package
 #[derive(Debug)]
@@ -342,9 +342,9 @@ impl<'m> Defs<'m> {
     pub fn def_regex(
         &mut self,
         lit: &str,
-        span: &Span,
+        span: U32Span,
         strings: &mut Strings<'m>,
-    ) -> Result<DefId, (String, Span)> {
+    ) -> Result<DefId, (String, U32Span)> {
         match self.regex_strings.get(&lit) {
             Some(def_id) => Ok(*def_id),
             None => {

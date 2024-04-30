@@ -150,8 +150,8 @@ impl RegexPatternCaptureNode {
         match self {
             Self::Capture { name_span, .. } => {
                 output.source_id = name_span.source_id;
-                output.start = std::cmp::min(output.start, name_span.start);
-                output.end = std::cmp::max(output.end, name_span.end);
+                output.span.start = std::cmp::min(output.span.start, name_span.span.start);
+                output.span.end = std::cmp::max(output.span.end, name_span.span.end);
             }
             Self::Concat { nodes } => {
                 for node in nodes {

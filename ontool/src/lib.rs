@@ -381,7 +381,7 @@ fn print_unified_compile_error(
 ) -> Result<(), OntoolError> {
     let mut colors = ColorGenerator::new();
     for error in unified_error.errors.iter() {
-        let span = error.span.start as usize..error.span.end as usize;
+        let span = error.span.span.start as usize..error.span.span.end as usize;
         let message = error.error.to_string();
 
         let ontol_source = ontol_sources.get_source(error.span.source_id).unwrap();
@@ -400,7 +400,7 @@ fn print_unified_compile_error(
             .eprint((ontol_source.name(), Source::from(literal_source.as_ref())))?;
 
         for note in &error.notes {
-            let span = note.span.start as usize..note.span.end as usize;
+            let span = note.span.span.start as usize..note.span.span.end as usize;
             let message = note.note.to_string();
 
             let ontol_source = ontol_sources.get_source(error.span.source_id).unwrap();

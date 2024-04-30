@@ -7,19 +7,25 @@ pub mod unescape;
 
 use kind::Kind;
 
-use crate::ParserError;
+use crate::{ParserError, ToUsizeRange, U32Span};
+
+const DEFAULT_TOKEN_CAPACITY: usize = 64;
 
 /// The new lexer for CST
 pub fn cst_lex(source: &str) -> (Lex, Vec<ParserError>) {
-    let mut tokens = vec![];
-    let mut pos: Vec<usize> = vec![];
+    if source.len() > u32::MAX as usize {
+        panic!("ONTOL file too large");
+    }
 
-    let mut error_ranges: Vec<Range<usize>> = vec![];
+    let mut tokens = Vec::with_capacity(DEFAULT_TOKEN_CAPACITY);
+    let mut pos: Vec<u32> = Vec::with_capacity(DEFAULT_TOKEN_CAPACITY);
+
+    let mut error_ranges: Vec<U32Span> = vec![];
 
     let mut lexer = Kind::lexer(source);
 
     while let Some(result) = lexer.next() {
-        pos.push(lexer.span().start);
+        pos.push(lexer.span().start as u32);
         match result {
             Ok(kind) => {
                 tokens.push(kind);
@@ -31,7 +37,7 @@ pub fn cst_lex(source: &str) -> (Lex, Vec<ParserError>) {
         }
     }
 
-    pos.push(source.len());
+    pos.push(source.len() as u32);
 
     let errors = error_ranges
         .into_iter()
@@ -43,23 +49,31 @@ pub fn cst_lex(source: &str) -> (Lex, Vec<ParserError>) {
 
 /// Raw lexed source for the CST parser
 pub struct Lex {
-    pub tokens: Vec<Kind>,
-    pos: Vec<usize>,
+    tokens: Vec<Kind>,
+    pos: Vec<u32>,
 }
 
 impl Lex {
-    pub fn span(&self, index: usize) -> Range<usize> {
+    pub fn tokens(&self) -> &[Kind] {
+        &self.tokens
+    }
+
+    pub fn kind(&self, index: usize) -> Kind {
+        self.tokens[index]
+    }
+
+    pub fn span(&self, index: usize) -> U32Span {
         let start = self.pos[index];
         let end = self.pos[index + 1];
 
-        start..end
+        U32Span { start, end }
     }
 
-    pub fn span_end(&self, index: usize) -> usize {
+    pub fn span_end(&self, index: usize) -> u32 {
         self.pos[index + 1]
     }
 
-    pub fn opt_span(&self, index: usize) -> Option<Range<usize>> {
+    pub fn opt_span(&self, index: usize) -> Option<U32Span> {
         if index < self.tokens.len() {
             Some(self.span(index))
         } else {
@@ -68,27 +82,27 @@ impl Lex {
     }
 }
 
-pub fn format_lex_error(span: Range<usize>, source: &str) -> ParserError {
+pub fn format_lex_error(span: U32Span, source: &str) -> ParserError {
     let msg = if span.len() > 1 {
-        format!("illegal characters `{}`", &source[span.clone()])
+        format!("illegal characters `{}`", &source[span.to_usize_range()])
     } else {
-        format!("illegal character `{}`", &source[span.clone()])
+        format!("illegal character `{}`", &source[span.to_usize_range()])
     };
 
     ParserError { msg, span }
 }
 
-pub fn extend_contiguous_ranges(ranges: &mut Vec<Range<usize>>, span: Range<usize>) {
+pub fn extend_contiguous_ranges(ranges: &mut Vec<U32Span>, span: Range<usize>) {
     match ranges.last_mut() {
         Some(last) => {
-            if span.start == last.end {
-                last.end = span.end;
+            if span.start == last.end as usize {
+                last.end = span.end as u32;
             } else {
-                ranges.push(span);
+                ranges.push(span.into());
             }
         }
         None => {
-            ranges.push(span);
+            ranges.push(span.into());
         }
     }
 }

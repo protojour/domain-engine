@@ -1,6 +1,6 @@
 use std::{collections::HashMap, str::Chars};
 
-use ontol_parser::Span;
+use ontol_parser::U32Span;
 use ontol_runtime::DefId;
 use regex_syntax::{
     ast::{Ast, GroupKind},
@@ -137,10 +137,10 @@ pub fn constant_prefix(hir: &Hir) -> Option<String> {
     }
 }
 
-pub fn parse_literal_regex<'m>(
-    pattern: &'m str,
-    pattern_span: &Span,
-) -> Result<RegexMeta<'m>, (String, Span)> {
+pub fn parse_literal_regex(
+    pattern: &str,
+    pattern_span: U32Span,
+) -> Result<RegexMeta, (String, U32Span)> {
     let mut ast_parser = regex_syntax::ast::parse::Parser::new();
     let ast = match ast_parser.parse(pattern) {
         Ok(ast) => ast,
@@ -172,7 +172,7 @@ pub struct RegexToPatternLowerer<'a> {
     pushback: Vec<StackNode>,
 
     pattern_literal: &'a str,
-    pattern_span: &'a Span,
+    pattern_span: U32Span,
     source_id: SourceId,
     var_table: &'a mut MapVarTable,
     patterns: &'a mut Patterns,
@@ -181,7 +181,7 @@ pub struct RegexToPatternLowerer<'a> {
 impl<'a> RegexToPatternLowerer<'a> {
     pub fn new(
         pattern_literal: &'a str,
-        pattern_span: &'a Span,
+        pattern_span: U32Span,
         source_id: SourceId,
         var_table: &'a mut MapVarTable,
         patterns: &'a mut Patterns,
@@ -283,8 +283,7 @@ impl<'l, 'a> regex_syntax::ast::Visitor for RegexSyntaxVisitor<'l, 'a> {
                     name.name.as_str().into(),
                     SourceSpan {
                         source_id: self.0.source_id,
-                        start: span.start as u32,
-                        end: span.end as u32,
+                        span,
                     },
                 );
             }
@@ -400,19 +399,19 @@ impl<'l, 'a> regex_syntax::hir::Visitor for RegexSyntaxVisitor<'l, 'a> {
 
 fn project_regex_span(
     pattern: &str,
-    pattern_span: &Span,
+    pattern_span: U32Span,
     ast_span: &regex_syntax::ast::Span,
-) -> Span {
+) -> U32Span {
     // literal regexes start with '/' so that's part of the ontol span,
     // but regex-syntax never sees that, so add 1.
 
     struct Scanner {
-        source_cursor: usize,
+        source_cursor: u32,
         regex_cursor: usize,
     }
 
     impl Scanner {
-        fn advance_to_regex_pos(&mut self, chars: &mut Chars, regex_pos: usize) -> usize {
+        fn advance_to_regex_pos(&mut self, chars: &mut Chars, regex_pos: usize) -> u32 {
             while self.regex_cursor < regex_pos {
                 let char = chars.next().unwrap();
                 match char {
@@ -435,7 +434,7 @@ fn project_regex_span(
     let start = scanner.advance_to_regex_pos(&mut chars, ast_span.start.offset);
     let end = scanner.advance_to_regex_pos(&mut chars, ast_span.end.offset);
 
-    Span { start, end }
+    U32Span { start, end }
 }
 
 #[cfg(test)]

@@ -1,5 +1,5 @@
 use crate::docs::{get_core_completions, get_ontol_var, COMPLETIONS};
-use crate::old_parser::{self, ast_lex, parse_statements};
+use crate::old_parser::{self, ast_lex, parse_statements, Spanned};
 use crate::old_parser::{
     ast::{
         AnyPattern, DefStatement, MapArm, Path, Statement, StructPattern, StructPatternParameter,
@@ -7,7 +7,6 @@ use crate::old_parser::{
     },
     token::Token,
 };
-use chumsky::prelude::*;
 use derivative::Derivative;
 use either::Either;
 use lsp_types::{CompletionItem, Location, MarkedString, Position, Range, Url};
@@ -17,7 +16,7 @@ use ontol_compiler::{
     package::{GraphState, PackageGraphBuilder, PackageReference, ParsedPackage, ONTOL_PKG},
     CompileError, Compiler, SourceId, SourceSpan, Sources, SpannedCompileError, NO_SPAN,
 };
-use ontol_parser::{syntax::SyntaxSource, Spanned};
+use ontol_parser::syntax::SyntaxSource;
 use ontol_runtime::ontology::{config::PackageConfig, domain::TypeInfo, Ontology};
 use regex::Regex;
 use std::{
@@ -28,6 +27,8 @@ use std::{
     sync::Arc,
 };
 use substring::Substring;
+
+type UsizeRange = std::ops::Range<usize>;
 
 /// Language server state
 #[derive(Derivative)]
@@ -297,8 +298,8 @@ impl State {
             let cursor = get_byte_pos(&doc.text, pos);
             let mut loc: Option<Location> = None;
 
-            for (statement, range) in doc.statements.iter() {
-                if !in_range(range, &cursor) {
+            for (statement, span) in doc.statements.iter() {
+                if !in_range(span, cursor) {
                     continue;
                 }
                 match statement {
@@ -313,16 +314,16 @@ impl State {
                         }
                     }
                     Statement::Def(stmt) => {
-                        if let Some((_, range)) = doc.defs.get(stmt.ident.0.as_str()) {
+                        if let Some((_, span)) = doc.defs.get(stmt.ident.0.as_str()) {
                             loc = Some(Location {
                                 uri: Url::parse(uri).unwrap(),
-                                range: get_range(&doc.text, range),
+                                range: get_range(&doc.text, span),
                             });
                         }
                     }
                     Statement::Rel(stmt) => {
                         let mut rel_loc: Option<Location> = None;
-                        if in_range(&stmt.subject.1, &cursor) {
+                        if in_range(&stmt.subject.1, cursor) {
                             match &stmt.subject.0 {
                                 Either::Left(_) => return loc,
                                 Either::Right(Type::Path(path)) => {
@@ -330,7 +331,7 @@ impl State {
                                 }
                                 _ => {}
                             }
-                        } else if in_range(&stmt.object.1, &cursor) {
+                        } else if in_range(&stmt.object.1, cursor) {
                             if let Either::Right(type_or_pattern) = &stmt.object.0 {
                                 match type_or_pattern {
                                     TypeOrPattern::Type(Type::Path(path)) => {
@@ -351,13 +352,13 @@ impl State {
                     }
                     Statement::Fmt(stmt) => {
                         let mut fmt_loc: Option<Location> = None;
-                        if in_range(&stmt.origin.1, &cursor) {
+                        if in_range(&stmt.origin.1, cursor) {
                             if let Type::Path(path) = &stmt.origin.0 {
                                 fmt_loc = self.get_location_for_path(doc, path);
                             }
                         } else {
                             for trans in &stmt.transitions {
-                                if in_range(&trans.1, &cursor) {
+                                if in_range(&trans.1, cursor) {
                                     match &trans.0 {
                                         Either::Left(_) => return loc,
                                         Either::Right(Type::Path(path)) => {
@@ -373,11 +374,11 @@ impl State {
                         }
                     }
                     Statement::Map(stmt) => {
-                        if in_range(&stmt.first.1, &cursor) {
+                        if in_range(&stmt.first.1, cursor) {
                             if let Some(path) = get_map_arm_path(&stmt.first.0, &cursor) {
                                 return self.get_location_for_path(doc, &path);
                             }
-                        } else if in_range(&stmt.second.1, &cursor) {
+                        } else if in_range(&stmt.second.1, cursor) {
                             if let Some(path) = get_map_arm_path(&stmt.second.0, &cursor) {
                                 return self.get_location_for_path(doc, &path);
                             }
@@ -406,10 +407,10 @@ impl State {
 
     /// Get Location given a local identifier
     fn get_location_for_ident(&self, doc: &Document, ident: &str) -> Option<Location> {
-        if let Some((_, range)) = doc.defs.get(ident) {
+        if let Some((_, span)) = doc.defs.get(ident) {
             return Some(Location {
                 uri: Url::parse(&doc.uri).unwrap(),
-                range: get_range(&doc.text, range),
+                range: get_range(&doc.text, span),
             });
         }
         None
@@ -437,20 +438,20 @@ impl State {
             let mut hover = HoverDoc::from(&doc.name, "");
 
             // check statements, may overlap
-            for (statement, range) in doc.statements.iter() {
-                if !range.contains(&cursor) {
+            for (statement, span) in doc.statements.iter() {
+                if !span.contains(&cursor) {
                     continue;
                 }
 
                 match statement {
                     Statement::Use(stmt) => {
                         hover.path = format!("{} as {}", &stmt.reference.0, &stmt.as_ident.0);
-                        hover.signature = get_signature(&doc.text, range, &self.regex);
+                        hover.signature = get_signature(&doc.text, span.clone(), &self.regex);
                         break;
                     }
                     Statement::Def(stmt) => {
                         hover.path = format!("{}.{}", &doc.name, &stmt.ident.0);
-                        hover.signature = get_signature(&doc.text, range, &self.regex);
+                        hover.signature = get_signature(&doc.text, span.clone(), &self.regex);
                         hover.docs = stmt.docs.as_deref().unwrap_or("").to_string();
                         break;
                     }
@@ -478,7 +479,7 @@ impl State {
                                 }
                             }
                         }
-                        hover.signature = get_signature(&doc.text, range, &self.regex);
+                        hover.signature = get_signature(&doc.text, span.clone(), &self.regex);
                         hover.docs = stmt.docs.as_deref().unwrap_or("").to_string();
                     }
                     Statement::Fmt(stmt) => {
@@ -499,7 +500,7 @@ impl State {
                                 }
                             }
                         }
-                        hover.signature = get_signature(&doc.text, range, &self.regex);
+                        hover.signature = get_signature(&doc.text, span.clone(), &self.regex);
                         hover.docs = stmt.docs.as_deref().unwrap_or("").to_string();
                         break;
                     }
@@ -527,8 +528,8 @@ impl State {
             }
 
             // check tokens, may replace hover
-            for (index, (token, range)) in doc.tokens.iter().enumerate() {
-                if range.contains(&cursor) {
+            for (index, (token, span)) in doc.tokens.iter().enumerate() {
+                if span.contains(&cursor) {
                     match token {
                         Token::Use => return self.get_ontol_docs("use"),
                         Token::Def => return self.get_ontol_docs("def"),
@@ -613,9 +614,9 @@ impl State {
     /// Get HoverDoc given a local identifier
     fn get_hoverdoc_for_ident(&self, doc: &Document, ident: &str) -> Option<HoverDoc> {
         match doc.defs.get(ident) {
-            Some((stmt, range)) => Some(HoverDoc {
+            Some((stmt, span)) => Some(HoverDoc {
                 path: format!("{}.{}", doc.name, stmt.ident.0),
-                signature: get_signature(&doc.text, range, &self.regex),
+                signature: get_signature(&doc.text, span.clone(), &self.regex),
                 docs: stmt.docs.as_deref().unwrap_or("").to_string(),
                 ..Default::default()
             }),
@@ -729,12 +730,11 @@ pub fn build_uri(path: &str, name: &str) -> String {
 
 /// Convert a byte index SourceSpan to a zero-based line/char Range
 pub fn get_span_range(text: &str, span: &SourceSpan) -> Range {
-    let range = span.start as usize..span.end as usize;
-    get_range(text, &range)
+    get_range(text, &span.span.into())
 }
 
 /// Convert a byte index Range to a zero-based line/char Range
-pub fn get_range(text: &str, range: &std::ops::Range<usize>) -> Range {
+pub fn get_range(text: &str, span: &UsizeRange) -> Range {
     let mut lsp_range = Range::default();
     let mut start_set = false;
     let mut cursor = 0;
@@ -743,20 +743,20 @@ pub fn get_range(text: &str, range: &std::ops::Range<usize>) -> Range {
         // utf-16 is LSP standard encoding
         let len = line.encode_utf16().count();
         if !start_set {
-            if cursor + len < range.start {
+            if cursor + len < span.start {
                 cursor += len + 1;
             } else {
                 lsp_range.start.line = line_index as u32;
-                lsp_range.start.character = (range.start - cursor) as u32;
+                lsp_range.start.character = (span.start - cursor) as u32;
                 start_set = true
             }
         }
         if start_set {
-            if cursor + len < range.end {
+            if cursor + len < span.end {
                 cursor += len + 1;
             } else {
                 lsp_range.end.line = line_index as u32;
-                lsp_range.end.character = (range.end - cursor) as u32;
+                lsp_range.end.character = (span.end - cursor) as u32;
                 break;
             }
         }
@@ -778,13 +778,14 @@ fn get_byte_pos(text: &str, pos: &Position) -> usize {
 }
 
 /// Check if index is in Range, inclusive
-fn in_range(range: &std::ops::Range<usize>, cursor: &usize) -> bool {
-    cursor >= &range.start && cursor <= &range.end
+fn in_range(span: &UsizeRange, cursor: usize) -> bool {
+    cursor >= span.start && cursor <= span.end
 }
 
 /// Get a stripped-down rendition of a statement
-pub fn get_signature(text: &str, range: &std::ops::Range<usize>, regex: &CompiledRegex) -> String {
-    let sig = text.substring(range.start(), range.end());
+pub fn get_signature(text: &str, span: impl Into<UsizeRange>, regex: &CompiledRegex) -> String {
+    let span = span.into();
+    let sig = text.substring(span.start, span.end);
     let stripped = &regex.comments.replace_all(sig, "");
     stripped.trim().replace("\n\n", "\n").to_string()
 }
@@ -826,15 +827,15 @@ fn get_map_arm_path(arm: &MapArm, cursor: &usize) -> Option<Path> {
 /// Try to find a Path in a StructPattern
 fn get_struct_pattern_path(s: &StructPattern, cursor: &usize) -> Option<Path> {
     let path = s.path.as_ref()?;
-    let range = &path.1;
-    if in_range(range, cursor) {
+    let span = &path.1;
+    if in_range(span, *cursor) {
         return Some(path.0.to_owned());
     }
     if let StructPatternParameter::Attributes(attrs) = &s.param {
-        for (arg, range) in attrs {
+        for (arg, span) in attrs {
             match arg {
                 old_parser::ast::StructPatternAttributeKind::Attr(attr) => {
-                    if in_range(range, cursor) {
+                    if in_range(span, *cursor) {
                         return get_pattern_path(&attr.object.0, cursor);
                     }
                 }
@@ -850,8 +851,8 @@ fn get_pattern_path(pattern: &AnyPattern, cursor: &usize) -> Option<Path> {
     match pattern {
         AnyPattern::Struct((s, _)) => get_struct_pattern_path(s, cursor),
         AnyPattern::Set((set, _)) => {
-            for (elem, range) in &set.elements {
-                if in_range(range, cursor) {
+            for (elem, span) in &set.elements {
+                if in_range(span, *cursor) {
                     return get_pattern_path(&elem.pattern.0, cursor);
                 }
             }

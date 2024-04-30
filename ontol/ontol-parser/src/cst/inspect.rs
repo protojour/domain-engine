@@ -26,14 +26,16 @@ macro_rules! nodes {
     ($ident:ident { $($kind:ident),* $(,)? }) => {
         $(
             #[derive(Clone, Copy)]
-            pub struct $kind<V> {
-                pub view: V,
-            }
+            pub struct $kind<V>(pub V);
 
-            impl<'a, V: NodeView<'a>> $kind<V> {
+            impl<V: NodeView> $kind<V> {
+                pub fn view(&self) -> V {
+                    self.0.clone()
+                }
+
                 pub fn from_view(view: V) -> Option<Self> {
                     if view.kind() == Kind::$kind {
-                        Some(Self { view })
+                        Some(Self(view))
                     } else {
                         None
                     }
@@ -60,12 +62,12 @@ macro_rules! node_union {
             $($kind($kind<V>)),*
         }
 
-        impl<'a, V: NodeView<'a>> $ident<V> {
-            pub fn view(self) -> V {
+        impl<V: NodeView> $ident<V> {
+            pub fn view(&self) -> V {
                 match self {
                     $(
-                        Self::$kind($kind { view }) => {
-                            view
+                        Self::$kind($kind(view)) => {
+                            view.clone()
                         }
                     )*
                 }
@@ -80,12 +82,12 @@ macro_rules! node_union {
             }
         )*
 
-        impl<'a, V: NodeView<'a>> $ident<V> {
+        impl<V: NodeView> $ident<V> {
             #[allow(unused)]
             pub(crate) fn from_view(view: V) -> Option<Self> {
                 match view.kind() {
                     $(
-                        Kind::$kind => Some(Self::$kind($kind { view }))
+                        Kind::$kind => Some(Self::$kind($kind(view)))
                     ),*,
                     _ => None
                 }
@@ -172,78 +174,70 @@ pub enum TypeModOrPattern<V> {
     Pattern(Pattern<V>),
 }
 
-impl<'a, V: NodeView<'a> + 'a> Ontol<V> {
-    pub fn statements(self) -> impl Iterator<Item = Statement<V>> + 'a {
-        self.view.sub_nodes().filter_map(Statement::from_view)
+impl<V: NodeView> Ontol<V> {
+    pub fn statements(&self) -> impl Iterator<Item = Statement<V>> {
+        self.view().sub_nodes().filter_map(Statement::from_view)
     }
 }
 
-impl<'a, V: NodeView<'a>> UseStatement<V> {
-    pub fn name(self) -> Option<Name<V>> {
-        self.view.sub_nodes().find_map(Name::from_view)
+impl<V: NodeView> UseStatement<V> {
+    pub fn name(&self) -> Option<Name<V>> {
+        self.view().sub_nodes().find_map(Name::from_view)
     }
 
-    pub fn ident_path(self) -> Option<IdentPath<V>> {
-        self.view.sub_nodes().find_map(IdentPath::from_view)
-    }
-}
-
-impl<'a, V: NodeView<'a>> DefStatement<V> {
-    pub fn doc_comments(self) -> impl Iterator<Item = &'a str> {
-        self.view.local_doc_comments()
-    }
-
-    pub fn modifiers(self) -> impl Iterator<Item = V::Token> {
-        self.view.local_tokens_filter(Kind::Modifier)
-    }
-
-    pub fn ident_path(self) -> Option<IdentPath<V>> {
-        self.view.sub_nodes().find_map(IdentPath::from_view)
-    }
-
-    pub fn body(self) -> Option<DefBody<V>> {
-        self.view.sub_nodes().find_map(DefBody::from_view)
+    pub fn ident_path(&self) -> Option<IdentPath<V>> {
+        self.view().sub_nodes().find_map(IdentPath::from_view)
     }
 }
 
-impl<'a, V: NodeView<'a> + 'a> DefBody<V> {
-    pub fn statements(self) -> impl Iterator<Item = Statement<V>> + 'a {
-        self.view.sub_nodes().filter_map(Statement::from_view)
+impl<V: NodeView> DefStatement<V> {
+    pub fn modifiers(&self) -> impl Iterator<Item = V::Token> {
+        self.view().local_tokens_filter(Kind::Modifier)
+    }
+
+    pub fn ident_path(&self) -> Option<IdentPath<V>> {
+        self.view().sub_nodes().find_map(IdentPath::from_view)
+    }
+
+    pub fn body(&self) -> Option<DefBody<V>> {
+        self.view().sub_nodes().find_map(DefBody::from_view)
     }
 }
 
-impl<'a, V: NodeView<'a>> RelStatement<V> {
-    pub fn doc_comments(self) -> impl Iterator<Item = &'a str> {
-        self.view.local_doc_comments()
-    }
-
-    pub fn subject(self) -> Option<RelSubject<V>> {
-        self.view.sub_nodes().find_map(RelSubject::from_view)
-    }
-
-    pub fn fwd_set(self) -> Option<RelFwdSet<V>> {
-        self.view.sub_nodes().find_map(RelFwdSet::from_view)
-    }
-
-    pub fn backwd_set(self) -> Option<RelBackwdSet<V>> {
-        self.view.sub_nodes().find_map(RelBackwdSet::from_view)
-    }
-
-    pub fn object(self) -> Option<RelObject<V>> {
-        self.view.sub_nodes().find_map(RelObject::from_view)
+impl<V: NodeView> DefBody<V> {
+    pub fn statements(&self) -> impl Iterator<Item = Statement<V>> {
+        self.view().sub_nodes().filter_map(Statement::from_view)
     }
 }
 
-impl<'a, V: NodeView<'a>> RelSubject<V> {
-    pub fn type_mod(self) -> Option<TypeMod<V>> {
-        self.view.sub_nodes().find_map(TypeMod::from_view)
+impl<V: NodeView> RelStatement<V> {
+    pub fn subject(&self) -> Option<RelSubject<V>> {
+        self.view().sub_nodes().find_map(RelSubject::from_view)
+    }
+
+    pub fn fwd_set(&self) -> Option<RelFwdSet<V>> {
+        self.view().sub_nodes().find_map(RelFwdSet::from_view)
+    }
+
+    pub fn backwd_set(&self) -> Option<RelBackwdSet<V>> {
+        self.view().sub_nodes().find_map(RelBackwdSet::from_view)
+    }
+
+    pub fn object(&self) -> Option<RelObject<V>> {
+        self.view().sub_nodes().find_map(RelObject::from_view)
     }
 }
 
-impl<'a, V: NodeView<'a>> RelObject<V> {
-    pub fn type_mod_or_pattern(self) -> Option<TypeModOrPattern<V>> {
-        self.view.sub_nodes().find_map(|view| {
-            if let Some(type_mod) = TypeMod::from_view(view) {
+impl<V: NodeView> RelSubject<V> {
+    pub fn type_mod(&self) -> Option<TypeMod<V>> {
+        self.view().sub_nodes().find_map(TypeMod::from_view)
+    }
+}
+
+impl<V: NodeView> RelObject<V> {
+    pub fn type_mod_or_pattern(&self) -> Option<TypeModOrPattern<V>> {
+        self.view().sub_nodes().find_map(|view| {
+            if let Some(type_mod) = TypeMod::from_view(view.clone()) {
                 Some(TypeModOrPattern::TypeMod(type_mod))
             } else {
                 Pattern::from_view(view).map(TypeModOrPattern::Pattern)
@@ -252,79 +246,75 @@ impl<'a, V: NodeView<'a>> RelObject<V> {
     }
 }
 
-impl<'a, V: NodeView<'a> + 'a> RelFwdSet<V> {
-    pub fn relations(self) -> impl Iterator<Item = Relation<V>> + 'a {
-        self.view.sub_nodes().filter_map(Relation::from_view)
+impl<V: NodeView> RelFwdSet<V> {
+    pub fn relations(&self) -> impl Iterator<Item = Relation<V>> {
+        self.view().sub_nodes().filter_map(Relation::from_view)
     }
 }
 
 /// TODO: In the AST parser, the backward relation set can contain
 /// many things, but it's never used in examples, so it's not implemented here yet
-impl<'a, V: NodeView<'a> + 'a> RelBackwdSet<V> {
-    pub fn name(self) -> Option<Name<V>> {
-        self.view.sub_nodes().find_map(Name::from_view)
+impl<V: NodeView> RelBackwdSet<V> {
+    pub fn name(&self) -> Option<Name<V>> {
+        self.view().sub_nodes().find_map(Name::from_view)
     }
 
-    pub fn prop_cardinality(self) -> Option<PropCardinality<V>> {
-        self.view.sub_nodes().find_map(PropCardinality::from_view)
-    }
-}
-
-impl<'a, V: NodeView<'a>> Relation<V> {
-    pub fn relation_type(self) -> Option<TypeMod<V>> {
-        self.view.sub_nodes().find_map(TypeMod::from_view)
-    }
-
-    pub fn rel_params(self) -> Option<RelParams<V>> {
-        self.view.sub_nodes().find_map(RelParams::from_view)
-    }
-
-    pub fn prop_cardinality(self) -> Option<PropCardinality<V>> {
-        self.view.sub_nodes().find_map(PropCardinality::from_view)
+    pub fn prop_cardinality(&self) -> Option<PropCardinality<V>> {
+        self.view().sub_nodes().find_map(PropCardinality::from_view)
     }
 }
 
-impl<'a, V: NodeView<'a> + 'a> RelParams<V> {
-    pub fn statements(self) -> impl Iterator<Item = Statement<V>> + 'a {
-        self.view.sub_nodes().filter_map(Statement::from_view)
+impl<V: NodeView> Relation<V> {
+    pub fn relation_type(&self) -> Option<TypeMod<V>> {
+        self.view().sub_nodes().find_map(TypeMod::from_view)
+    }
+
+    pub fn rel_params(&self) -> Option<RelParams<V>> {
+        self.view().sub_nodes().find_map(RelParams::from_view)
+    }
+
+    pub fn prop_cardinality(&self) -> Option<PropCardinality<V>> {
+        self.view().sub_nodes().find_map(PropCardinality::from_view)
     }
 }
 
-impl<'a, V: NodeView<'a>> PropCardinality<V> {
-    pub fn question(self) -> Option<V::Token> {
-        self.view.local_tokens_filter(Kind::Question).next()
+impl<V: NodeView> RelParams<V> {
+    pub fn statements(&self) -> impl Iterator<Item = Statement<V>> {
+        self.view().sub_nodes().filter_map(Statement::from_view)
     }
 }
 
-impl<'a, V: NodeView<'a> + 'a> FmtStatement<V> {
-    pub fn transitions(self) -> impl Iterator<Item = TypeMod<V>> + 'a {
-        self.view.sub_nodes().filter_map(TypeMod::from_view)
+impl<V: NodeView> PropCardinality<V> {
+    pub fn question(&self) -> Option<V::Token> {
+        self.view().local_tokens_filter(Kind::Question).next()
     }
 }
 
-impl<'a, V: NodeView<'a> + 'a> MapStatement<V> {
-    pub fn doc_comments(self) -> impl Iterator<Item = &'a str> {
-        self.view.local_doc_comments()
-    }
-
-    pub fn ident_path(self) -> Option<IdentPath<V>> {
-        self.view.sub_nodes().find_map(IdentPath::from_view)
-    }
-
-    pub fn arms(self) -> impl Iterator<Item = MapArm<V>> + 'a {
-        self.view.sub_nodes().filter_map(MapArm::from_view)
+impl<V: NodeView> FmtStatement<V> {
+    pub fn transitions(&self) -> impl Iterator<Item = TypeMod<V>> {
+        self.view().sub_nodes().filter_map(TypeMod::from_view)
     }
 }
 
-impl<'a, V: NodeView<'a>> MapArm<V> {
-    pub fn pattern(self) -> Option<Pattern<V>> {
-        self.view.sub_nodes().find_map(Pattern::from_view)
+impl<V: NodeView> MapStatement<V> {
+    pub fn ident_path(&self) -> Option<IdentPath<V>> {
+        self.view().sub_nodes().find_map(IdentPath::from_view)
+    }
+
+    pub fn arms(&self) -> impl Iterator<Item = MapArm<V>> {
+        self.view().sub_nodes().filter_map(MapArm::from_view)
     }
 }
 
-impl<'a, V: NodeView<'a>> TypeMod<V> {
-    pub fn type_ref(self) -> Option<TypeRef<V>> {
-        match self {
+impl<V: NodeView> MapArm<V> {
+    pub fn pattern(&self) -> Option<Pattern<V>> {
+        self.view().sub_nodes().find_map(Pattern::from_view)
+    }
+}
+
+impl<V: NodeView> TypeMod<V> {
+    pub fn type_ref(&self) -> Option<TypeRef<V>> {
+        match self.clone() {
             Self::TypeModUnit(t) => t.type_ref(),
             Self::TypeModSet(t) => t.type_ref(),
             Self::TypeModList(t) => t.type_ref(),
@@ -332,103 +322,103 @@ impl<'a, V: NodeView<'a>> TypeMod<V> {
     }
 }
 
-impl<'a, V: NodeView<'a>> TypeModUnit<V> {
-    pub fn type_ref(self) -> Option<TypeRef<V>> {
-        self.view.sub_nodes().find_map(TypeRef::from_view)
+impl<V: NodeView> TypeModUnit<V> {
+    pub fn type_ref(&self) -> Option<TypeRef<V>> {
+        self.view().sub_nodes().find_map(TypeRef::from_view)
     }
 }
 
-impl<'a, V: NodeView<'a>> TypeModSet<V> {
-    pub fn type_ref(self) -> Option<TypeRef<V>> {
-        self.view.sub_nodes().find_map(TypeRef::from_view)
+impl<V: NodeView> TypeModSet<V> {
+    pub fn type_ref(&self) -> Option<TypeRef<V>> {
+        self.view().sub_nodes().find_map(TypeRef::from_view)
     }
 }
 
-impl<'a, V: NodeView<'a>> TypeModList<V> {
-    pub fn type_ref(self) -> Option<TypeRef<V>> {
-        self.view.sub_nodes().find_map(TypeRef::from_view)
+impl<V: NodeView> TypeModList<V> {
+    pub fn type_ref(&self) -> Option<TypeRef<V>> {
+        self.view().sub_nodes().find_map(TypeRef::from_view)
     }
 }
 
-impl<'a, V: NodeView<'a> + 'a> PatStruct<V> {
-    pub fn modifiers(self) -> impl Iterator<Item = V::Token> {
-        self.view.local_tokens_filter(Kind::Modifier)
+impl<V: NodeView> PatStruct<V> {
+    pub fn modifiers(&self) -> impl Iterator<Item = V::Token> {
+        self.view().local_tokens_filter(Kind::Modifier)
     }
 
-    pub fn ident_path(self) -> Option<IdentPath<V>> {
-        self.view.sub_nodes().find_map(IdentPath::from_view)
+    pub fn ident_path(&self) -> Option<IdentPath<V>> {
+        self.view().sub_nodes().find_map(IdentPath::from_view)
     }
 
-    pub fn params(self) -> impl Iterator<Item = StructParam<V>> + 'a {
-        self.view.sub_nodes().filter_map(StructParam::from_view)
-    }
-}
-
-impl<'a, V: NodeView<'a>> StructParamAttrProp<V> {
-    pub fn relation(self) -> Option<TypeMod<V>> {
-        self.view.sub_nodes().find_map(TypeMod::from_view)
-    }
-
-    pub fn rel_args(self) -> Option<RelArgs<V>> {
-        self.view.sub_nodes().find_map(RelArgs::from_view)
-    }
-
-    pub fn prop_cardinality(self) -> Option<PropCardinality<V>> {
-        self.view.sub_nodes().find_map(PropCardinality::from_view)
-    }
-
-    pub fn pattern(self) -> Option<Pattern<V>> {
-        self.view.sub_nodes().find_map(Pattern::from_view)
+    pub fn params(&self) -> impl Iterator<Item = StructParam<V>> {
+        self.view().sub_nodes().filter_map(StructParam::from_view)
     }
 }
 
-impl<'a, V: NodeView<'a> + 'a> RelArgs<V> {
-    pub fn params(self) -> impl Iterator<Item = StructParam<V>> + 'a {
-        self.view.sub_nodes().filter_map(StructParam::from_view)
+impl<V: NodeView> StructParamAttrProp<V> {
+    pub fn relation(&self) -> Option<TypeMod<V>> {
+        self.view().sub_nodes().find_map(TypeMod::from_view)
+    }
+
+    pub fn rel_args(&self) -> Option<RelArgs<V>> {
+        self.view().sub_nodes().find_map(RelArgs::from_view)
+    }
+
+    pub fn prop_cardinality(&self) -> Option<PropCardinality<V>> {
+        self.view().sub_nodes().find_map(PropCardinality::from_view)
+    }
+
+    pub fn pattern(&self) -> Option<Pattern<V>> {
+        self.view().sub_nodes().find_map(Pattern::from_view)
     }
 }
 
-impl<'a, V: NodeView<'a>> StructParamAttrUnit<V> {
-    pub fn pattern(self) -> Option<Pattern<V>> {
-        self.view.sub_nodes().find_map(Pattern::from_view)
+impl<V: NodeView> RelArgs<V> {
+    pub fn params(&self) -> impl Iterator<Item = StructParam<V>> {
+        self.view().sub_nodes().filter_map(StructParam::from_view)
     }
 }
 
-impl<'a, V: NodeView<'a> + 'a> PatSet<V> {
-    pub fn modifier(self) -> Option<V::Token> {
-        self.view.local_tokens_filter(Kind::Modifier).next()
-    }
-
-    pub fn ident_path(self) -> Option<IdentPath<V>> {
-        self.view.sub_nodes().find_map(IdentPath::from_view)
-    }
-
-    pub fn elements(self) -> impl Iterator<Item = SetElement<V>> + 'a {
-        self.view.sub_nodes().filter_map(SetElement::from_view)
+impl<V: NodeView> StructParamAttrUnit<V> {
+    pub fn pattern(&self) -> Option<Pattern<V>> {
+        self.view().sub_nodes().find_map(Pattern::from_view)
     }
 }
 
-impl<'a, V: NodeView<'a> + 'a> SetElement<V> {
-    pub fn spread(self) -> Option<Spread<V>> {
-        self.view.sub_nodes().find_map(Spread::from_view)
+impl<V: NodeView> PatSet<V> {
+    pub fn modifier(&self) -> Option<V::Token> {
+        self.view().local_tokens_filter(Kind::Modifier).next()
     }
 
-    pub fn rel_args(self) -> Option<RelArgs<V>> {
-        self.view.sub_nodes().find_map(RelArgs::from_view)
+    pub fn ident_path(&self) -> Option<IdentPath<V>> {
+        self.view().sub_nodes().find_map(IdentPath::from_view)
     }
 
-    pub fn pattern(self) -> Option<Pattern<V>> {
-        self.view.sub_nodes().find_map(Pattern::from_view)
+    pub fn elements(&self) -> impl Iterator<Item = SetElement<V>> {
+        self.view().sub_nodes().filter_map(SetElement::from_view)
     }
 }
 
-impl<'a, V: NodeView<'a> + 'a> PatBinary<V> {
-    pub fn operands(self) -> impl Iterator<Item = Pattern<V>> + 'a {
-        self.view.sub_nodes().filter_map(Pattern::from_view)
+impl<V: NodeView> SetElement<V> {
+    pub fn spread(&self) -> Option<Spread<V>> {
+        self.view().sub_nodes().find_map(Spread::from_view)
     }
 
-    pub fn infix_token(self) -> Option<V::Token> {
-        self.view.local_tokens().find(|token| {
+    pub fn rel_args(&self) -> Option<RelArgs<V>> {
+        self.view().sub_nodes().find_map(RelArgs::from_view)
+    }
+
+    pub fn pattern(&self) -> Option<Pattern<V>> {
+        self.view().sub_nodes().find_map(Pattern::from_view)
+    }
+}
+
+impl<V: NodeView> PatBinary<V> {
+    pub fn operands(&self) -> impl Iterator<Item = Pattern<V>> {
+        self.view().sub_nodes().filter_map(Pattern::from_view)
+    }
+
+    pub fn infix_token(&self) -> Option<V::Token> {
+        self.view().local_tokens().find(|token| {
             matches!(
                 token.kind(),
                 Kind::Plus | Kind::Minus | Kind::Star | Kind::Div
@@ -437,39 +427,39 @@ impl<'a, V: NodeView<'a> + 'a> PatBinary<V> {
     }
 }
 
-impl<'a, V: NodeView<'a>> Name<V> {
-    pub fn text(self) -> Option<UnescapeTextResult> {
-        self.view.local_tokens().next()?.literal_text()
+impl<V: NodeView> Name<V> {
+    pub fn text(&self) -> Option<UnescapeTextResult> {
+        self.view().local_tokens().next()?.literal_text()
     }
 }
 
-impl<'a, V: NodeView<'a>> IdentPath<V> {
-    pub fn symbols(self) -> impl Iterator<Item = V::Token> {
-        self.view.local_tokens_filter(Kind::Sym)
+impl<V: NodeView> IdentPath<V> {
+    pub fn symbols(&self) -> impl Iterator<Item = V::Token> {
+        self.view().local_tokens_filter(Kind::Sym)
     }
 }
 
-impl<'a, V: NodeView<'a>> NumberRange<V> {
-    pub fn start(self) -> Option<V::Token> {
+impl<V: NodeView> NumberRange<V> {
+    pub fn start(&self) -> Option<V::Token> {
         let start = self
-            .view
+            .view()
             .sub_nodes()
             .find(|view| view.kind() == Kind::RangeStart)?;
         start.local_tokens_filter(Kind::Number).next()
     }
 
-    pub fn end(self) -> Option<V::Token> {
+    pub fn end(&self) -> Option<V::Token> {
         let end = self
-            .view
+            .view()
             .sub_nodes()
             .find(|view| view.kind() == Kind::RangeEnd)?;
         end.local_tokens_filter(Kind::Number).next()
     }
 }
 
-impl<'a, V: NodeView<'a>> Spread<V> {
-    pub fn symbol(self) -> Option<V::Token> {
-        self.view.local_tokens_filter(Kind::Sym).next()
+impl<V: NodeView> Spread<V> {
+    pub fn symbol(&self) -> Option<V::Token> {
+        self.view().local_tokens_filter(Kind::Sym).next()
     }
 }
 
