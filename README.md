@@ -35,6 +35,43 @@ a high level interface for interacting with the ontology.
 
 The _domain service_ encapsulates the domain engine, turning it into an internet service.
 
+### Workspace crate graph
+```mermaid
+graph TD
+   ontol-runtime-->ontol-macros
+
+   ontol-compiler-->ontol-runtime
+   ontol-compiler-->ontol-parser
+   ontol-compiler-->ontol-macros
+   ontol-compiler-->ontol-hir
+
+   ontol-hir-->ontol-runtime
+
+   ontol-syntax-->ontol-parser
+
+   ontol-lsp-->ontol-runtime
+   ontol-lsp-->ontol-compiler
+   ontol-lsp-->ontol-parser
+
+   ontol-faker-->ontol-runtime
+
+   domain-engine-core-->ontol-runtime
+
+   domain-engine-juniper-->ontol-runtime
+   domain-engine-juniper-->domain-engine-core
+
+   domain-engine-in-memory-store-->ontol-runtime
+   domain-engine-in-memory-store-->domain-engine-core
+
+   ontool-->ontol-compiler
+   ontool-->ontol-runtime
+   ontool-->ontol-parser
+   ontool-->ontol-lsp
+   ontool-->domain-engine-core
+   ontool-->domain-engine-juniper
+   ontool-->domain-engine-in-memory-store
+```
+
 ### ONTOL compiler transformation steps
 
 The compiler goes through a number of transformation steps before producing
