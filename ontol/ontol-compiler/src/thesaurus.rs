@@ -81,7 +81,7 @@ impl<'a> Iterator for EntriesIter<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some((is, span)) = self.builtin_entries.next() {
-            return Some((&is, &span));
+            return Some((is, span));
         }
 
         self.domain_entries.next()

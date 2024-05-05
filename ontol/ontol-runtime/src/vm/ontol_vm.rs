@@ -79,11 +79,6 @@ impl<'o> Processor for OntolProcessor<'o> {
     type Yield = Yield;
 
     #[inline(always)]
-    fn size(&self) -> usize {
-        self.stack.len()
-    }
-
-    #[inline(always)]
     fn stack_mut(&mut self) -> &mut Vec<Self::Value> {
         &mut self.stack
     }
@@ -104,11 +99,6 @@ impl<'o> Processor for OntolProcessor<'o> {
     #[inline(always)]
     fn pop_until(&mut self, local: Local) {
         self.stack.truncate(local.0 as usize + 1);
-    }
-
-    #[inline(always)]
-    fn swap(&mut self, a: Local, b: Local) {
-        self.stack.swap(a.0 as usize, b.0 as usize);
     }
 
     #[inline(always)]
@@ -363,16 +353,6 @@ impl<'o> Processor for OntolProcessor<'o> {
 
         self.stack.push(Value::Sequence(attrs.into(), text_def_id));
         Ok(())
-    }
-
-    #[inline(always)]
-    fn assert_true(&mut self) -> VmResult<()> {
-        let [val]: [Value; 1] = self.pop_n();
-        if matches!(val, Value::I64(1, _)) {
-            Ok(())
-        } else {
-            Err(VmError::AssertionFailed)
-        }
     }
 
     fn cond_var(&mut self, cond_local: Local) -> VmResult<()> {

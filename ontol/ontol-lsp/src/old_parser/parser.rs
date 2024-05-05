@@ -278,9 +278,7 @@ fn fmt_statement() -> impl AstParser<FmtStatement> {
         })
 }
 
-fn with_raw_cardinality<T>(
-    inner: impl AstParser<T> + Clone,
-) -> impl AstParser<(RawCardinality, T)> {
+fn with_raw_cardinality<T>(inner: impl AstParser<T>) -> impl AstParser<(RawCardinality, T)> {
     inner
         .clone()
         .map(|unit| (RawCardinality::Unit, unit))
@@ -330,7 +328,7 @@ fn any_pattern() -> impl AstParser<AnyPattern> {
 }
 
 fn parenthesized_struct_pattern(
-    any_pattern: impl AstParser<AnyPattern> + Clone + 'static,
+    any_pattern: impl AstParser<AnyPattern> + 'static,
 ) -> impl AstParser<StructPattern> {
     let modifier = modifier(Modifier::Match).to(StructPatternModifier::Match);
 
@@ -347,7 +345,7 @@ fn parenthesized_struct_pattern(
 }
 
 fn struct_pattern_param(
-    any_pattern: impl AstParser<AnyPattern> + Clone + 'static,
+    any_pattern: impl AstParser<AnyPattern> + 'static,
 ) -> impl AstParser<StructPatternParameter> {
     let attributes = spanned(
         struct_pattern_attr(any_pattern.clone())
@@ -367,7 +365,7 @@ fn struct_pattern_param(
 }
 
 fn struct_pattern_attr(
-    any_pattern: impl AstParser<AnyPattern> + Clone + 'static,
+    any_pattern: impl AstParser<AnyPattern> + 'static,
 ) -> impl AstParser<StructPatternAttr> {
     recursive(|struct_pattern_attr| {
         spanned(named_type())
@@ -399,9 +397,7 @@ fn struct_pattern_spread() -> impl AstParser<StructPatternAttributeKind> {
         .map(StructPatternAttributeKind::Spread)
 }
 
-fn set_pattern(
-    any_pattern: impl AstParser<AnyPattern> + Clone + 'static,
-) -> impl AstParser<SetPattern> {
+fn set_pattern(any_pattern: impl AstParser<AnyPattern> + 'static) -> impl AstParser<SetPattern> {
     let modifier = spanned(
         modifier(Modifier::In)
             .to(SetPatternModifier::In)

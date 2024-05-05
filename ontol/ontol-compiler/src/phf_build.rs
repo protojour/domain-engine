@@ -110,16 +110,6 @@ mod tests {
         }
     }
 
-    struct ConstsAsArcStr<'u>(&'u Consts);
-
-    impl<'u> Index<TextConstant> for ConstsAsArcStr<'u> {
-        type Output = ArcStr;
-
-        fn index(&self, index: TextConstant) -> &Self::Output {
-            &self.0.constants[index.0 as usize]
-        }
-    }
-
     fn entries() -> Vec<(PhfKey, &'static str)> {
         let mut c = Consts::default();
         vec![

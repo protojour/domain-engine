@@ -520,8 +520,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 if self
                     .relations
                     .value_generators
-                    .get(&match_attribute.property_id.relationship_id)
-                    .is_some()
+                    .contains_key(&match_attribute.property_id.relationship_id)
                 {
                     flags.insert(PropFlags::REL_OPTIONAL);
                 }
@@ -733,8 +732,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             if self
                 .relations
                 .value_generators
-                .get(&relationship_id)
-                .is_some()
+                .contains_key(&relationship_id)
             {
                 // Value generators should be handled in data storage,
                 // so leave these fields out when not mentioned.

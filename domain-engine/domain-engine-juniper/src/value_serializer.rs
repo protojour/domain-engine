@@ -229,9 +229,9 @@ impl ser::SerializeSeq for JuniperListSerializer {
     type Ok = juniper::Value<GqlScalar>;
     type Error = SerializeError;
 
-    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+    fn serialize_element<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
-        T: serde::Serialize,
+        T: ?Sized + serde::Serialize,
     {
         self.elements.push(value.serialize(JuniperValueSerializer)?);
         Ok(())

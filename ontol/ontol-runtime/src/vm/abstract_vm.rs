@@ -47,13 +47,11 @@ pub trait Processor {
     type Value: Sized;
     type Yield: Sized;
 
-    fn size(&self) -> usize;
     fn stack_mut(&mut self) -> &mut Vec<Self::Value>;
 
     fn clone(&mut self, source: Local);
     fn bump(&mut self, source: Local);
     fn pop_until(&mut self, local: Local);
-    fn swap(&mut self, a: Local, b: Local);
 
     fn call_builtin(&mut self, proc: BuiltinProc, result_type: DefId) -> VmResult<()>;
     fn iter_next(&mut self, seq: Local, index: Local) -> VmResult<bool>;
@@ -82,7 +80,6 @@ pub trait Processor {
         pattern_id: DefId,
         index_filter: &BitVec,
     ) -> VmResult<()>;
-    fn assert_true(&mut self) -> VmResult<()>;
     fn cond_var(&mut self, condition: Local) -> VmResult<()>;
     fn push_cond_clause(
         &mut self,

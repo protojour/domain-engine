@@ -79,16 +79,11 @@ impl<'m, T: Debug> std::fmt::Debug for TypedHirData<'m, T> {
 
 pub trait IntoTypedHirData<'m>: Sized {
     fn with_meta(self, meta: Meta<'m>) -> TypedHirData<'m, Self>;
-    fn with_ty(self, ty: TypeRef<'m>) -> TypedHirData<'m, Self>;
 }
 
 impl<'m, T> IntoTypedHirData<'m> for T {
     fn with_meta(self, meta: Meta<'m>) -> TypedHirData<'m, Self> {
         TypedHirData(self, meta)
-    }
-
-    fn with_ty(self, ty: TypeRef<'m>) -> TypedHirData<'m, Self> {
-        TypedHirData(self, Meta { ty, span: NO_SPAN })
     }
 }
 

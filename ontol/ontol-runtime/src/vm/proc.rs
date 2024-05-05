@@ -172,7 +172,6 @@ pub enum Predicate {
 }
 
 bitflags::bitflags! {
-    ///
     #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug, Serialize, Deserialize)]
     pub struct GetAttrFlags: u8 {
         /// If flag is set, take the attribute instead of cloning it

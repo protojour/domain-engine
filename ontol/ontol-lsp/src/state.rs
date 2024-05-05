@@ -313,7 +313,7 @@ impl State {
                     Statement::Use(stmt) => {
                         let (path, _) = get_path_and_name(uri);
                         let ref_uri = build_uri(path, &stmt.reference.0);
-                        if self.docs.get(&ref_uri).is_some() {
+                        if self.docs.contains_key(&ref_uri) {
                             return Some(Location {
                                 uri: Url::parse(&ref_uri).unwrap(),
                                 range: Range::default(),
