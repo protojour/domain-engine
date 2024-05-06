@@ -10,7 +10,7 @@ use logos::{Lexer, Logos};
 /// The lexer will slice the full document into tokens.
 /// The produced Spans will need some post-processing
 /// for extracting useful data (such as escape codes, etc)
-#[derive(Logos, Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Logos, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 #[repr(u16)]
 pub enum Kind {
     #[regex(r"([ \t\n\r])+")]
