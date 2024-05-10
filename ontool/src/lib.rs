@@ -33,7 +33,6 @@ use ontol_runtime::{
         config::{DataStoreConfig, PackageConfig},
         Ontology,
     },
-    PackageId,
 };
 use service::{domains_router, ontology_router};
 use std::{
@@ -197,24 +196,28 @@ pub async fn run() -> Result<(), OntoolError> {
 
             let output_file = File::create(args.output)?;
 
-            let compile_output = compile(args.dir, args.files, args.data_store, args.backend)?;
-            compile_output
-                .ontology
-                .try_serialize_to_bincode(output_file)
-                .unwrap();
+            let ontology = compile(args.dir, args.files, args.data_store, args.backend)?;
+            ontology.try_serialize_to_bincode(output_file).unwrap();
 
             Ok(())
         }
         Some(Commands::Generate(args)) => {
             init_tracing();
 
-            let CompileOutput {
-                ontology,
-                root_package,
-            } = compile(args.dir, args.files, None, None)?;
+            let first_domain =
+                get_source_name(args.files.as_slice().iter().next().expect("no input files"));
 
-            let domain = ontology.find_domain(root_package).unwrap();
-            let schemas = build_openapi_schemas(&ontology, root_package, domain);
+            let ontology = compile(args.dir, args.files, None, None)?;
+
+            let (package_id, domain) = ontology
+                .domains()
+                .find(|domain| {
+                    let name = &ontology[domain.1.unique_name()];
+                    name == first_domain
+                })
+                .expect("domain not found");
+
+            let schemas = build_openapi_schemas(&ontology, *package_id, domain);
 
             match args.format {
                 Format::Json => {
@@ -263,22 +266,16 @@ fn init_tracing_stderr() {
         .init();
 }
 
-struct CompileOutput {
-    ontology: Ontology,
-    root_package: PackageId,
-}
-
 fn compile(
     root_dir: PathBuf,
     root_files: Vec<PathBuf>,
     data_store_domain: Option<String>,
     backend: Option<String>,
-) -> Result<CompileOutput, OntoolError> {
+) -> Result<Ontology, OntoolError> {
     if root_files.is_empty() {
         return Err(OntoolError::NoInputFiles);
     }
 
-    let root_file_name = get_source_name(root_files.first().unwrap());
     let mut ontol_sources = Sources::default();
     let mut sources_by_name: HashMap<String, Rc<String>> = Default::default();
     let mut paths_by_name: HashMap<String, PathBuf> = Default::default();
@@ -300,8 +297,8 @@ fn compile(
     }
 
     let mut source_code_registry = SourceCodeRegistry::default();
-    let mut package_graph_builder = PackageGraphBuilder::with_roots([root_file_name.clone()]);
-    let mut root_package = None;
+    let mut package_graph_builder =
+        PackageGraphBuilder::with_roots(root_files.iter().map(|path| get_source_name(path)));
 
     let topology = loop {
         let graph_state = package_graph_builder.transition().map_err(|err| {
@@ -317,10 +314,6 @@ fn compile(
                     let source_name = match &request.reference {
                         PackageReference::Named(source_name) => source_name.as_str(),
                     };
-
-                    if source_name == root_file_name {
-                        root_package = Some(request.package_id);
-                    }
 
                     let mut package_config = PackageConfig::default();
 
@@ -359,10 +352,7 @@ fn compile(
     let mem = Mem::default();
     let mut compiler = Compiler::new(&mem, ontol_sources.clone()).with_ontol();
     match compiler.compile_package_topology(topology) {
-        Ok(()) => Ok(CompileOutput {
-            ontology: compiler.into_ontology(),
-            root_package: root_package.expect("No root package"),
-        }),
+        Ok(()) => Ok(compiler.into_ontology()),
         Err(err) => {
             print_unified_compile_error(err, &ontol_sources, &source_code_registry)?;
             Err(OntoolError::Compile)
@@ -512,21 +502,15 @@ async fn serve(
 
     // initial compilation
     let backend = Some(String::from("inmemory"));
-    let compile_output = compile(
+    let ontology_result = compile(
         root_dir.clone(),
         root_files.clone(),
         data_store.clone(),
         backend.clone(),
     );
-    match compile_output {
-        Ok(output) => {
-            reload_routes(
-                output.ontology,
-                &dynamic_routers,
-                data_store.as_deref(),
-                &base_url,
-            )
-            .await;
+    match ontology_result {
+        Ok(ontology) => {
+            reload_routes(ontology, &dynamic_routers, data_store.as_deref(), &base_url).await;
             let _ = reload_tx.send(ChannelMessage::Reload);
         }
         Err(error) => println!("{:?}", error),
@@ -545,16 +529,16 @@ async fn serve(
                         cancellation_token = CancellationToken::new();
                         clear_term(&mut stdout);
 
-                        let compile_output = compile(
+                        let ontology_result = compile(
                             root_dir.clone(),
                             root_files.clone(),
                             data_store.clone(),
                             backend.clone(),
                         );
-                        match compile_output {
-                            Ok(output) => {
+                        match ontology_result {
+                            Ok(ontology) => {
                                 reload_routes(
-                                    output.ontology,
+                                    ontology,
                                     &dynamic_routers,
                                     data_store.as_deref(),
                                     &base_url,
