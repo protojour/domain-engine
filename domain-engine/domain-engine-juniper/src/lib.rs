@@ -97,6 +97,8 @@ pub fn create_graphql_schema(
 
     if should_debug {
         debug!("Created schema \n{}", juniper_schema.as_sdl());
+    } else {
+        debug!("Created schema too large to debug");
     }
 
     Ok(juniper_schema)

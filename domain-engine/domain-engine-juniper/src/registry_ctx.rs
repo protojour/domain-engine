@@ -432,7 +432,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                 //     union_op.unfiltered_variants()
                 // );
 
-                // If this is an entity, use Edge + ReferenceInput
+                // If this is an entity, use Edge + InputOrReference
                 // to get the option of just specifying an ID.
                 // TODO: Ensure this for create mutations only
                 let (query_level, typing_purpose) = if type_info.entity_info().is_some() {
@@ -456,13 +456,12 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         typing_purpose,
                     ),
                     AppliedVariants::OneOf(_variants) => {
-                        let type_addr = self
-                            .schema_ctx
-                            .type_addr_by_def(def_id, query_level)
+                        let type_addr = self.schema_ctx.type_addr_by_def(def_id, query_level)
+                            .or_else(|| self.schema_ctx.type_addr_by_def(def_id, QueryLevel::Node))
                             .unwrap_or_else(|| {
                                 panic!(
-                                    "no union found: {def_id:?}. union_op={union_op:#?}",
-                                    union_op = NoFmt(union_op)
+                                    "no union found: {def_id:?}/{query_level:?}. union_op={union_op:#?}",
+                                    union_op = self.schema_ctx.ontology.debug(union_op),
                                 )
                             });
 

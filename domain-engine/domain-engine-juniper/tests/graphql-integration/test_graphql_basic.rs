@@ -1741,3 +1741,18 @@ async fn flattened_union_entity() {
         })),
     );
 }
+
+#[test(tokio::test)]
+async fn schema_bug1() {
+    let (_test, [_schema]) = TestPackages::with_static_sources([(
+        SrcName::default(),
+        "
+        def foo (rel .'id'|id: (rel .is: text))
+        def bar (rel .'id'|id: (rel .is: text))
+        rel bar 'foo': foo
+        rel foo 'bar2'::'foo2'? {bar}
+        ",
+    )])
+    .with_data_store(SrcName::default(), DataStoreConfig::Default)
+    .compile_schemas([SrcName::default()]);
+}

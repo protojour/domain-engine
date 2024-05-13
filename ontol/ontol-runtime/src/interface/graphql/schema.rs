@@ -106,7 +106,7 @@ impl TypingPurpose {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash)]
+#[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash, Debug)]
 pub enum QueryLevel {
     Node,
     Edge {

@@ -887,7 +887,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
     ) {
         let (_, (prop_cardinality, value_cardinality), _) = meta.relationship.by(property_id.role);
         let (value_def_id, ..) = meta.relationship.by(property_id.role.opposite());
-        trace!("    register struct field `{prop_key}`: {property_id}");
+        trace!("    harvest data struct field `{prop_key}`: {property_id} ({value_def_id:?}) ({prop_cardinality:?}, {value_cardinality:?})");
 
         let value_properties = self.relations.properties_by_def_id(value_def_id);
 
@@ -943,10 +943,10 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     }
                     RelParams::IndexRange(_) => todo!(),
                 };
-                TypeRef {
-                    modifier,
-                    unit: self.get_def_type_ref(value_def_id, qlevel),
-                }
+
+                let unit = self.get_def_type_ref(value_def_id, qlevel);
+
+                TypeRef { modifier, unit }
             };
 
             FieldData {
