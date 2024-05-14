@@ -1,6 +1,6 @@
 def bar ( rel .'prop': text )
 def foo (
     rel .'bar'
-        [rel .gen: auto] // ERROR Cannot generate a value of type bar
+        [rel .gen: auto] // ERROR Cannot generate a value of type `bar`
     : bar
 )

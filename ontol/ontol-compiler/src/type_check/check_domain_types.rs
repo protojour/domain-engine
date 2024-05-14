@@ -278,7 +278,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         self.error(
                             CompileError::CannotGenerateValue(format!(
                                 "{}",
-                                FormatType(object_ty, self.defs, self.primitives)
+                                FormatType::new(object_ty, self.defs, self.primitives)
                             )),
                             &span,
                         );

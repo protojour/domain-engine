@@ -90,5 +90,8 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
 fn format_map_def(compiler: &Compiler, map_def: MapDef) -> String {
     let ty = compiler.def_types.table.get(&map_def.def_id).unwrap();
 
-    format!("{}", FormatType(ty, &compiler.defs, &compiler.primitives))
+    format!(
+        "{}",
+        FormatType::new(ty, &compiler.defs, &compiler.primitives)
+    )
 }

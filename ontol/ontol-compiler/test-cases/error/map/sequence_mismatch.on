@@ -10,11 +10,11 @@ def bar (
 
 map(
     foo(
-        'a': x, // ERROR {text} variable must be enclosed in {}
-        'b': y, // ERROR {text} variable must be enclosed in {}
+        'a': x, // ERROR {`ontol.text`} variable must be enclosed in {}
+        'b': y, // ERROR {`ontol.text`} variable must be enclosed in {}
     ),
     bar(
         'a': x,
-        'b': y, // ERROR {i64} variable must be enclosed in {}
+        'b': y, // ERROR {`ontol.i64`} variable must be enclosed in {}
     ),
 )

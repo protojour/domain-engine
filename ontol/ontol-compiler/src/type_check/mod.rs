@@ -100,26 +100,26 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 CompileError::TypeMismatch {
                     actual: format!(
                         "{}",
-                        FormatType(equation.actual.0, self.defs, self.primitives)
+                        FormatType::new(equation.actual.0, self.defs, self.primitives)
                     ),
                     expected: format!(
                         "{}",
-                        FormatType(equation.expected.0, self.defs, self.primitives)
+                        FormatType::new(equation.expected.0, self.defs, self.primitives)
                     ),
                 },
                 span,
             ),
             TypeError::MustBeSequence(ty) => self.error(
                 CompileError::TypeMismatch {
-                    actual: format!("{}", FormatType(ty, self.defs, self.primitives)),
-                    expected: format!("{{{}}}", FormatType(ty, self.defs, self.primitives)),
+                    actual: format!("{}", FormatType::new(ty, self.defs, self.primitives)),
+                    expected: format!("{{{}}}", FormatType::new(ty, self.defs, self.primitives)),
                 },
                 span,
             ),
             TypeError::VariableMustBeSequenceEnclosed(ty) => self.error(
                 CompileError::VariableMustBeSequenceEnclosed(format!(
                     "{}",
-                    FormatType(ty, self.defs, self.primitives)
+                    FormatType::new(ty, self.defs, self.primitives)
                 )),
                 span,
             ),
@@ -130,7 +130,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             TypeError::NotConvertibleFromNumber(ty) => self.error(
                 CompileError::TODO(format!(
                     "Type {} cannot be represented as a number",
-                    FormatType(ty, self.defs, self.primitives)
+                    FormatType::new(ty, self.defs, self.primitives)
                 )),
                 span,
             ),

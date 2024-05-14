@@ -3,9 +3,9 @@ def bar (rel .'b': {text})
 
 map(
     foo(
-        'a': x // ERROR {text} variable must be enclosed in {}
+        'a': x // ERROR {`ontol.text`} variable must be enclosed in {}
     ),
     bar(
-        'b': x // ERROR {text} variable must be enclosed in {}
+        'b': x // ERROR {`ontol.text`} variable must be enclosed in {}
     ),
 )

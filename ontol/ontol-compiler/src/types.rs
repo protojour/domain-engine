@@ -152,67 +152,89 @@ pub struct DefTypes<'m> {
     pub ontology_externs: FnvHashMap<DefId, Extern>,
 }
 
-pub struct FormatType<'m, 'c>(pub TypeRef<'m>, pub &'c Defs<'m>, pub &'c Primitives);
+pub struct FormatType<'m, 'c> {
+    ty: TypeRef<'m>,
+    defs: &'c Defs<'m>,
+    primitives: &'c Primitives,
+    root: bool,
+}
+
+impl<'m, 'c> FormatType<'m, 'c> {
+    pub fn new(ty: TypeRef<'m>, defs: &'c Defs<'m>, primitives: &'c Primitives) -> Self {
+        Self {
+            ty,
+            defs,
+            primitives,
+            root: true,
+        }
+    }
+
+    fn child(&self, ty: TypeRef<'m>) -> Self {
+        Self {
+            ty,
+            defs: self.defs,
+            primitives: self.primitives,
+            root: false,
+        }
+    }
+}
 
 impl<'m, 'c> Display for FormatType<'m, 'c> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let Self(ty, defs, primitives) = self;
+        let tick = if self.root { "`" } else { "" };
 
-        match ty {
+        match self.ty {
             Type::Tautology => write!(f, "tautology"),
             Type::Primitive(kind, def_id) => {
                 // write!(f, "{}", kind.ident())
-                match (kind, self.1.def_kind(*def_id)) {
-                    (_, DefKind::Primitive(_, Some(ident))) => write!(f, "{ident}"),
+                match (kind, self.defs.def_kind(*def_id)) {
+                    (_, DefKind::Primitive(_, Some(ident))) => {
+                        write!(f, "{tick}ontol.{ident}{tick}")
+                    }
                     (_, DefKind::Primitive(primitive_kind, None)) => {
                         write!(f, "{primitive_kind:?}")
                     }
                     _ => unreachable!(),
                 }
             }
-            Type::EmptySequence(_) => write!(f, "[]"),
-            Type::IntConstant(val) => write!(f, "int({val})"),
-            Type::FloatConstant(val) => write!(f, "float({val})"),
+            Type::EmptySequence(_) => write!(f, "{tick}[]{tick}"),
+            Type::IntConstant(val) => write!(f, "{tick}ontol.int({val}){tick}"),
+            Type::FloatConstant(val) => write!(f, "{tick}ontol.float({val}){tick}"),
             Type::TextConstant(def_id) => {
-                let DefKind::TextLiteral(lit) = defs.def_kind(*def_id) else {
+                let DefKind::TextLiteral(lit) = self.defs.def_kind(*def_id) else {
                     panic!();
                 };
 
                 write!(f, "\"{lit}\"")
             }
             Type::Regex(def_id) => {
-                let DefKind::Regex(lit) = defs.def_kind(*def_id) else {
+                let DefKind::Regex(lit) = self.defs.def_kind(*def_id) else {
                     panic!();
                 };
 
                 write!(f, "/{lit}/")
             }
-            Type::TextLike(_, TextLikeType::Uuid) => write!(f, "uuid"),
-            Type::TextLike(_, TextLikeType::DateTime) => write!(f, "datetime"),
+            Type::TextLike(_, TextLikeType::Uuid) => write!(f, "{tick}ontol.uuid{tick}"),
+            Type::TextLike(_, TextLikeType::DateTime) => write!(f, "{tick}ontol.datetime{tick}"),
             Type::Seq(rel, val) => {
-                write!(
-                    f,
-                    "{{{}: {}}}",
-                    FormatType(rel, defs, primitives),
-                    FormatType(val, defs, primitives)
-                )
+                write!(f, "{{{}: {}}}", self.child(rel), self.child(val),)
             }
             Type::Option(ty) => {
-                write!(f, "{}?", FormatType(ty, defs, primitives))
+                write!(f, "{tick}{}?{tick}", self.child(ty))
             }
             Type::Function { .. } => write!(f, "function"),
             Type::Domain(def_id) => {
-                let ident = defs.def_kind(*def_id).opt_identifier().unwrap();
-                write!(f, "{ident}")
+                let ident = self.defs.def_kind(*def_id).opt_identifier().unwrap();
+                write!(f, "{tick}{ident}{tick}")
             }
             Type::Anonymous(_) => {
-                write!(f, "anonymous")
+                write!(f, "anonymous type")
             }
-            Type::ValueGenerator(_) => write!(f, "value_generator"),
+            Type::ValueGenerator(_) => write!(f, "value generator"),
             Type::Package => write!(f, "package"),
             Type::BuiltinRelation => write!(f, "relation"),
             Type::Extern(def_id) => {
-                let ident = defs.def_kind(*def_id).opt_identifier().unwrap();
+                let ident = self.defs.def_kind(*def_id).opt_identifier().unwrap();
                 write!(f, "extern({ident})")
             }
             Type::Infer(_) => write!(f, "?infer"),

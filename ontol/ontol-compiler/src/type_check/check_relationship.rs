@@ -206,7 +206,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         CompileError::TypeMismatch {
                             actual: format!(
                                 "{}",
-                                FormatType(object_ty, self.defs, self.primitives)
+                                FormatType::new(object_ty, self.defs, self.primitives)
                             ),
                             expected: "text constant".to_string(),
                         },

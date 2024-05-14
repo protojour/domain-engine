@@ -6,7 +6,7 @@ map(
     foo('prop': x),
     bar(
         'prop':
-            x // ERROR type mismatch: expected `i64`, found `text`
+            x // ERROR type mismatch: expected `ontol.i64`, found `ontol.text`
             * 2
     )
 )

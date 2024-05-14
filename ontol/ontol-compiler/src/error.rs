@@ -191,7 +191,7 @@ impl std::fmt::Display for CompileError {
             Self::UnknownProperty => write!(f, "unknown property"),
             Self::DuplicateProperty => write!(f, "duplicate property"),
             Self::TypeMismatch { actual, expected } => {
-                write!(f, "type mismatch: expected `{expected}`, found `{actual}`")
+                write!(f, "type mismatch: expected {expected}, found {actual}")
             }
             Self::MissingProperties(props) => {
                 write!(
@@ -211,7 +211,7 @@ impl std::fmt::Display for CompileError {
             }
             Self::CannotDiscriminateType => write!(f, "cannot discriminate type"),
             Self::UnitTypePartOfUnion(name) => {
-                write!(f, "unit type `{name}` cannot be part of a union")
+                write!(f, "unit type {name} cannot be part of a union")
             }
             Self::CannotMixNonEntitiesInUnion => {
                 write!(f, "impossible mix of entities and non-entities in union")
@@ -249,7 +249,7 @@ impl std::fmt::Display for CompileError {
             }
             Self::CannotConvertMissingMapping { input, output } => write!(
                 f,
-                "cannot convert this `{output}` from `{input}`: These types are not equated.",
+                "cannot convert this {output} from {input}: These types are not equated.",
             ),
             Self::NonEntityInReverseRelationship => {
                 write!(f, "only entities may have named reverse relationship")

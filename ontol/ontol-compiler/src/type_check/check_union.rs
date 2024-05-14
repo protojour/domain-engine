@@ -631,7 +631,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let ty = self.def_types.table.get(&def_id).unwrap();
                 CompileError::UnitTypePartOfUnion(format!(
                     "{}",
-                    FormatType(ty, self.defs, self.primitives)
+                    FormatType::new(ty, self.defs, self.primitives)
                 ))
             }
             UnionCheckError::CannotDiscriminateType

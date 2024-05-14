@@ -232,7 +232,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 notes.push(SpannedNote {
                     note: Note::BaseTypeIs(format!(
                         "{}",
-                        FormatType(base_ty, self.defs, self.primitives)
+                        FormatType::new(base_ty, self.defs, self.primitives)
                     )),
                     span: level1_path.rel_span,
                 });

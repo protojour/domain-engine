@@ -2,6 +2,6 @@
 def meters (rel .is: i64)
 
 def my_length ( // ERROR Intersection of disjoint types
-    rel .is: meters // NOTE Base type is number
-    rel .is: text // NOTE Base type is text
+    rel .is: meters // NOTE Base type is `ontol.number`
+    rel .is: text // NOTE Base type is `ontol.text`
 )
