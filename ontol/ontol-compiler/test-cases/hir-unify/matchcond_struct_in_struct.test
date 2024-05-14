@@ -1,0 +1,39 @@
+(struct ($c)
+    (prop! $c S:1:0 (#u $a))
+    (prop! $c S:1:1 (#u $b))
+)
+
+(set (.. @f
+    #u
+    (match-struct ($d)
+        (prop! $d O:1:0
+            (#u
+                (struct ($e)
+                    (prop! $e O:2:0 ($a $b))
+                )
+            )
+        )
+    )
+))
+
+|$c| (block
+    (let-prop $_ $a ($c S:1:0))
+    (let-prop $_ $b ($c S:1:1))
+    (match-struct ($g)
+        (let-cond-var $d $g)
+        (push-cond-clauses $g
+            (root '$d)
+        )
+        (let-cond-var $e $g)
+        (let-cond-var $i $g)
+        (push-cond-clauses $g
+            (match-prop '$d O:1:0 element-in '$i)
+            (member '$i (_ '$e))
+        )
+        (let-cond-var $h $g)
+        (push-cond-clauses $g
+            (match-prop '$e O:2:0 element-in '$h)
+            (member '$h ($a $b))
+        )
+    )
+)

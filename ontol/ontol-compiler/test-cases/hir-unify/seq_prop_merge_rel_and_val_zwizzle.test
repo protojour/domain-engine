@@ -1,0 +1,74 @@
+(struct ($e)
+    (prop! $e S:1:0
+        (#u
+            (set
+                (.. @f
+                    (struct ($g)
+                        (prop! $g S:2:0 (#u $a))
+                        (prop! $g S:2:1 (#u $b))
+                    )
+                    (struct ($h)
+                        (prop! $h S:3:0 (#u $c))
+                        (prop! $h S:3:1 (#u $d))
+                    )
+                )
+            )
+        )
+    )
+)
+
+(struct ($i)
+    (prop! $i O:1:0
+        (#u
+            (set
+                (.. @f
+                    (struct ($j)
+                        (prop! $j O:2:0 (#u $a))
+                        (prop! $j O:2:1 (#u $c))
+                    )
+                    (struct ($k)
+                        (prop! $k O:3:0 (#u $b))
+                        (prop! $k O:3:1 (#u $d))
+                    )
+                )
+            )
+        )
+    )
+)
+
+|$e| (block
+    (let-prop $_ $f ($e S:1:0))
+    (struct ($i)
+        (prop! $i O:1:0
+            (#u
+                (make-seq ($l)
+                    (for-each $f ($g $h)
+                        (let-prop $_ $a ($g S:2:0))
+                        (let-prop $_ $b ($g S:2:1))
+                        (let-prop $_ $c ($h S:3:0))
+                        (let-prop $_ $d ($h S:3:1))
+                        (insert $l
+                            (struct ($j)
+                                (prop! $j O:2:0
+                                    (#u $a)
+                                )
+                                (prop! $j O:2:1
+                                    (#u $c)
+                                )
+                            )
+                            (struct ($k)
+                                (prop! $k O:3:0
+                                    (#u $b)
+                                )
+                                (prop! $k O:3:1
+                                    (#u $d)
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+        (move-rest-attrs $i $e)
+    )
+)

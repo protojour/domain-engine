@@ -1,0 +1,16 @@
+(struct ($b))
+
+(set (.. @a
+    #u
+    (match-struct ($c))
+))
+
+|$b| (block
+    (match-struct ($d)
+        (let-cond-var $c $d)
+        (push-cond-clauses $d
+            (root '$c)
+        )
+    )
+)
+

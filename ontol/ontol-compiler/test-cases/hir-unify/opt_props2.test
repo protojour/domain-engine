@@ -1,0 +1,43 @@
+(struct ($b)
+    (prop? $b S:1:0
+        (#u
+            (struct ($c)
+                (prop? $c S:2:1
+                    (#u $a)
+                )
+            )
+        )
+    )
+)
+
+(struct ($d)
+    (prop? $d O:1:0
+        (#u
+            (struct ($e)
+                (prop? $e O:2:1
+                    (#u $a)
+                )
+            )
+        )
+    )
+)
+
+|$b| (block
+    (let-prop $_ $c ($b S:1:0))
+    (struct ($d)
+        (prop? $d O:1:0
+            (#u
+                (struct ($e)
+                    (catch (@f)
+                        (try? @f $c)
+                        (let-prop? @f $_ $a ($c S:2:1))
+                        (prop? $e O:2:1
+                            (#u $a)
+                        )
+                    )
+                )
+            )
+        )
+        (move-rest-attrs $d $b)
+    )
+)

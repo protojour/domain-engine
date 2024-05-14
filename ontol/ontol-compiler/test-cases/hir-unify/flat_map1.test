@@ -1,0 +1,51 @@
+(struct ($c)
+    (prop! $c S:1:0
+        (#u
+            (set
+                (.. @d
+                    #u
+                    (struct ($e)
+                        (prop! $e S:3:2
+                            (#u $a)
+                        )
+                    )
+                )
+            )
+        )
+    )
+    (prop! $c S:2:1 (#u $b))
+)
+
+(set
+    (.. @d
+        #u
+        (struct ($f)
+            (prop! $f O:1:0
+                (#u $a)
+            )
+            (prop! $f O:2:1
+                (#u $b)
+            )
+        )
+    )
+)
+
+|$c| (block
+    (let-prop $_ $d ($c S:1:0))
+    (let-prop $_ $b ($c S:2:1))
+    (make-seq ($g)
+        (for-each $d ($_ $e)
+            (let-prop $_ $a ($e S:3:2))
+            (insert $g #u
+                (struct ($f)
+                    (prop! $f O:1:0
+                        (#u $a)
+                    )
+                    (prop! $f O:2:1
+                        (#u $b)
+                    )
+                )
+            )
+        )
+    )
+)

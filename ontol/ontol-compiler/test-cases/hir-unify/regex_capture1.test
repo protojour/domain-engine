@@ -1,0 +1,27 @@
+(struct ($b)
+    (prop! $b S:1:0
+        (#u
+            (regex def@0:0 ((1 $a)))
+        )
+    )
+)
+
+(struct ($c)
+    (prop! $c O:1:0
+        (#u $a)
+    )
+)
+
+|$b| (block
+    (let-prop $_ $d ($b S:1:0))
+    (let-regex ((1 $a)) def@0:0 $d)
+    (struct ($c)
+        (catch (@e)
+            (try? @e $a)
+            (prop! $c O:1:0
+                (#u $a)
+            )
+        )
+        (move-rest-attrs $c $b)
+    )
+)

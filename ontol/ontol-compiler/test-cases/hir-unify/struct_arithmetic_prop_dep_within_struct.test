@@ -1,0 +1,36 @@
+(struct ($c)
+    (prop! $c S:1:0 (#u (- $a 10)))
+    (prop! $c S:1:1
+        (#u
+            (struct ($e)
+                (prop! $e S:2:0 (#u (- $b 10)))
+            )
+        )
+    )
+)
+
+(struct ($d)
+    (prop! $d O:1:0 (#u (+ $a $b)))
+    (prop! $d O:1:1 (#u (+ $a 20)))
+    (prop! $d O:1:2 (#u (+ $b 20)))
+)
+
+|$c| (block
+    (let-prop $_ $f ($c S:1:0))
+    (let-prop $_ $e ($c S:1:1))
+    (let-prop $_ $g ($e S:2:0))
+    (let $a (+ $f 10))
+    (let $b (+ $g 10))
+    (struct ($d)
+        (prop! $d O:1:0
+            (#u (+ $a $b))
+        )
+        (prop! $d O:1:1
+            (#u (+ $a 20))
+        )
+        (prop! $d O:1:2
+            (#u (+ $b 20))
+        )
+        (move-rest-attrs $d $c)
+    )
+)

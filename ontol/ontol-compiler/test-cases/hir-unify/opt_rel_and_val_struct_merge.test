@@ -1,0 +1,30 @@
+(struct ($c)
+    (prop? $c S:1:0
+        (
+            (struct ($d) (prop! $d S:2:0 (#u $a)))
+            (struct ($e) (prop! $e S:2:1 (#u $b)))
+        )
+    )
+)
+
+(struct ($f)
+    (prop? $f O:1:0
+        (#u (+ $a $b))
+    )
+)
+
+|$c| (block
+    (let-prop $d $e ($c S:1:0))
+    (struct ($f)
+        (catch (@g)
+            (try? @g $d)
+            (let-prop? @g $_ $a ($d S:2:0))
+            (try? @g $e)
+            (let-prop? @g $_ $b ($e S:2:1))
+            (prop? $f O:1:0
+                (#u (+ $a $b))
+            )
+        )
+        (move-rest-attrs $f $c)
+    )
+)

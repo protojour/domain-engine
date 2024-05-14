@@ -170,23 +170,19 @@ pub mod test_api {
 
     use crate::{hir_unify::unify_to_function, mem::Mem, typed_hir::TypedHir, Compiler};
 
-    fn parse_typed<'m>(src: &str) -> ontol_hir::RootNode<'m, TypedHir> {
+    pub fn parse_typed<'m>(src: &str) -> (ontol_hir::RootNode<'m, TypedHir>, &str) {
         ontol_hir::parse::Parser::new(TypedHir)
             .parse_root(src)
             .unwrap()
-            .0
     }
 
-    pub fn test_unify(scope: &str, expr: &str) -> String {
-        let mem = Mem::default();
-        let mut compiler = Compiler::new(&mem, Default::default());
-        let func = unify_to_function(
-            &parse_typed(scope),
-            &parse_typed(expr),
-            MapFlags::empty(),
-            &mut compiler,
-        )
-        .unwrap();
+    pub fn test_unify<'m>(
+        mem: &'m Mem,
+        scope: &ontol_hir::RootNode<'m, TypedHir>,
+        expr: &ontol_hir::RootNode<'m, TypedHir>,
+    ) -> String {
+        let mut compiler = Compiler::new(mem, Default::default());
+        let func = unify_to_function(scope, expr, MapFlags::empty(), &mut compiler).unwrap();
         let mut output = String::new();
         write!(&mut output, "{func}").unwrap();
         output

@@ -1,0 +1,18 @@
+(struct ($b)
+    (prop! $b S:1:0 (#u (- $a 10)))
+)
+
+(struct ($c)
+    (prop! $c S:1:1 (#u (+ $a 20)))
+)
+
+|$b| (block
+    (let-prop $_ $d ($b S:1:0))
+    (let $a (+ $d 10))
+    (struct ($c)
+        (prop! $c S:1:1
+            (#u (+ $a 20))
+        )
+        (move-rest-attrs $c $b)
+    )
+)

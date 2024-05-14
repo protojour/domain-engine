@@ -1,0 +1,24 @@
+(struct ($b)
+    (prop? $b S:1:0
+        (#u (map $a))
+    )
+)
+
+(struct ($c)
+    (prop? $c O:2:1
+        (#u (map $a))
+    )
+)
+
+|$b| (block
+    (let-prop $_ $a ($b S:1:0))
+    (struct ($c)
+        (catch (@d)
+            (try? @d $a)
+            (prop? $c O:2:1
+                (#u (map $a))
+            )
+        )
+        (move-rest-attrs $c $b)
+    )
+)

@@ -1,0 +1,68 @@
+(struct ($c)
+    (prop $c S:1:0
+        (#u (set (.. @e #u $a)))
+    )
+    (prop $c S:1:1
+        (#u (set (.. @f #u $b)))
+    )
+)
+
+(set (.. @g #u
+    (match-struct ($d)
+        (prop $d O:1:0
+            (element-in
+                (set
+                    (.. @e
+                        #u
+                        (struct ($q)
+                            (prop $q O:2:0 (#u $a))
+                        )
+                    )
+                    (.. @f
+                        #u
+                        (struct ($r)
+                            (prop $r O:2:0 (#u $b))
+                        )
+                    )
+                )
+            )
+        )
+    )
+))
+
+|$c| (block
+    (let-prop-default $_ $e ($c S:1:0) #u #u)
+    (let-prop-default $_ $f ($c S:1:1) #u #u)
+    (match-struct ($s)
+        (let-cond-var $d $s)
+        (push-cond-clauses $s
+            (root '$d)
+        )
+        (let-cond-var $t $s)
+        (push-cond-clauses $s
+            (match-prop '$d O:1:0 element-in '$t)
+        )
+        (for-each $e ($_ $a)
+            (let-cond-var $q $s)
+            (push-cond-clauses $s
+                (member '$t (_ '$q))
+            )
+            (let-cond-var $u $s)
+            (push-cond-clauses $s
+                (match-prop '$q O:2:0 element-in '$u)
+                (member '$u (_ $a))
+            )
+        )
+        (for-each $f ($_ $b)
+            (let-cond-var $r $s)
+            (push-cond-clauses $s
+                (member '$t (_ '$r))
+            )
+            (let-cond-var $v $s)
+            (push-cond-clauses $s
+                (match-prop '$r O:2:0 element-in '$v)
+                (member '$v (_ $b))
+            )
+        )
+    )
+)

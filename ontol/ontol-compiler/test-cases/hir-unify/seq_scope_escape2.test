@@ -1,0 +1,76 @@
+(struct ($e)
+    (prop! $e S:1:0
+        (#u
+            (struct ($f)
+                (prop! $f S:2:0
+                    (#u (set (.. @a #u $b)))
+                )
+            )
+        )
+    )
+    (prop! $e S:1:1
+        (#u (set (.. @c #u $d)))
+    )
+)
+
+// Note: The expr prop O:1:0 itself does not depend on anything in scope.
+// So it's constant in this sense, but each _child_ need to _clone_ the original scope.
+(struct ($g)
+    (prop! $g O:1:0
+        (#u
+            (struct ($h)
+                (prop! $h O:2:0
+                    (#u
+                        (struct ($i)
+                            (prop! $i O:3:0
+                                (#u (set (.. @a #u $b)))
+                            )
+                        )
+                    )
+                )
+                (prop! $h O:2:1
+                    (#u (set (.. @c #u $d)))
+                )
+            )
+        )
+    )
+)
+
+|$e| (block
+    (let-prop $_ $f ($e S:1:0))
+    (let-prop $_ $a ($f S:2:0))
+    (let-prop $_ $c ($e S:1:1))
+    (struct ($g)
+        (prop! $g O:1:0
+            (#u
+                (struct ($h)
+                    (prop! $h O:2:0
+                        (#u
+                            (struct ($i)
+                                (prop! $i O:3:0
+                                    (#u
+                                        (make-seq ($j)
+                                            (for-each $a ($_ $b)
+                                                (insert $j #u $b)
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                    (prop! $h O:2:1
+                        (#u
+                            (make-seq ($k)
+                                (for-each $c ($_ $d)
+                                    (insert $k #u $d)
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+        (move-rest-attrs $g $e)
+    )
+)
