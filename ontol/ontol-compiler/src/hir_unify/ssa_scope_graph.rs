@@ -1,4 +1,4 @@
-use ontol_hir::{Binder, Binding, CaptureGroup, Kind, Node, Nodes};
+use ontol_hir::{import::arena_import, Binder, Binding, CaptureGroup, Kind, Node, Nodes};
 use ontol_runtime::{
     property::PropertyId,
     value::Attribute,
@@ -11,7 +11,7 @@ use tracing::{debug, warn};
 
 use crate::{
     hir_unify::{ssa_util::scan_all_vars_and_labels, UnifierError},
-    typed_hir::{arena_import, TypedHir, TypedHirData},
+    typed_hir::{TypedHir, TypedHirData},
     CompileError, SourceSpan,
 };
 

@@ -16,6 +16,10 @@ impl Lang for TestLang {
         hir
     }
 
+    fn wrap<'a, H: Clone>(_data: &Self::Data<'a, H>, hir: H) -> Self::Data<'a, H> {
+        hir
+    }
+
     fn as_hir<'m, H: Clone>(data: &'m Self::Data<'_, H>) -> &'m H {
         data
     }

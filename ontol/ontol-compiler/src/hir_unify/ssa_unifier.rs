@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
 use ontol_hir::{
-    arena::NodeRef, find_value_node, Binder, Binding, EvalCondTerm, Kind, Node, Nodes, PropFlags,
-    PropVariant, SetEntry, StructFlags,
+    arena::NodeRef, find_value_node, import::arena_import, Binder, Binding, EvalCondTerm, Kind,
+    Node, Nodes, PropFlags, PropVariant, SetEntry, StructFlags,
 };
 use ontol_runtime::{
     property::PropertyId,
@@ -27,7 +27,7 @@ use crate::{
         repr_ctx::ReprCtx,
         repr_model::{ReprKind, ReprScalarKind},
     },
-    typed_hir::{arena_import, Meta, TypedHir, TypedHirData, TypedNodeRef},
+    typed_hir::{Meta, TypedHir, TypedHirData, TypedNodeRef},
     types::{Type, Types, UNIT_TYPE},
     CompileError, CompileErrors, Compiler, SourceSpan, NO_SPAN,
 };

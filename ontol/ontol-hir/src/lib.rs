@@ -16,6 +16,7 @@ use thin_vec::ThinVec;
 
 pub mod arena;
 pub mod display;
+pub mod import;
 pub mod parse;
 pub mod visitor;
 
@@ -34,6 +35,8 @@ pub trait Lang: Sized + Copy {
 
     /// Wrapping the given ontol_hir data T in Lang-specific Data.
     fn default_data<'a, H: Clone>(&self, hir: H) -> Self::Data<'a, H>;
+
+    fn wrap<'a, H: Clone>(data: &Self::Data<'a, H>, hir: H) -> Self::Data<'a, H>;
 
     /// Extract the ontol-hir part of the data
     fn as_hir<'a, H: Clone>(data: &'a Self::Data<'_, H>) -> &'a H;
