@@ -575,6 +575,10 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     }
                 }
             }
+            ontol_hir::Kind::Narrow(expr) => {
+                let expr = arena.node_ref(*expr);
+                self.gen_node(expr, block);
+            }
             ontol_hir::Kind::Struct(binder, flags, nodes) => {
                 if flags.contains(StructFlags::MATCH) {
                     // warn!("Skipping match-struct for now");

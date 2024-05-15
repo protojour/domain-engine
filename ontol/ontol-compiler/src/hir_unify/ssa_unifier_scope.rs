@@ -250,7 +250,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     *node_ref.meta(),
                 )))
             }
-            Kind::Map(inner) => match self.traverse(*inner, scoped, lets)? {
+            Kind::Map(inner) | Kind::Narrow(inner) => match self.traverse(*inner, scoped, lets)? {
                 Binding::Wildcard => Ok(Binding::Wildcard),
                 Binding::Binder(binder) => Ok(Binding::Binder(TypedHirData(
                     *binder.hir(),

@@ -166,6 +166,8 @@ pub enum Kind<'a, L: Lang> {
     Call(BuiltinProc, Nodes),
     /// A map call
     Map(Node),
+    /// Narrowing of a type, e.g. selecting a specific union variant.
+    Narrow(Node),
     /// A set-builder of set entries
     Set(SmallVec<[SetEntry<'a, L>; 1]>),
     /// A struct with associated binder. The value is the struct.

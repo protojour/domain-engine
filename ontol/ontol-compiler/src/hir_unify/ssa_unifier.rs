@@ -357,6 +357,13 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     *node_ref.meta()
                 )])
             }
+            Kind::Narrow(expr) => {
+                // narrowing has no effect on expressions, just peel it off
+                Ok(smallvec![arena_import(
+                    &mut self.out_arena,
+                    self.expr_arena.node_ref(*expr)
+                )])
+            }
             _other => Ok(smallvec![arena_import(
                 &mut self.out_arena,
                 self.expr_arena.node_ref(expr_node),

@@ -238,10 +238,10 @@ pub fn arena_import<'m>(
             let arg = arena_import(target, source.arena().node_ref(*arg));
             target.add(TypedHirData(Map(arg), *meta))
         }
-        // DeclSet(label, attr) => {
-        //     let attr = import_attr(target, source.arena(), *attr);
-        //     target.add(TypedHirData(DeclSet(*label, attr), *meta))
-        // }
+        Narrow(arg) => {
+            let arg = arena_import(target, source.arena().node_ref(*arg));
+            target.add(TypedHirData(Narrow(arg), *meta))
+        }
         Set(entries) => {
             let entries = import_entries(target, source.arena(), entries);
             target.add(TypedHirData(Set(entries), *meta))

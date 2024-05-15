@@ -233,12 +233,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             Some(ReprKind::Union(members) | ReprKind::StructUnion(members)) => {
                                 let hir_def_id = meta.ty.get_single_def_id().unwrap();
 
-                                if members
+                                if !members
                                     .iter()
                                     .any(|(member_def_id, _)| *member_def_id == hir_def_id)
                                 {
-                                    node
-                                } else {
                                     self.type_error_node(
                                         TypeError::Mismatch(TypeEquation {
                                             actual: (meta.ty, Strength::Strong),
@@ -246,6 +244,19 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         }),
                                         &pattern.span,
                                         ctx,
+                                    )
+                                } else if node_info.parent_struct_flags.contains(StructFlags::MATCH)
+                                {
+                                    // This is one-way, so a variant is OK
+                                    node
+                                } else {
+                                    ctx.partial = true;
+                                    ctx.mk_node(
+                                        ontol_hir::Kind::Narrow(node),
+                                        Meta {
+                                            ty: expected_ty,
+                                            span: meta.span,
+                                        },
                                     )
                                 }
                             }
