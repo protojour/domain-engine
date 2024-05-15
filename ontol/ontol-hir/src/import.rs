@@ -67,13 +67,13 @@ impl<'i, 'o, 'a, L: Lang> Importer<'i, 'o, 'a, L> {
             Set(entries) => Set(self.import_entries(entries)),
             Struct(binder, flags, body) => Struct(binder.clone(), *flags, self.import_nodes(body)),
             Prop(optional, struct_var, prop_id, variant) => Prop(
-                optional.clone(),
+                *optional,
                 *struct_var,
                 *prop_id,
                 match variant {
                     PropVariant::Value(attr) => PropVariant::Value(self.import_attr(*attr)),
                     PropVariant::Predicate(operator, param) => {
-                        PropVariant::Predicate(operator.clone(), self.import(*param))
+                        PropVariant::Predicate(*operator, self.import(*param))
                     }
                 },
             ),
