@@ -15,7 +15,7 @@ use domain_engine_core::{
     DomainError,
     DomainResult,
 };
-use tracing::warn;
+use tracing::{error, warn};
 
 use crate::core::DbContext;
 
@@ -130,7 +130,7 @@ impl InMemoryStore {
                     FilterVal::Struct {
                         type_def_id,
                         prop_tree,
-                        dynamic_key: Some(key),
+                        dynamic_key,
                     },
                 ) => {
                     let type_info = ctx.ontology.get_type_info(type_def_id);
@@ -154,6 +154,12 @@ impl InMemoryStore {
                             )?);
                         }
                         DataRelationshipKind::EntityGraph { .. } => {
+                            let Some(key) = dynamic_key else {
+                                return Err(ProofError::Domain(DomainError::DataStore(anyhow!(
+                                    "cannot filter entity-graph without dynamic key"
+                                ))));
+                            };
+
                             let edge_collection = self
                                 .edge_collections
                                 .get(&prop_id.relationship_id)
@@ -192,7 +198,9 @@ impl InMemoryStore {
                         }
                     }
                 }
-                _ => {
+                (clause, filter_val) => {
+                    error!("unhandled combination: {clause:?} on {filter_val:?}");
+
                     return Err(ProofError::Domain(DomainError::DataStore(anyhow!(
                         "unexpected clause"
                     ))));

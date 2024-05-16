@@ -807,6 +807,23 @@ async fn entity_subtype() {
     let ctx: ServiceCtx = make_domain_engine(test.ontology_owned()).await.into();
 
     r#"mutation {
+        foo(create: [
+            {
+                id: "1",
+                type: "bar",
+                name: "NAME!"
+            },
+            {
+                id: "2",
+                type: "baz"
+            }
+        ]) { node { id } }
+    }"#
+    .exec([], &db_schema, &ctx)
+    .await
+    .unwrap();
+
+    r#"mutation {
         foo(create: [{
             id: "ID",
             type: "baz"
@@ -816,7 +833,7 @@ async fn entity_subtype() {
     .await
     .unwrap();
 
-    r#"{
+    let result = r#"{
         bars {
             nodes {
                 id
@@ -827,4 +844,16 @@ async fn entity_subtype() {
     .exec([], &derived_schema, &ctx)
     .await
     .unwrap();
+
+    expect_eq!(
+        actual = result,
+        expected = graphql_value!({
+            "bars": {
+                "nodes": [{
+                    "id": "1",
+                    "name": "NAME!"
+                }]
+            }
+        })
+    );
 }

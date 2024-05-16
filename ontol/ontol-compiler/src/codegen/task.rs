@@ -377,7 +377,7 @@ fn generate_ontol_map_procs<'m>(
         if needs_static_condition {
             let _entered = debug_span!("cond").entered();
 
-            let condition = generate_static_condition_from_scope(scope, &compiler);
+            let condition = generate_static_condition_from_scope(scope, compiler);
 
             proc_table.static_conditions.insert(key, condition);
         }

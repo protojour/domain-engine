@@ -212,6 +212,10 @@ impl Ontology {
         Some(&self.data.property_flows[range.start as usize..range.end as usize])
     }
 
+    pub fn get_static_condition(&self, key: &MapKey) -> Option<&Condition> {
+        self.data.static_conditions.get(key)
+    }
+
     pub fn get_mapper_proc(&self, key: &MapKey) -> Option<Procedure> {
         self.data.map_meta_table.get(key).map(|map_info| {
             debug!(

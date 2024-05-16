@@ -58,6 +58,17 @@ impl Condition {
             .push(clause);
     }
 
+    pub fn merge(&mut self, other: Condition) {
+        let mut rewrite_table: FnvHashMap<Var, Var> = Default::default();
+        rewrite_table.insert(Var(0), Var(0));
+
+        for (cond_var, expansion) in other.expansions {
+            for clause in expansion.clauses {
+                self.merge_clause(cond_var, clause, &mut rewrite_table);
+            }
+        }
+    }
+
     fn register_term(&mut self, term: &CondTerm) {
         match term {
             CondTerm::Wildcard => {}
@@ -66,6 +77,42 @@ impl Condition {
             }
             CondTerm::Value(_) => {}
         }
+    }
+
+    fn merge_clause(
+        &mut self,
+        cond_var: Var,
+        clause: Clause<Var, CondTerm>,
+        rewrite_table: &mut FnvHashMap<Var, Var>,
+    ) {
+        let cond_var = self.merge_cond_var(cond_var, rewrite_table);
+
+        match clause {
+            Clause::Root => {}
+            Clause::IsEntity(def_id) => self.add_clause(cond_var, Clause::IsEntity(def_id)),
+            Clause::MatchProp(property_id, set_op, var) => {
+                let var = self.merge_cond_var(var, rewrite_table);
+                self.add_clause(cond_var, Clause::MatchProp(property_id, set_op, var));
+            }
+            Clause::Member(rel, val) => {
+                let rel = self.merge_term(rel, rewrite_table);
+                let val = self.merge_term(val, rewrite_table);
+                self.add_clause(cond_var, Clause::Member(rel, val));
+            }
+        }
+    }
+
+    fn merge_term(&mut self, term: CondTerm, rewrite_table: &mut FnvHashMap<Var, Var>) -> CondTerm {
+        match term {
+            CondTerm::Variable(var) => CondTerm::Variable(self.merge_cond_var(var, rewrite_table)),
+            term => term,
+        }
+    }
+
+    fn merge_cond_var(&mut self, var: Var, rewrite_table: &mut FnvHashMap<Var, Var>) -> Var {
+        *rewrite_table
+            .entry(var)
+            .or_insert_with(|| self.mk_cond_var())
     }
 }
 
@@ -112,7 +159,7 @@ impl Default for Condition {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ClausePair<V, Term>(pub V, pub Clause<V, Term>);
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum Clause<V, Term> {
     Root,
     IsEntity(DefId),

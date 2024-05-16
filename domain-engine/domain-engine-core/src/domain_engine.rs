@@ -5,7 +5,10 @@ use ontol_runtime::{
     interface::serde::processor::ProcessorMode,
     ontology::{config::data_store_backed_domains, map::Extern, Ontology},
     property::ValueCardinality,
-    query::select::{EntitySelect, Select, StructOrUnionSelect},
+    query::{
+        condition::Condition,
+        select::{EntitySelect, Select, StructOrUnionSelect},
+    },
     resolve_path::{ProbeDirection, ProbeFilter, ProbeOptions, ResolvePath, ResolverGraph},
     sequence::Sequence,
     value::Value,
@@ -452,6 +455,8 @@ impl DomainEngine {
 
         debug!("match filter:\n{:#?}", entity_select.filter);
 
+        let mut static_conditions: Vec<Condition> = vec![];
+
         match &entity_select.source {
             StructOrUnionSelect::Struct(struct_select) => {
                 let inner_entity_def_id = entity_select
@@ -487,10 +492,27 @@ impl DomainEngine {
 
                 // Transform select
                 for map_key in resolve_path.iter() {
+                    if !static_conditions.is_empty() {
+                        todo!("translate static conditions");
+                    }
+
+                    if let Some(static_condition) = self.ontology.get_static_condition(&map_key) {
+                        static_conditions.push(static_condition.clone());
+                    }
+
                     translate_entity_select(&mut entity_select, &map_key, &self.ontology);
                 }
             }
             _ => todo!("Basically apply the same operation as above, but refactor"),
+        }
+
+        for static_condition in static_conditions {
+            debug!(
+                "merge {static_condition} INTO: {}",
+                entity_select.filter.condition()
+            );
+
+            entity_select.filter.condition_mut().merge(static_condition);
         }
 
         let data_store::Response::Query(edge_seq) = data_store

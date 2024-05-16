@@ -108,20 +108,18 @@ impl<'c, 'm> ConditionBuilder<'c, 'm> {
                             ),
                         );
 
-                        match leaf {
-                            LeafDiscriminant::IsTextLiteral(constant) => {
-                                self.output.add_clause(
-                                    variant_var,
-                                    Clause::Member(
-                                        CondTerm::Wildcard,
-                                        CondTerm::Value(Value::Text(
-                                            self.compiler.strings[*constant].into(),
-                                            self.compiler.primitives.text,
-                                        )),
-                                    ),
-                                );
-                            }
-                            _ => {}
+                        if let LeafDiscriminant::IsTextLiteral(constant) = leaf {
+                            self.output.add_clause(
+                                variant_var,
+                                Clause::Member(
+                                    CondTerm::Wildcard,
+                                    CondTerm::Value(Value::Text(
+                                        self.compiler.strings[*constant].into(),
+                                        self.compiler.primitives.text,
+                                    )),
+                                ),
+                            );
+                        } else {
                         }
                     }
                     _ => todo!(),
