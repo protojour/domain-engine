@@ -119,7 +119,7 @@ pub enum Clause<V, Term> {
     /// The left variable is connected via a property to the right variable.
     /// The right variable represents a set of values for the property.
     MatchProp(PropertyId, SetOperator, V),
-    /// An element in the set defined by the variable
+    /// An attribute (rel, val) is a member of the set
     Member(Term, Term),
 }
 

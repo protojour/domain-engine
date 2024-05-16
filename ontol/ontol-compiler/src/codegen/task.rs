@@ -9,13 +9,16 @@ use ontol_runtime::{
         map::{MapLossiness, PropertyFlow},
         ontol::TextConstant,
     },
+    query::condition::Condition,
     vm::proc::{Address, Lib, NParams, OpCode, Procedure},
     DefId, MapDef, MapFlags, MapKey, PackageId,
 };
 use tracing::{debug, debug_span, warn};
 
 use crate::{
-    codegen::code_generator::map_codegen,
+    codegen::{
+        code_generator::map_codegen, static_condition::generate_static_condition_from_scope,
+    },
     def::{DefKind, Defs},
     hir_unify::unify_to_function,
     map::UndirectedMapKey,
@@ -43,6 +46,7 @@ pub struct CodegenTasks<'m> {
     pub result_map_proc_table: FnvHashMap<MapKey, Procedure>,
     pub result_named_forward_maps: FnvHashMap<(PackageId, TextConstant), MapKey>,
     pub result_propflow_table: FnvHashMap<MapKey, Vec<PropertyFlow>>,
+    pub result_static_conditions: FnvHashMap<MapKey, Condition>,
     pub result_metadata_table: FnvHashMap<MapKey, MapOutputMeta>,
 }
 
@@ -183,6 +187,7 @@ pub(super) struct ProcTable {
     pub procedure_calls: Vec<ProcedureCall>,
     pub propflow_table: FnvHashMap<MapKey, Vec<PropertyFlow>>,
     pub metadata_table: FnvHashMap<MapKey, MapOutputMeta>,
+    pub static_conditions: FnvHashMap<MapKey, Condition>,
     pub named_forward_maps: FnvHashMap<(PackageId, TextConstant), MapKey>,
 }
 
@@ -251,6 +256,7 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
     compiler.codegen_tasks.result_const_procs = const_procs;
     compiler.codegen_tasks.result_map_proc_table = map_proc_table;
     compiler.codegen_tasks.result_named_forward_maps = proc_table.named_forward_maps;
+    compiler.codegen_tasks.result_static_conditions = proc_table.static_conditions;
     compiler.codegen_tasks.result_propflow_table = proc_table.propflow_table;
     compiler.codegen_tasks.result_metadata_table = proc_table.metadata_table;
 }
@@ -360,6 +366,21 @@ fn generate_ontol_map_procs<'m>(
             proc_table,
             compiler,
         );
+    }
+
+    if let Some(key) = key {
+        let needs_static_condition = scope
+            .arena()
+            .iter_data()
+            .any(|hir_data| matches!(hir_data.hir(), ontol_hir::Kind::Narrow(_)));
+
+        if needs_static_condition {
+            let _entered = debug_span!("cond").entered();
+
+            let condition = generate_static_condition_from_scope(scope, &compiler);
+
+            proc_table.static_conditions.insert(key, condition);
+        }
     }
 
     key

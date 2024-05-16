@@ -17,6 +17,7 @@ use crate::{
         },
         DomainInterface,
     },
+    query::condition::Condition,
     vm::{
         ontol_vm::OntolVm,
         proc::{Lib, Procedure},
@@ -50,6 +51,7 @@ pub struct Ontology {
 pub struct Data {
     pub(crate) const_proc_table: FnvHashMap<DefId, Procedure>,
     pub(crate) map_meta_table: FnvHashMap<MapKey, MapMeta>,
+    pub(crate) static_conditions: FnvHashMap<MapKey, Condition>,
     pub(crate) named_forward_maps: FnvHashMap<(PackageId, TextConstant), MapKey>,
     pub(crate) text_like_types: FnvHashMap<DefId, TextLikeType>,
     pub(crate) text_patterns: FnvHashMap<DefId, TextPattern>,

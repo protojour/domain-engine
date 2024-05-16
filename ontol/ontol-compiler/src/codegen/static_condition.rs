@@ -1,0 +1,138 @@
+use ontol_hir::{Kind, Node, PropVariant};
+use ontol_runtime::{
+    interface::discriminator::{Discriminant, LeafDiscriminant},
+    property::PropertyId,
+    query::condition::{Clause, CondTerm, Condition, SetOperator},
+    value::Value,
+    var::Var,
+};
+use tracing::debug;
+
+use crate::{
+    typed_hir::{TypedArena, TypedRootNode},
+    Compiler,
+};
+
+pub fn generate_static_condition_from_scope<'m>(
+    scope_node: &TypedRootNode<'m>,
+    compiler: &Compiler<'m>,
+) -> Condition {
+    let mut builder = ConditionBuilder {
+        arena: scope_node.arena(),
+        output: Condition::default(),
+        compiler,
+    };
+
+    let term = builder.term(scope_node.node(), None);
+
+    if let CondTerm::Variable(root_var) = term {
+        builder.output.add_clause(root_var, Clause::Root);
+    }
+
+    builder.output
+}
+
+struct ConditionBuilder<'c, 'm> {
+    arena: &'c TypedArena<'m>,
+    output: Condition,
+    compiler: &'c Compiler<'m>,
+}
+
+impl<'c, 'm> ConditionBuilder<'c, 'm> {
+    fn term(&mut self, node: Node, parent_var: Option<Var>) -> CondTerm {
+        match self.arena[node].hir() {
+            Kind::Struct(_, _, nodes) => {
+                let var = self.output.mk_cond_var();
+                for node in nodes {
+                    self.term(*node, Some(var));
+                }
+                CondTerm::Variable(var)
+            }
+            Kind::Prop(_, _, prop_id, variant) => match variant {
+                PropVariant::Predicate(..) => CondTerm::Wildcard,
+                PropVariant::Value(attr) => {
+                    let Some(parent_var) = parent_var else {
+                        return CondTerm::Wildcard;
+                    };
+                    let prop_var = self.output.mk_cond_var();
+
+                    let rel = self.term(attr.rel, Some(prop_var));
+                    let val = self.term(attr.val, Some(prop_var));
+
+                    if !matches!(rel, CondTerm::Wildcard) || !matches!(val, CondTerm::Wildcard) {
+                        self.output.add_clause(
+                            parent_var,
+                            Clause::MatchProp(*prop_id, SetOperator::ElementIn, prop_var),
+                        );
+
+                        self.output.add_clause(prop_var, Clause::Member(rel, val));
+                    }
+
+                    CondTerm::Wildcard
+                }
+            },
+            Kind::Narrow(inner) => {
+                let Some(pre_narrowed_def_id) = self.arena[node].ty().get_single_def_id() else {
+                    return CondTerm::Wildcard;
+                };
+                let Some(narrowed_def_id) = self.arena[*inner].ty().get_single_def_id() else {
+                    return CondTerm::Wildcard;
+                };
+
+                let narrow_var = self.output.mk_cond_var();
+
+                debug!("narrow {pre_narrowed_def_id:?} to {narrowed_def_id:?}");
+
+                let discr = self
+                    .compiler
+                    .relations
+                    .union_discriminators
+                    .get(&pre_narrowed_def_id)
+                    .expect("narrowing must be union-based");
+                let variant = discr
+                    .variants
+                    .iter()
+                    .find(|variant| variant.def_id() == narrowed_def_id)
+                    .expect("union variant not found");
+
+                match &variant.discriminant {
+                    Discriminant::HasAttribute(relationship_id, _, leaf) => {
+                        let variant_var = self.output.mk_cond_var();
+
+                        self.output.add_clause(
+                            narrow_var,
+                            Clause::MatchProp(
+                                PropertyId::subject(*relationship_id),
+                                SetOperator::ElementIn,
+                                variant_var,
+                            ),
+                        );
+
+                        match leaf {
+                            LeafDiscriminant::IsTextLiteral(constant) => {
+                                self.output.add_clause(
+                                    variant_var,
+                                    Clause::Member(
+                                        CondTerm::Wildcard,
+                                        CondTerm::Value(Value::Text(
+                                            self.compiler.strings[*constant].into(),
+                                            self.compiler.primitives.text,
+                                        )),
+                                    ),
+                                );
+                            }
+                            _ => {}
+                        }
+                    }
+                    _ => todo!(),
+                }
+
+                self.term(*inner, Some(narrow_var));
+
+                CondTerm::Variable(narrow_var)
+            }
+            // TODO: Maybe support more variations
+            _ => CondTerm::Wildcard,
+        }
+    }
+}

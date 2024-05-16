@@ -6,6 +6,7 @@ use crate::{
         serde::operator::{SerdeOperator, SerdeOperatorAddr},
         DomainInterface,
     },
+    query::condition::Condition,
     vm::proc::{Lib, Procedure},
     DefId, MapKey, PackageId, RelationshipId,
 };
@@ -89,6 +90,11 @@ impl OntologyBuilder {
         self
     }
 
+    pub fn static_conditions(mut self, static_conditions: FnvHashMap<MapKey, Condition>) -> Self {
+        self.data().static_conditions = static_conditions;
+        self
+    }
+
     pub fn named_forward_maps(
         mut self,
         named_forward_maps: FnvHashMap<(PackageId, TextConstant), MapKey>,
@@ -151,6 +157,7 @@ pub(super) fn new_builder() -> OntologyBuilder {
                 text_constants: vec![],
                 const_proc_table: Default::default(),
                 map_meta_table: Default::default(),
+                static_conditions: Default::default(),
                 named_forward_maps: Default::default(),
                 text_like_types: Default::default(),
                 text_patterns: Default::default(),

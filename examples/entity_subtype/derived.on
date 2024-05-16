@@ -6,6 +6,10 @@ def bar (
 )
 
 map (
+    bar (
+        'id': id,
+        'name': name,
+    ),
     db.foo (
         'id': id,
         db.anonymous: db.bar(
@@ -13,10 +17,6 @@ map (
             'name': name,
         )
     ),
-    bar (
-        'id': id,
-        'name': name,
-    )
 )
 
 map bars (

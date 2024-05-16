@@ -472,6 +472,7 @@ impl<'m> Compiler<'m> {
             .docs(docs)
             .const_procs(self.codegen_tasks.result_const_procs)
             .map_meta_table(map_meta_table)
+            .static_conditions(self.codegen_tasks.result_static_conditions)
             .named_forward_maps(self.codegen_tasks.result_named_forward_maps)
             .serde_operators(serde_operators)
             .dynamic_sequence_operator_addr(dynamic_sequence_operator_addr)

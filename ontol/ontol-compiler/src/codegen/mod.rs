@@ -8,6 +8,7 @@ mod ir;
 mod link;
 mod optimize;
 mod proc_builder;
+mod static_condition;
 mod union_map_generator;
 
 #[cfg(test)]
