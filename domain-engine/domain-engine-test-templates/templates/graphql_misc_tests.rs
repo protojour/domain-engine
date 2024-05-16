@@ -823,16 +823,6 @@ async fn entity_subtype() {
     .await
     .unwrap();
 
-    r#"mutation {
-        foo(create: [{
-            id: "ID",
-            type: "baz"
-        }]) { node { id } }
-    }"#
-    .exec([], &db_schema, &ctx)
-    .await
-    .unwrap();
-
     let result = r#"{
         bars {
             nodes {

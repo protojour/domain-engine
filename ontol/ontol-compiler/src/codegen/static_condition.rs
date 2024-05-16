@@ -10,17 +10,18 @@ use tracing::debug;
 
 use crate::{
     typed_hir::{TypedArena, TypedRootNode},
-    Compiler,
+    CompileError, CompileErrors, Compiler,
 };
 
 pub fn generate_static_condition_from_scope<'m>(
     scope_node: &TypedRootNode<'m>,
-    compiler: &Compiler<'m>,
+    compiler: &mut Compiler<'m>,
 ) -> Condition {
     let mut builder = ConditionBuilder {
         arena: scope_node.arena(),
         output: Condition::default(),
         compiler,
+        errors: CompileErrors::default(),
     };
 
     let term = builder.term(scope_node.node(), None);
@@ -29,13 +30,16 @@ pub fn generate_static_condition_from_scope<'m>(
         builder.output.add_clause(root_var, Clause::Root);
     }
 
-    builder.output
+    let output = builder.output;
+    compiler.errors.extend(builder.errors);
+    output
 }
 
 struct ConditionBuilder<'c, 'm> {
     arena: &'c TypedArena<'m>,
     output: Condition,
     compiler: &'c Compiler<'m>,
+    errors: CompileErrors,
 }
 
 impl<'c, 'm> ConditionBuilder<'c, 'm> {
@@ -120,9 +124,18 @@ impl<'c, 'm> ConditionBuilder<'c, 'm> {
                                 ),
                             );
                         } else {
+                            self.errors.push(
+                                CompileError::BUG("static condition: unhandled leaf discriminant for has-attribute")
+                                    .spanned(&self.arena[node].span()),
+                            );
                         }
                     }
-                    _ => todo!(),
+                    _ => {
+                        self.errors.push(
+                            CompileError::BUG("static condition: unhandled discriminant")
+                                .spanned(&self.arena[node].span()),
+                        );
+                    }
                 }
 
                 self.term(*inner, Some(narrow_var));
