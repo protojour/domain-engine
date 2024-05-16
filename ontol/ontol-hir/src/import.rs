@@ -36,7 +36,9 @@ impl<'i, 'o, 'a, L: Lang> Importer<'i, 'o, 'a, L> {
             }
             Block(body) => Block(self.import_nodes(body)),
             Catch(label, body) => Catch(*label, self.import_nodes(body)),
+            CatchFunc(label, body) => CatchFunc(*label, self.import_nodes(body)),
             Try(label, var) => Try(*label, *var),
+            TryNarrow(label, var) => TryNarrow(*label, *var),
             Let(binder, node) => Let(binder.clone(), self.import(*node)),
             TryLet(label, binder, node) => TryLet(*label, binder.clone(), self.import(*node)),
             LetProp(binding, (var, prop_id)) => LetProp(binding.clone(), (*var, *prop_id)),

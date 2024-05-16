@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
 use ontol_hir::{
     arena::NodeRef, find_value_node, import::arena_import, Binder, Binding, EvalCondTerm, Kind,
-    Node, Nodes, PropFlags, PropVariant, SetEntry, StructFlags,
+    Label, Node, Nodes, PropFlags, PropVariant, SetEntry, StructFlags,
 };
 use ontol_runtime::{
     property::PropertyId,
@@ -55,6 +55,7 @@ pub struct SsaUnifier<'c, 'm> {
     pub(super) expr_arena: &'c ontol_hir::arena::Arena<'m, TypedHir>,
     pub(super) out_arena: ontol_hir::arena::Arena<'m, TypedHir>,
     pub(super) map_flags: MapFlags,
+    pub(super) root_try_label: Option<Label>,
 
     pub(super) all_scope_vars_and_labels: VarSet,
     pub(super) iter_extended_scope_table:
@@ -82,6 +83,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             expr_arena,
             out_arena: Default::default(),
             map_flags,
+            root_try_label: None,
             all_scope_vars_and_labels: Default::default(),
             iter_extended_scope_table: Default::default(),
             scope_tracker: Default::default(),
@@ -133,7 +135,15 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             )?);
         }
 
-        self.write_node(block, Kind::Block(block_body), *expr.meta());
+        self.write_node(
+            block,
+            if let Some(root_try_label) = self.root_try_label {
+                Kind::CatchFunc(root_try_label, block_body)
+            } else {
+                Kind::Block(block_body)
+            },
+            *expr.meta(),
+        );
 
         Ok(UnifiedNode {
             typed_binder: match scope_binding {
@@ -991,6 +1001,15 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
 
     pub(super) fn alloc_var(&mut self) -> Var {
         self.var_allocator.alloc()
+    }
+
+    pub(super) fn mk_root_try_label(&mut self) -> Label {
+        if let Some(root_try_label) = self.root_try_label {
+            root_try_label
+        } else {
+            self.root_try_label = Some(Label(self.var_allocator.alloc().0));
+            self.root_try_label.unwrap()
+        }
     }
 
     #[inline]

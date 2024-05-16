@@ -145,7 +145,7 @@ fn inc_opt_struct_level(level: Option<u16>) -> u16 {
     level.map(|level| level + 1).unwrap_or(0)
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum Scoped {
     Yes,
     MaybeVoid,

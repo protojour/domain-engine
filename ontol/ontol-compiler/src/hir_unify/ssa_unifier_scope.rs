@@ -7,7 +7,7 @@ use ontol_runtime::{
 };
 use smallvec::smallvec;
 use thin_vec::thin_vec;
-use tracing::trace;
+use tracing::{debug, trace};
 
 use crate::{
     hir_unify::{ssa_util::scan_all_vars_and_labels, UnifierError},
@@ -86,21 +86,28 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         let scoped_lets = self.process_let_graph(scoped_lets)?;
 
         for (let_node, span) in scoped_lets {
-            let kind = match let_node {
-                Let::Prop(attr, var_prop) => Kind::LetProp(attr, var_prop),
+            let (kind, ty) = match let_node {
+                Let::Prop(attr, var_prop) => (Kind::LetProp(attr, var_prop), &UNIT_TYPE),
                 Let::PropDefault(attr, var_prop, default) => {
-                    Kind::LetPropDefault(attr, var_prop, default)
+                    (Kind::LetPropDefault(attr, var_prop, default), &UNIT_TYPE)
                 }
-                Let::Regex(groups_list, def, var) => Kind::LetRegex(groups_list, def, var),
-                Let::RegexIter(binder, groups_list, def, var) => {
-                    Kind::LetRegexIter(binder, groups_list, def, var)
+                Let::Narrow(typed_var) => (
+                    Kind::TryNarrow(self.mk_root_try_label(), *typed_var.hir()),
+                    typed_var.ty(),
+                ),
+                Let::Regex(groups_list, def, var) => {
+                    (Kind::LetRegex(groups_list, def, var), &UNIT_TYPE)
                 }
-                Let::Expr(binder, node) => Kind::Let(binder, node),
+                Let::RegexIter(binder, groups_list, def, var) => (
+                    Kind::LetRegexIter(binder, groups_list, def, var),
+                    &UNIT_TYPE,
+                ),
+                Let::Expr(binder, node) => (Kind::Let(binder, node), &UNIT_TYPE),
                 Let::Complex(ComplexExpr { .. }) => {
                     continue;
                 }
             };
-            body.push(self.mk_node(kind, Meta::new(&UNIT_TYPE, span)));
+            body.push(self.mk_node(kind, Meta::new(ty, span)));
         }
 
         Ok(binding)
@@ -220,7 +227,9 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     *node_ref.meta(),
                 )))
             }
-            Kind::Block(block_body) | Kind::Catch(_, block_body) => {
+            Kind::Block(block_body)
+            | Kind::Catch(_, block_body)
+            | Kind::CatchFunc(_, block_body) => {
                 if let Some(last) = block_body.last() {
                     self.traverse(*last, scoped, lets)
                 } else {
@@ -233,7 +242,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             Kind::Text(_) => Ok(Binding::Wildcard),
             Kind::Const(_) => Ok(Binding::Wildcard),
             Kind::Call(_, nodes) => {
-                let var = self.var_allocator.alloc();
+                let var = self.alloc_var();
                 let free_vars = scan_all_vars_and_labels(self.scope_arena, nodes.iter().cloned());
                 self.push_let(
                     Let::Complex(ComplexExpr {
@@ -250,7 +259,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     *node_ref.meta(),
                 )))
             }
-            Kind::Map(inner) | Kind::Narrow(inner) => match self.traverse(*inner, scoped, lets)? {
+            Kind::Map(inner) => match self.traverse(*inner, scoped, lets)? {
                 Binding::Wildcard => Ok(Binding::Wildcard),
                 Binding::Binder(binder) => Ok(Binding::Binder(TypedHirData(
                     *binder.hir(),
@@ -258,6 +267,34 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     *node_ref.meta(),
                 ))),
             },
+            Kind::Narrow(inner) => {
+                let mut sub_lets = vec![];
+
+                let binding = match self.traverse(*inner, scoped, &mut sub_lets)? {
+                    Binding::Wildcard => Ok(Binding::Wildcard),
+                    Binding::Binder(inner_binder) => {
+                        let inner_meta = self.scope_arena[*inner].meta();
+
+                        debug!(
+                            "narrow {:?} to {:?}: scoped: {scoped:?}",
+                            node_ref.meta().ty,
+                            inner_meta.ty,
+                        );
+
+                        self.push_let(
+                            Let::Narrow(TypedHirData(inner_binder.hir().var, *inner_meta)),
+                            node_ref.span(),
+                            Scoped::Yes,
+                            lets,
+                        );
+
+                        Ok(Binding::Binder(inner_binder))
+                    }
+                };
+
+                lets.extend(sub_lets);
+                binding
+            }
             Kind::Set(entries) => {
                 if entries.len() == 1 {
                     let SetEntry(iter, Attribute { rel, val }) = entries.first().unwrap();
@@ -462,6 +499,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             | Kind::LetPropDefault(..)
             | Kind::TryLetProp(..)
             | Kind::TryLetTup(..)
+            | Kind::TryNarrow(..)
             | Kind::LetRegex(..)
             | Kind::LetRegexIter(..)
             | Kind::LetCondVar(..) => {

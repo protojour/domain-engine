@@ -167,6 +167,7 @@ impl_ontol_debug!(BuiltinProc);
 #[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize, OntolDebug)]
 pub enum Predicate {
     MatchesDiscriminant(Local, DefId),
+    NotMatchesDiscriminant(Local, DefId),
     IsVoid(Local),
     IsNotVoid(Local),
 }

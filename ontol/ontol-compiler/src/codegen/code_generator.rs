@@ -100,7 +100,7 @@ pub(super) fn map_codegen<'m>(
 
     let return_ty = body.data().ty();
 
-    let mut builder = ProcBuilder::new(NParams(0));
+    let mut builder = ProcBuilder::new(NParams(1));
     let mut root_block = builder.new_block(Delta(1), body_span);
     let mut generator = CodeGenerator {
         proc_table,
@@ -203,6 +203,27 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
                 self.catch_points.remove(label);
             }
+            ontol_hir::Kind::CatchFunc(label, body) => {
+                {
+                    let (_label, mut pre) = self.builder.split_block(block);
+                    self.catch_points.insert(*label, block.label());
+
+                    for node_ref in arena.node_refs(body) {
+                        self.gen_node(node_ref, &mut pre);
+                    }
+
+                    pre.commit(Terminator::Return, self.builder);
+                }
+
+                block.op(
+                    OpCode::CallBuiltin(BuiltinProc::NewVoid, DefId::unit()),
+                    Delta(1),
+                    span,
+                    self.builder,
+                );
+
+                self.catch_points.remove(label);
+            }
             ontol_hir::Kind::Try(catch_label, var) => {
                 let catch = self.catch_dest(*catch_label, &span);
                 let Ok(local) = self.var_local(*var, &span) else {
@@ -211,6 +232,19 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
                 block.ir(
                     Ir::Cond(Predicate::IsVoid(local), catch),
+                    Delta(0),
+                    span,
+                    self.builder,
+                );
+            }
+            ontol_hir::Kind::TryNarrow(catch_label, var) => {
+                let catch = self.catch_dest(*catch_label, &span);
+                let Ok(local) = self.var_local(*var, &span) else {
+                    return;
+                };
+                let def_id = ty.get_single_def_id().unwrap();
+                block.ir(
+                    Ir::Cond(Predicate::NotMatchesDiscriminant(local, def_id), catch),
                     Delta(0),
                     span,
                     self.builder,
@@ -375,6 +409,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     );
                 }
             }
+
             ontol_hir::Kind::LetRegex(groups_list, regex_def_id, haystack_var) => {
                 if groups_list.is_empty() {
                     return;

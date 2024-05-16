@@ -1,0 +1,25 @@
+use 'db' as db
+
+def bar (
+    rel .'id'|id: (rel .is: text)
+    rel .'name': text
+)
+
+map (
+    db.foo (
+        'id': id,
+        db.anonymous: db.bar(
+            'type': 'bar',
+            'name': name,
+        )
+    ),
+    bar (
+        'id': id,
+        'name': name,
+    )
+)
+
+map bars (
+    (),
+    bar { ..@match db.foo() }
+)

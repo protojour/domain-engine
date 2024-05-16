@@ -91,3 +91,17 @@ pub const MUNICIPALITIES: Example = (
 pub const SI: Example = (src_name("SI"), include_str!("../../../examples/SI.on"));
 
 pub const WGS: Example = (src_name("wgs"), include_str!("../../../examples/wgs.on"));
+
+pub mod entity_subtype {
+    use super::*;
+
+    pub const DB: Example = (
+        src_name("db"),
+        include_str!("../../../examples/entity_subtype/db.on"),
+    );
+
+    pub const DERIVED: Example = (
+        src_name("derived"),
+        include_str!("../../../examples/entity_subtype/derived.on"),
+    );
+}

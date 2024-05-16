@@ -62,7 +62,7 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                     self.visit_node(index, node)
                 }
             }
-            Kind::Catch(label, nodes) => {
+            Kind::Catch(label, nodes) | Kind::CatchFunc(label, nodes) => {
                 self.visit_label(*label);
                 for (index, node) in arena.node_refs(nodes).enumerate() {
                     self.visit_node(index, node)
@@ -106,6 +106,10 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                 }
                 self.visit_node(0, arena.node_ref(*node));
             }
+            Kind::TryNarrow(try_label, var) => {
+                self.visit_label(*try_label);
+                self.visit_var(*var);
+            }
             Kind::LetRegex(groups_list, _regex_def_id, var) => {
                 for capture_groups in groups_list.iter() {
                     for capture_group in capture_groups.iter() {
@@ -129,7 +133,10 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                     self.visit_node(index, arg);
                 }
             }
-            Kind::Map(arg) | Kind::Narrow(arg) => {
+            Kind::Map(arg) => {
+                self.visit_node(0, arena.node_ref(*arg));
+            }
+            Kind::Narrow(arg) => {
                 self.visit_node(0, arena.node_ref(*arg));
             }
             Kind::With(binder, def, body) => {

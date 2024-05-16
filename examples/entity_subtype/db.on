@@ -1,0 +1,17 @@
+def anonymous ()
+
+def foo (
+    rel .'id'|id: (rel .is: text)
+    rel .anonymous: (
+        rel .is?: bar
+        rel .is?: baz
+    )
+)
+
+def bar (
+    rel .'type': 'bar'
+    rel .'name': text
+)
+def baz (
+    rel .'type': 'baz'
+)

@@ -25,6 +25,7 @@ pub enum Let<'m> {
         (Var, PropertyId),
         Attribute<Node>,
     ),
+    Narrow(TypedHirData<'m, Var>),
     Regex(ThinVec<ThinVec<CaptureGroup<'m, TypedHir>>>, DefId, Var),
     RegexIter(
         TypedHirData<'m, Binder>,
@@ -59,6 +60,7 @@ impl<'m> Let<'m> {
                 }
                 var_set
             }
+            Self::Narrow(_) => VarSet::default(),
             Self::RegexIter(binder, ..) => VarSet::from_iter([binder.hir().var]),
             Self::Expr(binder, _) => VarSet::from_iter([binder.hir().var]),
             Self::Complex(ComplexExpr { dependency, .. }) => {
@@ -72,6 +74,7 @@ impl<'m> Let<'m> {
             Self::Prop(_, (var, _)) | Self::PropDefault(_, (var, _), _) => {
                 VarSet::from_iter([*var])
             }
+            Self::Narrow(input) => VarSet::from_iter([input.0]),
             Self::Regex(.., var) => VarSet::from_iter([*var]),
             Self::RegexIter(.., var) => VarSet::from_iter([*var]),
             Self::Expr(..) => VarSet::default(),

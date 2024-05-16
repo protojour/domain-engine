@@ -106,7 +106,9 @@ where
         match node_ref.kind() {
             ontol_hir::Kind::NoOp => VarSet::default(),
             ontol_hir::Kind::Var(var) => VarSet::from([*var]),
-            ontol_hir::Kind::Block(body) | ontol_hir::Kind::Catch(_, body) => {
+            ontol_hir::Kind::Block(body)
+            | ontol_hir::Kind::Catch(_, body)
+            | ontol_hir::Kind::CatchFunc(_, body) => {
                 let mut var_set = VarSet::default();
                 for child in arena.node_refs(body) {
                     var_set.union_with(&self.analyze_node(child, parent_prop));
@@ -285,7 +287,8 @@ where
             | ontol_hir::Kind::PushCondClauses(..)
             | ontol_hir::Kind::MoveRestAttrs(..)
             | ontol_hir::Kind::CopySubSeq(..)
-            | ontol_hir::Kind::LetCondVar(..) => VarSet::default(),
+            | ontol_hir::Kind::LetCondVar(..)
+            | ontol_hir::Kind::TryNarrow(..) => VarSet::default(),
         }
     }
 

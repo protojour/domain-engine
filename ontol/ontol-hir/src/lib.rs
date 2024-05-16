@@ -123,12 +123,18 @@ pub enum Kind<'a, L: Lang> {
     /// Block - a sequence of nodes where the last node is the value.
     /// Blocks support local variable scope.
     Block(Nodes),
-    /// Try block
+    /// Catch block
     /// Statements within may refer to the try label to immediately exit the try block
     /// with a #void value
     Catch(Label, Nodes),
+    /// Catch entire function - function will return within the block.
+    /// Statements within may refer to the try label to immediately exit the try block
+    /// with a #void value
+    CatchFunc(Label, Nodes),
     /// Try a variable. Exists labelled try block if #void.
     Try(Label, Var),
+    /// Try a variable type narrowing. Exists labelled try block if unsuccessful.
+    TryNarrow(Label, Var),
     /// Bind expression to a variable.
     Let(L::Data<'a, Binder>, Node),
     /// Tries to bind expression to a variable. Exits labelled try block if #void.
@@ -145,6 +151,7 @@ pub enum Kind<'a, L: Lang> {
     TryLetProp(Label, Attribute<Binding<'a, L>>, (Var, PropertyId)),
     /// Unpack a tuple-like sequence to bind each element to a variable
     TryLetTup(Label, ThinVec<Binding<'a, L>>, Node),
+    /// Narrowing with exit point
     LetRegex(ThinVec<ThinVec<CaptureGroup<'a, L>>>, DefId, Var),
     LetRegexIter(
         L::Data<'a, Binder>,
@@ -169,7 +176,9 @@ pub enum Kind<'a, L: Lang> {
     Call(BuiltinProc, Nodes),
     /// A map call
     Map(Node),
-    /// Narrowing of a type, e.g. selecting a specific union variant.
+    /// Narrowing of the type of an expression, e.g. selecting a specific union variant.
+    /// The variable represents the not-yet-narrowed value.
+    /// The expression (node) represents something which is evaluated on the narrowed value.
     Narrow(Node),
     /// A set-builder of set entries
     Set(SmallVec<[SetEntry<'a, L>; 1]>),
@@ -273,7 +282,7 @@ pub fn find_value_node<'h, 'a, L: Lang>(
     node_ref: NodeRef<'h, 'a, L>,
 ) -> Option<NodeRef<'h, 'a, L>> {
     match L::as_hir(&node_ref) {
-        Kind::Block(nodes) | Kind::Catch(_, nodes) => {
+        Kind::Block(nodes) | Kind::Catch(_, nodes) | Kind::CatchFunc(_, nodes) => {
             let last = nodes.last()?;
             find_value_node(node_ref.arena().node_ref(*last))
         }

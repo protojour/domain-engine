@@ -262,6 +262,10 @@ impl<'o> Processor for OntolProcessor<'o> {
         match predicate {
             Predicate::IsVoid(local) => Ok(matches!(self.local(*local), Value::Void(_))),
             Predicate::IsNotVoid(local) => Ok(!matches!(self.local(*local), Value::Void(_))),
+            Predicate::NotMatchesDiscriminant(local, def_id) => {
+                let value = self.local(*local);
+                Ok(value.type_def_id() != *def_id)
+            }
             Predicate::MatchesDiscriminant(local, def_id) => {
                 let value = self.local(*local);
                 Ok(value.type_def_id() == *def_id)

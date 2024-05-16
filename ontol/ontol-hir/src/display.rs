@@ -84,8 +84,18 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
                 self.print_rparen(f, multi)?;
                 Ok(Multiline(true))
             }
+            Kind::CatchFunc(label, nodes) => {
+                write!(f, "{indent}(catch-func ({label})")?;
+                let multi = self.print_all(f, Sep::Space, self.kinds(nodes))?;
+                self.print_rparen(f, multi)?;
+                Ok(Multiline(true))
+            }
             Kind::Try(label, var) => {
                 write!(f, "{indent}(try? {label} {var})")?;
+                Ok(Multiline(false))
+            }
+            Kind::TryNarrow(try_label, var) => {
+                write!(f, "{indent}(try-narrow? {try_label} {var})")?;
                 Ok(Multiline(false))
             }
             Kind::Let(binder, node) => {
@@ -94,10 +104,10 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
                 self.print_rparen(f, multi)?;
                 Ok(multi)
             }
-            Kind::TryLet(label, binder, node) => {
+            Kind::TryLet(try_label, binder, node) => {
                 write!(
                     f,
-                    "{indent}(let? {label} {binder}",
+                    "{indent}(let? {try_label} {binder}",
                     binder = L::as_hir(binder).var
                 )?;
                 let multi = self.print(f, Sep::Space, self.kind(*node))?;

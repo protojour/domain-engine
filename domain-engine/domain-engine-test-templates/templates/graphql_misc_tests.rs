@@ -16,6 +16,7 @@ use domain_engine_test_utils::{
 use ontol_runtime::ontology::{config::DataStoreConfig, Ontology};
 use ontol_test_utils::{
     examples::{
+        entity_subtype,
         stix::{stix_bundle, STIX},
         GITMESH, GUITAR_SYNTH_UNION,
     },
@@ -795,4 +796,35 @@ async fn test_gitmesh_ownership_transfer() {
             }
         })),
     );
+}
+
+#[test(tokio::test)]
+async fn entity_subtype() {
+    let (test, [derived_schema, db_schema]) =
+        TestPackages::with_static_sources([entity_subtype::DERIVED, entity_subtype::DB])
+            .with_data_store(entity_subtype::DB.0, DataStoreConfig::Default)
+            .compile_schemas([entity_subtype::DERIVED.0, entity_subtype::DB.0]);
+    let ctx: ServiceCtx = make_domain_engine(test.ontology_owned()).await.into();
+
+    r#"mutation {
+        foo(create: [{
+            id: "ID",
+            type: "baz"
+        }]) { node { id } }
+    }"#
+    .exec([], &db_schema, &ctx)
+    .await
+    .unwrap();
+
+    r#"{
+        bars {
+            nodes {
+                id
+                name
+            }
+        }
+    }"#
+    .exec([], &derived_schema, &ctx)
+    .await
+    .unwrap();
 }
