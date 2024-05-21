@@ -4,6 +4,7 @@ use ontol_parser::{cst::tree::SyntaxTree, U32Span};
 use ontol_runtime::DefId;
 
 use crate::{
+    lower_ontol_syntax,
     package::{extract_ontol_dependentices, PackageReference},
     Compiler, Src,
 };
@@ -29,6 +30,6 @@ impl<S: Borrow<String> + UnwindSafe> OntolSyntax for OntolTreeSyntax<S> {
     }
 
     fn lower(&self, src: Src, compiler: &mut Compiler) -> Vec<DefId> {
-        compiler.lower_ontol_syntax(self.tree.view(self.source_text.borrow()), src)
+        lower_ontol_syntax(self.tree.view(self.source_text.borrow()), src, compiler)
     }
 }
