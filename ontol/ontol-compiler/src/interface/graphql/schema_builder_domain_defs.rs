@@ -41,7 +41,7 @@ use crate::{
     repr::repr_model::{ReprKind, ReprScalarKind},
 };
 
-use super::{builder::*, graphql_namespace::GraphqlNamespace};
+use super::{graphql_namespace::GraphqlNamespace, schema_builder::*};
 
 impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
     pub fn make_def_type(&mut self, def_id: DefId, level: QLevel) -> NewType {

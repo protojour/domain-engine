@@ -28,8 +28,8 @@ ontol-test-utils.path = "../../ontol/ontol-test-utils"
 ontol-macros.path = "../../ontol/ontol-macros"
 domain-engine-test-utils.path = "../domain-engine-test-utils"
 tracing-subscriber.workspace = true
+uuid.workspace = true
 pretty_assertions = "1"
-uuid = "1"
 
 [build-dependencies]
 domain-engine-test-templates.path = "../domain-engine-test-templates"

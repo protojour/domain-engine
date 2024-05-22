@@ -1,5 +1,5 @@
 pub mod generate_schema;
 pub mod graphql_namespace;
 
-mod builder;
-mod builder_domain_defs;
+mod schema_builder;
+mod schema_builder_domain_defs;

@@ -17,15 +17,15 @@ use tracing::{debug_span, trace};
 
 use crate::{
     codegen::task::CodegenTasks,
-    interface::{graphql::builder::QLevel, serde::serde_generator::SerdeGenerator},
+    interface::{graphql::schema_builder::QLevel, serde::serde_generator::SerdeGenerator},
     phf_build::build_phf_map,
     primitive::Primitives,
     relation::UnionMemberCache,
 };
 
 use super::{
-    builder::SchemaBuilder,
     graphql_namespace::{DomainDisambiguation, GraphqlNamespace},
+    schema_builder::SchemaBuilder,
 };
 
 pub fn generate_graphql_schema<'c>(
