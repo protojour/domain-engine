@@ -41,8 +41,8 @@ fn test_fake_text_like_types() {
         expect_eq!(
             actual = serde_read(&foo).as_json(&foo.new_fake(ProcessorMode::Raw)),
             expected = json!({
-                "id": "042da2de-98c0-64cf-94c2-5463ca1c3fbe",
-                "created_at": "1943-07-25T19:00:15.149284864+00:00",
+                "id": "be63cfde-00db-4e4f-04e9-5224a7b8351a",
+                "created_at": "2249-06-21T19:23:34.131225284+00:00",
             }),
         );
     });
