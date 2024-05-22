@@ -1,4 +1,3 @@
-use documented::DocumentedFields;
 use fnv::FnvHashMap;
 use indoc::indoc;
 use ontol_runtime::{
@@ -16,6 +15,7 @@ use ontol_runtime::{
         Ontology,
     },
     property::PropertyId,
+    rustdoc::RustDoc,
     DefId, PackageId,
 };
 use std::{
@@ -52,15 +52,13 @@ impl<'m> Compiler<'m> {
             #[allow(clippy::single_match)]
             match self.defs.def_kind(def_id) {
                 DefKind::Primitive(kind, _ident) => {
-                    let name = kind.as_ref();
-                    if let Ok(field_docs) = PrimitiveKind::get_field_docs(name) {
-                        docs_table.insert(def_id, field_docs.into());
+                    if let Some(field_docs) = PrimitiveKind::get_field_rustdoc(kind) {
+                        docs_table.insert(def_id, field_docs.to_string());
                     }
                 }
                 DefKind::BuiltinRelType(kind, _ident) => {
-                    let name = kind.as_ref();
-                    if let Ok(field_docs) = BuiltinRelationKind::get_field_docs(name) {
-                        docs_table.insert(def_id, field_docs.into());
+                    if let Some(field_docs) = BuiltinRelationKind::get_field_rustdoc(kind) {
+                        docs_table.insert(def_id, field_docs.to_string());
                     }
                 }
                 DefKind::Type(type_def) => {
@@ -84,9 +82,8 @@ impl<'m> Compiler<'m> {
                             ),
                         );
                     } else if let Some(slt) = self.defs.string_like_types.get(&def_id) {
-                        let name = slt.as_ref();
-                        if let Ok(field_docs) = TextLikeType::get_field_docs(name) {
-                            docs_table.insert(def_id, field_docs.into());
+                        if let Some(field_docs) = TextLikeType::get_field_rustdoc(slt) {
+                            docs_table.insert(def_id, field_docs.to_string());
                         }
                     }
                 }

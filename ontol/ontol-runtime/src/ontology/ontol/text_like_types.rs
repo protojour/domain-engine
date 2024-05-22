@@ -1,12 +1,11 @@
 use ::serde::{Deserialize, Serialize};
-use documented::DocumentedFields;
-use strum::AsRefStr;
+use ontol_macros::RustDoc;
 use tracing::error;
 use uuid::Uuid;
 
 use crate::{value::Value, DefId};
 
-#[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize, DocumentedFields, AsRefStr)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize, RustDoc)]
 pub enum TextLikeType {
     /// A UUID value, e.g. `'018e0f80-7bb4-7475-ac1d-7a0ada330122'`.
     ///

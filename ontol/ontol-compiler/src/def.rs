@@ -1,7 +1,7 @@
 use std::{borrow::Cow, collections::HashMap, ops::Range};
 
-use documented::DocumentedFields;
 use fnv::FnvHashMap;
+use ontol_macros::RustDoc;
 use ontol_runtime::{
     ontology::domain::{BasicTypeInfo, TypeKind},
     ontology::ontol::TextLikeType,
@@ -10,7 +10,6 @@ use ontol_runtime::{
     vm::proc::BuiltinProc,
     DefId, PackageId, RelationshipId,
 };
-use strum::AsRefStr;
 
 use crate::{
     mem::Intern, namespace::Space, package::ONTOL_PKG, pattern::PatId, primitive::PrimitiveKind,
@@ -112,7 +111,7 @@ bitflags::bitflags! {
 #[derive(Clone, Copy, Debug)]
 pub struct FmtFinalState(pub bool);
 
-#[derive(Clone, Hash, PartialEq, Eq, Debug, AsRefStr, DocumentedFields)]
+#[derive(Clone, Hash, PartialEq, Eq, Debug, RustDoc)]
 pub enum BuiltinRelationKind {
     /// Relates one definition to another.
     /// The subject type takes on all properties of the object type,

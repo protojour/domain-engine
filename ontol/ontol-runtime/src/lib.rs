@@ -13,6 +13,7 @@ pub mod phf;
 pub mod property;
 pub mod query;
 pub mod resolve_path;
+pub mod rustdoc;
 pub mod sequence;
 pub mod value;
 pub mod var;

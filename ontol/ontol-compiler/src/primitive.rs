@@ -1,6 +1,5 @@
-use documented::DocumentedFields;
+use ontol_macros::RustDoc;
 use ontol_runtime::DefId;
-use strum::AsRefStr;
 
 use crate::{
     def::{BuiltinRelationKind, DefKind, Defs, TypeDef, TypeDefFlags},
@@ -8,7 +7,7 @@ use crate::{
     NO_SPAN,
 };
 
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug, DocumentedFields, AsRefStr)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug, RustDoc)]
 pub enum PrimitiveKind {
     /// The unit data type which contains no information
     Unit,

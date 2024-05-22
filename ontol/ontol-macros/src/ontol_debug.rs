@@ -1,10 +1,10 @@
 use quote::quote;
 
-pub fn derive(item: syn::Item) -> proc_macro2::TokenStream {
-    let (ident, generics, body) = match &item {
-        syn::Item::Struct(item) => {
-            let body = fields_debug_body(&item.ident, &item.fields);
-            let match_arm = fields_match_arm(&quote!(), &item.ident, &item.fields, body);
+pub fn derive(item: syn::DeriveInput) -> proc_macro2::TokenStream {
+    let (ident, generics, body) = match item.data {
+        syn::Data::Struct(data) => {
+            let body = fields_debug_body(&item.ident, &data.fields);
+            let match_arm = fields_match_arm(&quote!(), &item.ident, &data.fields, body);
             (
                 &item.ident,
                 &item.generics,
@@ -13,10 +13,10 @@ pub fn derive(item: syn::Item) -> proc_macro2::TokenStream {
                 },
             )
         }
-        syn::Item::Enum(item) => {
+        syn::Data::Enum(data) => {
             let arm_prefix = quote! { Self:: };
 
-            let arms = item.variants.iter().map(|variant| {
+            let arms = data.variants.iter().map(|variant| {
                 let body = fields_debug_body(&variant.ident, &variant.fields);
                 fields_match_arm(&arm_prefix, &variant.ident, &variant.fields, body)
             });

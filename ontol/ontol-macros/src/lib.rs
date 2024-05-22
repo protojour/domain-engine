@@ -3,10 +3,17 @@ use quote::quote;
 use syn::parse_macro_input;
 
 mod ontol_debug;
+mod rustdoc;
 
 #[proc_macro_derive(OntolDebug)]
 pub fn derive_ontol_debug(input: TokenStream) -> TokenStream {
-    let output = ontol_debug::derive(parse_macro_input!(input as syn::Item));
+    let output = ontol_debug::derive(parse_macro_input!(input as syn::DeriveInput));
+    TokenStream::from(output)
+}
+
+#[proc_macro_derive(RustDoc)]
+pub fn derive_rustdoc(input: TokenStream) -> TokenStream {
+    let output = rustdoc::derive(parse_macro_input!(input as syn::DeriveInput));
     TokenStream::from(output)
 }
 
