@@ -1,4 +1,5 @@
 use assert_matches::assert_matches;
+use ontol_macros::test;
 use ontol_runtime::{
     debug::NoFmt,
     interface::graphql::{
@@ -20,7 +21,6 @@ use ontol_test_utils::{
     },
     OntolTest, SrcName, TestCompile, TestPackages,
 };
-use test_log::test;
 
 #[test]
 fn test_graphql_small_range_number_becomes_int() {

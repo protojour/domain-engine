@@ -1,3 +1,4 @@
+use ontol_macros::test;
 use ontol_runtime::interface::serde::processor::ProcessorMode;
 use ontol_test_utils::{
     examples::{GEOJSON, GUITAR_SYNTH_UNION, WGS},
@@ -6,7 +7,6 @@ use ontol_test_utils::{
     TestCompile, TestPackages,
 };
 use serde_json::json;
-use test_log::test;
 
 #[test]
 fn test_fake_primitives() {

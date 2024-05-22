@@ -30,6 +30,7 @@ pub enum Type<'m> {
     Regex(DefId),
     TextLike(DefId, TextLikeType),
     Seq(TypeRef<'m>, TypeRef<'m>),
+    #[allow(unused)]
     Option(TypeRef<'m>),
     // Maybe this is a macro instead of a function, because
     // it represents abstraction of syntax:

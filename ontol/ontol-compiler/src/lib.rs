@@ -29,7 +29,6 @@ use type_check::seal::SealCtx;
 use types::{DefTypes, Types};
 
 pub mod error;
-pub mod hir_unify;
 pub mod mem;
 pub mod ontol_syntax;
 pub mod ontology_graph;
@@ -42,6 +41,7 @@ mod compile_domain;
 mod compiler_queries;
 mod def;
 mod entity;
+mod hir_unify;
 mod interface;
 mod into_ontology;
 mod lowering;
@@ -62,38 +62,99 @@ mod type_check;
 mod typed_hir;
 mod types;
 
+/// Compile an ONTOL package topology.
+///
+/// The compilation either completely succeeds or returns a [UnifiedCompileError].
+///
+/// The errors produces by the compiler mark places in source files according to the [Sources] that is passed in.
+pub fn compile(
+    topology: PackageTopology,
+    sources: Sources,
+    mem: &Mem,
+) -> Result<Compiled, UnifiedCompileError> {
+    let mut compiler = Compiler::new(mem, sources);
+    compiler.register_ontol_domain();
+
+    // There could be errors in the ontol domain, this is useful for development:
+    compiler.check_error()?;
+
+    for parsed_package in topology.packages {
+        debug!(
+            "lower {:?}: {:?}",
+            parsed_package.package_id, parsed_package.reference
+        );
+        let source_id = compiler
+            .sources
+            .source_id_for_package(parsed_package.package_id)
+            .expect("no source id available for package");
+        let src = compiler
+            .sources
+            .get_source(source_id)
+            .expect("no compiled source available");
+
+        compiler.lower_and_check_next_domain(parsed_package, src)?;
+    }
+
+    execute_codegen_tasks(&mut compiler);
+    compile_all_text_patterns(&mut compiler);
+    compiler.relations.sort_property_tables();
+    compiler.check_error()?;
+
+    Ok(Compiled { compiler })
+}
+
+/// Value representing a successful compile.
+pub struct Compiled<'m> {
+    compiler: Compiler<'m>,
+}
+
+impl<'m> Compiled<'m> {
+    /// Convert the compiled code into an ontol_runtime Ontology.
+    pub fn into_ontology(self) -> Ontology {
+        self.compiler.into_ontology_inner()
+    }
+
+    /// Get the current ontology graph (which is serde-serializable)
+    pub fn ontology_graph(&self) -> OntologyGraph<'_, 'm> {
+        OntologyGraph::from(&self.compiler)
+    }
+}
+
+/// An ongoing compilation session
+pub struct Session<'c, 'm>(&'c mut Compiler<'m>);
+
 /// The ONTOL compiler data structure.
 ///
 /// It consists of various data types used throughout the compilation session.
-pub struct Compiler<'m> {
-    pub sources: Sources,
+struct Compiler<'m> {
+    sources: Sources,
 
-    pub(crate) packages: Packages,
-    pub(crate) package_names: Vec<(PackageId, TextConstant)>,
+    packages: Packages,
+    package_names: Vec<(PackageId, TextConstant)>,
 
-    pub(crate) namespaces: Namespaces<'m>,
-    pub(crate) defs: Defs<'m>,
-    pub(crate) package_config_table: FnvHashMap<PackageId, PackageConfig>,
-    pub(crate) primitives: Primitives,
-    pub(crate) patterns: Patterns,
+    namespaces: Namespaces<'m>,
+    defs: Defs<'m>,
+    package_config_table: FnvHashMap<PackageId, PackageConfig>,
+    primitives: Primitives,
+    patterns: Patterns,
 
-    pub(crate) strings: Strings<'m>,
-    pub(crate) types: Types<'m>,
-    pub(crate) def_types: DefTypes<'m>,
-    pub(crate) relations: Relations,
-    pub(crate) thesaurus: Thesaurus,
-    pub(crate) repr_ctx: ReprCtx,
-    pub(crate) seal_ctx: SealCtx,
-    pub(crate) text_patterns: TextPatterns,
-    pub(crate) entity_ctx: EntityCtx,
+    strings: Strings<'m>,
+    types: Types<'m>,
+    def_types: DefTypes<'m>,
+    relations: Relations,
+    thesaurus: Thesaurus,
+    repr_ctx: ReprCtx,
+    seal_ctx: SealCtx,
+    text_patterns: TextPatterns,
+    entity_ctx: EntityCtx,
 
-    pub(crate) codegen_tasks: CodegenTasks<'m>,
+    codegen_tasks: CodegenTasks<'m>,
 
-    pub(crate) errors: CompileErrors,
+    errors: CompileErrors,
 }
 
 impl<'m> Compiler<'m> {
-    pub fn new(mem: &'m Mem, sources: Sources) -> Self {
+    fn new(mem: &'m Mem, sources: Sources) -> Self {
         let mut defs = Defs::default();
         let primitives = Primitives::new(&mut defs);
 
@@ -120,47 +181,6 @@ impl<'m> Compiler<'m> {
             codegen_tasks: Default::default(),
             errors: Default::default(),
         }
-    }
-
-    /// Entry point of all compilation: Compiles the full package topology
-    pub fn compile_package_topology(
-        &mut self,
-        topology: PackageTopology,
-    ) -> Result<(), UnifiedCompileError> {
-        // There could be errors in the ontol domain, this is useful for development:
-        self.check_error()?;
-
-        for parsed_package in topology.packages {
-            debug!(
-                "lower {:?}: {:?}",
-                parsed_package.package_id, parsed_package.reference
-            );
-            let source_id = self
-                .sources
-                .source_id_for_package(parsed_package.package_id)
-                .expect("no source id available for package");
-            let src = self
-                .sources
-                .get_source(source_id)
-                .expect("no compiled source available");
-
-            self.lower_and_check_next_domain(parsed_package, src)?;
-        }
-
-        execute_codegen_tasks(self);
-        compile_all_text_patterns(self);
-        self.relations.sort_property_tables();
-        self.check_error()
-    }
-
-    /// Get the current ontology graph (which is serde-serializable)
-    pub fn ontology_graph(&self) -> OntologyGraph<'_, 'm> {
-        OntologyGraph::from(self)
-    }
-
-    /// Finish compilation, turn into runtime ontology.
-    pub fn into_ontology(self) -> Ontology {
-        self.into_ontology_inner()
     }
 
     fn package_ids(&self) -> Vec<PackageId> {
@@ -213,11 +233,56 @@ impl<'m> Index<TextConstant> for Compiler<'m> {
 pub fn lower_ontol_syntax<V: ontol_parser::cst::view::NodeView>(
     ontol_view: V,
     src: Src,
-    compiler: &mut Compiler,
+    session: Session,
 ) -> Vec<DefId> {
     use ontol_parser::cst::view::NodeViewExt;
 
-    CstLowering::new(compiler, src)
+    CstLowering::new(session.0, src)
         .lower_ontol(ontol_view.node())
         .finish()
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fmt::Write;
+    use std::{fs, path::PathBuf};
+
+    use ontol_runtime::MapFlags;
+
+    use crate::{hir_unify::unify_to_function, mem::Mem, typed_hir::TypedHir, Compiler};
+
+    pub fn hir_parse<'m>(src: &str) -> (ontol_hir::RootNode<'m, TypedHir>, &str) {
+        ontol_hir::parse::Parser::new(TypedHir)
+            .parse_root(src)
+            .unwrap()
+    }
+
+    #[rstest::rstest]
+    #[ontol_macros::test]
+    fn hir_unify(#[files("test-cases/hir-unify/**/*.test")] path: PathBuf) {
+        let contents = fs::read_to_string(path).unwrap();
+        let mut without_comments = String::new();
+        for line in contents.lines() {
+            if !line.starts_with("//") {
+                without_comments.push_str(line);
+                without_comments.push('\n');
+            }
+        }
+
+        let mem = Mem::default();
+        let (scope, next) = hir_parse(&without_comments);
+        let (expr, next) = hir_parse(next);
+
+        let expected = next.trim();
+
+        let output = {
+            let mut compiler = Compiler::new(&mem, Default::default());
+            let func = unify_to_function(&scope, &expr, MapFlags::empty(), &mut compiler).unwrap();
+            let mut output = String::new();
+            write!(&mut output, "{func}").unwrap();
+            output
+        };
+
+        pretty_assertions::assert_eq!(expected, output);
+    }
 }

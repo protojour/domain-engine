@@ -109,7 +109,7 @@ regression test.
 Every ONTOL language feature must have a test in
 `ontol/ontol-compiler/tests/compiler-integration`.
 
-Tests must use the `test_log::test` attribute for proper tracing.
+Tests must use the `ontol_macros::test` attribute for proper tracing.
 
 ### Running tests and debugging
 

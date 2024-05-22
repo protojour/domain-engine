@@ -2,6 +2,7 @@ use domain_engine_core::{DomainEngine, Session};
 use domain_engine_test_utils::{
     system::mock_current_time_monotonic, unimock, DomainEngineTestExt, TestFindQuery,
 };
+use ontol_macros::test;
 use ontol_runtime::{
     interface::serde::processor::{ProcessorProfile, ProcessorProfileFlags},
     ontology::config::DataStoreConfig,
@@ -20,7 +21,6 @@ use ontol_test_utils::{
 };
 use serde_json::json;
 use std::sync::Arc;
-use test_log::test;
 use uuid::Uuid;
 
 fn conduit_db() -> TestPackages {

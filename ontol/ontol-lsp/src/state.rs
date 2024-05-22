@@ -15,7 +15,7 @@ use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
     package::{GraphState, PackageGraphBuilder, PackageReference, ParsedPackage, ONTOL_PKG},
-    CompileError, Compiler, SourceId, SourceSpan, Sources, SpannedCompileError, NO_SPAN,
+    CompileError, SourceId, SourceSpan, Sources, SpannedCompileError, NO_SPAN,
 };
 use ontol_parser::cst_parse;
 use ontol_runtime::ontology::{config::PackageConfig, domain::TypeInfo, Ontology};
@@ -118,11 +118,9 @@ impl State {
     /// Compile ontology for docs, prepare data, and return a new State
     pub fn new() -> Self {
         let mem = Mem::default();
-        let mut compiler = Compiler::new(&mem, Default::default()).with_ontol();
-        compiler
-            .compile_package_topology(Default::default())
-            .unwrap();
-        let ontology = compiler.into_ontology();
+        let ontology = ontol_compiler::compile(Default::default(), Default::default(), &mem)
+            .unwrap()
+            .into_ontology();
 
         let ontol_domain = ontology.find_domain(ONTOL_PKG).unwrap();
         let mut ontol_type_info = HashMap::new();
@@ -260,8 +258,7 @@ impl State {
 
         panic::catch_unwind(|| {
             let mem = Mem::default();
-            let mut compiler = Compiler::new(&mem, ontol_sources.clone()).with_ontol();
-            compiler.compile_package_topology(topology)
+            ontol_compiler::compile(topology, ontol_sources.clone(), &mem).map(|_| ())
         })
         .unwrap_or_else(|err| {
             let message = if let Some(message) = err.downcast_ref::<&str>() {

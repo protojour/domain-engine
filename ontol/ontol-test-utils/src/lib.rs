@@ -13,7 +13,7 @@ use ontol_compiler::{
     mem::Mem,
     ontol_syntax::OntolTreeSyntax,
     package::{GraphState, PackageGraphBuilder, PackageReference, PackageTopology, ParsedPackage},
-    Compiler, SourceCodeRegistry, Sources,
+    SourceCodeRegistry, Sources,
 };
 use ontol_parser::cst_parse;
 use ontol_runtime::{
@@ -30,7 +30,6 @@ use type_binding::TypeBinding;
 
 pub mod diagnostics;
 pub mod examples;
-pub mod init_tracing;
 pub mod json_utils;
 pub mod serde_helper;
 pub mod test_extensions;
@@ -375,32 +374,27 @@ impl TestPackages {
     }
 
     fn compile_topology(&mut self) -> Result<OntolTest, UnifiedCompileError> {
-        let (package_topology, root_package) = self.load_topology()?;
         let mem = Mem::default();
-        let mut compiler = Compiler::new(&mem, self.sources.clone()).with_ontol();
+        let (package_topology, root_package) = self.load_topology()?;
 
-        match compiler.compile_package_topology(package_topology) {
-            Ok(()) => {
-                let mut ontology = compiler.into_ontology();
+        let mut ontology =
+            ontol_compiler::compile(package_topology, self.sources.clone(), &mem)?.into_ontology();
 
-                if !self.disable_ontology_serde {
-                    let mut binary_ontology: Vec<u8> = Vec::new();
-                    ontology
-                        .try_serialize_to_bincode(&mut binary_ontology)
-                        .unwrap();
-                    ontology = Ontology::try_from_bincode(binary_ontology.as_slice()).unwrap();
-                }
-
-                Ok(OntolTest {
-                    ontology: Arc::new(ontology),
-                    root_package,
-                    // NOTE: waiting on https://github.com/Stranger6667/jsonschema-rs/issues/420
-                    compile_json_schema: false,
-                    packages_by_source_name: self.packages_by_source_name.clone(),
-                })
-            }
-            Err(error) => Err(error),
+        if !self.disable_ontology_serde {
+            let mut binary_ontology: Vec<u8> = Vec::new();
+            ontology
+                .try_serialize_to_bincode(&mut binary_ontology)
+                .unwrap();
+            ontology = Ontology::try_from_bincode(binary_ontology.as_slice()).unwrap();
         }
+
+        Ok(OntolTest {
+            ontology: Arc::new(ontology),
+            root_package,
+            // NOTE: waiting on https://github.com/Stranger6667/jsonschema-rs/issues/420
+            compile_json_schema: false,
+            packages_by_source_name: self.packages_by_source_name.clone(),
+        })
     }
 
     #[track_caller]

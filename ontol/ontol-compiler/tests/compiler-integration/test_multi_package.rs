@@ -1,8 +1,8 @@
+use ontol_macros::test;
 use ontol_test_utils::{
     assert_json_io_matches, expect_eq, serde_helper::serde_create, src_name, TestCompile,
     TestPackages,
 };
-use test_log::test;
 
 #[test]
 fn load_package() {

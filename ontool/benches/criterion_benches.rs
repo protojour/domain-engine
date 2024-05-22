@@ -11,7 +11,7 @@ use indoc::indoc;
 use ontol_compiler::{
     mem::Mem,
     package::{GraphState, PackageGraphBuilder, ParsedPackage},
-    Compiler, SourceCodeRegistry, Sources,
+    SourceCodeRegistry, Sources,
 };
 use ontol_runtime::{
     interface::serde::operator::SerdeOperatorAddr,

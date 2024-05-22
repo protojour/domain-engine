@@ -1,3 +1,4 @@
+use ontol_macros::test;
 use ontol_test_utils::{
     assert_error_msg, assert_json_io_matches,
     examples::{GEOJSON, WGS},
@@ -5,7 +6,6 @@ use ontol_test_utils::{
     src_name, TestCompile, TestPackages,
 };
 use serde_json::json;
-use test_log::test;
 
 #[test]
 fn test_geojson() {

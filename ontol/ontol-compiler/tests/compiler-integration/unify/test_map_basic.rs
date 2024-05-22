@@ -1,8 +1,8 @@
+use ontol_macros::test;
 use ontol_test_utils::{
     serde_helper::serde_raw, src_name, test_map::AsKey, TestCompile, TestPackages,
 };
 use serde_json::json;
-use test_log::test;
 
 #[test]
 fn test_map_simple() {

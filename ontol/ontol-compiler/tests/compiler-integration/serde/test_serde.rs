@@ -1,5 +1,6 @@
 use assert_matches::assert_matches;
 use fnv::FnvHashMap;
+use ontol_macros::test;
 use ontol_runtime::{
     interface::serde::processor::{
         ProcessorLevel, ProcessorMode, ProcessorProfile, ProcessorProfileFlags, ScalarFormat,
@@ -16,7 +17,6 @@ use ontol_test_utils::{
 };
 use serde::de::DeserializeSeed;
 use serde_json::json;
-use test_log::test;
 
 #[test]
 fn test_serde_empty_type() {
@@ -693,8 +693,8 @@ fn test_serde_with_raw_prefix_int_id_overridde_profile() {
 
 mod serde_raw_dynamic_entity_in_union {
     use super::*;
+    use ontol_macros::test;
     use ontol_test_utils::OntolTest;
-    use test_log::test;
 
     /// This tests an entity union without data-based discriminators (only id-based)
     const ONTOL: &str = "

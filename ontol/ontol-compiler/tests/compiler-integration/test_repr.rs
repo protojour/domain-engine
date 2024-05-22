@@ -1,5 +1,5 @@
+use ontol_macros::test;
 use ontol_test_utils::{src_name, TestCompile, TestPackages};
-use test_log::test;
 
 #[test]
 fn test_repr_valid_mesh1() {

@@ -41,8 +41,6 @@ pub enum MapOutputClass {
 
 #[derive(Debug)]
 pub enum CheckMapError {
-    MutualArmInference,
-    ArmNotInferrable,
     DepthExceeded,
     RootCount(usize),
     NoLeaves,

@@ -18,7 +18,7 @@ use crate::{
 };
 
 impl<'m> Compiler<'m> {
-    pub fn with_ontol(mut self) -> Self {
+    pub fn register_ontol_domain(&mut self) {
         self.strings.intern_constant("ontol");
         self.define_package(self.primitives.ontol_domain);
 
@@ -168,8 +168,6 @@ impl<'m> Compiler<'m> {
 
         self.seal_domain(ONTOL_PKG);
         self.repr_smoke_test();
-
-        self
     }
 
     fn setup_number_system(&mut self) {

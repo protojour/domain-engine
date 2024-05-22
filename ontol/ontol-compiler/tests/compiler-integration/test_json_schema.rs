@@ -1,9 +1,9 @@
+use ontol_macros::test;
 use ontol_runtime::interface::{
     json_schema::build_openapi_schemas, serde::processor::ProcessorMode::*,
 };
 use ontol_test_utils::{examples::ARTIST_AND_INSTRUMENT, expect_eq, TestCompile};
 use serde_json::json;
-use test_log::test;
 
 #[test]
 fn json_schema_from_simple_entity() {

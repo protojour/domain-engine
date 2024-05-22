@@ -2,13 +2,13 @@ use std::fmt::Debug;
 
 use ontol_hir::visitor::HirVisitor;
 use ontol_runtime::{
-    var::{Var, VarAllocator, VarSet},
+    var::{Var, VarAllocator},
     MapFlags,
 };
 
 use crate::{
     typed_hir::{HirFunc, IntoTypedHirData, TypedHir, TypedHirData},
-    Compiler, SourceSpan,
+    Compiler,
 };
 
 use self::ssa_unifier::SsaUnifier;
@@ -24,15 +24,10 @@ mod ssa_util;
 pub enum UnifierError {
     /// CompileErrors have been reported, so not a silent error
     Reported,
-    NonUniqueVariableDatapoints(VarSet),
-    NoInputBinder,
-    SequenceInputNotSupported,
-    MultipleVariablesInExpression(SourceSpan),
     NonEntityQuery,
-    ImpossibleMapping,
-    NoIterationSource,
     Unsolvable,
     Unimplemented(String),
+    #[allow(clippy::upper_case_acronyms)]
     TODO(String),
 }
 
@@ -160,31 +155,5 @@ impl VariableTracker {
     fn var_allocator(&self) -> VarAllocator {
         let idx = self.largest.0 + 1;
         Var(idx).into()
-    }
-}
-
-pub mod test_api {
-    use std::fmt::Write;
-
-    use ontol_runtime::MapFlags;
-
-    use crate::{hir_unify::unify_to_function, mem::Mem, typed_hir::TypedHir, Compiler};
-
-    pub fn parse_typed<'m>(src: &str) -> (ontol_hir::RootNode<'m, TypedHir>, &str) {
-        ontol_hir::parse::Parser::new(TypedHir)
-            .parse_root(src)
-            .unwrap()
-    }
-
-    pub fn test_unify<'m>(
-        mem: &'m Mem,
-        scope: &ontol_hir::RootNode<'m, TypedHir>,
-        expr: &ontol_hir::RootNode<'m, TypedHir>,
-    ) -> String {
-        let mut compiler = Compiler::new(mem, Default::default());
-        let func = unify_to_function(scope, expr, MapFlags::empty(), &mut compiler).unwrap();
-        let mut output = String::new();
-        write!(&mut output, "{func}").unwrap();
-        output
     }
 }

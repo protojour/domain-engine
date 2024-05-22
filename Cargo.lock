@@ -855,7 +855,6 @@ dependencies = [
  "pretty_assertions",
  "serde",
  "serde_json",
- "test-log",
  "thiserror",
  "tracing",
  "tracing-subscriber",
@@ -876,13 +875,13 @@ dependencies = [
  "fnv",
  "indexmap",
  "itertools 0.11.0",
+ "ontol-macros",
  "ontol-runtime",
  "ontol-test-utils",
  "pretty_assertions",
  "serde",
  "serde_json",
  "smallvec",
- "test-log",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -902,13 +901,13 @@ dependencies = [
  "fnv",
  "graphql-parser",
  "juniper",
+ "ontol-macros",
  "ontol-runtime",
  "ontol-test-utils",
  "pretty_assertions",
  "serde",
  "serde_json",
  "smartstring",
- "test-log",
  "thiserror",
  "tokio",
  "tracing",
@@ -2278,7 +2277,6 @@ dependencies = [
  "smallvec",
  "strum",
  "strum_macros",
- "test-log",
  "thin-vec",
  "thiserror",
  "tracing",
@@ -2322,7 +2320,6 @@ dependencies = [
  "ontol-runtime",
  "pretty_assertions",
  "smallvec",
- "test-log",
  "thin-vec",
  "tracing-subscriber",
 ]
@@ -2396,7 +2393,6 @@ dependencies = [
  "smartstring",
  "strum",
  "strum_macros",
- "test-log",
  "thin-vec",
  "thiserror",
  "tracing",
@@ -2428,7 +2424,6 @@ dependencies = [
  "serde",
  "serde-value",
  "serde_json",
- "test-log",
  "tracing",
  "unimock",
 ]
@@ -3490,27 +3485,6 @@ checksum = "21bebf2b7c9e0a515f6e0f8c51dc0f8e4696391e6f1ff30379559f8365fb0df7"
 dependencies = [
  "rustix",
  "windows-sys 0.48.0",
-]
-
-[[package]]
-name = "test-log"
-version = "0.2.16"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3dffced63c2b5c7be278154d76b479f9f9920ed34e7574201407f0b14e2bbb93"
-dependencies = [
- "test-log-macros",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "test-log-macros"
-version = "0.2.16"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5999e24eaa32083191ba4e425deb75cdf25efefabe5aaccb7446dd0d4122a3f5"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.63",
 ]
 
 [[package]]

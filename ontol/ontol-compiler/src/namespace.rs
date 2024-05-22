@@ -8,7 +8,6 @@ use crate::PackageId;
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub enum Space {
     Type,
-    Rel,
     Map,
 }
 
@@ -18,7 +17,6 @@ pub enum Space {
 #[derive(Default, Debug)]
 pub struct Namespace<'m> {
     pub(crate) types: IndexMap<&'m str, DefId>,
-    pub(crate) relations: IndexMap<&'m str, DefId>,
     pub(crate) maps: IndexMap<&'m str, DefId>,
     pub(crate) anonymous: Vec<DefId>,
 }
@@ -27,7 +25,6 @@ impl<'m> Namespace<'m> {
     pub fn space(&self, space: Space) -> &IndexMap<&'m str, DefId> {
         match space {
             Space::Type => &self.types,
-            Space::Rel => &self.relations,
             Space::Map => &self.maps,
         }
     }
@@ -35,7 +32,6 @@ impl<'m> Namespace<'m> {
     pub fn space_mut(&mut self, space: Space) -> &mut IndexMap<&'m str, DefId> {
         match space {
             Space::Type => &mut self.types,
-            Space::Rel => &mut self.relations,
             Space::Map => &mut self.maps,
         }
     }

@@ -1,4 +1,5 @@
 use indoc::indoc;
+use ontol_macros::test;
 use ontol_runtime::{format_utils::Literal, property::ValueCardinality, value::Value};
 use ontol_test_utils::{
     examples::conduit::{
@@ -8,7 +9,6 @@ use ontol_test_utils::{
     TestCompile, TestPackages,
 };
 use serde_json::json;
-use test_log::test;
 use unimock::{matching, MockFn};
 
 #[test]

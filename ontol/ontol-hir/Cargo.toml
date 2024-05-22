@@ -16,6 +16,5 @@ thin-vec.workspace = true
 
 [dev-dependencies]
 tracing-subscriber.workspace = true
-test-log.workspace = true
 pretty_assertions = "1"
 indoc = "2"

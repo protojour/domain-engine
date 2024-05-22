@@ -37,4 +37,3 @@ phf_shared = "0.11"
 
 [dev-dependencies]
 tracing-subscriber.workspace = true
-test-log.workspace = true

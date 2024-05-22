@@ -34,10 +34,6 @@ pub type TypedRootNode<'m> = ontol_hir::RootNode<'m, TypedHir>;
 pub struct TypedHirData<'m, H>(pub H, pub Meta<'m>);
 
 impl<'m, H> TypedHirData<'m, H> {
-    pub fn split(self) -> (H, Meta<'m>) {
-        (self.0, self.1)
-    }
-
     /// Access the ontol-hir part of data
     pub fn hir(&self) -> &H {
         &self.0
@@ -45,10 +41,6 @@ impl<'m, H> TypedHirData<'m, H> {
 
     pub fn hir_mut(&mut self) -> &mut H {
         &mut self.0
-    }
-
-    pub fn into_hir(self) -> H {
-        self.0
     }
 
     pub fn meta(&self) -> &Meta<'m> {
@@ -102,13 +94,6 @@ impl<'m> Meta<'m> {
     pub fn unit(span: SourceSpan) -> Self {
         Self {
             ty: &UNIT_TYPE,
-            span,
-        }
-    }
-
-    pub fn error(span: SourceSpan) -> Self {
-        Self {
-            ty: &ERROR_TYPE,
             span,
         }
     }

@@ -1,8 +1,8 @@
 use domain_engine_test_utils::graphql_test_utils::{
     gql_ctx_mock_data_store, Exec, TestCompileSingletonSchema,
 };
+use ontol_macros::test;
 use ontol_test_utils::{assert_error_msg, SrcName};
-use test_log::test;
 
 fn root() -> SrcName {
     SrcName::default()

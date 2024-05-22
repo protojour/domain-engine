@@ -1,5 +1,5 @@
+use ontol_macros::test;
 use ontol_test_utils::TestCompile;
-use test_log::test;
 
 #[test]
 fn readonly_property() {

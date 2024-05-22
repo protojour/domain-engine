@@ -1,3 +1,4 @@
+use ontol_macros::test;
 use ontol_runtime::{value::Value, PackageId};
 use ontol_test_utils::{
     assert_error_msg, assert_json_io_matches,
@@ -7,7 +8,6 @@ use ontol_test_utils::{
     TestCompile,
 };
 use serde_json::json;
-use test_log::test;
 
 #[test]
 fn id_cannot_identify_two_things() {

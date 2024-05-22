@@ -25,8 +25,8 @@ bincode = "1"
 
 [dev-dependencies]
 ontol-test-utils.path = "../../ontol/ontol-test-utils"
+ontol-macros.path = "../../ontol/ontol-macros"
 domain-engine-test-utils.path = "../domain-engine-test-utils"
-test-log.workspace = true
 tracing-subscriber.workspace = true
 pretty_assertions = "1"
 uuid = "1"

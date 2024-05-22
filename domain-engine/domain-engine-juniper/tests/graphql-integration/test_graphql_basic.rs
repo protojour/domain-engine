@@ -5,6 +5,7 @@ use domain_engine_juniper::{
     juniper::{self, graphql_value},
     Schema,
 };
+use ontol_macros::test;
 use ontol_runtime::{
     interface::serde::processor::ProcessorProfileFlags,
     ontology::config::DataStoreConfig,
@@ -18,7 +19,6 @@ use ontol_test_utils::{
     SrcName, TestPackages,
 };
 use serde_json::json;
-use test_log::test;
 use unimock::*;
 
 use domain_engine_test_utils::{

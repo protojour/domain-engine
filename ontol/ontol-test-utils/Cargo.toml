@@ -18,7 +18,6 @@ pretty_assertions = "1"
 serde.workspace = true
 serde_json.workspace = true
 fnv.workspace = true
-test-log.workspace = true
 unimock.workspace = true
 jsonschema = { version = "0.18", default-features = false, features = ["draft202012"] }
 serde-value = "0.7"

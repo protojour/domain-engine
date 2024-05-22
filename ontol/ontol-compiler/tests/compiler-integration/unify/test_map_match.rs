@@ -1,10 +1,10 @@
 use indoc::indoc;
+use ontol_macros::test;
 use ontol_runtime::{format_utils::Literal, property::ValueCardinality, value::Value};
 use ontol_test_utils::{
     assert_error_msg, serde_helper::serde_create, test_map::YielderMock, TestCompile,
 };
 use serde_json::json;
-use test_log::test;
 use unimock::{matching, MockFn};
 
 #[test]
@@ -311,7 +311,7 @@ fn test_map_match_sequence_filter_in_set() {
 
 mod match_contains_all {
     use super::*;
-    use test_log::test;
+    use ontol_macros::test;
 
     const TEST_DOMAIN: &str = r#"
     def foo (

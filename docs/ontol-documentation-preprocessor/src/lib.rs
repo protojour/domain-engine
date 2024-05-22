@@ -11,7 +11,6 @@ use ontol_runtime::ontology::{
 };
 
 use ontol_compiler::package::ONTOL_PKG;
-use ontol_compiler::Compiler;
 
 /// A ontol documentation preprocessor.
 pub struct OntolDocumentationPreprocessor;
@@ -35,11 +34,9 @@ impl Default for OntolDocumentationPreprocessor {
 
 fn compile() -> Ontology {
     let mem = Mem::default();
-    let mut compiler = Compiler::new(&mem, Default::default()).with_ontol();
-    compiler
-        .compile_package_topology(Default::default())
-        .unwrap();
-    compiler.into_ontology()
+    ontol_compiler::compile(Default::default(), Default::default(), &mem)
+        .unwrap()
+        .into_ontology()
 }
 
 fn get_ontol_docs_md(ontology: &Ontology, predicate: &dyn Fn(&TypeInfo) -> bool) -> String {

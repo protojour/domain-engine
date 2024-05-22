@@ -10,7 +10,7 @@ use crate::{
     relation::Relations,
     repr::repr_model::ReprKind,
     thesaurus::{Thesaurus, TypeRelation},
-    CompileError, Compiler, Src, UnifiedCompileError,
+    CompileError, Compiler, Session, Src, UnifiedCompileError,
 };
 
 impl<'m> Compiler<'m> {
@@ -45,7 +45,7 @@ impl<'m> Compiler<'m> {
         self.package_config_table
             .insert(package.package_id, package.config);
 
-        let root_defs = package.syntax.lower(src.clone(), self);
+        let root_defs = package.syntax.lower(src.clone(), Session(self));
 
         for def_id in root_defs {
             self.type_check().check_def(def_id);

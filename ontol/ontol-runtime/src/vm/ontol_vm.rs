@@ -582,7 +582,7 @@ fn extract_regex_captures(
 #[cfg(test)]
 mod tests {
     use fnv::FnvHashSet;
-    use test_log::test;
+    use ontol_macros::test;
 
     use crate::{
         ontology::Ontology,

@@ -13,6 +13,7 @@ use domain_engine_test_utils::{
     system::mock_current_time_monotonic,
     unimock,
 };
+use ontol_macros::test;
 use ontol_runtime::ontology::{config::DataStoreConfig, Ontology};
 use ontol_test_utils::{
     examples::{
@@ -22,7 +23,6 @@ use ontol_test_utils::{
     },
     expect_eq, TestPackages,
 };
-use test_log::test;
 
 async fn make_domain_engine(ontology: Arc<Ontology>) -> DomainEngine {
     DomainEngine::builder(ontology)

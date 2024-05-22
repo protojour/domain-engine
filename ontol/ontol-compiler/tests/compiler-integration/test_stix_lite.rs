@@ -1,9 +1,9 @@
+use ontol_macros::test;
 use ontol_test_utils::{
     assert_error_msg, assert_json_io_matches, examples::stix::stix_bundle, serde_helper::*,
     TestCompile,
 };
 use serde_json::json;
-use test_log::test;
 
 #[test]
 fn test_stix_lite() {

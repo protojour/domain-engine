@@ -1,7 +1,7 @@
 use fnv::FnvHashMap;
 use ontol_runtime::{var::Var, DefId};
 
-use crate::{source::SourceSpan, Compiler};
+use crate::source::SourceSpan;
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub struct PatId(pub u32);
@@ -11,12 +11,6 @@ pub struct Pattern {
     pub id: PatId,
     pub kind: PatternKind,
     pub span: SourceSpan,
-}
-
-impl Pattern {
-    pub fn kind(&self) -> &PatternKind {
-        &self.kind
-    }
 }
 
 #[derive(Debug)]
@@ -178,16 +172,6 @@ pub enum TypePath {
     Inferred { def_id: DefId },
     // The type path is contextual (relation parameter)
     RelContextual,
-}
-
-impl<'m> Compiler<'m> {
-    pub fn expr(&mut self, kind: PatternKind, span: SourceSpan) -> Pattern {
-        Pattern {
-            id: self.patterns.alloc_pat_id(),
-            kind,
-            span,
-        }
-    }
 }
 
 pub struct Patterns {

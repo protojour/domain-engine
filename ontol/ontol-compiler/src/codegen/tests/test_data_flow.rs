@@ -1,10 +1,10 @@
+use ontol_macros::test;
 use ontol_runtime::{
     ontology::map::{PropertyFlow, PropertyFlowData},
     property::{PropertyCardinality, ValueCardinality},
     DefId, RelationshipId,
 };
 use ontol_test_utils::expect_eq;
-use test_log::test;
 use tracing::debug;
 use unimock::{matching, MockFn, Unimock};
 

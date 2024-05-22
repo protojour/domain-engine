@@ -1,6 +1,6 @@
+use ontol_macros::test;
 use ontol_test_utils::{src_name, TestCompile, TestPackages};
 use serde_json::json;
-use test_log::test;
 
 #[test]
 fn should_map_inherent_capturing_pattern_id() {

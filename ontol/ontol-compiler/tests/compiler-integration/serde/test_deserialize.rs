@@ -1,10 +1,10 @@
 //! Tests for deserialization, including errors
 
 use assert_matches::assert_matches;
+use ontol_macros::test;
 use ontol_runtime::value::Value;
 use ontol_test_utils::{assert_error_msg, serde_helper::*, TestCompile};
 use serde_json::json;
-use test_log::test;
 
 #[test]
 fn deserialize_empty_type() {

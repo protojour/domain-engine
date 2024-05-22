@@ -23,7 +23,7 @@ use ontol_compiler::{
     mem::Mem,
     ontol_syntax::OntolTreeSyntax,
     package::{GraphState, PackageGraphBuilder, PackageReference, ParsedPackage},
-    Compiler, SourceCodeRegistry, Sources,
+    SourceCodeRegistry, Sources,
 };
 use ontol_lsp::Backend;
 use ontol_parser::cst_parse;
@@ -350,14 +350,12 @@ fn compile(
     };
 
     let mem = Mem::default();
-    let mut compiler = Compiler::new(&mem, ontol_sources.clone()).with_ontol();
-    match compiler.compile_package_topology(topology) {
-        Ok(()) => Ok(compiler.into_ontology()),
-        Err(err) => {
+    ontol_compiler::compile(topology, ontol_sources.clone(), &mem)
+        .map(|compiled| compiled.into_ontology())
+        .or_else(|err| {
             print_unified_compile_error(err, &ontol_sources, &source_code_registry)?;
             Err(OntoolError::Compile)
-        }
-    }
+        })
 }
 
 /// Get a source name from a path.

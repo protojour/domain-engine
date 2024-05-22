@@ -1,10 +1,10 @@
 use ontol_compiler::package::ONTOL_PKG;
+use ontol_macros::test;
 use ontol_runtime::{interface::serde::operator::SerdeOperator, RelationshipId};
 use ontol_test_utils::{
     assert_json_io_matches, expect_eq, serde_helper::serde_create, src_name,
     type_binding::TypeBinding, OntolTest, TestCompile, TestPackages,
 };
-use test_log::test;
 
 #[test]
 fn test_relations_are_distinct_for_different_domains() {
