@@ -52,7 +52,7 @@ pub struct Data {
     pub(crate) const_proc_table: FnvHashMap<DefId, Procedure>,
     pub(crate) map_meta_table: FnvHashMap<MapKey, MapMeta>,
     pub(crate) static_conditions: FnvHashMap<MapKey, Condition>,
-    pub(crate) named_forward_maps: FnvHashMap<(PackageId, TextConstant), MapKey>,
+    pub(crate) named_downmaps: FnvHashMap<(PackageId, TextConstant), MapKey>,
     pub(crate) text_like_types: FnvHashMap<DefId, TextLikeType>,
     pub(crate) text_patterns: FnvHashMap<DefId, TextPattern>,
     pub(crate) extern_table: FnvHashMap<DefId, Extern>,
@@ -194,11 +194,11 @@ impl Ontology {
             .map(|(key, proc)| (*key, proc))
     }
 
-    pub fn iter_named_forward_maps(
+    pub fn iter_named_downmaps(
         &self,
     ) -> impl Iterator<Item = (PackageId, TextConstant, MapKey)> + '_ {
         self.data
-            .named_forward_maps
+            .named_downmaps
             .iter()
             .map(|((package_id, text_constant), value)| (*package_id, *text_constant, *value))
     }
@@ -271,10 +271,10 @@ impl Ontology {
     }
 
     /// This primarily exists for testing only.
-    pub fn find_named_forward_map_meta(&self, package_id: PackageId, name: &str) -> Option<MapKey> {
+    pub fn find_named_downmap_meta(&self, package_id: PackageId, name: &str) -> Option<MapKey> {
         let text_constant = self.find_text_constant(name)?;
         self.data
-            .named_forward_maps
+            .named_downmaps
             .get(&(package_id, text_constant))
             .cloned()
     }

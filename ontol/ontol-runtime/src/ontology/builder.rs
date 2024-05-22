@@ -99,7 +99,7 @@ impl OntologyBuilder {
         mut self,
         named_forward_maps: FnvHashMap<(PackageId, TextConstant), MapKey>,
     ) -> Self {
-        self.data().named_forward_maps = named_forward_maps;
+        self.data().named_downmaps = named_forward_maps;
         self
     }
 
@@ -158,7 +158,7 @@ pub(super) fn new_builder() -> OntologyBuilder {
                 const_proc_table: Default::default(),
                 map_meta_table: Default::default(),
                 static_conditions: Default::default(),
-                named_forward_maps: Default::default(),
+                named_downmaps: Default::default(),
                 text_like_types: Default::default(),
                 text_patterns: Default::default(),
                 extern_table: Default::default(),

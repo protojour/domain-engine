@@ -397,7 +397,7 @@ impl Domain {
         // let domain = context.find_domain(self.id).unwrap();
         context
             .ontology
-            .iter_named_forward_maps()
+            .iter_named_downmaps()
             .filter(|(package_id, ..)| package_id == &self.id)
             .map(|(_, name, _)| NamedMap { name })
             .collect()

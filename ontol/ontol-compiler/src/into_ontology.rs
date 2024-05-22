@@ -10,7 +10,7 @@ use ontol_runtime::{
             BasicTypeInfo, DataRelationshipInfo, DataRelationshipKind, DataRelationshipSource,
             DataRelationshipTarget, Domain, EntityInfo, TypeInfo, TypeKind,
         },
-        map::{MapLossiness, MapMeta},
+        map::MapMeta,
         ontol::{OntolDomainMeta, TextConstant, TextLikeType},
         Ontology,
     },
@@ -275,16 +275,19 @@ impl<'m> Compiler<'m> {
                     None
                 };
 
-                let metadata = self.codegen_tasks.result_metadata_table.remove(&key);
+                let metadata = self
+                    .codegen_tasks
+                    .result_metadata_table
+                    .remove(&key)
+                    .unwrap_or_else(|| panic!("metadata not found for {key:?}"));
 
                 (
                     key,
                     MapMeta {
                         procedure,
                         propflow_range,
-                        lossiness: metadata
-                            .map(|metadata| metadata.lossiness)
-                            .unwrap_or(MapLossiness::Lossy),
+                        direction: metadata.direction,
+                        lossiness: metadata.lossiness,
                     },
                 )
             })
@@ -316,7 +319,7 @@ impl<'m> Compiler<'m> {
             .const_procs(self.codegen_tasks.result_const_procs)
             .map_meta_table(map_meta_table)
             .static_conditions(self.codegen_tasks.result_static_conditions)
-            .named_forward_maps(self.codegen_tasks.result_named_forward_maps)
+            .named_forward_maps(self.codegen_tasks.result_named_downmaps)
             .serde_operators(serde_operators)
             .dynamic_sequence_operator_addr(dynamic_sequence_operator_addr)
             .property_flows(property_flows)

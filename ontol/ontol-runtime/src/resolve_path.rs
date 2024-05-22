@@ -1,7 +1,7 @@
 use crate::{
     ontology::{domain::TypeKind, map::MapLossiness, Ontology},
     query::select::{EntitySelect, Select, StructOrUnionSelect},
-    DefId, MapDef, MapDefFlags, MapFlags, MapKey, PackageId,
+    DefId, MapDef, MapDefFlags, MapDirection, MapFlags, MapKey, PackageId,
 };
 use fnv::{FnvHashMap, FnvHashSet};
 use tracing::trace;
@@ -69,17 +69,17 @@ impl ResolverGraph {
         Self::new(
             ontology
                 .iter_map_meta()
-                .map(|(key, meta)| (key, meta.lossiness)),
+                .map(|(key, meta)| (key, meta.direction, meta.lossiness)),
         )
     }
 
-    pub fn new(iterator: impl Iterator<Item = (MapKey, MapLossiness)>) -> Self {
+    pub fn new(iterator: impl Iterator<Item = (MapKey, MapDirection, MapLossiness)>) -> Self {
         let mut graph_by_input: FnvHashMap<DefId, FnvHashMap<MapDef, Vec<Flags>>> =
             Default::default();
         let mut graph_by_output: FnvHashMap<DefId, FnvHashMap<MapDef, Vec<Flags>>> =
             Default::default();
 
-        for (key, lossiness) in iterator {
+        for (key, _direction, lossiness) in iterator {
             let flags = Flags {
                 lossiness,
                 map_flags: key.flags,

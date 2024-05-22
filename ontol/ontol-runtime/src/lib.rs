@@ -3,6 +3,7 @@
 use std::{fmt::Debug, str::FromStr};
 
 use ::serde::{Deserialize, Serialize};
+use ontol_macros::OntolDebug;
 
 pub mod cast;
 pub mod debug;
@@ -99,6 +100,15 @@ bitflags::bitflags! {
         /// Used to implement translation of UPDATEs.
         const PURE_PARTIAL = 0b00000001;
     }
+}
+
+/// The direction of mapping.
+#[derive(Clone, Copy, Serialize, Deserialize, OntolDebug)]
+pub enum MapDirection {
+    /// An up direction indicates mapping up from canonical representation, increasing abstraction.
+    Up,
+    /// A down direction indicates mapping down from abtract representation into concrete/canonical representation.
+    Down,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize, Deserialize)]

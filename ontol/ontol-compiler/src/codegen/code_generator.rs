@@ -12,7 +12,7 @@ use ontol_runtime::{
     vm::proc::{
         BuiltinProc, GetAttrFlags, Local, NParams, OpCode, OpCodeCondTerm, Predicate, Procedure,
     },
-    DefId, MapFlags, MapKey,
+    DefId, MapDirection, MapFlags, MapKey,
 };
 use thin_vec::ThinVec;
 use tracing::debug;
@@ -75,6 +75,7 @@ pub(super) fn map_codegen<'m>(
     proc_table: &mut ProcTable,
     func: &HirFunc<'m>,
     map_flags: MapFlags,
+    direction: MapDirection,
     compiler: &mut Compiler<'m>,
 ) -> MapKey {
     let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs, &compiler.repr_ctx);
@@ -136,9 +137,13 @@ pub(super) fn map_codegen<'m>(
                 proc_table.propflow_table.insert(map_key, data_flow);
             }
 
-            proc_table
-                .metadata_table
-                .insert(map_key, MapOutputMeta { lossiness });
+            proc_table.metadata_table.insert(
+                map_key,
+                MapOutputMeta {
+                    lossiness,
+                    direction,
+                },
+            );
 
             map_key
         }

@@ -9,7 +9,7 @@ use crate::{
     property::{Cardinality, PropertyId},
     var::Var,
     vm::proc::Procedure,
-    DefId,
+    DefId, MapDirection,
 };
 
 use super::ontol::TextConstant;
@@ -18,6 +18,7 @@ use super::ontol::TextConstant;
 pub struct MapMeta {
     pub procedure: Procedure,
     pub propflow_range: Option<Range<u32>>,
+    pub direction: MapDirection,
     pub lossiness: MapLossiness,
 }
 

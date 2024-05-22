@@ -8,8 +8,9 @@
 
 use fnv::{FnvHashMap, FnvHashSet};
 use ontol_runtime::{
+    ontology::map::MapLossiness,
     vm::proc::{Local, NParams, OpCode, Predicate, Procedure},
-    DefId, MapDef, MapDefFlags, MapFlags, MapKey,
+    DefId, MapDef, MapDefFlags, MapDirection, MapFlags, MapKey,
 };
 use tracing::debug;
 
@@ -18,7 +19,7 @@ use crate::{repr::repr_model::ReprKind, Compiler, NO_SPAN};
 use super::{
     ir::{Ir, Terminator},
     proc_builder::{Delta, ProcBuilder},
-    task::ProcTable,
+    task::{MapOutputMeta, ProcTable},
 };
 
 /// Data that tracks one union definition
@@ -239,4 +240,11 @@ fn generate_union_switch_map(
     block.commit(Terminator::Return, &mut builder);
 
     proc_table.map_procedures.insert(map_key, builder);
+    proc_table.metadata_table.insert(
+        map_key,
+        MapOutputMeta {
+            direction: MapDirection::Down,
+            lossiness: MapLossiness::Complete,
+        },
+    );
 }

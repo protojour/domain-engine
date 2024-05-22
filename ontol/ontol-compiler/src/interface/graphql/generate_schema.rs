@@ -11,7 +11,7 @@ use ontol_runtime::{
     ontology::{config::data_store_backed_domains, map::MapLossiness, Ontology},
     phf::PhfKey,
     resolve_path::ResolverGraph,
-    DefId, MapKey, PackageId,
+    DefId, MapDirection, MapKey, PackageId,
 };
 use tracing::{debug_span, trace};
 
@@ -55,7 +55,7 @@ pub fn generate_graphql_schema<'c>(
             let name_constant = serde_gen.strings.intern_constant(name);
 
             if let Some(map_key) = codegen_tasks
-                .result_named_forward_maps
+                .result_named_downmaps
                 .get(&(package_id, name_constant))
             {
                 named_maps.push((name, *map_key));
@@ -92,14 +92,11 @@ pub fn generate_graphql_schema<'c>(
             repr_ctx,
             resolver_graph: ResolverGraph::new(codegen_tasks.result_map_proc_table.keys().map(
                 |key| {
-                    (
-                        *key,
-                        codegen_tasks
-                            .result_metadata_table
-                            .get(key)
-                            .map(|meta| meta.lossiness)
-                            .unwrap_or(MapLossiness::Lossy),
-                    )
+                    codegen_tasks
+                        .result_metadata_table
+                        .get(key)
+                        .map(|meta| (*key, meta.direction, meta.lossiness))
+                        .unwrap_or((*key, MapDirection::Down, MapLossiness::Lossy))
                 },
             )),
             union_member_cache,

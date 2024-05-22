@@ -11,7 +11,7 @@ use ontol_runtime::{
     },
     query::condition::Condition,
     vm::proc::{Address, Lib, NParams, OpCode, Procedure},
-    DefId, MapDef, MapFlags, MapKey, PackageId,
+    DefId, MapDef, MapDirection, MapFlags, MapKey, PackageId,
 };
 use tracing::{debug, debug_span, warn};
 
@@ -44,7 +44,7 @@ pub struct CodegenTasks<'m> {
     pub result_lib: Lib,
     pub result_const_procs: FnvHashMap<DefId, Procedure>,
     pub result_map_proc_table: FnvHashMap<MapKey, Procedure>,
-    pub result_named_forward_maps: FnvHashMap<(PackageId, TextConstant), MapKey>,
+    pub result_named_downmaps: FnvHashMap<(PackageId, TextConstant), MapKey>,
     pub result_propflow_table: FnvHashMap<MapKey, Vec<PropertyFlow>>,
     pub result_static_conditions: FnvHashMap<MapKey, Condition>,
     pub result_metadata_table: FnvHashMap<MapKey, MapOutputMeta>,
@@ -188,10 +188,11 @@ pub(super) struct ProcTable {
     pub propflow_table: FnvHashMap<MapKey, Vec<PropertyFlow>>,
     pub metadata_table: FnvHashMap<MapKey, MapOutputMeta>,
     pub static_conditions: FnvHashMap<MapKey, Condition>,
-    pub named_forward_maps: FnvHashMap<(PackageId, TextConstant), MapKey>,
+    pub named_downmaps: FnvHashMap<(PackageId, TextConstant), MapKey>,
 }
 
 pub struct MapOutputMeta {
+    pub direction: MapDirection,
     pub lossiness: MapLossiness,
 }
 
@@ -255,7 +256,7 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
     compiler.codegen_tasks.result_lib = lib;
     compiler.codegen_tasks.result_const_procs = const_procs;
     compiler.codegen_tasks.result_map_proc_table = map_proc_table;
-    compiler.codegen_tasks.result_named_forward_maps = proc_table.named_forward_maps;
+    compiler.codegen_tasks.result_named_downmaps = proc_table.named_downmaps;
     compiler.codegen_tasks.result_static_conditions = proc_table.static_conditions;
     compiler.codegen_tasks.result_propflow_table = proc_table.propflow_table;
     compiler.codegen_tasks.result_metadata_table = proc_table.metadata_table;
@@ -278,6 +279,7 @@ fn generate_explicit_map<'m>(
         generate_extern_map(
             undirected_key.first(),
             undirected_key.second(),
+            MapDirection::Down,
             extern_def_id,
             proc_table,
             compiler,
@@ -288,6 +290,7 @@ fn generate_explicit_map<'m>(
         generate_extern_map(
             undirected_key.second(),
             undirected_key.first(),
+            MapDirection::Up,
             extern_def_id,
             proc_table,
             compiler,
@@ -299,22 +302,36 @@ fn generate_explicit_map<'m>(
         debug!("1st (ty={:?}):\n{}", arms[0].data().ty(), arms[0]);
         debug!("2nd (ty={:?}):\n{}", arms[1].data().ty(), arms[1]);
 
-        let forward_key = {
-            let _entered = debug_span!("fwd").entered();
-            generate_ontol_map_procs(&arms[0], &arms[1], &externed_outputs, proc_table, compiler)
+        let down_key = {
+            let _entered = debug_span!("down").entered();
+            generate_ontol_map_procs(
+                &arms[0],
+                &arms[1],
+                MapDirection::Down,
+                &externed_outputs,
+                proc_table,
+                compiler,
+            )
         };
 
         {
-            let _entered = debug_span!("backwd").entered();
-            generate_ontol_map_procs(&arms[1], &arms[0], &externed_outputs, proc_table, compiler);
+            let _entered = debug_span!("up").entered();
+            generate_ontol_map_procs(
+                &arms[1],
+                &arms[0],
+                MapDirection::Up,
+                &externed_outputs,
+                proc_table,
+                compiler,
+            );
         }
 
-        match (compiler.map_ident(def_id), forward_key) {
-            (Some(ident), Some(forward_key)) => {
+        match (compiler.map_ident(def_id), down_key) {
+            (Some(ident), Some(down_key)) => {
                 let ident_constant = compiler.strings.intern_constant(ident);
                 proc_table
-                    .named_forward_maps
-                    .insert((def_id.package_id(), ident_constant), forward_key);
+                    .named_downmaps
+                    .insert((def_id.package_id(), ident_constant), down_key);
             }
             (Some(_), None) => {
                 compiler.errors.push(SpannedCompileError {
@@ -331,6 +348,7 @@ fn generate_explicit_map<'m>(
 fn generate_ontol_map_procs<'m>(
     scope: &TypedRootNode<'m>,
     expr: &TypedRootNode<'m>,
+    direction: MapDirection,
     externed_outputs: &FnvHashSet<DefId>,
     proc_table: &mut ProcTable,
     compiler: &mut Compiler<'m>,
@@ -350,6 +368,7 @@ fn generate_ontol_map_procs<'m>(
     let key = generate_map_proc(
         scope,
         expr,
+        direction,
         MapFlags::empty(),
         externed_outputs,
         proc_table,
@@ -361,6 +380,7 @@ fn generate_ontol_map_procs<'m>(
         generate_map_proc(
             scope,
             expr,
+            direction,
             MapFlags::PURE_PARTIAL,
             externed_outputs,
             proc_table,
@@ -389,6 +409,7 @@ fn generate_ontol_map_procs<'m>(
 fn generate_map_proc<'m>(
     scope: &TypedRootNode<'m>,
     expr: &TypedRootNode<'m>,
+    direction: MapDirection,
     map_flags: MapFlags,
     externed_outputs: &FnvHashSet<DefId>,
     proc_table: &mut ProcTable,
@@ -420,7 +441,7 @@ fn generate_map_proc<'m>(
 
     debug!("body type: {:?}", func.body.data().ty());
 
-    let key = map_codegen(proc_table, &func, map_flags, compiler);
+    let key = map_codegen(proc_table, &func, map_flags, direction, compiler);
 
     Some(key)
 }
@@ -428,6 +449,7 @@ fn generate_map_proc<'m>(
 fn generate_extern_map(
     input: MapDef,
     output: MapDef,
+    _direction: MapDirection,
     extern_def_id: DefId,
     proc_table: &mut ProcTable,
     compiler: &mut Compiler,
