@@ -1,1 +1,1 @@
-def @hello world() // ERROR TODO: invalid def modifier
+def @hello world() // ERROR modifier not recognized in this context

@@ -12,5 +12,5 @@ def Foo (
 
 map(
     Filter('foo': foo), // ERROR TODO: optional binding required, as a default value cannot be created
-    Foo('foo': foo) // ERROR missing property `bar`// NOTE Consider using `match {}`
+    Foo('foo': foo) // ERROR missing property `bar`// NOTE consider using `match {}`
 )

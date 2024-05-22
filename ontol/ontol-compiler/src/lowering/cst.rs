@@ -561,6 +561,23 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         let first = self.lower_map_arm(arms.next()?, &mut var_table)?;
         let second = self.lower_map_arm(arms.next()?, &mut var_table)?;
 
+        let mut is_abstract = false;
+
+        for modifier in stmt.modifiers() {
+            if modifier.slice() == "@abstract" {
+                if matches!(block_context, BlockContext::Context(_)) {
+                    self.report_error((
+                        CompileError::TODO("extern map cannot be abstract"),
+                        modifier.span(),
+                    ));
+                }
+
+                is_abstract = true;
+            } else {
+                self.report_error((CompileError::InvalidModifier, modifier.span()));
+            }
+        }
+
         let (def_id, ident) = match stmt.ident_path() {
             Some(ident_path) => {
                 let symbol = ident_path.symbols().next()?;
@@ -601,6 +618,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                         }
                     }
                 },
+                is_abstract,
             },
             stmt.0.span(),
         );
@@ -679,10 +697,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     if m.slice() == "@match" {
                         modifier = Some(CompoundPatternModifier::Match);
                     } else {
-                        self.report_error((
-                            CompileError::TODO("invalid struct modifier"),
-                            m.span(),
-                        ));
+                        self.report_error((CompileError::InvalidModifier, m.span()));
                     }
                 }
 
@@ -1320,10 +1335,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     symbol.0 = Some(modifier.span());
                 }
                 _ => {
-                    self.report_error((
-                        CompileError::TODO("invalid def modifier"),
-                        modifier.span(),
-                    ));
+                    self.report_error((CompileError::InvalidModifier, modifier.span()));
                 }
             }
         }

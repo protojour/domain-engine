@@ -297,6 +297,10 @@ impl<V: NodeView> FmtStatement<V> {
 }
 
 impl<V: NodeView> MapStatement<V> {
+    pub fn modifiers(&self) -> impl Iterator<Item = V::Token> {
+        self.view().local_tokens_filter(Kind::Modifier)
+    }
+
     pub fn ident_path(&self) -> Option<IdentPath<V>> {
         self.view().sub_nodes().find_map(IdentPath::from_view)
     }

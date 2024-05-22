@@ -12,7 +12,7 @@ def foo (
 )
 
 def bar (rel .'type': 'bar')
-def baz () // NOTE Type cannot be part of a struct union
+def baz () // NOTE type cannot be part of a struct union
 
 def foo_inverted (
     rel .anonymous: (

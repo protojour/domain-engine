@@ -105,10 +105,15 @@ bitflags::bitflags! {
 /// The direction of mapping.
 #[derive(Clone, Copy, Serialize, Deserialize, OntolDebug)]
 pub enum MapDirection {
-    /// An up direction indicates mapping up from canonical representation, increasing abstraction.
-    Up,
-    /// A down direction indicates mapping down from abtract representation into concrete/canonical representation.
+    /// The down direction decreases domain order towards storage.
+    /// It concretizes towards persisted model.
     Down,
+    /// A mixed direction may appear when mapping is inferred from other
+    /// mappings, for example for type unions.
+    Mixed,
+    /// The up direction increases domain order towards interface.
+    /// It abstracts away from persisted model.
+    Up,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize, Deserialize)]

@@ -166,11 +166,11 @@ impl RegexPatternCaptureNode {
 
 #[derive(Debug)]
 pub enum TypePath {
-    // The type path is specified, and resolved to the given DefId
+    /// The type path is specified, and resolved to the given DefId
     Specified { def_id: DefId, span: SourceSpan },
-    // The type path is anonymous and its structure should be inferred by its fields
+    /// The type path is anonymous and its structure should be inferred by its fields
     Inferred { def_id: DefId },
-    // The type path is contextual (relation parameter)
+    /// The type path is contextual (relation parameter)
     RelContextual,
 }
 

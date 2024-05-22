@@ -24,7 +24,7 @@ use crate::{
     map::UndirectedMapKey,
     typed_hir::TypedRootNode,
     types::Type,
-    CompileError, CompileErrors, Compiler, SourceSpan, SpannedCompileError,
+    CompileError, CompileErrors, Compiler, Note, SourceSpan, SpannedCompileError, SpannedNote,
 };
 
 use super::{
@@ -141,8 +141,13 @@ pub enum MapCodegenRequest<'m> {
 /// A native ontol `map` with full body expressed in ontol-hir
 pub struct OntolMap<'m> {
     pub def_id: DefId,
-    pub arms: [TypedRootNode<'m>; 2],
+    pub arms: OntolMapArms<'m>,
     pub span: SourceSpan,
+}
+
+pub enum OntolMapArms<'m> {
+    Patterns([TypedRootNode<'m>; 2]),
+    Abstract(DefId, DefId),
 }
 
 pub(super) enum MapCodegenTask<'m> {
@@ -173,8 +178,16 @@ impl<'m> Debug for ExplicitMapCodegenTask<'m> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut dbg = f.debug_struct("MapCodegenTask");
         if let Some(ontol) = &self.ontol_map {
-            dbg.field("first", &DebugViaDisplay(&ontol.arms[0]));
-            dbg.field("second", &DebugViaDisplay(&ontol.arms[1]));
+            match &ontol.arms {
+                OntolMapArms::Patterns(arms) => {
+                    dbg.field("first", &DebugViaDisplay(&arms[0]));
+                    dbg.field("second", &DebugViaDisplay(&arms[1]));
+                }
+                OntolMapArms::Abstract(upper, lower) => {
+                    dbg.field("first", &upper);
+                    dbg.field("second", &lower);
+                }
+            }
         }
         dbg.finish()
     }
@@ -274,8 +287,22 @@ fn generate_explicit_map<'m>(
 ) {
     let mut externed_outputs = FnvHashSet::default();
 
+    fn unknown_extern_map_direction(compiler: &mut Compiler, extern_def_id: DefId) {
+        let span = compiler.defs.def_span(extern_def_id);
+        compiler.push_error(CompileError::ExternMapUnknownDirection.spanned(&span).note(
+            SpannedNote {
+                note: Note::AbtractMapSuggestion,
+                span,
+            },
+        ));
+    }
+
     // the extern directions are in relation to the _undirected key_, not the ontol map arms!
     if let Some(extern_def_id) = forward_extern {
+        if ontol_map.is_none() {
+            unknown_extern_map_direction(compiler, extern_def_id);
+        }
+
         generate_extern_map(
             undirected_key.first(),
             undirected_key.second(),
@@ -287,6 +314,10 @@ fn generate_explicit_map<'m>(
         externed_outputs.insert(undirected_key.second().def_id);
     }
     if let Some(extern_def_id) = backward_extern {
+        if ontol_map.is_none() {
+            unknown_extern_map_direction(compiler, extern_def_id);
+        }
+
         generate_extern_map(
             undirected_key.second(),
             undirected_key.first(),
@@ -299,48 +330,76 @@ fn generate_explicit_map<'m>(
     }
 
     if let Some(OntolMap { def_id, arms, span }) = ontol_map {
-        debug!("1st (ty={:?}):\n{}", arms[0].data().ty(), arms[0]);
-        debug!("2nd (ty={:?}):\n{}", arms[1].data().ty(), arms[1]);
+        match arms {
+            OntolMapArms::Patterns(arms) => {
+                debug!("1st (ty={:?}):\n{}", arms[0].data().ty(), arms[0]);
+                debug!("2nd (ty={:?}):\n{}", arms[1].data().ty(), arms[1]);
 
-        let down_key = {
-            let _entered = debug_span!("down").entered();
-            generate_ontol_map_procs(
-                &arms[0],
-                &arms[1],
-                MapDirection::Down,
-                &externed_outputs,
-                proc_table,
-                compiler,
-            )
-        };
+                let down_key = {
+                    let _entered = debug_span!("down").entered();
+                    generate_ontol_map_procs(
+                        &arms[0],
+                        &arms[1],
+                        MapDirection::Down,
+                        &externed_outputs,
+                        proc_table,
+                        compiler,
+                    )
+                };
 
-        {
-            let _entered = debug_span!("up").entered();
-            generate_ontol_map_procs(
-                &arms[1],
-                &arms[0],
-                MapDirection::Up,
-                &externed_outputs,
-                proc_table,
-                compiler,
-            );
-        }
+                {
+                    let _entered = debug_span!("up").entered();
+                    generate_ontol_map_procs(
+                        &arms[1],
+                        &arms[0],
+                        MapDirection::Up,
+                        &externed_outputs,
+                        proc_table,
+                        compiler,
+                    );
+                }
 
-        match (compiler.map_ident(def_id), down_key) {
-            (Some(ident), Some(down_key)) => {
-                let ident_constant = compiler.strings.intern_constant(ident);
-                proc_table
-                    .named_downmaps
-                    .insert((def_id.package_id(), ident_constant), down_key);
+                match (compiler.map_ident(def_id), down_key) {
+                    (Some(ident), Some(down_key)) => {
+                        let ident_constant = compiler.strings.intern_constant(ident);
+                        proc_table
+                            .named_downmaps
+                            .insert((def_id.package_id(), ident_constant), down_key);
+                    }
+                    (Some(_), None) => {
+                        compiler.errors.push(SpannedCompileError {
+                            error: CompileError::BUG("Failed to generate forward mapping"),
+                            span,
+                            notes: vec![],
+                        });
+                    }
+                    _ => {}
+                }
             }
-            (Some(_), None) => {
-                compiler.errors.push(SpannedCompileError {
-                    error: CompileError::BUG("Failed to generate forward mapping"),
-                    span,
-                    notes: vec![],
-                });
+            OntolMapArms::Abstract(upper, lower) => {
+                proc_table.metadata_table.insert(
+                    MapKey {
+                        input: upper.into(),
+                        output: lower.into(),
+                        flags: MapFlags::default(),
+                    },
+                    MapOutputMeta {
+                        direction: MapDirection::Down,
+                        lossiness: MapLossiness::Complete,
+                    },
+                );
+                proc_table.metadata_table.insert(
+                    MapKey {
+                        input: lower.into(),
+                        output: upper.into(),
+                        flags: MapFlags::default(),
+                    },
+                    MapOutputMeta {
+                        direction: MapDirection::Up,
+                        lossiness: MapLossiness::Complete,
+                    },
+                );
             }
-            _ => {}
         }
     }
 }

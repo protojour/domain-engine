@@ -1,0 +1,7 @@
+def foo()
+def bar()
+
+def @extern hook1 ( // ERROR unknown map direction. Try to specify an @abstract mapping outside this scope.// NOTE consider defining a `map @abstract(..)` involving the same types, outside this scope, as this would explicitly state the direction`
+    rel .'url': 'http://localhost:8080/map_channel'
+    map(foo(), bar())
+)

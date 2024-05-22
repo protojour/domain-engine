@@ -50,6 +50,7 @@ pub enum DefKind<'m> {
         arms: [PatId; 2],
         var_alloc: VarAllocator,
         extern_def_id: Option<DefId>,
+        is_abstract: bool,
     },
     AutoMapping,
     Extern(&'m str),

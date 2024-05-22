@@ -17,6 +17,13 @@ pub struct SpannedCompileError {
     pub notes: Vec<SpannedNote>,
 }
 
+impl SpannedCompileError {
+    pub fn note(mut self, note: SpannedNote) -> Self {
+        self.notes.push(note);
+        self
+    }
+}
+
 #[derive(Debug)]
 pub enum CompileError {
     Lex(String),
@@ -91,6 +98,7 @@ pub enum CompileError {
     UnknownTypeParameter,
     CannotMapUnion,
     CannotMapAbstract,
+    ExternMapUnknownDirection,
     NoRelationParametersExpected,
     ExpectedExplicitStructPath,
     IncompatibleLiteral,
@@ -110,6 +118,7 @@ pub enum CompileError {
     UnsolvableEquation,
     UnsupportedVariableDuplication,
     SpreadLabelMustBeLastArgument,
+    InvalidModifier,
     /// A message regarded as a bug in the compiler
     Bug(String),
     /// An TODO message is an "immature" compile error, probably requires better UX design
@@ -278,6 +287,10 @@ impl std::fmt::Display for CompileError {
             Self::UnknownTypeParameter => write!(f, "unknown type parameter"),
             Self::CannotMapUnion => write!(f, "cannot map a union, map each variant instead"),
             Self::CannotMapAbstract => write!(f, "cannot map an abstract type"),
+            Self::ExternMapUnknownDirection => write!(
+                f,
+                "unknown map direction. Try to specify an @abstract mapping outside this scope."
+            ),
             Self::NoRelationParametersExpected => write!(f, "no relation parameters expected"),
             Self::ExpectedExplicitStructPath => write!(f, "expected explicit struct path"),
             Self::IncompatibleLiteral => write!(f, "Incompatible literal"),
@@ -285,8 +298,8 @@ impl std::fmt::Display for CompileError {
             Self::TypeNotRepresentable => write!(f, "type not representable"),
             Self::AnonymousUnionAbstraction => write!(f, "anonymous union abstraction"),
             Self::MutationOfSealedDef => write!(f, "definition is sealed and cannot be modified"),
-            Self::IntersectionOfDisjointTypes => write!(f, "Intersection of disjoint types"),
-            Self::CircularSubtypingRelation => write!(f, "Circular subtyping relation"),
+            Self::IntersectionOfDisjointTypes => write!(f, "intersection of disjoint types"),
+            Self::CircularSubtypingRelation => write!(f, "circular subtyping relation"),
             Self::AmbiguousNumberResolution => write!(f, "ambiguous number resolution"),
             Self::DuplicateTypeParam(ident) => write!(f, "duplicate type param `{ident}`"),
             Self::RequiresSpreading => write!(f, "requires spreading (`..`)"),
@@ -298,6 +311,9 @@ impl std::fmt::Display for CompileError {
             ),
             Self::SpreadLabelMustBeLastArgument => {
                 write!(f, "spread label must be the last argument")
+            }
+            Self::InvalidModifier => {
+                write!(f, "modifier not recognized in this context")
             }
             Self::Bug(msg) => write!(f, "BUG: {msg}"),
             Self::Todo(msg) => write!(f, "TODO: {msg}"),
@@ -319,22 +335,24 @@ impl SpannedNote {
 
 #[derive(Debug, Error)]
 pub enum Note {
-    #[error("Consider using `match {{}}`")]
+    #[error("consider using `match {{}}`")]
     ConsiderUsingMatch,
-    #[error("Type is abstract")]
+    #[error("type is abstract")]
     TypeIsAbstract,
-    #[error("Type cannot be part of a struct union")]
+    #[error("type cannot be part of a struct union")]
     CannotBePartOfStructUnion,
-    #[error("Type of field is abstract")]
+    #[error("type of field is abstract")]
     FieldTypeIsAbstract,
-    #[error("Base type is {0}")]
+    #[error("base type is {0}")]
     BaseTypeIs(String),
-    #[error("Number type is abstract")]
+    #[error("number type is abstract")]
     NumberTypeIsAbstract,
     #[error("defined here")]
     DefinedHere,
     #[error("use a domain-specific unit type instead")]
     UseDomainSpecificUnitType,
+    #[error("consider defining a `map @abstract(..)` involving the same types, outside this scope, as this would explicitly state the direction`")]
+    AbtractMapSuggestion,
 }
 
 impl CompileError {

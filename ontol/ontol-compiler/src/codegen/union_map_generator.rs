@@ -203,7 +203,22 @@ fn generate_union_switch_map(
     let mut builder = ProcBuilder::new(NParams(1));
     let mut block = builder.new_block(Delta(0), NO_SPAN);
 
+    let mut map_direction: Option<MapDirection> = None;
+
     for (input_def_id, output_def_id) in switch_pairs {
+        merge_next_map_direction(
+            &mut map_direction,
+            proc_table
+                .metadata_table
+                .get(&MapKey {
+                    input: input_def_id.into(),
+                    output: output_def_id.into(),
+                    flags: MapFlags::empty(),
+                })
+                .unwrap()
+                .direction,
+        );
+
         let mut case_block = builder.new_block(Delta(0), NO_SPAN);
 
         block.ir(
@@ -243,8 +258,21 @@ fn generate_union_switch_map(
     proc_table.metadata_table.insert(
         map_key,
         MapOutputMeta {
-            direction: MapDirection::Down,
+            direction: map_direction.unwrap_or(MapDirection::Mixed),
             lossiness: MapLossiness::Complete,
         },
     );
+}
+
+fn merge_next_map_direction(output: &mut Option<MapDirection>, next: MapDirection) {
+    match (*output, next) {
+        (None, dir) => {
+            *output = Some(dir);
+        }
+        (Some(MapDirection::Down), MapDirection::Down)
+        | (Some(MapDirection::Up), MapDirection::Up) => {}
+        _ => {
+            *output = Some(MapDirection::Mixed);
+        }
+    }
 }

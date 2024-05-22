@@ -1,16 +1,16 @@
 use ontol_hir::Label;
-use ontol_runtime::var::VarAllocator;
+use ontol_runtime::{var::VarAllocator, DefId};
 
 use crate::{
     codegen::{
-        task::{MapCodegenRequest, OntolMap},
+        task::{MapCodegenRequest, OntolMap, OntolMapArms},
         type_mapper::TypeMapper,
     },
     def::{Def, DefKind},
     error::CompileError,
     map::UndirectedMapKey,
     mem::Intern,
-    pattern::PatId,
+    pattern::{PatId, PatternKind, TypePath},
     repr::repr_model::ReprKind,
     type_check::hir_build_ctx::{Arm, VariableMapping},
     typed_hir::TypedRootNode,
@@ -53,28 +53,50 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         def: &Def,
         var_allocator: &VarAllocator,
         pat_ids: [PatId; 2],
+        is_abstract: bool,
     ) -> Result<TypeRef<'m>, CheckMapError> {
-        let mut ctx = HirBuildCtx::new(def.span, VarAllocator::from(*var_allocator.peek_next()));
+        if is_abstract {
+            let upper = self.expect_pattern_abstract_def_id(pat_ids[0]);
+            let lower = self.expect_pattern_abstract_def_id(pat_ids[1]);
 
-        let mut analyzer = PreAnalyzer {
-            errors: self.errors,
-        };
-        for (pat_id, arm) in pat_ids.iter().zip(ARMS) {
-            let _entered = arm.tracing_debug_span().entered();
+            if let (Some(upper), Some(lower)) = (upper, lower) {
+                let key_pair = UndirectedMapKey::new([upper.into(), lower.into()]);
 
-            ctx.current_arm = arm;
+                self.codegen_tasks.add_map_task(
+                    key_pair,
+                    MapCodegenRequest::ExplicitOntol(OntolMap {
+                        def_id: def.id,
+                        arms: OntolMapArms::Abstract(upper, lower),
+                        span: def.span,
+                    }),
+                    self.defs,
+                    self.errors,
+                );
+            }
+        } else {
+            let mut ctx =
+                HirBuildCtx::new(def.span, VarAllocator::from(*var_allocator.peek_next()));
 
-            let pattern = self.patterns.table.get(pat_id).unwrap();
-            analyzer.analyze_arm(pattern, None, &mut ctx)?;
+            let mut analyzer = PreAnalyzer {
+                errors: self.errors,
+            };
+            for (pat_id, arm) in pat_ids.iter().zip(ARMS) {
+                let _entered = arm.tracing_debug_span().entered();
+
+                ctx.current_arm = arm;
+
+                let pattern = self.patterns.table.get(pat_id).unwrap();
+                analyzer.analyze_arm(pattern, None, &mut ctx)?;
+            }
+
+            self.build_typed_ontol_hir_arms(
+                def,
+                [(pat_ids[0], Arm::First), (pat_ids[1], Arm::Second)],
+                &mut ctx,
+            )?;
+
+            self.report_missing_prop_errors(&mut ctx);
         }
-
-        self.build_typed_ontol_hir_arms(
-            def,
-            [(pat_ids[0], Arm::First), (pat_ids[1], Arm::Second)],
-            &mut ctx,
-        )?;
-
-        self.report_missing_prop_errors(&mut ctx);
 
         Ok(self.types.intern(Type::Tautology))
     }
@@ -104,7 +126,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 key_pair,
                 MapCodegenRequest::ExplicitOntol(OntolMap {
                     def_id: def.id,
-                    arms: arm_nodes,
+                    arms: OntolMapArms::Patterns(arm_nodes),
                     span: def.span,
                 }),
                 self.defs,
@@ -268,6 +290,27 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }],
                 );
             }
+        }
+    }
+
+    fn expect_pattern_abstract_def_id(&mut self, pat_id: PatId) -> Option<DefId> {
+        self.get_pattern_abstract_def_id(pat_id).or_else(|| {
+            let pat = self.patterns.table.get(&pat_id).unwrap();
+            self.errors
+                .push(CompileError::TODO("must be named compound pattern").spanned(&pat.span));
+
+            None
+        })
+    }
+
+    fn get_pattern_abstract_def_id(&self, pat_id: PatId) -> Option<DefId> {
+        match &self.patterns.table.get(&pat_id)?.kind {
+            PatternKind::Compound { type_path, .. } => match type_path {
+                TypePath::Specified { def_id, .. } => Some(*def_id),
+                TypePath::Inferred { .. } => None,
+                TypePath::RelContextual => None,
+            },
+            _ => None,
         }
     }
 }

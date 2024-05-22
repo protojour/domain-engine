@@ -31,7 +31,10 @@ map(
     )
 )
 
-/// The channel
+/// This expresses the mapping direction between these types:
+map @abstract(channel(), channel_base())
+
+/// The actual mapping logic is outsourced to a hook
 def @extern channel_hook (
     rel .'url': 'http://localhost:8080/map_channel'
     map(channel_base(), channel())

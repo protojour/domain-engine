@@ -11,5 +11,5 @@ def foobar (
 
 map(
     foobar(), // ERROR cannot map a union, map each variant instead
-    foo(), // ERROR missing property `type`// NOTE Consider using `match {}`
+    foo(), // ERROR missing property `type`// NOTE consider using `match {}`
 )

@@ -346,6 +346,8 @@ fn fmt_statement(p: &mut CstParser) {
 fn map_statement(p: &mut CstParser) {
     p.eat(K![map]);
 
+    p.eat_modifiers();
+
     if p.at() == Kind::Sym {
         let ident = p.start(Kind::IdentPath);
         p.eat(Kind::Sym);

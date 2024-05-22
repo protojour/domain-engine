@@ -215,12 +215,13 @@ impl<'m> Compiler<'m> {
                     arms,
                     var_alloc,
                     extern_def_id,
+                    is_abstract,
                 } = &def.kind
                 {
                     if let Some(extern_def_id) = extern_def_id {
                         type_check.check_map_extern(def, *arms, *extern_def_id);
                     } else {
-                        match type_check.check_map(def, var_alloc, *arms) {
+                        match type_check.check_map(def, var_alloc, *arms, *is_abstract) {
                             Ok(_) => {}
                             Err(error) => {
                                 debug!("Check map error: {error:?}");

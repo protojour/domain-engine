@@ -1,5 +1,5 @@
-def level ( // ERROR Intersection of disjoint types
-    rel .is: 1 // NOTE Base type is `ontol.int(1)`
-    rel .is: 2 // NOTE Base type is `ontol.int(2)`
-    rel .is: 3 // NOTE Base type is `ontol.int(3)`
+def level ( // ERROR intersection of disjoint types
+    rel .is: 1 // NOTE base type is `ontol.int(1)`
+    rel .is: 2 // NOTE base type is `ontol.int(2)`
+    rel .is: 3 // NOTE base type is `ontol.int(3)`
 )

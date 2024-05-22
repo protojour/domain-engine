@@ -1,5 +1,5 @@
 def u ( // ERROR type not representable
     rel .'a':
-        integer // NOTE Type of field is abstract
+        integer // NOTE type of field is abstract
     rel .0: text // ERROR invalid mix of relationship type for subject
 )
