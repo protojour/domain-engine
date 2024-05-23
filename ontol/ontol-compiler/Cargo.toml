@@ -19,7 +19,6 @@ serde.workspace = true
 smallvec.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
-either.workspace = true
 bit-set.workspace = true
 thin-vec.workspace = true
 regex-automata.workspace = true

@@ -2213,7 +2213,6 @@ dependencies = [
  "bit-set",
  "bitflags 2.5.0",
  "bumpalo",
- "either",
  "ena",
  "fnv",
  "heck",
@@ -2319,7 +2318,6 @@ name = "ontol-parser"
 version = "0.1.0"
 dependencies = [
  "assert_matches",
- "either",
  "indoc",
  "logos",
  "pretty_assertions",
