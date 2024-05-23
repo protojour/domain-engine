@@ -1,7 +1,7 @@
 use fnv::FnvHashSet;
 use ontol_parser::cst::view::NodeViewExt;
 use ontol_runtime::{ontology::ontol::TextConstant, DefId, PackageId};
-use tracing::debug;
+use tracing::{debug, info};
 
 use crate::{
     def::{DefKind, RelParams},
@@ -218,6 +218,7 @@ impl<'m> Compiler<'m> {
                     is_abstract,
                 } = &def.kind
                 {
+                    info!("CHECK MAP: {:?}", type_check.defs.def_span(def_id));
                     if let Some(extern_def_id) = extern_def_id {
                         type_check.check_map_extern(def, *arms, *extern_def_id);
                     } else {

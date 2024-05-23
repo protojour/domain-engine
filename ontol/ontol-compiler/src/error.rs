@@ -98,6 +98,7 @@ pub enum CompileError {
     UnknownTypeParameter,
     CannotMapUnion,
     CannotMapAbstract,
+    ConflictingMap,
     ExternMapUnknownDirection,
     NoRelationParametersExpected,
     ExpectedExplicitStructPath,
@@ -124,6 +125,16 @@ pub enum CompileError {
     /// An TODO message is an "immature" compile error, probably requires better UX design
     /// for presenting to the user
     Todo(String),
+}
+
+impl CompileError {
+    pub fn spanned(self, span: &SourceSpan) -> SpannedCompileError {
+        SpannedCompileError {
+            error: self,
+            span: *span,
+            notes: vec![],
+        }
+    }
 }
 
 impl CompileError {
@@ -287,6 +298,7 @@ impl std::fmt::Display for CompileError {
             Self::UnknownTypeParameter => write!(f, "unknown type parameter"),
             Self::CannotMapUnion => write!(f, "cannot map a union, map each variant instead"),
             Self::CannotMapAbstract => write!(f, "cannot map an abstract type"),
+            Self::ConflictingMap => write!(f, "conflicting map"),
             Self::ExternMapUnknownDirection => write!(f, "unknown map direction for extern map"),
             Self::NoRelationParametersExpected => write!(f, "no relation parameters expected"),
             Self::ExpectedExplicitStructPath => write!(f, "expected explicit struct path"),
@@ -350,14 +362,15 @@ pub enum Note {
     UseDomainSpecificUnitType,
     #[error("consider defining a `map @abstract(..)` involving the same types, outside this scope, as this would explicitly state the direction`")]
     AbtractMapSuggestion,
+    #[error("already defined here")]
+    AlreadyDefinedHere,
 }
 
-impl CompileError {
-    pub fn spanned(self, span: &SourceSpan) -> SpannedCompileError {
-        SpannedCompileError {
-            error: self,
+impl Note {
+    pub fn spanned(self, span: &SourceSpan) -> SpannedNote {
+        SpannedNote {
+            note: self,
             span: *span,
-            notes: vec![],
         }
     }
 }

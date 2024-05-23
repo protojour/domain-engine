@@ -65,7 +65,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.codegen_tasks.add_map_task(
                     key_pair,
                     MapCodegenRequest::ExplicitOntol(OntolMap {
-                        def_id: def.id,
+                        map_def_id: def.id,
                         arms: OntolMapArms::Abstract(upper, lower),
                         span: def.span,
                     }),
@@ -125,7 +125,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             self.codegen_tasks.add_map_task(
                 key_pair,
                 MapCodegenRequest::ExplicitOntol(OntolMap {
-                    def_id: def.id,
+                    map_def_id: def.id,
                     arms: OntolMapArms::Patterns(arm_nodes),
                     span: def.span,
                 }),

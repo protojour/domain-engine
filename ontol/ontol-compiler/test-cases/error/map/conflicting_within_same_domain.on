@@ -1,0 +1,10 @@
+def a()
+def b()
+def c()
+def d()
+
+map(a(), b()) // NOTE already defined here
+map(a(), b()) // ERROR conflicting map
+
+map(c(), d()) // NOTE already defined here
+map(d(), c()) // ERROR conflicting map

@@ -5,7 +5,10 @@ use ontol_runtime::{
 use tracing::warn;
 
 use crate::{
-    codegen::{task::MapCodegenRequest, type_mapper::TypeMapper},
+    codegen::{
+        task::{ExternMap, MapCodegenRequest},
+        type_mapper::TypeMapper,
+    },
     def::{Def, DefKind, LookupRelationshipMeta},
     mem::Intern,
     pattern::{PatId, PatternKind, TypePath},
@@ -91,7 +94,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     /// Check a mapping within an extern definition
     pub fn check_map_extern(
         &mut self,
-        _def: &Def,
+        def: &Def,
         pat_ids: [PatId; 2],
         extern_def_id: DefId,
     ) -> TypeRef<'m> {
@@ -100,14 +103,19 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let first = self.check_arm(pat_ids[0]);
         let second = self.check_arm(pat_ids[1]);
 
+        let extern_map = ExternMap {
+            extern_def_id,
+            map_def_id: def.id,
+        };
+
         if let Some(key_pair) = TypeMapper::new(self.relations, self.defs, self.repr_ctx)
             .find_map_key_pair([first, second])
         {
             let first_def_id = first.get_single_def_id().unwrap();
             let request = if key_pair.first().def_id == first_def_id {
-                MapCodegenRequest::ExternForward(extern_def_id)
+                MapCodegenRequest::ExternForward(extern_map)
             } else {
-                MapCodegenRequest::ExternBackward(extern_def_id)
+                MapCodegenRequest::ExternBackward(extern_map)
             };
 
             self.codegen_tasks

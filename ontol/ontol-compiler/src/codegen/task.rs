@@ -55,8 +55,8 @@ impl<'m> CodegenTasks<'m> {
         &mut self,
         pair: UndirectedMapKey,
         request: MapCodegenRequest<'m>,
-        _defs: &Defs,
-        _errors: &mut CompileErrors,
+        defs: &Defs,
+        errors: &mut CompileErrors,
     ) {
         match self.map_tasks.entry(pair) {
             Entry::Occupied(mut occupied) => {
@@ -70,19 +70,33 @@ impl<'m> CodegenTasks<'m> {
                         }));
                     }
                     (
-                        MapCodegenTask::Explicit(expl),
+                        MapCodegenTask::Explicit(old),
                         MapCodegenRequest::ExplicitOntol(ontol_map),
                     ) => {
-                        expl.ontol_map = Some(ontol_map);
-                    }
-                    (MapCodegenTask::Explicit(expl), MapCodegenRequest::ExternForward(extern_)) => {
-                        expl.forward_extern = Some(extern_);
+                        if let Some(old_ontol_map) = &old.ontol_map {
+                            errors.push(
+                                CompileError::ConflictingMap
+                                    .spanned(&defs.def_span(ontol_map.map_def_id))
+                                    .note(
+                                        Note::AlreadyDefinedHere
+                                            .spanned(&defs.def_span(old_ontol_map.map_def_id)),
+                                    ),
+                            );
+                        } else {
+                            old.ontol_map = Some(ontol_map);
+                        }
                     }
                     (
                         MapCodegenTask::Explicit(expl),
-                        MapCodegenRequest::ExternBackward(extern_),
+                        MapCodegenRequest::ExternForward(extern_map),
                     ) => {
-                        expl.backward_extern = Some(extern_);
+                        expl.forward_extern = Some(extern_map);
+                    }
+                    (
+                        MapCodegenTask::Explicit(expl),
+                        MapCodegenRequest::ExternBackward(extern_map),
+                    ) => {
+                        expl.backward_extern = Some(extern_map);
                     }
                     _ => {
                         warn!("TODO: Invalid mix of map strategies");
@@ -134,13 +148,13 @@ pub enum MapCodegenRequest<'m> {
     /// Autogenerate
     Auto(PackageId),
     ExplicitOntol(OntolMap<'m>),
-    ExternForward(DefId),
-    ExternBackward(DefId),
+    ExternForward(ExternMap),
+    ExternBackward(ExternMap),
 }
 
 /// A native ontol `map` with full body expressed in ontol-hir
 pub struct OntolMap<'m> {
-    pub def_id: DefId,
+    pub map_def_id: DefId,
     pub arms: OntolMapArms<'m>,
     pub span: SourceSpan,
 }
@@ -160,10 +174,15 @@ pub(super) struct ExplicitMapCodegenTask<'m> {
     pub ontol_map: Option<OntolMap<'m>>,
     /// extern forward override of the ontol mapping.
     /// note: The direction is relative to [UndirectedMapKey].
-    pub forward_extern: Option<DefId>,
+    pub forward_extern: Option<ExternMap>,
     /// extern forward override of the ontol mapping.
     /// note: The direction is relative to [UndirectedMapKey].
-    pub backward_extern: Option<DefId>,
+    pub backward_extern: Option<ExternMap>,
+}
+
+pub struct ExternMap {
+    pub extern_def_id: DefId,
+    pub map_def_id: DefId,
 }
 
 impl<'m> Debug for ConstCodegenTask<'m> {
@@ -287,8 +306,8 @@ fn generate_explicit_map<'m>(
 ) {
     let mut externed_outputs = FnvHashSet::default();
 
-    fn unknown_extern_map_direction(compiler: &mut Compiler, extern_def_id: DefId) {
-        let span = compiler.defs.def_span(extern_def_id);
+    fn unknown_extern_map_direction(compiler: &mut Compiler, map_def_id: DefId) {
+        let span = compiler.defs.def_span(map_def_id);
         compiler.push_error(CompileError::ExternMapUnknownDirection.spanned(&span).note(
             SpannedNote {
                 note: Note::AbtractMapSuggestion,
@@ -298,36 +317,41 @@ fn generate_explicit_map<'m>(
     }
 
     // the extern directions are in relation to the _undirected key_, not the ontol map arms!
-    if let Some(extern_def_id) = forward_extern {
+    if let Some(extern_map) = forward_extern {
         if ontol_map.is_none() {
-            unknown_extern_map_direction(compiler, extern_def_id);
+            unknown_extern_map_direction(compiler, extern_map.map_def_id);
         }
 
         generate_extern_map(
             undirected_key.first(),
             undirected_key.second(),
-            extern_def_id,
+            extern_map.extern_def_id,
             proc_table,
             compiler,
         );
         externed_outputs.insert(undirected_key.second().def_id);
     }
-    if let Some(extern_def_id) = backward_extern {
+    if let Some(extern_map) = backward_extern {
         if ontol_map.is_none() {
-            unknown_extern_map_direction(compiler, extern_def_id);
+            unknown_extern_map_direction(compiler, extern_map.map_def_id);
         }
 
         generate_extern_map(
             undirected_key.second(),
             undirected_key.first(),
-            extern_def_id,
+            extern_map.extern_def_id,
             proc_table,
             compiler,
         );
         externed_outputs.insert(undirected_key.first().def_id);
     }
 
-    if let Some(OntolMap { def_id, arms, span }) = ontol_map {
+    if let Some(OntolMap {
+        map_def_id: def_id,
+        arms,
+        span,
+    }) = ontol_map
+    {
         match arms {
             OntolMapArms::Patterns(arms) => {
                 debug!("1st (ty={:?}):\n{}", arms[0].data().ty(), arms[0]);

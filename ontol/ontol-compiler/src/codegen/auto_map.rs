@@ -42,7 +42,7 @@ pub fn autogenerate_mapping<'m>(
 
             Some(ExplicitMapCodegenTask {
                 ontol_map: Some(OntolMap {
-                    def_id: compiler
+                    map_def_id: compiler
                         .defs
                         .add_def(DefKind::AutoMapping, package_id, NO_SPAN),
                     arms: OntolMapArms::Patterns(arms),
@@ -58,7 +58,7 @@ pub fn autogenerate_mapping<'m>(
 
             Some(ExplicitMapCodegenTask {
                 ontol_map: Some(OntolMap {
-                    def_id: compiler
+                    map_def_id: compiler
                         .defs
                         .add_def(DefKind::AutoMapping, package_id, NO_SPAN),
                     arms: OntolMapArms::Patterns([fmt_node, transparent_node]),
@@ -74,7 +74,7 @@ pub fn autogenerate_mapping<'m>(
 
             Some(ExplicitMapCodegenTask {
                 ontol_map: Some(OntolMap {
-                    def_id: compiler
+                    map_def_id: compiler
                         .defs
                         .add_def(DefKind::AutoMapping, package_id, NO_SPAN),
                     arms: OntolMapArms::Patterns([transparent_node, fmt_node]),
