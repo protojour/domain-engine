@@ -375,7 +375,7 @@ fn print_unified_compile_error(
     source_code_registry: &SourceCodeRegistry,
 ) -> Result<(), OntoolError> {
     let mut colors = ColorGenerator::new();
-    for error in unified_error.errors.iter() {
+    for error in unified_error.errors.into_iter() {
         let span = error.span.span.start as usize..error.span.span.end as usize;
         let message = error.error.to_string();
 
@@ -394,9 +394,9 @@ fn print_unified_compile_error(
             .finish()
             .eprint((ontol_source.name(), Source::from(literal_source.as_ref())))?;
 
-        for note in &error.notes {
-            let span = note.span.span.start as usize..note.span.span.end as usize;
-            let message = note.note.to_string();
+        for note in error.notes {
+            let span = note.span().span.start as usize..note.span().span.end as usize;
+            let message = note.into_note().to_string();
 
             let ontol_source = ontol_sources.get_source(error.span.source_id).unwrap();
             let literal_source = source_code_registry

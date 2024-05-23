@@ -332,13 +332,21 @@ impl std::fmt::Display for CompileError {
 
 #[derive(Debug)]
 pub struct SpannedNote {
-    pub note: Note,
-    pub span: SourceSpan,
+    note: Note,
+    span: SourceSpan,
 }
 
 impl SpannedNote {
     pub const fn new(note: Note, span: SourceSpan) -> Self {
         Self { note, span }
+    }
+
+    pub fn into_note(self) -> Note {
+        self.note
+    }
+
+    pub fn span(&self) -> SourceSpan {
+        self.span
     }
 }
 
@@ -367,11 +375,8 @@ pub enum Note {
 }
 
 impl Note {
-    pub fn spanned(self, span: &SourceSpan) -> SpannedNote {
-        SpannedNote {
-            note: self,
-            span: *span,
-        }
+    pub fn spanned(self, span: SourceSpan) -> SpannedNote {
+        SpannedNote { note: self, span }
     }
 }
 

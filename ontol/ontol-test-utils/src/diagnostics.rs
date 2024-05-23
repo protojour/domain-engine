@@ -124,8 +124,8 @@ pub fn diff_errors(
             add_message_to_builder(
                 &mut builders,
                 SpannedMessage {
-                    message: Message::Note(spanned_note.note),
-                    span: spanned_note.span,
+                    span: spanned_note.span(),
+                    message: Message::Note(spanned_note.into_note()),
                 },
             );
         }

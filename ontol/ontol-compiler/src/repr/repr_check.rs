@@ -130,17 +130,15 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 match span_node.kind {
                     SpanKind::Type(span_def_id) => {
                         if span_def_id != self.root_def_id {
-                            self.state.abstract_notes.push(SpannedNote {
-                                note: Note::TypeIsAbstract,
-                                span: span_node.span,
-                            });
+                            self.state
+                                .abstract_notes
+                                .push(Note::TypeIsAbstract.spanned(span_node.span));
                         }
                     }
                     SpanKind::Field => {
-                        self.state.abstract_notes.push(SpannedNote {
-                            note: Note::FieldTypeIsAbstract,
-                            span: span_node.span,
-                        });
+                        self.state
+                            .abstract_notes
+                            .push(Note::FieldTypeIsAbstract.spanned(span_node.span));
                     }
                 }
             }
@@ -555,10 +553,9 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             (Sub, Some(ReprKind::StructUnion(_)), _) => {
                 self.errors.push(SpannedCompileError {
                     error: CompileError::TypeNotRepresentable,
-                    notes: vec![SpannedNote {
-                        note: Note::CannotBePartOfStructUnion,
-                        span: self.defs.def_span(next_def_id),
-                    }],
+                    notes: vec![
+                        Note::CannotBePartOfStructUnion.spanned(self.defs.def_span(next_def_id))
+                    ],
                     span: self.defs.def_span(repr_def_id),
                 });
             }
@@ -645,10 +642,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 notes: is_path
                     .invalid_super_set
                     .values()
-                    .map(|span| SpannedNote {
-                        note: Note::UseDomainSpecificUnitType,
-                        span: *span,
-                    })
+                    .map(|span| Note::UseDomainSpecificUnitType.spanned(*span))
                     .collect(),
             });
         }

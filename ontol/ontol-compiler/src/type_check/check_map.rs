@@ -15,7 +15,7 @@ use crate::{
     type_check::hir_build_ctx::{Arm, VariableMapping},
     typed_hir::TypedRootNode,
     types::{Type, TypeRef},
-    Note, SpannedNote,
+    Note,
 };
 
 use super::{
@@ -281,14 +281,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
 
                 let error = CompileError::MissingProperties(formatted_properties);
-                self.error_with_notes(
-                    error,
-                    &span,
-                    vec![SpannedNote {
-                        note: Note::ConsiderUsingMatch,
-                        span,
-                    }],
-                );
+                self.error_with_notes(error, &span, vec![Note::ConsiderUsingMatch.spanned(span)]);
             }
         }
     }

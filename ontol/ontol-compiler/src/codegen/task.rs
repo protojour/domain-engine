@@ -24,7 +24,7 @@ use crate::{
     map::UndirectedMapKey,
     typed_hir::TypedRootNode,
     types::Type,
-    CompileError, CompileErrors, Compiler, Note, SourceSpan, SpannedCompileError, SpannedNote,
+    CompileError, CompileErrors, Compiler, Note, SourceSpan, SpannedCompileError,
 };
 
 use super::{
@@ -79,7 +79,7 @@ impl<'m> CodegenTasks<'m> {
                                     .spanned(&defs.def_span(ontol_map.map_def_id))
                                     .note(
                                         Note::AlreadyDefinedHere
-                                            .spanned(&defs.def_span(old_ontol_map.map_def_id)),
+                                            .spanned(defs.def_span(old_ontol_map.map_def_id)),
                                     ),
                             );
                         } else {
@@ -308,12 +308,11 @@ fn generate_explicit_map<'m>(
 
     fn unknown_extern_map_direction(compiler: &mut Compiler, map_def_id: DefId) {
         let span = compiler.defs.def_span(map_def_id);
-        compiler.push_error(CompileError::ExternMapUnknownDirection.spanned(&span).note(
-            SpannedNote {
-                note: Note::AbtractMapSuggestion,
-                span,
-            },
-        ));
+        compiler.push_error(
+            CompileError::ExternMapUnknownDirection
+                .spanned(&span)
+                .note(Note::AbtractMapSuggestion.spanned(span)),
+        );
     }
 
     // the extern directions are in relation to the _undirected key_, not the ontol map arms!

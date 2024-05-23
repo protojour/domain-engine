@@ -116,13 +116,13 @@ impl Backend {
                                 message: err.error.to_string(),
                                 related_information: Some(
                                     err.notes
-                                        .iter()
+                                        .into_iter()
                                         .map(|note| DiagnosticRelatedInformation {
                                             location: Location {
                                                 uri: url.clone(),
-                                                range: get_span_range(&doc.text, &note.span),
+                                                range: get_span_range(&doc.text, &note.span()),
                                             },
-                                            message: note.note.to_string(),
+                                            message: note.into_note().to_string(),
                                         })
                                         .collect(),
                                 ),

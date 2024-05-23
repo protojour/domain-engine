@@ -11,7 +11,7 @@ use crate::{
     relation::RelObjectConstraint,
     thesaurus::TypeRelation,
     types::FormatType,
-    Note, SpannedNote,
+    Note,
 };
 
 use super::{
@@ -229,13 +229,13 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             if let Some(level1_path) = self.level1_path_to_base(collected_mesh, base_def) {
                 let base_ty = self.def_types.table.get(&base_def).unwrap();
 
-                notes.push(SpannedNote {
-                    note: Note::BaseTypeIs(format!(
+                notes.push(
+                    Note::BaseTypeIs(format!(
                         "{}",
                         FormatType::new(base_ty, self.defs, self.primitives)
-                    )),
-                    span: level1_path.rel_span,
-                });
+                    ))
+                    .spanned(level1_path.rel_span),
+                );
             }
         }
 
@@ -318,10 +318,7 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                         self.defs
                             .def_kind(type_def_id)
                             .opt_identifier()
-                            .map(|identifier| SpannedNote {
-                                note: Note::BaseTypeIs(identifier.into()),
-                                span: *span,
-                            })
+                            .map(|identifier| Note::BaseTypeIs(identifier.into()).spanned(*span))
                     })
                     .collect();
 
