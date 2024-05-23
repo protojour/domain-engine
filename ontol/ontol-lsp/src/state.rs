@@ -7,7 +7,6 @@ use crate::old_parser::{
     },
     token::Token,
 };
-use derivative::Derivative;
 use either::Either;
 use lsp_types::{CompletionItem, Location, MarkedString, Position, Range, Url};
 use ontol_compiler::ontol_syntax::OntolTreeSyntax;
@@ -20,6 +19,7 @@ use ontol_compiler::{
 use ontol_parser::cst_parse;
 use ontol_runtime::ontology::{config::PackageConfig, domain::TypeInfo, Ontology};
 use regex::Regex;
+use std::fmt::Debug;
 use std::{
     collections::{HashMap, HashSet},
     format,
@@ -32,8 +32,7 @@ use substring::Substring;
 type UsizeRange = std::ops::Range<usize>;
 
 /// Language server state
-#[derive(Derivative)]
-#[derivative(Clone, Debug)]
+#[derive(Clone)]
 pub struct State {
     /// Current documents, by uri
     pub docs: HashMap<String, Document>,
@@ -45,15 +44,24 @@ pub struct State {
     pub regex: CompiledRegex,
 
     /// Ontology with only the `ontol` domain
-    #[derivative(Debug = "ignore")]
     pub ontology: Arc<Ontology>,
 
     /// Fast lookup for TypeInfo
-    #[derivative(Debug = "ignore")]
     pub ontol_type_info: HashMap<String, TypeInfo>,
 
     /// Prebuilt data structure
     pub core_completions: Vec<CompletionItem>,
+}
+
+impl Debug for State {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("State")
+            .field("docs", &self.docs)
+            .field("srcref", &self.srcref)
+            .field("regex", &self.regex)
+            .field("core_completions", &self.core_completions)
+            .finish()
+    }
 }
 
 /// A document and its various constituents

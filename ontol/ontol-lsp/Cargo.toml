@@ -25,4 +25,3 @@ regex = "1.9.1"
 substring = "1.4.5"
 tower-lsp = { version = "0.20.0" }
 futures-util = { version = "0.3.28", features = ["futures-io", "io"] }
-derivative = "2"
