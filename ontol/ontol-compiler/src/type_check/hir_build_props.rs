@@ -76,7 +76,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let hir_meta = Meta { ty, span };
 
         let Some(repr_kind) = self.repr_ctx.get_repr_kind(&type_def_id) else {
-            return self.error_node(CompileError::CannotMapAbstract, &span, ctx);
+            return self.error_node(CompileError::CannotMapAbstract.span(span), ctx);
         };
 
         match repr_kind {
@@ -122,7 +122,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
                 None => {
                     if !pattern_attrs.is_empty() {
-                        return self.error_node(CompileError::NoPropertiesExpected, &span, ctx);
+                        return self.error_node(CompileError::NoPropertiesExpected.span(span), ctx);
                     }
                     ctx.mk_node(ontol_hir::Kind::Unit, hir_meta)
                 }
@@ -181,8 +181,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         }
                         _ => {
                             return self.error_node(
-                                CompileError::ExpectedPatternAttribute,
-                                &span,
+                                CompileError::ExpectedPatternAttribute.span(span),
                                 ctx,
                             );
                         }
@@ -200,7 +199,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             ReprKind::Union(_) | ReprKind::StructUnion(_) => {
-                self.error_node(CompileError::CannotMapUnion, &span, ctx)
+                self.error_node(CompileError::CannotMapUnion.span(span), ctx)
             }
             kind => todo!("{kind:?}"),
         }
@@ -375,13 +374,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             _ => match_attributes.get_mut(&MatchAttributeKey::Def(def_id)),
         };
         let Some(match_attribute) = match_attribute else {
-            self.error(CompileError::UnknownProperty, &prop_span);
+            self.error(CompileError::UnknownProperty.span(prop_span));
             return None;
         };
 
         if match_attribute.mentioned {
             // TODO: This is probably allowed in match
-            self.error(CompileError::DuplicateProperty, &prop_span);
+            self.error(CompileError::DuplicateProperty.span(prop_span));
             return None;
         }
         match_attribute.mentioned = true;
@@ -449,8 +448,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         if element.is_iter {
                                             let Some(label) = ctx.label_map.get(&element.id) else {
                                                 self.error(
-                                                    CompileError::TODO("unable to loop"),
-                                                    &prop_span,
+                                                    CompileError::TODO("unable to loop")
+                                                        .span(prop_span),
                                                 );
                                                 return None;
                                             };
@@ -504,7 +503,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 } else {
                                     self.type_error(
                                         TypeError::VariableMustBeSequenceEnclosed(value_ty),
-                                        &val.span,
+                                        val.span,
                                     );
                                     return None;
                                 }
@@ -581,7 +580,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             ValueCardinality::IndexSet | ValueCardinality::List,
                             SetBinaryOperator::ElementIn,
                         ) => {
-                            self.error(CompileError::TODO("property must be a scalar"), &prop_span);
+                            self.error(
+                                CompileError::TODO("property must be a scalar").span(prop_span),
+                            );
                             return None;
                         }
                         (ValueCardinality::IndexSet, operator) => {
@@ -597,7 +598,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             )
                         }
                         _ => {
-                            self.error(CompileError::TODO("property must be a set"), &prop_span);
+                            self.error(
+                                CompileError::TODO("property must be a set").span(prop_span),
+                            );
                             return None;
                         }
                     };
@@ -628,9 +631,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         ctx: &mut HirBuildCtx<'m>,
     ) -> ontol_hir::Node {
         match (rel_params_ty, rel) {
-            (Type::Primitive(PrimitiveKind::Unit, _), Some(rel)) => {
-                self.error_node(CompileError::NoRelationParametersExpected, &rel.span, ctx)
-            }
+            (Type::Primitive(PrimitiveKind::Unit, _), Some(rel)) => self.error_node(
+                CompileError::NoRelationParametersExpected.span(rel.span),
+                ctx,
+            ),
             (ty @ Type::Primitive(PrimitiveKind::Unit, _), None) => ctx.mk_node(
                 ontol_hir::Kind::Unit,
                 Meta {
@@ -773,7 +777,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn check_can_construct_default(&mut self, ty: TypeRef<'m>, span: SourceSpan) {
         let Some(def_id) = ty.get_single_def_id() else {
-            self.error(CompileError::TODO("Type not found"), &NO_SPAN);
+            self.error(CompileError::TODO("Type not found").span(NO_SPAN));
             return;
         };
 
@@ -781,8 +785,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             self.error(
                 CompileError::TODO(
                     "optional binding required, as a default value cannot be created",
-                ),
-                &span,
+                )
+                .span(span),
             );
         } else {
             info!("CAN MAKE DEFAULT: {ty:?}");

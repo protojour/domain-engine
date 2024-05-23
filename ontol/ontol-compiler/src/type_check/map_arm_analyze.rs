@@ -354,7 +354,7 @@ impl<'c> PreAnalyzer<'c> {
     }
 
     fn error(&mut self, error: CompileError, span: &SourceSpan) -> TypeRef {
-        self.errors.push(error.spanned(span));
+        error.span(*span).report(self.errors);
         &ERROR_TYPE
     }
 }

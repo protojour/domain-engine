@@ -23,7 +23,7 @@ use crate::{
     },
     typed_hir::{IntoTypedHirData, Meta, TypedHir, TypedHirData, TypedRootNode},
     types::{Type, TypeRef, ERROR_TYPE, UNIT_TYPE},
-    SourceSpan, NO_SPAN,
+    SourceSpan, SpannedCompileError, NO_SPAN,
 };
 
 use super::{
@@ -100,8 +100,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 CompileError::IncorrectNumberOfArguments {
                                     expected: u8::try_from(params.len()).unwrap(),
                                     actual: u8::try_from(args.len()).unwrap(),
-                                },
-                                &pattern.span,
+                                }
+                                .span(pattern.span),
                                 ctx,
                             );
                         }
@@ -128,7 +128,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             },
                         )
                     }
-                    _ => self.error_node(CompileError::NotCallable, &pattern.span, ctx),
+                    _ => self.error_node(CompileError::NotCallable.span(pattern.span), ctx),
                 }
             }
             (
@@ -148,7 +148,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             actual: (actual_ty, Strength::Strong),
                             expected: (expected_struct_ty, Strength::Strong),
                         }),
-                        &pattern.span,
+                        pattern.span,
                         ctx,
                     );
                 }
@@ -187,7 +187,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 assert_eq!(*def_id, *path_def_id);
                             }
                             _ => {
-                                return self.error_node(CompileError::DomainTypeExpected, span, ctx)
+                                return self
+                                    .error_node(CompileError::DomainTypeExpected.span(*span), ctx)
                             }
                         };
                         (struct_ty, *path_def_id)
@@ -199,7 +200,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         if expected_ty.is_some() {
                             return self.type_error_node(
                                 TypeError::StructTypeNotInferrable,
-                                &pattern.span,
+                                pattern.span,
                                 ctx,
                             );
                         }
@@ -242,7 +243,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                             actual: (meta.ty, Strength::Strong),
                                             expected: (expected_ty, Strength::Strong),
                                         }),
-                                        &pattern.span,
+                                        pattern.span,
                                         ctx,
                                     )
                                 } else if node_info.parent_struct_flags.contains(StructFlags::MATCH)
@@ -275,7 +276,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             actual: (meta.ty, Strength::Strong),
                             expected: (expected_ty, Strength::Strong),
                         }),
-                        &pattern.span,
+                        pattern.span,
                         ctx,
                     ),
                     _ => node,
@@ -328,8 +329,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         );
                                     } else {
                                         return self.error_node(
-                                            CompileError::RequiresSpreading,
-                                            &pat_element.val.span,
+                                            CompileError::RequiresSpreading
+                                                .span(pat_element.val.span),
                                             ctx,
                                         );
                                     }
@@ -337,7 +338,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             }
                         }
 
-                        self.type_error(TypeError::MustBeSequence(other_ty), &pattern.span);
+                        self.type_error(TypeError::MustBeSequence(other_ty), pattern.span);
                         (&UNIT_TYPE, &ERROR_TYPE)
                     }
                     None => {
@@ -359,8 +360,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 if elements.len() != 1 {
                     return self.error_node(
-                        CompileError::TODO("Standalone set needs one element"),
-                        &pattern.span,
+                        CompileError::TODO("Standalone set needs one element").span(pattern.span),
                         ctx,
                     );
                 }
@@ -416,12 +416,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 span: pattern.span,
                             },
                         ),
-                        Err(_) => {
-                            self.error_node(CompileError::IncompatibleLiteral, &pattern.span, ctx)
-                        }
+                        Err(_) => self
+                            .error_node(CompileError::IncompatibleLiteral.span(pattern.span), ctx),
                     }
                 }
-                _ => self.error_node(CompileError::IncompatibleLiteral, &pattern.span, ctx),
+                _ => self.error_node(CompileError::IncompatibleLiteral.span(pattern.span), ctx),
             },
             (PatternKind::ConstBool(bool), Some(expected_ty)) => match expected_ty {
                 (Type::Primitive(PrimitiveKind::Boolean, _), _strengt) => ctx.mk_node(
@@ -431,7 +430,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         span: pattern.span,
                     },
                 ),
-                _ => self.error_node(CompileError::IncompatibleLiteral, &pattern.span, ctx),
+                _ => self.error_node(CompileError::IncompatibleLiteral.span(pattern.span), ctx),
             },
             (PatternKind::ConstText(literal), Some(expected_ty)) => match expected_ty {
                 (Type::Primitive(PrimitiveKind::Text, _), _strength) => ctx.mk_node(
@@ -449,9 +448,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             span: pattern.span,
                         },
                     ),
-                    _ => self.error_node(CompileError::IncompatibleLiteral, &pattern.span, ctx),
+                    _ => self.error_node(CompileError::IncompatibleLiteral.span(pattern.span), ctx),
                 },
-                _ => self.error_node(CompileError::IncompatibleLiteral, &pattern.span, ctx),
+                _ => self.error_node(CompileError::IncompatibleLiteral.span(pattern.span), ctx),
             },
             (PatternKind::Variable(var), expected_ty) => {
                 let arm = ctx.current_arm;
@@ -477,7 +476,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 match expected_ty {
                     Some((Type::Seq(_rel_ty, val_ty), _)) => self.type_error_node(
                         TypeError::VariableMustBeSequenceEnclosed(val_ty),
-                        &pattern.span,
+                        pattern.span,
                         ctx,
                     ),
                     Some(expected_ty) => {
@@ -505,7 +504,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         panic!("Should not happen anymore");
                                     }
 
-                                    _ => self.type_error_node(err, &pattern.span, ctx),
+                                    _ => self.type_error_node(err, pattern.span, ctx),
                                 }
                             }
                             Err(err) => todo!("Report unification error: {err:?}"),
@@ -538,14 +537,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         },
                     )
                 }
-                _ => self.error_node(CompileError::IncompatibleLiteral, &pattern.span, ctx),
+                _ => self.error_node(CompileError::IncompatibleLiteral.span(pattern.span), ctx),
             },
-            (PatternKind::Error, _) => self.make_error_node(&pattern.span, ctx),
+            (PatternKind::Error, _) => self.make_error_node(pattern.span, ctx),
             (kind, ty) => self.error_node(
                 CompileError::TODO(format!(
                     "Not enough type information for {kind:?}, expected_ty = {ty:?}"
-                )),
-                &pattern.span,
+                ))
+                .span(pattern.span),
                 ctx,
             ),
         };
@@ -621,11 +620,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
 
-                self.error_node(CompileError::TODO("Seq problem"), &prop_span, ctx)
+                self.error_node(CompileError::TODO("Seq problem").span(prop_span), ctx)
             }
             _pat => self.error_node(
-                CompileError::TODO("Explicit mapping of relation parameters needed"),
-                &prop_span,
+                CompileError::TODO("Explicit mapping of relation parameters needed")
+                    .span(prop_span),
                 ctx,
             ),
         }
@@ -774,7 +773,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     pub(super) fn type_error_node(
         &mut self,
         error: TypeError<'m>,
-        span: &SourceSpan,
+        span: SourceSpan,
         ctx: &mut HirBuildCtx<'m>,
     ) -> ontol_hir::Node {
         self.type_error(error, span);
@@ -783,24 +782,24 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     pub(super) fn error_node(
         &mut self,
-        error: CompileError,
-        span: &SourceSpan,
+        error: SpannedCompileError,
         ctx: &mut HirBuildCtx<'m>,
     ) -> ontol_hir::Node {
-        self.error(error, span);
+        let span = error.span();
+        self.error(error);
         self.make_error_node(span, ctx)
     }
 
     pub(super) fn make_error_node(
         &mut self,
-        span: &SourceSpan,
+        span: SourceSpan,
         ctx: &mut HirBuildCtx<'m>,
     ) -> ontol_hir::Node {
         ctx.mk_node(
             ontol_hir::Kind::Unit,
             Meta {
                 ty: &ERROR_TYPE,
-                span: *span,
+                span,
             },
         )
     }

@@ -401,10 +401,9 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     || relationship_id.0 == builtin_rels.direction
                 {
                     if match_level != 0 {
-                        self.errors.error(
-                            CompileError::TODO("order/direction at incorrect location"),
-                            &meta.span,
-                        );
+                        CompileError::TODO("order/direction at incorrect location")
+                            .span(meta.span)
+                            .report(self);
 
                         return Err(UnifierError::Reported);
                     }
@@ -561,8 +560,9 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             if let Some(label) = label {
                 let label = *label.hir();
                 let Some(scope_attr) = self.iter_extended_scope_table.get(&label).cloned() else {
-                    self.errors
-                        .error(CompileError::TODO("no iteration source"), &seq_meta.span);
+                    CompileError::TODO("no iteration source")
+                        .span(seq_meta.span)
+                        .report(self);
                     return Ok(smallvec![]);
                 };
                 let free_vars = scan_immediate_free_vars(self.expr_arena, [*rel, *val]);
@@ -983,17 +983,17 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 match self.defs.def_kind(*scalar_def_id) {
                     DefKind::TextLiteral(str) => self.mk_node(Kind::Text((*str).into()), meta),
                     _ => {
-                        self.errors.error(
-                            CompileError::TODO("cannot create a constant out of any `text`"),
-                            &meta.span,
-                        );
+                        CompileError::TODO("cannot create a constant out of any `text`")
+                            .span(meta.span)
+                            .report(self);
                         self.mk_node(Kind::Unit, meta)
                     }
                 }
             }
             _ => {
-                self.errors
-                    .error(CompileError::TODO("create constant"), &meta.span);
+                CompileError::TODO("create constant")
+                    .span(meta.span)
+                    .report(self);
                 self.mk_node(Kind::Unit, meta)
             }
         }
@@ -1046,5 +1046,11 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
     ) -> Node {
         *self.out_arena.data_mut(slot) = TypedHirData(kind, meta);
         slot
+    }
+}
+
+impl<'c, 'm> AsMut<CompileErrors> for SsaUnifier<'c, 'm> {
+    fn as_mut(&mut self) -> &mut CompileErrors {
+        self.errors
     }
 }

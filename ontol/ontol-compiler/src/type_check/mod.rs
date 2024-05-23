@@ -14,7 +14,7 @@ use crate::{
     strings::Strings,
     thesaurus::Thesaurus,
     types::{DefTypes, FormatType, Type, TypeRef, Types, ERROR_TYPE},
-    CompileErrors, Compiler, SourceSpan, SpannedNote,
+    CompileErrors, Compiler, SourceSpan, SpannedCompileError,
 };
 
 use self::ena_inference::KnownType;
@@ -81,21 +81,12 @@ pub struct TypeCheck<'c, 'm> {
 }
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
-    fn error(&mut self, error: CompileError, span: &SourceSpan) -> TypeRef<'m> {
-        self.error_with_notes(error, span, vec![])
-    }
-
-    fn error_with_notes(
-        &mut self,
-        error: CompileError,
-        span: &SourceSpan,
-        notes: Vec<SpannedNote>,
-    ) -> TypeRef<'m> {
-        self.errors.error_with_notes(error, span, notes);
+    fn error(&mut self, error: SpannedCompileError) -> TypeRef<'m> {
+        error.report(self);
         &ERROR_TYPE
     }
 
-    fn type_error(&mut self, error: TypeError<'m>, span: &SourceSpan) -> TypeRef<'m> {
+    fn type_error(&mut self, error: TypeError<'m>, span: SourceSpan) -> TypeRef<'m> {
         match error {
             TypeError::Propagated => self.types.intern(Type::Error),
             TypeError::Mismatch(equation) => self.error(
@@ -108,39 +99,38 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         "{}",
                         FormatType::new(equation.expected.0, self.defs, self.primitives)
                     ),
-                },
-                span,
+                }
+                .span(span),
             ),
             TypeError::MustBeSequence(ty) => self.error(
                 CompileError::TypeMismatch {
                     actual: format!("{}", FormatType::new(ty, self.defs, self.primitives)),
                     expected: format!("{{{}}}", FormatType::new(ty, self.defs, self.primitives)),
-                },
-                span,
+                }
+                .span(span),
             ),
             TypeError::VariableMustBeSequenceEnclosed(ty) => self.error(
                 CompileError::VariableMustBeSequenceEnclosed(format!(
                     "{}",
                     FormatType::new(ty, self.defs, self.primitives)
-                )),
-                span,
+                ))
+                .span(span),
             ),
-            TypeError::NotEnoughInformation => self.error(
-                CompileError::TODO("Not enough information to infer type"),
-                span,
-            ),
+            TypeError::NotEnoughInformation => {
+                self.error(CompileError::TODO("Not enough information to infer type").span(span))
+            }
             TypeError::NotConvertibleFromNumber(ty) => self.error(
                 CompileError::TODO(format!(
                     "Type {} cannot be represented as a number",
                     FormatType::new(ty, self.defs, self.primitives)
-                )),
-                span,
+                ))
+                .span(span),
             ),
             TypeError::NoRelationParametersExpected => {
-                self.error(CompileError::NoRelationParametersExpected, span)
+                self.error(CompileError::NoRelationParametersExpected.span(span))
             }
             TypeError::StructTypeNotInferrable => {
-                self.error(CompileError::ExpectedExplicitStructPath, span)
+                self.error(CompileError::ExpectedExplicitStructPath.span(span))
             }
         }
     }
@@ -169,6 +159,12 @@ impl<'c, 'm> AsRef<Defs<'m>> for TypeCheck<'c, 'm> {
 impl<'c, 'm> AsRef<Relations> for TypeCheck<'c, 'm> {
     fn as_ref(&self) -> &Relations {
         self.relations
+    }
+}
+
+impl<'c, 'm> AsMut<CompileErrors> for TypeCheck<'c, 'm> {
+    fn as_mut(&mut self) -> &mut CompileErrors {
+        self.errors
     }
 }
 

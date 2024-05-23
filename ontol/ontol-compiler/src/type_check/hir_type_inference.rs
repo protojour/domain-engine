@@ -31,10 +31,9 @@ impl<'c, 'm> HirArmTypeInference<'c, 'm> {
             Ok(ty) => data.meta_mut().ty = ty,
             Err(TypeError::Propagated) => {}
             Err(TypeError::NotEnoughInformation) => {
-                self.errors.error(
-                    CompileError::TODO("Not enough type information"),
-                    &data.span(),
-                );
+                CompileError::TODO("Not enough type information")
+                    .span(data.span())
+                    .report(&mut self.errors);
             }
             _ => panic!("Unexpected inference error"),
         }

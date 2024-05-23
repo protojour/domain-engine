@@ -177,10 +177,9 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                     // *def_id = self.root_def_id;
                 }
                 _ => {
-                    self.errors.error(
-                        CompileError::TODO("Must be a scalar"),
-                        &self.defs.def_span(self.root_def_id),
-                    );
+                    CompileError::TODO("Must be a scalar")
+                        .span(self.defs.def_span(self.root_def_id))
+                        .report(self);
                 }
             }
         }
@@ -234,16 +233,15 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                         "{}",
                         FormatType::new(base_ty, self.defs, self.primitives)
                     ))
-                    .spanned(level1_path.rel_span),
+                    .span(level1_path.rel_span),
                 );
             }
         }
 
-        self.errors.error_with_notes(
-            CompileError::IntersectionOfDisjointTypes,
-            &root_def.span,
-            notes,
-        );
+        CompileError::IntersectionOfDisjointTypes
+            .span(root_def.span)
+            .with_notes(notes)
+            .report(self);
 
         None
     }
@@ -318,15 +316,14 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                         self.defs
                             .def_kind(type_def_id)
                             .opt_identifier()
-                            .map(|identifier| Note::BaseTypeIs(identifier.into()).spanned(*span))
+                            .map(|identifier| Note::BaseTypeIs(identifier.into()).span(*span))
                     })
                     .collect();
 
-                self.errors.error_with_notes(
-                    CompileError::AmbiguousNumberResolution,
-                    &self.defs.def_span(self.root_def_id),
-                    notes,
-                );
+                CompileError::AmbiguousNumberResolution
+                    .span(self.defs.def_span(self.root_def_id))
+                    .with_notes(notes)
+                    .report(self);
 
                 None
             }

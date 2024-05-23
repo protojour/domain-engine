@@ -376,13 +376,14 @@ fn print_unified_compile_error(
 ) -> Result<(), OntoolError> {
     let mut colors = ColorGenerator::new();
     for error in unified_error.errors.into_iter() {
-        let span = error.span.span.start as usize..error.span.span.end as usize;
+        let err_span = error.span();
+        let span = err_span.span.start as usize..err_span.span.end as usize;
         let message = error.error.to_string();
 
-        let ontol_source = ontol_sources.get_source(error.span.source_id).unwrap();
+        let ontol_source = ontol_sources.get_source(err_span.source_id).unwrap();
         let literal_source = source_code_registry
             .registry
-            .get(&error.span.source_id)
+            .get(&err_span.source_id)
             .unwrap();
 
         Report::build(ReportKind::Error, ontol_source.name(), span.start)
@@ -398,10 +399,10 @@ fn print_unified_compile_error(
             let span = note.span().span.start as usize..note.span().span.end as usize;
             let message = note.into_note().to_string();
 
-            let ontol_source = ontol_sources.get_source(error.span.source_id).unwrap();
+            let ontol_source = ontol_sources.get_source(err_span.source_id).unwrap();
             let literal_source = source_code_registry
                 .registry
-                .get(&error.span.source_id)
+                .get(&err_span.source_id)
                 .unwrap();
 
             Report::build(ReportKind::Advice, ontol_source.name(), span.start)

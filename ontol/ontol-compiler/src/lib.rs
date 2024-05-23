@@ -242,6 +242,12 @@ pub fn lower_ontol_syntax<V: ontol_parser::cst::view::NodeView>(
         .finish()
 }
 
+impl<'m> AsMut<CompileErrors> for Compiler<'m> {
+    fn as_mut(&mut self) -> &mut CompileErrors {
+        &mut self.errors
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::fmt::Write;

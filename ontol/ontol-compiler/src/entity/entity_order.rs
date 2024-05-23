@@ -33,14 +33,16 @@ impl<'m> Compiler<'m> {
                 if object.0.package_id() != package_id
                     || !matches!(self.defs.def_kind(*scalar_def_id), DefKind::TextLiteral(_))
                 {
-                    self.errors
-                        .error(CompileError::EntityOrderMustBeSymbolInThisDomain, &object.1);
+                    CompileError::EntityOrderMustBeSymbolInThisDomain
+                        .span(object.1)
+                        .report(self);
                     return None;
                 }
             }
             _other => {
-                self.errors
-                    .error(CompileError::EntityOrderMustBeSymbolInThisDomain, &object.1);
+                CompileError::EntityOrderMustBeSymbolInThisDomain
+                    .span(object.1)
+                    .report(self);
                 return None;
             }
         }
@@ -50,10 +52,9 @@ impl<'m> Compiler<'m> {
                 self.check_order_params(entity_def_id, params_def_id, *meta.relationship.span)?
             }
             _ => {
-                self.errors.error(
-                    CompileError::EntityOrderMustSpecifyParameters,
-                    meta.relationship.span,
-                );
+                CompileError::EntityOrderMustSpecifyParameters
+                    .span(*meta.relationship.span)
+                    .report(self);
                 return None;
             }
         };
@@ -71,23 +72,22 @@ impl<'m> Compiler<'m> {
         rel_span: SourceSpan,
     ) -> Option<EntityOrder> {
         let Some(properties) = self.relations.properties_by_def_id(params_def_id) else {
-            self.errors
-                .error(CompileError::EntityOrderMustSpecifyParameters, &rel_span);
+            CompileError::EntityOrderMustSpecifyParameters
+                .span(rel_span)
+                .report(self);
             return None;
         };
         let Constructor::Sequence(sequence) = &properties.constructor else {
-            self.errors.error(
-                CompileError::TODO("must specify a tuple of fields"),
-                &rel_span,
-            );
+            CompileError::TODO("must specify a tuple of fields")
+                .span(rel_span)
+                .report(self);
             return None;
         };
 
         if sequence.is_infinite() {
-            self.errors.error(
-                CompileError::TODO("order tuple sequence must be finite"),
-                &rel_span,
-            );
+            CompileError::TODO("order tuple sequence must be finite")
+                .span(rel_span)
+                .report(self);
             return None;
         }
 
@@ -95,8 +95,9 @@ impl<'m> Compiler<'m> {
 
         for (_index, relationship) in sequence.elements() {
             let Some(relationship_id) = relationship else {
-                self.errors
-                    .error(CompileError::TODO("missing relationship"), &rel_span);
+                CompileError::TODO("missing relationship")
+                    .span(rel_span)
+                    .report(&mut self.errors);
                 continue;
             };
 
@@ -118,10 +119,9 @@ impl<'m> Compiler<'m> {
                     }
                 }
                 _ => {
-                    self.errors.error(
-                        CompileError::TODO("invalid ordering field"),
-                        meta.relationship.span,
-                    );
+                    CompileError::TODO("invalid ordering field")
+                        .span(*meta.relationship.span)
+                        .report(&mut self.errors);
                 }
             }
         }
@@ -134,8 +134,9 @@ impl<'m> Compiler<'m> {
                     Direction::Descending
                 } else {
                     let span = self.defs.def_span(rel_id.0);
-                    self.errors
-                        .error(CompileError::TODO("invalid direction"), &span);
+                    CompileError::TODO("invalid direction")
+                        .span(span)
+                        .report(self);
                     return None;
                 }
             }
@@ -162,10 +163,9 @@ impl<'m> Compiler<'m> {
         for field_segment in field.split('.') {
             let Ok((property_id, next_def_id)) = self.lookup_order_field(def_id, field_segment)
             else {
-                errors.error(
-                    CompileError::TODO(format!("no such field: `{field_segment}`")),
-                    &field_span,
-                );
+                CompileError::TODO(format!("no such field: `{field_segment}`"))
+                    .span(field_span)
+                    .report(&mut errors);
                 break;
             };
 

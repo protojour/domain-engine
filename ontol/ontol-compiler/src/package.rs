@@ -16,7 +16,6 @@ use crate::error::UnifiedCompileError;
 use crate::ontol_syntax::OntolSyntax;
 use crate::SourceSpan;
 use crate::Sources;
-use crate::SpannedCompileError;
 use crate::Src;
 use crate::NO_SPAN;
 
@@ -205,11 +204,10 @@ impl PackageGraphBuilder {
         for (reference, requested_package) in &self.package_graph {
             if !requested_package.found {
                 if requested_package.requested_at_generation < self.generation {
-                    load_errors.push(SpannedCompileError {
-                        error: CompileError::PackageNotFound(reference.clone()),
-                        span: requested_package.use_source_span,
-                        notes: vec![],
-                    });
+                    load_errors.push(
+                        CompileError::PackageNotFound(reference.clone())
+                            .span(requested_package.use_source_span),
+                    );
                 } else {
                     requests.push(PackageRequest {
                         package_id: requested_package.package_id,

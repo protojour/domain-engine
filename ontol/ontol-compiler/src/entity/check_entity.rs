@@ -23,10 +23,9 @@ impl<'m> Compiler<'m> {
             if !is_entity {
                 for order_rel in &order_rels {
                     let meta = self.defs.relationship_meta(*order_rel);
-                    self.errors.error(
-                        CompileError::RelationSubjectMustBeEntity,
-                        &meta.relationship.subject.1,
-                    );
+                    CompileError::RelationSubjectMustBeEntity
+                        .span(meta.relationship.subject.1)
+                        .report(self);
                 }
             } else {
                 let entity_span = self.defs.def_span(def_id);

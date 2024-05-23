@@ -61,7 +61,7 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
                                 input: format_map_def(compiler, key.input),
                                 output: format_map_def(compiler, key.output),
                             }
-                            .spanned(&spans[index]),
+                            .span(spans[index]),
                         );
                     }
                 },
@@ -72,7 +72,7 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
                     None => {
                         call_procedure.address = Address(0);
                         compiler.push_error(
-                            CompileError::TODO("Unable to link constant").spanned(&spans[index]),
+                            CompileError::TODO("Unable to link constant").span(spans[index]),
                         );
                     }
                 },

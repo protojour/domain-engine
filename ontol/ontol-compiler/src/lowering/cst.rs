@@ -913,7 +913,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             ))),
             LoweredStructPatternParams::Unit(unit_pattern) => {
                 self.ctx.compiler.push_error(
-                    CompileError::TODO("unit not supported here").spanned(&unit_pattern.span),
+                    CompileError::TODO("unit not supported here").span(unit_pattern.span),
                 );
                 None
             }
@@ -1423,7 +1423,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
     fn report_error(&mut self, (error, span): (CompileError, U32Span)) {
         self.ctx
             .compiler
-            .push_error(error.spanned(&self.ctx.source_span(span)));
+            .push_error(error.span(self.ctx.source_span(span)));
     }
 }
 

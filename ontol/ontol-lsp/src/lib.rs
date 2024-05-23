@@ -108,9 +108,9 @@ impl Backend {
                             continue;
                         }
 
-                        if let Some(doc) = state.get_doc_by_sourceid(&err.span.source_id) {
+                        if let Some(doc) = state.get_doc_by_sourceid(&err.span().source_id) {
                             diagnostics.push(Diagnostic {
-                                range: get_span_range(&doc.text, &err.span),
+                                range: get_span_range(&doc.text, &err.span()),
                                 severity: Some(DiagnosticSeverity::ERROR),
                                 source: Some(NAME.to_string()),
                                 message: err.error.to_string(),

@@ -200,7 +200,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 _ => {
                     self.type_error(
                         TypeError::Mismatch(TypeEquation { actual, expected }),
-                        &var_arms[1].span,
+                        var_arms[1].span,
                     );
                 }
             }
@@ -281,7 +281,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
 
                 let error = CompileError::MissingProperties(formatted_properties);
-                self.error_with_notes(error, &span, vec![Note::ConsiderUsingMatch.spanned(span)]);
+                self.error(
+                    error
+                        .span(span)
+                        .with_note(Note::ConsiderUsingMatch.span(span)),
+                );
             }
         }
     }
@@ -289,8 +293,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn expect_pattern_abstract_def_id(&mut self, pat_id: PatId) -> Option<DefId> {
         self.get_pattern_abstract_def_id(pat_id).or_else(|| {
             let pat = self.patterns.table.get(&pat_id).unwrap();
-            self.errors
-                .push(CompileError::TODO("must be named compound pattern").spanned(&pat.span));
+            CompileError::TODO("must be named compound pattern")
+                .span(pat.span)
+                .report(self);
 
             None
         })

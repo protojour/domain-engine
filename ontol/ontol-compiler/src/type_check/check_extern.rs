@@ -27,7 +27,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         warn!("check extern");
 
         let Some(table) = self.relations.properties_table_by_def_id(def_id) else {
-            self.error(CompileError::TODO("extern has no properties"), &span);
+            self.error(CompileError::TODO("extern has no properties").span(span));
             return;
         };
 
@@ -45,17 +45,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         }
                     }
                     _ => {
-                        self.errors.error(
-                            CompileError::TODO("unknown property name for extern"),
-                            meta.relationship.span,
-                        );
+                        CompileError::TODO("unknown property name for extern")
+                            .span(*meta.relationship.span)
+                            .report(&mut self.errors);
                     }
                 },
                 _ => {
-                    self.errors.error(
-                        CompileError::TODO("unknown property for extern"),
-                        meta.relationship.span,
-                    );
+                    CompileError::TODO("unknown property for extern")
+                        .span(*meta.relationship.span)
+                        .report(&mut self.errors);
                 }
             }
         }
@@ -75,8 +73,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         span: SourceSpan,
     ) -> Result<Extern, ()> {
         let Some(url) = builder.url else {
-            self.errors
-                .error(CompileError::TODO("extern has no url"), &span);
+            CompileError::TODO("extern has no url")
+                .span(span)
+                .report(self);
             return Err(());
         };
 
@@ -136,18 +135,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             } => {
                 if !attributes.is_empty() {
                     self.error(
-                        CompileError::TODO("external mapping cannot have attributes"),
-                        &pattern.span,
+                        CompileError::TODO("external mapping cannot have attributes")
+                            .span(pattern.span),
                     );
                 }
 
                 self.check_def(def_id)
             }
             _ => {
-                self.error(
-                    CompileError::TODO("must specify a named pattern"),
-                    &pattern.span,
-                );
+                self.error(CompileError::TODO("must specify a named pattern").span(pattern.span));
                 self.types.intern(Type::Error)
             }
         }

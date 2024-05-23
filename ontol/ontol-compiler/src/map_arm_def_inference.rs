@@ -13,7 +13,7 @@ use crate::{
     pattern::{CompoundPatternAttrKind, PatId, Pattern, PatternKind, Patterns, TypePath},
     primitive::Primitives,
     relation::{Property, Relations},
-    CompileError, CompileErrors, Compiler, SourceSpan, SpannedCompileError,
+    CompileError, CompileErrors, Compiler, SourceSpan,
 };
 
 #[derive(Clone, Copy)]
@@ -75,7 +75,9 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
     ) {
         match &target_pat.kind {
             PatternKind::Call(_, _) => {
-                self.error(CompileError::TODO("Not inferrable"), &target_pat.span)
+                CompileError::TODO("Not inferrable")
+                    .span(target_pat.span)
+                    .report(self);
             }
             PatternKind::Compound {
                 is_unit_binding,
@@ -83,7 +85,9 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                 ..
             } => {
                 if *is_unit_binding {
-                    self.error(CompileError::TODO("Not inferrable"), &target_pat.span);
+                    CompileError::TODO("Not inferrable")
+                        .span(target_pat.span)
+                        .report(&mut self.errors);
                     return;
                 }
 
@@ -127,7 +131,9 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
     ) {
         match &pattern.kind {
             PatternKind::Call(_, _) => {
-                self.error(CompileError::TODO("Not inferrable"), &pattern.span)
+                CompileError::TODO("Not inferrable")
+                    .span(pattern.span)
+                    .report(self);
             }
             PatternKind::Variable(var) => {
                 if let Some(var_relationship) =
@@ -135,7 +141,9 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                 {
                     if flags != var_relationship.flags {
                         debug!("flags: {flags:?} var_rel: {:?}", var_relationship.flags);
-                        self.error(CompileError::InferenceCardinalityMismatch, &pattern.span);
+                        CompileError::InferenceCardinalityMismatch
+                            .span(pattern.span)
+                            .report(self);
                     }
 
                     let value_cardinality = if flags.is_iter {
@@ -177,10 +185,9 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                 }
             }
             PatternKind::Compound { .. } => {
-                self.error(
-                    CompileError::TODO("Recursive compounds not supported"),
-                    &pattern.span,
-                );
+                CompileError::TODO("Recursive compounds not supported")
+                    .span(pattern.span)
+                    .report(self);
             }
             PatternKind::Set { elements, .. } => {
                 for element in elements.iter() {
@@ -212,20 +219,17 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
     ) -> Option<&'r VarRelationship> {
         match source_vars.get(&var) {
             None => {
-                self.error(
-                    CompileError::TODO("Inference failed: Corresponding variable not found"),
-                    span,
-                );
+                CompileError::TODO("Inference failed: Corresponding variable not found")
+                    .span(*span)
+                    .report(self);
                 None
             }
             Some(relationships) => {
                 if relationships.len() != 1 {
-                    self.error(
-                        CompileError::TODO(
+                    CompileError::TODO(
                             "Inference failed: Variable is mentioned more than once in the opposing arm"
-                        ),
-                        span,
-                    );
+                        ).span(*span)
+                        .report(self);
                     None
                 } else {
                     relationships.iter().next()
@@ -415,14 +419,6 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
     fn get_pattern(&self, id: PatId) -> &Pattern {
         self.patterns.table.get(&id).unwrap()
     }
-
-    fn error(&mut self, error: CompileError, span: &SourceSpan) {
-        self.errors.push(SpannedCompileError {
-            error,
-            span: *span,
-            notes: vec![],
-        })
-    }
 }
 
 impl<'m> Compiler<'m> {
@@ -459,11 +455,9 @@ impl<'m> Compiler<'m> {
         let statuses = arms.map(|pat_id| inf_status(self.patterns.table.get(&pat_id).unwrap()));
         match statuses {
             [InfStatus::Infer(_), InfStatus::Infer(_)] => {
-                self.errors.push(SpannedCompileError {
-                    error: CompileError::TODO("Mutual inference"),
-                    span: self.defs.def_span(map_def_id),
-                    notes: vec![],
-                });
+                CompileError::TODO("Mutual inference")
+                    .span(self.defs.def_span(map_def_id))
+                    .report(self);
                 None
             }
             [InfStatus::Infer(target_def_id), InfStatus::Source(source_def_id)] => {
@@ -493,5 +487,11 @@ impl<'m> Compiler<'m> {
             primitives: &self.primitives,
             errors: &mut self.errors,
         }
+    }
+}
+
+impl<'c, 'm> AsMut<CompileErrors> for MapArmDefInferencer<'c, 'm> {
+    fn as_mut(&mut self) -> &mut CompileErrors {
+        self.errors
     }
 }

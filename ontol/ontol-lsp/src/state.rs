@@ -14,7 +14,7 @@ use ontol_compiler::{
     error::UnifiedCompileError,
     mem::Mem,
     package::{GraphState, PackageGraphBuilder, PackageReference, ParsedPackage, ONTOL_PKG},
-    CompileError, SourceId, SourceSpan, Sources, SpannedCompileError, NO_SPAN,
+    CompileError, SourceId, SourceSpan, Sources, NO_SPAN,
 };
 use ontol_parser::cst_parse;
 use ontol_runtime::ontology::{config::PackageConfig, domain::TypeInfo, Ontology};
@@ -275,13 +275,7 @@ impl State {
                 "Caught unknown error.".to_string()
             };
             Err(UnifiedCompileError {
-                errors: vec![
-                    (SpannedCompileError {
-                        error: CompileError::BUG(message),
-                        span: NO_SPAN,
-                        notes: vec![],
-                    }),
-                ],
+                errors: vec![CompileError::BUG(message).span(NO_SPAN)],
             })
         })
     }

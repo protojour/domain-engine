@@ -111,11 +111,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let entities_only = match entity_detector.detect(union_variants.len()) {
             Ok(entities_only) => Some(entities_only),
             Err(error) => {
-                errors.push(SpannedCompileError {
-                    error,
-                    span: union_def.span,
-                    notes: vec![],
-                });
+                errors.push(error.span(union_def.span));
 
                 None
             }
@@ -177,7 +173,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 .errors
                 .into_iter()
                 .flat_map(|(_, errors)| errors.into_iter())
-                .map(|(union_error, span)| self.make_compile_error(union_error).spanned(&span)),
+                .map(|(union_error, span)| self.make_compile_error(union_error).span(span)),
         );
 
         self.strings.attach(strings);

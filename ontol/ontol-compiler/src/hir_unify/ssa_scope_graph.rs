@@ -169,7 +169,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             } else if complex_list.len() == list_len {
                 debug!("not able to make progress");
                 for (_, span) in complex_list {
-                    self.errors.error(CompileError::UnsolvableEquation, &span);
+                    CompileError::UnsolvableEquation.span(span).report(self);
                 }
                 return Err(UnifierError::Unsolvable);
             }
@@ -208,10 +208,9 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
 
                 if subst_params.len() > 1 {
                     for (_, param_ref) in subst_params {
-                        self.errors.error(
-                            CompileError::UnsupportedVariableDuplication,
-                            &param_ref.meta().span,
-                        );
+                        CompileError::UnsupportedVariableDuplication
+                            .span(param_ref.meta().span)
+                            .report(self);
                     }
                     return Err(UnifierError::Unsolvable);
                 }

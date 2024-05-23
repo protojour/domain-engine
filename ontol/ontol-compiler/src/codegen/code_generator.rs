@@ -177,7 +177,7 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
             ontol_hir::Kind::Var(var) => {
                 let Some(local) = self.scope.get(var) else {
                     debug!("unbound variable {var}");
-                    return self.errors.error(CompileError::UnboundVariable, &span);
+                    return CompileError::UnboundVariable.span(span).report(self.errors);
                 };
 
                 block.op(OpCode::Clone(*local), Delta(1), span, self.builder);
@@ -982,8 +982,9 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 "var {var} was already in scope, but span is native. scope={:?}",
                 self.scope
             );
-            self.errors
-                .error(CompileError::BUG("Variable already in scope"), span);
+            CompileError::BUG("Variable already in scope")
+                .span(*span)
+                .report(self.errors);
         }
     }
 
@@ -996,8 +997,9 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     !span.is_native(),
                     "var {var} was not in scope, but span is native."
                 );
-                self.errors
-                    .error(CompileError::BUG("Variable not in scope"), span);
+                CompileError::BUG("Variable not in scope")
+                    .span(*span)
+                    .report(self.errors);
                 Err(())
             }
         }
@@ -1005,8 +1007,9 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
 
     fn catch_dest(&mut self, hir_label: ontol_hir::Label, span: &SourceSpan) -> BlockLabel {
         let Some(fail_label) = self.catch_points.get(&hir_label).cloned() else {
-            self.errors
-                .error(CompileError::TODO("catch block not found"), span);
+            CompileError::TODO("catch block not found")
+                .span(*span)
+                .report(self.errors);
             return BlockLabel(Var(0));
         };
         fail_label

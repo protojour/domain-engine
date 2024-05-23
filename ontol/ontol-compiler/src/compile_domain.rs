@@ -26,11 +26,11 @@ impl<'m> Compiler<'m> {
             self.push_error(match error {
                 ontol_parser::Error::Lex(lex_error) => {
                     let span = lex_error.span;
-                    CompileError::Lex(lex_error.msg).spanned(&src.span(span))
+                    CompileError::Lex(lex_error.msg).span(src.span(span))
                 }
                 ontol_parser::Error::Parse(parse_error) => {
                     let span = parse_error.span;
-                    CompileError::Parse(parse_error.msg).spanned(&src.span(span))
+                    CompileError::Parse(parse_error.msg).span(src.span(span))
                 }
             });
         }
@@ -119,8 +119,9 @@ impl<'m> Compiler<'m> {
                         .and_then(|properties| properties.identified_by);
 
                     if identified_by.is_some() {
-                        self.errors
-                            .push(CompileError::EntityCannotBeSupertype.spanned(span));
+                        CompileError::EntityCannotBeSupertype
+                            .span(*span)
+                            .report(&mut self.errors);
                     }
                 }
             }
@@ -134,7 +135,7 @@ impl<'m> Compiler<'m> {
                 match type_check.repr_ctx.get_repr_kind(&def_id) {
                     Some(ReprKind::Union(_) | ReprKind::StructUnion(_)) => {
                         for error in type_check.check_union(def_id) {
-                            type_check.errors.push(error);
+                            error.report(&mut type_check);
                         }
                     }
                     Some(ReprKind::Extern) => {

@@ -21,8 +21,7 @@ use crate::{
     thesaurus::Thesaurus,
     thesaurus::{Is, TypeRelation},
     types::{DefTypes, Type},
-    CompileErrors, Note, SourceId, SourceSpan, SpannedCompileError, SpannedNote, NATIVE_SOURCE,
-    NO_SPAN,
+    CompileErrors, Note, SourceId, SourceSpan, SpannedNote, NATIVE_SOURCE, NO_SPAN,
 };
 
 use super::{
@@ -47,6 +46,12 @@ pub struct ReprCheck<'c, 'm> {
     pub errors: &'c mut CompileErrors,
 
     pub state: State,
+}
+
+impl<'c, 'm> AsMut<CompileErrors> for ReprCheck<'c, 'm> {
+    fn as_mut(&mut self) -> &mut CompileErrors {
+        self.errors
+    }
 }
 
 #[derive(Default)]
@@ -101,11 +106,10 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         );
 
         if self.state.do_emit_diagnostics && !self.state.abstract_notes.is_empty() {
-            self.errors.error_with_notes(
-                CompileError::TypeNotRepresentable,
-                &def.span,
-                std::mem::take(&mut self.state.abstract_notes),
-            );
+            CompileError::TypeNotRepresentable
+                .span(def.span)
+                .with_notes(std::mem::take(&mut self.state.abstract_notes))
+                .report(self.errors);
         }
     }
 
@@ -132,13 +136,13 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                         if span_def_id != self.root_def_id {
                             self.state
                                 .abstract_notes
-                                .push(Note::TypeIsAbstract.spanned(span_node.span));
+                                .push(Note::TypeIsAbstract.span(span_node.span));
                         }
                     }
                     SpanKind::Field => {
                         self.state
                             .abstract_notes
-                            .push(Note::FieldTypeIsAbstract.spanned(span_node.span));
+                            .push(Note::FieldTypeIsAbstract.span(span_node.span));
                     }
                 }
             }
@@ -459,20 +463,20 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
         }
 
         for (relation_def_id, spans) in std::mem::take(&mut self.state.duplicate_type_params) {
-            self.errors.error_with_notes(
-                CompileError::DuplicateTypeParam(
-                    self.defs
-                        .def_kind(relation_def_id)
-                        .opt_identifier()
-                        .unwrap()
-                        .into(),
-                ),
-                &self.defs.def_span(self.root_def_id),
+            CompileError::DuplicateTypeParam(
+                self.defs
+                    .def_kind(relation_def_id)
+                    .opt_identifier()
+                    .unwrap()
+                    .into(),
+            )
+            .span(self.defs.def_span(self.root_def_id))
+            .with_notes(
                 spans
                     .into_iter()
-                    .map(|span| SpannedNote::new(Note::DefinedHere, span))
-                    .collect(),
-            );
+                    .map(|span| SpannedNote::new(Note::DefinedHere, span)),
+            )
+            .report(self.errors);
         }
 
         self.check_soundness(builder, &mesh)
@@ -551,13 +555,12 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 variants.push((next_def_id, data.rel_span));
             }
             (Sub, Some(ReprKind::StructUnion(_)), _) => {
-                self.errors.push(SpannedCompileError {
-                    error: CompileError::TypeNotRepresentable,
-                    notes: vec![
-                        Note::CannotBePartOfStructUnion.spanned(self.defs.def_span(next_def_id))
-                    ],
-                    span: self.defs.def_span(repr_def_id),
-                });
+                CompileError::TypeNotRepresentable
+                    .span(self.defs.def_span(repr_def_id))
+                    .with_note(
+                        Note::CannotBePartOfStructUnion.span(self.defs.def_span(next_def_id)),
+                    )
+                    .report(self);
             }
             (Sub, Some(ReprKind::Union(variants)), ReprKind::Struct) => {
                 let mut variants = std::mem::take(variants);
@@ -586,10 +589,9 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 variants.push((def_id, span));
             }
             (Super | Sub, Some(ReprKind::Seq), _) => {
-                self.errors.error(
-                    CompileError::InvalidMixOfRelationshipTypeForSubject,
-                    &data.rel_span,
-                );
+                CompileError::InvalidMixOfRelationshipTypeForSubject
+                    .span(data.rel_span)
+                    .report(self);
             }
             (is_relation, old, new) => {
                 panic!("Invalid repr transition: {old:?} =({is_relation:?})> {new:?}")
@@ -628,23 +630,21 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
             let spans = std::mem::take(&mut self.state.circular_spans);
             let initial_span = spans.into_iter().next().unwrap();
 
-            self.errors.push(SpannedCompileError {
-                error: CompileError::CircularSubtypingRelation,
-                span: initial_span,
-                notes: vec![],
-            })
+            CompileError::CircularSubtypingRelation
+                .span(initial_span)
+                .report(self.errors);
         }
 
         if !is_path.invalid_super_set.is_empty() {
-            self.errors.push(SpannedCompileError {
-                error: CompileError::AnonymousUnionAbstraction,
-                span: self.defs.def_span(def_id),
-                notes: is_path
-                    .invalid_super_set
-                    .values()
-                    .map(|span| Note::UseDomainSpecificUnitType.spanned(*span))
-                    .collect(),
-            });
+            CompileError::AnonymousUnionAbstraction
+                .span(self.defs.def_span(def_id))
+                .with_notes(
+                    is_path
+                        .invalid_super_set
+                        .values()
+                        .map(|span| Note::UseDomainSpecificUnitType.span(*span)),
+                )
+                .report(self.errors)
         }
 
         output

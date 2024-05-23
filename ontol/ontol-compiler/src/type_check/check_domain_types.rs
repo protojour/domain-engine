@@ -104,10 +104,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                     // Check that the same relation_def_id is not reused for subject properties
                     if !subject_relation_set.insert(meta.relationship.relation_def_id) {
-                        let span = self.defs.def_span(meta.relationship_id.0);
-                        self.errors.push(
-                            CompileError::UnionInNamedRelationshipNotSupported.spanned(&span),
-                        );
+                        CompileError::UnionInNamedRelationshipNotSupported
+                            .span(self.defs.def_span(meta.relationship_id.0))
+                            .report(&mut self.errors);
                     }
 
                     let object_properties = self
@@ -120,8 +119,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     {
                         if matches!(property.cardinality.1, ValueCardinality::List) {
                             let span = self.defs.def_span(meta.relationship_id.0);
-                            self.errors
-                                .push(CompileError::EntityRelationshipCannotBeAList.spanned(&span));
+                            CompileError::EntityRelationshipCannotBeAList
+                                .span(span)
+                                .report(&mut self.errors);
                         }
 
                         actions.push(Action::AdjustEntityPropertyCardinality(def_id, *prop_id));
@@ -148,20 +148,18 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             .unwrap();
 
                         if !matches!(relation_repr_kind, ReprKind::Unit) {
-                            self.errors.push(
-                                CompileError::InvalidRelationType
-                                    .spanned(&meta.relationship.relation_span),
-                            );
+                            CompileError::InvalidRelationType
+                                .span(meta.relationship.relation_span)
+                                .report(&mut self.errors);
                         } else {
                             let object = meta.relationship.object;
 
                             let object_repr_kind = self.repr_ctx.get_repr_kind(&object.0).unwrap();
 
                             if !matches!(object_repr_kind, ReprKind::StructUnion(_)) {
-                                self.errors.push(
-                                    CompileError::FlattenedRelationshipObjectMustBeStructUnion
-                                        .spanned(&object.1),
-                                );
+                                CompileError::FlattenedRelationshipObjectMustBeStructUnion
+                                    .span(object.1)
+                                    .report(&mut self.errors);
                             }
                         }
                     }
@@ -227,8 +225,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     let meta = self.defs.relationship_meta(relationship_id);
 
                     self.error(
-                        CompileError::NonEntityInReverseRelationship,
-                        meta.relationship.span,
+                        CompileError::NonEntityInReverseRelationship.span(*meta.relationship.span),
                     );
                 }
                 Action::AdjustEntityPropertyCardinality(def_id, property_id) => {
@@ -279,8 +276,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             CompileError::CannotGenerateValue(format!(
                                 "{}",
                                 FormatType::new(object_ty, self.defs, self.primitives)
-                            )),
-                            &span,
+                            ))
+                            .span(span),
                         );
                     }
                 },

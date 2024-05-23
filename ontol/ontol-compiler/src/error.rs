@@ -13,14 +13,27 @@ pub struct UnifiedCompileError {
 #[error("")]
 pub struct SpannedCompileError {
     pub error: CompileError,
-    pub span: SourceSpan,
     pub notes: Vec<SpannedNote>,
+    span: SourceSpan,
 }
 
 impl SpannedCompileError {
-    pub fn note(mut self, note: SpannedNote) -> Self {
+    pub fn with_note(mut self, note: SpannedNote) -> Self {
         self.notes.push(note);
         self
+    }
+
+    pub fn with_notes(mut self, notes: impl IntoIterator<Item = SpannedNote>) -> Self {
+        self.notes.extend(notes);
+        self
+    }
+
+    pub(crate) fn report(self, ctx: &mut impl AsMut<CompileErrors>) {
+        ctx.as_mut().errors.push(self);
+    }
+
+    pub fn span(&self) -> SourceSpan {
+        self.span
     }
 }
 
@@ -128,11 +141,11 @@ pub enum CompileError {
 }
 
 impl CompileError {
-    pub fn spanned(self, span: &SourceSpan) -> SpannedCompileError {
+    pub fn span(self, span: SourceSpan) -> SpannedCompileError {
         SpannedCompileError {
             error: self,
-            span: *span,
             notes: vec![],
+            span,
         }
     }
 }
@@ -375,7 +388,7 @@ pub enum Note {
 }
 
 impl Note {
-    pub fn spanned(self, span: SourceSpan) -> SpannedNote {
+    pub fn span(self, span: SourceSpan) -> SpannedNote {
         SpannedNote { note: self, span }
     }
 }
@@ -389,25 +402,10 @@ impl CompileErrors {
     pub fn extend(&mut self, errors: CompileErrors) {
         self.errors.extend(errors.errors);
     }
+}
 
-    pub fn push(&mut self, error: SpannedCompileError) {
-        self.errors.push(error);
-    }
-
-    pub fn error(&mut self, error: CompileError, span: &SourceSpan) {
-        self.error_with_notes(error, span, vec![]);
-    }
-
-    pub fn error_with_notes(
-        &mut self,
-        error: CompileError,
-        span: &SourceSpan,
-        notes: Vec<SpannedNote>,
-    ) {
-        self.errors.push(SpannedCompileError {
-            error,
-            span: *span,
-            notes,
-        });
+impl AsMut<CompileErrors> for CompileErrors {
+    fn as_mut(&mut self) -> &mut CompileErrors {
+        self
     }
 }

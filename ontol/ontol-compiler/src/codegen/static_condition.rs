@@ -42,6 +42,12 @@ struct ConditionBuilder<'c, 'm> {
     errors: CompileErrors,
 }
 
+impl<'c, 'm> AsMut<CompileErrors> for ConditionBuilder<'c, 'm> {
+    fn as_mut(&mut self) -> &mut CompileErrors {
+        &mut self.errors
+    }
+}
+
 impl<'c, 'm> ConditionBuilder<'c, 'm> {
     fn term(&mut self, node: Node, parent_var: Option<Var>) -> CondTerm {
         match self.arena[node].hir() {
@@ -124,17 +130,17 @@ impl<'c, 'm> ConditionBuilder<'c, 'm> {
                                 ),
                             );
                         } else {
-                            self.errors.push(
-                                CompileError::BUG("static condition: unhandled leaf discriminant for has-attribute")
-                                    .spanned(&self.arena[node].span()),
-                            );
+                            CompileError::BUG(
+                                "static condition: unhandled leaf discriminant for has-attribute",
+                            )
+                            .span(self.arena[node].span())
+                            .report(self)
                         }
                     }
                     _ => {
-                        self.errors.push(
-                            CompileError::BUG("static condition: unhandled discriminant")
-                                .spanned(&self.arena[node].span()),
-                        );
+                        CompileError::BUG("static condition: unhandled discriminant")
+                            .span(self.arena[node].span())
+                            .report(self);
                     }
                 }
 

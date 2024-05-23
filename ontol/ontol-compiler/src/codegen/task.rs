@@ -24,7 +24,7 @@ use crate::{
     map::UndirectedMapKey,
     typed_hir::TypedRootNode,
     types::Type,
-    CompileError, CompileErrors, Compiler, Note, SourceSpan, SpannedCompileError,
+    CompileError, CompileErrors, Compiler, Note, SourceSpan,
 };
 
 use super::{
@@ -74,14 +74,13 @@ impl<'m> CodegenTasks<'m> {
                         MapCodegenRequest::ExplicitOntol(ontol_map),
                     ) => {
                         if let Some(old_ontol_map) = &old.ontol_map {
-                            errors.push(
-                                CompileError::ConflictingMap
-                                    .spanned(&defs.def_span(ontol_map.map_def_id))
-                                    .note(
-                                        Note::AlreadyDefinedHere
-                                            .spanned(defs.def_span(old_ontol_map.map_def_id)),
-                                    ),
-                            );
+                            CompileError::ConflictingMap
+                                .span(defs.def_span(ontol_map.map_def_id))
+                                .with_note(
+                                    Note::AlreadyDefinedHere
+                                        .span(defs.def_span(old_ontol_map.map_def_id)),
+                                )
+                                .report(errors);
                         } else {
                             old.ontol_map = Some(ontol_map);
                         }
@@ -310,8 +309,8 @@ fn generate_explicit_map<'m>(
         let span = compiler.defs.def_span(map_def_id);
         compiler.push_error(
             CompileError::ExternMapUnknownDirection
-                .spanned(&span)
-                .note(Note::AbtractMapSuggestion.spanned(span)),
+                .span(span)
+                .with_note(Note::AbtractMapSuggestion.span(span)),
         );
     }
 
@@ -388,11 +387,9 @@ fn generate_explicit_map<'m>(
                             .insert((def_id.package_id(), ident_constant), down_key);
                     }
                     (Some(_), None) => {
-                        compiler.errors.push(SpannedCompileError {
-                            error: CompileError::BUG("Failed to generate forward mapping"),
-                            span,
-                            notes: vec![],
-                        });
+                        CompileError::BUG("Failed to generate forward mapping")
+                            .span(span)
+                            .report(compiler);
                     }
                     _ => {}
                 }

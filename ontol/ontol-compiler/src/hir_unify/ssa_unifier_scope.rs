@@ -325,10 +325,9 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     } else {
                         // TODO
                         // Ok(Binding::Wildcard)
-                        self.errors.error(
-                            CompileError::PatternRequiresIteratedVariable,
-                            &node_ref.span(),
-                        );
+                        CompileError::PatternRequiresIteratedVariable
+                            .span(node_ref.span())
+                            .report(self);
                         Ok(Binding::Wildcard)
                     }
                 } else {

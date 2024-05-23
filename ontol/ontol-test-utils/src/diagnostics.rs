@@ -116,8 +116,8 @@ pub fn diff_errors(
         add_message_to_builder(
             &mut builders,
             SpannedMessage {
+                span: spanned_error.span(),
                 message: Message::Error(spanned_error.error),
-                span: spanned_error.span,
             },
         );
         for spanned_note in spanned_error.notes {
