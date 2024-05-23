@@ -11,7 +11,6 @@ doctest = false
 [dependencies]
 logos = "0.14"
 unindent = "0.2"
-tracing.workspace = true
 thin-vec.workspace = true
 
 [dev-dependencies]
