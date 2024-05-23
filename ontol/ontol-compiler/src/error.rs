@@ -287,10 +287,7 @@ impl std::fmt::Display for CompileError {
             Self::UnknownTypeParameter => write!(f, "unknown type parameter"),
             Self::CannotMapUnion => write!(f, "cannot map a union, map each variant instead"),
             Self::CannotMapAbstract => write!(f, "cannot map an abstract type"),
-            Self::ExternMapUnknownDirection => write!(
-                f,
-                "unknown map direction. Try to specify an @abstract mapping outside this scope."
-            ),
+            Self::ExternMapUnknownDirection => write!(f, "unknown map direction for extern map"),
             Self::NoRelationParametersExpected => write!(f, "no relation parameters expected"),
             Self::ExpectedExplicitStructPath => write!(f, "expected explicit struct path"),
             Self::IncompatibleLiteral => write!(f, "Incompatible literal"),
