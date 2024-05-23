@@ -2,18 +2,6 @@ use 'conduit_public' as public
 use 'conduit_db' as db
 
 map(
-    db.Article(
-        'slug': slug,
-        'title': title,
-        'description': desc,
-        'body': body,
-        'createdAt': ca,
-        'updatedAt': ua,
-        'favorited_by': { ..db.User match(
-            'username': fav_user
-        )},
-        'author': author,
-    ),
     public.Article(
         'slug': slug,
         'title': title,
@@ -26,18 +14,22 @@ map(
         ),
         'favoritesCount': length { ..fav_user },
         'author': author,
-    )
+    ),
+    db.Article(
+        'slug': slug,
+        'title': title,
+        'description': desc,
+        'body': body,
+        'createdAt': ca,
+        'updatedAt': ua,
+        'favorited_by': { ..db.User match(
+            'username': fav_user
+        )},
+        'author': author,
+    ),
 )
 
 map(
-    public.ArticleFilter(
-        'slug'?: slug,
-        'tag'?: {filter_tag},
-        'author'?: {author},
-        'favorited'?: {favorited_by},
-        'offset': offset,
-        'limit': limit,
-    ),
     db.Article: {
         ..db.Article match[offset, limit] (
             'slug'?: slug,
@@ -51,5 +43,13 @@ map(
                 ..db.User match('username': favorited),
             }
         )
-    }
+    },
+    public.ArticleFilter(
+        'slug'?: slug,
+        'tag'?: {filter_tag},
+        'author'?: {author},
+        'favorited'?: {favorited_by},
+        'offset': offset,
+        'limit': limit,
+    ),
 )

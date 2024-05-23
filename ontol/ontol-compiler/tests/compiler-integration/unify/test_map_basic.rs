@@ -681,8 +681,8 @@ fn test_map_delegation() {
             def millimeters (rel .is: i64)
 
             map(
-                meters(m),
                 millimeters(m * 1000),
+                meters(m),
             )
             ",
         ),

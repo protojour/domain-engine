@@ -232,29 +232,29 @@ fn test_imperfect_mapping_mutation() {
         (
             SrcName::default(),
             "
-            use 'inner' as inner
+            use 'lower' as lower
 
-            def outer (
+            def upper (
                 rel .'id'|id: (rel .is: text)
                 rel .'x': text
             )
 
             map(
-                @match inner.inner(
-                    'id': id,
-                    'a': x,
-                ),
-                outer(
+                upper(
                     'id': id,
                     'x': x,
+                ),
+                @match lower.lower(
+                    'id': id,
+                    'a': x,
                 )
             )
             ",
         ),
         (
-            src_name("inner"),
+            src_name("lower"),
             "
-            def inner (
+            def lower (
                 rel .'id'|id: (rel .is: text)
                 rel .'a': text
                 rel .'b': text
@@ -262,12 +262,12 @@ fn test_imperfect_mapping_mutation() {
             ",
         ),
     ])
-    .with_data_store(src_name("inner"), DataStoreConfig::Default)
+    .with_data_store(src_name("lower"), DataStoreConfig::Default)
     .compile();
     let (_schema, test) = schema_test(&test, SrcName::default());
     let mutation_object = test.mutation_object_data();
-    let outer_field = mutation_object.fields.get("outer").unwrap();
-    let FieldKind::EntityMutation(field) = &outer_field.kind else {
+    let upper_field = mutation_object.fields.get("upper").unwrap();
+    let FieldKind::EntityMutation(field) = &upper_field.kind else {
         panic!()
     };
 

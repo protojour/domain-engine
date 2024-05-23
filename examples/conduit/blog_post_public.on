@@ -9,6 +9,13 @@ def BlogPost (
 )
 
 map(
+    BlogPost(
+        'post_id'?: id,
+        'name': title,
+        'contents': body,
+        'written_by': author,
+        'tags': {..tag},
+    ),
     @match db.Article(
         'article_id'?: id,
         'body': body,
@@ -20,13 +27,6 @@ map(
             ..db.TagEntity('tag': tag)
         },
     ),
-    BlogPost(
-        'post_id'?: id,
-        'name': title,
-        'contents': body,
-        'written_by': author,
-        'tags': {..tag},
-    )
 )
 
 map posts(
