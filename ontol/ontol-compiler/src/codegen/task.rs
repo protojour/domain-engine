@@ -306,7 +306,6 @@ fn generate_explicit_map<'m>(
         generate_extern_map(
             undirected_key.first(),
             undirected_key.second(),
-            MapDirection::Down,
             extern_def_id,
             proc_table,
             compiler,
@@ -321,7 +320,6 @@ fn generate_explicit_map<'m>(
         generate_extern_map(
             undirected_key.second(),
             undirected_key.first(),
-            MapDirection::Up,
             extern_def_id,
             proc_table,
             compiler,
@@ -508,7 +506,6 @@ fn generate_map_proc<'m>(
 fn generate_extern_map(
     input: MapDef,
     output: MapDef,
-    _direction: MapDirection,
     extern_def_id: DefId,
     proc_table: &mut ProcTable,
     compiler: &mut Compiler,
