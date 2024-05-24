@@ -185,10 +185,10 @@ impl<'m> ExplicitMapCodegenTask<'m> {
             Some(ontol_map.map_def_id.package_id())
         } else if let Some(ext) = self.forward_extern.as_ref() {
             Some(ext.map_def_id.package_id())
-        } else if let Some(ext) = self.backward_extern.as_ref() {
-            Some(ext.map_def_id.package_id())
         } else {
-            None
+            self.backward_extern
+                .as_ref()
+                .map(|ext| ext.map_def_id.package_id())
         }
     }
 }
