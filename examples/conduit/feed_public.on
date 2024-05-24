@@ -14,19 +14,19 @@ def @private channel_base (
 
 /// An item in the channel
 def item (
-    rel .'guid'?: uuid
+    rel .'guid': uuid
     rel .'title': text
 )
 
 map(
     item(
-        'guid'?: id,
+        'guid': id,
         'title': t,
     ),
     @match db.Article(
         // BUG: Don't want this to be optional.
-        // it's clearly a mapping from top to bottom, and then it will come from the data store
-        'article_id'?: id,
+        // it's clearly an upward mapping, and then it will come from the data store
+        'article_id': id,
         'title': t,
     ),
 )

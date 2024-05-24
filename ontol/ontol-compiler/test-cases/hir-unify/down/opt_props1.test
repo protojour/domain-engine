@@ -15,7 +15,7 @@
     (struct ($c)
         (catch (@d)
             (try? @d $a)
-            (prop? $c O:2:1
+            (prop?- $c O:2:1
                 (#u (map $a))
             )
         )

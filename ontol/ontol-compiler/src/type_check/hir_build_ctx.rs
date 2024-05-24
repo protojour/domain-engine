@@ -1,6 +1,5 @@
 use fnv::FnvHashMap;
 use ontol_runtime::var::{Var, VarAllocator};
-use tracing::debug_span;
 
 use crate::{
     pattern::PatId,
@@ -156,11 +155,14 @@ impl Arm {
     pub fn is_first(&self) -> bool {
         matches!(self, Self::First)
     }
+}
 
-    pub fn tracing_debug_span(&self) -> tracing::Span {
-        match self {
-            Self::First => debug_span!("1st"),
-            Self::Second => debug_span!("2nd"),
+#[macro_export(local_inner_macros)]
+macro_rules! arm_span {
+    ($arm:expr) => {
+        match $arm {
+            Arm::First => tracing::debug_span!("1st"),
+            Arm::Second => tracing::debug_span!("2nd"),
         }
-    }
+    };
 }

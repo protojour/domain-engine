@@ -2,6 +2,7 @@ use ontol_hir::Label;
 use ontol_runtime::{var::VarAllocator, DefId};
 
 use crate::{
+    arm_span,
     codegen::{
         task::{MapCodegenRequest, OntolMap, OntolMapArms},
         type_mapper::TypeMapper,
@@ -81,7 +82,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 errors: self.errors,
             };
             for (pat_id, arm) in pat_ids.iter().zip(ARMS) {
-                let _entered = arm.tracing_debug_span().entered();
+                let _entered = arm_span!(arm).entered();
 
                 ctx.current_arm = arm;
 
@@ -108,7 +109,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         ctx: &mut HirBuildCtx<'m>,
     ) -> Result<(), CheckMapError> {
         let mut arm_nodes = input.map(|(pat_id, arm)| {
-            let _entered = arm.tracing_debug_span().entered();
+            let _entered = arm_span!(arm).entered();
 
             ctx.current_arm = arm;
             let mut root_node = self.build_root_pattern(pat_id, ctx);

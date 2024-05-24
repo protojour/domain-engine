@@ -181,7 +181,7 @@ impl<'o> Processor for OntolProcessor<'o> {
     #[inline(always)]
     fn put_attr1(&mut self, target: Local, key: PropertyId) -> VmResult<()> {
         let value = self.stack.pop().unwrap();
-        if !matches!(value, Value::Unit(_)) {
+        if !matches!(value, Value::Unit(_) | Value::Void(_)) {
             match &mut self.stack[target.0 as usize] {
                 Value::Struct(attrs, _) | Value::StructUpdate(attrs, _) => {
                     attrs.insert(key, value.to_unit_attr());
@@ -210,7 +210,7 @@ impl<'o> Processor for OntolProcessor<'o> {
     #[inline(always)]
     fn put_attr2(&mut self, target: Local, key: PropertyId) -> VmResult<()> {
         let [rel, val]: [Value; 2] = self.pop_n();
-        if !matches!(val, Value::Unit(_)) {
+        if !matches!(val, Value::Unit(_) | Value::Void(_)) {
             let map = self.struct_local_mut(target)?;
             map.insert(key, Attribute { rel, val });
         }

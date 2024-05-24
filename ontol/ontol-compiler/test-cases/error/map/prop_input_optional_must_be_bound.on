@@ -1,0 +1,20 @@
+//@ src_name=upper
+use 'lower' as lower
+
+def foo (
+    rel .'_id'[rel .gen: auto]|id: (rel .is: serial)
+)
+
+map(
+    foo (
+        '_id'?: id,
+    ),
+    lower.bar (
+        '_id'?: id,
+    ),
+)
+
+//@ src_name=lower
+def bar (
+    rel .'_id'[rel .gen: auto]|id: (rel .is: serial)
+)

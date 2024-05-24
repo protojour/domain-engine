@@ -16,7 +16,7 @@
         (catch (@e)
             (try? @e $a)
             (try? @e $b)
-            (prop? $d S:1:7
+            (prop?- $d S:1:7
                 (#u (+ $a $b))
             )
         )

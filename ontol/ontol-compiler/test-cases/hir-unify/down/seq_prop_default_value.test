@@ -13,7 +13,7 @@
 |$b| (block
     (let-prop-default $_ $d ($b S:1:0) #u #u)
     (struct ($c)
-        (prop $c S:2:1
+        (prop- $c S:2:1
             (#u
                 (make-seq ($e)
                     (for-each $d ($_ $a)

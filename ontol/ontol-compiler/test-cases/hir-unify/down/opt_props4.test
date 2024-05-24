@@ -43,20 +43,20 @@
     (let-prop $_ $e ($c S:1:1))
     (let-prop $_ $h ($c S:1:2))
     (struct ($f)
-        (prop? $f O:1:0
+        (prop?- $f O:1:0
             (#u
                 (struct ($g)
                     (catch (@i)
                         (try? @i $d)
                         (let-prop? @i $_ $a ($d S:2:0))
-                        (prop? $g O:2:0
+                        (prop?- $g O:2:0
                             (#u $a)
                         )
                     )
                     (catch (@j)
                         (try? @j $e)
                         (let-prop? @j $_ $b ($e S:2:1))
-                        (prop? $g O:2:1
+                        (prop?- $g O:2:1
                             (#u $b)
                         )
                     )

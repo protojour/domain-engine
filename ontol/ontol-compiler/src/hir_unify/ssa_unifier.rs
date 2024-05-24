@@ -8,11 +8,11 @@ use ontol_runtime::{
     query::condition::{Clause, ClausePair, SetOperator},
     value::Attribute,
     var::{Var, VarAllocator, VarSet},
-    MapFlags,
+    MapDirection, MapFlags,
 };
 use smallvec::{smallvec, SmallVec};
 use thin_vec::thin_vec;
-use tracing::debug;
+use tracing::{debug, info};
 
 use crate::{
     def::{DefKind, Defs},
@@ -54,6 +54,7 @@ pub struct SsaUnifier<'c, 'm> {
     pub(super) scope_arena: &'c ontol_hir::arena::Arena<'m, TypedHir>,
     pub(super) expr_arena: &'c ontol_hir::arena::Arena<'m, TypedHir>,
     pub(super) out_arena: ontol_hir::arena::Arena<'m, TypedHir>,
+    pub(super) direction: MapDirection,
     pub(super) map_flags: MapFlags,
     pub(super) root_try_label: Option<Label>,
 
@@ -68,6 +69,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         scope_arena: &'c ontol_hir::arena::Arena<'m, TypedHir>,
         expr_arena: &'c ontol_hir::arena::Arena<'m, TypedHir>,
         var_allocator: VarAllocator,
+        direction: MapDirection,
         map_flags: MapFlags,
         compiler: &'c mut Compiler<'m>,
     ) -> Self {
@@ -82,6 +84,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
             scope_arena,
             expr_arena,
             out_arena: Default::default(),
+            direction,
             map_flags,
             root_try_label: None,
             all_scope_vars_and_labels: Default::default(),
@@ -309,8 +312,8 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     }
                 }
             }
-            Kind::Prop(optional, var, prop_id, variant) => {
-                self.write_prop_expr((*optional, *var, *prop_id), variant, node_ref.meta(), mode)
+            Kind::Prop(flags, var, prop_id, variant) => {
+                self.write_prop_expr((*flags, *var, *prop_id), variant, node_ref.meta(), mode)
             }
             Kind::Regex(_seq_label, regex_def_id, capture_group_alternation) => {
                 let regex_meta = self
@@ -457,7 +460,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 let set_var = self.alloc_var();
                 let let_cond_var = self.mk_let_cond_var(set_var, match_var, meta.span);
 
-                if flags.rel_optional() {
+                if flags.rel_up_optional() {
                     let mut free_vars = scan_immediate_free_vars(self.expr_arena, [*rel, *val]);
                     free_vars.insert(struct_var);
                     free_vars.insert(set_var);
@@ -990,8 +993,15 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     }
                 }
             }
-            _ => {
-                CompileError::TODO("create constant")
+            Some(repr) => {
+                info!("ERROR: create constant");
+                CompileError::TODO(format!("create constant for {repr:?}"))
+                    .span(meta.span)
+                    .report(self);
+                self.mk_node(Kind::Unit, meta)
+            }
+            None => {
+                CompileError::BUG("no repr available")
                     .span(meta.span)
                     .report(self);
                 self.mk_node(Kind::Unit, meta)

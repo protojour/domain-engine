@@ -1,7 +1,7 @@
 use fnv::FnvHashSet;
 use ontol_parser::cst::view::NodeViewExt;
 use ontol_runtime::{ontology::ontol::TextConstant, DefId, PackageId};
-use tracing::{debug, info};
+use tracing::{debug, debug_span, info};
 
 use crate::{
     def::{DefKind, RelParams},
@@ -22,6 +22,8 @@ impl<'m> Compiler<'m> {
         package: ParsedPackage,
         src: Src,
     ) -> Result<(), UnifiedCompileError> {
+        let _entered = debug_span!("pkg", id = ?package.package_id.0).entered();
+
         for error in package.parse_errors {
             match error {
                 ontol_parser::Error::Lex(lex_error) => {

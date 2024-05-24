@@ -249,7 +249,7 @@ mod tests {
     use std::fmt::Write;
     use std::{fs, path::PathBuf};
 
-    use ontol_runtime::MapFlags;
+    use ontol_runtime::{MapDirection, MapFlags};
 
     use crate::{hir_unify::unify_to_function, mem::Mem, typed_hir::TypedHir, Compiler};
 
@@ -261,7 +261,19 @@ mod tests {
 
     #[rstest::rstest]
     #[ontol_macros::test]
-    fn hir_unify(#[files("test-cases/hir-unify/**/*.test")] path: PathBuf) {
+    fn hir_unify(#[files("test-cases/hir-unify/down/**/*.test")] path: PathBuf) {
+        let mut direction = MapDirection::Mixed;
+
+        for comp in path.components() {
+            if comp.as_os_str() == "down" {
+                direction = MapDirection::Down;
+            } else if comp.as_os_str() == "up" {
+                direction = MapDirection::Up;
+            }
+        }
+
+        assert!(matches!(direction, MapDirection::Down | MapDirection::Up));
+
         let contents = fs::read_to_string(path).unwrap();
         let mut without_comments = String::new();
         for line in contents.lines() {
@@ -279,7 +291,9 @@ mod tests {
 
         let output = {
             let mut compiler = Compiler::new(&mem, Default::default());
-            let func = unify_to_function(&scope, &expr, MapFlags::empty(), &mut compiler).unwrap();
+            let func =
+                unify_to_function(&scope, &expr, direction, MapFlags::empty(), &mut compiler)
+                    .unwrap();
             let mut output = String::new();
             write!(&mut output, "{func}").unwrap();
             output

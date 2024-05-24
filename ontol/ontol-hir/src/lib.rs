@@ -245,8 +245,11 @@ pub struct SetEntry<'a, L: Lang>(pub Option<L::Data<'a, Label>>, pub Attribute<N
 bitflags::bitflags! {
     #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
     pub struct PropFlags: u8 {
-        const PAT_OPTIONAL  = 0b00000001;
-        const REL_OPTIONAL  = 0b00000010;
+        const PAT_OPTIONAL     = 0b00000001;
+        /// Whether the property is optional when data travels upwards
+        const REL_UP_OPTIONAL = 0b00000010;
+        /// Whether the property is optional when data travels downwards
+        const REL_DOWN_OPTIONAL  = 0b00000100;
     }
 }
 
@@ -255,8 +258,12 @@ impl PropFlags {
         self.contains(Self::PAT_OPTIONAL)
     }
 
-    pub fn rel_optional(self) -> bool {
-        self.contains(Self::REL_OPTIONAL)
+    pub fn rel_up_optional(self) -> bool {
+        self.contains(Self::REL_UP_OPTIONAL)
+    }
+
+    pub fn rel_down_optional(self) -> bool {
+        self.contains(Self::REL_DOWN_OPTIONAL)
     }
 }
 
@@ -264,9 +271,10 @@ impl Display for PropFlags {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{pat}{rel}",
+            "{pat}{down_opt}{up_opt}",
             pat = if self.pat_optional() { "?" } else { "" },
-            rel = if self.rel_optional() { "" } else { "!" }
+            down_opt = if self.rel_down_optional() { "-" } else { "" },
+            up_opt = if self.rel_up_optional() { "" } else { "!" }
         )
     }
 }

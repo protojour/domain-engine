@@ -35,11 +35,11 @@ async fn test_default_mapping_error() {
 
             map(
                 event (
-                    '_id'?: id,
+                    '_id': id,
                     'level': level,
                 ),
                 db.event (
-                    '_id'?: id,
+                    '_id': id,
                     'level': level,
                 ),
             )

@@ -465,7 +465,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 }
 
                                 if matches!(match_attribute.property_id.role, Role::Object) {
-                                    flags.insert(PropFlags::REL_OPTIONAL);
+                                    flags.insert(PropFlags::REL_UP_OPTIONAL);
                                 }
 
                                 ontol_hir::PropVariant::Value(Attribute {
@@ -513,7 +513,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 };
 
                 if matches!(match_attribute.cardinality.0, PropertyCardinality::Optional) {
-                    flags.insert(PropFlags::REL_OPTIONAL);
+                    flags.insert(PropFlags::REL_DOWN_OPTIONAL | PropFlags::REL_UP_OPTIONAL);
                 }
 
                 if self
@@ -521,12 +521,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .value_generators
                     .contains_key(&match_attribute.property_id.relationship_id)
                 {
-                    flags.insert(PropFlags::REL_OPTIONAL);
+                    flags.insert(PropFlags::REL_DOWN_OPTIONAL);
                 }
 
                 if actual_struct_flags.contains(StructFlags::MATCH) && bind_option {
                     // When in a MATCH context, the rel optionality always matches what is written in map
-                    flags.insert(PropFlags::REL_OPTIONAL);
+                    flags.insert(PropFlags::REL_DOWN_OPTIONAL | PropFlags::REL_UP_OPTIONAL);
                 }
 
                 if matches!(match_attribute.cardinality.0, PropertyCardinality::Optional)
@@ -536,12 +536,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ctx.partial = true;
                 }
 
-                if flags.rel_optional()
+                if flags.rel_up_optional()
                     && !flags.pat_optional()
                     && !matches!(
                         match_attribute.cardinality.1,
                         ValueCardinality::IndexSet | ValueCardinality::List
                     )
+                    && !actual_struct_flags.contains(StructFlags::MATCH)
                 {
                     self.check_can_construct_default(rel_params_ty, prop_span);
                     self.check_can_construct_default(value_ty, prop_span);
@@ -607,7 +608,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 Some(ctx.mk_node(
                     ontol_hir::Kind::Prop(
-                        flags | PropFlags::REL_OPTIONAL, // TODO
+                        flags | PropFlags::REL_UP_OPTIONAL | PropFlags::REL_DOWN_OPTIONAL, // TODO
                         struct_binder_var,
                         match_attribute.property_id,
                         prop_variant,
@@ -782,6 +783,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         };
 
         if !self.check_can_construct_default_inner(def_id) {
+            info!("CANNOT MAKE DEFAULT: {ty:?}");
             self.error(
                 CompileError::TODO(
                     "optional binding required, as a default value cannot be created",

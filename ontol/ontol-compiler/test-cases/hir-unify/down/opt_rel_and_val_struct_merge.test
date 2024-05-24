@@ -21,7 +21,7 @@
             (let-prop? @g $_ $a ($d S:2:0))
             (try? @g $e)
             (let-prop? @g $_ $b ($e S:2:1))
-            (prop? $f O:1:0
+            (prop?- $f O:1:0
                 (#u (+ $a $b))
             )
         )

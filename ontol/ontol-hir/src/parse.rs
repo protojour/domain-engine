@@ -170,12 +170,20 @@ impl<'a, L: Lang> Parser<'a, L> {
             }
             ("struct", next) => self.parse_struct_inner(next, StructFlags::empty()),
             ("match-struct", next) => self.parse_struct_inner(next, StructFlags::MATCH),
-            ("prop", next) => self.parse_prop(PropFlags::REL_OPTIONAL, next),
-            ("prop?", next) => {
-                self.parse_prop(PropFlags::PAT_OPTIONAL | PropFlags::REL_OPTIONAL, next)
-            }
+            ("prop" | "prop-", next) => self.parse_prop(
+                PropFlags::REL_DOWN_OPTIONAL | PropFlags::REL_UP_OPTIONAL,
+                next,
+            ),
+            ("prop?" | "prop?-", next) => self.parse_prop(
+                PropFlags::PAT_OPTIONAL | PropFlags::REL_DOWN_OPTIONAL | PropFlags::REL_UP_OPTIONAL,
+                next,
+            ),
             ("prop!", next) => self.parse_prop(PropFlags::empty(), next),
+            ("prop-!", next) => self.parse_prop(PropFlags::REL_DOWN_OPTIONAL, next),
             ("prop?!", next) => self.parse_prop(PropFlags::PAT_OPTIONAL, next),
+            ("prop?-!", next) => {
+                self.parse_prop(PropFlags::PAT_OPTIONAL | PropFlags::REL_DOWN_OPTIONAL, next)
+            }
             ("set", next) => {
                 let (entries, next) = self.parse_many(next, Self::parse_set_entry)?;
                 Ok((self.make_node(Kind::Set(entries.into())), next))

@@ -179,6 +179,20 @@ pub(super) struct ExplicitMapCodegenTask<'m> {
     pub backward_extern: Option<ExternMap>,
 }
 
+impl<'m> ExplicitMapCodegenTask<'m> {
+    fn pkg_id(&self) -> Option<PackageId> {
+        if let Some(ontol_map) = self.ontol_map.as_ref() {
+            Some(ontol_map.map_def_id.package_id())
+        } else if let Some(ext) = self.forward_extern.as_ref() {
+            Some(ext.map_def_id.package_id())
+        } else if let Some(ext) = self.backward_extern.as_ref() {
+            Some(ext.map_def_id.package_id())
+        } else {
+            None
+        }
+    }
+}
+
 pub struct ExternMap {
     pub extern_def_id: DefId,
     pub map_def_id: DefId,
@@ -295,17 +309,22 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
 
 fn generate_explicit_map<'m>(
     undirected_key: UndirectedMapKey,
-    ExplicitMapCodegenTask {
-        ontol_map,
-        forward_extern,
-        backward_extern,
-    }: ExplicitMapCodegenTask<'m>,
+    codegen_task: ExplicitMapCodegenTask<'m>,
     proc_table: &mut ProcTable,
     compiler: &mut Compiler<'m>,
 ) {
+    let _entered =
+        debug_span!("pkg", id = ?codegen_task.pkg_id().unwrap_or(PackageId(0)).0).entered();
+
+    let ExplicitMapCodegenTask {
+        ontol_map,
+        forward_extern,
+        backward_extern,
+    } = codegen_task;
+
     let mut externed_outputs = FnvHashSet::default();
 
-    fn unknown_extern_map_direction(compiler: &mut Compiler, map_def_id: DefId) {
+    fn unknown_extern_map_direction(map_def_id: DefId, compiler: &mut Compiler) {
         let span = compiler.defs.def_span(map_def_id);
         CompileError::ExternMapUnknownDirection
             .span(span)
@@ -316,7 +335,7 @@ fn generate_explicit_map<'m>(
     // the extern directions are in relation to the _undirected key_, not the ontol map arms!
     if let Some(extern_map) = forward_extern {
         if ontol_map.is_none() {
-            unknown_extern_map_direction(compiler, extern_map.map_def_id);
+            unknown_extern_map_direction(extern_map.map_def_id, compiler);
         }
 
         generate_extern_map(
@@ -330,7 +349,7 @@ fn generate_explicit_map<'m>(
     }
     if let Some(extern_map) = backward_extern {
         if ontol_map.is_none() {
-            unknown_extern_map_direction(compiler, extern_map.map_def_id);
+            unknown_extern_map_direction(extern_map.map_def_id, compiler);
         }
 
         generate_extern_map(
@@ -491,7 +510,7 @@ fn generate_map_proc<'m>(
     proc_table: &mut ProcTable,
     compiler: &mut Compiler<'m>,
 ) -> Option<MapKey> {
-    let func = match unify_to_function(scope, expr, map_flags, compiler) {
+    let func = match unify_to_function(scope, expr, direction, map_flags, compiler) {
         Ok(func) => func,
         Err(err) => {
             debug!("unifier error: {err:?}");

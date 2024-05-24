@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use ontol_hir::visitor::HirVisitor;
 use ontol_runtime::{
     var::{Var, VarAllocator},
-    MapFlags,
+    MapDirection, MapFlags,
 };
 
 use crate::{
@@ -46,6 +46,7 @@ pub type UnifierResult<T> = Result<T, UnifierError>;
 pub fn unify_to_function<'m>(
     scope: &ontol_hir::RootNode<'m, TypedHir>,
     expr: &ontol_hir::RootNode<'m, TypedHir>,
+    direction: MapDirection,
     map_flags: MapFlags,
     compiler: &mut Compiler<'m>,
 ) -> UnifierResult<HirFunc<'m>> {
@@ -56,6 +57,7 @@ pub fn unify_to_function<'m>(
     let (unified, mut var_allocator) = unify_ssa(
         scope,
         expr,
+        direction,
         map_flags,
         var_tracker.var_allocator(),
         compiler,
@@ -75,6 +77,7 @@ pub fn unify_to_function<'m>(
 fn unify_ssa<'m>(
     scope: &ontol_hir::RootNode<'m, TypedHir>,
     expr: &ontol_hir::RootNode<'m, TypedHir>,
+    direction: MapDirection,
     map_flags: MapFlags,
     var_allocator: VarAllocator,
     compiler: &mut Compiler<'m>,
@@ -83,6 +86,7 @@ fn unify_ssa<'m>(
         scope.arena(),
         expr.arena(),
         var_allocator,
+        direction,
         map_flags,
         compiler,
     );

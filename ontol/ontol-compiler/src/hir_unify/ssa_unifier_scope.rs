@@ -4,6 +4,7 @@ use ontol_hir::{Binder, Binding, Kind, Label, Node, Nodes, PropVariant, SetEntry
 use ontol_runtime::{
     value::Attribute,
     var::{Var, VarSet},
+    MapDirection,
 };
 use smallvec::smallvec;
 use thin_vec::thin_vec;
@@ -348,8 +349,20 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                     PropVariant::Value(Attribute { rel, val }) => {
                         let prop_scoped = scoped.prop(self.map_flags);
 
-                        match (flags.rel_optional(), flags.pat_optional()) {
-                            (true, false) => {
+                        let (rel_optional, needs_default) = match self.direction {
+                            MapDirection::Down => {
+                                if flags.rel_down_optional() && !flags.rel_up_optional() {
+                                    (true, false)
+                                } else {
+                                    (flags.rel_up_optional(), !flags.pat_optional())
+                                }
+                            }
+                            MapDirection::Up => (flags.rel_up_optional(), !flags.pat_optional()),
+                            MapDirection::Mixed => (true, true),
+                        };
+
+                        match (rel_optional, needs_default) {
+                            (true, true) => {
                                 // This passed type check, so there must be a way to construct a value default
                                 let default = Attribute {
                                     rel: self.write_default_node(
