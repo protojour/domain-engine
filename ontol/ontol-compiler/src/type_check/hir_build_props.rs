@@ -374,13 +374,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             _ => match_attributes.get_mut(&MatchAttributeKey::Def(def_id)),
         };
         let Some(match_attribute) = match_attribute else {
-            self.error(CompileError::UnknownProperty.span(prop_span));
+            CompileError::UnknownProperty.span(prop_span).report(self);
             return None;
         };
 
         if match_attribute.mentioned {
             // TODO: This is probably allowed in match
-            self.error(CompileError::DuplicateProperty.span(prop_span));
+            CompileError::DuplicateProperty.span(prop_span).report(self);
             return None;
         }
         match_attribute.mentioned = true;
@@ -447,10 +447,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                     hir_set_elements.push(ontol_hir::SetEntry(
                                         if element.is_iter {
                                             let Some(label) = ctx.label_map.get(&element.id) else {
-                                                self.error(
-                                                    CompileError::TODO("unable to loop")
-                                                        .span(prop_span),
-                                                );
+                                                CompileError::TODO("unable to loop")
+                                                    .span(prop_span)
+                                                    .report(self);
                                                 return None;
                                             };
                                             Some(TypedHirData(*label, Meta::new(seq_ty, prop_span)))
@@ -581,9 +580,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             ValueCardinality::IndexSet | ValueCardinality::List,
                             SetBinaryOperator::ElementIn,
                         ) => {
-                            self.error(
-                                CompileError::TODO("property must be a scalar").span(prop_span),
-                            );
+                            CompileError::TODO("property must be a scalar")
+                                .span(prop_span)
+                                .report(self);
                             return None;
                         }
                         (ValueCardinality::IndexSet, operator) => {
@@ -599,9 +598,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             )
                         }
                         _ => {
-                            self.error(
-                                CompileError::TODO("property must be a set").span(prop_span),
-                            );
+                            CompileError::TODO("property must be a set")
+                                .span(prop_span)
+                                .report(self);
                             return None;
                         }
                     };
@@ -790,18 +789,17 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn check_can_construct_default(&mut self, ty: TypeRef<'m>, span: SourceSpan) {
         let Some(def_id) = ty.get_single_def_id() else {
-            self.error(CompileError::TODO("Type not found").span(NO_SPAN));
+            CompileError::TODO("Type not found")
+                .span(NO_SPAN)
+                .report(self);
             return;
         };
 
         if !self.check_can_construct_default_inner(def_id) {
             debug!("cannot make default: {ty:?}");
-            self.error(
-                CompileError::TODO(
-                    "optional binding required, as a default value cannot be created",
-                )
-                .span(span),
-            );
+            CompileError::TODO("optional binding required, as a default value cannot be created")
+                .span(span)
+                .report(self);
         } else {
             info!("CAN MAKE DEFAULT: {ty:?}");
         }

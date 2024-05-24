@@ -81,57 +81,52 @@ pub struct TypeCheck<'c, 'm> {
 }
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
-    fn error(&mut self, error: SpannedCompileError) -> TypeRef<'m> {
-        error.report(self);
-        &ERROR_TYPE
-    }
-
     fn type_error(&mut self, error: TypeError<'m>, span: SourceSpan) -> TypeRef<'m> {
         match error {
             TypeError::Propagated => self.types.intern(Type::Error),
-            TypeError::Mismatch(equation) => self.error(
-                CompileError::TypeMismatch {
-                    actual: format!(
-                        "{}",
-                        FormatType::new(equation.actual.0, self.defs, self.primitives)
-                    ),
-                    expected: format!(
-                        "{}",
-                        FormatType::new(equation.expected.0, self.defs, self.primitives)
-                    ),
-                }
-                .span(span),
-            ),
-            TypeError::MustBeSequence(ty) => self.error(
-                CompileError::TypeMismatch {
-                    actual: format!("{}", FormatType::new(ty, self.defs, self.primitives)),
-                    expected: format!("{{{}}}", FormatType::new(ty, self.defs, self.primitives)),
-                }
-                .span(span),
-            ),
-            TypeError::VariableMustBeSequenceEnclosed(ty) => self.error(
+            TypeError::Mismatch(equation) => CompileError::TypeMismatch {
+                actual: format!(
+                    "{}",
+                    FormatType::new(equation.actual.0, self.defs, self.primitives)
+                ),
+                expected: format!(
+                    "{}",
+                    FormatType::new(equation.expected.0, self.defs, self.primitives)
+                ),
+            }
+            .span(span)
+            .report_ty(self),
+            TypeError::MustBeSequence(ty) => CompileError::TypeMismatch {
+                actual: format!("{}", FormatType::new(ty, self.defs, self.primitives)),
+                expected: format!("{{{}}}", FormatType::new(ty, self.defs, self.primitives)),
+            }
+            .span(span)
+            .report_ty(self),
+            TypeError::VariableMustBeSequenceEnclosed(ty) => {
                 CompileError::VariableMustBeSequenceEnclosed(format!(
                     "{}",
                     FormatType::new(ty, self.defs, self.primitives)
                 ))
-                .span(span),
-            ),
+                .span(span)
+                .report_ty(self)
+            }
             TypeError::NotEnoughInformation => {
-                self.error(CompileError::TODO("Not enough information to infer type").span(span))
+                CompileError::TODO("Not enough information to infer type")
+                    .span(span)
+                    .report_ty(self)
             }
-            TypeError::NotConvertibleFromNumber(ty) => self.error(
-                CompileError::TODO(format!(
-                    "Type {} cannot be represented as a number",
-                    FormatType::new(ty, self.defs, self.primitives)
-                ))
-                .span(span),
-            ),
-            TypeError::NoRelationParametersExpected => {
-                self.error(CompileError::NoRelationParametersExpected.span(span))
-            }
-            TypeError::StructTypeNotInferrable => {
-                self.error(CompileError::ExpectedExplicitStructPath.span(span))
-            }
+            TypeError::NotConvertibleFromNumber(ty) => CompileError::TODO(format!(
+                "Type {} cannot be represented as a number",
+                FormatType::new(ty, self.defs, self.primitives)
+            ))
+            .span(span)
+            .report_ty(self),
+            TypeError::NoRelationParametersExpected => CompileError::NoRelationParametersExpected
+                .span(span)
+                .report_ty(self),
+            TypeError::StructTypeNotInferrable => CompileError::ExpectedExplicitStructPath
+                .span(span)
+                .report_ty(self),
         }
     }
 
@@ -186,5 +181,12 @@ impl<'m> Compiler<'m> {
             primitives: &self.primitives,
             entity_ctx: &self.entity_ctx,
         }
+    }
+}
+
+impl SpannedCompileError {
+    fn report_ty(self, ctx: &mut TypeCheck) -> TypeRef<'static> {
+        ctx.as_mut().errors.push(self);
+        &ERROR_TYPE
     }
 }

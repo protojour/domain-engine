@@ -786,7 +786,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         ctx: &mut HirBuildCtx<'m>,
     ) -> ontol_hir::Node {
         let span = error.span();
-        self.error(error);
+        error.report(self);
         self.make_error_node(span, ctx)
     }
 

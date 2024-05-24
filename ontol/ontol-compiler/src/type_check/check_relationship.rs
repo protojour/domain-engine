@@ -112,13 +112,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     )
                     .is_some()
                 {
-                    return self
-                        .error(CompileError::UnionInNamedRelationshipNotSupported.span(*span));
+                    return CompileError::UnionInNamedRelationshipNotSupported
+                        .span(*span)
+                        .report_ty(self);
                 }
             }
             (Some(_), _) => {
                 // non-domain type in object
-                return self.error(CompileError::NonEntityInReverseRelationship.span(*span));
+                return CompileError::NonEntityInReverseRelationship
+                    .span(*span)
+                    .report_ty(self);
             }
             (None, _) => {}
         }
@@ -158,7 +161,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     object.0,
                     *span,
                 ) {
-                    self.error(CompileError::DuplicateAnonymousRelationship.span(*span));
+                    CompileError::DuplicateAnonymousRelationship
+                        .span(*span)
+                        .report(self);
                 }
 
                 object_ty
@@ -172,10 +177,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let properties = self.relations.properties_by_def_id_mut(subject.0);
 
                 if properties.identifies.is_some() {
-                    return self.error(CompileError::AlreadyIdentifiesAType.span(*span));
+                    return CompileError::AlreadyIdentifiesAType
+                        .span(*span)
+                        .report_ty(self);
                 }
                 if subject.0.package_id() != object.0.package_id() {
-                    return self.error(CompileError::MustIdentifyWithinDomain.span(*span));
+                    return CompileError::MustIdentifyWithinDomain
+                        .span(*span)
+                        .report_ty(self);
                 }
 
                 properties.identifies = Some(relationship_id);
@@ -186,7 +195,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             "Object is identified by {id:?}, this relation is {:?}",
                             relationship.relation_def_id
                         );
-                        return self.error(CompileError::AlreadyIdentified.span(*span));
+                        return CompileError::AlreadyIdentified.span(*span).report_ty(self);
                     }
                     None => object_properties.identified_by = Some(relationship_id),
                 }
@@ -203,16 +212,15 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.check_subject_data_type(subject_ty, &subject.1);
 
                 let Type::TextConstant(def_id) = object_ty else {
-                    return self.error(
-                        CompileError::TypeMismatch {
-                            actual: format!(
-                                "{}",
-                                FormatType::new(object_ty, self.defs, self.primitives)
-                            ),
-                            expected: "text constant".to_string(),
-                        }
-                        .span(*span),
-                    );
+                    return CompileError::TypeMismatch {
+                        actual: format!(
+                            "{}",
+                            FormatType::new(object_ty, self.defs, self.primitives)
+                        ),
+                        expected: "text constant".to_string(),
+                    }
+                    .span(*span)
+                    .report_ty(self);
                 };
 
                 let DefKind::TextLiteral(text_literal) = self.defs.def_kind(*def_id) else {
@@ -237,7 +245,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         if let Err(error) =
                             sequence.define_relationship(&relationship.rel_params, relationship_id)
                         {
-                            return self.error(error.span(*span));
+                            return error.span(*span).report_ty(self);
                         }
 
                         properties.constructor = Constructor::Sequence(sequence);
@@ -246,13 +254,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         if let Err(error) =
                             sequence.define_relationship(&relationship.rel_params, relationship_id)
                         {
-                            return self.error(error.span(*span));
+                            return error.span(*span).report_ty(self);
                         }
                     }
                     _ => {
-                        return self.error(
-                            CompileError::InvalidMixOfRelationshipTypeForSubject.span(*span),
-                        );
+                        return CompileError::InvalidMixOfRelationshipTypeForSubject
+                            .span(*span)
+                            .report_ty(self);
                     }
                 }
 
@@ -267,12 +275,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ..
                 }) = subject_def_kind
                 else {
-                    return self.error(
-                        CompileError::TODO(
-                            "default not supported here, must be on a relation type",
-                        )
-                        .span(*span),
-                    );
+                    return CompileError::TODO(
+                        "default not supported here, must be on a relation type",
+                    )
+                    .span(*span)
+                    .report_ty(self);
                 };
 
                 let DefKind::Relationship(Relationship {
@@ -284,10 +291,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 };
 
                 let Some(object_ty) = self.def_types.table.get(&outer_object.0).cloned() else {
-                    return self.error(
-                        CompileError::TODO("the type of the default relation has not been checked")
-                            .span(*span),
-                    );
+                    return CompileError::TODO(
+                        "the type of the default relation has not been checked",
+                    )
+                    .span(*span)
+                    .report_ty(self);
                 };
 
                 // just copy the type, type check done later
@@ -308,17 +316,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let subject_def_kind = self.defs.def_kind(subject.0);
 
                 let Type::ValueGenerator(value_generator_def_id) = object_ty else {
-                    return self.error(CompileError::TODO("Not a value generator").span(object.1));
+                    return CompileError::TODO("Not a value generator")
+                        .span(object.1)
+                        .report_ty(self);
                 };
                 let DefKind::Type(TypeDef {
                     rel_type_for: Some(RelationshipId(outer_relationship_id)),
                     ..
                 }) = subject_def_kind
                 else {
-                    return self.error(
-                        CompileError::TODO("gen not supported here, must be on a relation type")
-                            .span(*span),
-                    );
+                    return CompileError::TODO(
+                        "gen not supported here, must be on a relation type",
+                    )
+                    .span(*span)
+                    .report_ty(self);
                 };
                 let DefKind::Relationship(Relationship {
                     object: outer_object,
@@ -329,10 +340,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 };
 
                 let Some(_) = self.def_types.table.get(&outer_object.0) else {
-                    return self.error(
-                        CompileError::TODO("the type of the gen relation has not been checked")
-                            .span(*span),
-                    );
+                    return CompileError::TODO("the type of the gen relation has not been checked")
+                        .span(*span)
+                        .report_ty(self);
                 };
 
                 self.relations.value_generators_unchecked.insert(
@@ -386,9 +396,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .insert(subject.0, (relationship_id, object.0))
                     .is_some()
                 {
-                    return self.error(
-                        CompileError::TODO("duplicate `direction` relationship").span(*span),
-                    );
+                    return CompileError::TODO("duplicate `direction` relationship")
+                        .span(*span)
+                        .report_ty(self);
                 }
 
                 object_ty
@@ -432,7 +442,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     .map(|props| &props.constructor);
 
                 let Some(Constructor::TextFmt(subject_pattern)) = subject_constructor else {
-                    return self.error(CompileError::ConstructorMismatch.span(*span));
+                    return CompileError::ConstructorMismatch
+                        .span(*span)
+                        .report_ty(self);
                 };
 
                 if let Err(err) = self.extend_text_pattern_fmt_constructor(
@@ -448,7 +460,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             _ => {
-                return self.error(CompileError::ConstructorMismatch.span(*span));
+                return CompileError::ConstructorMismatch
+                    .span(*span)
+                    .report_ty(self);
             }
         }
 
@@ -457,7 +471,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn check_subject_data_type(&mut self, ty: TypeRef<'m>, span: &SourceSpan) {
         let Some(def_id) = ty.get_single_def_id() else {
-            self.error(CompileError::SubjectMustBeDomainType.span(*span));
+            CompileError::SubjectMustBeDomainType
+                .span(*span)
+                .report_ty(self);
             return;
         };
 
@@ -466,7 +482,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.check_not_sealed(ty, span);
             }
             _ => {
-                self.error(CompileError::SubjectMustBeDomainType.span(*span));
+                CompileError::SubjectMustBeDomainType
+                    .span(*span)
+                    .report(self);
             }
         }
     }
@@ -480,7 +498,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             | Type::Infer(_)
             | Type::ValueGenerator(_)
             | Type::Error => {
-                self.error(CompileError::ObjectMustBeDataType.span(*span));
+                CompileError::ObjectMustBeDataType.span(*span).report(self);
             }
             _ => {}
         }
@@ -489,7 +507,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn check_not_sealed(&mut self, ty: TypeRef<'m>, span: &SourceSpan) {
         if let Some(def_id) = ty.get_single_def_id() {
             if self.seal_ctx.is_sealed(def_id) {
-                self.error(CompileError::MutationOfSealedDef.span(*span));
+                CompileError::MutationOfSealedDef.span(*span).report(self);
             }
         }
     }
@@ -534,9 +552,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         segment: Box::new(rel_segment.clone()),
                     },
                     _ => {
-                        return Err(
-                            self.error(CompileError::CannotConcatenateStringPattern.span(*span))
-                        )
+                        return Err(CompileError::CannotConcatenateStringPattern
+                            .span(*span)
+                            .report_ty(self))
                     }
                 }
             }
@@ -545,7 +563,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         let object_properties = self.relations.properties_by_def_id_mut(object_def);
 
         if !matches!(&object_properties.constructor, Constructor::Transparent) {
-            return Err(self.error(CompileError::ConstructorMismatch.span(*span)));
+            return Err(CompileError::ConstructorMismatch
+                .span(*span)
+                .report_ty(self));
         }
 
         object_properties.constructor =

@@ -224,9 +224,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 Action::ReportNonEntityInObjectRelationship(_def_id, relationship_id) => {
                     let meta = self.defs.relationship_meta(relationship_id);
 
-                    self.error(
-                        CompileError::NonEntityInReverseRelationship.span(*meta.relationship.span),
-                    );
+                    CompileError::NonEntityInReverseRelationship
+                        .span(*meta.relationship.span)
+                        .report(self);
                 }
                 Action::AdjustEntityPropertyCardinality(def_id, property_id) => {
                     let properties = self.relations.properties_by_def_id_mut(def_id);
@@ -272,13 +272,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                     Err(_) => {
                         let object_ty = self.def_types.table.get(&object_def_id).unwrap();
-                        self.error(
-                            CompileError::CannotGenerateValue(format!(
-                                "{}",
-                                FormatType::new(object_ty, self.defs, self.primitives)
-                            ))
-                            .span(span),
-                        );
+                        CompileError::CannotGenerateValue(format!(
+                            "{}",
+                            FormatType::new(object_ty, self.defs, self.primitives)
+                        ))
+                        .span(span)
+                        .report(self);
                     }
                 },
             }

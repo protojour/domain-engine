@@ -27,7 +27,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         warn!("check extern");
 
         let Some(table) = self.relations.properties_table_by_def_id(def_id) else {
-            self.error(CompileError::TODO("extern has no properties").span(span));
+            CompileError::TODO("extern has no properties")
+                .span(span)
+                .report(self);
             return;
         };
 
@@ -134,18 +136,16 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 ..
             } => {
                 if !attributes.is_empty() {
-                    self.error(
-                        CompileError::TODO("external mapping cannot have attributes")
-                            .span(pattern.span),
-                    );
+                    CompileError::TODO("external mapping cannot have attributes")
+                        .span(pattern.span)
+                        .report(self);
                 }
 
                 self.check_def(def_id)
             }
-            _ => {
-                self.error(CompileError::TODO("must specify a named pattern").span(pattern.span));
-                self.types.intern(Type::Error)
-            }
+            _ => CompileError::TODO("must specify a named pattern")
+                .span(pattern.span)
+                .report_ty(self),
         }
     }
 }

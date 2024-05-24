@@ -282,11 +282,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
 
                 let error = CompileError::MissingProperties(formatted_properties);
-                self.error(
-                    error
-                        .span(span)
-                        .with_note(Note::ConsiderUsingMatch.span(span)),
-                );
+                error
+                    .span(span)
+                    .with_note(Note::ConsiderUsingMatch.span(span))
+                    .report(self);
             }
         }
     }
