@@ -56,13 +56,12 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
                     }
                     None => {
                         call_procedure.address = Address(0);
-                        compiler.push_error(
-                            CompileError::CannotConvertMissingMapping {
-                                input: format_map_def(compiler, key.input),
-                                output: format_map_def(compiler, key.output),
-                            }
-                            .span(spans[index]),
-                        );
+                        CompileError::CannotConvertMissingMapping {
+                            input: format_map_def(compiler, key.input),
+                            output: format_map_def(compiler, key.output),
+                        }
+                        .span(spans[index])
+                        .report(compiler);
                     }
                 },
                 ProcedureCall::Const(const_def_id) => match const_proc_table.get(const_def_id) {
@@ -71,9 +70,9 @@ pub(super) fn link(compiler: &mut Compiler, proc_table: &mut ProcTable) -> LinkR
                     }
                     None => {
                         call_procedure.address = Address(0);
-                        compiler.push_error(
-                            CompileError::TODO("Unable to link constant").span(spans[index]),
-                        );
+                        CompileError::TODO("Unable to link constant")
+                            .span(spans[index])
+                            .report(compiler);
                     }
                 },
             }

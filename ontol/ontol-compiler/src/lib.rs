@@ -197,10 +197,6 @@ impl<'m> Compiler<'m> {
             })
         }
     }
-
-    fn push_error(&mut self, error: SpannedCompileError) {
-        self.errors.errors.push(error);
-    }
 }
 
 impl<'m> AsRef<Defs<'m>> for Compiler<'m> {

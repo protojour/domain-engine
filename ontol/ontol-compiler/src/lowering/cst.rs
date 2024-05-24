@@ -106,7 +106,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 let Some(used_package_def_id) =
                     self.ctx.compiler.packages.loaded_packages.get(&reference)
                 else {
-                    self.report_error((CompileError::PackageNotFound(reference), name.0.span()));
+                    CompileError::PackageNotFound(reference)
+                        .span_report(name.0.span(), &mut self.ctx);
                     return None;
                 };
 
@@ -312,15 +313,13 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                         DefKind::NumberLiteral(lit) => match lit.parse::<u16>() {
                             Ok(int) => (RelationKey::Indexed, span, Some(Some(int)..Some(int + 1))),
                             Err(_) => {
-                                self.report_error((
-                                    CompileError::NumberParse("not an integer".to_string()),
-                                    span,
-                                ));
+                                CompileError::NumberParse("not an integer".to_string())
+                                    .span_report(span, &mut self.ctx);
                                 return None;
                             }
                         },
                         _ => {
-                            self.report_error((CompileError::InvalidRelationType, span));
+                            CompileError::InvalidRelationType.span_report(span, &mut self.ctx);
                             return None;
                         }
                     }
@@ -338,10 +337,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
         let rel_params = if let Some(index_range_rel_params) = index_range_rel_params {
             if let Some(rp) = relation.rel_params() {
-                self.report_error((
-                    CompileError::CannotMixIndexedRelationIdentsAndEdgeTypes,
-                    rp.0.span(),
-                ));
+                CompileError::CannotMixIndexedRelationIdentsAndEdgeTypes
+                    .span_report(rp.0.span(), &mut self.ctx);
                 return None;
             }
 
@@ -459,7 +456,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         let mut transitions = stmt.transitions().peekable();
 
         let Some(origin) = transitions.next() else {
-            self.report_error((CompileError::TODO("missing origin"), stmt.0.span()));
+            CompileError::TODO("missing origin").span_report(stmt.0.span(), &mut self.ctx);
             return None;
         };
         let mut origin_def_id = self.resolve_type_reference(
@@ -469,7 +466,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         )?;
 
         let Some(mut transition) = transitions.next() else {
-            self.report_error((CompileError::FmtTooFewTransitions, stmt.0.span()));
+            CompileError::FmtTooFewTransitions.span_report(stmt.0.span(), &mut self.ctx);
             return None;
         };
 
@@ -481,7 +478,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 }
                 Some(item) => item,
                 _ => {
-                    self.report_error((CompileError::FmtTooFewTransitions, stmt.0.span()));
+                    CompileError::FmtTooFewTransitions.span_report(stmt.0.span(), &mut self.ctx);
                     return None;
                 }
             };
@@ -566,15 +563,13 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         for modifier in stmt.modifiers() {
             if modifier.slice() == "@abstract" {
                 if matches!(block_context, BlockContext::Context(_)) {
-                    self.report_error((
-                        CompileError::TODO("extern map cannot be abstract"),
-                        modifier.span(),
-                    ));
+                    CompileError::TODO("extern map cannot be abstract")
+                        .span_report(modifier.span(), &mut self.ctx);
                 }
 
                 is_abstract = true;
             } else {
-                self.report_error((CompileError::InvalidModifier, modifier.span()));
+                CompileError::InvalidModifier.span_report(modifier.span(), &mut self.ctx);
             }
         }
 
@@ -586,7 +581,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                         .named_def_id(Space::Map, symbol.slice(), symbol.span())
                 })?;
                 if matches!(coinage, Coinage::Used) {
-                    self.report_error((CompileError::DuplicateMapIdentifier, symbol.span()));
+                    CompileError::DuplicateMapIdentifier.span_report(symbol.span(), &mut self.ctx);
                     return None;
                 }
                 let ident = self.ctx.compiler.strings.intern(symbol.slice());
@@ -697,7 +692,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     if m.slice() == "@match" {
                         modifier = Some(CompoundPatternModifier::Match);
                     } else {
-                        self.report_error((CompileError::InvalidModifier, m.span()));
+                        CompileError::InvalidModifier.span_report(m.span(), &mut self.ctx);
                     }
                 }
 
@@ -714,10 +709,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             }
             LoweredStructPatternParams::Unit(unit_pattern) => {
                 if let Some(modifier) = pat_struct.modifiers().next() {
-                    self.report_error((
-                        CompileError::TODO("modifier not supported here"),
-                        modifier.span(),
-                    ));
+                    CompileError::TODO("modifier not supported here")
+                        .span_report(modifier.span(), &mut self.ctx);
                 }
 
                 let key = (DefId::unit(), self.ctx.source_span(span));
@@ -756,10 +749,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
         for param in params {
             if spread_label.is_some() && !spread_error_reported {
-                self.report_error((
-                    CompileError::SpreadLabelMustBeLastArgument,
-                    param.view().span(),
-                ));
+                CompileError::SpreadLabelMustBeLastArgument
+                    .span_report(param.view().span(), &mut self.ctx);
                 spread_error_reported = true;
             }
 
@@ -782,10 +773,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 insp::StructParam::StructParamAttrUnit(attr_unit) => {
                     let unit_pattern = match attr_unit.pattern() {
                         Some(insp::Pattern::PatSet(pat_set)) => {
-                            self.report_error((
-                                CompileError::TODO("set pattern not allowed here"),
-                                pat_set.0.span(),
-                            ));
+                            CompileError::TODO("set pattern not allowed here")
+                                .span_report(pat_set.0.span(), &mut self.ctx);
                             return LoweredStructPatternParams::Error;
                         }
                         None => return LoweredStructPatternParams::Error,
@@ -830,12 +819,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         match cst_pattern {
             insp::Pattern::PatSet(pat_set) => {
                 if let Some(rel_args) = attr_prop.rel_args() {
-                    self.report_error((
-                        CompileError::TODO(
-                            "relation arguments must be associated with each element",
-                        ),
-                        rel_args.0.span(),
-                    ));
+                    CompileError::TODO("relation arguments must be associated with each element")
+                        .span_report(rel_args.0.span(), &mut self.ctx);
                     return None;
                 }
 
@@ -912,9 +897,9 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 rel_args.0.span(),
             ))),
             LoweredStructPatternParams::Unit(unit_pattern) => {
-                self.ctx.compiler.push_error(
-                    CompileError::TODO("unit not supported here").span(unit_pattern.span),
-                );
+                CompileError::TODO("unit not supported here")
+                    .span(unit_pattern.span)
+                    .report(self.ctx.compiler);
                 None
             }
             LoweredStructPatternParams::Error => {
@@ -954,10 +939,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                             }
                         }
                         insp::StructParam::StructParamAttrUnit(unit) => {
-                            self.report_error((
-                                CompileError::TODO("unit cannot be used here"),
-                                unit.0.span(),
-                            ));
+                            CompileError::TODO("unit cannot be used here")
+                                .span_report(unit.0.span(), &mut self.ctx);
                         }
                         insp::StructParam::Spread(spread) => {
                             if let Some(symbol) = spread.symbol() {
@@ -1045,10 +1028,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         }
 
         if elements.is_empty() {
-            self.report_error((
-                CompileError::TODO("inner set must have at least one element"),
-                pat_set.0.span(),
-            ));
+            CompileError::TODO("inner set must have at least one element")
+                .span_report(pat_set.0.span(), &mut self.ctx);
         }
 
         Some(CompoundPatternAttrKind::SetOperator {
@@ -1077,7 +1058,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             Kind::Number => match token.slice().parse::<i64>() {
                 Ok(int) => Some(self.ctx.mk_pattern(PatternKind::ConstI64(int), span)),
                 Err(_) => {
-                    self.report_error((CompileError::InvalidInteger, span));
+                    CompileError::InvalidInteger.span_report(span, &mut self.ctx);
                     None
                 }
             },
@@ -1094,7 +1075,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 ) {
                     Ok(def_id) => def_id,
                     Err((compile_error, err_span)) => {
-                        self.report_error((CompileError::InvalidRegex(compile_error), err_span));
+                        CompileError::InvalidRegex(compile_error)
+                            .span_report(err_span, &mut self.ctx);
                         return None;
                     }
                 };
@@ -1155,10 +1137,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             Kind::Star => "*",
             Kind::Div => "/",
             _ => {
-                self.report_error((
-                    CompileError::TODO("invalid infix operator"),
-                    infix_token.span(),
-                ));
+                CompileError::TODO("invalid infix operator")
+                    .span_report(infix_token.span(), &mut self.ctx);
                 return self.mk_error_pattern(span);
             }
         };
@@ -1189,11 +1169,12 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             (insp::TypeRef::IdentPath(path), _) => self.lookup_path(&path),
             (insp::TypeRef::This(_), BlockContext::Context(func)) => Some(func()),
             (insp::TypeRef::This(this), BlockContext::NoContext) => {
-                self.report_error((CompileError::WildcardNeedsContextualBlock, this.0.span()));
+                CompileError::WildcardNeedsContextualBlock
+                    .span_report(this.0.span(), &mut self.ctx);
                 None
             }
             (insp::TypeRef::This(this), BlockContext::FmtLeading) => {
-                self.report_error((CompileError::FmtMisplacedSelf, this.0.span()));
+                CompileError::FmtMisplacedSelf.span_report(this.0.span(), &mut self.ctx);
                 None
             }
             (insp::TypeRef::Literal(literal), _) => {
@@ -1229,10 +1210,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                         ) {
                             Ok(def_id) => Some(def_id),
                             Err((compile_error, span)) => {
-                                self.report_error((
-                                    CompileError::InvalidRegex(compile_error),
-                                    span,
-                                ));
+                                CompileError::InvalidRegex(compile_error)
+                                    .span_report(span, &mut self.ctx);
                                 None
                             }
                         }
@@ -1246,10 +1225,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 }
 
                 let Some(root_defs) = root_defs else {
-                    self.report_error((
-                        CompileError::TODO("Anonymous struct not allowed here"),
-                        body.0.span(),
-                    ));
+                    CompileError::TODO("Anonymous struct not allowed here")
+                        .span_report(body.0.span(), &mut self.ctx);
                     return None;
                 };
 
@@ -1282,10 +1259,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 Some(def_id)
             }
             (insp::TypeRef::NumberRange(range), _) => {
-                self.report_error((
-                    CompileError::TODO("number range is not a proper type"),
-                    range.0.span(),
-                ));
+                CompileError::TODO("number range is not a proper type")
+                    .span_report(range.0.span(), &mut self.ctx);
                 None
             }
         }
@@ -1303,7 +1278,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             Ok(string) => Some(string),
             Err(unescape_errors) => {
                 for error in unescape_errors {
-                    self.report_error((CompileError::TODO(error.msg), error.span));
+                    CompileError::TODO(error.msg).span_report(error.span, &mut self.ctx);
                 }
 
                 None
@@ -1335,7 +1310,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     symbol.0 = Some(modifier.span());
                 }
                 _ => {
-                    self.report_error((CompileError::InvalidModifier, modifier.span()));
+                    CompileError::InvalidModifier.span_report(modifier.span(), &mut self.ctx);
                 }
             }
         }
@@ -1357,10 +1332,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             "@intersects" => Some((SetBinaryOperator::Intersects, span)),
             "@equals" => Some((SetBinaryOperator::SetEquals, span)),
             _ => {
-                self.report_error((
-                    CompileError::TODO("invalid set binary operator"),
-                    modifier.span(),
-                ));
+                CompileError::TODO("invalid set binary operator")
+                    .span_report(modifier.span(), &mut self.ctx);
                 None
             }
         }
@@ -1377,10 +1350,8 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         match token.slice().parse::<u16>() {
             Ok(number) => Some(number),
             Err(_error) => {
-                self.report_error((
-                    CompileError::NumberParse("unable to parse integer".to_string()),
-                    token.span(),
-                ));
+                CompileError::NumberParse("unable to parse integer".to_string())
+                    .span_report(token.span(), &mut self.ctx);
                 None
             }
         }
@@ -1414,16 +1385,10 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         match f(self) {
             Ok(value) => Some(value),
             Err((err, span)) => {
-                self.report_error((err, span));
+                err.span_report(span, &mut self.ctx);
                 None
             }
         }
-    }
-
-    fn report_error(&mut self, (error, span): (CompileError, U32Span)) {
-        self.ctx
-            .compiler
-            .push_error(error.span(self.ctx.source_span(span)));
     }
 }
 
@@ -1443,4 +1408,10 @@ fn property_cardinality<V: NodeView>(
     } else {
         PropertyCardinality::Mandatory
     })
+}
+
+impl CompileError {
+    fn span_report(self, span: U32Span, ctx: &mut LoweringCtx) {
+        self.span(ctx.source_span(span)).report(ctx.compiler);
+    }
 }

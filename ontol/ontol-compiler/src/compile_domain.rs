@@ -23,7 +23,7 @@ impl<'m> Compiler<'m> {
         src: Src,
     ) -> Result<(), UnifiedCompileError> {
         for error in package.parse_errors {
-            self.push_error(match error {
+            match error {
                 ontol_parser::Error::Lex(lex_error) => {
                     let span = lex_error.span;
                     CompileError::Lex(lex_error.msg).span(src.span(span))
@@ -32,7 +32,8 @@ impl<'m> Compiler<'m> {
                     let span = parse_error.span;
                     CompileError::Parse(parse_error.msg).span(src.span(span))
                 }
-            });
+            }
+            .report(self);
         }
 
         let package_def_id = self.defs.alloc_def_id(package.package_id);

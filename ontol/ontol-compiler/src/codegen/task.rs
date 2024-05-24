@@ -307,11 +307,10 @@ fn generate_explicit_map<'m>(
 
     fn unknown_extern_map_direction(compiler: &mut Compiler, map_def_id: DefId) {
         let span = compiler.defs.def_span(map_def_id);
-        compiler.push_error(
-            CompileError::ExternMapUnknownDirection
-                .span(span)
-                .with_note(Note::AbtractMapSuggestion.span(span)),
-        );
+        CompileError::ExternMapUnknownDirection
+            .span(span)
+            .with_note(Note::AbtractMapSuggestion.span(span))
+            .report(compiler);
     }
 
     // the extern directions are in relation to the _undirected key_, not the ontol map arms!
