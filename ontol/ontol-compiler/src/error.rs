@@ -72,6 +72,7 @@ pub enum CompileError {
     NamedPropertyExpected,
     UnknownProperty,
     DuplicateProperty,
+    PropertyNotOptional,
     TypeMismatch {
         actual: String,
         expected: String,
@@ -223,6 +224,7 @@ impl std::fmt::Display for CompileError {
             Self::NamedPropertyExpected => write!(f, "expected named property"),
             Self::UnknownProperty => write!(f, "unknown property"),
             Self::DuplicateProperty => write!(f, "duplicate property"),
+            Self::PropertyNotOptional => write!(f, "property is not optional"),
             Self::TypeMismatch { actual, expected } => {
                 write!(f, "type mismatch: expected {expected}, found {actual}")
             }

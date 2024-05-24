@@ -10,14 +10,14 @@ def BlogPost (
 
 map(
     BlogPost(
-        'post_id'?: id,
+        'post_id': id,
         'name': title,
         'contents': body,
         'written_by': author,
         'tags': {..tag},
     ),
     @match db.Article(
-        'article_id'?: id,
+        'article_id': id,
         'body': body,
         'title': title,
         'author': db.User(

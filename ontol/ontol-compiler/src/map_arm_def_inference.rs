@@ -97,7 +97,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                             self.infer_attr_sub_pat(
                                 val,
                                 VarFlags {
-                                    is_option: pattern_attr.bind_option,
+                                    is_option: pattern_attr.bind_option.is_some(),
                                     is_iter: false,
                                 },
                                 pattern_attr.key.0,
@@ -272,7 +272,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                                 val,
                                 attr.key.0,
                                 VarFlags {
-                                    is_option: attr.bind_option,
+                                    is_option: attr.bind_option.is_some(),
                                     is_iter: false,
                                 },
                                 (*def_id, table),
@@ -285,7 +285,7 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                         } => {
                             for element in elements.iter() {
                                 let sub_flags = VarFlags {
-                                    is_option: flags.is_option || attr.bind_option,
+                                    is_option: flags.is_option || attr.bind_option.is_some(),
                                     is_iter: element.is_iter,
                                 };
                                 if let Some(rel) = &element.rel {

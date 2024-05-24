@@ -64,15 +64,15 @@ fn test_fn_call() {
 fn test_struct() {
     let src = indoc! {"
         (struct ($a)
-            (prop $a S:0:0
+            (prop- $a S:0:0
                 (#u #u)
             )
-            (prop $a S:0:0
+            (prop- $a S:0:0
                 (#u
                     (struct ($b))
                 )
             )
-            (prop $a S:0:0
+            (prop- $a S:0:0
                 (
                     (struct ($c))
                     #u
@@ -97,7 +97,7 @@ fn test_mixed() {
 fn test_set() {
     let src = indoc! {"
         (struct ($a)
-            (prop $a S:0:0
+            (prop- $a S:0:0
                 (#u
                     (set
                         (.. @c #u $b)
@@ -113,7 +113,7 @@ fn test_set() {
 fn test_set_in_prop() {
     let src = indoc! {"
         (struct ($a)
-            (prop $a S:0:0
+            (prop- $a S:0:0
                 (#u
                     (set
                         (.. @c #u $b)
@@ -131,7 +131,7 @@ fn test_map_seq() {
         (block
             (let-prop $_ $c ($b S:0:0))
             (struct ($a)
-                (prop $a S:0:0
+                (prop- $a S:0:0
                     (#u
                         (make-seq ($d)
                             (for-each $c ($e $f) $d)
@@ -148,7 +148,7 @@ fn test_map_seq() {
 fn test_with() {
     let src = indoc! {"
         (with ($a (+ 1 2))
-            (prop $b S:0:0
+            (prop- $b S:0:0
                 (#u $a)
             )
         )"

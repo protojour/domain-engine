@@ -908,11 +908,11 @@ async fn test_create_through_mapped_domain() {
 
             map(
                 player(
-                    'id'?: id,
+                    'id': id,
                     'nick': n,
                 ),
                 ai.artist(
-                    'ID'?: id,
+                    'ID': id,
                     'name': n,
                 ),
             )
@@ -1586,11 +1586,11 @@ async fn test_constant_index_panic() {
 
             map(
                 event (
-                    '_id'?: id,
+                    '_id': id,
                     '_class': class,
                 ),
                 db.event (
-                    '_id'?: id,
+                    '_id': id,
                     '_class': class,
                 ),
             )

@@ -722,7 +722,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                         is_unit_binding: true,
                         attributes: [CompoundPatternAttr {
                             key,
-                            bind_option: false,
+                            bind_option: None,
                             kind: CompoundPatternAttrKind::Value {
                                 rel: None,
                                 val: unit_pattern,
@@ -803,7 +803,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         let bind_option = attr_prop
             .prop_cardinality()
             .and_then(|pc| pc.question())
-            .is_some();
+            .map(|q| self.ctx.source_span(q.span()));
 
         let Some(cst_pattern) = attr_prop.pattern() else {
             return Some(CompoundPatternAttr {
@@ -856,7 +856,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     key: (relation_def, relation_span),
                     bind_option,
                     kind: CompoundPatternAttrKind::Value {
-                        rel,
+                        rel: rel.map(Box::new),
                         val: object_pattern,
                     },
                 })

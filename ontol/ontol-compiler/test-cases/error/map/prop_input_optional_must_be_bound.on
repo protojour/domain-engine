@@ -7,10 +7,12 @@ def foo (
 
 map(
     foo (
-        '_id'?: id,
+        '_id'
+            ? // ERROR property is not optional
+            : id,
     ),
     lower.bar (
-        '_id'?: id,
+        '_id'?: id, // ERROR property is not optional
     ),
 )
 

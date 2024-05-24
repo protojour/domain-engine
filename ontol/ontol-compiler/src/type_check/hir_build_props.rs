@@ -365,7 +365,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let mut flags = PropFlags::empty();
 
-        if bind_option {
+        if bind_option.is_some() {
             flags.insert(PropFlags::PAT_OPTIONAL);
         }
 
@@ -392,7 +392,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         debug!("rel_params_ty: {rel_params_ty:?}");
 
-        match kind {
+        let node = match kind {
             CompoundPatternAttrKind::Value { rel, val } => {
                 let value_ty = self.check_def(match_attribute.value_def);
                 debug!("value_ty: {value_ty:?}");
@@ -401,7 +401,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     ValueCardinality::Unit => {
                         let rel_node = self.build_rel_node_from_option(
                             rel_params_ty,
-                            rel.as_ref(),
+                            rel.as_deref(),
                             val,
                             prop_span,
                             actual_struct_flags,
@@ -479,7 +479,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             _ => {
                                 let rel_node = self.build_rel_node_from_option(
                                     rel_params_ty,
-                                    rel.as_ref(),
+                                    rel.as_deref(),
                                     val,
                                     prop_span,
                                     actual_struct_flags,
@@ -524,13 +524,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     flags.insert(PropFlags::REL_DOWN_OPTIONAL);
                 }
 
-                if actual_struct_flags.contains(StructFlags::MATCH) && bind_option {
+                if actual_struct_flags.contains(StructFlags::MATCH) && bind_option.is_some() {
                     // When in a MATCH context, the rel optionality always matches what is written in map
                     flags.insert(PropFlags::REL_DOWN_OPTIONAL | PropFlags::REL_UP_OPTIONAL);
                 }
 
                 if matches!(match_attribute.cardinality.0, PropertyCardinality::Optional)
-                    && !bind_option
+                    && bind_option.is_none()
                 {
                     // note: This is probably not necessary
                     ctx.partial = true;
@@ -619,7 +619,19 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     },
                 ))
             }
-        }
+        }?;
+
+        if let Some(option_span) = bind_option {
+            if let ontol_hir::Kind::Prop(flags, ..) = ctx.hir_arena.node_ref(node).hir() {
+                if !flags.contains(PropFlags::REL_UP_OPTIONAL) {
+                    CompileError::PropertyNotOptional
+                        .span(option_span)
+                        .report(self);
+                }
+            }
+        };
+
+        Some(node)
     }
 
     fn build_rel_node_from_option(

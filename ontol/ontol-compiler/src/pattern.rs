@@ -52,7 +52,7 @@ pub enum CompoundPatternModifier {
 #[derive(Debug)]
 pub struct CompoundPatternAttr {
     pub key: (DefId, SourceSpan),
-    pub bind_option: bool,
+    pub bind_option: Option<SourceSpan>,
     pub kind: CompoundPatternAttrKind,
 }
 
@@ -62,7 +62,7 @@ pub struct SpreadLabel(pub std::string::String, pub SourceSpan);
 #[derive(Debug)]
 pub enum CompoundPatternAttrKind {
     Value {
-        rel: Option<Pattern>,
+        rel: Option<Box<Pattern>>,
         val: Pattern,
     },
     SetOperator {
