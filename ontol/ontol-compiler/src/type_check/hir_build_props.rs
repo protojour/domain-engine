@@ -795,7 +795,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         };
 
         if !self.check_can_construct_default_inner(def_id) {
-            info!("CANNOT MAKE DEFAULT: {ty:?}");
+            debug!("cannot make default: {ty:?}");
             self.error(
                 CompileError::TODO(
                     "optional binding required, as a default value cannot be created",
