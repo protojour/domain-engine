@@ -6,14 +6,13 @@ use crate::{
     def::Defs,
     entity::entity_ctx::EntityCtx,
     error::CompileError,
-    mem::Intern,
     pattern::Patterns,
     primitive::Primitives,
     relation::Relations,
     repr::{repr_check::ReprCheck, repr_ctx::ReprCtx},
     strings::Strings,
     thesaurus::Thesaurus,
-    types::{DefTypes, FormatType, Type, TypeRef, Types, ERROR_TYPE},
+    types::{DefTypes, FormatType, TypeRef, Types, ERROR_TYPE},
     CompileErrors, Compiler, SourceSpan, SpannedCompileError,
 };
 
@@ -37,21 +36,6 @@ mod map_arm_analyze;
 
 // Experimental setting
 // pub const LABEL_PER_ITER_ELEMENT: bool = false;
-
-#[derive(Clone, Copy, Debug)]
-pub enum TypeError<'m> {
-    // Another error is the cause of this error
-    Propagated,
-    Mismatch(TypeEquation<'m>),
-    MustBeSequence(TypeRef<'m>),
-    VariableMustBeSequenceEnclosed(TypeRef<'m>),
-    NotEnoughInformation,
-    #[allow(unused)]
-    NotConvertibleFromNumber(TypeRef<'m>),
-    #[allow(unused)]
-    NoRelationParametersExpected,
-    StructTypeNotInferrable,
-}
 
 #[derive(Clone, Copy, Debug)]
 pub struct TypeEquation<'m> {
@@ -80,56 +64,63 @@ pub struct TypeCheck<'c, 'm> {
     pub primitives: &'c Primitives,
 }
 
-impl<'c, 'm> TypeCheck<'c, 'm> {
-    fn type_error(&mut self, error: TypeError<'m>, span: SourceSpan) -> TypeRef<'m> {
-        match error {
-            TypeError::Propagated => self.types.intern(Type::Error),
+#[derive(Clone, Copy, Debug)]
+pub enum TypeError<'m> {
+    // Another error is the cause of this error
+    Propagated,
+    Mismatch(TypeEquation<'m>),
+    MustBeSequence(TypeRef<'m>),
+    VariableMustBeSequenceEnclosed(TypeRef<'m>),
+    NotEnoughInformation,
+    #[allow(unused)]
+    NotConvertibleFromNumber(TypeRef<'m>),
+    #[allow(unused)]
+    NoRelationParametersExpected,
+    StructTypeNotInferrable,
+}
+
+impl<'m> TypeError<'m> {
+    fn report<'c>(self, span: SourceSpan, tc: &mut TypeCheck<'c, 'm>) -> TypeRef<'m> {
+        let error = match self {
+            TypeError::Propagated => return &ERROR_TYPE,
             TypeError::Mismatch(equation) => CompileError::TypeMismatch {
                 actual: format!(
                     "{}",
-                    FormatType::new(equation.actual.0, self.defs, self.primitives)
+                    FormatType::new(equation.actual.0, tc.defs, tc.primitives)
                 ),
                 expected: format!(
                     "{}",
-                    FormatType::new(equation.expected.0, self.defs, self.primitives)
+                    FormatType::new(equation.expected.0, tc.defs, tc.primitives)
                 ),
-            }
-            .span(span)
-            .report_ty(self),
+            },
             TypeError::MustBeSequence(ty) => CompileError::TypeMismatch {
-                actual: format!("{}", FormatType::new(ty, self.defs, self.primitives)),
-                expected: format!("{{{}}}", FormatType::new(ty, self.defs, self.primitives)),
-            }
-            .span(span)
-            .report_ty(self),
+                actual: format!("{}", FormatType::new(ty, tc.defs, tc.primitives)),
+                expected: format!("{{{}}}", FormatType::new(ty, tc.defs, tc.primitives)),
+            },
             TypeError::VariableMustBeSequenceEnclosed(ty) => {
                 CompileError::VariableMustBeSequenceEnclosed(format!(
                     "{}",
-                    FormatType::new(ty, self.defs, self.primitives)
+                    FormatType::new(ty, tc.defs, tc.primitives)
                 ))
-                .span(span)
-                .report_ty(self)
             }
             TypeError::NotEnoughInformation => {
                 CompileError::TODO("Not enough information to infer type")
-                    .span(span)
-                    .report_ty(self)
             }
             TypeError::NotConvertibleFromNumber(ty) => CompileError::TODO(format!(
                 "Type {} cannot be represented as a number",
-                FormatType::new(ty, self.defs, self.primitives)
-            ))
-            .span(span)
-            .report_ty(self),
-            TypeError::NoRelationParametersExpected => CompileError::NoRelationParametersExpected
-                .span(span)
-                .report_ty(self),
-            TypeError::StructTypeNotInferrable => CompileError::ExpectedExplicitStructPath
-                .span(span)
-                .report_ty(self),
-        }
-    }
+                FormatType::new(ty, tc.defs, tc.primitives)
+            )),
+            TypeError::NoRelationParametersExpected => CompileError::NoRelationParametersExpected,
+            TypeError::StructTypeNotInferrable => CompileError::ExpectedExplicitStructPath,
+        };
 
+        error.span(span).report(tc);
+
+        &ERROR_TYPE
+    }
+}
+
+impl<'c, 'm> TypeCheck<'c, 'm> {
     pub(crate) fn repr_check<'tc>(&'tc mut self, root_def_id: DefId) -> ReprCheck<'tc, 'm> {
         ReprCheck {
             root_def_id,
@@ -185,6 +176,7 @@ impl<'m> Compiler<'m> {
 }
 
 impl SpannedCompileError {
+    /// Report the error and return the [ERROR_TYPE]
     fn report_ty(self, ctx: &mut TypeCheck) -> TypeRef<'static> {
         ctx.as_mut().errors.push(self);
         &ERROR_TYPE

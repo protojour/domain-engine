@@ -338,7 +338,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             }
                         }
 
-                        self.type_error(TypeError::MustBeSequence(other_ty), pattern.span);
+                        TypeError::MustBeSequence(other_ty).report(pattern.span, self);
                         (&UNIT_TYPE, &ERROR_TYPE)
                     }
                     None => {
@@ -776,7 +776,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         span: SourceSpan,
         ctx: &mut HirBuildCtx<'m>,
     ) -> ontol_hir::Node {
-        self.type_error(error, span);
+        error.report(span, self);
         self.make_error_node(span, ctx)
     }
 

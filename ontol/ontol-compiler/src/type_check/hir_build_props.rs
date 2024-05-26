@@ -500,10 +500,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                         val: val_node,
                                     })
                                 } else {
-                                    self.type_error(
-                                        TypeError::VariableMustBeSequenceEnclosed(value_ty),
-                                        val.span,
-                                    );
+                                    TypeError::VariableMustBeSequenceEnclosed(value_ty)
+                                        .report(val.span, self);
                                     return None;
                                 }
                             }

@@ -199,10 +199,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
                 }
                 _ => {
-                    self.type_error(
-                        TypeError::Mismatch(TypeEquation { actual, expected }),
-                        var_arms[1].span,
-                    );
+                    TypeError::Mismatch(TypeEquation { actual, expected })
+                        .report(var_arms[1].span, self);
                 }
             }
         }
