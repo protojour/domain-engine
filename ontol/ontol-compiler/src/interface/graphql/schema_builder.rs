@@ -470,14 +470,14 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             .gen_addr_lazy(gql_list_serde_key(entity_data.node_def_id))
             .unwrap();
 
-        let [data_resolve_path, create_resolve_path, update_resolve_path] = [
-            (ProbeFilter::Complete, ProbeDirection::ByOutput),
+        let [up_path, create_down_path, update_down_path] = [
+            (ProbeDirection::Up, ProbeFilter::Complete),
             // The CREATE resolve path must be PERFECT | PURE for create to be available
-            (ProbeFilter::Complete, ProbeDirection::ByInput),
+            (ProbeDirection::Down, ProbeFilter::Complete),
             // The UPDATE resolve path must be PURE (but not perfect) for update to be available
-            (ProbeFilter::Pure, ProbeDirection::ByInput),
+            (ProbeDirection::Down, ProbeFilter::Pure),
         ]
-        .map(|(filter, direction)| {
+        .map(|(direction, filter)| {
             self.resolver_graph.probe_path(
                 self.partial_ontology,
                 type_info.def_id,
@@ -490,10 +490,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             )
         });
 
-        if data_resolve_path.is_none()
-            && create_resolve_path.is_none()
-            && update_resolve_path.is_none()
-        {
+        if up_path.is_none() && create_down_path.is_none() && update_down_path.is_none() {
             return;
         }
 
@@ -502,29 +499,29 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             FieldData {
                 kind: FieldKind::EntityMutation(Box::new(EntityMutationField {
                     def_id: type_info.def_id,
-                    create_arg: create_resolve_path.is_some().then_some(
+                    create_arg: create_down_path.is_some().then_some(
                         argument::EntityCreateInputsArg {
                             type_addr: entity_data.type_addr,
                             def_id: entity_data.node_def_id,
                             operator_addr: entity_array_operator_addr,
                         },
                     ),
-                    update_arg: update_resolve_path.is_some().then_some(
+                    update_arg: update_down_path.is_some().then_some(
                         argument::EntityUpdateInputsArg {
                             type_addr: entity_data.type_addr,
                             def_id: entity_data.node_def_id,
                             operator_addr: entity_array_operator_addr,
                         },
                     ),
-                    delete_arg: data_resolve_path.is_some().then_some(
-                        argument::EntityDeleteInputsArg {
+                    delete_arg: up_path
+                        .is_some()
+                        .then_some(argument::EntityDeleteInputsArg {
                             def_id: entity_data.id_def_id,
                             operator_addr: self
                                 .serde_gen
                                 .gen_addr_lazy(gql_list_serde_key(entity_data.id_def_id))
                                 .unwrap(),
-                        },
-                    ),
+                        }),
                     field_unit_type_addr: match mutation_result_ref {
                         UnitTypeRef::Addr(addr) => addr,
                         UnitTypeRef::NativeScalar(_) => unreachable!(),

@@ -144,18 +144,18 @@ impl DomainEngine {
         for request in &mut requests {
             match request {
                 BatchWriteRequest::Insert(mut_values, select) => {
-                    let input_path = self
+                    let down_path = self
                         .resolver_graph
                         .probe_path_for_select(
                             ontology,
                             select,
                             data_store.package_id(),
-                            ProbeDirection::ByInput,
+                            ProbeDirection::Down,
                             ProbeFilter::Complete,
                         )
                         .ok_or(DomainError::NoResolvePathToDataStore)?;
 
-                    for map_key in input_path.iter() {
+                    for map_key in down_path.iter() {
                         let procedure = ontology
                             .get_mapper_proc(&map_key)
                             .expect("No mapping procedure for query output");
@@ -174,38 +174,38 @@ impl DomainEngine {
                         }
                     }
 
-                    let select_path = self
+                    let up_path = self
                         .resolver_graph
                         .probe_path_for_select(
                             ontology,
                             select,
                             data_store.package_id(),
-                            ProbeDirection::ByOutput,
+                            ProbeDirection::Up,
                             ProbeFilter::Complete,
                         )
                         .ok_or(DomainError::NoResolvePathToDataStore)?;
 
-                    for map_key in select_path.iter() {
+                    for map_key in up_path.iter() {
                         translate_select(select, &map_key, ontology);
                     }
 
-                    ordered_resolve_paths.push(Some(select_path));
+                    ordered_resolve_paths.push(Some(up_path));
                 }
                 BatchWriteRequest::Update(mut_values, select) => {
-                    let input_path = self
+                    let down_path = self
                         .resolver_graph
                         .probe_path_for_select(
                             ontology,
                             select,
                             data_store.package_id(),
-                            ProbeDirection::ByInput,
+                            ProbeDirection::Down,
                             ProbeFilter::Pure,
                         )
                         .ok_or(DomainError::NoResolvePathToDataStore)?;
 
-                    debug!("UPDATE input resolve path: {input_path:?}");
+                    debug!("UPDATE input downpath: {down_path:?}");
 
-                    for map_key in input_path.iter() {
+                    for map_key in down_path.iter() {
                         let procedure = ontology
                             .get_mapper_proc(&map_key)
                             .expect("No mapping procedure for query output");
@@ -228,27 +228,27 @@ impl DomainEngine {
                         sanitize_update(value);
                     }
 
-                    let select_path = self
+                    let up_path = self
                         .resolver_graph
                         .probe_path_for_select(
                             ontology,
                             select,
                             data_store.package_id(),
-                            ProbeDirection::ByOutput,
+                            ProbeDirection::Up,
                             ProbeFilter::Complete,
                         )
                         .ok_or(DomainError::NoResolvePathToDataStore)?;
 
-                    for map_key in select_path.iter() {
+                    for map_key in up_path.iter() {
                         translate_select(select, &map_key, ontology);
                     }
 
-                    ordered_resolve_paths.push(Some(select_path));
+                    ordered_resolve_paths.push(Some(up_path));
                 }
                 BatchWriteRequest::Delete(_ids, def_id) => {
                     if def_id.package_id() != data_store.package_id() {
                         // TODO: Do ids need to be translated?
-                        let path = self
+                        let up_path = self
                             .resolver_graph
                             .probe_path(
                                 &self.ontology,
@@ -256,12 +256,12 @@ impl DomainEngine {
                                 data_store.package_id(),
                                 ProbeOptions {
                                     must_be_entity: true,
-                                    direction: ProbeDirection::ByOutput,
+                                    direction: ProbeDirection::Up,
                                     filter: ProbeFilter::Complete,
                                 },
                             )
                             .ok_or(DomainError::NoResolvePathToDataStore)?;
-                        *def_id = path.iter().last().unwrap().input.def_id;
+                        *def_id = up_path.iter().last().unwrap().input.def_id;
                     }
                     ordered_resolve_paths.push(None);
                 }
@@ -472,7 +472,7 @@ impl DomainEngine {
                 // because the conditions must be expressed in its domain.
                 // So we don't need to search for a target type, only a valid resolve
                 // path _between_ the two known types
-                let resolve_path = self
+                let up_path = self
                     .resolver_graph
                     .probe_path(
                         &self.ontology,
@@ -480,18 +480,18 @@ impl DomainEngine {
                         data_store.package_id(),
                         ProbeOptions {
                             must_be_entity: true,
-                            direction: ProbeDirection::ByOutput,
+                            direction: ProbeDirection::Up,
                             filter: ProbeFilter::Complete,
                         },
                     )
                     .ok_or(DomainError::NoResolvePathToDataStore)?;
 
-                if let Some(map_key) = resolve_path.iter().last() {
+                if let Some(map_key) = up_path.iter().last() {
                     assert_eq!(map_key.input.def_id, inner_entity_def_id);
                 }
 
                 // Transform select
-                for map_key in resolve_path.iter() {
+                for map_key in up_path.iter() {
                     if !static_conditions.is_empty() {
                         todo!("translate static conditions");
                     }

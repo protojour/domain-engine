@@ -38,8 +38,10 @@ pub struct ProbeOptions {
 
 #[derive(Clone, Copy, Debug)]
 pub enum ProbeDirection {
-    ByInput,
-    ByOutput,
+    /// Probe for downmappings, i.e. data flowing towards persistence layer
+    Down,
+    /// Probe for upmappings, i.e. data flowing out of persistence layer
+    Up,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -50,12 +52,16 @@ pub enum ProbeFilter {
     Pure,
 }
 
+type Graph = FnvHashMap<DefId, FnvHashMap<MapDef, Vec<Flags>>>;
+
 #[derive(Debug)]
 pub struct ResolverGraph {
-    /// Graph of what each DefId can map to
-    graph_by_input: FnvHashMap<DefId, FnvHashMap<MapDef, Vec<Flags>>>,
-    /// Graph of what each DefId can map from
-    graph_by_output: FnvHashMap<DefId, FnvHashMap<MapDef, Vec<Flags>>>,
+    /// Graph of mappings pointing down, keyed by input.
+    /// A search starts at the top
+    downgraph: FnvHashMap<DefId, FnvHashMap<MapDef, Vec<Flags>>>,
+    /// Graph of mappings pointing up, keyed by output.
+    /// A search starts at the top also in this graph.
+    upgraph: FnvHashMap<DefId, FnvHashMap<MapDef, Vec<Flags>>>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -74,12 +80,10 @@ impl ResolverGraph {
     }
 
     pub fn new(iterator: impl Iterator<Item = (MapKey, MapDirection, MapLossiness)>) -> Self {
-        let mut graph_by_input: FnvHashMap<DefId, FnvHashMap<MapDef, Vec<Flags>>> =
-            Default::default();
-        let mut graph_by_output: FnvHashMap<DefId, FnvHashMap<MapDef, Vec<Flags>>> =
-            Default::default();
+        let mut downgraph = Graph::default();
+        let mut upgraph = Graph::default();
 
-        for (key, _direction, lossiness) in iterator {
+        for (key, direction, lossiness) in iterator {
             let flags = Flags {
                 lossiness,
                 map_flags: key.flags,
@@ -92,25 +96,28 @@ impl ResolverGraph {
                 key.flags
             );
 
-            graph_by_input
-                .entry(key.input.def_id)
-                .or_default()
-                .entry(key.output)
-                .or_default()
-                .push(flags);
-
-            graph_by_output
-                .entry(key.output.def_id)
-                .or_default()
-                .entry(key.input)
-                .or_default()
-                .push(flags);
+            match direction {
+                MapDirection::Down => {
+                    downgraph
+                        .entry(key.input.def_id)
+                        .or_default()
+                        .entry(key.output)
+                        .or_default()
+                        .push(flags);
+                }
+                MapDirection::Up => {
+                    upgraph
+                        .entry(key.output.def_id)
+                        .or_default()
+                        .entry(key.input)
+                        .or_default()
+                        .push(flags);
+                }
+                MapDirection::Mixed => {}
+            }
         }
 
-        Self {
-            graph_by_input,
-            graph_by_output,
-        }
+        Self { downgraph, upgraph }
     }
 
     pub fn probe_path_for_select(
@@ -177,7 +184,7 @@ impl ResolverGraph {
                 target_package,
                 ProbeOptions {
                     must_be_entity: true,
-                    direction: ProbeDirection::ByOutput,
+                    direction: ProbeDirection::Up,
                     filter: ProbeFilter::Complete,
                 },
             ),
@@ -197,8 +204,8 @@ impl ResolverGraph {
         let mut probe = Probe {
             ontology,
             graph: match options.direction {
-                ProbeDirection::ByInput => &self.graph_by_input,
-                ProbeDirection::ByOutput => &self.graph_by_output,
+                ProbeDirection::Down => &self.downgraph,
+                ProbeDirection::Up => &self.upgraph,
             },
             options: &options,
             path: &mut path,
@@ -276,7 +283,7 @@ impl<'on, 'a> Probe<'on, 'a> {
             }
 
             match self.options.direction {
-                ProbeDirection::ByInput => {
+                ProbeDirection::Down => {
                     self.path.push(MapKey {
                         input: MapDef {
                             def_id,
@@ -286,7 +293,7 @@ impl<'on, 'a> Probe<'on, 'a> {
                         flags: flags.map_flags,
                     });
                 }
-                ProbeDirection::ByOutput => {
+                ProbeDirection::Up => {
                     self.path.push(MapKey {
                         input: *edge_def,
                         output: MapDef {
