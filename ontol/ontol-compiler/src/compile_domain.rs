@@ -5,7 +5,7 @@ use tracing::{debug, debug_span, info};
 
 use crate::{
     def::{DefKind, RelParams},
-    lowering::cst::CstLowering,
+    lowering::context::CstLowering,
     package::ParsedPackage,
     relation::Relations,
     repr::repr_model::ReprKind,

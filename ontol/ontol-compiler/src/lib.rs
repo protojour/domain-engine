@@ -7,7 +7,6 @@ use std::ops::Index;
 
 use codegen::task::{execute_codegen_tasks, CodegenTasks};
 use def::Defs;
-use lowering::cst::CstLowering;
 use mem::Mem;
 use namespace::Namespaces;
 use ontol_runtime::{
@@ -27,6 +26,8 @@ use thesaurus::Thesaurus;
 use tracing::debug;
 use type_check::seal::SealCtx;
 use types::{DefTypes, Types};
+
+use crate::lowering::context::CstLowering;
 
 pub mod error;
 pub mod mem;

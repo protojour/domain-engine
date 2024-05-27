@@ -1,6 +1,6 @@
 //! utilities for lowering ontol-parser output
 
-use std::collections::HashMap;
+use std::{collections::HashMap, marker::PhantomData};
 
 use indexmap::map::Entry;
 use ontol_parser::{
@@ -29,14 +29,20 @@ pub struct LoweringCtx<'c, 'm> {
     pub root_defs: Vec<DefId>,
 }
 
+pub struct CstLowering<'c, 'm, V: NodeView> {
+    pub(super) ctx: LoweringCtx<'c, 'm>,
+    pub(super) _phantom: PhantomData<V>,
+}
+
+pub type LoweringError = (CompileError, U32Span);
+pub type Res<T> = Result<T, LoweringError>;
+
 pub type RootDefs = Vec<DefId>;
 
 pub enum Coinage {
     New,
     Used,
 }
-
-pub type LoweringError = (CompileError, U32Span);
 
 pub struct Open(pub Option<U32Span>);
 pub struct Private(pub Option<U32Span>);
