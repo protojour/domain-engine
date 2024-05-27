@@ -6,21 +6,28 @@ use ontol_parser::{
         view::{NodeView, NodeViewExt, TokenView, TokenViewExt},
     },
     lexer::{kind::Kind, unescape::unescape_regex},
-    ParserError, U32Span,
 };
 use ontol_runtime::DefId;
 
 use crate::{
     def::{DefKind, TypeDef, TypeDefFlags},
-    lowering::context::LoweringCtx,
     package::ONTOL_PKG,
-    pattern::{Pattern, PatternKind, SetBinaryOperator},
-    CompileError, SourceSpan,
+    CompileError,
 };
 
-use super::context::{BlockContext, CstLowering, Extern, Open, Private, Res, RootDefs, Symbol};
+use super::context::{BlockContext, CstLowering, Res, RootDefs};
 
 impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
+    pub(super) fn catch<T>(&mut self, f: impl FnOnce(&mut Self) -> Res<T>) -> Option<T> {
+        match f(self) {
+            Ok(value) => Some(value),
+            Err((err, span)) => {
+                err.span_report(span, &mut self.ctx);
+                None
+            }
+        }
+    }
+
     pub(super) fn resolve_type_reference(
         &mut self,
         type_ref: insp::TypeRef<V>,
@@ -52,7 +59,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                         Some(def_id)
                     }
                     Kind::SingleQuoteText | Kind::DoubleQuoteText => {
-                        let unescaped = self.unescape(token.literal_text()?)?;
+                        let unescaped = self.ctx.unescape(token.literal_text()?)?;
                         match unescaped.as_str() {
                             "" => Some(self.ctx.compiler.primitives.empty_text),
                             other => Some(
@@ -135,72 +142,6 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         })
     }
 
-    pub(super) fn unescape(&mut self, result: Result<String, Vec<ParserError>>) -> Option<String> {
-        match result {
-            Ok(string) => Some(string),
-            Err(unescape_errors) => {
-                for error in unescape_errors {
-                    CompileError::TODO(error.msg).span_report(error.span, &mut self.ctx);
-                }
-
-                None
-            }
-        }
-    }
-
-    pub(super) fn read_def_modifiers(
-        &mut self,
-        modifiers: impl Iterator<Item = V::Token>,
-    ) -> (Private, Open, Extern, Symbol) {
-        let mut private = Private(None);
-        let mut open = Open(None);
-        let mut extern_ = Extern(None);
-        let mut symbol = Symbol(None);
-
-        for modifier in modifiers {
-            match modifier.slice() {
-                "@private" => {
-                    private.0 = Some(modifier.span());
-                }
-                "@open" => {
-                    open.0 = Some(modifier.span());
-                }
-                "@extern" => {
-                    extern_.0 = Some(modifier.span());
-                }
-                "@symbol" => {
-                    symbol.0 = Some(modifier.span());
-                }
-                _ => {
-                    CompileError::InvalidModifier.span_report(modifier.span(), &mut self.ctx);
-                }
-            }
-        }
-
-        (private, open, extern_, symbol)
-    }
-
-    pub(super) fn get_set_binary_operator(
-        &mut self,
-        modifier: Option<V::Token>,
-    ) -> Option<(SetBinaryOperator, SourceSpan)> {
-        let modifier = modifier?;
-        let span = self.ctx.source_span(modifier.span());
-
-        match modifier.slice() {
-            "@in" => Some((SetBinaryOperator::ElementIn, span)),
-            "@all_in" => Some((SetBinaryOperator::AllIn, span)),
-            "@contains_all" => Some((SetBinaryOperator::ContainsAll, span)),
-            "@intersects" => Some((SetBinaryOperator::Intersects, span)),
-            "@equals" => Some((SetBinaryOperator::SetEquals, span)),
-            _ => {
-                CompileError::TODO("invalid set binary operator")
-                    .span_report(modifier.span(), &mut self.ctx);
-                None
-            }
-        }
-    }
-
     pub(super) fn lower_u16_range(&mut self, range: insp::NumberRange<V>) -> Range<Option<u16>> {
         let start = range.start().and_then(|token| self.token_to_u16(token));
         let end = range.end().and_then(|token| self.token_to_u16(token));
@@ -237,25 +178,5 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 occupied.get_mut().push_str(&docs);
             }
         }
-    }
-
-    pub(super) fn mk_error_pattern(&mut self, span: U32Span) -> Pattern {
-        self.ctx.mk_pattern(PatternKind::Error, span)
-    }
-
-    pub(super) fn catch<T>(&mut self, f: impl FnOnce(&mut Self) -> Res<T>) -> Option<T> {
-        match f(self) {
-            Ok(value) => Some(value),
-            Err((err, span)) => {
-                err.span_report(span, &mut self.ctx);
-                None
-            }
-        }
-    }
-}
-
-impl CompileError {
-    pub(super) fn span_report(self, span: U32Span, ctx: &mut LoweringCtx) {
-        self.span(ctx.source_span(span)).report(ctx.compiler);
     }
 }

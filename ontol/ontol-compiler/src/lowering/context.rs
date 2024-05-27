@@ -5,7 +5,7 @@ use std::{collections::HashMap, marker::PhantomData};
 use indexmap::map::Entry;
 use ontol_parser::{
     cst::view::{NodeView, TokenView},
-    U32Span,
+    ParserError, U32Span,
 };
 use ontol_runtime::{
     property::{PropertyCardinality, ValueCardinality},
@@ -329,5 +329,24 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
             kind,
             span: self.source_span(span),
         }
+    }
+
+    pub(super) fn unescape(&mut self, result: Result<String, Vec<ParserError>>) -> Option<String> {
+        match result {
+            Ok(string) => Some(string),
+            Err(unescape_errors) => {
+                for error in unescape_errors {
+                    CompileError::TODO(error.msg).span_report(error.span, self);
+                }
+
+                None
+            }
+        }
+    }
+}
+
+impl CompileError {
+    pub(super) fn span_report(self, span: U32Span, ctx: &mut LoweringCtx) {
+        self.span(ctx.source_span(span)).report(ctx.compiler);
     }
 }

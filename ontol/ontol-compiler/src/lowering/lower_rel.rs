@@ -173,7 +173,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 .clone()
                 .and_then(|rel| rel.name())
                 .and_then(|name| name.text())
-                .and_then(|result| self.unescape(result))
+                .and_then(|result| self.ctx.unescape(result))
                 .map(|prop| self.ctx.compiler.strings.intern(&prop));
 
             let subject_cardinality = (

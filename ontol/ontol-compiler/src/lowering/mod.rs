@@ -1,7 +1,8 @@
 pub mod context;
-pub mod lower_misc;
-pub mod lower_ontol;
-pub mod lower_rel;
-pub mod lower_stmt;
 
+mod lower_fmt;
 mod lower_map;
+mod lower_misc;
+mod lower_ontol;
+mod lower_pattern;
+mod lower_rel;

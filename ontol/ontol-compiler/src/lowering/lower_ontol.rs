@@ -2,13 +2,23 @@ use std::marker::PhantomData;
 
 use ontol_parser::cst::{
     inspect::{self as insp},
-    view::NodeView,
+    view::{NodeView, TokenView},
 };
 use ontol_runtime::DefId;
+use tracing::debug_span;
 
-use crate::{Compiler, Src};
+use crate::{namespace::Space, package::PackageReference, CompileError, Compiler, Src};
 
-use super::context::{BlockContext, CstLowering, LoweringCtx};
+use super::context::{
+    BlockContext, CstLowering, Extern, LoweringCtx, Open, Private, RootDefs, Symbol,
+};
+
+enum PreDefinedStmt<V> {
+    Def(DefId, insp::DefStatement<V>),
+    Rel(insp::RelStatement<V>),
+    Fmt(insp::FmtStatement<V>),
+    Map(insp::MapStatement<V>),
+}
 
 impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
     pub fn new(compiler: &'c mut Compiler<'m>, src: Src) -> Self {
@@ -27,8 +37,10 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         self.ctx.root_defs
     }
 
+    /// Entry point for lowering a top-level ONTOL domain syntax node
     pub fn lower_ontol(mut self, ontol: insp::Node<V>) -> Self {
         let insp::Node::Ontol(ontol) = ontol else {
+            // This is a pre-reported parser error, so don't report here
             return self;
         };
 
@@ -49,5 +61,165 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         }
 
         self
+    }
+
+    pub(super) fn lower_statement(
+        &mut self,
+        statement: insp::Statement<V>,
+        block_context: BlockContext,
+    ) -> Option<RootDefs> {
+        match statement {
+            insp::Statement::UseStatement(_use_stmt) => None,
+            insp::Statement::DefStatement(def_stmt) => {
+                let ident_token = def_stmt.ident_path()?.symbols().next()?;
+                let (private, open, extern_, symbol) =
+                    self.read_def_modifiers(def_stmt.modifiers());
+
+                let def_id = self.catch(|zelf| {
+                    zelf.ctx.coin_type_definition(
+                        ident_token.slice(),
+                        ident_token.span(),
+                        private,
+                        open,
+                        extern_,
+                        symbol,
+                    )
+                })?;
+                let mut root_defs: RootDefs = [def_id].into();
+                root_defs.extend(self.lower_def_body(def_id, def_stmt)?);
+                Some(root_defs)
+            }
+            insp::Statement::RelStatement(rel_stmt) => {
+                self.lower_rel_statement(rel_stmt, block_context)
+            }
+            insp::Statement::FmtStatement(fmt_stmt) => {
+                self.lower_fmt_statement(fmt_stmt, block_context)
+            }
+            insp::Statement::MapStatement(map_stmt) => {
+                let def_id = self.lower_map_statement(map_stmt, block_context)?;
+                Some(vec![def_id])
+            }
+        }
+    }
+
+    fn lower_def_body(&mut self, def_id: DefId, stmt: insp::DefStatement<V>) -> Option<RootDefs> {
+        self.append_documentation(def_id, stmt.0.clone());
+
+        let mut root_defs: RootDefs = [def_id].into();
+
+        if let Some(body) = stmt.body() {
+            let _entered = debug_span!("def", id = ?def_id).entered();
+
+            // The inherent relation block on the type uses the just defined
+            // type as its context
+            let context_fn = move || def_id;
+
+            for statement in body.statements() {
+                if let Some(mut defs) =
+                    self.lower_statement(statement, BlockContext::Context(&context_fn))
+                {
+                    root_defs.append(&mut defs);
+                }
+            }
+        }
+
+        Some(root_defs)
+    }
+
+    fn pre_define_statement(&mut self, statement: insp::Statement<V>) -> Option<PreDefinedStmt<V>> {
+        match statement {
+            insp::Statement::UseStatement(use_stmt) => {
+                let name = use_stmt.name()?;
+                let name_text = name.text().and_then(|result| self.ctx.unescape(result))?;
+
+                let reference = PackageReference::Named(name_text);
+                let Some(used_package_def_id) =
+                    self.ctx.compiler.packages.loaded_packages.get(&reference)
+                else {
+                    CompileError::PackageNotFound(reference)
+                        .span_report(name.0.span(), &mut self.ctx);
+                    return None;
+                };
+
+                let type_namespace = self
+                    .ctx
+                    .compiler
+                    .namespaces
+                    .get_namespace_mut(self.ctx.package_id, Space::Type);
+
+                let symbol = use_stmt.ident_path()?.symbols().next()?;
+
+                let as_ident = self.ctx.compiler.strings.intern(symbol.slice());
+                type_namespace.insert(as_ident, *used_package_def_id);
+
+                None
+            }
+            insp::Statement::DefStatement(def_stmt) => {
+                let ident_token = def_stmt.ident_path()?.symbols().next()?;
+                let (private, open, extern_, symbol) =
+                    self.read_def_modifiers(def_stmt.modifiers());
+
+                let def_id = self.catch(|zelf| {
+                    zelf.ctx.coin_type_definition(
+                        ident_token.slice(),
+                        ident_token.span(),
+                        private,
+                        open,
+                        extern_,
+                        symbol,
+                    )
+                })?;
+
+                Some(PreDefinedStmt::Def(def_id, def_stmt))
+            }
+            insp::Statement::RelStatement(rel_stmt) => Some(PreDefinedStmt::Rel(rel_stmt)),
+            insp::Statement::FmtStatement(fmt_stmt) => Some(PreDefinedStmt::Fmt(fmt_stmt)),
+            insp::Statement::MapStatement(map_stmt) => Some(PreDefinedStmt::Map(map_stmt)),
+        }
+    }
+
+    fn lower_pre_defined(
+        &mut self,
+        stmt: PreDefinedStmt<V>,
+        block_context: BlockContext,
+    ) -> Option<RootDefs> {
+        match stmt {
+            PreDefinedStmt::Def(def_id, def_stmt) => self.lower_def_body(def_id, def_stmt),
+            PreDefinedStmt::Rel(rel_stmt) => self.lower_statement(rel_stmt.into(), block_context),
+            PreDefinedStmt::Fmt(fmt_stmt) => self.lower_statement(fmt_stmt.into(), block_context),
+            PreDefinedStmt::Map(map_stmt) => self.lower_statement(map_stmt.into(), block_context),
+        }
+    }
+
+    pub(super) fn read_def_modifiers(
+        &mut self,
+        modifiers: impl Iterator<Item = V::Token>,
+    ) -> (Private, Open, Extern, Symbol) {
+        let mut private = Private(None);
+        let mut open = Open(None);
+        let mut extern_ = Extern(None);
+        let mut symbol = Symbol(None);
+
+        for modifier in modifiers {
+            match modifier.slice() {
+                "@private" => {
+                    private.0 = Some(modifier.span());
+                }
+                "@open" => {
+                    open.0 = Some(modifier.span());
+                }
+                "@extern" => {
+                    extern_.0 = Some(modifier.span());
+                }
+                "@symbol" => {
+                    symbol.0 = Some(modifier.span());
+                }
+                _ => {
+                    CompileError::InvalidModifier.span_report(modifier.span(), &mut self.ctx);
+                }
+            }
+        }
+
+        (private, open, extern_, symbol)
     }
 }
