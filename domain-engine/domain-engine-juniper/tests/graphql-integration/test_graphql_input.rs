@@ -16,7 +16,7 @@ async fn test_graphql_input_deserialization_error() {
         rel .'prop': 'const'
     )
     "
-    .compile_single_schema_with_datastore();
+    .compile_single_schema();
 
     let ctx = gql_ctx_mock_data_store(&test, root(), ());
     assert_error_msg!(
@@ -50,7 +50,7 @@ async fn test_graphql_input_constructor_sequence_as_json_scalar() {
         rel .'prop': tuple
     )
     "
-    .compile_single_schema_with_datastore();
+    .compile_single_schema();
 
     r#"mutation {
         foo(create: [{

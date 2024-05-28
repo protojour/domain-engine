@@ -1,10 +1,10 @@
 use crate::{
     ontology::{domain::TypeKind, map::MapLossiness, Ontology},
     query::select::{EntitySelect, Select, StructOrUnionSelect},
-    DefId, MapDef, MapDefFlags, MapDirection, MapFlags, MapKey, PackageId,
+    DefId, MapDef, MapDefFlags, MapDirection, MapFlags, MapKey,
 };
 use fnv::{FnvHashMap, FnvHashSet};
-use tracing::trace;
+use tracing::{debug, trace};
 
 #[derive(Debug)]
 pub struct ResolvePath {
@@ -54,7 +54,7 @@ pub enum ProbeFilter {
 
 type Graph = FnvHashMap<DefId, FnvHashMap<MapDef, Vec<Flags>>>;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ResolverGraph {
     /// Graph of mappings pointing down, keyed by input.
     /// A search starts at the top
@@ -124,7 +124,6 @@ impl ResolverGraph {
         &self,
         ontology: &Ontology,
         select: &Select,
-        target_package: PackageId,
         direction: ProbeDirection,
         filter: ProbeFilter,
     ) -> Option<ResolvePath> {
@@ -138,7 +137,6 @@ impl ResolverGraph {
             ) => self.probe_path(
                 ontology,
                 struct_select.def_id,
-                target_package,
                 ProbeOptions {
                     must_be_entity: true,
                     direction,
@@ -148,7 +146,6 @@ impl ResolverGraph {
             Select::Struct(struct_select) => self.probe_path(
                 ontology,
                 struct_select.def_id,
-                target_package,
                 ProbeOptions {
                     must_be_entity: true,
                     direction,
@@ -175,13 +172,11 @@ impl ResolverGraph {
         &self,
         ontology: &Ontology,
         select: &EntitySelect,
-        target_package: PackageId,
     ) -> Option<ResolvePath> {
         match &select.source {
             StructOrUnionSelect::Struct(struct_query) => self.probe_path(
                 ontology,
                 struct_query.def_id,
-                target_package,
                 ProbeOptions {
                     must_be_entity: true,
                     direction: ProbeDirection::Up,
@@ -196,7 +191,6 @@ impl ResolverGraph {
         &self,
         ontology: &Ontology,
         public_def_id: DefId,
-        target_package: PackageId,
         options: ProbeOptions,
     ) -> Option<ResolvePath> {
         let mut path = vec![];
@@ -210,7 +204,6 @@ impl ResolverGraph {
             options: &options,
             path: &mut path,
             visited: &mut visited,
-            target_package,
         };
 
         if probe.probe_rec(public_def_id) {
@@ -218,6 +211,30 @@ impl ResolverGraph {
         } else {
             None
         }
+    }
+
+    pub fn is_mapped_down(&self, def_id: &DefId) -> bool {
+        self.downgraph.contains_key(def_id)
+    }
+
+    pub fn is_mapped_up(&self, def_id: &DefId) -> bool {
+        self.upgraph.contains_key(def_id)
+    }
+
+    pub fn down_persistence_terminals(&self) -> FnvHashSet<DefId> {
+        cross_domain_edge_counts(&self.downgraph)
+            .into_iter()
+            .filter(|(_, count)| *count == 0)
+            .map(|(def_id, _)| def_id)
+            .collect()
+    }
+
+    pub fn up_persistence_terminals(&self) -> FnvHashSet<DefId> {
+        cross_domain_edge_counts(&self.upgraph)
+            .into_iter()
+            .filter(|(_, count)| *count == 0)
+            .map(|(def_id, _)| def_id)
+            .collect()
     }
 }
 
@@ -227,7 +244,6 @@ struct Probe<'on, 'a> {
     options: &'on ProbeOptions,
     path: &'a mut Vec<MapKey>,
     visited: &'a mut FnvHashSet<DefId>,
-    target_package: PackageId,
 }
 
 impl<'on, 'a> Probe<'on, 'a> {
@@ -242,20 +258,18 @@ impl<'on, 'a> Probe<'on, 'a> {
             return false;
         }
 
-        if def_id.package_id() == self.target_package {
-            if self.options.must_be_entity {
-                let type_info = self.ontology.get_type_info(def_id);
-                if !matches!(&type_info.kind, TypeKind::Entity(_)) {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
         let edges = match self.graph.get(&def_id) {
             Some(edges) => edges,
-            None => return false,
+            None => {
+                if self.options.must_be_entity {
+                    let type_info = self.ontology.get_type_info(def_id);
+                    if !matches!(&type_info.kind, TypeKind::Entity(_)) {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
         };
 
         for (edge_def, flag_candidates) in edges {
@@ -314,4 +328,33 @@ impl<'on, 'a> Probe<'on, 'a> {
 
         false
     }
+}
+
+fn cross_domain_edge_counts(graph: &Graph) -> FnvHashMap<DefId, u32> {
+    let mut counts: FnvHashMap<DefId, u32> = FnvHashMap::default();
+
+    for (input, edges) in graph {
+        let count = counts.entry(*input).or_default();
+
+        if true {
+            if edges
+                .iter()
+                .any(|(map_def, _)| map_def.def_id.package_id() != input.package_id())
+            {
+                *count += 1;
+            }
+        } else {
+            for edge in edges {
+                let count = counts.entry(edge.0.def_id).or_default();
+
+                if edge.0.def_id.package_id() != input.package_id() {
+                    *count += 1;
+                }
+            }
+        }
+    }
+
+    debug!("edge_counts: {counts:#?}");
+
+    counts
 }

@@ -13,7 +13,7 @@ use domain_engine_juniper::{
     context::ServiceCtx, create_graphql_schema, gql_scalar::GqlScalar, Schema,
 };
 use juniper::ScalarValue;
-use ontol_runtime::{ontology::config::DataStoreConfig, sequence::Sequence};
+use ontol_runtime::sequence::Sequence;
 use ontol_test_utils::{OntolTest, SrcName, TestCompile, TestPackages};
 use ordered_float::NotNan;
 use unimock::*;
@@ -36,16 +36,14 @@ impl<T: TestCompile> TestCompileSchema for T {
 }
 
 pub trait TestCompileSingletonSchema {
-    fn compile_single_schema_with_datastore(self) -> (OntolTest, Schema);
+    fn compile_single_schema(self) -> (OntolTest, Schema);
 }
 
 impl TestCompileSingletonSchema for &'static str {
     #[track_caller]
-    fn compile_single_schema_with_datastore(self) -> (OntolTest, Schema) {
+    fn compile_single_schema(self) -> (OntolTest, Schema) {
         let (ontol_test, [schema]) = compile_schemas_inner(
-            TestPackages::with_static_sources([(SrcName::default(), self)])
-                .with_data_store(SrcName::default(), DataStoreConfig::Default)
-                .compile(),
+            TestPackages::with_static_sources([(SrcName::default(), self)]).compile(),
             [SrcName::default()],
         );
         (ontol_test, schema)

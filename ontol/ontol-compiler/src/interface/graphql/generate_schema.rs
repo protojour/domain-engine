@@ -8,10 +8,10 @@ use ontol_runtime::{
         },
         schema::GraphqlSchema,
     },
-    ontology::{config::data_store_backed_domains, map::MapLossiness, Ontology},
+    ontology::Ontology,
     phf::PhfKey,
     resolve_path::ResolverGraph,
-    DefId, MapDirection, MapKey, PackageId,
+    DefId, MapKey, PackageId,
 };
 use tracing::{debug_span, trace};
 
@@ -28,20 +28,18 @@ use super::{
     schema_builder::SchemaBuilder,
 };
 
+#[allow(clippy::too_many_arguments)]
 pub fn generate_graphql_schema<'c>(
     package_id: PackageId,
     partial_ontology: &'c Ontology,
     primitives: &'c Primitives,
     map_namespace: Option<&'c IndexMap<&str, DefId>>,
     codegen_tasks: &'c CodegenTasks,
+    resolver_graph: &'c ResolverGraph,
     union_member_cache: &'c UnionMemberCache,
     serde_gen: &mut SerdeGenerator<'c, '_>,
 ) -> Option<GraphqlSchema> {
     let domain = partial_ontology.find_domain(package_id).unwrap();
-
-    let data_store_domain = data_store_backed_domains(partial_ontology)
-        .map(|(package_id, _)| package_id)
-        .last();
 
     let contains_entities = domain
         .type_infos()
@@ -90,15 +88,7 @@ pub fn generate_graphql_schema<'c>(
             defs,
             primitives,
             repr_ctx,
-            resolver_graph: ResolverGraph::new(codegen_tasks.result_map_proc_table.keys().map(
-                |key| {
-                    codegen_tasks
-                        .result_metadata_table
-                        .get(key)
-                        .map(|meta| (*key, meta.direction, meta.lossiness))
-                        .unwrap_or((*key, MapDirection::Down, MapLossiness::Lossy))
-                },
-            )),
+            resolver_graph,
             union_member_cache,
             builtin_scalars: Default::default(),
         }
@@ -121,11 +111,7 @@ pub fn generate_graphql_schema<'c>(
             let type_ref = builder.get_def_type_ref(type_info.def_id, QLevel::Node);
 
             if let Some(entity_data) = entity_check(builder.schema, type_ref) {
-                builder.add_entity_queries_and_mutations(
-                    entity_data,
-                    data_store_domain,
-                    &mut mutation_fields,
-                );
+                builder.add_entity_queries_and_mutations(entity_data, &mut mutation_fields);
             }
         }
     }

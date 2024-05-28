@@ -293,12 +293,6 @@ impl TestPackages {
         self
     }
 
-    /// Set data store config for one of the sources.
-    pub fn with_data_store(mut self, name: SrcName, config: DataStoreConfig) -> Self {
-        self.data_store = Some((name, config));
-        self
-    }
-
     /// In normal mode, the Ontology is serialized and then deserialized again before the test
     /// is returned. This is to increase confidence that this step indeed works.
     /// All tests do this by default.

@@ -244,6 +244,7 @@ impl<'m> Compiler<'m> {
                     &self.primitives,
                     map_namespaces.get(&package_id),
                     &self.codegen_tasks,
+                    &self.resolver_graph,
                     &union_member_cache,
                     &mut serde_gen,
                 ) {

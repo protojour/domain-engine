@@ -10,13 +10,12 @@ use domain_engine_test_utils::{
     system::mock_current_time_monotonic,
 };
 use ontol_macros::test;
-use ontol_runtime::ontology::config::DataStoreConfig;
 use ontol_test_utils::{examples::DEMO, src_name, TestPackages};
 use unimock::Unimock;
 
 #[test]
 fn test_graphql_demo_compile() {
-    DEMO.1.compile_single_schema_with_datastore();
+    DEMO.1.compile_single_schema();
 }
 
 // regression test for https://gitlab.com/protojour/memoriam/domain-engine/-/issues/111
@@ -60,7 +59,6 @@ async fn test_default_mapping_error() {
             ",
         ),
     ])
-    .with_data_store(src_name("events_db"), DataStoreConfig::Default)
     .compile_schemas([src_name("events")]);
 
     let ctx: ServiceCtx = DomainEngine::builder(test.ontology_owned())

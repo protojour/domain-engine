@@ -225,9 +225,15 @@ fn test_map_generate_edge() {
                 rel .'id'|id: (rel .is: text)
                 rel .'bars'[rel .'field': text]: {bar}
             )
-            def bar (rel .'id'|id: (rel .is: text))
+            def bar (rel .'id': (rel .is: text))
 
             map(
+                foo(
+                    'id': foo_id,
+                    'bars': {
+                        ..['field': field] bar('id': bar_id)
+                    }
+                ),
                 inner.foo(
                     'id': foo_id,
                     'bars': {
@@ -237,12 +243,6 @@ fn test_map_generate_edge() {
                         )
                     }
                 ),
-                foo(
-                    'id': foo_id,
-                    'bars': {
-                        ..['field': field] bar('id': bar_id)
-                    }
-                )
             )
             ",
         ),

@@ -89,7 +89,7 @@ impl DomainEngine {
 
         let resolve_path = self
             .resolver_graph
-            .probe_path_for_entity_select(ontology, &select, data_store.package_id())
+            .probe_path_for_entity_select(ontology, &select)
             .ok_or(DomainError::NoResolvePathToDataStore)?;
 
         // Transform select
@@ -149,7 +149,6 @@ impl DomainEngine {
                         .probe_path_for_select(
                             ontology,
                             select,
-                            data_store.package_id(),
                             ProbeDirection::Down,
                             ProbeFilter::Complete,
                         )
@@ -179,7 +178,6 @@ impl DomainEngine {
                         .probe_path_for_select(
                             ontology,
                             select,
-                            data_store.package_id(),
                             ProbeDirection::Up,
                             ProbeFilter::Complete,
                         )
@@ -197,7 +195,6 @@ impl DomainEngine {
                         .probe_path_for_select(
                             ontology,
                             select,
-                            data_store.package_id(),
                             ProbeDirection::Down,
                             ProbeFilter::Pure,
                         )
@@ -233,7 +230,6 @@ impl DomainEngine {
                         .probe_path_for_select(
                             ontology,
                             select,
-                            data_store.package_id(),
                             ProbeDirection::Up,
                             ProbeFilter::Complete,
                         )
@@ -253,7 +249,6 @@ impl DomainEngine {
                             .probe_path(
                                 &self.ontology,
                                 *def_id,
-                                data_store.package_id(),
                                 ProbeOptions {
                                     must_be_entity: true,
                                     direction: ProbeDirection::Up,
@@ -477,7 +472,6 @@ impl DomainEngine {
                     .probe_path(
                         &self.ontology,
                         struct_select.def_id,
-                        data_store.package_id(),
                         ProbeOptions {
                             must_be_entity: true,
                             direction: ProbeDirection::Up,

@@ -5,7 +5,6 @@ use domain_engine_test_utils::{
 use ontol_macros::test;
 use ontol_runtime::{
     interface::serde::processor::{ProcessorProfile, ProcessorProfileFlags},
-    ontology::config::DataStoreConfig,
     ontology::Ontology,
     query::select::Select,
     value::Serial,
@@ -25,12 +24,10 @@ use uuid::Uuid;
 
 fn conduit_db() -> TestPackages {
     TestPackages::with_static_sources([CONDUIT_DB])
-        .with_data_store(CONDUIT_DB.0, DataStoreConfig::Default)
 }
 
 fn artist_and_instrument() -> TestPackages {
     TestPackages::with_static_sources([ARTIST_AND_INSTRUMENT])
-        .with_data_store(ARTIST_AND_INSTRUMENT.0, DataStoreConfig::Default)
 }
 
 async fn make_domain_engine(

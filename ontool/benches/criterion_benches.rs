@@ -74,7 +74,6 @@ pub fn compile_benchmark(c: &mut Criterion) {
     c.bench_function("compile_tiny", |b| {
         b.iter(|| {
             TestPackages::with_static_sources(black_box([TINY]))
-                .with_data_store(TINY.0, DataStoreConfig::Default)
                 .bench_disable_ontology_serde()
                 .compile();
         })
@@ -86,16 +85,13 @@ pub fn compile_benchmark(c: &mut Criterion) {
                 FEED_PUBLIC,
                 CONDUIT_DB,
             ]))
-            .with_data_store(CONDUIT_DB.0, DataStoreConfig::Default)
             .bench_disable_ontology_serde()
             .compile();
         })
     });
 
     c.bench_function("serialize_ontology_bincode", |b| {
-        let test = TestPackages::with_static_sources(black_box([TINY]))
-            .with_data_store(TINY.0, DataStoreConfig::Default)
-            .compile();
+        let test = TestPackages::with_static_sources(black_box([TINY])).compile();
         b.iter(|| {
             let mut binary_ontology: Vec<u8> = Vec::new();
             test.ontology()
@@ -167,9 +163,7 @@ pub fn compile_benchmark(c: &mut Criterion) {
     });
 
     c.bench_function("graphql_create_entity", |b| {
-        let test = TestPackages::with_static_sources(black_box([TINY]))
-            .with_data_store(TINY.0, DataStoreConfig::Default)
-            .compile();
+        let test = TestPackages::with_static_sources(black_box([TINY])).compile();
         let rt = Runtime::new().unwrap();
 
         let engine = rt.block_on(async {

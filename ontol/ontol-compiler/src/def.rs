@@ -282,6 +282,10 @@ impl<'m> Defs<'m> {
         def_id
     }
 
+    pub fn iter_packages(&self) -> impl Iterator<Item = PackageId> + '_ {
+        self.def_id_allocators.keys().copied()
+    }
+
     pub fn iter_package_def_ids(&self, package_id: PackageId) -> impl Iterator<Item = DefId> {
         let max_idx = self
             .def_id_allocators

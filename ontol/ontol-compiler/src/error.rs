@@ -134,6 +134,7 @@ pub enum CompileError {
     UnsupportedVariableDuplication,
     SpreadLabelMustBeLastArgument,
     InvalidModifier,
+    MultiDomainPersistenceNotAllowed,
     /// A message regarded as a bug in the compiler
     Bug(String),
     /// An TODO message is an "immature" compile error, probably requires better UX design
@@ -338,6 +339,9 @@ impl std::fmt::Display for CompileError {
             }
             Self::InvalidModifier => {
                 write!(f, "modifier not recognized in this context")
+            }
+            Self::MultiDomainPersistenceNotAllowed => {
+                write!(f, "multi-domain persistence detected")
             }
             Self::Bug(msg) => write!(f, "BUG: {msg}"),
             Self::Todo(msg) => write!(f, "TODO: {msg}"),

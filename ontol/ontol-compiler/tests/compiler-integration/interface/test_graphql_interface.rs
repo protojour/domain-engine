@@ -12,7 +12,6 @@ use ontol_runtime::{
         },
         serde::operator::SerdeOperator,
     },
-    ontology::config::DataStoreConfig,
 };
 use ontol_test_utils::{
     examples::ARTIST_AND_INSTRUMENT,
@@ -240,19 +239,6 @@ fn test_graphql_artist_and_instrument() {
 }
 
 #[test]
-fn test_no_datastore_yields_empty_mutation() {
-    let test = "
-    def foo (
-        rel .'id'|id: (rel .is: text)
-        rel .'x': text
-    )
-    "
-    .compile();
-    let (_schema, test) = schema_test(&test, SrcName::default());
-    assert!(test.mutation_object_data().fields.is_empty());
-}
-
-#[test]
 fn test_imperfect_mapping_mutation() {
     let test = TestPackages::with_static_sources([
         (
@@ -288,7 +274,6 @@ fn test_imperfect_mapping_mutation() {
             ",
         ),
     ])
-    .with_data_store(src_name("lower"), DataStoreConfig::Default)
     .compile();
     let (_schema, test) = schema_test(&test, SrcName::default());
     let mutation_object = test.mutation_object_data();

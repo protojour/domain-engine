@@ -1,0 +1,23 @@
+//@ src_name=root
+use 'p0' as p0
+use 'p1' as p1
+
+def foo (
+    rel .'_id'[rel .gen: auto]|id: (rel .is: serial)
+)
+def bar (
+    rel .'_id'[rel .gen: auto]|id: (rel .is: serial)
+)
+
+map(foo ('_id': id), p0.db ('_id': id))
+map(bar ('_id': id), p1.db ('_id': id))
+
+//@ src_name=p0
+def db ( // ERROR multi-domain persistence detected
+    rel .'_id'[rel .gen: auto]|id: (rel .is: serial)
+)
+
+//@ src_name=p1
+def db ( // ERROR multi-domain persistence detected
+    rel .'_id'[rel .gen: auto]|id: (rel .is: serial)
+)

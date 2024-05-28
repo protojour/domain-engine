@@ -14,7 +14,7 @@ use domain_engine_test_utils::{
     unimock,
 };
 use ontol_macros::test;
-use ontol_runtime::ontology::{config::DataStoreConfig, Ontology};
+use ontol_runtime::ontology::Ontology;
 use ontol_test_utils::{
     examples::{
         entity_subtype,
@@ -37,9 +37,7 @@ async fn make_domain_engine(ontology: Arc<Ontology>) -> DomainEngine {
 /// There should only be one stix test since the domain is so big
 #[test(tokio::test)]
 async fn test_graphql_stix() {
-    let (test, [schema]) = stix_bundle()
-        .with_data_store(STIX.0, DataStoreConfig::Default)
-        .compile_schemas([STIX.0]);
+    let (test, [schema]) = stix_bundle().compile_schemas([STIX.0]);
     let ctx: ServiceCtx = make_domain_engine(test.ontology_owned()).await.into();
 
     expect_eq!(
@@ -72,7 +70,6 @@ async fn test_graphql_stix() {
 #[test(tokio::test)]
 async fn test_guitar_synth_union_mutation_and_query() {
     let (test, [schema]) = TestPackages::with_static_sources([GUITAR_SYNTH_UNION])
-        .with_data_store(GUITAR_SYNTH_UNION.0, DataStoreConfig::Default)
         .compile_schemas([GUITAR_SYNTH_UNION.0]);
     let ctx: ServiceCtx = make_domain_engine(test.ontology_owned()).await.into();
 
@@ -191,9 +188,8 @@ async fn test_guitar_synth_union_mutation_and_query() {
 
 #[test(tokio::test)]
 async fn test_gitmesh_misc() {
-    let (test, [schema]) = TestPackages::with_static_sources([GITMESH])
-        .with_data_store(GITMESH.0, DataStoreConfig::Default)
-        .compile_schemas([GITMESH.0]);
+    let (test, [schema]) =
+        TestPackages::with_static_sources([GITMESH]).compile_schemas([GITMESH.0]);
     let ctx: ServiceCtx = make_domain_engine(test.ontology_owned()).await.into();
 
     r#"mutation {
@@ -422,9 +418,8 @@ async fn test_gitmesh_misc() {
 
 #[test(tokio::test)]
 async fn test_gitmesh_fancy_filters() {
-    let (test, [schema]) = TestPackages::with_static_sources([GITMESH])
-        .with_data_store(GITMESH.0, DataStoreConfig::Default)
-        .compile_schemas([GITMESH.0]);
+    let (test, [schema]) =
+        TestPackages::with_static_sources([GITMESH]).compile_schemas([GITMESH.0]);
     let ctx: ServiceCtx = make_domain_engine(test.ontology_owned()).await.into();
 
     r#"mutation {
@@ -493,9 +488,8 @@ async fn test_gitmesh_fancy_filters() {
 
 #[test(tokio::test)]
 async fn test_gitmesh_update_owner_relation() {
-    let (test, [schema]) = TestPackages::with_static_sources([GITMESH])
-        .with_data_store(GITMESH.0, DataStoreConfig::Default)
-        .compile_schemas([GITMESH.0]);
+    let (test, [schema]) =
+        TestPackages::with_static_sources([GITMESH]).compile_schemas([GITMESH.0]);
     let ctx: ServiceCtx = make_domain_engine(test.ontology_owned()).await.into();
 
     let response = r#"mutation {
@@ -574,9 +568,8 @@ async fn test_gitmesh_update_owner_relation() {
 
 #[test(tokio::test)]
 async fn test_gitmesh_patch_members() {
-    let (test, [schema]) = TestPackages::with_static_sources([GITMESH])
-        .with_data_store(GITMESH.0, DataStoreConfig::Default)
-        .compile_schemas([GITMESH.0]);
+    let (test, [schema]) =
+        TestPackages::with_static_sources([GITMESH]).compile_schemas([GITMESH.0]);
     let ctx: ServiceCtx = make_domain_engine(test.ontology_owned()).await.into();
 
     r#"mutation {
@@ -710,9 +703,8 @@ async fn test_gitmesh_patch_members() {
 
 #[test(tokio::test)]
 async fn test_gitmesh_ownership_transfer() {
-    let (test, [schema]) = TestPackages::with_static_sources([GITMESH])
-        .with_data_store(GITMESH.0, DataStoreConfig::Default)
-        .compile_schemas([GITMESH.0]);
+    let (test, [schema]) =
+        TestPackages::with_static_sources([GITMESH]).compile_schemas([GITMESH.0]);
     let ctx: ServiceCtx = make_domain_engine(test.ontology_owned()).await.into();
 
     let response = r#"mutation {
@@ -802,7 +794,6 @@ async fn test_gitmesh_ownership_transfer() {
 async fn entity_subtype() {
     let (test, [derived_schema, db_schema]) =
         TestPackages::with_static_sources([entity_subtype::DERIVED, entity_subtype::DB])
-            .with_data_store(entity_subtype::DB.0, DataStoreConfig::Default)
             .compile_schemas([entity_subtype::DERIVED.0, entity_subtype::DB.0]);
     let ctx: ServiceCtx = make_domain_engine(test.ontology_owned()).await.into();
 

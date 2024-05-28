@@ -49,7 +49,7 @@ use thiserror::Error;
 use tokio::sync::broadcast::{self, Sender};
 use tokio_util::sync::CancellationToken;
 use tower_lsp::{LspService, Server};
-use tracing::{info, level_filters::LevelFilter, warn};
+use tracing::{info, level_filters::LevelFilter};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::service::Detach;
@@ -110,10 +110,6 @@ struct Compile {
     #[arg(short('w'), long, default_value = ".")]
     dir: PathBuf,
 
-    /// Specify a domain to be backed by a data store
-    #[arg(short('d'), long)]
-    data_store: Option<String>,
-
     /// Specify a data store backend [inmemory, arangodb, ..]
     #[arg(short('b'), long)]
     backend: Option<String>,
@@ -154,10 +150,6 @@ struct Serve {
     #[arg(short('w'), long, default_value = ".")]
     dir: PathBuf,
 
-    /// Specify a domain to be backed by a data store
-    #[arg(short('d'), long)]
-    data_store: Option<String>,
-
     /// Specify a port for the server
     #[arg(short('p'), long, default_value = "5000")]
     port: u16,
@@ -186,7 +178,7 @@ pub async fn run() -> Result<(), OntoolError> {
         Some(Commands::Check(args)) => {
             init_tracing();
 
-            compile(args.dir, args.files, None, None)?;
+            compile(args.dir, args.files, None)?;
             println!("No errors found.");
 
             Ok(())
@@ -196,7 +188,7 @@ pub async fn run() -> Result<(), OntoolError> {
 
             let output_file = File::create(args.output)?;
 
-            let ontology = compile(args.dir, args.files, args.data_store, args.backend)?;
+            let ontology = compile(args.dir, args.files, args.backend)?;
             ontology.try_serialize_to_bincode(output_file).unwrap();
 
             Ok(())
@@ -207,7 +199,7 @@ pub async fn run() -> Result<(), OntoolError> {
             let first_domain =
                 get_source_name(args.files.as_slice().iter().next().expect("no input files"));
 
-            let ontology = compile(args.dir, args.files, None, None)?;
+            let ontology = compile(args.dir, args.files, None)?;
 
             let (package_id, domain) = ontology
                 .domains()
@@ -235,7 +227,7 @@ pub async fn run() -> Result<(), OntoolError> {
         Some(Commands::Serve(args)) => {
             init_tracing();
 
-            serve(args.dir, args.files, args.data_store, args.port).await?;
+            serve(args.dir, args.files, args.port).await?;
 
             Ok(())
         }
@@ -269,7 +261,6 @@ fn init_tracing_stderr() {
 fn compile(
     root_dir: PathBuf,
     root_files: Vec<PathBuf>,
-    data_store_domain: Option<String>,
     backend: Option<String>,
 ) -> Result<Ontology, OntoolError> {
     if root_files.is_empty() {
@@ -315,14 +306,6 @@ fn compile(
                         PackageReference::Named(source_name) => source_name.as_str(),
                     };
 
-                    let mut package_config = PackageConfig::default();
-
-                    if Some(source_name) == data_store_domain.as_deref() {
-                        package_config.data_store = match &backend {
-                            Some(backend) => Some(DataStoreConfig::ByName(backend.into())),
-                            None => Some(DataStoreConfig::Default),
-                        }
-                    }
                     if let Some(source_text) = sources_by_name.remove(source_name) {
                         let (flat_tree, errors) = cst_parse(&source_text);
 
@@ -333,7 +316,7 @@ fn compile(
                                 source_text: source_text.clone(),
                             }),
                             errors,
-                            package_config,
+                            PackageConfig::default(),
                             &mut ontol_sources,
                         );
                         source_code_registry
@@ -351,7 +334,13 @@ fn compile(
 
     let mem = Mem::default();
     ontol_compiler::compile(topology, ontol_sources.clone(), &mem)
-        .map(|compiled| compiled.into_ontology())
+        .map(|mut compiled| {
+            if let Some(backend) = backend {
+                compiled.override_data_store(DataStoreConfig::ByName(backend));
+            }
+
+            compiled.into_ontology()
+        })
         .or_else(|err| {
             print_unified_compile_error(err, &ontol_sources, &source_code_registry)?;
             Err(OntoolError::Compile)
@@ -430,39 +419,12 @@ fn clear_term(stdout: &mut Stdout) {
     stdout.flush().unwrap();
 }
 
-fn check_datastore_domain_has_entities(data_store: Option<&str>, ontology: &Ontology) {
-    if let Some(data_store) = data_store {
-        let mut entities_exist = false;
-        for domain in ontology.domains() {
-            if &ontology[domain.1.unique_name()] == data_store {
-                for type_info in domain.1.type_infos() {
-                    if type_info.entity_info().is_some() {
-                        entities_exist = true;
-                        break;
-                    }
-                }
-            }
-        }
-        if !entities_exist {
-            warn!("There are no entities in the datastore domain. No mutations will be generated and the GraphQL schema will be invalid!");
-        }
-    }
-}
-
-async fn serve(
-    root_dir: PathBuf,
-    root_files: Vec<PathBuf>,
-    data_store: Option<String>,
-    port: u16,
-) -> Result<(), OntoolError> {
+async fn serve(root_dir: PathBuf, root_files: Vec<PathBuf>, port: u16) -> Result<(), OntoolError> {
     let mut stdout = stdout();
     let (tx, rx) = std::sync::mpsc::channel();
     let (reload_tx, _reload_rx) = broadcast::channel::<ChannelMessage>(16);
     let mut debouncer = new_debouncer(Duration::from_secs(1), None, tx).unwrap();
     clear_term(&mut stdout);
-    if data_store.is_none() {
-        warn!("No datastore domain set. No mutations will be generated and the GraphQL schema will be invalid!");
-    }
 
     debouncer
         .watcher()
@@ -501,15 +463,10 @@ async fn serve(
 
     // initial compilation
     let backend = Some(String::from("inmemory"));
-    let ontology_result = compile(
-        root_dir.clone(),
-        root_files.clone(),
-        data_store.clone(),
-        backend.clone(),
-    );
+    let ontology_result = compile(root_dir.clone(), root_files.clone(), backend.clone());
     match ontology_result {
         Ok(ontology) => {
-            reload_routes(ontology, &dynamic_routers, data_store.as_deref(), &base_url).await;
+            reload_routes(ontology, &dynamic_routers, &base_url).await;
             let _ = reload_tx.send(ChannelMessage::Reload);
         }
         Err(error) => println!("{:?}", error),
@@ -528,21 +485,11 @@ async fn serve(
                         cancellation_token = CancellationToken::new();
                         clear_term(&mut stdout);
 
-                        let ontology_result = compile(
-                            root_dir.clone(),
-                            root_files.clone(),
-                            data_store.clone(),
-                            backend.clone(),
-                        );
+                        let ontology_result =
+                            compile(root_dir.clone(), root_files.clone(), backend.clone());
                         match ontology_result {
                             Ok(ontology) => {
-                                reload_routes(
-                                    ontology,
-                                    &dynamic_routers,
-                                    data_store.as_deref(),
-                                    &base_url,
-                                )
-                                .await;
+                                reload_routes(ontology, &dynamic_routers, &base_url).await;
                                 let _ = reload_tx.send(ChannelMessage::Reload);
                             }
                             Err(error) => {
@@ -567,14 +514,7 @@ struct DynamicRouters {
     domains: Arc<Mutex<Option<axum::Router>>>,
 }
 
-async fn reload_routes(
-    ontology: Ontology,
-    dyn_routers: &DynamicRouters,
-    data_store: Option<&str>,
-    base_url: &str,
-) {
-    check_datastore_domain_has_entities(data_store, &ontology);
-
+async fn reload_routes(ontology: Ontology, dyn_routers: &DynamicRouters, base_url: &str) {
     let ontology = Arc::new(ontology);
     let o = ontology_router(ontology.clone(), &format!("{base_url}/o"));
     let d = domains_router(ontology, &format!("{base_url}/d")).await;

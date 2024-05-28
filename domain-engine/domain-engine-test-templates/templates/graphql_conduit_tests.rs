@@ -15,7 +15,7 @@ use domain_engine_test_utils::{
     unimock::MockFn,
 };
 use ontol_macros::test;
-use ontol_runtime::ontology::{config::DataStoreConfig, Ontology};
+use ontol_runtime::ontology::Ontology;
 use ontol_test_utils::{
     examples::conduit::{BLOG_POST_PUBLIC, CONDUIT_DB, FEED_PUBLIC},
     expect_eq, TestPackages,
@@ -24,7 +24,6 @@ use tracing::info;
 
 fn conduit_db_only() -> TestPackages {
     TestPackages::with_static_sources([CONDUIT_DB])
-        .with_data_store(CONDUIT_DB.0, DataStoreConfig::Default)
 }
 
 async fn make_domain_engine(
@@ -246,8 +245,7 @@ impl ConduitBundle {
     async fn new(mock_clauses: impl unimock::Clause) -> Self {
         let test_packages =
             TestPackages::with_static_sources([BLOG_POST_PUBLIC, FEED_PUBLIC, CONDUIT_DB])
-                .with_roots([BLOG_POST_PUBLIC.0, FEED_PUBLIC.0])
-                .with_data_store(CONDUIT_DB.0, DataStoreConfig::Default);
+                .with_roots([BLOG_POST_PUBLIC.0, FEED_PUBLIC.0]);
 
         let (test, [blog_schema, feed_schema, db_schema]) =
             test_packages.compile_schemas([BLOG_POST_PUBLIC.0, FEED_PUBLIC.0, CONDUIT_DB.0]);

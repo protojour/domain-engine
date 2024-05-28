@@ -10,7 +10,12 @@ use def::Defs;
 use mem::Mem;
 use namespace::Namespaces;
 use ontol_runtime::{
-    ontology::{config::PackageConfig, ontol::TextConstant, Ontology},
+    ontology::{
+        config::{DataStoreConfig, PackageConfig},
+        ontol::TextConstant,
+        Ontology,
+    },
+    resolve_path::ResolverGraph,
     DefId, PackageId,
 };
 use ontology_graph::OntologyGraph;
@@ -51,6 +56,7 @@ mod map_arm_def_inference;
 mod namespace;
 mod ontol_domain;
 mod pattern;
+mod persistence_check;
 mod phf_build;
 mod regex_util;
 mod relation;
@@ -99,7 +105,19 @@ pub fn compile(
     execute_codegen_tasks(&mut compiler);
     compile_all_text_patterns(&mut compiler);
     compiler.relations.sort_property_tables();
+    compiler.persistence_check();
     compiler.check_error()?;
+
+    compiler.package_config_table.clear();
+
+    if let Some(persistent_domain) = compiler.persistent_domain {
+        compiler.package_config_table.insert(
+            persistent_domain,
+            PackageConfig {
+                data_store: Some(DataStoreConfig::Default),
+            },
+        );
+    }
 
     Ok(Compiled { compiler })
 }
@@ -113,6 +131,15 @@ impl<'m> Compiled<'m> {
     /// Convert the compiled code into an ontol_runtime Ontology.
     pub fn into_ontology(self) -> Ontology {
         self.compiler.into_ontology_inner()
+    }
+
+    /// Overwrite the data store config of all persistence domains
+    pub fn override_data_store(&mut self, config: DataStoreConfig) {
+        for (_, pkg_config) in self.compiler.package_config_table.iter_mut() {
+            if pkg_config.data_store.is_some() {
+                pkg_config.data_store = Some(config.clone());
+            }
+        }
     }
 
     /// Get the current ontology graph (which is serde-serializable)
@@ -151,6 +178,11 @@ struct Compiler<'m> {
     entity_ctx: EntityCtx,
 
     codegen_tasks: CodegenTasks<'m>,
+    resolver_graph: ResolverGraph,
+
+    /// The persistent domain, which is inferred at the end of compilation
+    /// TODO: Support multiple
+    persistent_domain: Option<PackageId>,
 
     errors: CompileErrors,
 }
@@ -182,6 +214,8 @@ impl<'m> Compiler<'m> {
             entity_ctx: Default::default(),
             text_patterns: TextPatterns::default(),
             codegen_tasks: Default::default(),
+            resolver_graph: Default::default(),
+            persistent_domain: None,
             errors: Default::default(),
         }
     }

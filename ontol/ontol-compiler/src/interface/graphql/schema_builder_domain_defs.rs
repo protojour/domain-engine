@@ -977,17 +977,26 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 })),
                 connection_ref,
             )
-        } else if let RelParams::Type(_) = meta.relationship.rel_params {
-            todo!("Edge list with rel params");
         } else {
-            let mut unit = self.get_def_type_ref(value_def_id, QLevel::Node);
+            let mut unit = if let RelParams::Type(rel_def_id) = meta.relationship.rel_params {
+                let rel_operator_addr = self
+                    .serde_gen
+                    .gen_addr_lazy(gql_serde_key(rel_def_id))
+                    .unwrap();
+                self.get_def_type_ref(
+                    value_def_id,
+                    QLevel::Edge {
+                        rel_params: Some((rel_def_id, rel_operator_addr)),
+                    },
+                )
+            } else {
+                self.get_def_type_ref(value_def_id, QLevel::Node)
+            };
 
             let value_operator_addr = self
                 .serde_gen
                 .gen_addr_lazy(gql_list_serde_key(value_def_id))
                 .unwrap();
-
-            trace!("Array value operator addr: {value_operator_addr:?}");
 
             if let UnitTypeRef::NativeScalar(native) = &mut unit {
                 native.operator_addr = value_operator_addr;

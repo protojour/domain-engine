@@ -2,6 +2,8 @@ use fnv::FnvHashMap;
 use ontol_runtime::{ontology::domain::ExtendedEntityInfo, DefId};
 
 /// Compiler data structure storing the output of check_entity
+///
+/// "entities" in the ONTOL context are properties that must be persisted together.
 #[derive(Default)]
 pub struct EntityCtx {
     pub entities: FnvHashMap<DefId, ExtendedEntityInfo>,

@@ -62,7 +62,7 @@ pub(super) struct SchemaBuilder<'a, 's, 'c, 'm> {
     /// representation of concrete types
     pub repr_ctx: &'c ReprCtx,
     /// A resolver graph
-    pub resolver_graph: ResolverGraph,
+    pub resolver_graph: &'c ResolverGraph,
     /// cache of which def is member of which unions
     pub union_member_cache: &'c UnionMemberCache,
 
@@ -454,13 +454,8 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
     pub fn add_entity_queries_and_mutations(
         &mut self,
         entity_data: EntityData,
-        data_store_domain: Option<PackageId>,
         fields: &mut IndexMap<std::string::String, FieldData>,
     ) {
-        let Some(data_store_domain) = data_store_domain else {
-            return;
-        };
-
         let type_info = self.partial_ontology.get_type_info(entity_data.node_def_id);
 
         let mutation_result_ref =
@@ -487,7 +482,6 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             self.resolver_graph.probe_path(
                 self.partial_ontology,
                 type_info.def_id,
-                data_store_domain,
                 ProbeOptions {
                     must_be_entity: true,
                     direction,
