@@ -36,17 +36,17 @@ impl<'m> Compiler<'m> {
             .report(self);
         }
 
-        let package_def_id = self.defs.alloc_def_id(package.package_id);
-        self.define_package(package_def_id);
+        let pkg_def_id = self.defs.alloc_def_id(package.package_id);
+        self.define_package(pkg_def_id);
 
         self.packages
             .loaded_packages
-            .insert(package.reference, package_def_id);
+            .insert(package.reference, pkg_def_id);
 
         self.package_config_table
             .insert(package.package_id, package.config);
 
-        let root_defs = package.syntax.lower(src.clone(), Session(self));
+        let root_defs = package.syntax.lower(pkg_def_id, src.clone(), Session(self));
 
         for def_id in root_defs {
             self.type_check().check_def(def_id);

@@ -85,6 +85,9 @@ pub enum Kind {
     #[token(r"=>")]
     FatArrow,
 
+    #[token("domain")]
+    KwDomain,
+
     #[token("use")]
     KwUse,
 
@@ -126,6 +129,9 @@ pub enum Kind {
     //
     // Syntax-level nodes:
     //
+    /// domain statement
+    DomainStatement,
+
     /// use statement
     UseStatement,
 
@@ -275,6 +281,7 @@ impl Display for Kind {
             K![|] => write!(f, "`|`"),
             K![..] => write!(f, "`..`"),
             K![=>] => write!(f, "`=>`"),
+            K![domain] => write!(f, "`domain`"),
             K![use] => write!(f, "`use`"),
             K![def] => write!(f, "`def`"),
             K![rel] => write!(f, "`rel`"),
@@ -289,6 +296,7 @@ impl Display for Kind {
             Kind::Eof => write!(f, "end of file"),
             Kind::Error => write!(f, "error"),
             Kind::Ontol => write!(f, "ontol"),
+            Kind::DomainStatement => write!(f, "domain statement"),
             Kind::UseStatement => write!(f, "use statement"),
             Kind::DefStatement => write!(f, "def statement"),
             Kind::DefBody => write!(f, "def body"),
@@ -328,6 +336,9 @@ impl Display for Kind {
 
 #[macro_export]
 macro_rules! K {
+    [domain] => {
+        Kind::KwDomain
+    };
     [use] => {
         Kind::KwUse
     };

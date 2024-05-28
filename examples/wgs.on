@@ -1,3 +1,8 @@
+/// World Geodetic System 84
+domain wgs (
+    rel .version: '0.1.0'
+)
+
 /// Latitude lines run east-west and are parallel to each other.
 /// If you go north, latitude values increase.
 /// Finally, latitude values (Y-values) range between -90 and +90 degrees.

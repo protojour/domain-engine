@@ -59,12 +59,16 @@ fn statement(p: &mut CstParser) {
     }
 
     let kind = match p.at() {
+        K![domain] => {
+            def_like_statement(K![domain], p);
+            Kind::DomainStatement
+        }
         K![use] => {
             use_statement(p);
             Kind::UseStatement
         }
         K![def] => {
-            def_statement(p);
+            def_like_statement(K![def], p);
             Kind::DefStatement
         }
         K![rel] => {
@@ -105,15 +109,15 @@ fn use_statement(p: &mut CstParser) {
     p.end(path);
 }
 
-fn def_statement(p: &mut CstParser) {
-    p.eat(K![def]);
+fn def_like_statement(keyword: Kind, p: &mut CstParser) {
+    p.eat(keyword);
 
     p.eat_modifiers();
     p.eat_trivia();
 
-    let path = p.start(Kind::IdentPath);
+    let ident = p.start(Kind::IdentPath);
     p.eat(Kind::Sym);
-    p.end(path);
+    p.end(ident);
 
     p.eat_trivia();
 

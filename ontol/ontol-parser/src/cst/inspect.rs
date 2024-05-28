@@ -99,6 +99,7 @@ macro_rules! node_union {
 nodes!(Node {
     Error,
     Ontol,
+    DomainStatement,
     UseStatement,
     DefStatement,
     DefBody,
@@ -135,6 +136,7 @@ nodes!(Node {
 });
 
 node_union!(Statement {
+    DomainStatement,
     UseStatement,
     DefStatement,
     RelStatement,
@@ -177,6 +179,16 @@ pub enum TypeModOrPattern<V> {
 impl<V: NodeView> Ontol<V> {
     pub fn statements(&self) -> impl Iterator<Item = Statement<V>> {
         self.view().sub_nodes().filter_map(Statement::from_view)
+    }
+}
+
+impl<V: NodeView> DomainStatement<V> {
+    pub fn ident_path(&self) -> Option<IdentPath<V>> {
+        self.view().sub_nodes().find_map(IdentPath::from_view)
+    }
+
+    pub fn body(&self) -> Option<DefBody<V>> {
+        self.view().sub_nodes().find_map(DefBody::from_view)
     }
 }
 

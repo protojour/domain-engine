@@ -24,6 +24,7 @@ use crate::{
 
 pub struct LoweringCtx<'c, 'm> {
     pub compiler: &'c mut Compiler<'m>,
+    pub pkg_def_id: DefId,
     pub package_id: PackageId,
     pub source_id: SourceId,
     pub root_defs: Vec<DefId>,

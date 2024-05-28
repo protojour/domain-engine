@@ -97,28 +97,30 @@ pub fn extract_ontol_dependentices<V: NodeView>(ontol_view: V) -> Vec<(PackageRe
 
     if let insp::Node::Ontol(ontol) = ontol_view.node() {
         for statement in ontol.statements() {
-            if let insp::Statement::UseStatement(use_stmt) = statement {
-                if use_stmt
-                    .ident_path()
-                    .and_then(|path| path.symbols().next())
-                    .is_none()
-                {
-                    // avoid processing syntactically invalid statement
-                    continue;
+            match statement {
+                insp::Statement::DomainStatement(_) => continue,
+                insp::Statement::UseStatement(use_stmt) => {
+                    if use_stmt
+                        .ident_path()
+                        .and_then(|path| path.symbols().next())
+                        .is_none()
+                    {
+                        // avoid processing syntactically invalid statement
+                        continue;
+                    }
+
+                    let Some(name) = use_stmt.name() else {
+                        continue;
+                    };
+                    let Some(Ok(text)) = name.text() else {
+                        continue;
+                    };
+
+                    let pkg_ref = PackageReference::Named(text);
+
+                    deps.push((pkg_ref, name.0.span()));
                 }
-
-                let Some(name) = use_stmt.name() else {
-                    continue;
-                };
-                let Some(Ok(text)) = name.text() else {
-                    continue;
-                };
-
-                let pkg_ref = PackageReference::Named(text);
-
-                deps.push((pkg_ref, name.0.span()));
-            } else {
-                break;
+                _ => break,
             }
         }
     }

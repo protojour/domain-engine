@@ -8,6 +8,7 @@ pub enum Token {
     Open(char),
     Close(char),
     Sigil(char),
+    Domain,
     Use,
     Def,
     Rel,
@@ -30,6 +31,7 @@ impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Open(c) | Self::Close(c) | Self::Sigil(c) => write!(f, "`{c}`"),
+            Self::Domain => write!(f, "`domain`"),
             Self::Use => write!(f, "`use`"),
             Self::Def => write!(f, "`def`"),
             Self::Rel => write!(f, "`rel`"),

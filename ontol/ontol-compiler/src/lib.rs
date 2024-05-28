@@ -229,12 +229,13 @@ impl<'m> Index<TextConstant> for Compiler<'m> {
 /// Lower the ontol syntax to populate the compiler's data structures
 pub fn lower_ontol_syntax<V: ontol_parser::cst::view::NodeView>(
     ontol_view: V,
+    pkg_def_id: DefId,
     src: Src,
     session: Session,
 ) -> Vec<DefId> {
     use ontol_parser::cst::view::NodeViewExt;
 
-    CstLowering::new(session.0, src)
+    CstLowering::new(pkg_def_id, src, session.0)
         .lower_ontol(ontol_view.node())
         .finish()
 }

@@ -95,6 +95,7 @@ pub fn ast_lex(input: &str) -> (Vec<Spanned<Token>>, Vec<ParserError>) {
                     | Kind::Pipe => Token::Sigil(lexer.slice().chars().next().unwrap()),
                     Kind::DotDot => Token::DotDot,
                     Kind::FatArrow => Token::FatArrow,
+                    Kind::KwDomain => Token::Domain,
                     Kind::KwUse => Token::Use,
                     Kind::KwDef => Token::Def,
                     Kind::KwRel => Token::Rel,
@@ -123,6 +124,7 @@ pub fn ast_lex(input: &str) -> (Vec<Spanned<Token>>, Vec<ParserError>) {
                     | Kind::Eof
                     | Kind::Error
                     | Kind::Ontol
+                    | Kind::DomainStatement
                     | Kind::UseStatement
                     | Kind::DefStatement
                     | Kind::DefBody

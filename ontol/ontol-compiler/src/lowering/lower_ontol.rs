@@ -14,17 +14,26 @@ use super::context::{
 };
 
 enum PreDefinedStmt<V> {
+    Domain(insp::DomainStatement<V>),
     Def(DefId, insp::DefStatement<V>),
     Rel(insp::RelStatement<V>),
     Fmt(insp::FmtStatement<V>),
     Map(insp::MapStatement<V>),
 }
 
+/// General section of an ONTOL document
+enum Section {
+    Domain,
+    Use,
+    Body,
+}
+
 impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
-    pub fn new(compiler: &'c mut Compiler<'m>, src: Src) -> Self {
+    pub fn new(pkg_def_id: DefId, src: Src, compiler: &'c mut Compiler<'m>) -> Self {
         Self {
             ctx: LoweringCtx {
                 compiler,
+                pkg_def_id,
                 package_id: src.package_id,
                 source_id: src.id,
                 root_defs: Default::default(),
@@ -45,10 +54,11 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         };
 
         let mut pre_defined_statements = vec![];
+        let mut section = Section::Domain;
 
         // first pass: Register all named definitions into the namespace
         for statement in ontol.statements() {
-            if let Some(pre_defined) = self.pre_define_statement(statement) {
+            if let Some(pre_defined) = self.pre_define_statement(statement, &mut section) {
                 pre_defined_statements.push(pre_defined);
             }
         }
@@ -69,6 +79,10 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         block_context: BlockContext,
     ) -> Option<RootDefs> {
         match statement {
+            insp::Statement::DomainStatement(stmt) => {
+                self.append_documentation(self.ctx.pkg_def_id, stmt.0);
+                None
+            }
             insp::Statement::UseStatement(_use_stmt) => None,
             insp::Statement::DefStatement(def_stmt) => {
                 let ident_token = def_stmt.ident_path()?.symbols().next()?;
@@ -126,8 +140,34 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         Some(root_defs)
     }
 
-    fn pre_define_statement(&mut self, statement: insp::Statement<V>) -> Option<PreDefinedStmt<V>> {
+    fn pre_define_statement(
+        &mut self,
+        statement: insp::Statement<V>,
+        section: &mut Section,
+    ) -> Option<PreDefinedStmt<V>> {
+        match &statement {
+            insp::Statement::DomainStatement(stmt) => {
+                if !matches!(section, Section::Domain) {
+                    CompileError::TODO("misplaced domain header")
+                        .span_report(stmt.view().span(), &mut self.ctx);
+                }
+
+                *section = Section::Use;
+            }
+            insp::Statement::UseStatement(stmt) => {
+                if !matches!(section, Section::Domain | Section::Use) {
+                    CompileError::TODO("misplaced use statement")
+                        .span_report(stmt.view().span(), &mut self.ctx);
+                }
+                *section = Section::Use;
+            }
+            _ => {
+                *section = Section::Body;
+            }
+        }
+
         match statement {
+            insp::Statement::DomainStatement(stmt) => Some(PreDefinedStmt::Domain(stmt)),
             insp::Statement::UseStatement(use_stmt) => {
                 let name = use_stmt.name()?;
                 let name_text = name.text().and_then(|result| self.ctx.unescape(result))?;
@@ -184,6 +224,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         block_context: BlockContext,
     ) -> Option<RootDefs> {
         match stmt {
+            PreDefinedStmt::Domain(_) => None,
             PreDefinedStmt::Def(def_id, def_stmt) => self.lower_def_body(def_id, def_stmt),
             PreDefinedStmt::Rel(rel_stmt) => self.lower_statement(rel_stmt.into(), block_context),
             PreDefinedStmt::Fmt(fmt_stmt) => self.lower_statement(fmt_stmt.into(), block_context),

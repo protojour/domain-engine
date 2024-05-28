@@ -15,7 +15,7 @@ use crate::{
 /// the methods of the trait.
 pub trait OntolSyntax: UnwindSafe {
     fn dependencies(&self) -> Vec<(PackageReference, U32Span)>;
-    fn lower(&self, src: Src, session: Session) -> Vec<DefId>;
+    fn lower(&self, pkg_def_id: DefId, src: Src, session: Session) -> Vec<DefId>;
 }
 
 /// An ontol_parser native syntax tree.
@@ -29,7 +29,12 @@ impl<S: Borrow<String> + UnwindSafe> OntolSyntax for OntolTreeSyntax<S> {
         extract_ontol_dependentices(self.tree.view(self.source_text.borrow()))
     }
 
-    fn lower(&self, src: Src, session: Session) -> Vec<DefId> {
-        lower_ontol_syntax(self.tree.view(self.source_text.borrow()), src, session)
+    fn lower(&self, pkg_def_id: DefId, src: Src, session: Session) -> Vec<DefId> {
+        lower_ontol_syntax(
+            self.tree.view(self.source_text.borrow()),
+            pkg_def_id,
+            src,
+            session,
+        )
     }
 }
