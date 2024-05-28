@@ -900,3 +900,10 @@ async fn test_graphql_conduit_feed_public_with_items_query() {
         })),
     );
 }
+
+#[test(tokio::test)]
+async fn test_graphql_conduit_feed_public_is_immutable() {
+    let test = ConduitBundle::new(()).await;
+
+    assert!(test.feed_schema.schema.mutation_type().is_none());
+}
