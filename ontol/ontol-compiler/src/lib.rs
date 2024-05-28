@@ -135,6 +135,7 @@ struct Compiler<'m> {
 
     namespaces: Namespaces<'m>,
     defs: Defs<'m>,
+    package_def_ids: FnvHashMap<PackageId, DefId>,
     package_config_table: FnvHashMap<PackageId, PackageConfig>,
     primitives: Primitives,
     patterns: Patterns,
@@ -167,6 +168,7 @@ impl<'m> Compiler<'m> {
             package_names: Default::default(),
             namespaces: Default::default(),
             defs,
+            package_def_ids: Default::default(),
             package_config_table: Default::default(),
             primitives,
             patterns: Default::default(),

@@ -556,7 +556,7 @@ impl<'a> SelectAnalyzer<'a> {
             | ObjectKind::Connection(_)
             | ObjectKind::PageInfo
             | ObjectKind::MutationResult
-            | ObjectKind::Query
+            | ObjectKind::Query { .. }
             | ObjectKind::Mutation => panic!("Bug in ONTOL interface schema"),
         }
     }

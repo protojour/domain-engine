@@ -146,9 +146,9 @@ impl TypeData {
                 ..
             }) => None,
             TypeKind::Object(ObjectData {
-                kind: ObjectKind::Query,
+                kind: ObjectKind::Query { domain_def_id },
                 ..
-            }) => None,
+            }) => ontology.get_docs(*domain_def_id),
             TypeKind::Object(ObjectData {
                 kind: ObjectKind::Mutation,
                 ..
@@ -211,7 +211,7 @@ pub enum ObjectKind {
     Connection(ConnectionData),
     PageInfo,
     MutationResult,
-    Query,
+    Query { domain_def_id: DefId },
     Mutation,
 }
 

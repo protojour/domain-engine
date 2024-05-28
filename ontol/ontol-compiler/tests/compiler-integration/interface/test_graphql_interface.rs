@@ -2,12 +2,14 @@ use assert_matches::assert_matches;
 use ontol_macros::test;
 use ontol_runtime::{
     debug::NoFmt,
-    interface::graphql::{
-        data::{FieldKind, NativeScalarKind, ObjectData, TypeData},
-        schema::{GraphqlSchema, QueryLevel},
-    },
     interface::{
-        graphql::data::{ObjectInterface, TypeKind},
+        graphql::{
+            data::{
+                FieldKind, NativeScalarKind, ObjectData, ObjectInterface, ObjectKind, TypeData,
+                TypeKind,
+            },
+            schema::{GraphqlSchema, QueryLevel},
+        },
         serde::operator::SerdeOperator,
     },
     ontology::config::DataStoreConfig,
@@ -21,6 +23,30 @@ use ontol_test_utils::{
     },
     OntolTest, SrcName, TestCompile, TestPackages,
 };
+
+#[test]
+fn test_domain_docs_as_query_docs() {
+    "
+    /// Domain docs
+    domain foo ()
+
+    def foo (
+        rel .id: (fmt '' => text => .)
+        rel .'prop': i64
+    )
+    "
+    .compile_then(|test| {
+        let (_schema, test) = schema_test(&test, SrcName::default());
+        let ontology = test.test.ontology();
+        let query_data = test.query_object_data();
+        let ObjectKind::Query { domain_def_id } = &query_data.kind else {
+            panic!();
+        };
+
+        let docs = &ontology[ontology.get_docs(*domain_def_id).unwrap()];
+        assert_eq!(docs, "Domain docs");
+    });
+}
 
 #[test]
 fn test_graphql_small_range_number_becomes_int() {

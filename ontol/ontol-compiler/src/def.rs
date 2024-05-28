@@ -430,6 +430,7 @@ impl<'m> Compiler<'m> {
 
     pub fn define_package(&mut self, package_def_id: DefId) -> DefId {
         let package_id = package_def_id.package_id();
+        self.package_def_ids.insert(package_id, package_def_id);
         self.defs.table.insert(
             package_def_id,
             Def {

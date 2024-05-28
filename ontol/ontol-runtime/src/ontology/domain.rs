@@ -16,6 +16,8 @@ use super::ontol::{TextConstant, ValueGenerator};
 /// A domain in the ONTOL ontology.
 #[derive(Serialize, Deserialize)]
 pub struct Domain {
+    def_id: DefId,
+
     unique_name: TextConstant,
 
     /// Types by DefId.1 (the type's index within the domain)
@@ -23,11 +25,16 @@ pub struct Domain {
 }
 
 impl Domain {
-    pub fn new(unique_name: TextConstant) -> Self {
+    pub fn new(def_id: DefId, unique_name: TextConstant) -> Self {
         Self {
+            def_id,
             unique_name,
             info: Default::default(),
         }
+    }
+
+    pub fn def_id(&self) -> DefId {
+        self.def_id
     }
 
     pub fn unique_name(&self) -> TextConstant {

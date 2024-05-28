@@ -1,3 +1,6 @@
+/// The conduit persistence layer
+domain conduit_db ()
+
 def user_id (rel .is: uuid)
 def slug (rel.is: text)
 def tag (rel.is: text)

@@ -107,7 +107,7 @@ pub fn generate_graphql_schema<'c>(
     let mut query_fields: IndexMap<String, FieldData> = Default::default();
     let mut mutation_fields: IndexMap<String, FieldData> = Default::default();
 
-    builder.register_fundamental_types();
+    builder.register_fundamental_types(package_id, partial_ontology);
     builder.register_standard_queries(&mut query_fields);
 
     for type_info in domain.type_infos() {

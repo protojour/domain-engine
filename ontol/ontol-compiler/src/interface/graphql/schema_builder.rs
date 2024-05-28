@@ -163,14 +163,20 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         }
     }
 
-    pub fn register_fundamental_types(&mut self) {
+    pub fn register_fundamental_types(
+        &mut self,
+        package_id: PackageId,
+        partial_ontology: &'c Ontology,
+    ) {
         self.schema.query = self.schema.push_type_data(TypeData {
             typename: self.serde_gen.strings.intern_constant("Query"),
             input_typename: None,
             partial_input_typename: None,
             kind: TypeKind::Object(ObjectData {
                 fields: Default::default(),
-                kind: ObjectKind::Query,
+                kind: ObjectKind::Query {
+                    domain_def_id: partial_ontology.find_domain(package_id).unwrap().def_id(),
+                },
                 interface: ObjectInterface::Implements(thin_vec![]),
             }),
         });

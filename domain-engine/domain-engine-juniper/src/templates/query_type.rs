@@ -28,9 +28,13 @@ impl juniper::GraphQLType<GqlScalar> for QueryType {
         let mut reg = RegistryCtx::new(&info.schema_ctx, registry);
         let fields = reg.get_fields(info.type_addr);
 
-        registry
-            .build_object_type::<Self>(info, &fields)
-            .into_meta()
+        let mut builder = registry.build_object_type::<Self>(info, &fields);
+
+        if let Some(docs) = info.docs_str() {
+            builder = builder.description(docs);
+        }
+
+        builder.into_meta()
     }
 }
 

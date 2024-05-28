@@ -224,7 +224,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         block_context: BlockContext,
     ) -> Option<RootDefs> {
         match stmt {
-            PreDefinedStmt::Domain(_) => None,
+            PreDefinedStmt::Domain(stmt) => self.lower_statement(stmt.into(), block_context),
             PreDefinedStmt::Def(def_id, def_stmt) => self.lower_def_body(def_id, def_stmt),
             PreDefinedStmt::Rel(rel_stmt) => self.lower_statement(rel_stmt.into(), block_context),
             PreDefinedStmt::Fmt(fmt_stmt) => self.lower_statement(fmt_stmt.into(), block_context),

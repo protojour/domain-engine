@@ -128,10 +128,11 @@ impl<'m> Compiler<'m> {
 
         // For now, create serde operators for every domain
         for package_id in package_ids.iter().cloned() {
+            let domain_def_id = self.package_def_ids.get(&package_id).cloned().unwrap();
             let domain_name = *unique_domain_names
                 .get(&package_id)
                 .expect("Anonymous domain");
-            let mut domain = Domain::new(domain_name);
+            let mut domain = Domain::new(domain_def_id, domain_name);
 
             let namespace = namespaces.remove(&package_id).unwrap();
             let type_namespace = namespace.types;
