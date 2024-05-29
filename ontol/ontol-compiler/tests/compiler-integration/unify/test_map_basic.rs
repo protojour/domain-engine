@@ -63,8 +63,8 @@ fn test_meters() {
     def meters (rel .is: i64)
     def millimeters (rel .is: i64)
     map(
-        meters(x / 1000),
-        millimeters(x),
+        millimeters(m * 1000),
+        meters(m),
     )
     "
     .compile_then(|test| {
@@ -78,18 +78,26 @@ fn test_meters() {
 #[test]
 fn test_temperature() {
     "
-    def celsius (rel .is: i64)
-    def fahrenheit (rel .is: i64)
+    def celsius (rel .is: f64)
+    def fahrenheit (rel .is: f64)
     map(
-        celsius(x),
-        fahrenheit(x * 9 / 5 + 32),
+        fahrenheit(c * 9 / 5 + 32),
+        celsius(c),
     )
     "
     .compile_then(|test| {
+        let c_to_f = ("celsius", "fahrenheit");
+
+        test.mapper().assert_map_eq(c_to_f, json!(10), json!(50.0));
+        test.mapper().assert_map_eq(c_to_f, json!(0), json!(32.0));
         test.mapper()
-            .assert_map_eq(("celsius", "fahrenheit"), json!(10), json!(50));
+            .assert_map_eq(c_to_f, json!(100), json!(212.0));
+        test.mapper().assert_map_eq(c_to_f, json!(37), json!(98.6));
         test.mapper()
-            .assert_map_eq(("fahrenheit", "celsius"), json!(50), json!(10));
+            .assert_map_eq(c_to_f, json!(-273.15), json!(-459.67));
+
+        let f_to_c = ("fahrenheit", "celsius");
+        test.mapper().assert_map_eq(f_to_c, json!(50), json!(10.0));
     });
 }
 
