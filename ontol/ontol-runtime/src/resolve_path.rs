@@ -4,7 +4,7 @@ use crate::{
     DefId, MapDef, MapDefFlags, MapDirection, MapFlags, MapKey,
 };
 use fnv::{FnvHashMap, FnvHashSet};
-use tracing::{debug, trace};
+use tracing::trace;
 
 #[derive(Debug)]
 pub struct ResolvePath {
@@ -336,25 +336,15 @@ fn cross_domain_edge_counts(graph: &Graph) -> FnvHashMap<DefId, u32> {
     for (input, edges) in graph {
         let count = counts.entry(*input).or_default();
 
-        if true {
-            if edges
-                .iter()
-                .any(|(map_def, _)| map_def.def_id.package_id() != input.package_id())
-            {
-                *count += 1;
-            }
-        } else {
-            for edge in edges {
-                let count = counts.entry(edge.0.def_id).or_default();
-
-                if edge.0.def_id.package_id() != input.package_id() {
-                    *count += 1;
-                }
-            }
+        if edges
+            .iter()
+            .any(|(map_def, _)| map_def.def_id.package_id() != input.package_id())
+        {
+            *count += 1;
         }
     }
 
-    debug!("edge_counts: {counts:#?}");
+    trace!("edge_counts: {counts:#?}");
 
     counts
 }
