@@ -19,3 +19,23 @@ domain SI (
 def meter (
     rel .is: number
 )
+
+/// The millimeter is defined as 1/1000 of a meter.
+def millimeter (
+    rel .is: number
+)
+
+/// The kilometer is defined as 1000 meters.
+def kilometer (
+    rel .is: number
+)
+
+map @abstract(
+    millimeter(m * 1000),
+    meter(m),
+)
+
+map @abstract(
+    kilometer(m / 1000),
+    meter(m),
+)
