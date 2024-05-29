@@ -4,10 +4,10 @@ use ontol_runtime::{var::VarAllocator, DefId};
 use crate::{
     arm_span,
     codegen::{
-        task::{MapCodegenRequest, OntolMap, OntolMapArms},
+        task::{AbstractTemplate, MapCodegenRequest, OntolMap, OntolMapArms},
         type_mapper::TypeMapper,
     },
-    def::{Def, DefKind},
+    def::DefKind,
     error::CompileError,
     map::UndirectedMapKey,
     mem::Intern,
@@ -16,7 +16,7 @@ use crate::{
     type_check::hir_build_ctx::{Arm, VariableMapping},
     typed_hir::TypedRootNode,
     types::{Type, TypeRef},
-    Note,
+    Note, SourceSpan,
 };
 
 use super::{
@@ -25,7 +25,7 @@ use super::{
     hir_build_props::MatchAttributeKey,
     hir_type_inference::{HirArmTypeInference, HirVariableMapper},
     map_arm_analyze::PreAnalyzer,
-    TypeCheck, TypeEquation, TypeError,
+    MapArmsKind, TypeCheck, TypeEquation, TypeError,
 };
 
 pub enum MapOutputClass {
@@ -51,12 +51,12 @@ pub enum CheckMapError {
 impl<'c, 'm> TypeCheck<'c, 'm> {
     pub fn check_map(
         &mut self,
-        def: &Def,
+        map_def: (DefId, SourceSpan),
         var_allocator: &VarAllocator,
         pat_ids: [PatId; 2],
-        is_abstract: bool,
+        arms_kind: MapArmsKind,
     ) -> Result<TypeRef<'m>, CheckMapError> {
-        if is_abstract {
+        if matches!(arms_kind, MapArmsKind::Abstract) {
             let upper = self.expect_pattern_abstract_def_id(pat_ids[0]);
             let lower = self.expect_pattern_abstract_def_id(pat_ids[1]);
 
@@ -66,17 +66,25 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.codegen_tasks.add_map_task(
                     key_pair,
                     MapCodegenRequest::ExplicitOntol(OntolMap {
-                        map_def_id: def.id,
-                        arms: OntolMapArms::Abstract(upper, lower),
-                        span: def.span,
+                        map_def_id: map_def.0,
+                        arms: OntolMapArms::Abstract([upper, lower]),
+                        span: map_def.1,
                     }),
                     self.defs,
                     self.errors,
                 );
+
+                self.codegen_tasks.abstract_templates.insert(
+                    key_pair,
+                    AbstractTemplate {
+                        pat_ids,
+                        var_allocator: VarAllocator::from(*var_allocator.peek_next()),
+                    },
+                );
             }
         } else {
             let mut ctx =
-                HirBuildCtx::new(def.span, VarAllocator::from(*var_allocator.peek_next()));
+                HirBuildCtx::new(map_def.1, VarAllocator::from(*var_allocator.peek_next()));
 
             let mut analyzer = PreAnalyzer {
                 errors: self.errors,
@@ -91,8 +99,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
 
             self.build_typed_ontol_hir_arms(
-                def,
-                [(pat_ids[0], Arm::First), (pat_ids[1], Arm::Second)],
+                map_def,
+                [(pat_ids[0], Arm::Upper), (pat_ids[1], Arm::Lower)],
+                arms_kind,
                 &mut ctx,
             )?;
 
@@ -104,21 +113,22 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn build_typed_ontol_hir_arms(
         &mut self,
-        def: &Def,
+        map_def: (DefId, SourceSpan),
         input: [(PatId, Arm); 2],
+        arms_kind: MapArmsKind,
         ctx: &mut HirBuildCtx<'m>,
     ) -> Result<(), CheckMapError> {
         let mut arm_nodes = input.map(|(pat_id, arm)| {
             let _entered = arm_span!(arm).entered();
 
             ctx.current_arm = arm;
-            let mut root_node = self.build_root_pattern(pat_id, ctx);
+            let mut root_node = self.build_root_pattern(pat_id, arms_kind.clone(), ctx);
             self.infer_hir_arm_types(&mut root_node, ctx);
             root_node
         });
 
         // unify the type of variables on either side:
-        self.infer_hir_unify_arms(def, &mut arm_nodes, ctx);
+        self.infer_hir_unify_arms(map_def, &mut arm_nodes, ctx);
 
         if let Some(key_pair) = TypeMapper::new(self.relations, self.defs, self.repr_ctx)
             .find_map_key_pair([arm_nodes[0].data().ty(), arm_nodes[1].data().ty()])
@@ -126,9 +136,9 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             self.codegen_tasks.add_map_task(
                 key_pair,
                 MapCodegenRequest::ExplicitOntol(OntolMap {
-                    map_def_id: def.id,
+                    map_def_id: map_def.0,
                     arms: OntolMapArms::Patterns(arm_nodes),
-                    span: def.span,
+                    span: map_def.1,
                 }),
                 self.defs,
                 self.errors,
@@ -155,7 +165,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
     fn infer_hir_unify_arms(
         &mut self,
-        def: &Def,
+        map_def: (DefId, SourceSpan),
         arm_nodes: &mut [TypedRootNode<'m>; 2],
         ctx: &mut HirBuildCtx<'m>,
     ) {
@@ -192,7 +202,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                         self.codegen_tasks.add_map_task(
                             UndirectedMapKey::new([first_def_id.into(), second_def_id.into()]),
-                            MapCodegenRequest::Auto(def.id.package_id()),
+                            MapCodegenRequest::Auto(map_def.0.package_id()),
                             self.defs,
                             self.errors,
                         );

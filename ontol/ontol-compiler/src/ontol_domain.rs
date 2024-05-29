@@ -2,7 +2,8 @@
 
 use std::ops::Range;
 
-use ontol_runtime::{ontology::ontol::TextLikeType, vm::proc::BuiltinProc, DefId};
+use ontol_hir::OverloadFunc;
+use ontol_runtime::{ontology::ontol::TextLikeType, DefId};
 
 use crate::{
     def::{BuiltinRelationKind, DefKind, TypeDef, TypeDefFlags},
@@ -13,7 +14,7 @@ use crate::{
     relation::{Constructor, RelObjectConstraint, RelTypeConstraints, TypeParam},
     text_patterns::{store_text_pattern_segment, TextPatternSegment},
     thesaurus::TypeRelation,
-    types::{Type, TypeRef},
+    types::{FunctionType, Type, TypeRef},
     Compiler, NO_SPAN,
 };
 
@@ -99,35 +100,20 @@ impl<'m> Compiler<'m> {
 
         self.setup_number_system();
 
-        let i64_ty = *self.def_types.table.get(&self.primitives.i64).unwrap();
-
-        let i64_i64_ty = self.types.intern([i64_ty, i64_ty]);
-
-        let string_ty = *self.def_types.table.get(&self.primitives.text).unwrap();
-        let string_string_ty = self.types.intern([string_ty, string_ty]);
-
-        let i64_i64_to_i64 = self.types.intern(Type::Function {
-            params: i64_i64_ty,
-            output: i64_ty,
-        });
-        let string_string_to_string = self.types.intern(Type::Function {
-            params: string_string_ty,
-            output: string_ty,
-        });
+        let binary_arithmetic = self
+            .types
+            .intern(Type::Function(FunctionType::BinaryArithmetic));
+        let binary_text = self.types.intern(Type::Function(FunctionType::BinaryText));
 
         // built-in functions
         // arithmetic
-        self.def_proc("+", DefKind::Fn(BuiltinProc::Add), i64_i64_to_i64);
-        self.def_proc("-", DefKind::Fn(BuiltinProc::Sub), i64_i64_to_i64);
-        self.def_proc("*", DefKind::Fn(BuiltinProc::Mul), i64_i64_to_i64);
-        self.def_proc("/", DefKind::Fn(BuiltinProc::Div), i64_i64_to_i64);
+        self.def_proc("+", DefKind::Fn(OverloadFunc::Add), binary_arithmetic);
+        self.def_proc("-", DefKind::Fn(OverloadFunc::Sub), binary_arithmetic);
+        self.def_proc("*", DefKind::Fn(OverloadFunc::Mul), binary_arithmetic);
+        self.def_proc("/", DefKind::Fn(OverloadFunc::Div), binary_arithmetic);
 
         // string manipulation
-        self.def_proc(
-            "append",
-            DefKind::Fn(BuiltinProc::Append),
-            string_string_to_string,
-        );
+        self.def_proc("append", DefKind::Fn(OverloadFunc::Append), binary_text);
 
         self.def_uuid();
         self.def_datetime();

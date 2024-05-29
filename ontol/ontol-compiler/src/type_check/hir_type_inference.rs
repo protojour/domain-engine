@@ -58,8 +58,8 @@ impl<'c, 'm> HirVariableMapper<'c, 'm> {
                     Some(VariableMapping::Mapping(types)) => {
                         let arm = self.arm;
                         let mapped_type = match arm {
-                            Arm::First => types[1],
-                            Arm::Second => types[0],
+                            Arm::Upper => types[1],
+                            Arm::Lower => types[0],
                         };
 
                         // Make a new node which is the new var reference

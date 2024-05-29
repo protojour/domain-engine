@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 
+use fnv::FnvHashSet;
 use ontol_runtime::{
     value::Attribute,
     var::{Var, VarAllocator},
     DefId, PackageId,
 };
+use tracing::debug;
 
 use crate::{
     def::DefKind,
@@ -12,11 +14,14 @@ use crate::{
     relation::Constructor,
     repr::repr_model::ReprKind,
     text_patterns::TextPatternSegment,
+    thesaurus::TypeRelation,
     typed_hir::{IntoTypedHirData, Meta, TypedArena, TypedHir, TypedHirData, TypedRootNode},
     Compiler, NO_SPAN,
 };
 
-use super::task::{ExplicitMapCodegenTask, OntolMap, OntolMapArms};
+use super::task::{
+    AbstractTemplate, AbstractTemplateApplication, ExplicitMapCodegenTask, OntolMap, OntolMapArms,
+};
 
 pub fn autogenerate_mapping<'m>(
     key_pair: UndirectedMapKey,
@@ -84,30 +89,136 @@ pub fn autogenerate_mapping<'m>(
                 backward_extern: None,
             })
         }
+        (Constructor::Transparent, Constructor::Transparent) => {
+            // search for abstract template
+            let mut applicable_templates = vec![];
+
+            let mut first_set: FnvHashSet<DefId> = Default::default();
+            let mut second_set: FnvHashSet<DefId> = Default::default();
+
+            for (first, _) in compiler.thesaurus.entries(first_def_id, &compiler.defs) {
+                for (second, _) in compiler.thesaurus.entries(second_def_id, &compiler.defs) {
+                    if matches!(
+                        (&first.rel, &second.rel),
+                        (TypeRelation::Super, TypeRelation::Super)
+                    ) {
+                        first_set.insert(first.def_id);
+                        second_set.insert(second.def_id);
+
+                        let undirected_key =
+                            UndirectedMapKey::new([first.def_id.into(), second.def_id.into()]);
+
+                        if let Some(template) = compiler
+                            .codegen_tasks
+                            .abstract_templates
+                            .get(&undirected_key)
+                        {
+                            applicable_templates.push(AbstractTemplate {
+                                pat_ids: template.pat_ids,
+                                var_allocator: VarAllocator::from(
+                                    *template.var_allocator.peek_next(),
+                                ),
+                            });
+                        }
+                    }
+                }
+            }
+
+            if first_set == second_set && !first_set.is_empty() && !second_set.is_empty() {
+                // Generate "pun" body
+                let var = Var(0);
+                let mut upper_arena: TypedArena<'m> = Default::default();
+                let mut lower_arena: TypedArena<'m> = Default::default();
+
+                let upper_node = upper_arena.add(TypedHirData(
+                    ontol_hir::Kind::Var(var),
+                    Meta {
+                        ty: &compiler.def_types.table.get(&first_def_id).unwrap(),
+                        span: NO_SPAN,
+                    },
+                ));
+                let lower_node = lower_arena.add(TypedHirData(
+                    ontol_hir::Kind::Var(var),
+                    Meta {
+                        ty: compiler.def_types.table.get(&second_def_id).unwrap(),
+                        span: NO_SPAN,
+                    },
+                ));
+
+                return Some(ExplicitMapCodegenTask {
+                    ontol_map: Some(OntolMap {
+                        map_def_id: compiler.defs.add_def(
+                            DefKind::AutoMapping,
+                            package_id,
+                            NO_SPAN,
+                        ),
+                        arms: OntolMapArms::Patterns([
+                            ontol_hir::RootNode::new(upper_node, upper_arena),
+                            ontol_hir::RootNode::new(lower_node, lower_arena),
+                        ]),
+                        span: NO_SPAN,
+                    }),
+                    forward_extern: None,
+                    backward_extern: None,
+                });
+            }
+
+            match applicable_templates.len() {
+                0 => {
+                    debug!("no applicable abstract template");
+                    None
+                }
+                1 => {
+                    let applied_template = applicable_templates.into_iter().next().unwrap();
+                    let template_application = AbstractTemplateApplication {
+                        pat_ids: applied_template.pat_ids,
+                        def_ids: [first_def_id, second_def_id],
+                        var_allocator: applied_template.var_allocator,
+                    };
+
+                    Some(ExplicitMapCodegenTask {
+                        ontol_map: Some(OntolMap {
+                            map_def_id: compiler.defs.add_def(
+                                DefKind::AutoMapping,
+                                package_id,
+                                NO_SPAN,
+                            ),
+                            arms: OntolMapArms::Template(template_application),
+                            span: NO_SPAN,
+                        }),
+                        forward_extern: None,
+                        backward_extern: None,
+                    })
+                }
+                _ => {
+                    panic!();
+                }
+            }
+        }
         _ => None,
     }
 }
 
 fn autogenerate_fmt_to_fmt<'m>(
-    first: (DefId, &TextPatternSegment),
-    second: (DefId, &TextPatternSegment),
+    upper: (DefId, &TextPatternSegment),
+    lower: (DefId, &TextPatternSegment),
     compiler: &Compiler<'m>,
 ) -> Option<[TypedRootNode<'m>; 2]> {
     let mut var_allocator = VarAllocator::default();
-    let first_var = var_allocator.alloc();
-    let second_var = var_allocator.alloc();
+    let upper_var = var_allocator.alloc();
+    let lower_var = var_allocator.alloc();
     let mut var_map = Default::default();
 
     let first_node = autogenerate_fmt_hir_struct(
         Some(&mut var_allocator),
-        first.0,
-        first_var,
-        first.1,
+        upper.0,
+        upper_var,
+        upper.1,
         &mut var_map,
         compiler,
     )?;
     let second_node =
-        autogenerate_fmt_hir_struct(None, second.0, second_var, second.1, &mut var_map, compiler)?;
+        autogenerate_fmt_hir_struct(None, lower.0, lower_var, lower.1, &mut var_map, compiler)?;
 
     Some([first_node, second_node])
 }

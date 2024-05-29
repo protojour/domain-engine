@@ -10,6 +10,7 @@ use ontol_runtime::{
         ontol::TextConstant,
     },
     query::condition::Condition,
+    var::VarAllocator,
     vm::proc::{Address, Lib, NParams, OpCode, Procedure},
     DefId, MapDef, MapDirection, MapFlags, MapKey, PackageId,
 };
@@ -22,6 +23,8 @@ use crate::{
     def::{DefKind, Defs},
     hir_unify::unify_to_function,
     map::UndirectedMapKey,
+    pattern::PatId,
+    type_check::MapArmsKind,
     typed_hir::TypedRootNode,
     types::Type,
     CompileError, CompileErrors, Compiler, Note, SourceSpan,
@@ -41,6 +44,8 @@ pub struct CodegenTasks<'m> {
     const_tasks: Vec<ConstCodegenTask<'m>>,
     map_tasks: IndexMap<UndirectedMapKey, MapCodegenTask<'m>>,
 
+    pub abstract_templates: IndexMap<UndirectedMapKey, AbstractTemplate>,
+
     pub result_lib: Lib,
     pub result_const_procs: FnvHashMap<DefId, Procedure>,
     pub result_map_proc_table: FnvHashMap<MapKey, Procedure>,
@@ -48,6 +53,17 @@ pub struct CodegenTasks<'m> {
     pub result_propflow_table: FnvHashMap<MapKey, Vec<PropertyFlow>>,
     pub result_static_conditions: FnvHashMap<MapKey, Condition>,
     pub result_metadata_table: FnvHashMap<MapKey, MapOutputMeta>,
+}
+
+pub struct AbstractTemplate {
+    pub pat_ids: [PatId; 2],
+    pub var_allocator: VarAllocator,
+}
+
+pub struct AbstractTemplateApplication {
+    pub pat_ids: [PatId; 2],
+    pub def_ids: [DefId; 2],
+    pub var_allocator: VarAllocator,
 }
 
 impl<'m> CodegenTasks<'m> {
@@ -160,7 +176,8 @@ pub struct OntolMap<'m> {
 
 pub enum OntolMapArms<'m> {
     Patterns([TypedRootNode<'m>; 2]),
-    Abstract(DefId, DefId),
+    Abstract([DefId; 2]),
+    Template(AbstractTemplateApplication),
 }
 
 pub(super) enum MapCodegenTask<'m> {
@@ -212,12 +229,16 @@ impl<'m> Debug for ExplicitMapCodegenTask<'m> {
         if let Some(ontol) = &self.ontol_map {
             match &ontol.arms {
                 OntolMapArms::Patterns(arms) => {
-                    dbg.field("first", &DebugViaDisplay(&arms[0]));
-                    dbg.field("second", &DebugViaDisplay(&arms[1]));
+                    dbg.field("upper", &DebugViaDisplay(&arms[0]));
+                    dbg.field("lower", &DebugViaDisplay(&arms[1]));
                 }
-                OntolMapArms::Abstract(upper, lower) => {
-                    dbg.field("first", &upper);
-                    dbg.field("second", &lower);
+                OntolMapArms::Abstract([upper, lower]) => {
+                    dbg.field("upper", &upper);
+                    dbg.field("lower", &lower);
+                }
+                OntolMapArms::Template(template) => {
+                    dbg.field("upper", &template.pat_ids[0]);
+                    dbg.field("lower", &template.pat_ids[1]);
                 }
             }
         }
@@ -265,29 +286,44 @@ pub(super) enum ProcedureCall {
 
 /// Perform all codegen tasks
 pub fn execute_codegen_tasks(compiler: &mut Compiler) {
-    let mut explicit_map_tasks = Vec::with_capacity(compiler.codegen_tasks.map_tasks.len());
     let mut proc_table = ProcTable::default();
 
-    for (key, map_task) in std::mem::take(&mut compiler.codegen_tasks.map_tasks) {
-        match map_task {
-            MapCodegenTask::Auto(package_id) => {
-                if let Some(task) = autogenerate_mapping(key, package_id, compiler) {
-                    explicit_map_tasks.push((key, task));
+    let mut run = 0;
+
+    while !compiler.codegen_tasks.map_tasks.is_empty()
+        || !compiler.codegen_tasks.const_tasks.is_empty()
+    {
+        let mut explicit_map_tasks = Vec::with_capacity(compiler.codegen_tasks.map_tasks.len());
+
+        for (key, task) in std::mem::take(&mut compiler.codegen_tasks.map_tasks) {
+            match task {
+                MapCodegenTask::Auto(package_id) => {
+                    let _entered = debug_span!("auto_map", run, pkg = ?package_id.0).entered();
+
+                    if let Some(task) = autogenerate_mapping(key, package_id, compiler) {
+                        explicit_map_tasks.push((key, task));
+                    }
+                }
+                MapCodegenTask::Explicit(explicit) => {
+                    explicit_map_tasks.push((key, explicit));
                 }
             }
-            MapCodegenTask::Explicit(explicit) => {
-                explicit_map_tasks.push((key, explicit));
-            }
         }
-    }
 
-    for ConstCodegenTask { def_id, node } in std::mem::take(&mut compiler.codegen_tasks.const_tasks)
-    {
-        const_codegen(node, def_id, &mut proc_table, compiler);
-    }
+        for ConstCodegenTask { def_id, node } in
+            std::mem::take(&mut compiler.codegen_tasks.const_tasks)
+        {
+            const_codegen(node, def_id, &mut proc_table, compiler);
+        }
 
-    for (key, task) in explicit_map_tasks {
-        generate_explicit_map(key, task, &mut proc_table, compiler);
+        for (key, task) in explicit_map_tasks {
+            let _entered =
+                debug_span!("map", run, pkg = ?task.pkg_id().unwrap_or(PackageId(0)).0).entered();
+
+            generate_explicit_map(key, task, &mut proc_table, compiler);
+        }
+
+        run += 1;
     }
 
     generate_union_maps(&mut proc_table, compiler);
@@ -313,9 +349,6 @@ fn generate_explicit_map<'m>(
     proc_table: &mut ProcTable,
     compiler: &mut Compiler<'m>,
 ) {
-    let _entered =
-        debug_span!("pkg", id = ?codegen_task.pkg_id().unwrap_or(PackageId(0)).0).entered();
-
     let ExplicitMapCodegenTask {
         ontol_map,
         forward_extern,
@@ -363,56 +396,23 @@ fn generate_explicit_map<'m>(
     }
 
     if let Some(OntolMap {
-        map_def_id: def_id,
+        map_def_id,
         arms,
         span,
     }) = ontol_map
     {
         match arms {
             OntolMapArms::Patterns(arms) => {
-                debug!("1st (ty={:?}):\n{}", arms[0].data().ty(), arms[0]);
-                debug!("2nd (ty={:?}):\n{}", arms[1].data().ty(), arms[1]);
-
-                let down_key = {
-                    let _entered = debug_span!("down").entered();
-                    generate_ontol_map_procs(
-                        &arms[0],
-                        &arms[1],
-                        MapDirection::Down,
-                        &externed_outputs,
-                        proc_table,
-                        compiler,
-                    )
-                };
-
-                {
-                    let _entered = debug_span!("up").entered();
-                    generate_ontol_map_procs(
-                        &arms[1],
-                        &arms[0],
-                        MapDirection::Up,
-                        &externed_outputs,
-                        proc_table,
-                        compiler,
-                    );
-                }
-
-                match (compiler.map_ident(def_id), down_key) {
-                    (Some(ident), Some(down_key)) => {
-                        let ident_constant = compiler.strings.intern_constant(ident);
-                        proc_table
-                            .named_downmaps
-                            .insert((def_id.package_id(), ident_constant), down_key);
-                    }
-                    (Some(_), None) => {
-                        CompileError::BUG("Failed to generate forward mapping")
-                            .span(span)
-                            .report(compiler);
-                    }
-                    _ => {}
-                }
+                generate_pattern_map(
+                    map_def_id,
+                    arms,
+                    span,
+                    &externed_outputs,
+                    proc_table,
+                    compiler,
+                );
             }
-            OntolMapArms::Abstract(upper, lower) => {
+            OntolMapArms::Abstract([upper, lower]) => {
                 proc_table.metadata_table.insert(
                     MapKey {
                         input: upper.into(),
@@ -436,7 +436,69 @@ fn generate_explicit_map<'m>(
                     },
                 );
             }
+            OntolMapArms::Template(application) => {
+                let _entered = debug_span!("tmpl").entered();
+
+                let map_def_span = compiler.defs.def_span(map_def_id);
+                let _ = compiler.type_check().check_map(
+                    (map_def_id, map_def_span),
+                    &application.var_allocator,
+                    application.pat_ids,
+                    MapArmsKind::Template(application.def_ids),
+                );
+            }
         }
+    }
+}
+
+fn generate_pattern_map<'m>(
+    map_def_id: DefId,
+    arms: [TypedRootNode<'m>; 2],
+    span: SourceSpan,
+    externed_outputs: &FnvHashSet<DefId>,
+    proc_table: &mut ProcTable,
+    compiler: &mut Compiler<'m>,
+) {
+    debug!("1st (ty={:?}):\n{}", arms[0].data().ty(), arms[0]);
+    debug!("2nd (ty={:?}):\n{}", arms[1].data().ty(), arms[1]);
+
+    let down_key = {
+        let _entered = debug_span!("down").entered();
+        generate_ontol_map_procs(
+            &arms[0],
+            &arms[1],
+            MapDirection::Down,
+            externed_outputs,
+            proc_table,
+            compiler,
+        )
+    };
+
+    {
+        let _entered = debug_span!("up").entered();
+        generate_ontol_map_procs(
+            &arms[1],
+            &arms[0],
+            MapDirection::Up,
+            externed_outputs,
+            proc_table,
+            compiler,
+        );
+    }
+
+    match (compiler.map_ident(map_def_id), down_key) {
+        (Some(ident), Some(down_key)) => {
+            let ident_constant = compiler.strings.intern_constant(ident);
+            proc_table
+                .named_downmaps
+                .insert((map_def_id.package_id(), ident_constant), down_key);
+        }
+        (Some(_), None) => {
+            CompileError::BUG("Failed to generate forward mapping")
+                .span(span)
+                .report(compiler);
+        }
+        _ => {}
     }
 }
 

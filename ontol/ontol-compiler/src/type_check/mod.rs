@@ -43,6 +43,14 @@ pub struct TypeEquation<'m> {
     expected: KnownType<'m>,
 }
 
+#[derive(Clone)]
+pub enum MapArmsKind {
+    Concrete,
+    Abstract,
+    /// Instantiation of an abstract map
+    Template([DefId; 2]),
+}
+
 /// Type checking is a stage in compilation.
 /// It is not only an immutable "check" of typing,
 /// but also actually produces more output for later compile stages.

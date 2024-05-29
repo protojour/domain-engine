@@ -425,21 +425,37 @@ impl<'o> Processor for OntolProcessor<'o> {
 impl<'o> OntolProcessor<'o> {
     fn eval_builtin(&mut self, proc: BuiltinProc, result_type: DefId) -> Value {
         match proc {
-            BuiltinProc::Add => {
+            BuiltinProc::AddI64 => {
                 let [b, a]: [i64; 2] = self.pop_n();
                 Value::I64(a + b, result_type)
             }
-            BuiltinProc::Sub => {
+            BuiltinProc::SubI64 => {
                 let [b, a]: [i64; 2] = self.pop_n();
                 Value::I64(a - b, result_type)
             }
-            BuiltinProc::Mul => {
+            BuiltinProc::MulI64 => {
                 let [b, a]: [i64; 2] = self.pop_n();
                 Value::I64(a * b, result_type)
             }
-            BuiltinProc::Div => {
+            BuiltinProc::DivI64 => {
                 let [b, a]: [i64; 2] = self.pop_n();
                 Value::I64(a / b, result_type)
+            }
+            BuiltinProc::AddF64 => {
+                let [b, a]: [f64; 2] = self.pop_n();
+                Value::F64(a + b, result_type)
+            }
+            BuiltinProc::SubF64 => {
+                let [b, a]: [f64; 2] = self.pop_n();
+                Value::F64(a - b, result_type)
+            }
+            BuiltinProc::MulF64 => {
+                let [b, a]: [f64; 2] = self.pop_n();
+                Value::F64(a * b, result_type)
+            }
+            BuiltinProc::DivF64 => {
+                let [b, a]: [f64; 2] = self.pop_n();
+                Value::F64(a / b, result_type)
             }
             BuiltinProc::Append => {
                 let [b, a]: [String; 2] = self.pop_n();
@@ -648,14 +664,14 @@ mod tests {
             NParams(1),
             [
                 OpCode::Clone(Local(0)),
-                OpCode::CallBuiltin(BuiltinProc::Add, def_id(0)),
+                OpCode::CallBuiltin(BuiltinProc::AddI64, def_id(0)),
                 OpCode::Return,
             ],
         );
         let add_then_double = lib.append_procedure(
             NParams(2),
             [
-                OpCode::CallBuiltin(BuiltinProc::Add, def_id(0)),
+                OpCode::CallBuiltin(BuiltinProc::AddI64, def_id(0)),
                 OpCode::Call(double),
                 OpCode::Return,
             ],
@@ -724,7 +740,7 @@ mod tests {
                 OpCode::Return,
                 // Offset(4): map item
                 OpCode::I64(2, def_id(0)),
-                OpCode::CallBuiltin(BuiltinProc::Mul, def_id(0)),
+                OpCode::CallBuiltin(BuiltinProc::MulI64, def_id(0)),
                 // add rel params
                 OpCode::CallBuiltin(BuiltinProc::NewUnit, def_id(0)),
                 // pop (rel_params, value), append to sequence

@@ -91,7 +91,7 @@ impl<'c> PreAnalyzer<'c> {
                     ctx,
                 )?);
             }
-            PatternKind::ConstI64(_) | PatternKind::ConstText(_) | PatternKind::ConstBool(_) => {}
+            PatternKind::ConstInt(_) | PatternKind::ConstText(_) | PatternKind::ConstBool(_) => {}
             PatternKind::Error => {}
         };
 
@@ -109,7 +109,7 @@ impl<'c> PreAnalyzer<'c> {
         (group_set, arm_class): (&mut AggrGroupSet, &mut MapOutputClass),
         ctx: &mut HirBuildCtx<'_>,
     ) -> Result<(), CheckMapError> {
-        if ctx.current_arm.is_first() {
+        if ctx.current_arm.is_upper() {
             group_set.add(parent_aggr_group);
 
             for element in elements.iter() {
@@ -237,7 +237,7 @@ impl<'c> PreAnalyzer<'c> {
                 node: inner_node,
                 ..
             } => {
-                if ctx.current_arm.is_first() {
+                if ctx.current_arm.is_upper() {
                     group_set.add(parent_set_element_group);
 
                     // Register aggregation body
@@ -318,7 +318,7 @@ impl<'c> PreAnalyzer<'c> {
     ) {
         if let Some(explicit_variable) = ctx.pattern_variables.get(&var) {
             // Variable is used more than once
-            if ctx.current_arm.is_first()
+            if ctx.current_arm.is_upper()
                 && explicit_variable.set_element_group != parent_set_element_group
             {
                 self.error(CompileError::TODO("Incompatible aggregation group"), span);
@@ -327,7 +327,7 @@ impl<'c> PreAnalyzer<'c> {
             debug!("Join existing bound variable");
 
             group_set.add(explicit_variable.set_element_group);
-        } else if ctx.current_arm.is_first() {
+        } else if ctx.current_arm.is_upper() {
             ctx.pattern_variables.insert(
                 var,
                 PatternVariable {

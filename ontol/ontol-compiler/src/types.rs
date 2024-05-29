@@ -11,6 +11,10 @@ use crate::{
     def::{DefKind, Defs},
     mem::{Intern, Mem},
     primitive::{PrimitiveKind, Primitives},
+    repr::{
+        repr_ctx::ReprCtx,
+        repr_model::{ReprKind, ReprScalarKind},
+    },
     type_check::ena_inference::TypeVar,
 };
 
@@ -32,12 +36,7 @@ pub enum Type<'m> {
     Seq(TypeRef<'m>, TypeRef<'m>),
     #[allow(unused)]
     Option(TypeRef<'m>),
-    // Maybe this is a macro instead of a function, because
-    // it represents abstraction of syntax:
-    Function {
-        params: &'m [TypeRef<'m>],
-        output: TypeRef<'m>,
-    },
+    Function(FunctionType),
     // User-defined data type from a domain:
     Domain(DefId),
     Anonymous(DefId),
@@ -48,6 +47,94 @@ pub enum Type<'m> {
     Extern(DefId),
     Infer(TypeVar<'m>),
     Error,
+}
+
+#[derive(PartialEq, Eq, Hash, Debug)]
+pub enum FunctionType {
+    BinaryArithmetic,
+    BinaryText,
+}
+
+impl FunctionType {
+    pub fn signature<'m>(
+        &self,
+        param_types: &[Option<TypeRef<'m>>],
+        out_type: Option<TypeRef<'m>>,
+        primitives: &Primitives,
+        def_types: &DefTypes<'m>,
+        repr_ctx: &ReprCtx,
+        types: &mut Types<'m>,
+    ) -> FunctionSig<'m> {
+        match self {
+            Self::BinaryArithmetic => {
+                if param_types.iter().any(|arg| arg.is_some()) {
+                    let known_arg = Self::concrete_numeric_ty(
+                        param_types
+                            .iter()
+                            .filter_map(|ty| ty.as_ref())
+                            .next()
+                            .unwrap(),
+                        primitives,
+                        repr_ctx,
+                        types,
+                    );
+
+                    FunctionSig {
+                        args: types.intern([known_arg, known_arg]),
+                        output: known_arg,
+                    }
+                } else if out_type.is_some() {
+                    let output =
+                        Self::concrete_numeric_ty(out_type.unwrap(), primitives, repr_ctx, types);
+
+                    FunctionSig {
+                        args: types.intern([output, output]),
+                        output,
+                    }
+                } else {
+                    FunctionSig {
+                        args: &[],
+                        output: &ERROR_TYPE,
+                    }
+                }
+            }
+            Self::BinaryText => {
+                let text = *def_types.table.get(&primitives.text).unwrap();
+                let text_text = types.intern([text, text]);
+
+                FunctionSig {
+                    args: text_text,
+                    output: text,
+                }
+            }
+        }
+    }
+
+    fn concrete_numeric_ty<'m>(
+        ty: TypeRef<'m>,
+        primitives: &Primitives,
+        repr_ctx: &ReprCtx,
+        types: &mut Types<'m>,
+    ) -> TypeRef<'m> {
+        let Some(def_id) = ty.get_single_def_id() else {
+            return &ERROR_TYPE;
+        };
+        match repr_ctx.get_repr_kind(&def_id) {
+            Some(ReprKind::Scalar(_, ReprScalarKind::I64(_), _)) => {
+                types.intern(Type::Primitive(PrimitiveKind::I64, primitives.i64))
+            }
+            Some(ReprKind::Scalar(_, ReprScalarKind::F64(_), _)) => {
+                types.intern(Type::Primitive(PrimitiveKind::F64, primitives.f64))
+            }
+            _ => &ERROR_TYPE,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct FunctionSig<'m> {
+    pub args: &'m [TypeRef<'m>],
+    pub output: TypeRef<'m>,
 }
 
 pub static UNIT_TYPE: Type = Type::Primitive(PrimitiveKind::Unit, DefId::unit());
@@ -65,7 +152,7 @@ impl<'m> Type<'m> {
             Self::TextLike(def_id, _) => Some(*def_id),
             Self::Seq(_, _) => None,
             Self::Option(ty) => ty.get_single_def_id(),
-            Self::Function { .. } => None,
+            Self::Function(_) => None,
             Self::Domain(def_id) => Some(*def_id),
             Self::Anonymous(def_id) => Some(*def_id),
             Self::ValueGenerator(def_id) => Some(*def_id),
@@ -223,7 +310,7 @@ impl<'m, 'c> Display for FormatType<'m, 'c> {
             Type::Option(ty) => {
                 write!(f, "{tick}{}?{tick}", self.child(ty))
             }
-            Type::Function { .. } => write!(f, "function"),
+            Type::Function(_) => write!(f, "function"),
             Type::Domain(def_id) => {
                 let ident = self.defs.def_kind(*def_id).opt_identifier().unwrap();
                 write!(f, "{tick}{ident}{tick}")

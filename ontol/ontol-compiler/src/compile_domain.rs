@@ -1,6 +1,6 @@
 use fnv::FnvHashSet;
 use ontol_runtime::{ontology::ontol::TextConstant, DefId, PackageId};
-use tracing::{debug, debug_span, info};
+use tracing::{debug, debug_span};
 
 use crate::{
     def::{DefKind, RelParams},
@@ -8,6 +8,7 @@ use crate::{
     relation::Relations,
     repr::repr_model::ReprKind,
     thesaurus::{Thesaurus, TypeRelation},
+    type_check::MapArmsKind,
     CompileError, Compiler, Session, Src, UnifiedCompileError,
 };
 
@@ -210,11 +211,19 @@ impl<'m> Compiler<'m> {
                     is_abstract,
                 } = &def.kind
                 {
-                    info!("CHECK MAP: {:?}", type_check.defs.def_span(def_id));
                     if let Some(extern_def_id) = extern_def_id {
                         type_check.check_map_extern(def, *arms, *extern_def_id);
                     } else {
-                        match type_check.check_map(def, var_alloc, *arms, *is_abstract) {
+                        match type_check.check_map(
+                            (def.id, def.span),
+                            var_alloc,
+                            *arms,
+                            if *is_abstract {
+                                MapArmsKind::Abstract
+                            } else {
+                                MapArmsKind::Concrete
+                            },
+                        ) {
                             Ok(_) => {}
                             Err(error) => {
                                 debug!("Check map error: {error:?}");

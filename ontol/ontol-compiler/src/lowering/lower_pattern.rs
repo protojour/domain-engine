@@ -453,7 +453,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
         match token.kind() {
             Kind::Number => match token.slice().parse::<i64>() {
-                Ok(int) => Some(self.ctx.mk_pattern(PatternKind::ConstI64(int), span)),
+                Ok(int) => Some(self.ctx.mk_pattern(PatternKind::ConstInt(int), span)),
                 Err(_) => {
                     CompileError::InvalidInteger.span_report(span, &mut self.ctx);
                     None

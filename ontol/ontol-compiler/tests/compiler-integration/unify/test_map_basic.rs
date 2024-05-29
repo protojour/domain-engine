@@ -677,8 +677,8 @@ fn test_map_delegation() {
         (
             src_name("SI"),
             "
-            def meters (rel .is: i64)
-            def millimeters (rel .is: i64)
+            def meters (rel .is: f64)
+            def millimeters (rel .is: f64)
 
             map(
                 millimeters(m * 1000),
@@ -691,12 +691,150 @@ fn test_map_delegation() {
         test.mapper().assert_map_eq(
             ("car", "vehicle"),
             json!({ "length": 3 }),
-            json!({ "length": 3000 }),
+            json!({ "length": 3000.0 }),
         );
         test.mapper().assert_map_eq(
             ("vehicle", "car"),
             json!({ "length": 2000 }),
-            json!({ "length": 2 }),
+            json!({ "length": 2.0 }),
+        );
+    });
+}
+
+#[test]
+fn test_map_abstract_scalar_repr_templating() {
+    TestPackages::with_static_sources([
+        (
+            src_name("vehicle"),
+            "
+            use 'car' as car
+            use 'SI' as SI
+
+            def vehicle (
+                rel .'l': length
+                rel .'h': height
+            )
+            def length (
+                rel .is: SI.millimeters
+                rel .is: f64
+            )
+            def height (
+                rel .is: SI.millimeters
+                rel .is: i64
+            )
+
+            map(
+                vehicle('l': l, 'h': h),
+                car.car('l': l, 'h': h),
+            )
+            ",
+        ),
+        (
+            src_name("car"),
+            "
+            use 'SI' as SI
+
+            def car (
+                rel .'l': length
+                rel .'h': height
+            )
+            def length (
+                rel .is: SI.meters
+                rel .is: f64
+            )
+            def height (
+                rel .is: SI.meters
+                rel .is: i64
+            )
+            ",
+        ),
+        (
+            src_name("SI"),
+            "
+            def meters (rel .is: number)
+            def millimeters (rel .is: number)
+
+            map @abstract(
+                millimeters(m * 1000),
+                meters(m),
+            )
+            ",
+        ),
+    ])
+    .compile_then(|test| {
+        test.mapper().assert_map_eq(
+            ("car.car", "vehicle.vehicle"),
+            json!({ "l": 3.0, "h": 1 }),
+            json!({ "l": 3000.0, "h": 1000 }),
+        );
+        test.mapper().assert_map_eq(
+            ("vehicle.vehicle", "car.car"),
+            json!({ "l": 2000.0, "h": 1000 }),
+            json!({ "l": 2.0, "h": 1 }),
+        );
+    });
+}
+
+#[test]
+fn test_map_abstract_scalar_trivial() {
+    TestPackages::with_static_sources([
+        (
+            src_name("vehicle"),
+            "
+            use 'car' as car
+            use 'SI' as SI
+
+            def vehicle (
+                rel .'l': length
+            )
+            def length (
+                rel .is: SI.millimeters
+                rel .is: f64
+            )
+
+            map(
+                vehicle('l': l),
+                car.car('l': l),
+            )
+            ",
+        ),
+        (
+            src_name("car"),
+            "
+            use 'SI' as SI
+
+            def car (
+                rel .'l': length
+            )
+            def length (
+                rel .is: SI.millimeters
+                rel .is: f64
+            )
+            ",
+        ),
+        (
+            src_name("SI"),
+            "
+            def meters (rel .is: number)
+            def millimeters (rel .is: number)
+
+            map @abstract(
+                millimeters(m * 1000),
+                meters(m),
+            )
+            ",
+        ),
+    ])
+    .compile_then(|test| {
+        test.mapper().assert_map_eq(
+            ("car.car", "vehicle.vehicle"),
+            json!({ "l": 3000.0 }),
+            json!({ "l": 3000.0 }),
+        );
+        test.mapper().assert_map_eq(
+            ("vehicle.vehicle", "car.car"),
+            json!({ "l": 2000.0 }),
+            json!({ "l": 2000.0 }),
         );
     });
 }

@@ -493,7 +493,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         match ty {
             Type::Tautology
             | Type::BuiltinRelation
-            | Type::Function { .. }
+            | Type::Function(_)
             | Type::Package
             | Type::Infer(_)
             | Type::ValueGenerator(_)

@@ -1,9 +1,10 @@
-use ontol_hir::{import::arena_import, Binder, Binding, CaptureGroup, Kind, Node, Nodes};
+use ontol_hir::{
+    import::arena_import, Binder, Binding, CaptureGroup, Kind, Node, Nodes, OverloadFunc,
+};
 use ontol_runtime::{
     property::PropertyId,
     value::Attribute,
     var::{Var, VarSet},
-    vm::proc::BuiltinProc,
     DefId,
 };
 use thin_vec::ThinVec;
@@ -195,7 +196,7 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 *out_binder = Some(TypedHirData(Binder { var: *var }, *node_ref.meta()));
                 Ok(substitution)
             }
-            ontol_hir::Kind::Call(proc, params) => {
+            ontol_hir::Kind::Call(func, params) => {
                 let mut subst_params = vec![];
 
                 for (index, param) in params.iter().enumerate() {
@@ -227,16 +228,16 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
                 }
 
                 // FIXME: Properly check this
-                let inverted_proc = match proc {
-                    BuiltinProc::Add => BuiltinProc::Sub,
-                    BuiltinProc::Sub => BuiltinProc::Add,
-                    BuiltinProc::Mul => BuiltinProc::Div,
-                    BuiltinProc::Div => BuiltinProc::Mul,
-                    _ => panic!("Unsupported procedure; cannot invert {proc:?}"),
+                let inverted_func = match func {
+                    OverloadFunc::Add => OverloadFunc::Sub,
+                    OverloadFunc::Sub => OverloadFunc::Add,
+                    OverloadFunc::Mul => OverloadFunc::Div,
+                    OverloadFunc::Div => OverloadFunc::Mul,
+                    _ => panic!("Unsupported procedure; cannot invert {func:?}"),
                 };
 
                 let new_substitution = self.mk_node(
-                    Kind::Call(inverted_proc, out_params),
+                    Kind::Call(inverted_func, out_params),
                     *subst_node_ref.meta(),
                 );
 

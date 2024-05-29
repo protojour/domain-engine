@@ -1,4 +1,4 @@
-use ontol_runtime::{vm::proc::BuiltinProc, PackageId};
+use ontol_runtime::PackageId;
 use thin_vec::thin_vec;
 
 use crate::*;
@@ -96,10 +96,10 @@ impl<'a, L: Lang> Parser<'a, L> {
 
     pub fn parse_parenthesized<'s>(&mut self, next: &'s str) -> ParseResult<'s, Node> {
         match parse_symbol(next)? {
-            ("+", next) => self.parse_binary_call(BuiltinProc::Add, next),
-            ("-", next) => self.parse_binary_call(BuiltinProc::Sub, next),
-            ("*", next) => self.parse_binary_call(BuiltinProc::Mul, next),
-            ("/", next) => self.parse_binary_call(BuiltinProc::Div, next),
+            ("+", next) => self.parse_binary_call(OverloadFunc::Add, next),
+            ("-", next) => self.parse_binary_call(OverloadFunc::Sub, next),
+            ("*", next) => self.parse_binary_call(OverloadFunc::Mul, next),
+            ("/", next) => self.parse_binary_call(OverloadFunc::Div, next),
             ("with", next) => {
                 let (_, next) = parse_lparen(next)?;
                 let (bind_var, next) = parse_dollar_var(next)?;
@@ -349,11 +349,15 @@ impl<'a, L: Lang> Parser<'a, L> {
         })
     }
 
-    fn parse_binary_call<'s>(&mut self, proc: BuiltinProc, next: &'s str) -> ParseResult<'s, Node> {
+    fn parse_binary_call<'s>(
+        &mut self,
+        func: OverloadFunc,
+        next: &'s str,
+    ) -> ParseResult<'s, Node> {
         let (a, next) = self.parse(next)?;
         let (b, next) = self.parse(next)?;
 
-        Ok((self.make_node(Kind::Call(proc, [a, b].into())), next))
+        Ok((self.make_node(Kind::Call(func, [a, b].into())), next))
     }
 
     fn parse_binder<'s>(&self, next: &'s str) -> ParseResult<'s, L::Data<'a, Binder>> {

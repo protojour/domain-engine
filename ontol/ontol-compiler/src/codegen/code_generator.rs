@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use bit_set::BitSet;
 use fnv::FnvHashMap;
-use ontol_hir::{EvalCondTerm, PropVariant, StructFlags};
+use ontol_hir::{EvalCondTerm, OverloadFunc, PropVariant, StructFlags};
 use ontol_runtime::{
     ontology::map::MapLossiness,
     property::{PropertyId, ValueCardinality},
@@ -25,6 +25,10 @@ use crate::{
     },
     error::CompileError,
     primitive::Primitives,
+    repr::{
+        repr_ctx::ReprCtx,
+        repr_model::{ReprKind, ReprScalarKind},
+    },
     strings::Strings,
     typed_hir::{HirFunc, TypedArena, TypedHir, TypedNodeRef},
     types::{Type, UNIT_TYPE},
@@ -58,6 +62,7 @@ pub(super) fn const_codegen<'m>(
         errors: &mut compiler.errors,
         strings: &mut compiler.strings,
         primitives: &compiler.primitives,
+        repr_ctx: &compiler.repr_ctx,
         type_mapper,
         scope: Default::default(),
         catch_points: Default::default(),
@@ -109,6 +114,7 @@ pub(super) fn map_codegen<'m>(
         errors: &mut compiler.errors,
         strings: &mut compiler.strings,
         primitives: &compiler.primitives,
+        repr_ctx: &compiler.repr_ctx,
         type_mapper,
         scope: Default::default(),
         catch_points: Default::default(),
@@ -160,6 +166,7 @@ pub(super) struct CodeGenerator<'a, 'm> {
     pub strings: &'a mut Strings<'m>,
     #[allow(unused)]
     pub primitives: &'a Primitives,
+    pub repr_ctx: &'a ReprCtx,
     pub type_mapper: TypeMapper<'a, 'm>,
 
     scope: FnvHashMap<Var, Local>,
@@ -545,14 +552,43 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                 }
                 self.scope.remove(&binder.hir().var);
             }
-            ontol_hir::Kind::Call(proc, args) => {
+            ontol_hir::Kind::Call(func, args) => {
                 let stack_delta = Delta(-(args.len() as i32) + 1);
                 for param in arena.node_refs(args) {
                     self.gen_node(param, block);
                 }
                 let return_def_id = ty.get_single_def_id().unwrap();
+                let proc = match func {
+                    OverloadFunc::Add => self.func_number_repr_switch(
+                        (return_def_id, span),
+                        BuiltinProc::AddI64,
+                        BuiltinProc::AddF64,
+                    ),
+                    OverloadFunc::Sub => self.func_number_repr_switch(
+                        (return_def_id, span),
+                        BuiltinProc::SubI64,
+                        BuiltinProc::SubF64,
+                    ),
+                    OverloadFunc::Mul => self.func_number_repr_switch(
+                        (return_def_id, span),
+                        BuiltinProc::MulI64,
+                        BuiltinProc::MulF64,
+                    ),
+                    OverloadFunc::Div => self.func_number_repr_switch(
+                        (return_def_id, span),
+                        BuiltinProc::DivI64,
+                        BuiltinProc::DivF64,
+                    ),
+                    OverloadFunc::Append => BuiltinProc::Append,
+                    OverloadFunc::NewStruct => BuiltinProc::NewStruct,
+                    OverloadFunc::NewSeq => BuiltinProc::NewSeq,
+                    OverloadFunc::NewUnit => BuiltinProc::NewUnit,
+                    OverloadFunc::NewFilter => BuiltinProc::NewFilter,
+                    OverloadFunc::NewVoid => BuiltinProc::NewVoid,
+                };
+
                 block.op(
-                    OpCode::CallBuiltin(*proc, return_def_id),
+                    OpCode::CallBuiltin(proc, return_def_id),
                     stack_delta,
                     span,
                     self.builder,
@@ -852,6 +888,24 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     "{} is only declarative, not used in code generation",
                     node_ref
                 );
+            }
+        }
+    }
+
+    fn func_number_repr_switch(
+        &mut self,
+        (def_id, span): (DefId, SourceSpan),
+        i64: BuiltinProc,
+        f64: BuiltinProc,
+    ) -> BuiltinProc {
+        match self.repr_ctx.get_repr_kind(&def_id) {
+            Some(ReprKind::Scalar(_, ReprScalarKind::I64(_), _)) => i64,
+            Some(ReprKind::Scalar(_, ReprScalarKind::F64(_), _)) => f64,
+            _ => {
+                CompileError::BUG("Unable to select instruction")
+                    .span(span)
+                    .report(self.errors);
+                BuiltinProc::NewVoid
             }
         }
     }

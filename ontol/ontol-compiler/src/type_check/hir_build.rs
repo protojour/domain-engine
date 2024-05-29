@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use ontol_hir::{Label, StructFlags};
-use ontol_runtime::value::Attribute;
+use ontol_runtime::{value::Attribute, DefId};
 use smallvec::SmallVec;
 use thin_vec::{thin_vec, ThinVec};
 use tracing::debug;
@@ -27,7 +27,8 @@ use crate::{
 };
 
 use super::{
-    ena_inference::KnownType, hir_build_ctx::HirBuildCtx, TypeCheck, TypeEquation, TypeError,
+    ena_inference::KnownType, hir_build_ctx::HirBuildCtx, MapArmsKind, TypeCheck, TypeEquation,
+    TypeError,
 };
 
 pub(super) struct NodeInfo<'m> {
@@ -41,9 +42,20 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     pub(super) fn build_root_pattern(
         &mut self,
         pat_id: PatId,
+        arms_kind: MapArmsKind,
         ctx: &mut HirBuildCtx<'m>,
     ) -> TypedRootNode<'m> {
-        let pattern = self.patterns.table.remove(&pat_id).unwrap();
+        let pattern = match arms_kind {
+            MapArmsKind::Concrete => {
+                // pattern will not be reused
+                self.patterns.table.remove(&pat_id).unwrap()
+            }
+            MapArmsKind::Template(def_ids) => self.apply_arm_template(
+                self.patterns.table.get(&pat_id).unwrap().clone(),
+                def_ids[ctx.current_arm.index()],
+            ),
+            MapArmsKind::Abstract => unreachable!(),
+        };
 
         let node = self.build_node(
             &pattern,
@@ -83,7 +95,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         ctx: &mut HirBuildCtx<'m>,
     ) -> ontol_hir::Node {
         let node = match (&pattern.kind, node_info.expected_ty) {
-            (PatternKind::Call(def_id, args), Some(_expected_output)) => {
+            (PatternKind::Call(def_id, params), Some(expected_ty)) => {
                 match (
                     self.defs.table.get(def_id),
                     self.def_types.table.get(def_id),
@@ -93,13 +105,29 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             kind: DefKind::Fn(proc),
                             ..
                         }),
-                        Some(Type::Function { params, output }),
+                        Some(Type::Function(func_type)),
                     ) => {
-                        if args.len() != params.len() {
+                        let mut infer_args = vec![];
+                        for _ in 0..params.len() {
+                            infer_args.push(None);
+                        }
+
+                        let sig = func_type.signature(
+                            &infer_args,
+                            Some(expected_ty.0),
+                            self.primitives,
+                            self.def_types,
+                            &self.repr_ctx,
+                            self.types,
+                        );
+
+                        debug!("sig: {sig:?}");
+
+                        if params.len() != sig.args.len() {
                             return self.error_node(
                                 CompileError::IncorrectNumberOfArguments {
-                                    expected: u8::try_from(params.len()).unwrap(),
-                                    actual: u8::try_from(args.len()).unwrap(),
+                                    expected: u8::try_from(sig.args.len()).unwrap(),
+                                    actual: u8::try_from(params.len()).unwrap(),
                                 }
                                 .span(pattern.span),
                                 ctx,
@@ -107,12 +135,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         }
 
                         let mut hir_args = vec![];
-                        for (arg, param_ty) in args.iter().zip(*params) {
+                        for (param, arg_ty) in params.iter().zip(sig.args) {
                             let node = self.build_node(
-                                arg,
+                                param,
                                 NodeInfo {
                                     // Function arguments have weak type constraints.
-                                    expected_ty: Some((param_ty, Strength::Weak)),
+                                    expected_ty: Some((arg_ty, Strength::Weak)),
                                     parent_struct_flags: node_info.parent_struct_flags,
                                 },
                                 ctx,
@@ -123,7 +151,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         ctx.mk_node(
                             ontol_hir::Kind::Call(*proc, hir_args.into()),
                             Meta {
-                                ty: output,
+                                ty: sig.output,
                                 span: pattern.span,
                             },
                         )
@@ -398,30 +426,35 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     },
                 )
             }
-            (PatternKind::ConstI64(int), Some(expected_ty)) => match expected_ty {
-                (Type::Primitive(PrimitiveKind::I64, _), _strengt) => ctx.mk_node(
-                    ontol_hir::Kind::I64(*int),
-                    Meta {
-                        ty: expected_ty.0,
-                        span: pattern.span,
-                    },
-                ),
-                (Type::Primitive(PrimitiveKind::F64, _), _strength) => {
-                    // Didn't find a way to go from i64 to f64 in Rust std..
-                    match f64::from_str(&int.to_string()) {
-                        Ok(float) => ctx.mk_node(
-                            ontol_hir::Kind::F64(float),
-                            Meta {
-                                ty: expected_ty.0,
-                                span: pattern.span,
-                            },
-                        ),
-                        Err(_) => self
-                            .error_node(CompileError::IncompatibleLiteral.span(pattern.span), ctx),
+            (PatternKind::ConstInt(int), Some(expected_ty)) => {
+                debug!("ConstInt expected: {expected_ty:?}");
+                match expected_ty {
+                    (Type::Primitive(PrimitiveKind::I64, _), _strengt) => ctx.mk_node(
+                        ontol_hir::Kind::I64(*int),
+                        Meta {
+                            ty: expected_ty.0,
+                            span: pattern.span,
+                        },
+                    ),
+                    (Type::Primitive(PrimitiveKind::F64, _), _strength) => {
+                        // Didn't find a way to go from i64 to f64 in Rust std..
+                        match f64::from_str(&int.to_string()) {
+                            Ok(float) => ctx.mk_node(
+                                ontol_hir::Kind::F64(float),
+                                Meta {
+                                    ty: expected_ty.0,
+                                    span: pattern.span,
+                                },
+                            ),
+                            Err(_) => self.error_node(
+                                CompileError::IncompatibleLiteral.span(pattern.span),
+                                ctx,
+                            ),
+                        }
                     }
+                    _ => self.error_node(CompileError::IncompatibleLiteral.span(pattern.span), ctx),
                 }
-                _ => self.error_node(CompileError::IncompatibleLiteral.span(pattern.span), ctx),
-            },
+            }
             (PatternKind::ConstBool(bool), Some(expected_ty)) => match expected_ty {
                 (Type::Primitive(PrimitiveKind::Boolean, _), _strengt) => ctx.mk_node(
                     ontol_hir::Kind::I64(if *bool { 1 } else { 0 }),
@@ -768,6 +801,24 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 todo!()
             }
         }
+    }
+
+    fn apply_arm_template(&mut self, mut pattern: Pattern, type_def_id: DefId) -> Pattern {
+        match &mut pattern.kind {
+            PatternKind::Compound { type_path, .. } => match type_path {
+                TypePath::Specified { def_id, span: _ } => {
+                    *def_id = type_def_id;
+                }
+                _ => {
+                    CompileError::TODO("cannot apply pattern")
+                        .span(pattern.span)
+                        .report(self.errors);
+                }
+            },
+            _ => {}
+        }
+
+        pattern
     }
 
     pub(super) fn type_error_node(

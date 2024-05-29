@@ -5,14 +5,13 @@ use ontol_runtime::{
     query::condition::{Clause, ClausePair},
     value::Attribute,
     var::Var,
-    vm::proc::BuiltinProc,
 };
 use thin_vec::ThinVec;
 
 use crate::{
     arena::{Arena, NodeRef},
-    Binding, CaptureGroup, EvalCondTerm, Kind, Label, Lang, Node, PropVariant, RootNode, SetEntry,
-    StructFlags,
+    Binding, CaptureGroup, EvalCondTerm, Kind, Label, Lang, Node, OverloadFunc, PropVariant,
+    RootNode, SetEntry, StructFlags,
 };
 
 impl<'h, 'a, L: Lang> std::fmt::Display for NodeRef<'h, 'a, L> {
@@ -195,10 +194,10 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
             }
             Kind::Call(proc, args) => {
                 let proc = match proc {
-                    BuiltinProc::Add => "+",
-                    BuiltinProc::Sub => "-",
-                    BuiltinProc::Mul => "*",
-                    BuiltinProc::Div => "/",
+                    OverloadFunc::Add => "+",
+                    OverloadFunc::Sub => "-",
+                    OverloadFunc::Mul => "*",
+                    OverloadFunc::Div => "/",
                     proc => panic!("unsupported proc {proc:?}"),
                 };
                 write!(f, "{sep}({proc}")?;

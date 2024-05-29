@@ -102,6 +102,25 @@ impl Cast<i64> for Value {
     }
 }
 
+impl Cast<f64> for Value {
+    type Ref = f64;
+
+    fn cast_into(self) -> f64 {
+        match self {
+            Value::I64(i, _) => i as f64,
+            Value::F64(f, _) => f,
+            _ => panic!("not an f64"),
+        }
+    }
+
+    fn cast_ref(&self) -> &Self::Ref {
+        match self {
+            Value::F64(f, _) => f,
+            _ => panic!("not an f64"),
+        }
+    }
+}
+
 impl Cast<Serial> for Value {
     type Ref = Serial;
 

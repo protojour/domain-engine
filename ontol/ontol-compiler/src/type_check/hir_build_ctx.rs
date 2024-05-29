@@ -53,7 +53,7 @@ impl<'m> HirBuildCtx<'m> {
             variable_mapping: Default::default(),
             object_to_edge_var_table: Default::default(),
             partial: false,
-            current_arm: Arm::First,
+            current_arm: Arm::Upper,
             ctrl_flow_depth: CtrlFlowDepth(0),
             var_allocator,
             missing_properties: FnvHashMap::default(),
@@ -145,15 +145,22 @@ impl CtrlFlowForest {
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub enum Arm {
-    First,
-    Second,
+    Upper,
+    Lower,
 }
 
-pub const ARMS: [Arm; 2] = [Arm::First, Arm::Second];
+pub const ARMS: [Arm; 2] = [Arm::Upper, Arm::Lower];
 
 impl Arm {
-    pub fn is_first(&self) -> bool {
-        matches!(self, Self::First)
+    pub fn is_upper(&self) -> bool {
+        matches!(self, Self::Upper)
+    }
+
+    pub fn index(&self) -> usize {
+        match self {
+            Self::Upper => 0,
+            Self::Lower => 1,
+        }
     }
 }
 
@@ -161,8 +168,8 @@ impl Arm {
 macro_rules! arm_span {
     ($arm:expr) => {
         match $arm {
-            Arm::First => tracing::debug_span!("1st"),
-            Arm::Second => tracing::debug_span!("2nd"),
+            Arm::Upper => tracing::debug_span!("1st"),
+            Arm::Lower => tracing::debug_span!("2nd"),
         }
     };
 }

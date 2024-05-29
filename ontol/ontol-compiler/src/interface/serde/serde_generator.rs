@@ -484,7 +484,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             Type::Domain(_) => {
                 panic!("Domain not handled here")
             }
-            Type::Function { .. }
+            Type::Function(_)
             | Type::Anonymous(..)
             | Type::Package
             | Type::BuiltinRelation

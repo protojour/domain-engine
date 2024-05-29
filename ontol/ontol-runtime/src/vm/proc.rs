@@ -150,10 +150,14 @@ impl Display for Local {
 /// Builtin procedures.
 #[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Debug)]
 pub enum BuiltinProc {
-    Add,
-    Sub,
-    Mul,
-    Div,
+    AddI64,
+    SubI64,
+    MulI64,
+    DivI64,
+    AddF64,
+    SubF64,
+    MulF64,
+    DivF64,
     Append,
     NewStruct,
     NewSeq,

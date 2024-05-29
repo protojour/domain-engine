@@ -198,7 +198,10 @@ impl<'c, 'm> ReprCheck<'c, 'm> {
                 );
             }
 
-            self.repr_ctx.repr_table.insert(def_id, repr);
+            let old = self.repr_ctx.repr_table.insert(def_id, repr);
+            if old.is_some() {
+                panic!("already contained {def_id:?}");
+            }
             Ok(())
         } else {
             Err(())

@@ -7,7 +7,6 @@ use ontol_runtime::{
     ontology::ontol::TextLikeType,
     property::{Cardinality, Role},
     var::VarAllocator,
-    vm::proc::BuiltinProc,
     DefId, PackageId, RelationshipId,
 };
 
@@ -43,7 +42,7 @@ pub enum DefKind<'m> {
     // FIXME: This should not be builtin proc directly.
     // we may find the _actual_ builtin proc to call during type check,
     // if there are different variants per type.
-    Fn(BuiltinProc),
+    Fn(ontol_hir::OverloadFunc),
     Constant(PatId),
     Mapping {
         ident: Option<&'m str>,

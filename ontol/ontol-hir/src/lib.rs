@@ -8,7 +8,6 @@ use ontol_runtime::{
     query::condition::{ClausePair, SetOperator},
     value::Attribute,
     var::Var,
-    vm::proc::BuiltinProc,
     DefId,
 };
 use smallvec::SmallVec;
@@ -173,7 +172,7 @@ pub enum Kind<'a, L: Lang> {
     /// TODO: Superseded by let statements in blocks
     With(L::Data<'a, Binder>, Node, Nodes),
     /// A function call
-    Call(BuiltinProc, Nodes),
+    Call(OverloadFunc, Nodes),
     /// A map call
     Map(Node),
     /// Narrowing of the type of an expression, e.g. selecting a specific union variant.
@@ -237,6 +236,22 @@ pub enum EvalCondTerm {
     QuoteVar(Var),
     /// Evaluate var into a CondTerm::Value
     Eval(Node),
+}
+
+/// A dynamic function call,
+/// exact meaning can be overloaded by type of arguments/operands
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
+pub enum OverloadFunc {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Append,
+    NewStruct,
+    NewSeq,
+    NewUnit,
+    NewFilter,
+    NewVoid,
 }
 
 #[derive(Clone)]

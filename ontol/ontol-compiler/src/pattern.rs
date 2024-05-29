@@ -6,14 +6,14 @@ use crate::source::SourceSpan;
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub struct PatId(pub u32);
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Pattern {
     pub id: PatId,
     pub kind: PatternKind,
     pub span: SourceSpan,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum PatternKind {
     /// Function call
     Call(DefId, Box<[Pattern]>),
@@ -33,7 +33,7 @@ pub enum PatternKind {
         elements: Box<[SetPatternElement]>,
     },
     Variable(Var),
-    ConstI64(i64),
+    ConstInt(i64),
     ConstText(String),
     ConstBool(bool),
     Regex(RegexPattern),
@@ -49,17 +49,17 @@ pub enum CompoundPatternModifier {
     Match,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct CompoundPatternAttr {
     pub key: (DefId, SourceSpan),
     pub bind_option: Option<SourceSpan>,
     pub kind: CompoundPatternAttrKind,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct SpreadLabel(pub std::string::String, pub SourceSpan);
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum CompoundPatternAttrKind {
     Value {
         rel: Option<Box<Pattern>>,
@@ -71,7 +71,7 @@ pub enum CompoundPatternAttrKind {
     },
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct SetPatternElement {
     pub id: PatId,
     pub is_iter: bool,
@@ -80,7 +80,7 @@ pub struct SetPatternElement {
 }
 
 /// Binary operator that accepts a set on its right hand side
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum SetBinaryOperator {
     ElementIn,
     AllIn,
@@ -89,13 +89,13 @@ pub enum SetBinaryOperator {
     SetEquals,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct RegexPattern {
     pub regex_def_id: DefId,
     pub capture_node: RegexPatternCaptureNode,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum RegexPatternCaptureNode {
     // Capture: Leaf node
     Capture {
@@ -164,7 +164,7 @@ impl RegexPatternCaptureNode {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum TypePath {
     /// The type path is specified, and resolved to the given DefId
     Specified { def_id: DefId, span: SourceSpan },
