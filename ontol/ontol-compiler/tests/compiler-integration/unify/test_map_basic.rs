@@ -836,6 +836,11 @@ fn test_map_abstract_scalar_trivial() {
             json!({ "l": 2000.0 }),
             json!({ "l": 2000.0 }),
         );
+        test.mapper().assert_map_eq(
+            ("car.length", "vehicle.length"),
+            json!(3000.0),
+            json!(3000.0),
+        );
     });
 }
 

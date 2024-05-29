@@ -211,6 +211,12 @@ impl<'h, 'a, L: Lang> Print<Kind<'a, L>> for Printer<'h, 'a, L> {
                 self.print_rparen(f, multi)?;
                 Ok(multi.or(sep))
             }
+            Kind::Pun(arg) => {
+                write!(f, "{sep}(pun")?;
+                let multi = self.print_all(f, Sep::Space, [self.kind(*arg)].into_iter())?;
+                self.print_rparen(f, multi)?;
+                Ok(multi.or(sep))
+            }
             Kind::Narrow(arg) => {
                 write!(f, "{sep}(narrow")?;
                 let multi = self.print_all(f, Sep::Space, [self.kind(*arg)].into_iter())?;

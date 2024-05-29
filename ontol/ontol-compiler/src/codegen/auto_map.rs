@@ -130,20 +130,30 @@ pub fn autogenerate_mapping<'m>(
                 let mut upper_arena: TypedArena<'m> = Default::default();
                 let mut lower_arena: TypedArena<'m> = Default::default();
 
-                let upper_node = upper_arena.add(TypedHirData(
-                    ontol_hir::Kind::Var(var),
-                    Meta {
-                        ty: &compiler.def_types.table.get(&first_def_id).unwrap(),
-                        span: NO_SPAN,
-                    },
-                ));
-                let lower_node = lower_arena.add(TypedHirData(
-                    ontol_hir::Kind::Var(var),
-                    Meta {
-                        ty: compiler.def_types.table.get(&second_def_id).unwrap(),
-                        span: NO_SPAN,
-                    },
-                ));
+                fn pun_arm<'m>(
+                    var: Var,
+                    def_id: DefId,
+                    arena: &mut TypedArena<'m>,
+                    compiler: &mut Compiler<'m>,
+                ) -> ontol_hir::Node {
+                    let var = arena.add(TypedHirData(
+                        ontol_hir::Kind::Var(var),
+                        Meta {
+                            ty: compiler.def_types.table.get(&def_id).unwrap(),
+                            span: NO_SPAN,
+                        },
+                    ));
+                    arena.add(TypedHirData(
+                        ontol_hir::Kind::Pun(var),
+                        Meta {
+                            ty: compiler.def_types.table.get(&def_id).unwrap(),
+                            span: NO_SPAN,
+                        },
+                    ))
+                }
+
+                let upper_node = pun_arm(var, first_def_id, &mut upper_arena, compiler);
+                let lower_node = pun_arm(var, second_def_id, &mut lower_arena, compiler);
 
                 return Some(ExplicitMapCodegenTask {
                     ontol_map: Some(OntolMap {

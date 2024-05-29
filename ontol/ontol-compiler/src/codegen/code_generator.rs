@@ -651,6 +651,17 @@ impl<'a, 'm> CodeGenerator<'a, 'm> {
                     }
                 }
             }
+            ontol_hir::Kind::Pun(param) => {
+                let param = arena.node_ref(*param);
+                self.gen_node(param, block);
+
+                block.op(
+                    OpCode::TypePunTop(ty.get_single_def_id().unwrap()),
+                    Delta(0),
+                    span,
+                    self.builder,
+                );
+            }
             ontol_hir::Kind::Narrow(expr) => {
                 let expr = arena.node_ref(*expr);
                 self.gen_node(expr, block);

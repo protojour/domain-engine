@@ -117,7 +117,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             Some(expected_ty.0),
                             self.primitives,
                             self.def_types,
-                            &self.repr_ctx,
+                            self.repr_ctx,
                             self.types,
                         );
 
@@ -804,18 +804,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     }
 
     fn apply_arm_template(&mut self, mut pattern: Pattern, type_def_id: DefId) -> Pattern {
-        match &mut pattern.kind {
-            PatternKind::Compound { type_path, .. } => match type_path {
-                TypePath::Specified { def_id, span: _ } => {
-                    *def_id = type_def_id;
-                }
-                _ => {
-                    CompileError::TODO("cannot apply pattern")
-                        .span(pattern.span)
-                        .report(self.errors);
-                }
-            },
-            _ => {}
+        if let PatternKind::Compound { type_path, .. } = &mut pattern.kind {
+            if let TypePath::Specified { def_id, .. } = type_path {
+                *def_id = type_def_id;
+            } else {
+                CompileError::TODO("cannot apply pattern")
+                    .span(pattern.span)
+                    .report(self.errors);
+            }
         }
 
         pattern

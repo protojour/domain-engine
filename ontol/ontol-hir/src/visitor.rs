@@ -133,7 +133,7 @@ pub trait HirVisitor<'h, 'a: 'h, L: Lang + 'h> {
                     self.visit_node(index, arg);
                 }
             }
-            Kind::Map(arg) => {
+            Kind::Map(arg) | Kind::Pun(arg) => {
                 self.visit_node(0, arena.node_ref(*arg));
             }
             Kind::Narrow(arg) => {

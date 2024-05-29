@@ -65,6 +65,7 @@ impl<'i, 'o, 'a, L: Lang> Importer<'i, 'o, 'a, L> {
             }
             Call(proc, args) => Call(*proc, self.import_nodes(args)),
             Map(arg) => Map(self.import(*arg)),
+            Pun(arg) => Pun(self.import(*arg)),
             Narrow(arg) => Narrow(self.import(*arg)),
             Set(entries) => Set(self.import_entries(entries)),
             Struct(binder, flags, body) => Struct(binder.clone(), *flags, self.import_nodes(body)),

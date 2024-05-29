@@ -197,7 +197,9 @@ where
                 }
                 var_set
             }
-            ontol_hir::Kind::Map(node) | ontol_hir::Kind::Narrow(node) => {
+            ontol_hir::Kind::Map(node)
+            | ontol_hir::Kind::Pun(node)
+            | ontol_hir::Kind::Narrow(node) => {
                 self.analyze_node(arena.node_ref(*node), parent_prop)
             }
             ontol_hir::Kind::Set(entries) => {
