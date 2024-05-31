@@ -101,7 +101,7 @@ impl<'m> State<'m> {
             }
         }
 
-        for key in compiler.codegen_tasks.result_map_proc_table.keys() {
+        for key in compiler.code_ctx.result_map_proc_table.keys() {
             let input = key.input.def_id;
             let output = key.output.def_id;
 

@@ -5,7 +5,7 @@ pub use error::*;
 use fnv::FnvHashMap;
 use std::ops::Index;
 
-use codegen::task::{execute_codegen_tasks, CodegenTasks};
+use codegen::task::{execute_codegen_tasks, CodeCtx};
 use def::Defs;
 use mem::Mem;
 use namespace::Namespaces;
@@ -22,15 +22,15 @@ use ontology_graph::OntologyGraph;
 use package::{PackageTopology, Packages};
 use pattern::Patterns;
 use primitive::Primitives;
-use relation::Relations;
+use relation::RelCtx;
 use repr::repr_ctx::ReprCtx;
 pub use source::*;
-use strings::Strings;
+use strings::StringCtx;
 use text_patterns::{compile_all_text_patterns, TextPatterns};
 use thesaurus::Thesaurus;
 use tracing::debug;
 use type_check::seal::SealCtx;
-use types::{DefTypes, Types};
+use types::{DefTypeCtx, TypeCtx};
 
 use crate::lowering::context::CstLowering;
 
@@ -104,7 +104,7 @@ pub fn compile(
 
     execute_codegen_tasks(&mut compiler);
     compile_all_text_patterns(&mut compiler);
-    compiler.relations.sort_property_tables();
+    compiler.rel_ctx.sort_property_tables();
     compiler.persistence_check();
     compiler.check_error()?;
 
@@ -167,17 +167,17 @@ struct Compiler<'m> {
     primitives: Primitives,
     patterns: Patterns,
 
-    strings: Strings<'m>,
-    types: Types<'m>,
-    def_types: DefTypes<'m>,
-    relations: Relations,
+    str_ctx: StringCtx<'m>,
+    ty_ctx: TypeCtx<'m>,
+    def_ty_ctx: DefTypeCtx<'m>,
+    rel_ctx: RelCtx,
     thesaurus: Thesaurus,
     repr_ctx: ReprCtx,
     seal_ctx: SealCtx,
     text_patterns: TextPatterns,
     entity_ctx: EntityCtx,
 
-    codegen_tasks: CodegenTasks<'m>,
+    code_ctx: CodeCtx<'m>,
     resolver_graph: ResolverGraph,
 
     /// The persistent domain, which is inferred at the end of compilation
@@ -204,16 +204,16 @@ impl<'m> Compiler<'m> {
             package_config_table: Default::default(),
             primitives,
             patterns: Default::default(),
-            strings: Strings::new(mem),
-            types: Types::new(mem),
-            def_types: Default::default(),
-            relations: Relations::default(),
+            str_ctx: StringCtx::new(mem),
+            ty_ctx: TypeCtx::new(mem),
+            def_ty_ctx: Default::default(),
+            rel_ctx: RelCtx::default(),
             thesaurus,
             repr_ctx: ReprCtx::default(),
             seal_ctx: Default::default(),
             entity_ctx: Default::default(),
             text_patterns: TextPatterns::default(),
-            codegen_tasks: Default::default(),
+            code_ctx: Default::default(),
             resolver_graph: Default::default(),
             persistent_domain: None,
             errors: Default::default(),
@@ -242,15 +242,15 @@ impl<'m> AsRef<Defs<'m>> for Compiler<'m> {
     }
 }
 
-impl<'m> AsRef<DefTypes<'m>> for Compiler<'m> {
-    fn as_ref(&self) -> &DefTypes<'m> {
-        &self.def_types
+impl<'m> AsRef<DefTypeCtx<'m>> for Compiler<'m> {
+    fn as_ref(&self) -> &DefTypeCtx<'m> {
+        &self.def_ty_ctx
     }
 }
 
-impl<'m> AsRef<Relations> for Compiler<'m> {
-    fn as_ref(&self) -> &Relations {
-        &self.relations
+impl<'m> AsRef<RelCtx> for Compiler<'m> {
+    fn as_ref(&self) -> &RelCtx {
+        &self.rel_ctx
     }
 }
 
@@ -258,7 +258,7 @@ impl<'m> Index<TextConstant> for Compiler<'m> {
     type Output = str;
 
     fn index(&self, index: TextConstant) -> &Self::Output {
-        &self.strings[index]
+        &self.str_ctx[index]
     }
 }
 

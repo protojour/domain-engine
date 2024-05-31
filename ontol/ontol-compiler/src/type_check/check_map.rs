@@ -63,7 +63,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             if let (Some(upper), Some(lower)) = (upper, lower) {
                 let key_pair = UndirectedMapKey::new([upper.into(), lower.into()]);
 
-                self.codegen_tasks.add_map_task(
+                self.code_ctx.add_map_task(
                     key_pair,
                     MapCodegenRequest::ExplicitOntol(OntolMap {
                         map_def_id: map_def.0,
@@ -74,7 +74,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     self.errors,
                 );
 
-                self.codegen_tasks.abstract_templates.insert(
+                self.code_ctx.abstract_templates.insert(
                     key_pair,
                     AbstractTemplate {
                         pat_ids,
@@ -130,10 +130,10 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         // unify the type of variables on either side:
         self.infer_hir_unify_arms(map_def, &mut arm_nodes, ctx);
 
-        if let Some(key_pair) = TypeMapper::new(self.relations, self.defs, self.repr_ctx)
+        if let Some(key_pair) = TypeMapper::new(self.rel_ctx, self.defs, self.repr_ctx)
             .find_map_key_pair([arm_nodes[0].data().ty(), arm_nodes[1].data().ty()])
         {
-            self.codegen_tasks.add_map_task(
+            self.code_ctx.add_map_task(
                 key_pair,
                 MapCodegenRequest::ExplicitOntol(OntolMap {
                     map_def_id: map_def.0,
@@ -200,7 +200,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         ctx.variable_mapping
                             .insert(*var, VariableMapping::Mapping([actual.0, expected.0]));
 
-                        self.codegen_tasks.add_map_task(
+                        self.code_ctx.add_map_task(
                             UndirectedMapKey::new([first_def_id.into(), second_def_id.into()]),
                             MapCodegenRequest::Auto(map_def.0.package_id()),
                             self.defs,

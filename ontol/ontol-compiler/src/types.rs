@@ -61,9 +61,9 @@ impl FunctionType {
         param_types: &[Option<TypeRef<'m>>],
         out_type: Option<TypeRef<'m>>,
         primitives: &Primitives,
-        def_types: &DefTypes<'m>,
+        def_types: &DefTypeCtx<'m>,
         repr_ctx: &ReprCtx,
-        types: &mut Types<'m>,
+        types: &mut TypeCtx<'m>,
     ) -> FunctionSig<'m> {
         match self {
             Self::BinaryArithmetic => {
@@ -114,7 +114,7 @@ impl FunctionType {
         ty: TypeRef<'m>,
         primitives: &Primitives,
         repr_ctx: &ReprCtx,
-        types: &mut Types<'m>,
+        types: &mut TypeCtx<'m>,
     ) -> TypeRef<'m> {
         let Some(def_id) = ty.get_single_def_id() else {
             return &ERROR_TYPE;
@@ -173,13 +173,13 @@ impl<'m> Type<'m> {
     }
 }
 
-pub struct Types<'m> {
+pub struct TypeCtx<'m> {
     mem: &'m Mem,
     pub(crate) types: FnvHashSet<&'m Type<'m>>,
     pub(crate) slices: HashSet<&'m [TypeRef<'m>]>,
 }
 
-impl<'m> Types<'m> {
+impl<'m> TypeCtx<'m> {
     pub fn new(mem: &'m Mem) -> Self {
         Self {
             mem,
@@ -189,7 +189,7 @@ impl<'m> Types<'m> {
     }
 }
 
-impl<'m> Intern<Type<'m>> for Types<'m> {
+impl<'m> Intern<Type<'m>> for TypeCtx<'m> {
     type Facade = TypeRef<'m>;
 
     fn intern(&mut self, ty: Type<'m>) -> Self::Facade {
@@ -204,7 +204,7 @@ impl<'m> Intern<Type<'m>> for Types<'m> {
     }
 }
 
-impl<'m, const N: usize> Intern<[TypeRef<'m>; N]> for Types<'m> {
+impl<'m, const N: usize> Intern<[TypeRef<'m>; N]> for TypeCtx<'m> {
     type Facade = &'m [TypeRef<'m>];
 
     fn intern(&mut self, types: [TypeRef<'m>; N]) -> Self::Facade {
@@ -219,7 +219,7 @@ impl<'m, const N: usize> Intern<[TypeRef<'m>; N]> for Types<'m> {
     }
 }
 
-impl<'m> Intern<Vec<TypeRef<'m>>> for Types<'m> {
+impl<'m> Intern<Vec<TypeRef<'m>>> for TypeCtx<'m> {
     type Facade = &'m [TypeRef<'m>];
 
     fn intern(&mut self, types: Vec<TypeRef<'m>>) -> Self::Facade {
@@ -235,7 +235,7 @@ impl<'m> Intern<Vec<TypeRef<'m>>> for Types<'m> {
 }
 
 #[derive(Default)]
-pub struct DefTypes<'m> {
+pub struct DefTypeCtx<'m> {
     pub table: FnvHashMap<DefId, TypeRef<'m>>,
     pub ontology_externs: FnvHashMap<DefId, Extern>,
 }
@@ -345,9 +345,9 @@ mod tests {
         let mem = Mem::default();
         let mut compiler = Compiler::new(&mem, Sources::default());
 
-        let c0 = compiler.types.intern(Type::IntConstant(42));
-        let c1 = compiler.types.intern(Type::IntConstant(42));
-        let c2 = compiler.types.intern(Type::IntConstant(66));
+        let c0 = compiler.ty_ctx.intern(Type::IntConstant(42));
+        let c1 = compiler.ty_ctx.intern(Type::IntConstant(42));
+        let c2 = compiler.ty_ctx.intern(Type::IntConstant(66));
 
         assert_eq!(type_ptr(c0), type_ptr(c1));
         assert_ne!(type_ptr(c1), type_ptr(c2));

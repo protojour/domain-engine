@@ -71,7 +71,7 @@ impl<'m> Compiler<'m> {
         params_def_id: DefId,
         rel_span: SourceSpan,
     ) -> Option<EntityOrder> {
-        let Some(properties) = self.relations.properties_by_def_id(params_def_id) else {
+        let Some(properties) = self.rel_ctx.properties_by_def_id(params_def_id) else {
             CompileError::EntityOrderMustSpecifyParameters
                 .span(rel_span)
                 .report(self);
@@ -126,7 +126,7 @@ impl<'m> Compiler<'m> {
             }
         }
 
-        let direction = match self.relations.direction_relationships.get(&params_def_id) {
+        let direction = match self.rel_ctx.direction_relationships.get(&params_def_id) {
             Some((rel_id, dir_def_id)) => {
                 if dir_def_id == &self.primitives.symbols.ascending {
                     Direction::Ascending
@@ -190,7 +190,7 @@ impl<'m> Compiler<'m> {
             return Err(());
         };
 
-        let Some(table) = self.relations.properties_table_by_def_id(parent_def_id) else {
+        let Some(table) = self.rel_ctx.properties_table_by_def_id(parent_def_id) else {
             debug!("order field: no properties table for {parent_def_id:?}");
             return Err(());
         };

@@ -66,7 +66,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         span: SourceSpan,
         ctx: &mut HirBuildCtx<'m>,
     ) -> ontol_hir::Node {
-        let property_set = self.relations.properties_table_by_def_id(type_def_id);
+        let property_set = self.rel_ctx.properties_table_by_def_id(type_def_id);
 
         let actual_struct_flags = match modifier {
             Some(CompoundPatternModifier::Match) => ontol_hir::StructFlags::MATCH,
@@ -136,7 +136,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 for (member_def_id, _) in members {
                     if let Some(property_set) =
-                        self.relations.properties_table_by_def_id(*member_def_id)
+                        self.rel_ctx.properties_table_by_def_id(*member_def_id)
                     {
                         self.collect_named_match_attributes(property_set, &mut match_attributes);
                     }
@@ -233,7 +233,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             };
 
             if matches!(is.rel, TypeRelation::SubVariant) {
-                if let Some(property_set) = self.relations.properties_table_by_def_id(*mem_def_id) {
+                if let Some(property_set) = self.rel_ctx.properties_table_by_def_id(*mem_def_id) {
                     self.collect_named_match_attributes(property_set, match_attributes);
                 }
             }
@@ -287,7 +287,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         let mut hir_props = Vec::with_capacity(pattern_attrs.len());
 
-        if self.relations.identified_by(type_def_id).is_some() {
+        if self.rel_ctx.identified_by(type_def_id).is_some() {
             if let Some(order_union_def_id) = self.entity_ctx.order_union(&type_def_id) {
                 match_attributes.insert(
                     MatchAttributeKey::Def(self.primitives.relations.order),
@@ -514,7 +514,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
 
                 if self
-                    .relations
+                    .rel_ctx
                     .value_generators
                     .contains_key(&match_attribute.property_id.relationship_id)
                 {
@@ -661,7 +661,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 ctx,
             ),
             (ty @ Type::Anonymous(def_id), None) => {
-                match self.relations.properties_by_def_id(*def_id) {
+                match self.rel_ctx.properties_by_def_id(*def_id) {
                     Some(_) => {
                         if actual_struct_flags.contains(StructFlags::MATCH) {
                             ctx.mk_node(
@@ -712,7 +712,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             let relationship_id = match_attr.property_id.relationship_id;
 
             if let Some(const_def_id) = self
-                .relations
+                .rel_ctx
                 .default_const_objects
                 .get(&relationship_id)
                 .cloned()
@@ -743,11 +743,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 continue;
             }
 
-            if self
-                .relations
-                .value_generators
-                .contains_key(&relationship_id)
-            {
+            if self.rel_ctx.value_generators.contains_key(&relationship_id) {
                 // Value generators should be handled in data storage,
                 // so leave these fields out when not mentioned.
                 continue;
@@ -763,8 +759,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 // to be valid. This is because an entity can always "stand on its own"
                 // and be complete without looking at other entities.
                 // FIXME: Does this work with unions?
-                if let Some(target_properties) = self.relations.properties_by_def_id(target_def_id)
-                {
+                if let Some(target_properties) = self.rel_ctx.properties_by_def_id(target_def_id) {
                     if target_properties.identified_by.is_some()
                         && matches!(
                             cardinality,
@@ -830,7 +825,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     }
 
     fn check_relations_can_construct_default(&self, def_id: DefId) -> bool {
-        if let Some(property_set) = self.relations.properties_table_by_def_id(def_id) {
+        if let Some(property_set) = self.rel_ctx.properties_table_by_def_id(def_id) {
             let mut match_attributes = Default::default();
             self.collect_named_match_attributes(property_set, &mut match_attributes);
 

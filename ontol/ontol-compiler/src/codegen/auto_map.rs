@@ -31,8 +31,8 @@ pub fn autogenerate_mapping<'m>(
     let first_def_id = key_pair[0].def_id;
     let second_def_id = key_pair[1].def_id;
 
-    let first_properties = compiler.relations.properties_by_def_id(first_def_id)?;
-    let second_properties = compiler.relations.properties_by_def_id(second_def_id)?;
+    let first_properties = compiler.rel_ctx.properties_by_def_id(first_def_id)?;
+    let second_properties = compiler.rel_ctx.properties_by_def_id(second_def_id)?;
 
     match (
         &first_properties.constructor,
@@ -108,10 +108,8 @@ pub fn autogenerate_mapping<'m>(
                         let undirected_key =
                             UndirectedMapKey::new([first.def_id.into(), second.def_id.into()]);
 
-                        if let Some(template) = compiler
-                            .codegen_tasks
-                            .abstract_templates
-                            .get(&undirected_key)
+                        if let Some(template) =
+                            compiler.code_ctx.abstract_templates.get(&undirected_key)
                         {
                             applicable_templates.push(AbstractTemplate {
                                 pat_ids: template.pat_ids,
@@ -139,14 +137,14 @@ pub fn autogenerate_mapping<'m>(
                     let var = arena.add(TypedHirData(
                         ontol_hir::Kind::Var(var),
                         Meta {
-                            ty: compiler.def_types.table.get(&def_id).unwrap(),
+                            ty: compiler.def_ty_ctx.table.get(&def_id).unwrap(),
                             span: NO_SPAN,
                         },
                     ));
                     arena.add(TypedHirData(
                         ontol_hir::Kind::Pun(var),
                         Meta {
-                            ty: compiler.def_types.table.get(&def_id).unwrap(),
+                            ty: compiler.def_ty_ctx.table.get(&def_id).unwrap(),
                             span: NO_SPAN,
                         },
                     ))
@@ -261,7 +259,7 @@ fn autogenerate_fmt_to_transparent<'m>(
         let mut arena: TypedArena<'m> = Default::default();
         let node = arena.add(TypedHirData(
             ontol_hir::Kind::Var(transparent_var),
-            Meta::new(compiler.def_types.table.get(&transparent_def_id)?, NO_SPAN),
+            Meta::new(compiler.def_ty_ctx.table.get(&transparent_def_id)?, NO_SPAN),
         ));
         ontol_hir::RootNode::new(node, arena)
     };
@@ -295,12 +293,12 @@ fn autogenerate_fmt_hir_struct<'m>(
         }
     }
 
-    let ty = compiler.def_types.table.get(&def_id)?;
+    let ty = compiler.def_ty_ctx.table.get(&def_id)?;
 
     let struct_node = arena.add(TypedHirData(
         ontol_hir::Kind::Struct(
             ontol_hir::Binder { var: binder_var }.with_meta(Meta {
-                ty: compiler.def_types.table.get(&def_id).unwrap(),
+                ty: compiler.def_ty_ctx.table.get(&def_id).unwrap(),
                 span: NO_SPAN,
             }),
             ontol_hir::StructFlags::empty(),
@@ -326,7 +324,7 @@ fn autogenerate_fmt_segment_property<'m>(
         segment: _,
     } = segment
     {
-        let object_ty = compiler.def_types.table.get(type_def_id)?;
+        let object_ty = compiler.def_ty_ctx.table.get(type_def_id)?;
         let meta = Meta {
             ty: object_ty,
             span: NO_SPAN,

@@ -9,14 +9,14 @@ use crate::mem::Mem;
 /// could use owned ArcStr values instead.
 ///
 /// Many compiler types should switch to storing TextConstant (index) anyway
-pub struct Strings<'m> {
+pub struct StringCtx<'m> {
     mem: &'m Mem,
     table: HashMap<&'m str, Option<TextConstant>>,
     constants: Vec<&'m str>,
     detached: bool,
 }
 
-impl<'m> Strings<'m> {
+impl<'m> StringCtx<'m> {
     pub fn new(mem: &'m Mem) -> Self {
         Self {
             mem,
@@ -38,7 +38,7 @@ impl<'m> Strings<'m> {
         }
     }
 
-    pub fn attach(&mut self, other: Strings<'m>) {
+    pub fn attach(&mut self, other: StringCtx<'m>) {
         self.table = other.table;
         self.constants = other.constants;
         self.detached = false;
@@ -104,13 +104,13 @@ fn push_constant<'m>(vec: &mut Vec<&'m str>, str: &'m str) -> TextConstant {
     TextConstant(next as u32)
 }
 
-impl<'m> Debug for Strings<'m> {
+impl<'m> Debug for StringCtx<'m> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Strings").finish()
     }
 }
 
-impl<'m> Index<TextConstant> for Strings<'m> {
+impl<'m> Index<TextConstant> for StringCtx<'m> {
     type Output = str;
 
     fn index(&self, index: TextConstant) -> &Self::Output {

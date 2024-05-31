@@ -5,7 +5,7 @@ use tracing::{debug, debug_span};
 use crate::{
     def::{DefKind, RelParams},
     package::ParsedPackage,
-    relation::Relations,
+    relation::RelCtx,
     repr::repr_model::ReprKind,
     thesaurus::{Thesaurus, TypeRelation},
     type_check::MapArmsKind,
@@ -56,7 +56,7 @@ impl<'m> Compiler<'m> {
         self.seal_domain(package.package_id);
 
         self.package_names
-            .push((package.package_id, self.strings.intern_constant(&src.name)));
+            .push((package.package_id, self.str_ctx.intern_constant(&src.name)));
 
         self.check_error()
     }
@@ -105,7 +105,7 @@ impl<'m> Compiler<'m> {
             for (is, span) in is_table {
                 if matches!(&is.rel, TypeRelation::Super) {
                     let identified_by = self
-                        .relations
+                        .rel_ctx
                         .properties_by_def_id
                         .get(&is.def_id)
                         .and_then(|properties| properties.identified_by);
@@ -152,7 +152,7 @@ impl<'m> Compiler<'m> {
                     copy_relationship_store_key(
                         *rel_params_def_id,
                         def_id,
-                        &mut self.relations,
+                        &mut self.rel_ctx,
                         &self.thesaurus,
                     );
 
@@ -244,12 +244,12 @@ impl<'m> Compiler<'m> {
 fn copy_relationship_store_key(
     rel_params_def_id: DefId,
     rel_def_id: DefId,
-    relations: &mut Relations,
+    relations: &mut RelCtx,
     thesaurus: &Thesaurus,
 ) {
     fn recurse_search(
         def_id: DefId,
-        relations: &mut Relations,
+        relations: &mut RelCtx,
         thesaurus: &Thesaurus,
         result: &mut Option<TextConstant>,
         visited: &mut FnvHashSet<DefId>,

@@ -4,7 +4,7 @@ use tracing::warn;
 use crate::{
     def::Defs,
     map::UndirectedMapKey,
-    relation::Relations,
+    relation::RelCtx,
     repr::{repr_ctx::ReprCtx, repr_model::ReprKind},
     types::{Type, TypeRef},
 };
@@ -18,13 +18,13 @@ pub struct MapInfo {
 
 #[derive(Clone, Copy)]
 pub struct TypeMapper<'c, 'm> {
-    pub relations: &'c Relations,
+    pub relations: &'c RelCtx,
     pub defs: &'c Defs<'m>,
     pub repr_ctx: &'c ReprCtx,
 }
 
 impl<'c, 'm> TypeMapper<'c, 'm> {
-    pub fn new(relations: &'c Relations, defs: &'c Defs<'m>, repr_ctx: &'c ReprCtx) -> Self {
+    pub fn new(relations: &'c RelCtx, defs: &'c Defs<'m>, repr_ctx: &'c ReprCtx) -> Self {
         Self {
             relations,
             defs,
@@ -110,8 +110,8 @@ impl<'c, 'm> TypeMapper<'c, 'm> {
     }
 }
 
-impl<'c, 'm> AsRef<Relations> for TypeMapper<'c, 'm> {
-    fn as_ref(&self) -> &Relations {
+impl<'c, 'm> AsRef<RelCtx> for TypeMapper<'c, 'm> {
+    fn as_ref(&self) -> &RelCtx {
         self.relations
     }
 }

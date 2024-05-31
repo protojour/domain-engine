@@ -50,7 +50,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 let token = literal.0.local_tokens().next()?;
                 match token.kind() {
                     Kind::Number => {
-                        let lit = self.ctx.compiler.strings.intern(token.slice());
+                        let lit = self.ctx.compiler.str_ctx.intern(token.slice());
                         let def_id = self.ctx.compiler.defs.add_def(
                             DefKind::NumberLiteral(lit),
                             ONTOL_PKG,
@@ -66,7 +66,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                                 self.ctx
                                     .compiler
                                     .defs
-                                    .def_text_literal(other, &mut self.ctx.compiler.strings),
+                                    .def_text_literal(other, &mut self.ctx.compiler.str_ctx),
                             ),
                         }
                     }
@@ -75,7 +75,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                         match self.ctx.compiler.defs.def_regex(
                             &regex_literal,
                             token.span(),
-                            &mut self.ctx.compiler.strings,
+                            &mut self.ctx.compiler.str_ctx,
                         ) {
                             Ok(def_id) => Some(def_id),
                             Err((compile_error, span)) => {

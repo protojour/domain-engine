@@ -12,7 +12,7 @@ use crate::{
     entity::entity_ctx::EntityCtx,
     pattern::{CompoundPatternAttrKind, PatId, Pattern, PatternKind, Patterns, TypePath},
     primitive::Primitives,
-    relation::{Property, Relations},
+    relation::{Property, RelCtx},
     CompileError, CompileErrors, Compiler, SourceSpan,
 };
 
@@ -40,7 +40,7 @@ pub struct MapArmDefInferencer<'c, 'm> {
     map_def_id: DefId,
     new_defs: Vec<DefId>,
     patterns: &'c Patterns,
-    relations: &'c mut Relations,
+    relations: &'c mut RelCtx,
     defs: &'c mut Defs<'m>,
     entity_ctx: &'c EntityCtx,
     primitives: &'c Primitives,
@@ -482,7 +482,7 @@ impl<'m> Compiler<'m> {
             new_defs: vec![],
             patterns: &self.patterns,
             defs: &mut self.defs,
-            relations: &mut self.relations,
+            relations: &mut self.rel_ctx,
             entity_ctx: &self.entity_ctx,
             primitives: &self.primitives,
             errors: &mut self.errors,

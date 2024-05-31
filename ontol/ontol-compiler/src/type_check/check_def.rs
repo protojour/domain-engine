@@ -17,11 +17,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     /// Compute the immediate type of a definition.
     /// Performs relationship analysis for relationship definitions (rel statements).
     pub fn check_def(&mut self, def_id: DefId) -> TypeRef<'m> {
-        if let Some(type_ref) = self.def_types.table.get(&def_id) {
+        if let Some(type_ref) = self.def_ty_ctx.table.get(&def_id) {
             return type_ref;
         }
         let ty = self.check_def_inner(def_id);
-        self.def_types.table.insert(def_id, ty);
+        self.def_ty_ctx.table.insert(def_id, ty);
         ty
     }
 
@@ -64,7 +64,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     &mut ctx,
                 );
 
-                self.codegen_tasks.add_const_task(ConstCodegenTask {
+                self.code_ctx.add_const_task(ConstCodegenTask {
                     def_id,
                     node: ontol_hir::RootNode::new(node, ctx.hir_arena),
                 });

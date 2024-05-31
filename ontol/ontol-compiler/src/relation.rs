@@ -12,7 +12,7 @@ use ontol_runtime::{
 use crate::{sequence::Sequence, text_patterns::TextPatternSegment, SourceSpan};
 
 #[derive(Default)]
-pub struct Relations {
+pub struct RelCtx {
     pub properties_by_def_id: FnvHashMap<DefId, Properties>,
     /// A map from "idenfities" relationship to named relationship:
     pub inherent_id_map: FnvHashMap<RelationshipId, RelationshipId>,
@@ -39,7 +39,7 @@ pub struct Relations {
     pub store_keys: FnvHashMap<DefId, TextConstant>,
 }
 
-impl Relations {
+impl RelCtx {
     pub fn properties_by_def_id(&self, domain_type_id: DefId) -> Option<&Properties> {
         self.properties_by_def_id.get(&domain_type_id)
     }

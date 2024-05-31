@@ -8,8 +8,8 @@ use crate::{CompileError, Compiler};
 impl<'m> Compiler<'m> {
     pub(super) fn persistence_check(&mut self) {
         self.resolver_graph =
-            ResolverGraph::new(self.codegen_tasks.result_map_proc_table.keys().map(|key| {
-                self.codegen_tasks
+            ResolverGraph::new(self.code_ctx.result_map_proc_table.keys().map(|key| {
+                self.code_ctx
                     .result_metadata_table
                     .get(key)
                     .map(|meta| (*key, meta.direction, meta.lossiness))

@@ -40,7 +40,7 @@ enum Action {
 
 impl<'c, 'm> TypeCheck<'c, 'm> {
     pub fn check_domain_type_pre_repr(&mut self, def_id: DefId, _def: &Def) {
-        let Some(table) = self.relations.properties_table_by_def_id(def_id) else {
+        let Some(table) = self.rel_ctx.properties_table_by_def_id(def_id) else {
             return;
         };
 
@@ -54,7 +54,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     let meta = self.defs.relationship_meta(prop_id.relationship_id);
 
                     let object_properties = self
-                        .relations
+                        .rel_ctx
                         .properties_by_def_id(meta.relationship.object.0)
                         .unwrap();
 
@@ -84,7 +84,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     }
 
     pub fn check_domain_type_post_repr(&mut self, def_id: DefId, _def: &Def) {
-        let Some(properties) = self.relations.properties_by_def_id.get(&def_id) else {
+        let Some(properties) = self.rel_ctx.properties_by_def_id.get(&def_id) else {
             return;
         };
         let Some(table) = properties.table.as_ref() else {
@@ -110,7 +110,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
 
                     let object_properties = self
-                        .relations
+                        .rel_ctx
                         .properties_by_def_id(meta.relationship.object.0)
                         .unwrap();
 
@@ -128,7 +128,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     }
 
                     if let Some((generator_def_id, gen_span)) = self
-                        .relations
+                        .rel_ctx
                         .value_generators_unchecked
                         .remove(&prop_id.relationship_id)
                     {
@@ -188,7 +188,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                                 .filter(|(is, _)| is.is_sub())
                                 .any(|(is, _)| {
                                     let subject_properties =
-                                        self.relations.properties_by_def_id(is.def_id).unwrap();
+                                        self.rel_ctx.properties_by_def_id(is.def_id).unwrap();
 
                                     subject_properties.identified_by.is_some()
                                 });
@@ -202,7 +202,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     } else {
                         let meta = self.defs.relationship_meta(prop_id.relationship_id);
                         let subject_properties = self
-                            .relations
+                            .rel_ctx
                             .properties_by_def_id(meta.relationship.subject.0)
                             .unwrap();
 
@@ -229,7 +229,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                         .report(self);
                 }
                 Action::AdjustEntityPropertyCardinality(def_id, property_id) => {
-                    let properties = self.relations.properties_by_def_id_mut(def_id);
+                    let properties = self.rel_ctx.properties_by_def_id_mut(def_id);
                     if let Some(table) = &mut properties.table {
                         let cardinality = table.get_mut(&property_id).unwrap();
                         adjust_entity_prop_cardinality(cardinality);
@@ -240,11 +240,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     inherent_property_id,
                     identifies_relationship_id,
                 } => {
-                    self.relations.inherent_id_map.insert(
+                    self.rel_ctx.inherent_id_map.insert(
                         identifies_relationship_id,
                         inherent_property_id.relationship_id,
                     );
-                    let properties = self.relations.properties_by_def_id_mut(def_id);
+                    let properties = self.rel_ctx.properties_by_def_id_mut(def_id);
 
                     if let Some(table) = &mut properties.table {
                         table.insert(
@@ -266,12 +266,12 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     span,
                 } => match self.determine_value_generator(generator_def_id, object_def_id) {
                     Ok(value_generator) => {
-                        self.relations
+                        self.rel_ctx
                             .value_generators
                             .insert(relationship_id, value_generator);
                     }
                     Err(_) => {
-                        let object_ty = self.def_types.table.get(&object_def_id).unwrap();
+                        let object_ty = self.def_ty_ctx.table.get(&object_def_id).unwrap();
                         CompileError::CannotGenerateValue(format!(
                             "{}",
                             FormatType::new(object_ty, self.defs, self.primitives)
@@ -290,7 +290,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         generator_def_id: DefId,
         object_def_id: DefId,
     ) -> Result<ValueGenerator, ()> {
-        let properties = self.relations.properties_by_def_id.get(&object_def_id);
+        let properties = self.rel_ctx.properties_by_def_id.get(&object_def_id);
         let repr = self
             .repr_ctx
             .repr_table
@@ -311,7 +311,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         match generator_def_id {
             _ if generator_def_id == generators.auto => {
-                match self.def_types.table.get(&scalar_def_id) {
+                match self.def_ty_ctx.table.get(&scalar_def_id) {
                     Some(Type::Primitive(PrimitiveKind::Serial, _)) => {
                         Ok(ValueGenerator::Autoincrement)
                     }
@@ -326,7 +326,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             _ if generator_def_id == generators.create_time => {
-                match self.def_types.table.get(&scalar_def_id) {
+                match self.def_ty_ctx.table.get(&scalar_def_id) {
                     Some(Type::TextLike(_, TextLikeType::DateTime)) => {
                         Ok(ValueGenerator::CreatedAtTime)
                     }
@@ -334,7 +334,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
             }
             _ if generator_def_id == generators.update_time => {
-                match self.def_types.table.get(&scalar_def_id) {
+                match self.def_ty_ctx.table.get(&scalar_def_id) {
                     Some(Type::TextLike(_, TextLikeType::DateTime)) => {
                         Ok(ValueGenerator::UpdatedAtTime)
                     }

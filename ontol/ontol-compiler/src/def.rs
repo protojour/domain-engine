@@ -12,7 +12,7 @@ use ontol_runtime::{
 
 use crate::{
     mem::Intern, namespace::Space, package::ONTOL_PKG, pattern::PatId, primitive::PrimitiveKind,
-    regex_util::parse_literal_regex, source::SourceSpan, strings::Strings, types::Type, Compiler,
+    regex_util::parse_literal_regex, source::SourceSpan, strings::StringCtx, types::Type, Compiler,
     SpannedBorrow, NO_SPAN,
 };
 use ontol_parser::U32Span;
@@ -330,7 +330,7 @@ impl<'m> Defs<'m> {
         )
     }
 
-    pub fn def_text_literal(&mut self, lit: &str, strings: &mut Strings<'m>) -> DefId {
+    pub fn def_text_literal(&mut self, lit: &str, strings: &mut StringCtx<'m>) -> DefId {
         match self.text_literals.get(&lit) {
             Some(def_id) => *def_id,
             None => {
@@ -346,7 +346,7 @@ impl<'m> Defs<'m> {
         &mut self,
         lit: &str,
         span: U32Span,
-        strings: &mut Strings<'m>,
+        strings: &mut StringCtx<'m>,
     ) -> Result<DefId, (String, U32Span)> {
         match self.regex_strings.get(&lit) {
             Some(def_id) => Ok(*def_id),
@@ -443,8 +443,8 @@ impl<'m> Compiler<'m> {
                 kind: DefKind::Package(package_def_id.package_id()),
             },
         );
-        let ty = self.types.intern(Type::Package);
-        self.def_types.table.insert(package_def_id, ty);
+        let ty = self.ty_ctx.intern(Type::Package);
+        self.def_ty_ctx.table.insert(package_def_id, ty);
 
         // make sure the namespace exists
         let namespace = self.namespaces.get_namespace_mut(package_id, Space::Type);

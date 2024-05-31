@@ -57,7 +57,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 // FIXME: what if some of the relation data's fields are called "node"
                 let fields: PhfIndexMap<FieldData> = build_phf_index_map([(
                     self.serde_gen
-                        .strings
+                        .str_ctx
                         .make_phf_key(&field_namespace.unique_literal("node")),
                     FieldData {
                         kind: FieldKind::Node,
@@ -147,7 +147,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         kind: TypeKind::Object(ObjectData {
                             fields: build_phf_index_map([
                                 (
-                                    self.serde_gen.strings.make_phf_key("nodes"),
+                                    self.serde_gen.str_ctx.make_phf_key("nodes"),
                                     FieldData {
                                         kind: FieldKind::Nodes,
                                         field_type: TypeRef::mandatory(node_ref)
@@ -155,7 +155,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                                     },
                                 ),
                                 (
-                                    self.serde_gen.strings.make_phf_key("edges"),
+                                    self.serde_gen.str_ctx.make_phf_key("edges"),
                                     FieldData {
                                         kind: FieldKind::Edges,
                                         field_type: TypeRef::mandatory(edge_ref)
@@ -163,7 +163,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                                     },
                                 ),
                                 (
-                                    self.serde_gen.strings.make_phf_key("pageInfo"),
+                                    self.serde_gen.str_ctx.make_phf_key("pageInfo"),
                                     FieldData {
                                         kind: FieldKind::PageInfo,
                                         field_type: TypeRef::mandatory(UnitTypeRef::Addr(
@@ -172,7 +172,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                                     },
                                 ),
                                 (
-                                    self.serde_gen.strings.make_phf_key("totalCount"),
+                                    self.serde_gen.str_ctx.make_phf_key("totalCount"),
                                     FieldData {
                                         kind: FieldKind::TotalCount,
                                         field_type: TypeRef {
@@ -212,14 +212,14 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         kind: TypeKind::Object(ObjectData {
                             fields: build_phf_index_map([
                                 (
-                                    self.serde_gen.strings.make_phf_key("node"),
+                                    self.serde_gen.str_ctx.make_phf_key("node"),
                                     FieldData {
                                         kind: FieldKind::Node,
                                         field_type: TypeRef::optional(node_ref),
                                     },
                                 ),
                                 (
-                                    self.serde_gen.strings.make_phf_key("deleted"),
+                                    self.serde_gen.str_ctx.make_phf_key("deleted"),
                                     FieldData {
                                         kind: FieldKind::Deleted,
                                         field_type: TypeRef {
@@ -376,7 +376,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     NewType::TypeData(
                         TypeData {
                             // FIXME: Must make sure that domain typenames take precedence over generated ones
-                            typename: self.serde_gen.strings.intern_constant("_ontol_i64"),
+                            typename: self.serde_gen.str_ctx.intern_constant("_ontol_i64"),
                             input_typename: None,
                             partial_input_typename: None,
                             kind: TypeKind::CustomScalar(ScalarData {
@@ -514,7 +514,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             };
 
             (
-                self.serde_gen.strings[type_data.typename].to_string(),
+                self.serde_gen.str_ctx[type_data.typename].to_string(),
                 node_data.entity_id,
                 node_data.operator_addr,
             )
@@ -538,16 +538,16 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             }
 
             if let Some(relation_name) = relation_type_info.name() {
-                typename_append(&mut typename, &self.serde_gen.strings[relation_name]);
+                typename_append(&mut typename, &self.serde_gen.str_ctx[relation_name]);
             }
 
             if let Some(variant_name) = variant_type_info.name() {
-                typename_append(&mut typename, &self.serde_gen.strings[variant_name]);
+                typename_append(&mut typename, &self.serde_gen.str_ctx[variant_name]);
             }
         }
 
         let permutation_addr = self.schema.push_type_data(TypeData {
-            typename: self.serde_gen.strings.intern_constant(&typename),
+            typename: self.serde_gen.str_ctx.intern_constant(&typename),
             input_typename: None,
             partial_input_typename: None,
             kind: TypeKind::Object(ObjectData {
@@ -716,7 +716,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
         let mut fields_vec: Vec<_> = fields
             .into_iter()
-            .map(|(key, value)| (self.serde_gen.strings.make_phf_key(&key), value))
+            .map(|(key, value)| (self.serde_gen.str_ctx.make_phf_key(&key), value))
             .collect();
 
         // note: The sort is stable.
@@ -798,7 +798,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                         UnitTypeRef::Addr(self.schema.json_scalar)
                     };
 
-                    let prop_key = &self.serde_gen.strings[prop_keys.into_iter().next().unwrap()];
+                    let prop_key = &self.serde_gen.str_ctx[prop_keys.into_iter().next().unwrap()];
 
                     let resolvers: FnvHashMap<DefId, PropertyId> = discriminators
                         .iter()

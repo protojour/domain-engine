@@ -22,13 +22,13 @@ use crate::{
     },
     mem::Intern,
     primitive::Primitives,
-    relation::Relations,
+    relation::RelCtx,
     repr::{
         repr_ctx::ReprCtx,
         repr_model::{ReprKind, ReprScalarKind},
     },
     typed_hir::{Meta, TypedHir, TypedHirData, TypedNodeRef},
-    types::{Type, Types, UNIT_TYPE},
+    types::{Type, TypeCtx, UNIT_TYPE},
     CompileError, CompileErrors, Compiler, SourceSpan, NO_SPAN,
 };
 
@@ -43,9 +43,9 @@ use super::{
 /// Unifier that strives to produce Static Single-Assignment form flat hir blocks
 pub struct SsaUnifier<'c, 'm> {
     #[allow(unused)]
-    pub(super) types: &'c mut Types<'m>,
+    pub(super) types: &'c mut TypeCtx<'m>,
     #[allow(unused)]
-    pub(super) relations: &'c Relations,
+    pub(super) relations: &'c RelCtx,
     pub(super) repr_ctx: &'c ReprCtx,
     pub(super) defs: &'c Defs<'m>,
     pub(super) errors: &'c mut CompileErrors,
@@ -74,8 +74,8 @@ impl<'c, 'm> SsaUnifier<'c, 'm> {
         compiler: &'c mut Compiler<'m>,
     ) -> Self {
         Self {
-            types: &mut compiler.types,
-            relations: &compiler.relations,
+            types: &mut compiler.ty_ctx,
+            relations: &compiler.rel_ctx,
             repr_ctx: &compiler.repr_ctx,
             defs: &compiler.defs,
             primitives: &compiler.primitives,

@@ -468,7 +468,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                 let regex_def_id = match self.ctx.compiler.defs.def_regex(
                     &regex_literal,
                     span,
-                    &mut self.ctx.compiler.strings,
+                    &mut self.ctx.compiler.str_ctx,
                 ) {
                     Ok(def_id) => def_id,
                     Err((compile_error, err_span)) => {

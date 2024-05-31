@@ -17,10 +17,10 @@ use crate::{
     error::CompileError,
     package::ONTOL_PKG,
     primitive::{PrimitiveKind, Primitives},
-    relation::{Constructor, Properties, Relations},
+    relation::{Constructor, Properties, RelCtx},
     thesaurus::Thesaurus,
     thesaurus::{Is, TypeRelation},
-    types::{DefTypes, Type},
+    types::{DefTypeCtx, Type},
     CompileErrors, Note, SourceId, SourceSpan, SpannedNote, NATIVE_SOURCE, NO_SPAN,
 };
 
@@ -36,8 +36,8 @@ const TRACE_BUILTIN: bool = false;
 pub struct ReprCheck<'c, 'm> {
     pub root_def_id: DefId,
     pub defs: &'c Defs<'m>,
-    pub def_types: &'c DefTypes<'m>,
-    pub relations: &'c Relations,
+    pub def_types: &'c DefTypeCtx<'m>,
+    pub relations: &'c RelCtx,
     pub thesaurus: &'c Thesaurus,
     pub repr_ctx: &'c mut ReprCtx,
     pub primitives: &'c Primitives,

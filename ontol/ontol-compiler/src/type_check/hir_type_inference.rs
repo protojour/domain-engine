@@ -4,7 +4,7 @@ use ontol_runtime::var::Var;
 use crate::{
     error::CompileError,
     typed_hir::{Meta, TypedArena, TypedHir, TypedHirData},
-    types::Types,
+    types::TypeCtx,
     CompileErrors,
 };
 
@@ -16,7 +16,7 @@ use super::{
 
 /// Perform type inference limited to within one "map arm"
 pub(super) struct HirArmTypeInference<'c, 'm> {
-    pub(super) types: &'c mut Types<'m>,
+    pub(super) types: &'c mut TypeCtx<'m>,
     pub(super) eq_relations: &'c mut ena::unify::InPlaceUnificationTable<TypeVar<'m>>,
     pub(super) errors: &'c mut CompileErrors,
 }

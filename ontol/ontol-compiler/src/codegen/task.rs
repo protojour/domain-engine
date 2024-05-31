@@ -40,7 +40,7 @@ use super::{
 };
 
 #[derive(Default)]
-pub struct CodegenTasks<'m> {
+pub struct CodeCtx<'m> {
     const_tasks: Vec<ConstCodegenTask<'m>>,
     map_tasks: IndexMap<UndirectedMapKey, MapCodegenTask<'m>>,
 
@@ -66,7 +66,7 @@ pub struct AbstractTemplateApplication {
     pub var_allocator: VarAllocator,
 }
 
-impl<'m> CodegenTasks<'m> {
+impl<'m> CodeCtx<'m> {
     pub fn add_map_task(
         &mut self,
         pair: UndirectedMapKey,
@@ -290,12 +290,10 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
 
     let mut run = 0;
 
-    while !compiler.codegen_tasks.map_tasks.is_empty()
-        || !compiler.codegen_tasks.const_tasks.is_empty()
-    {
-        let mut explicit_map_tasks = Vec::with_capacity(compiler.codegen_tasks.map_tasks.len());
+    while !compiler.code_ctx.map_tasks.is_empty() || !compiler.code_ctx.const_tasks.is_empty() {
+        let mut explicit_map_tasks = Vec::with_capacity(compiler.code_ctx.map_tasks.len());
 
-        for (key, task) in std::mem::take(&mut compiler.codegen_tasks.map_tasks) {
+        for (key, task) in std::mem::take(&mut compiler.code_ctx.map_tasks) {
             match task {
                 MapCodegenTask::Auto(package_id) => {
                     let _entered = debug_span!("auto_map", run, pkg = ?package_id.0).entered();
@@ -310,8 +308,7 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
             }
         }
 
-        for ConstCodegenTask { def_id, node } in
-            std::mem::take(&mut compiler.codegen_tasks.const_tasks)
+        for ConstCodegenTask { def_id, node } in std::mem::take(&mut compiler.code_ctx.const_tasks)
         {
             const_codegen(node, def_id, &mut proc_table, compiler);
         }
@@ -334,13 +331,13 @@ pub fn execute_codegen_tasks(compiler: &mut Compiler) {
         map_proc_table,
     } = link(compiler, &mut proc_table);
 
-    compiler.codegen_tasks.result_lib = lib;
-    compiler.codegen_tasks.result_const_procs = const_procs;
-    compiler.codegen_tasks.result_map_proc_table = map_proc_table;
-    compiler.codegen_tasks.result_named_downmaps = proc_table.named_downmaps;
-    compiler.codegen_tasks.result_static_conditions = proc_table.static_conditions;
-    compiler.codegen_tasks.result_propflow_table = proc_table.propflow_table;
-    compiler.codegen_tasks.result_metadata_table = proc_table.metadata_table;
+    compiler.code_ctx.result_lib = lib;
+    compiler.code_ctx.result_const_procs = const_procs;
+    compiler.code_ctx.result_map_proc_table = map_proc_table;
+    compiler.code_ctx.result_named_downmaps = proc_table.named_downmaps;
+    compiler.code_ctx.result_static_conditions = proc_table.static_conditions;
+    compiler.code_ctx.result_propflow_table = proc_table.propflow_table;
+    compiler.code_ctx.result_metadata_table = proc_table.metadata_table;
 }
 
 fn generate_explicit_map<'m>(
@@ -488,7 +485,7 @@ fn generate_pattern_map<'m>(
 
     match (compiler.map_ident(map_def_id), down_key) {
         (Some(ident), Some(down_key)) => {
-            let ident_constant = compiler.strings.intern_constant(ident);
+            let ident_constant = compiler.str_ctx.intern_constant(ident);
             proc_table
                 .named_downmaps
                 .insert((map_def_id.package_id(), ident_constant), down_key);
@@ -516,7 +513,7 @@ fn generate_ontol_map_procs<'m>(
             .meta()
             .ty
             .get_single_def_id()
-            .and_then(|def_id| compiler.relations.properties_by_def_id(def_id))
+            .and_then(|def_id| compiler.rel_ctx.properties_by_def_id(def_id))
             .map(|properties| properties.identified_by.is_some())
             .unwrap_or(false),
         _ => false,

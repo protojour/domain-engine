@@ -137,7 +137,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
             let mut def_id;
 
             loop {
-                let segment = self.compiler.strings.intern(current.slice());
+                let segment = self.compiler.str_ctx.intern(current.slice());
                 def_id = namespace.space(Space::Type).get(segment);
                 if segment_iter.peek().is_some() {
                     match def_id {
@@ -188,7 +188,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
     ) -> Result<DefId, LoweringError> {
         let (def_id, coinage) = self.named_def_id(Space::Type, ident, ident_span)?;
         if matches!(coinage, Coinage::New) {
-            let ident = self.compiler.strings.intern(ident);
+            let ident = self.compiler.str_ctx.intern(ident);
             debug!("{def_id:?}: `{}`", ident);
 
             let kind = if extern_.0.is_some() {
@@ -218,7 +218,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
                 let ident_literal = self
                     .compiler
                     .defs
-                    .def_text_literal(ident, &mut self.compiler.strings);
+                    .def_text_literal(ident, &mut self.compiler.str_ctx);
 
                 let relationship_id = self.compiler.defs.alloc_def_id(self.package_id);
 
@@ -274,7 +274,7 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
         ident: &str,
         span: U32Span,
     ) -> Result<(DefId, Coinage), LoweringError> {
-        let ident = self.compiler.strings.intern(ident);
+        let ident = self.compiler.str_ctx.intern(ident);
         match self
             .compiler
             .namespaces

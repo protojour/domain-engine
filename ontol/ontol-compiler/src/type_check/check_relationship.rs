@@ -67,7 +67,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         self.check_subject_data_type(subject_ty, &subject.1);
         self.check_object_data_type(object_ty, &object.1);
 
-        let properties = self.relations.properties_by_def_id_mut(subject.0);
+        let properties = self.rel_ctx.properties_by_def_id_mut(subject.0);
         match &mut properties.table {
             None => {
                 properties.table = Some(
@@ -93,14 +93,14 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         }
 
         // Ensure properties in object
-        self.relations.properties_by_def_id_mut(object.0);
+        self.rel_ctx.properties_by_def_id_mut(object.0);
 
         match (&relationship.object_prop, object_ty) {
             (Some(_), Type::Domain(_)) => {
                 self.check_not_sealed(object_ty, &object.1);
 
                 if self
-                    .relations
+                    .rel_ctx
                     .properties_by_def_id_mut(object.0)
                     .table_mut()
                     .insert(
@@ -150,7 +150,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.check_object_data_type(object_ty, &object.1);
 
                 // Ensure properties
-                self.relations.properties_by_def_id_mut(subject.0);
+                self.rel_ctx.properties_by_def_id_mut(subject.0);
 
                 if !self.thesaurus.insert_domain_is(
                     subject.0,
@@ -174,7 +174,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
-                let properties = self.relations.properties_by_def_id_mut(subject.0);
+                let properties = self.rel_ctx.properties_by_def_id_mut(subject.0);
 
                 if properties.identifies.is_some() {
                     return CompileError::AlreadyIdentifiesAType
@@ -188,7 +188,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 }
 
                 properties.identifies = Some(relationship_id);
-                let object_properties = self.relations.properties_by_def_id_mut(object.0);
+                let object_properties = self.rel_ctx.properties_by_def_id_mut(object.0);
                 match object_properties.identified_by {
                     Some(id) => {
                         debug!(
@@ -226,8 +226,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let DefKind::TextLiteral(text_literal) = self.defs.def_kind(*def_id) else {
                     panic!("text literal expected to be registered not found!");
                 };
-                let text_constant = self.strings.intern_constant(text_literal);
-                self.relations.store_keys.insert(subject.0, text_constant);
+                let text_constant = self.str_ctx.intern_constant(text_literal);
+                self.rel_ctx.store_keys.insert(subject.0, text_constant);
 
                 object_ty
             }
@@ -237,7 +237,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 self.check_subject_data_type(subject_ty, &subject.1);
                 self.check_object_data_type(object_ty, &object.1);
-                let properties = self.relations.properties_by_def_id_mut(subject.0);
+                let properties = self.rel_ctx.properties_by_def_id_mut(subject.0);
                 match (&properties.table, &mut properties.constructor) {
                     (None, Constructor::Transparent) => {
                         let mut sequence = Sequence::default();
@@ -290,7 +290,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     unreachable!();
                 };
 
-                let Some(object_ty) = self.def_types.table.get(&outer_object.0).cloned() else {
+                let Some(object_ty) = self.def_ty_ctx.table.get(&outer_object.0).cloned() else {
                     return CompileError::TODO(
                         "the type of the default relation has not been checked",
                     )
@@ -303,7 +303,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
                 let _object_ty = self.check_def(object.0);
 
-                self.relations
+                self.rel_ctx
                     .default_const_objects
                     .insert(RelationshipId(*outer_relationship_id), object.0);
 
@@ -339,13 +339,13 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     unreachable!();
                 };
 
-                let Some(_) = self.def_types.table.get(&outer_object.0) else {
+                let Some(_) = self.def_ty_ctx.table.get(&outer_object.0) else {
                     return CompileError::TODO("the type of the gen relation has not been checked")
                         .span(*span)
                         .report_ty(self);
                 };
 
-                self.relations.value_generators_unchecked.insert(
+                self.rel_ctx.value_generators_unchecked.insert(
                     RelationshipId(*outer_relationship_id),
                     (*value_generator_def_id, *span),
                 );
@@ -355,7 +355,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let subject_ty = self.check_def(subject.0);
                 let _ = self.check_def(object.0);
 
-                self.relations
+                self.rel_ctx
                     .type_params
                     .entry(subject.0)
                     .or_default()
@@ -378,7 +378,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 self.check_object_data_type(object_ty, &object.1);
 
                 // This will be checked post-seal in check_entity.rs
-                self.relations
+                self.rel_ctx
                     .order_relationships
                     .entry(subject.0)
                     .or_default()
@@ -391,7 +391,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 let object_ty = self.check_def(object.0);
 
                 if self
-                    .relations
+                    .rel_ctx
                     .direction_relationships
                     .insert(subject.0, (relationship_id, object.0))
                     .is_some()
@@ -437,7 +437,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             Type::Anonymous(_) => {
                 debug!("Fmt subject anonymous object: {:?}", subject.0);
                 let subject_constructor = self
-                    .relations
+                    .rel_ctx
                     .properties_by_def_id(subject.0)
                     .map(|props| &props.constructor);
 
@@ -541,7 +541,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             },
             _ => {
                 let constructor = self
-                    .relations
+                    .rel_ctx
                     .properties_by_def_id(relation_def_id)
                     .map(Properties::constructor);
 
@@ -560,7 +560,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
         };
 
-        let object_properties = self.relations.properties_by_def_id_mut(object_def);
+        let object_properties = self.rel_ctx.properties_by_def_id_mut(object_def);
 
         if !matches!(&object_properties.constructor, Constructor::Transparent) {
             return Err(CompileError::ConstructorMismatch
@@ -574,7 +574,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         if final_state.0 || !object_ty.is_anonymous() {
             // constructors of unnamable types do not need to be processed..
             // Register pattern processing for later:
-            self.relations.text_pattern_constructors.insert(object_def);
+            self.rel_ctx.text_pattern_constructors.insert(object_def);
         }
 
         Ok(())

@@ -20,7 +20,7 @@ use crate::{
 
 impl<'m> Compiler<'m> {
     pub fn register_ontol_domain(&mut self) {
-        self.strings.intern_constant("ontol");
+        self.str_ctx.intern_constant("ontol");
         self.define_package(self.primitives.ontol_domain);
 
         // fundamental types
@@ -33,13 +33,13 @@ impl<'m> Compiler<'m> {
 
             match def_kind {
                 DefKind::Primitive(kind, ident) => {
-                    let ty = self.types.intern(Type::Primitive(*kind, def_id));
+                    let ty = self.ty_ctx.intern(Type::Primitive(*kind, def_id));
                     if let Some(ident) = *ident {
                         self.namespaces
                             .get_namespace_mut(ONTOL_PKG, Space::Type)
                             .insert(ident, def_id);
                     }
-                    self.def_types.table.insert(def_id, ty);
+                    self.def_ty_ctx.table.insert(def_id, ty);
                 }
                 DefKind::BuiltinRelType(kind, ident) => {
                     if let Some(ident) = ident {
@@ -54,7 +54,7 @@ impl<'m> Compiler<'m> {
                         _ => RelTypeConstraints::default(),
                     };
 
-                    self.relations
+                    self.rel_ctx
                         .rel_type_constraints
                         .insert(def_id, constraints);
                 }
@@ -63,7 +63,7 @@ impl<'m> Compiler<'m> {
                         let ident = type_def.ident.unwrap();
 
                         let symbol_literal_def_id =
-                            self.defs.def_text_literal(ident, &mut self.strings);
+                            self.defs.def_text_literal(ident, &mut self.str_ctx);
 
                         self.register_type(def_id, Type::Domain);
 
@@ -101,9 +101,9 @@ impl<'m> Compiler<'m> {
         self.setup_number_system();
 
         let binary_arithmetic = self
-            .types
+            .ty_ctx
             .intern(Type::Function(FunctionType::BinaryArithmetic));
-        let binary_text = self.types.intern(Type::Function(FunctionType::BinaryText));
+        let binary_text = self.ty_ctx.intern(Type::Function(FunctionType::BinaryText));
 
         // built-in functions
         // arithmetic
@@ -205,18 +205,14 @@ impl<'m> Compiler<'m> {
         let literal = self
             .defs
             .add_def(DefKind::NumberLiteral(literal), ONTOL_PKG, NO_SPAN);
-        self.relations
-            .type_params
-            .entry(subject)
-            .or_default()
-            .insert(
-                param,
-                TypeParam {
-                    definition_site: ONTOL_PKG,
-                    object: literal,
-                    span: NO_SPAN,
-                },
-            );
+        self.rel_ctx.type_params.entry(subject).or_default().insert(
+            param,
+            TypeParam {
+                definition_site: ONTOL_PKG,
+                object: literal,
+                span: NO_SPAN,
+            },
+        );
     }
 
     fn def_uuid(&mut self) {
@@ -224,8 +220,8 @@ impl<'m> Compiler<'m> {
             Type::TextLike(def_id, TextLikeType::Uuid)
         });
         let segment = TextPatternSegment::Regex(regex_util::uuid());
-        store_text_pattern_segment(uuid, &segment, &mut self.text_patterns, &mut self.strings);
-        self.relations.properties_by_def_id_mut(uuid).constructor = Constructor::TextFmt(segment);
+        store_text_pattern_segment(uuid, &segment, &mut self.text_patterns, &mut self.str_ctx);
+        self.rel_ctx.properties_by_def_id_mut(uuid).constructor = Constructor::TextFmt(segment);
         self.defs.string_like_types.insert(uuid, TextLikeType::Uuid);
     }
 
@@ -238,11 +234,10 @@ impl<'m> Compiler<'m> {
             datetime,
             &segment,
             &mut self.text_patterns,
-            &mut self.strings,
+            &mut self.str_ctx,
         );
-        self.relations
-            .properties_by_def_id_mut(datetime)
-            .constructor = Constructor::TextFmt(segment.clone());
+        self.rel_ctx.properties_by_def_id_mut(datetime).constructor =
+            Constructor::TextFmt(segment.clone());
         self.defs
             .string_like_types
             .insert(datetime, TextLikeType::DateTime);
@@ -268,8 +263,8 @@ impl<'m> Compiler<'m> {
     }
 
     fn register_type(&mut self, def_id: DefId, ty_fn: impl Fn(DefId) -> Type<'m>) -> TypeRef<'m> {
-        let ty = self.types.intern(ty_fn(def_id));
-        self.def_types.table.insert(def_id, ty);
+        let ty = self.ty_ctx.intern(ty_fn(def_id));
+        self.def_ty_ctx.table.insert(def_id, ty);
         ty
     }
 
@@ -279,17 +274,17 @@ impl<'m> Compiler<'m> {
         ident: &'m str,
         ty_fn: impl Fn(DefId) -> Type<'m>,
     ) -> TypeRef<'m> {
-        let ty = self.types.intern(ty_fn(def_id));
+        let ty = self.ty_ctx.intern(ty_fn(def_id));
         self.namespaces
             .get_namespace_mut(ONTOL_PKG, Space::Type)
             .insert(ident, def_id);
-        self.def_types.table.insert(def_id, ty);
+        self.def_ty_ctx.table.insert(def_id, ty);
         ty
     }
 
     fn def_proc(&mut self, ident: &'static str, def_kind: DefKind<'m>, ty: TypeRef<'m>) -> DefId {
         let def_id = self.add_named_def(ident, Space::Type, def_kind, ONTOL_PKG, NO_SPAN);
-        self.def_types.table.insert(def_id, ty);
+        self.def_ty_ctx.table.insert(def_id, ty);
 
         def_id
     }

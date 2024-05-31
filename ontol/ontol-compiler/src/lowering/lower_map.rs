@@ -46,7 +46,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     CompileError::DuplicateMapIdentifier.span_report(symbol.span(), &mut self.ctx);
                     return None;
                 }
-                let ident = self.ctx.compiler.strings.intern(symbol.slice());
+                let ident = self.ctx.compiler.str_ctx.intern(symbol.slice());
                 (def_id, Some(ident))
             }
             None => (

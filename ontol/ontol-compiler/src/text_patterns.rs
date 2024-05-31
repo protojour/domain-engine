@@ -13,7 +13,7 @@ use tracing::debug;
 use crate::{
     regex_util::{self, set_of_all_strings, unsigned_integer_with_radix},
     relation::Constructor,
-    strings::Strings,
+    strings::StringCtx,
     Compiler,
 };
 
@@ -156,7 +156,7 @@ impl TextPatternSegment {
         &self,
         parts: &mut Vec<TextPatternConstantPart>,
         capture_cursor: &mut CaptureCursor,
-        strings: &mut Strings,
+        strings: &mut StringCtx,
     ) {
         match self {
             Self::EmptyString => {}
@@ -222,11 +222,11 @@ fn compile_regex_literals(compiler: &mut Compiler) {
 }
 
 fn compile_text_pattern_constructors(compiler: &mut Compiler) {
-    let text_patterns = std::mem::take(&mut compiler.relations.text_pattern_constructors);
+    let text_patterns = std::mem::take(&mut compiler.rel_ctx.text_pattern_constructors);
 
     for def_id in text_patterns {
         let segment = match compiler
-            .relations
+            .rel_ctx
             .properties_by_def_id(def_id)
             .map(|p| &p.constructor)
         {
@@ -238,7 +238,7 @@ fn compile_text_pattern_constructors(compiler: &mut Compiler) {
             def_id,
             segment,
             &mut compiler.text_patterns,
-            &mut compiler.strings,
+            &mut compiler.str_ctx,
         );
     }
 }
@@ -247,7 +247,7 @@ pub fn store_text_pattern_segment(
     def_id: DefId,
     segment: &TextPatternSegment,
     patterns: &mut TextPatterns,
-    strings: &mut Strings,
+    strings: &mut StringCtx,
 ) {
     let anchored_hir = Hir::concat(vec![
         Hir::look(Look::Start),

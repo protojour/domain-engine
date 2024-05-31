@@ -2,17 +2,17 @@ use fnv::FnvHashMap;
 use ontol_runtime::DefId;
 
 use crate::{
-    codegen::task::CodegenTasks,
+    codegen::task::CodeCtx,
     def::Defs,
     entity::entity_ctx::EntityCtx,
     error::CompileError,
     pattern::Patterns,
     primitive::Primitives,
-    relation::Relations,
+    relation::RelCtx,
     repr::{repr_check::ReprCheck, repr_ctx::ReprCtx},
-    strings::Strings,
+    strings::StringCtx,
     thesaurus::Thesaurus,
-    types::{DefTypes, FormatType, TypeRef, Types, ERROR_TYPE},
+    types::{DefTypeCtx, FormatType, TypeCtx, TypeRef, ERROR_TYPE},
     CompileErrors, Compiler, SourceSpan, SpannedCompileError,
 };
 
@@ -57,16 +57,16 @@ pub enum MapArmsKind {
 pub struct TypeCheck<'c, 'm> {
     /// This map stores the expected type of constants
     pub expected_constant_types: FnvHashMap<DefId, TypeRef<'m>>,
-    pub types: &'c mut Types<'m>,
-    pub def_types: &'c mut DefTypes<'m>,
-    pub relations: &'c mut Relations,
+    pub types: &'c mut TypeCtx<'m>,
+    pub def_ty_ctx: &'c mut DefTypeCtx<'m>,
+    pub rel_ctx: &'c mut RelCtx,
     pub thesaurus: &'c mut Thesaurus,
     pub errors: &'c mut CompileErrors,
-    pub codegen_tasks: &'c mut CodegenTasks<'m>,
+    pub code_ctx: &'c mut CodeCtx<'m>,
     pub patterns: &'c mut Patterns,
     pub repr_ctx: &'c mut ReprCtx,
     pub seal_ctx: &'c mut SealCtx,
-    pub strings: &'c mut Strings<'m>,
+    pub str_ctx: &'c mut StringCtx<'m>,
     pub defs: &'c Defs<'m>,
     pub entity_ctx: &'c EntityCtx,
     pub primitives: &'c Primitives,
@@ -133,8 +133,8 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         ReprCheck {
             root_def_id,
             defs: self.defs,
-            def_types: self.def_types,
-            relations: self.relations,
+            def_types: self.def_ty_ctx,
+            relations: self.rel_ctx,
             thesaurus: self.thesaurus,
             primitives: self.primitives,
             repr_ctx: self.repr_ctx,
@@ -150,9 +150,9 @@ impl<'c, 'm> AsRef<Defs<'m>> for TypeCheck<'c, 'm> {
     }
 }
 
-impl<'c, 'm> AsRef<Relations> for TypeCheck<'c, 'm> {
-    fn as_ref(&self) -> &Relations {
-        self.relations
+impl<'c, 'm> AsRef<RelCtx> for TypeCheck<'c, 'm> {
+    fn as_ref(&self) -> &RelCtx {
+        self.rel_ctx
     }
 }
 
@@ -166,16 +166,16 @@ impl<'m> Compiler<'m> {
     pub fn type_check(&mut self) -> TypeCheck<'_, 'm> {
         TypeCheck {
             expected_constant_types: Default::default(),
-            types: &mut self.types,
+            types: &mut self.ty_ctx,
             errors: &mut self.errors,
-            def_types: &mut self.def_types,
-            relations: &mut self.relations,
+            def_ty_ctx: &mut self.def_ty_ctx,
+            rel_ctx: &mut self.rel_ctx,
             thesaurus: &mut self.thesaurus,
-            codegen_tasks: &mut self.codegen_tasks,
+            code_ctx: &mut self.code_ctx,
             patterns: &mut self.patterns,
             repr_ctx: &mut self.repr_ctx,
             seal_ctx: &mut self.seal_ctx,
-            strings: &mut self.strings,
+            str_ctx: &mut self.str_ctx,
             defs: &self.defs,
             primitives: &self.primitives,
             entity_ctx: &self.entity_ctx,

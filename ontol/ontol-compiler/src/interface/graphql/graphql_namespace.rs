@@ -6,7 +6,7 @@ use ontol_runtime::{
     DefId, PackageId,
 };
 
-use crate::strings::Strings;
+use crate::strings::StringCtx;
 
 #[derive(Default)]
 pub struct GraphqlNamespace<'o> {
@@ -35,7 +35,7 @@ impl<'o> GraphqlNamespace<'o> {
         self.rewrite(&string).into()
     }
 
-    pub fn typename(&mut self, type_info: &TypeInfo, strings: &Strings) -> String {
+    pub fn typename(&mut self, type_info: &TypeInfo, strings: &StringCtx) -> String {
         self.concat(&[&Typename(type_info, strings)], strings)
     }
 
@@ -43,7 +43,7 @@ impl<'o> GraphqlNamespace<'o> {
         &mut self,
         rel_type_info: Option<&TypeInfo>,
         type_info: &TypeInfo,
-        strings: &Strings,
+        strings: &StringCtx,
     ) -> String {
         if let Some(rel_type_info) = rel_type_info {
             self.concat(
@@ -59,7 +59,7 @@ impl<'o> GraphqlNamespace<'o> {
         }
     }
 
-    pub fn mutation_result(&mut self, type_info: &TypeInfo, strings: &Strings) -> String {
+    pub fn mutation_result(&mut self, type_info: &TypeInfo, strings: &StringCtx) -> String {
         self.concat(&[&Typename(type_info, strings), &"Mutation"], strings)
     }
 
@@ -67,7 +67,7 @@ impl<'o> GraphqlNamespace<'o> {
         &mut self,
         rel_type_info: Option<&TypeInfo>,
         type_info: &TypeInfo,
-        strings: &Strings,
+        strings: &StringCtx,
     ) -> String {
         if let Some(rel_type_info) = rel_type_info {
             self.concat(
@@ -83,19 +83,19 @@ impl<'o> GraphqlNamespace<'o> {
         }
     }
 
-    pub fn input(&mut self, type_info: &TypeInfo, strings: &Strings) -> String {
+    pub fn input(&mut self, type_info: &TypeInfo, strings: &StringCtx) -> String {
         self.concat(&[&Typename(type_info, strings), &"Input"], strings)
     }
 
-    pub fn partial_input(&mut self, type_info: &TypeInfo, strings: &Strings) -> String {
+    pub fn partial_input(&mut self, type_info: &TypeInfo, strings: &StringCtx) -> String {
         self.concat(&[&Typename(type_info, strings), &"PartialInput"], strings)
     }
 
-    pub fn union_input(&mut self, type_info: &TypeInfo, strings: &Strings) -> String {
+    pub fn union_input(&mut self, type_info: &TypeInfo, strings: &StringCtx) -> String {
         self.concat(&[&Typename(type_info, strings), &"UnionInput"], strings)
     }
 
-    pub fn union_partial_input(&mut self, type_info: &TypeInfo, strings: &Strings) -> String {
+    pub fn union_partial_input(&mut self, type_info: &TypeInfo, strings: &StringCtx) -> String {
         self.concat(
             &[&Typename(type_info, strings), &"UnionPartialInput"],
             strings,
@@ -106,7 +106,7 @@ impl<'o> GraphqlNamespace<'o> {
         &mut self,
         rel_type_info: Option<&TypeInfo>,
         type_info: &TypeInfo,
-        strings: &Strings,
+        strings: &StringCtx,
     ) -> String {
         if let Some(rel_type_info) = rel_type_info {
             self.concat(
@@ -126,7 +126,7 @@ impl<'o> GraphqlNamespace<'o> {
         &mut self,
         rel_type_info: Option<&TypeInfo>,
         type_info: &TypeInfo,
-        strings: &Strings,
+        strings: &StringCtx,
     ) -> String {
         if let Some(rel_type_info) = rel_type_info {
             self.concat(
@@ -145,7 +145,7 @@ impl<'o> GraphqlNamespace<'o> {
         }
     }
 
-    fn concat(&mut self, elements: &[&dyn ProcessName], strings: &Strings) -> String {
+    fn concat(&mut self, elements: &[&dyn ProcessName], strings: &StringCtx) -> String {
         let mut output: String = "".into();
 
         if let Some(domain_disambiguation) = &self.domain_disambiguation {
@@ -196,7 +196,7 @@ trait ProcessName {
     fn process<'n>(&self, namespace: &'n mut GraphqlNamespace) -> &'n str;
 }
 
-struct Typename<'a, 'm>(&'a TypeInfo, &'a Strings<'m>);
+struct Typename<'a, 'm>(&'a TypeInfo, &'a StringCtx<'m>);
 
 impl<'a, 'm> ProcessName for Typename<'a, 'm> {
     fn def_id(&self) -> Option<DefId> {

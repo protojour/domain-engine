@@ -95,7 +95,7 @@ impl<'c, 'm> ConditionBuilder<'c, 'm> {
 
                 let discr = self
                     .compiler
-                    .relations
+                    .rel_ctx
                     .union_discriminators
                     .get(&pre_narrowed_def_id)
                     .expect("narrowing must be union-based");
@@ -124,7 +124,7 @@ impl<'c, 'm> ConditionBuilder<'c, 'm> {
                                 Clause::Member(
                                     CondTerm::Wildcard,
                                     CondTerm::Value(Value::Text(
-                                        self.compiler.strings[*constant].into(),
+                                        self.compiler.str_ctx[*constant].into(),
                                         self.compiler.primitives.text,
                                     )),
                                 ),

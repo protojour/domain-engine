@@ -4,7 +4,7 @@ use ontol_runtime::DefId;
 
 use crate::{
     def::Defs,
-    types::{DefTypes, TypeRef},
+    types::{DefTypeCtx, TypeRef},
 };
 
 fn get<T: AsRef<U>, U>(owner: &T) -> &U {
@@ -18,9 +18,9 @@ pub trait GetDefType<'m> {
 
 impl<'m, T> GetDefType<'m> for T
 where
-    T: AsRef<Defs<'m>> + AsRef<DefTypes<'m>>,
+    T: AsRef<Defs<'m>> + AsRef<DefTypeCtx<'m>>,
 {
     fn get_def_type(&self, def_id: DefId) -> Option<TypeRef<'m>> {
-        get::<_, DefTypes>(self).table.get(&def_id).copied()
+        get::<_, DefTypeCtx>(self).table.get(&def_id).copied()
     }
 }

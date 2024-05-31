@@ -35,7 +35,7 @@ use crate::{
     primitive::PrimitiveKind,
     relation::{Properties, UnionMemberCache},
     repr::repr_model::ReprKind,
-    strings::Strings,
+    strings::StringCtx,
     Compiler,
 };
 
@@ -112,7 +112,7 @@ impl<'m> Compiler<'m> {
             UnionMemberCache { cache }
         };
 
-        let mut strings = self.strings.detach();
+        let mut strings = self.str_ctx.detach();
         let mut serde_gen = self.serde_generator(&mut strings, &union_member_cache);
         let mut builder = Ontology::builder();
         let mut ontology_union_variants: FnvHashMap<DefId, Box<[DefId]>> = Default::default();
@@ -142,11 +142,11 @@ impl<'m> Compiler<'m> {
             }
 
             for (type_name, type_def_id) in type_namespace {
-                let type_name_constant = serde_gen.strings.intern_constant(type_name);
+                let type_name_constant = serde_gen.str_ctx.intern_constant(type_name);
                 let data_relationships = self.find_data_relationships(
                     type_def_id,
                     &union_member_cache,
-                    serde_gen.strings,
+                    serde_gen.str_ctx,
                 );
                 let def_kind = self.defs.def_kind(type_def_id);
 
@@ -183,7 +183,7 @@ impl<'m> Compiler<'m> {
                         SerdeModifier::json_default(),
                     ))),
                     store_key: Some(
-                        self.relations
+                        self.rel_ctx
                             .store_keys
                             .get(&type_def_id)
                             .copied()
@@ -205,11 +205,11 @@ impl<'m> Compiler<'m> {
                         type_def_id,
                         SerdeModifier::json_default(),
                     ))),
-                    store_key: self.relations.store_keys.get(&type_def_id).copied(),
+                    store_key: self.rel_ctx.store_keys.get(&type_def_id).copied(),
                     data_relationships: self.find_data_relationships(
                         type_def_id,
                         &union_member_cache,
-                        serde_gen.strings,
+                        serde_gen.str_ctx,
                     ),
                 });
             }
@@ -243,7 +243,7 @@ impl<'m> Compiler<'m> {
                     builder.partial_ontology(),
                     &self.primitives,
                     map_namespaces.get(&package_id),
-                    &self.codegen_tasks,
+                    &self.code_ctx,
                     &self.resolver_graph,
                     &union_member_cache,
                     &mut serde_gen,
@@ -262,12 +262,12 @@ impl<'m> Compiler<'m> {
         let mut property_flows = vec![];
 
         let map_meta_table = self
-            .codegen_tasks
+            .code_ctx
             .result_map_proc_table
             .into_iter()
             .map(|(key, procedure)| {
                 let propflow_range = if let Some(current_prop_flows) =
-                    self.codegen_tasks.result_propflow_table.remove(&key)
+                    self.code_ctx.result_propflow_table.remove(&key)
                 {
                     let start: u32 = property_flows.len().try_into().unwrap();
                     let len: u32 = current_prop_flows.len().try_into().unwrap();
@@ -278,7 +278,7 @@ impl<'m> Compiler<'m> {
                 };
 
                 let metadata = self
-                    .codegen_tasks
+                    .code_ctx
                     .result_metadata_table
                     .remove(&key)
                     .unwrap_or_else(|| panic!("metadata not found for {key:?}"));
@@ -316,19 +316,19 @@ impl<'m> Compiler<'m> {
             })
             .union_variants(ontology_union_variants)
             .extended_entity_info(self.entity_ctx.entities)
-            .lib(self.codegen_tasks.result_lib)
+            .lib(self.code_ctx.result_lib)
             .docs(docs)
-            .const_procs(self.codegen_tasks.result_const_procs)
+            .const_procs(self.code_ctx.result_const_procs)
             .map_meta_table(map_meta_table)
-            .static_conditions(self.codegen_tasks.result_static_conditions)
-            .named_forward_maps(self.codegen_tasks.result_named_downmaps)
+            .static_conditions(self.code_ctx.result_static_conditions)
+            .named_forward_maps(self.code_ctx.result_named_downmaps)
             .serde_operators(serde_operators)
             .dynamic_sequence_operator_addr(dynamic_sequence_operator_addr)
             .property_flows(property_flows)
             .string_like_types(self.defs.string_like_types)
             .text_patterns(self.text_patterns.text_patterns)
-            .externs(self.def_types.ontology_externs)
-            .value_generators(self.relations.value_generators)
+            .externs(self.def_ty_ctx.ontology_externs)
+            .value_generators(self.rel_ctx.value_generators)
             .domain_interfaces(domain_interfaces)
             .build()
     }
@@ -337,7 +337,7 @@ impl<'m> Compiler<'m> {
         &self,
         type_def_id: DefId,
         union_member_cache: &UnionMemberCache,
-        strings: &mut Strings<'m>,
+        strings: &mut StringCtx<'m>,
     ) -> FnvHashMap<PropertyId, DataRelationshipInfo> {
         let mut data_relationships = FnvHashMap::default();
         self.add_inherent_data_relationships(type_def_id, &mut data_relationships, strings);
@@ -356,7 +356,7 @@ impl<'m> Compiler<'m> {
 
         if let Some(union_memberships) = union_member_cache.cache.get(&type_def_id) {
             for union_def_id in union_memberships {
-                let Some(properties) = self.relations.properties_by_def_id(*union_def_id) else {
+                let Some(properties) = self.rel_ctx.properties_by_def_id(*union_def_id) else {
                     continue;
                 };
                 let Some(table) = &properties.table else {
@@ -382,9 +382,9 @@ impl<'m> Compiler<'m> {
         &self,
         type_def_id: DefId,
         output: &mut FnvHashMap<PropertyId, DataRelationshipInfo>,
-        strings: &mut Strings<'m>,
+        strings: &mut StringCtx<'m>,
     ) {
-        let Some(properties) = self.relations.properties_by_def_id(type_def_id) else {
+        let Some(properties) = self.rel_ctx.properties_by_def_id(type_def_id) else {
             return;
         };
         if let Some(table) = &properties.table {
@@ -404,7 +404,7 @@ impl<'m> Compiler<'m> {
         &self,
         property_id: PropertyId,
         source: DataRelationshipSource,
-        strings: &mut Strings<'m>,
+        strings: &mut StringCtx<'m>,
     ) -> Option<DataRelationshipInfo> {
         let meta = self.defs.relationship_meta(property_id.relationship_id);
 
@@ -417,7 +417,7 @@ impl<'m> Compiler<'m> {
             DefKind::Type(_) => strings.intern_constant(""),
             _ => return None,
         };
-        let target_properties = self.relations.properties_by_def_id(target_def_id)?;
+        let target_properties = self.rel_ctx.properties_by_def_id(target_def_id)?;
         let repr_kind = self.repr_ctx.get_repr_kind(&target_def_id)?;
 
         let graph_rel_params = match meta.relationship.rel_params {
@@ -430,7 +430,7 @@ impl<'m> Compiler<'m> {
                 let target = DataRelationshipTarget::Union(target_def_id);
 
                 if members.iter().all(|(member_def_id, _)| {
-                    self.relations
+                    self.rel_ctx
                         .properties_by_def_id(*member_def_id)
                         .map(|properties| properties.identified_by.is_some())
                         .unwrap_or(false)
@@ -455,7 +455,7 @@ impl<'m> Compiler<'m> {
                         target,
                     )
                 } else {
-                    let source_properties = self.relations.properties_by_def_id(source_def_id);
+                    let source_properties = self.rel_ctx.properties_by_def_id(source_def_id);
                     let is_entity_id = source_properties
                         .map(|properties| {
                             properties.identified_by == Some(property_id.relationship_id)
@@ -484,7 +484,7 @@ impl<'m> Compiler<'m> {
                 .object_prop
                 .map(|prop| strings.intern_constant(prop)),
             store_key: self
-                .relations
+                .rel_ctx
                 .store_keys
                 .get(&property_id.relationship_id.0)
                 .copied(),
@@ -500,7 +500,7 @@ impl<'m> Compiler<'m> {
         serde_generator: &mut SerdeGenerator,
         data_relationships: &FnvHashMap<PropertyId, DataRelationshipInfo>,
     ) -> Option<EntityInfo> {
-        let properties = self.relations.properties_by_def_id(type_def_id)?;
+        let properties = self.rel_ctx.properties_by_def_id(type_def_id)?;
         let id_relationship_id = properties.identified_by?;
 
         let identifies_meta = self.defs.relationship_meta(id_relationship_id);
@@ -517,7 +517,7 @@ impl<'m> Compiler<'m> {
         let inherent_primary_id_meta = self.find_inherent_primary_id(type_def_id, properties);
 
         let id_value_generator = if let Some(inherent_primary_id_meta) = &inherent_primary_id_meta {
-            self.relations
+            self.rel_ctx
                 .value_generators
                 .get(&inherent_primary_id_meta.relationship_id)
                 .cloned()
@@ -552,7 +552,7 @@ impl<'m> Compiler<'m> {
     ) -> Option<RelationshipMeta<'_, 'm>> {
         let id_relationship_id = properties.identified_by?;
         let inherent_id = self
-            .relations
+            .rel_ctx
             .inherent_id_map
             .get(&id_relationship_id)
             .cloned()?;
@@ -564,7 +564,7 @@ impl<'m> Compiler<'m> {
 
     fn unique_domain_names(&self) -> FnvHashMap<PackageId, TextConstant> {
         let mut map: HashMap<TextConstant, PackageId> = HashMap::new();
-        map.insert(self.strings.get_constant("ontol").unwrap(), ONTOL_PKG);
+        map.insert(self.str_ctx.get_constant("ontol").unwrap(), ONTOL_PKG);
 
         for (package_id, name) in self.package_names.iter().cloned() {
             if map.contains_key(&name) {

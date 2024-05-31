@@ -16,7 +16,7 @@ use ontol_runtime::{
 use tracing::{debug_span, trace};
 
 use crate::{
-    codegen::task::CodegenTasks,
+    codegen::task::CodeCtx,
     interface::{graphql::schema_builder::QLevel, serde::serde_generator::SerdeGenerator},
     phf_build::build_phf_map,
     primitive::Primitives,
@@ -34,7 +34,7 @@ pub fn generate_graphql_schema<'c>(
     partial_ontology: &'c Ontology,
     primitives: &'c Primitives,
     map_namespace: Option<&'c IndexMap<&str, DefId>>,
-    codegen_tasks: &'c CodegenTasks,
+    code_ctx: &'c CodeCtx,
     resolver_graph: &'c ResolverGraph,
     union_member_cache: &'c UnionMemberCache,
     serde_gen: &mut SerdeGenerator<'c, '_>,
@@ -50,9 +50,9 @@ pub fn generate_graphql_schema<'c>(
     if let Some(map_namespace) = map_namespace {
         // Register named maps in the user-specified order (using the IndexMap from the namespace)
         for name in map_namespace.keys() {
-            let name_constant = serde_gen.strings.intern_constant(name);
+            let name_constant = serde_gen.str_ctx.intern_constant(name);
 
-            if let Some(map_key) = codegen_tasks
+            if let Some(map_key) = code_ctx
                 .result_named_downmaps
                 .get(&(package_id, name_constant))
             {
@@ -75,7 +75,7 @@ pub fn generate_graphql_schema<'c>(
     });
 
     let mut builder = {
-        let relations = serde_gen.relations;
+        let relations = serde_gen.rel_ctx;
         let defs = serde_gen.defs;
         let repr_ctx = serde_gen.repr_ctx;
         SchemaBuilder {
@@ -117,7 +117,7 @@ pub fn generate_graphql_schema<'c>(
     }
 
     for (name, map_key) in named_maps {
-        let prop_flow = codegen_tasks.result_propflow_table.get(&map_key).unwrap();
+        let prop_flow = code_ctx.result_propflow_table.get(&map_key).unwrap();
 
         builder.add_named_map_query(name, map_key, prop_flow, &mut query_fields);
     }
@@ -131,7 +131,7 @@ pub fn generate_graphql_schema<'c>(
         build_phf_map(schema.types.iter().enumerate().map(|(addr, data)| {
             let constant = data.typename;
             (
-                PhfKey::new(constant, serde_gen.strings[constant].into()),
+                PhfKey::new(constant, serde_gen.str_ctx[constant].into()),
                 TypeAddr(addr as u32),
             )
         }));

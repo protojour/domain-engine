@@ -35,9 +35,9 @@ use crate::{
     interface::serde::{serde_generator::SerdeGenerator, SerdeKey},
     phf_build::build_phf_index_map,
     primitive::Primitives,
-    relation::{Relations, UnionMemberCache},
+    relation::{RelCtx, UnionMemberCache},
     repr::{repr_ctx::ReprCtx, repr_model::ReprKind},
-    strings::Strings,
+    strings::StringCtx,
 };
 
 use super::graphql_namespace::GraphqlNamespace;
@@ -54,7 +54,7 @@ pub(super) struct SchemaBuilder<'a, 's, 'c, 'm> {
     /// Serde generator for generating new serialization operators
     pub serde_gen: &'a mut SerdeGenerator<'c, 'm>,
     /// The compiler's relations
-    pub relations: &'c Relations,
+    pub relations: &'c RelCtx,
     /// The compiler's defs
     pub defs: &'c Defs<'m>,
     /// The compiler's primitives
@@ -169,7 +169,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         partial_ontology: &'c Ontology,
     ) {
         self.schema.query = self.schema.push_type_data(TypeData {
-            typename: self.serde_gen.strings.intern_constant("Query"),
+            typename: self.serde_gen.str_ctx.intern_constant("Query"),
             input_typename: None,
             partial_input_typename: None,
             kind: TypeKind::Object(ObjectData {
@@ -182,7 +182,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         });
 
         self.schema.mutation = self.schema.push_type_data(TypeData {
-            typename: self.serde_gen.strings.intern_constant("Mutation"),
+            typename: self.serde_gen.str_ctx.intern_constant("Mutation"),
             input_typename: None,
             partial_input_typename: None,
             kind: TypeKind::Object(ObjectData {
@@ -194,7 +194,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
         {
             self.schema.page_info = self.schema.push_type_data(TypeData {
-                typename: self.serde_gen.strings.intern_constant("PageInfo"),
+                typename: self.serde_gen.str_ctx.intern_constant("PageInfo"),
                 input_typename: None,
                 partial_input_typename: None,
                 kind: TypeKind::Object(ObjectData {
@@ -206,7 +206,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
             let data = object_data_mut(self.schema.page_info, self.schema);
             data.fields = build_phf_index_map([
                 (
-                    self.serde_gen.strings.make_phf_key("endCursor"),
+                    self.serde_gen.str_ctx.make_phf_key("endCursor"),
                     FieldData {
                         kind: FieldKind::PageInfo,
                         field_type: TypeRef {
@@ -225,7 +225,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                     },
                 ),
                 (
-                    self.serde_gen.strings.make_phf_key("hasNextPage"),
+                    self.serde_gen.str_ctx.make_phf_key("hasNextPage"),
                     FieldData {
                         kind: FieldKind::PageInfo,
                         field_type: TypeRef {
@@ -249,7 +249,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         self.schema.json_scalar = self.schema.push_type_data(TypeData {
             typename: self
                 .serde_gen
-                .strings
+                .str_ctx
                 .intern_constant(&self.type_namespace.unique_literal("_ontol_json")),
             input_typename: None,
             partial_input_typename: None,
@@ -304,7 +304,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                                 let type_addr = self.schema.push_type_data(type_data);
                                 self.builtin_scalars.insert(typename, type_addr);
 
-                                if &self.serde_gen.strings[typename] == "_ontol_i64" {
+                                if &self.serde_gen.str_ctx[typename] == "_ontol_i64" {
                                     self.schema.i64_custom_scalar = Some(type_addr);
                                 }
 
@@ -380,7 +380,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 MapInputArg {
                     operator_addr: input_operator_addr,
                     scalar_input_name: Some(
-                        self.serde_gen.strings.intern_constant(&scalar_input_name),
+                        self.serde_gen.str_ctx.intern_constant(&scalar_input_name),
                     ),
                     default_arg: None,
                     hidden: false,
@@ -495,7 +495,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         }
 
         fields.insert(
-            mutation_namespace.typename(type_info, self.serde_gen.strings),
+            mutation_namespace.typename(type_info, self.serde_gen.str_ctx),
             FieldData {
                 kind: FieldKind::EntityMutation(Box::new(EntityMutationField {
                     def_id: type_info.def_id,
@@ -535,10 +535,10 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
     pub fn mk_typename_constant<S: AsRef<str>>(
         &mut self,
-        f: impl Fn(&mut GraphqlNamespace, &Strings<'m>) -> S,
+        f: impl Fn(&mut GraphqlNamespace, &StringCtx<'m>) -> S,
     ) -> TextConstant {
-        let string = f(self.type_namespace, self.serde_gen.strings);
-        self.serde_gen.strings.intern_constant(string.as_ref())
+        let string = f(self.type_namespace, self.serde_gen.str_ctx);
+        self.serde_gen.str_ctx.intern_constant(string.as_ref())
     }
 
     pub fn set_object_fields(
@@ -549,7 +549,7 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
         object_data_mut(address, self.schema).fields = build_phf_index_map(
             fields
                 .into_iter()
-                .map(|(key, data)| (self.serde_gen.strings.make_phf_key(&key), data)),
+                .map(|(key, data)| (self.serde_gen.str_ctx.make_phf_key(&key), data)),
         );
     }
 }

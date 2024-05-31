@@ -62,7 +62,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         if let Some(union_memberships) = self.union_member_cache.cache.get(&def.def_id) {
             for union_def_id in union_memberships {
-                let Some(properties) = self.relations.properties_by_def_id(*union_def_id) else {
+                let Some(properties) = self.rel_ctx.properties_by_def_id(*union_def_id) else {
                     continue;
                 };
                 let Some(table) = &properties.table else {
@@ -95,7 +95,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         serde_properties.insert(
             EDGE_PROPERTY.into(),
             (
-                self.strings.make_phf_key(EDGE_PROPERTY),
+                self.str_ctx.make_phf_key(EDGE_PROPERTY),
                 SerdeProperty {
                     property_id: PropertyId::subject(RelationshipId(DefId::unit())),
                     flags: SerdePropertyFlags::REL_PARAMS | SerdePropertyFlags::OPTIONAL,
@@ -168,12 +168,12 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         let mut flags = SerdePropertyFlags::default();
 
         if let Some(default_const_def) = self
-            .relations
+            .rel_ctx
             .default_const_objects
             .get(&meta.relationship_id)
         {
             let proc = self
-                .codegen_tasks
+                .code_ctx
                 .result_const_procs
                 .get(default_const_def)
                 .unwrap_or_else(|| panic!());
@@ -182,7 +182,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         }
 
         if let Some(explicit_value_generator) = self
-            .relations
+            .rel_ctx
             .value_generators
             .get(&property_id.relationship_id)
         {
@@ -205,7 +205,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             struct_flags.insert(SerdeStructFlags::ENTITY_ID_OPTIONAL);
         }
 
-        if let Some(target_properties) = self.relations.properties_by_def_id(value_type_def_id) {
+        if let Some(target_properties) = self.rel_ctx.properties_by_def_id(value_type_def_id) {
             if target_properties.identified_by.is_some() && !property.is_entity_id {
                 flags |= SerdePropertyFlags::IN_ENTITY_GRAPH;
             }
@@ -222,7 +222,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 kind: SerdePropertyKind::Plain { rel_params_addr },
             },
             modifier,
-            self.strings,
+            self.str_ctx,
         );
     }
 
@@ -298,7 +298,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
             }
         }
 
-        let entrypoint_prop_name = self.strings[discriminator_property_text_constant].to_string();
+        let entrypoint_prop_name = self.str_ctx[discriminator_property_text_constant].to_string();
 
         insert_property(
             output,
@@ -311,7 +311,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 kind: SerdePropertyKind::FlatUnionDiscriminator { union_addr },
             },
             modifier,
-            self.strings,
+            self.str_ctx,
         );
 
         for (key, addrs) in covered_properties {
@@ -329,7 +329,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 let old = output.insert(
                     key.as_str().into(),
                     (
-                        self.strings.make_phf_key(&key),
+                        self.str_ctx.make_phf_key(&key),
                         SerdeProperty {
                             property_id: PropertyId::subject(RelationshipId(DefId::unit())),
                             value_addr,
@@ -386,7 +386,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         let mut properties: IndexMap<String, (PhfKey, SerdeProperty)> = Default::default();
         for (phf_key, val) in new_operator.properties.iter() {
-            let string = &self.strings[phf_key.constant()];
+            let string = &self.str_ctx[phf_key.constant()];
 
             properties.insert(string.into(), (phf_key.clone(), val.clone()));
         }
@@ -412,7 +412,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                             key.arc_str().as_str(),
                             serde_property.clone(),
                             next_def.modifier,
-                            self.strings,
+                            self.str_ctx,
                         );
                     }
                 }
@@ -434,7 +434,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
         let _entered = debug_span!("lazy_union", def=?def.def_id).entered();
 
         let union_discriminator = self
-            .relations
+            .rel_ctx
             .union_discriminators
             .get(&def.def_id)
             .expect("no union discriminator available. Should fail earlier");

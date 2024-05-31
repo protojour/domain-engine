@@ -250,7 +250,7 @@ fn generate_union_switch_map(
         case_block.commit(Terminator::Return, &mut builder);
     }
 
-    let msg = compiler.strings.intern_constant("no variant matched");
+    let msg = compiler.str_ctx.intern_constant("no variant matched");
     block.op(OpCode::Panic(msg), Delta(0), NO_SPAN, &mut builder);
     block.commit(Terminator::Return, &mut builder);
 

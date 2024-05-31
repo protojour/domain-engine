@@ -29,7 +29,7 @@ use crate::{
         repr_ctx::ReprCtx,
         repr_model::{ReprKind, ReprScalarKind},
     },
-    strings::Strings,
+    strings::StringCtx,
     typed_hir::{HirFunc, TypedArena, TypedHir, TypedNodeRef},
     types::{Type, UNIT_TYPE},
     CompileErrors, Compiler, SourceSpan,
@@ -48,7 +48,7 @@ pub(super) fn const_codegen<'m>(
     proc_table: &mut ProcTable,
     compiler: &mut Compiler<'m>,
 ) {
-    let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs, &compiler.repr_ctx);
+    let type_mapper = TypeMapper::new(&compiler.rel_ctx, &compiler.defs, &compiler.repr_ctx);
 
     debug!("Generating const code for\n{}", expr);
 
@@ -60,7 +60,7 @@ pub(super) fn const_codegen<'m>(
         proc_table,
         builder: &mut builder,
         errors: &mut compiler.errors,
-        strings: &mut compiler.strings,
+        strings: &mut compiler.str_ctx,
         primitives: &compiler.primitives,
         repr_ctx: &compiler.repr_ctx,
         type_mapper,
@@ -83,7 +83,7 @@ pub(super) fn map_codegen<'m>(
     direction: MapDirection,
     compiler: &mut Compiler<'m>,
 ) -> MapKey {
-    let type_mapper = TypeMapper::new(&compiler.relations, &compiler.defs, &compiler.repr_ctx);
+    let type_mapper = TypeMapper::new(&compiler.rel_ctx, &compiler.defs, &compiler.repr_ctx);
 
     let body = &func.body;
     let body_span = body.data().span();
@@ -112,7 +112,7 @@ pub(super) fn map_codegen<'m>(
         proc_table,
         builder: &mut builder,
         errors: &mut compiler.errors,
-        strings: &mut compiler.strings,
+        strings: &mut compiler.str_ctx,
         primitives: &compiler.primitives,
         repr_ctx: &compiler.repr_ctx,
         type_mapper,
@@ -163,7 +163,7 @@ pub(super) struct CodeGenerator<'a, 'm> {
     proc_table: &'a mut ProcTable,
     pub builder: &'a mut ProcBuilder,
     pub errors: &'a mut CompileErrors,
-    pub strings: &'a mut Strings<'m>,
+    pub strings: &'a mut StringCtx<'m>,
     #[allow(unused)]
     pub primitives: &'a Primitives,
     pub repr_ctx: &'a ReprCtx,

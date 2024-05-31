@@ -26,31 +26,31 @@ use tracing::{debug, debug_span, error, trace, warn};
 use super::{sequence_range_builder::SequenceRangeBuilder, SerdeIntersection, SerdeKey};
 
 use crate::{
-    codegen::task::CodegenTasks,
+    codegen::task::CodeCtx,
     compiler_queries::GetDefType,
     def::{DefKind, Defs, LookupRelationshipMeta, TypeDef, TypeDefFlags},
     interface::graphql::graphql_namespace::{adapt_graphql_identifier, GqlAdaptedIdent},
     primitive::{PrimitiveKind, Primitives},
-    relation::{Constructor, Properties, Relations, UnionMemberCache},
+    relation::{Constructor, Properties, RelCtx, UnionMemberCache},
     repr::{
         repr_ctx::ReprCtx,
         repr_model::{ReprKind, ReprScalarKind},
     },
-    strings::Strings,
+    strings::StringCtx,
     text_patterns::{TextPatternSegment, TextPatterns},
-    types::{DefTypes, Type, TypeRef},
+    types::{DefTypeCtx, Type, TypeRef},
     SourceSpan,
 };
 
 pub struct SerdeGenerator<'c, 'm> {
-    pub strings: &'c mut Strings<'m>,
+    pub str_ctx: &'c mut StringCtx<'m>,
     pub defs: &'c Defs<'m>,
     pub primitives: &'c Primitives,
-    pub def_types: &'c DefTypes<'m>,
-    pub relations: &'c Relations,
+    pub def_ty_ctx: &'c DefTypeCtx<'m>,
+    pub rel_ctx: &'c RelCtx,
     pub repr_ctx: &'c ReprCtx,
     pub patterns: &'c TextPatterns,
-    pub codegen_tasks: &'c CodegenTasks<'m>,
+    pub code_ctx: &'c CodeCtx<'m>,
     pub union_member_cache: &'c UnionMemberCache,
 
     pub(super) lazy_struct_op_tasks: VecDeque<(SerdeOperatorAddr, SerdeDef, &'c Properties)>,
@@ -282,7 +282,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 trace!("Gen primary id: {def:?}");
 
                 let table = self
-                    .relations
+                    .rel_ctx
                     .properties_by_def_id
                     .get(&def.def_id)?
                     .table
@@ -317,7 +317,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                         self.alloc_addr_for_key(&key),
                         SerdeOperator::IdSingletonStruct(
                             def.def_id,
-                            self.strings.intern_constant(&ident),
+                            self.str_ctx.intern_constant(&ident),
                             object_addr,
                         ),
                     ))
@@ -352,7 +352,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
 
         // FIXME: What about unions?
         let to_entity = self
-            .relations
+            .rel_ctx
             .properties_by_def_id(def.def_id)
             .map(|properties| properties.identified_by.is_some())
             .unwrap_or(false);
@@ -373,8 +373,8 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     fn alloc_def_type_operator(&mut self, def: SerdeDef) -> Option<OperatorAllocation> {
         match self.get_def_type(def.def_id) {
             Some(Type::Domain(def_id) | Type::Anonymous(def_id)) => {
-                let properties = self.relations.properties_by_def_id.get(def_id);
-                let typename = self.strings.intern_constant(self.get_typename(*def_id));
+                let properties = self.rel_ctx.properties_by_def_id.get(def_id);
+                let typename = self.str_ctx.intern_constant(self.get_typename(*def_id));
                 self.alloc_domain_type_serde_operator(def.with_def(*def_id), typename, properties)
             }
             Some(type_ref) => match def.modifier {
@@ -452,7 +452,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
                 assert_eq!(def.def_id, *def_id);
 
                 let literal = self.defs.get_string_representation(*def_id);
-                let constant = self.strings.intern_constant(literal);
+                let constant = self.str_ctx.intern_constant(literal);
 
                 Some(OperatorAllocation::Allocated(
                     self.alloc_addr(&def),
@@ -872,7 +872,7 @@ impl<'c, 'm> SerdeGenerator<'c, 'm> {
     ) -> OperatorAllocation {
         let addr = self.alloc_addr(&def);
         let union_discriminator = self
-            .relations
+            .rel_ctx
             .union_discriminators
             .get(&def.def_id)
             .expect("no union discriminator available. Should fail earlier");
@@ -965,7 +965,7 @@ pub(super) fn insert_property(
     property_name: &str,
     property: SerdeProperty,
     modifier: SerdeModifier,
-    strings: &mut Strings,
+    strings: &mut StringCtx,
 ) -> IdentAdaption {
     if modifier.contains(SerdeModifier::GRAPHQL) {
         let (mut graphql_identifier, adaption) = make_property_name(property_name, modifier);
@@ -1028,14 +1028,14 @@ impl<'c, 'm> AsRef<Defs<'m>> for SerdeGenerator<'c, 'm> {
     }
 }
 
-impl<'c, 'm> AsRef<DefTypes<'m>> for SerdeGenerator<'c, 'm> {
-    fn as_ref(&self) -> &DefTypes<'m> {
-        self.def_types
+impl<'c, 'm> AsRef<DefTypeCtx<'m>> for SerdeGenerator<'c, 'm> {
+    fn as_ref(&self) -> &DefTypeCtx<'m> {
+        self.def_ty_ctx
     }
 }
 
-impl<'c, 'm> AsRef<Relations> for SerdeGenerator<'c, 'm> {
-    fn as_ref(&self) -> &Relations {
-        self.relations
+impl<'c, 'm> AsRef<RelCtx> for SerdeGenerator<'c, 'm> {
+    fn as_ref(&self) -> &RelCtx {
+        self.rel_ctx
     }
 }

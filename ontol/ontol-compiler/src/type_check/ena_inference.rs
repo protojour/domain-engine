@@ -6,7 +6,7 @@ use tracing::debug;
 use crate::{
     mem::Intern,
     pattern::PatId,
-    types::{Type, TypeRef, Types},
+    types::{Type, TypeCtx, TypeRef},
 };
 
 use super::{TypeEquation, TypeError};
@@ -102,7 +102,7 @@ impl<'m> Inference<'m> {
 }
 
 pub struct Infer<'c, 'm> {
-    pub types: &'c mut Types<'m>,
+    pub types: &'c mut TypeCtx<'m>,
     pub eq_relations: &'c mut ena::unify::InPlaceUnificationTable<TypeVar<'m>>,
 }
 

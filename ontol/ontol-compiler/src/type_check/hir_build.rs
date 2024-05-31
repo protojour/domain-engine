@@ -98,7 +98,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             (PatternKind::Call(def_id, params), Some(expected_ty)) => {
                 match (
                     self.defs.table.get(def_id),
-                    self.def_types.table.get(def_id),
+                    self.def_ty_ctx.table.get(def_id),
                 ) {
                     (
                         Some(Def {
@@ -116,7 +116,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                             &infer_args,
                             Some(expected_ty.0),
                             self.primitives,
-                            self.def_types,
+                            self.def_ty_ctx,
                             self.repr_ctx,
                             self.types,
                         );

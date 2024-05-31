@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use ontol_runtime::interface::serde::{operator::SerdeOperator, SerdeDef};
 use serde_generator::SerdeGenerator;
 
-use crate::{relation::UnionMemberCache, strings::Strings, Compiler};
+use crate::{relation::UnionMemberCache, strings::StringCtx, Compiler};
 
 use self::serde_generator::DebugTaskState;
 
@@ -30,20 +30,20 @@ pub struct SerdeIntersection {
 impl<'m> Compiler<'m> {
     pub fn serde_generator<'c>(
         &'c self,
-        strings: &'c mut Strings<'m>,
+        str_ctx: &'c mut StringCtx<'m>,
         union_member_cache: &'c UnionMemberCache,
     ) -> SerdeGenerator<'_, 'm> {
         let operators_by_addr: Vec<SerdeOperator> = vec![SerdeOperator::AnyPlaceholder];
 
         SerdeGenerator {
-            strings,
+            str_ctx,
             defs: &self.defs,
             primitives: &self.primitives,
-            def_types: &self.def_types,
-            relations: &self.relations,
+            def_ty_ctx: &self.def_ty_ctx,
+            rel_ctx: &self.rel_ctx,
             repr_ctx: &self.repr_ctx,
             patterns: &self.text_patterns,
-            codegen_tasks: &self.codegen_tasks,
+            code_ctx: &self.code_ctx,
             union_member_cache,
             lazy_struct_op_tasks: VecDeque::new(),
             lazy_struct_intersection_tasks: VecDeque::new(),

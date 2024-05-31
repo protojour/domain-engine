@@ -26,7 +26,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     pub fn check_extern(&mut self, def_id: DefId, span: SourceSpan) {
         warn!("check extern");
 
-        let Some(table) = self.relations.properties_table_by_def_id(def_id) else {
+        let Some(table) = self.rel_ctx.properties_table_by_def_id(def_id) else {
             CompileError::TODO("extern has no properties")
                 .span(span)
                 .report(self);
@@ -43,7 +43,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 DefKind::TextLiteral(prop_name) => match *prop_name {
                     "url" => {
                         if let Some(url) = self.get_string_constant(value_type_def_id) {
-                            extern_builder.url = Some(self.strings.intern_constant(&url));
+                            extern_builder.url = Some(self.str_ctx.intern_constant(&url));
                         }
                     }
                     _ => {
@@ -64,7 +64,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             return;
         };
 
-        self.def_types
+        self.def_ty_ctx
             .ontology_externs
             .insert(def_id, ontology_extern);
     }
@@ -109,7 +109,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             map_def_id: def.id,
         };
 
-        if let Some(key_pair) = TypeMapper::new(self.relations, self.defs, self.repr_ctx)
+        if let Some(key_pair) = TypeMapper::new(self.rel_ctx, self.defs, self.repr_ctx)
             .find_map_key_pair([first, second])
         {
             let first_def_id = first.get_single_def_id().unwrap();
@@ -119,7 +119,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 MapCodegenRequest::ExternBackward(extern_map)
             };
 
-            self.codegen_tasks
+            self.code_ctx
                 .add_map_task(key_pair, request, self.defs, self.errors);
         }
 

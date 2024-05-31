@@ -10,7 +10,7 @@ impl<'m> Compiler<'m> {
     /// This is also run for non-entities.
     pub fn check_entity(&mut self, def_id: DefId) {
         let identified_by = self
-            .relations
+            .rel_ctx
             .properties_by_def_id
             .get(&def_id)
             .and_then(|properties| properties.identified_by);
@@ -19,7 +19,7 @@ impl<'m> Compiler<'m> {
 
         let mut info = ExtendedEntityInfo::default();
 
-        if let Some(order_rels) = self.relations.order_relationships.remove(&def_id) {
+        if let Some(order_rels) = self.rel_ctx.order_relationships.remove(&def_id) {
             if !is_entity {
                 for order_rel in &order_rels {
                     let meta = self.defs.relationship_meta(*order_rel);

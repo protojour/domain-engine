@@ -24,7 +24,7 @@ use crate::{
     relation::{Constructor, Property},
     repr::repr_model::{ReprKind, ReprScalarKind},
     sequence::Sequence,
-    strings::Strings,
+    strings::StringCtx,
     text_patterns::TextPatternSegment,
     types::{FormatType, Type},
     SourceSpan, SpannedCompileError,
@@ -36,7 +36,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     pub fn check_union(&mut self, value_union_def_id: DefId) -> Vec<SpannedCompileError> {
         let _entered = debug_span!("union", id = ?value_union_def_id).entered();
 
-        let mut strings = self.strings.detach();
+        let mut strings = self.str_ctx.detach();
 
         // An error set to avoid reporting the same error more than once
         let mut error_set = ErrorSet::default();
@@ -71,7 +71,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 &mut strings,
             );
 
-            if let Some(properties) = self.relations.properties_by_def_id(variant_def_id) {
+            if let Some(properties) = self.rel_ctx.properties_by_def_id(variant_def_id) {
                 if let Some(id_relationship_id) = &properties.identified_by {
                     let identifies_meta = self.defs.relationship_meta(*id_relationship_id);
 
@@ -164,7 +164,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
         }
 
-        self.relations
+        self.rel_ctx
             .union_discriminators
             .insert(value_union_def_id, union_discriminator);
 
@@ -176,7 +176,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                 .map(|(union_error, span)| self.make_compile_error(union_error).span(span)),
         );
 
-        self.strings.attach(strings);
+        self.str_ctx.attach(strings);
 
         errors
     }
@@ -188,11 +188,11 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         variant_def: DefId,
         error_set: &mut ErrorSet,
         span: &SourceSpan,
-        strings: &mut Strings<'m>,
+        strings: &mut StringCtx<'m>,
     ) where
         't: 'b,
     {
-        let variant_ty = self.def_types.table.get(&variant_def).unwrap_or_else(|| {
+        let variant_ty = self.def_ty_ctx.table.get(&variant_def).unwrap_or_else(|| {
             let def = self.defs.def_kind(variant_def);
             panic!("No type found for {def:?}");
         });
@@ -284,7 +284,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
 
         debug!("find domain type match data {def_id:?}: {repr_kind:?}");
 
-        if let Some(properties) = self.relations.properties_by_def_id(def_id) {
+        if let Some(properties) = self.rel_ctx.properties_by_def_id(def_id) {
             match &properties.constructor {
                 Constructor::Transparent => {
                     debug!("was Transparent: {properties:?}");
@@ -322,7 +322,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         property_set: &IndexMap<PropertyId, Property>,
         span: &SourceSpan,
         error_set: &mut ErrorSet,
-        strings: &mut Strings<'m>,
+        strings: &mut StringCtx<'m>,
     ) {
         let mut map_discriminator_candidate = MapDiscriminatorCandidate {
             result_type: variant_def,
@@ -333,7 +333,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             let meta = self.defs.relationship_meta(property_id.relationship_id);
 
             let (object_def_id, _) = meta.relationship.object;
-            let object_ty = self.def_types.table.get(&object_def_id).unwrap();
+            let object_ty = self.def_ty_ctx.table.get(&object_def_id).unwrap();
             let Some(property_name) =
                 meta.relationship
                     .object_prop
@@ -518,7 +518,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
         builder: DiscriminatorBuilder,
         discriminator_type: DiscriminatorType,
         error_set: &ErrorSet,
-        strings: &mut Strings<'m>,
+        strings: &mut StringCtx<'m>,
     ) -> UnionDiscriminator {
         let mut union_discriminator = UnionDiscriminator { variants: vec![] };
 
@@ -624,7 +624,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
     fn make_compile_error(&self, union_error: UnionCheckError) -> CompileError {
         match union_error {
             UnionCheckError::UnitTypePartOfUnion(def_id) => {
-                let ty = self.def_types.table.get(&def_id).unwrap();
+                let ty = self.def_ty_ctx.table.get(&def_id).unwrap();
                 CompileError::UnitTypePartOfUnion(format!(
                     "{}",
                     FormatType::new(ty, self.defs, self.primitives)

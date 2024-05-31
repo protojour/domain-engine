@@ -189,7 +189,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
                 let symbol = use_stmt.ident_path()?.symbols().next()?;
 
-                let as_ident = self.ctx.compiler.strings.intern(symbol.slice());
+                let as_ident = self.ctx.compiler.str_ctx.intern(symbol.slice());
                 type_namespace.insert(as_ident, *used_package_def_id);
 
                 None
