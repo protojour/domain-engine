@@ -28,7 +28,7 @@ use crate::{
 use self::{
     builder::OntologyBuilder,
     config::PackageConfig,
-    domain::{Domain, ExtendedEntityInfo, TypeInfo},
+    domain::{Domain, EdgeInfo, ExtendedEntityInfo, TypeInfo},
     map::{Extern, MapMeta, PropertyFlow},
     ontol::{
         text_pattern::TextPattern, OntolDomainMeta, TextConstant, TextLikeType, ValueGenerator,
@@ -165,6 +165,11 @@ impl Ontology {
             .get(&union_def_id)
             .map(|slice| slice.as_ref())
             .unwrap_or(&[])
+    }
+
+    pub fn find_edge(&self, edge_id: DefId) -> Option<&EdgeInfo> {
+        let domain = self.data.domain_table.get(&edge_id.package_id())?;
+        domain.find_edge(edge_id)
     }
 
     pub fn extended_entity_info(&self, def_id: DefId) -> Option<&ExtendedEntityInfo> {

@@ -4,6 +4,7 @@ use ontol_runtime::DefId;
 use crate::{
     codegen::task::CodeCtx,
     def::Defs,
+    edge::EdgeCtx,
     entity::entity_ctx::EntityCtx,
     error::CompileError,
     pattern::Patterns,
@@ -60,6 +61,7 @@ pub struct TypeCheck<'c, 'm> {
     pub types: &'c mut TypeCtx<'m>,
     pub def_ty_ctx: &'c mut DefTypeCtx<'m>,
     pub rel_ctx: &'c mut RelCtx,
+    pub edge_ctx: &'c mut EdgeCtx,
     pub thesaurus: &'c mut Thesaurus,
     pub errors: &'c mut CompileErrors,
     pub code_ctx: &'c mut CodeCtx<'m>,
@@ -170,6 +172,7 @@ impl<'m> Compiler<'m> {
             errors: &mut self.errors,
             def_ty_ctx: &mut self.def_ty_ctx,
             rel_ctx: &mut self.rel_ctx,
+            edge_ctx: &mut self.edge_ctx,
             thesaurus: &mut self.thesaurus,
             code_ctx: &mut self.code_ctx,
             patterns: &mut self.patterns,

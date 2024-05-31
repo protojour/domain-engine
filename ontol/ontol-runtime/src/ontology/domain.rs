@@ -1,12 +1,15 @@
 //! Domain description model, part of the Ontology
 
+use std::collections::BTreeMap;
+
 use fnv::FnvHashMap;
 use ontol_macros::OntolDebug;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    impl_ontol_debug,
     interface::serde::operator::SerdeOperatorAddr,
-    property::{Cardinality, PropertyId, Role},
+    property::{Cardinality, PropertyId},
     query::order::Direction,
     DefId, RelationshipId,
 };
@@ -21,7 +24,9 @@ pub struct Domain {
     unique_name: TextConstant,
 
     /// Types by DefId.1 (the type's index within the domain)
-    info: Vec<TypeInfo>,
+    types: Vec<TypeInfo>,
+
+    edges: BTreeMap<DefId, EdgeInfo>,
 }
 
 impl Domain {
@@ -29,7 +34,8 @@ impl Domain {
         Self {
             def_id,
             unique_name,
-            info: Default::default(),
+            types: Default::default(),
+            edges: Default::default(),
         }
     }
 
@@ -42,23 +48,31 @@ impl Domain {
     }
 
     pub fn type_count(&self) -> usize {
-        self.info.len()
+        self.types.len()
     }
 
     pub fn type_info(&self, def_id: DefId) -> &TypeInfo {
-        &self.info[def_id.1 as usize]
+        &self.types[def_id.1 as usize]
     }
 
     pub fn type_info_option(&self, def_id: DefId) -> Option<&TypeInfo> {
-        self.info.get(def_id.1 as usize)
+        self.types.get(def_id.1 as usize)
     }
 
     pub fn type_infos(&self) -> impl Iterator<Item = &TypeInfo> {
-        self.info.iter()
+        self.types.iter()
+    }
+
+    pub fn edges(&self) -> impl Iterator<Item = (&DefId, &EdgeInfo)> {
+        self.edges.iter()
+    }
+
+    pub fn find_edge(&self, edge_id: DefId) -> Option<&EdgeInfo> {
+        self.edges.get(&edge_id)
     }
 
     pub fn find_type_by_name(&self, name: TextConstant) -> Option<&TypeInfo> {
-        self.info
+        self.types
             .iter()
             .find(|type_info| type_info.name() == Some(name))
     }
@@ -71,8 +85,8 @@ impl Domain {
         let index = type_info.def_id.1 as usize;
 
         // pad the vector
-        let new_size = std::cmp::max(self.info.len(), index + 1);
-        self.info.resize_with(new_size, || TypeInfo {
+        let new_size = std::cmp::max(self.types.len(), index + 1);
+        self.types.resize_with(new_size, || TypeInfo {
             def_id: DefId(type_info.def_id.0, 0),
             public: false,
             kind: TypeKind::Data(BasicTypeInfo { name: None }),
@@ -81,13 +95,17 @@ impl Domain {
             data_relationships: Default::default(),
         });
 
-        self.info[index] = type_info;
+        self.types[index] = type_info;
     }
 
     pub fn find_type_info_by_name(&self, name: TextConstant) -> Option<&TypeInfo> {
-        self.info
+        self.types
             .iter()
             .find(|type_info| type_info.name() == Some(name))
+    }
+
+    pub fn set_edges(&mut self, edges: impl IntoIterator<Item = (DefId, EdgeInfo)>) {
+        self.edges = edges.into_iter().collect();
     }
 }
 
@@ -122,12 +140,10 @@ impl TypeInfo {
         }
     }
 
-    pub fn entity_relationships(
-        &self,
-    ) -> impl Iterator<Item = (&PropertyId, &DataRelationshipInfo)> {
+    pub fn edge_relationships(&self) -> impl Iterator<Item = (&PropertyId, &DataRelationshipInfo)> {
         self.data_relationships
             .iter()
-            .filter(|(_, info)| matches!(info.kind, DataRelationshipKind::EntityGraph { .. }))
+            .filter(|(_, info)| matches!(info.kind, DataRelationshipKind::Edge { .. }))
     }
 }
 
@@ -158,25 +174,14 @@ pub struct EntityInfo {
     pub id_value_generator: Option<ValueGenerator>,
 }
 
+/// Data relationships for a type in the domain
 #[derive(Clone, Serialize, Deserialize, OntolDebug)]
 pub struct DataRelationshipInfo {
+    pub name: TextConstant,
     pub kind: DataRelationshipKind,
-    pub subject_cardinality: Cardinality,
-    pub object_cardinality: Cardinality,
-    pub subject_name: TextConstant,
-    pub object_name: Option<TextConstant>,
-    pub store_key: Option<TextConstant>,
+    pub cardinality: Cardinality,
     pub source: DataRelationshipSource,
     pub target: DataRelationshipTarget,
-}
-
-impl DataRelationshipInfo {
-    pub fn cardinality_by_role(&self, role: Role) -> Cardinality {
-        match role {
-            Role::Subject => self.subject_cardinality,
-            Role::Object => self.object_cardinality,
-        }
-    }
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, OntolDebug)]
@@ -188,10 +193,12 @@ pub enum DataRelationshipKind {
     Tree,
     /// Graph data relationships can be circular and involves entities.
     /// The Graph relationship kind must go from one entity to another entity.
-    EntityGraph {
-        /// EntityGraph data relationships are allowed to be parametric.
-        /// i.e. the relation itself has parameters.
-        rel_params: Option<DefId>,
+    Edge {
+        /// The edge id that is the source of this data point
+        edge_id: DefId,
+
+        /// The cardinal index of this data point within the edge
+        cardinal_idx: CardinalIdx,
     },
 }
 
@@ -234,3 +241,29 @@ pub struct EntityOrder {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FieldPath(pub Box<[PropertyId]>);
+
+#[derive(Serialize, Deserialize)]
+pub struct EdgeInfo {
+    /// The cardinals represents a template for how to represent the edge.
+    /// The length of the cardinals is the edge's cardinality.
+    pub cardinals: Vec<EdgeCardinal>,
+
+    /// Custom name for this edge, for naming in data stores
+    pub store_key: Option<TextConstant>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct EdgeCardinal {
+    /// The target type of this cardinal
+    pub target: DataRelationshipTarget,
+
+    /// The cardinality of the _data point_ of this cardinal
+    pub cardinality: Cardinality,
+
+    pub is_entity: bool,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Debug)]
+pub struct CardinalIdx(pub u8);
+
+impl_ontol_debug!(CardinalIdx);

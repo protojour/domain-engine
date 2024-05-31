@@ -2,11 +2,16 @@
 
 use std::ops::Range;
 
+use fnv::FnvHashMap;
 use ontol_hir::OverloadFunc;
-use ontol_runtime::{ontology::ontol::TextLikeType, DefId};
+use ontol_runtime::{
+    ontology::{domain::CardinalIdx, ontol::TextLikeType},
+    DefId,
+};
 
 use crate::{
     def::{BuiltinRelationKind, DefKind, TypeDef, TypeDefFlags},
+    edge::{Edge, Slot},
     mem::Intern,
     namespace::Space,
     package::ONTOL_PKG,
@@ -150,6 +155,45 @@ impl<'m> Compiler<'m> {
 
         for def_id in self.defs.iter_package_def_ids(ONTOL_PKG) {
             self.type_check().check_def(def_id);
+        }
+
+        // "identifies" edge
+        {
+            let id = self.primitives.relations.id;
+            let identifies = self.primitives.relations.identifies;
+            let identifies_id = self.defs.add_def(DefKind::Edge, ONTOL_PKG, NO_SPAN);
+            self.edge_ctx
+                .symbols
+                .insert(self.primitives.relations.id, identifies_id);
+            self.edge_ctx
+                .symbols
+                .insert(self.primitives.relations.identifies, identifies_id);
+
+            self.edge_ctx.edges.insert(
+                identifies_id,
+                Edge {
+                    slots: FnvHashMap::from_iter([
+                        (
+                            id,
+                            Slot {
+                                left: Some(CardinalIdx(0)),
+                                depth: 0,
+                                right: CardinalIdx(1),
+                            },
+                        ),
+                        (
+                            identifies,
+                            Slot {
+                                left: Some(CardinalIdx(1)),
+                                depth: 0,
+                                right: CardinalIdx(0),
+                            },
+                        ),
+                    ]),
+                    cardinality: 2,
+                    materialized: false,
+                },
+            );
         }
 
         self.seal_domain(ONTOL_PKG);

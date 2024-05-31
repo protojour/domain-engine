@@ -82,57 +82,53 @@ impl InMemoryStore {
                 DataRelationshipKind::Tree => {
                     raw_props_update.insert(property_id, attribute);
                 }
-                DataRelationshipKind::EntityGraph { .. } => {
-                    match data_relationship.cardinality_by_role(property_id.role).1 {
-                        ValueCardinality::Unit => {
-                            self.insert_entity_relationship(
-                                type_info.def_id,
-                                &dynamic_key,
-                                (property_id, Some(EdgeWriteMode::Overwrite)),
-                                attribute,
-                                data_relationship,
-                                ctx,
-                            )?;
+                DataRelationshipKind::Edge { .. } => match data_relationship.cardinality.1 {
+                    ValueCardinality::Unit => {
+                        self.insert_entity_relationship(
+                            type_info.def_id,
+                            &dynamic_key,
+                            (property_id, Some(EdgeWriteMode::Overwrite)),
+                            attribute,
+                            data_relationship,
+                            ctx,
+                        )?;
+                    }
+                    ValueCardinality::IndexSet | ValueCardinality::List => match attribute.val {
+                        Value::Sequence(_sequence, _) => {
+                            return Err(DomainError::DataStore(anyhow!(
+                                "Multi-relation overwrite not yet implemented"
+                            )));
                         }
-                        ValueCardinality::IndexSet | ValueCardinality::List => {
-                            match attribute.val {
-                                Value::Sequence(_sequence, _) => {
-                                    return Err(DomainError::DataStore(anyhow!(
-                                        "Multi-relation overwrite not yet implemented"
-                                    )));
-                                }
-                                Value::Patch(patch_attributes, _) => {
-                                    for attribute in patch_attributes {
-                                        if matches!(attribute.rel, Value::DeleteRelationship(_)) {
-                                            self.delete_entity_relationship(
-                                                type_info.def_id,
-                                                &dynamic_key,
-                                                property_id,
-                                                attribute.val,
-                                                data_relationship,
-                                                ctx,
-                                            )?;
-                                        } else {
-                                            self.insert_entity_relationship(
-                                                type_info.def_id,
-                                                &dynamic_key,
-                                                (property_id, None),
-                                                attribute,
-                                                data_relationship,
-                                                ctx,
-                                            )?;
-                                        }
-                                    }
-                                }
-                                _ => {
-                                    return Err(DomainError::DataStoreBadRequest(anyhow!(
-                                        "Invalid input for multi-relation write"
-                                    )));
+                        Value::Patch(patch_attributes, _) => {
+                            for attribute in patch_attributes {
+                                if matches!(attribute.rel, Value::DeleteRelationship(_)) {
+                                    self.delete_entity_relationship(
+                                        type_info.def_id,
+                                        &dynamic_key,
+                                        property_id,
+                                        attribute.val,
+                                        data_relationship,
+                                        ctx,
+                                    )?;
+                                } else {
+                                    self.insert_entity_relationship(
+                                        type_info.def_id,
+                                        &dynamic_key,
+                                        (property_id, None),
+                                        attribute,
+                                        data_relationship,
+                                        ctx,
+                                    )?;
                                 }
                             }
                         }
-                    }
-                }
+                        _ => {
+                            return Err(DomainError::DataStoreBadRequest(anyhow!(
+                                "Invalid input for multi-relation write"
+                            )));
+                        }
+                    },
+                },
             }
         }
 
@@ -238,9 +234,25 @@ impl InMemoryStore {
                 DataRelationshipKind::Tree => {
                     raw_props.insert(property_id, attribute);
                 }
-                DataRelationshipKind::EntityGraph { .. } => {
-                    match data_relationship.cardinality_by_role(property_id.role).1 {
-                        ValueCardinality::Unit => {
+                DataRelationshipKind::Edge { .. } => match data_relationship.cardinality.1 {
+                    ValueCardinality::Unit => {
+                        self.insert_entity_relationship(
+                            type_info.def_id,
+                            &entity_key,
+                            (property_id, Some(EdgeWriteMode::Insert)),
+                            attribute,
+                            data_relationship,
+                            ctx,
+                        )?;
+                    }
+                    ValueCardinality::IndexSet | ValueCardinality::List => {
+                        let Value::Sequence(seq, _) = attribute.val else {
+                            return Err(DomainError::DataStoreBadRequest(anyhow!(
+                                "Expected sequence for ValueCardinality::Many"
+                            )));
+                        };
+
+                        for attribute in seq.into_attrs() {
                             self.insert_entity_relationship(
                                 type_info.def_id,
                                 &entity_key,
@@ -250,26 +262,8 @@ impl InMemoryStore {
                                 ctx,
                             )?;
                         }
-                        ValueCardinality::IndexSet | ValueCardinality::List => {
-                            let Value::Sequence(seq, _) = attribute.val else {
-                                return Err(DomainError::DataStoreBadRequest(anyhow!(
-                                    "Expected sequence for ValueCardinality::Many"
-                                )));
-                            };
-
-                            for attribute in seq.into_attrs() {
-                                self.insert_entity_relationship(
-                                    type_info.def_id,
-                                    &entity_key,
-                                    (property_id, Some(EdgeWriteMode::Insert)),
-                                    attribute,
-                                    data_relationship,
-                                    ctx,
-                                )?;
-                            }
-                        }
                     }
-                }
+                },
             }
         }
 
@@ -379,7 +373,7 @@ impl InMemoryStore {
 
         let edge_collection = self
             .edge_collections
-            .get_mut(&property_id.relationship_id)
+            .get_mut(&property_id.relationship_id.0)
             .expect("No edge collection");
 
         let local_key = EntityKey {
@@ -490,7 +484,7 @@ impl InMemoryStore {
 
         let edge_collection = self
             .edge_collections
-            .get_mut(&property_id.relationship_id)
+            .get_mut(&property_id.relationship_id.0)
             .expect("No edge collection");
         let edges = &mut edge_collection.edges;
 
@@ -598,14 +592,11 @@ fn enforce_cardinality_pre_insert(
     from_key: &EntityKey,
     to_key: &EntityKey,
 ) {
-    if matches!(
-        edge_collection.subject_cardinality.1,
-        ValueCardinality::Unit
-    ) {
+    if edge_collection.subject_unique {
         edge_collection.edges.retain(|edge| &edge.from != from_key);
     }
 
-    if matches!(edge_collection.object_cardinality.1, ValueCardinality::Unit) {
+    if edge_collection.object_unique {
         edge_collection.edges.retain(|edge| &edge.to != to_key);
     }
 }

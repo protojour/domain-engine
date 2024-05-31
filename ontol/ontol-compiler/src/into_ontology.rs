@@ -7,14 +7,15 @@ use ontol_runtime::{
     },
     ontology::{
         domain::{
-            BasicTypeInfo, DataRelationshipInfo, DataRelationshipKind, DataRelationshipSource,
-            DataRelationshipTarget, Domain, EntityInfo, TypeInfo, TypeKind,
+            BasicTypeInfo, CardinalIdx, DataRelationshipInfo, DataRelationshipKind,
+            DataRelationshipSource, DataRelationshipTarget, Domain, EdgeCardinal, EdgeInfo,
+            EntityInfo, TypeInfo, TypeKind,
         },
         map::MapMeta,
         ontol::{OntolDomainMeta, TextConstant, TextLikeType},
         Ontology,
     },
-    property::PropertyId,
+    property::{PropertyCardinality, PropertyId, Role, ValueCardinality},
     rustdoc::RustDoc,
     DefId, PackageId,
 };
@@ -141,11 +142,14 @@ impl<'m> Compiler<'m> {
                 builder.add_package_config(package_id, package_config);
             }
 
+            let mut edges: FnvHashMap<DefId, EdgeInfo> = Default::default();
+
             for (type_name, type_def_id) in type_namespace {
                 let type_name_constant = serde_gen.str_ctx.intern_constant(type_name);
-                let data_relationships = self.find_data_relationships(
+                let data_relationships = self.collect_relationships_and_edges(
                     type_def_id,
                     &union_member_cache,
+                    &mut edges,
                     serde_gen.str_ctx,
                 );
                 let def_kind = self.defs.def_kind(type_def_id);
@@ -183,7 +187,7 @@ impl<'m> Compiler<'m> {
                         SerdeModifier::json_default(),
                     ))),
                     store_key: Some(
-                        self.rel_ctx
+                        self.edge_ctx
                             .store_keys
                             .get(&type_def_id)
                             .copied()
@@ -205,10 +209,11 @@ impl<'m> Compiler<'m> {
                         type_def_id,
                         SerdeModifier::json_default(),
                     ))),
-                    store_key: self.rel_ctx.store_keys.get(&type_def_id).copied(),
-                    data_relationships: self.find_data_relationships(
+                    store_key: self.edge_ctx.store_keys.get(&type_def_id).copied(),
+                    data_relationships: self.collect_relationships_and_edges(
                         type_def_id,
                         &union_member_cache,
+                        &mut edges,
                         serde_gen.str_ctx,
                     ),
                 });
@@ -227,6 +232,7 @@ impl<'m> Compiler<'m> {
                 }
             }
 
+            domain.set_edges(edges.into_iter());
             builder.add_domain(package_id, domain);
         }
 
@@ -333,22 +339,29 @@ impl<'m> Compiler<'m> {
             .build()
     }
 
-    fn find_data_relationships(
+    fn collect_relationships_and_edges(
         &self,
         type_def_id: DefId,
         union_member_cache: &UnionMemberCache,
+        edges: &mut FnvHashMap<DefId, EdgeInfo>,
         strings: &mut StringCtx<'m>,
     ) -> FnvHashMap<PropertyId, DataRelationshipInfo> {
-        let mut data_relationships = FnvHashMap::default();
-        self.add_inherent_data_relationships(type_def_id, &mut data_relationships, strings);
+        let mut relationships = FnvHashMap::default();
+        self.collect_inherent_relationships_and_edges(
+            type_def_id,
+            &mut relationships,
+            edges,
+            strings,
+        );
 
         if let Some(ReprKind::StructIntersection(members)) =
             self.repr_ctx.get_repr_kind(&type_def_id)
         {
             for (member_def_id, _) in members {
-                self.add_inherent_data_relationships(
+                self.collect_inherent_relationships_and_edges(
                     *member_def_id,
-                    &mut data_relationships,
+                    &mut relationships,
+                    edges,
                     strings,
                 );
             }
@@ -364,24 +377,25 @@ impl<'m> Compiler<'m> {
                 };
 
                 for property_id in table.keys() {
-                    if let Some(data_relationship) = self.generate_data_relationship_info(
+                    self.collect_prop_relationship_and_edge(
                         *property_id,
                         DataRelationshipSource::ByUnionProxy,
+                        &mut relationships,
+                        edges,
                         strings,
-                    ) {
-                        data_relationships.insert(*property_id, data_relationship);
-                    }
+                    );
                 }
             }
         }
 
-        data_relationships
+        relationships
     }
 
-    fn add_inherent_data_relationships(
+    fn collect_inherent_relationships_and_edges(
         &self,
         type_def_id: DefId,
-        output: &mut FnvHashMap<PropertyId, DataRelationshipInfo>,
+        relationships: &mut FnvHashMap<PropertyId, DataRelationshipInfo>,
+        edges: &mut FnvHashMap<DefId, EdgeInfo>,
         strings: &mut StringCtx<'m>,
     ) {
         let Some(properties) = self.rel_ctx.properties_by_def_id(type_def_id) else {
@@ -389,40 +403,63 @@ impl<'m> Compiler<'m> {
         };
         if let Some(table) = &properties.table {
             for property_id in table.keys() {
-                if let Some(data_relationship) = self.generate_data_relationship_info(
+                self.collect_prop_relationship_and_edge(
                     *property_id,
                     DataRelationshipSource::Inherent,
+                    relationships,
+                    edges,
                     strings,
-                ) {
-                    output.insert(*property_id, data_relationship);
-                }
+                );
             }
         }
     }
 
-    fn generate_data_relationship_info(
+    fn collect_prop_relationship_and_edge(
         &self,
         property_id: PropertyId,
         source: DataRelationshipSource,
+        relationships: &mut FnvHashMap<PropertyId, DataRelationshipInfo>,
+        edges: &mut FnvHashMap<DefId, EdgeInfo>,
         strings: &mut StringCtx<'m>,
-    ) -> Option<DataRelationshipInfo> {
+    ) {
         let meta = self.defs.relationship_meta(property_id.relationship_id);
 
         let (source_def_id, _, _) = meta.relationship.by(property_id.role);
         let (target_def_id, _, _) = meta.relationship.by(property_id.role.opposite());
 
-        let subject_name = match meta.relation_def_kind.value {
-            DefKind::TextLiteral(subject_name) => strings.intern_constant(subject_name),
-            // FIXME: This doesn't _really_ have a subject "name". It represents a flattened structure:
-            DefKind::Type(_) => strings.intern_constant(""),
-            _ => return None,
+        let Some(target_properties) = self.rel_ctx.properties_by_def_id(target_def_id) else {
+            return;
         };
-        let target_properties = self.rel_ctx.properties_by_def_id(target_def_id)?;
-        let repr_kind = self.repr_ctx.get_repr_kind(&target_def_id)?;
+        let Some(repr_kind) = self.repr_ctx.get_repr_kind(&target_def_id) else {
+            return;
+        };
+        let name = match property_id.role {
+            Role::Subject => match meta.relation_def_kind.value {
+                DefKind::TextLiteral(subject_name) => strings.intern_constant(subject_name),
+                // FIXME: This doesn't _really_ have a subject "name". It represents a flattened structure:
+                DefKind::Type(_) => strings.intern_constant(""),
+                _ => return,
+            },
+            Role::Object => {
+                let Some(prop) = meta.relationship.object_prop else {
+                    return;
+                };
+                strings.intern_constant(prop)
+            }
+        };
 
-        let graph_rel_params = match meta.relationship.rel_params {
+        let edge_params = match meta.relationship.rel_params {
             RelParams::Type(def_id) => Some(def_id),
             RelParams::Unit | RelParams::IndexRange(_) => None,
+        };
+
+        // For now, the edge_id is just the relationship, but this will change
+        // when for more complex edge models
+        let edge_id = property_id.relationship_id.0;
+
+        let cardinal_idx = match property_id.role {
+            Role::Subject => CardinalIdx(0),
+            Role::Object => CardinalIdx(1),
         };
 
         let (data_relationship_kind, target) = match repr_kind {
@@ -436,8 +473,9 @@ impl<'m> Compiler<'m> {
                         .unwrap_or(false)
                 }) {
                     (
-                        DataRelationshipKind::EntityGraph {
-                            rel_params: graph_rel_params,
+                        DataRelationshipKind::Edge {
+                            edge_id,
+                            cardinal_idx,
                         },
                         target,
                     )
@@ -449,8 +487,9 @@ impl<'m> Compiler<'m> {
                 let target = DataRelationshipTarget::Unambiguous(target_def_id);
                 if target_properties.identified_by.is_some() {
                     (
-                        DataRelationshipKind::EntityGraph {
-                            rel_params: graph_rel_params,
+                        DataRelationshipKind::Edge {
+                            edge_id,
+                            cardinal_idx,
                         },
                         target,
                     )
@@ -474,23 +513,59 @@ impl<'m> Compiler<'m> {
             }
         };
 
-        Some(DataRelationshipInfo {
-            kind: data_relationship_kind,
-            subject_cardinality: meta.relationship.subject_cardinality,
-            object_cardinality: meta.relationship.object_cardinality,
-            subject_name,
-            object_name: meta
-                .relationship
-                .object_prop
-                .map(|prop| strings.intern_constant(prop)),
-            store_key: self
-                .rel_ctx
-                .store_keys
-                .get(&property_id.relationship_id.0)
-                .copied(),
-            source,
-            target,
-        })
+        // collect edge
+        if let DataRelationshipKind::Edge { .. } = &data_relationship_kind {
+            let edge_info = edges.entry(edge_id).or_insert_with(|| EdgeInfo {
+                cardinals: vec![],
+                store_key: self.edge_ctx.store_keys.get(&edge_id).copied(),
+            });
+
+            edge_info.cardinals.resize_with(2, || EdgeCardinal {
+                target: DataRelationshipTarget::Unambiguous(DefId::unit()),
+                cardinality: (PropertyCardinality::Optional, ValueCardinality::Unit),
+                is_entity: false,
+            });
+
+            match property_id.role {
+                Role::Subject => {
+                    edge_info.cardinals[0] = EdgeCardinal {
+                        target: target.clone(),
+                        cardinality: meta.relationship.subject_cardinality,
+                        is_entity: true,
+                    };
+                }
+                Role::Object => {
+                    edge_info.cardinals[1] = EdgeCardinal {
+                        target: target.clone(),
+                        cardinality: meta.relationship.object_cardinality,
+                        is_entity: true,
+                    };
+                }
+            }
+
+            if let Some(edge_params) = edge_params {
+                edge_info.cardinals.resize_with(3, || EdgeCardinal {
+                    target: DataRelationshipTarget::Unambiguous(edge_params),
+                    cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Unit),
+                    is_entity: false,
+                });
+            }
+        }
+
+        // collect relationship
+        relationships.insert(
+            property_id,
+            DataRelationshipInfo {
+                name,
+                kind: data_relationship_kind,
+                cardinality: match property_id.role {
+                    Role::Subject => meta.relationship.subject_cardinality,
+                    Role::Object => meta.relationship.object_cardinality,
+                },
+                source,
+                target,
+            },
+        );
     }
 
     fn entity_info(

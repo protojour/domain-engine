@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+use edge::EdgeCtx;
 use entity::entity_ctx::EntityCtx;
 pub use error::*;
 use fnv::FnvHashMap;
@@ -46,6 +47,7 @@ mod codegen;
 mod compile_domain;
 mod compiler_queries;
 mod def;
+mod edge;
 mod entity;
 mod hir_unify;
 mod interface;
@@ -171,6 +173,7 @@ struct Compiler<'m> {
     ty_ctx: TypeCtx<'m>,
     def_ty_ctx: DefTypeCtx<'m>,
     rel_ctx: RelCtx,
+    edge_ctx: EdgeCtx,
     thesaurus: Thesaurus,
     repr_ctx: ReprCtx,
     seal_ctx: SealCtx,
@@ -208,6 +211,7 @@ impl<'m> Compiler<'m> {
             ty_ctx: TypeCtx::new(mem),
             def_ty_ctx: Default::default(),
             rel_ctx: RelCtx::default(),
+            edge_ctx: EdgeCtx::default(),
             thesaurus,
             repr_ctx: ReprCtx::default(),
             seal_ctx: Default::default(),

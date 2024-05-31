@@ -4,8 +4,8 @@ use tracing::{debug, debug_span};
 
 use crate::{
     def::{DefKind, RelParams},
+    edge::EdgeCtx,
     package::ParsedPackage,
-    relation::RelCtx,
     repr::repr_model::ReprKind,
     thesaurus::{Thesaurus, TypeRelation},
     type_check::MapArmsKind,
@@ -152,7 +152,7 @@ impl<'m> Compiler<'m> {
                     copy_relationship_store_key(
                         *rel_params_def_id,
                         def_id,
-                        &mut self.rel_ctx,
+                        &mut self.edge_ctx,
                         &self.thesaurus,
                     );
 
@@ -244,12 +244,12 @@ impl<'m> Compiler<'m> {
 fn copy_relationship_store_key(
     rel_params_def_id: DefId,
     rel_def_id: DefId,
-    relations: &mut RelCtx,
+    edge_ctx: &mut EdgeCtx,
     thesaurus: &Thesaurus,
 ) {
     fn recurse_search(
         def_id: DefId,
-        relations: &mut RelCtx,
+        edge_ctx: &mut EdgeCtx,
         thesaurus: &Thesaurus,
         result: &mut Option<TextConstant>,
         visited: &mut FnvHashSet<DefId>,
@@ -258,14 +258,14 @@ fn copy_relationship_store_key(
             return;
         }
 
-        if let Some(text_constant) = relations.store_keys.get(&def_id) {
+        if let Some(text_constant) = edge_ctx.store_keys.get(&def_id) {
             *result = Some(*text_constant);
             return;
         }
 
         for entry in thesaurus.entries_raw(def_id) {
             if matches!(entry.rel, TypeRelation::Super) {
-                recurse_search(entry.def_id, relations, thesaurus, result, visited);
+                recurse_search(entry.def_id, edge_ctx, thesaurus, result, visited);
             }
         }
     }
@@ -274,13 +274,13 @@ fn copy_relationship_store_key(
 
     recurse_search(
         rel_params_def_id,
-        relations,
+        edge_ctx,
         thesaurus,
         &mut store_key,
         &mut Default::default(),
     );
 
     if let Some(store_key) = store_key {
-        relations.store_keys.insert(rel_def_id, store_key);
+        edge_ctx.store_keys.insert(rel_def_id, store_key);
     }
 }

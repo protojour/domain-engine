@@ -37,8 +37,9 @@ pub enum DefKind<'m> {
     /// A type definition in some domain:
     Type(TypeDef<'m>),
     BuiltinRelType(BuiltinRelationKind, Option<&'static str>),
-    FmtTransition(DefId, FmtFinalState),
+    Edge,
     Relationship(Relationship<'m>),
+    FmtTransition(DefId, FmtFinalState),
     // FIXME: This should not be builtin proc directly.
     // we may find the _actual_ builtin proc to call during type check,
     // if there are different variants per type.
@@ -67,8 +68,9 @@ impl<'m> DefKind<'m> {
             Self::Fn(_) => None,
             Self::Type(domain_type) => domain_type.ident.map(|ident| ident.into()),
             Self::BuiltinRelType(_, ident) => ident.map(|ident| ident.into()),
-            Self::FmtTransition(..) => None,
+            Self::Edge => None,
             Self::Relationship(_) => None,
+            Self::FmtTransition(..) => None,
             Self::Constant(_) => None,
             Self::Mapping { ident, .. } => ident.map(|ident| ident.into()),
             Self::AutoMapping => None,

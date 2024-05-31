@@ -166,16 +166,13 @@ impl InMemoryStore {
 
             let data_relationship = find_data_relationship(type_info, property_id)?;
 
-            if !matches!(
-                data_relationship.kind,
-                DataRelationshipKind::EntityGraph { .. }
-            ) {
+            if !matches!(data_relationship.kind, DataRelationshipKind::Edge { .. }) {
                 continue;
             }
 
             let attrs = self.sub_query_attributes(*property_id, subselect, entity_key, ctx)?;
 
-            match data_relationship.cardinality_by_role(property_id.role).1 {
+            match data_relationship.cardinality.1 {
                 ValueCardinality::Unit => {
                     if let Some(attribute) = attrs.into_iter().next() {
                         properties.insert(*property_id, attribute);
@@ -210,7 +207,7 @@ impl InMemoryStore {
         let relationship_id = property_id.relationship_id;
         let edge_collection = self
             .edge_collections
-            .get(&relationship_id)
+            .get(&relationship_id.0)
             .expect("No edge collection");
 
         let mut out = vec![];

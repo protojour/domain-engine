@@ -153,7 +153,7 @@ impl InMemoryStore {
                                 ctx,
                             )?);
                         }
-                        DataRelationshipKind::EntityGraph { .. } => {
+                        DataRelationshipKind::Edge { .. } => {
                             let Some(key) = dynamic_key else {
                                 return Err(ProofError::Domain(DomainError::DataStore(anyhow!(
                                     "cannot filter entity-graph without dynamic key"
@@ -162,7 +162,7 @@ impl InMemoryStore {
 
                             let edge_collection = self
                                 .edge_collections
-                                .get(&prop_id.relationship_id)
+                                .get(&prop_id.relationship_id.0)
                                 .ok_or(ProofError::Disproven)?;
 
                             let (target_key, rel_params) = match prop_id.role {

@@ -227,7 +227,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
                     panic!("text literal expected to be registered not found!");
                 };
                 let text_constant = self.str_ctx.intern_constant(text_literal);
-                self.rel_ctx.store_keys.insert(subject.0, text_constant);
+                self.edge_ctx.store_keys.insert(subject.0, text_constant);
 
                 object_ty
             }

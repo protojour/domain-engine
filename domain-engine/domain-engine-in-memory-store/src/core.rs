@@ -8,9 +8,9 @@ use ontol_runtime::{
         domain::{DataRelationshipInfo, TypeInfo},
         Ontology,
     },
-    property::{Cardinality, PropertyId},
+    property::PropertyId,
     value::{Attribute, Serial, Value},
-    DefId, RelationshipId,
+    DefId,
 };
 use smallvec::SmallVec;
 use tracing::warn;
@@ -19,7 +19,7 @@ use domain_engine_core::{system::ArcSystemApi, DomainError, DomainResult};
 
 pub(super) struct InMemoryStore {
     pub collections: FnvHashMap<DefId, EntityTable<DynamicKey>>,
-    pub edge_collections: FnvHashMap<RelationshipId, EdgeCollection>,
+    pub edge_collections: FnvHashMap<DefId, EdgeCollection>,
     pub serial_counter: u64,
 }
 
@@ -40,8 +40,8 @@ pub type EntityTable<K> = IndexMap<K, FnvHashMap<PropertyId, Attribute>>;
 #[derive(Debug)]
 pub(super) struct EdgeCollection {
     pub edges: Vec<Edge>,
-    pub subject_cardinality: Cardinality,
-    pub object_cardinality: Cardinality,
+    pub subject_unique: bool,
+    pub object_unique: bool,
 }
 
 #[derive(Debug)]

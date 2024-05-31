@@ -531,15 +531,17 @@ fn store_key_in_type_info() {
                 if name == "foo" {
                     assert_eq!(&ontology[type_info.store_key.unwrap()], "fu");
 
-                    let (_, rel_info) = type_info.entity_relationships().next().unwrap();
-                    assert_eq!(&ontology[rel_info.store_key.unwrap()], "fubar");
+                    let (prop_id, _rel_info) = type_info.edge_relationships().next().unwrap();
+                    let edge_info = ontology.find_edge(prop_id.relationship_id.0).unwrap();
+                    assert_eq!(&ontology[edge_info.store_key.unwrap()], "fubar");
                 }
 
                 if name == "bar" {
                     assert_eq!(&ontology[type_info.store_key.unwrap()], "bar");
 
-                    let (_, rel_info) = type_info.entity_relationships().next().unwrap();
-                    assert_eq!(&ontology[rel_info.store_key.unwrap()], "baaah");
+                    let (prop_id, _rel_info) = type_info.edge_relationships().next().unwrap();
+                    let edge_info = ontology.find_edge(prop_id.relationship_id.0).unwrap();
+                    assert_eq!(&ontology[edge_info.store_key.unwrap()], "baaah");
                 }
             }
         }

@@ -7,8 +7,9 @@ use domain_engine_core::system::ArcSystemApi;
 use domain_engine_core::Session;
 use fnv::FnvHashMap;
 use ontol_runtime::interface::serde::processor::ProcessorMode;
-use ontol_runtime::ontology::{config::DataStoreConfig, domain::DataRelationshipSource, Ontology};
-use ontol_runtime::{DefId, PackageId, RelationshipId};
+use ontol_runtime::ontology::{config::DataStoreConfig, Ontology};
+use ontol_runtime::property::ValueCardinality;
+use ontol_runtime::{DefId, PackageId};
 use tokio::sync::RwLock;
 
 use domain_engine_core::{
@@ -47,7 +48,7 @@ impl InMemoryDb {
         let domain = ontology.find_domain(package_id).unwrap();
 
         let mut collections: FnvHashMap<DefId, EntityTable<DynamicKey>> = Default::default();
-        let mut edge_collections: FnvHashMap<RelationshipId, EdgeCollection> = Default::default();
+        let mut edge_collections: FnvHashMap<DefId, EdgeCollection> = Default::default();
 
         for type_info in domain.type_infos() {
             if let Some(entity_info) = type_info.entity_info() {
@@ -57,23 +58,23 @@ impl InMemoryDb {
                 );
 
                 collections.insert(type_info.def_id, Default::default());
-
-                for (property_id, entity_relationship) in type_info.entity_relationships() {
-                    match entity_relationship.source {
-                        DataRelationshipSource::Inherent => {
-                            let relationship_id = property_id.relationship_id;
-                            edge_collections.entry(relationship_id).or_insert_with(|| {
-                                EdgeCollection {
-                                    edges: vec![],
-                                    subject_cardinality: entity_relationship.subject_cardinality,
-                                    object_cardinality: entity_relationship.object_cardinality,
-                                }
-                            });
-                        }
-                        DataRelationshipSource::ByUnionProxy => {}
-                    }
-                }
             }
+        }
+
+        for (edge_id, edge_info) in domain.edges() {
+            edge_collections
+                .entry(*edge_id)
+                .or_insert_with(|| EdgeCollection {
+                    edges: vec![],
+                    subject_unique: matches!(
+                        edge_info.cardinals[0].cardinality.1,
+                        ValueCardinality::Unit
+                    ),
+                    object_unique: matches!(
+                        edge_info.cardinals[1].cardinality.1,
+                        ValueCardinality::Unit
+                    ),
+                });
         }
 
         Self {

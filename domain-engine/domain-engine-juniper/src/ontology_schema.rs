@@ -7,8 +7,13 @@ use crate::juniper::{
 
 use ::juniper::{GraphQLEnum, GraphQLObject};
 use ontol_runtime::{
-    ontology::{domain::TypeKind, map::MapMeta, ontol::TextConstant, Ontology},
-    property::PropertyId,
+    ontology::{
+        domain::{self, CardinalIdx, TypeKind},
+        map::MapMeta,
+        ontol::TextConstant,
+        Ontology,
+    },
+    property::{self, PropertyId},
     DefId, MapKey, PackageId,
 };
 
@@ -33,7 +38,21 @@ struct DataRelationshipInfo {
     def_id: DefId,
     kind: RelationshipKindEnum,
     property_id: PropertyId,
-    rel_params: Option<DefId>,
+    edge: Option<(DefId, CardinalIdx)>,
+}
+
+struct DataRelationshipEdge {
+    edge_id: DefId,
+    cardinal_idx: CardinalIdx,
+}
+
+struct Edge {
+    edge_id: DefId,
+}
+
+struct EdgeCardinal {
+    idx: usize,
+    inner: domain::EdgeCardinal,
 }
 
 struct Entity {
@@ -74,6 +93,22 @@ enum ValueCardinality {
 struct Cardinality {
     property_cardinality: PropertyCardinality,
     value_cardinality: ValueCardinality,
+}
+
+impl From<property::Cardinality> for Cardinality {
+    fn from(value: property::Cardinality) -> Self {
+        Self {
+            property_cardinality: match value.0 {
+                property::PropertyCardinality::Optional => PropertyCardinality::Optional,
+                property::PropertyCardinality::Mandatory => PropertyCardinality::Mandatory,
+            },
+            value_cardinality: match value.1 {
+                property::ValueCardinality::Unit => ValueCardinality::Unit,
+                property::ValueCardinality::IndexSet => ValueCardinality::IndexSet,
+                property::ValueCardinality::List => ValueCardinality::List,
+            },
+        }
+    }
 }
 
 #[derive(GraphQLEnum)]
@@ -140,64 +175,75 @@ impl DataRelationshipInfo {
         };
         TypeInfo { id: target_def_id }
     }
-    fn subject_name(&self, context: &Context) -> String {
+    fn name(&self, context: &Context) -> String {
         let type_info = context.get_type_info(self.def_id);
         let data_relationship = type_info.data_relationships.get(&self.property_id).unwrap();
-        context[data_relationship.subject_name].into()
+        context[data_relationship.name].into()
     }
-    fn object_name(&self, context: &Context) -> Option<String> {
+    fn cardinality(&self, context: &Context) -> Cardinality {
         let type_info = context.get_type_info(self.def_id);
         let data_relationship = type_info.data_relationships.get(&self.property_id).unwrap();
-        data_relationship
-            .object_name
-            .map(|text_constant| context[text_constant].into())
-    }
-    fn subject_cardinality(&self, context: &Context) -> Cardinality {
-        let type_info = context.get_type_info(self.def_id);
-        let data_relationship = type_info.data_relationships.get(&self.property_id).unwrap();
-        let (property_cardinality, value_cardinality) = data_relationship.subject_cardinality;
-        let property_cardinality = match property_cardinality {
-            ontol_runtime::property::PropertyCardinality::Optional => PropertyCardinality::Optional,
-            ontol_runtime::property::PropertyCardinality::Mandatory => {
-                PropertyCardinality::Mandatory
-            }
-        };
-        let value_cardinality = match value_cardinality {
-            ontol_runtime::property::ValueCardinality::Unit => ValueCardinality::Unit,
-            ontol_runtime::property::ValueCardinality::IndexSet => ValueCardinality::IndexSet,
-            ontol_runtime::property::ValueCardinality::List => ValueCardinality::List,
-        };
-        Cardinality {
-            property_cardinality,
-            value_cardinality,
-        }
-    }
-    fn object_cardinality(&self, context: &Context) -> Cardinality {
-        let type_info = context.get_type_info(self.def_id);
-        let data_relationship = type_info.data_relationships.get(&self.property_id).unwrap();
-        let (property_cardinality, value_cardinality) = data_relationship.object_cardinality;
-        let property_cardinality = match property_cardinality {
-            ontol_runtime::property::PropertyCardinality::Optional => PropertyCardinality::Optional,
-            ontol_runtime::property::PropertyCardinality::Mandatory => {
-                PropertyCardinality::Mandatory
-            }
-        };
-        let value_cardinality = match value_cardinality {
-            ontol_runtime::property::ValueCardinality::Unit => ValueCardinality::Unit,
-            ontol_runtime::property::ValueCardinality::IndexSet => ValueCardinality::IndexSet,
-            ontol_runtime::property::ValueCardinality::List => ValueCardinality::List,
-        };
-        Cardinality {
-            property_cardinality,
-            value_cardinality,
-        }
+        Cardinality::from(data_relationship.cardinality)
     }
     fn kind(&self) -> RelationshipKindEnum {
         self.kind
     }
-    fn rel_params(&self) -> Option<TypeInfo> {
-        self.rel_params
-            .map(|rel_params| TypeInfo { id: rel_params })
+    fn edge(&self) -> Option<DataRelationshipEdge> {
+        self.edge
+            .map(|(edge_id, cardinal_idx)| DataRelationshipEdge {
+                edge_id,
+                cardinal_idx,
+            })
+    }
+}
+
+#[graphql_object]
+#[graphql(context = Context)]
+impl DataRelationshipEdge {
+    fn cardinal_idx(&self) -> i32 {
+        self.cardinal_idx.0.into()
+    }
+
+    fn edge(&self) -> Edge {
+        Edge {
+            edge_id: self.edge_id,
+        }
+    }
+}
+
+#[graphql_object]
+#[graphql(context = Context)]
+impl Edge {
+    fn type_info(&self) -> TypeInfo {
+        TypeInfo { id: self.edge_id }
+    }
+
+    fn cardinals(&self, context: &Context) -> Vec<EdgeCardinal> {
+        let edge = context.find_edge(self.edge_id).unwrap();
+        edge.cardinals
+            .iter()
+            .enumerate()
+            .map(|(idx, cardinal)| EdgeCardinal {
+                idx,
+                inner: cardinal.clone(),
+            })
+            .collect()
+    }
+}
+
+#[graphql_object]
+#[graphql(context = Context)]
+impl EdgeCardinal {
+    fn index(&self) -> i32 {
+        self.idx.try_into().unwrap()
+    }
+
+    fn target(&self) -> TypeInfo {
+        let target_def_id = match self.inner.target {
+            ontol_runtime::ontology::domain::DataRelationshipTarget::Unambiguous(def_id) => def_id,
+            ontol_runtime::ontology::domain::DataRelationshipTarget::Union(def_id) => def_id,
+        };
+        TypeInfo { id: target_def_id }
     }
 }
 
@@ -274,7 +320,7 @@ enum TypeKindEnum {
 enum RelationshipKindEnum {
     Id,
     Tree,
-    EntityGraph,
+    Edge,
 }
 
 #[graphql_object]
@@ -322,22 +368,23 @@ impl TypeInfo {
             .data_relationships
             .iter()
             .map(|(property_id, dri)| {
-                let (kind, rel_params) = match dri.kind {
+                let (kind, edge) = match dri.kind {
                     ontol_runtime::ontology::domain::DataRelationshipKind::Id => {
                         (RelationshipKindEnum::Id, None)
                     }
                     ontol_runtime::ontology::domain::DataRelationshipKind::Tree => {
                         (RelationshipKindEnum::Tree, None)
                     }
-                    ontol_runtime::ontology::domain::DataRelationshipKind::EntityGraph {
-                        rel_params,
-                    } => (RelationshipKindEnum::EntityGraph, rel_params),
+                    ontol_runtime::ontology::domain::DataRelationshipKind::Edge {
+                        edge_id,
+                        cardinal_idx,
+                    } => (RelationshipKindEnum::Edge, Some((edge_id, cardinal_idx))),
                 };
                 DataRelationshipInfo {
                     kind,
                     def_id: self.id,
-                    rel_params,
                     property_id: *property_id,
+                    edge,
                 }
             })
             .collect()
