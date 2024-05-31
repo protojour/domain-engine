@@ -39,6 +39,8 @@ use super::{
     union_map_generator::generate_union_maps,
 };
 
+/// The code context tracks all structures related to code that needs to run on ONTOL VM,
+/// and other information resulting from mapping of definitions.
 #[derive(Default)]
 pub struct CodeCtx<'m> {
     const_tasks: Vec<ConstCodegenTask<'m>>,

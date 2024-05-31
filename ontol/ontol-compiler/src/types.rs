@@ -173,6 +173,8 @@ impl<'m> Type<'m> {
     }
 }
 
+/// Cache for types. Every ontol value/variable has a type during compile time.
+/// Types are erased when the ontology is produced.
 pub struct TypeCtx<'m> {
     mem: &'m Mem,
     pub(crate) types: FnvHashSet<&'m Type<'m>>,
@@ -234,6 +236,9 @@ impl<'m> Intern<Vec<TypeRef<'m>>> for TypeCtx<'m> {
     }
 }
 
+/// Data structure that maps DefId to type information.
+///
+/// This is populated during the type check phase.
 #[derive(Default)]
 pub struct DefTypeCtx<'m> {
     pub table: FnvHashMap<DefId, TypeRef<'m>>,

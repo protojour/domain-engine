@@ -11,6 +11,7 @@ use ontol_runtime::{
 
 use crate::{sequence::Sequence, text_patterns::TextPatternSegment, SourceSpan};
 
+/// Context that tracks relation and relationship information
 #[derive(Default)]
 pub struct RelCtx {
     pub properties_by_def_id: FnvHashMap<DefId, Properties>,

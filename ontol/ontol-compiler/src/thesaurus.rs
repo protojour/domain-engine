@@ -88,6 +88,7 @@ impl<'a> Iterator for EntriesIter<'a> {
     }
 }
 
+/// The thesaurus tracks information from `is` relationships.
 pub struct Thesaurus {
     table: FnvHashMap<DefId, IndexMap<Is, SourceSpan>>,
     pub reverse_table: FnvHashMap<DefId, HashSet<DefId>>,

@@ -3,6 +3,10 @@ use ontol_runtime::DefId;
 
 use super::repr_model::{Repr, ReprKind};
 
+/// Context that tracks the data representation (repr) of ONTOL definitions.
+///
+/// Data representation encodes how values are stored in memory.
+/// For example, some defs are structs, other defs are numbers, strings or unions.
 #[derive(Default)]
 pub struct ReprCtx {
     /// Table of repr results
