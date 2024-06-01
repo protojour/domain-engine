@@ -159,22 +159,20 @@ impl<'m> Compiler<'m> {
 
         // "identifies" edge
         {
-            let id = self.primitives.relations.id;
-            let identifies = self.primitives.relations.identifies;
-            let identifies_id = self.defs.add_def(DefKind::Edge, ONTOL_PKG, NO_SPAN);
+            let edge_id = self.primitives.edges.identifies;
             self.edge_ctx
                 .symbols
-                .insert(self.primitives.relations.id, identifies_id);
+                .insert(self.primitives.relations.id, edge_id);
             self.edge_ctx
                 .symbols
-                .insert(self.primitives.relations.identifies, identifies_id);
+                .insert(self.primitives.relations.identifies, edge_id);
 
             self.edge_ctx.edges.insert(
-                identifies_id,
+                edge_id,
                 Edge {
                     slots: FnvHashMap::from_iter([
                         (
-                            id,
+                            self.primitives.relations.identifies,
                             Slot {
                                 left: Some(CardinalIdx(0)),
                                 depth: 0,
@@ -182,7 +180,7 @@ impl<'m> Compiler<'m> {
                             },
                         ),
                         (
-                            identifies,
+                            self.primitives.relations.id,
                             Slot {
                                 left: Some(CardinalIdx(1)),
                                 depth: 0,

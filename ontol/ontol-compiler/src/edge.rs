@@ -2,8 +2,11 @@
 
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    ontology::{domain::CardinalIdx, ontol::TextConstant},
-    DefId,
+    ontology::{
+        domain::{CardinalIdx, EdgeCardinalId},
+        ontol::TextConstant,
+    },
+    DefId, RelationshipId,
 };
 
 #[derive(Default)]
@@ -14,6 +17,8 @@ pub struct EdgeCtx {
     pub symbols: FnvHashMap<DefId, DefId>,
 
     pub edges: FnvHashMap<DefId, Edge>,
+
+    pub rel_to_edge: FnvHashMap<RelationshipId, EdgeCardinalId>,
 
     pub store_keys: FnvHashMap<DefId, TextConstant>,
 }

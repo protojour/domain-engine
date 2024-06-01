@@ -8,8 +8,8 @@ use ontol_runtime::{
     ontology::{
         domain::{
             BasicTypeInfo, CardinalIdx, DataRelationshipInfo, DataRelationshipKind,
-            DataRelationshipSource, DataRelationshipTarget, Domain, EdgeCardinal, EdgeInfo,
-            EntityInfo, TypeInfo, TypeKind,
+            DataRelationshipSource, DataRelationshipTarget, Domain, EdgeCardinal, EdgeCardinalId,
+            EdgeInfo, EntityInfo, TypeInfo, TypeKind,
         },
         map::MapMeta,
         ontol::{OntolDomainMeta, TextConstant, TextLikeType},
@@ -457,9 +457,12 @@ impl<'m> Compiler<'m> {
         // when for more complex edge models
         let edge_id = property_id.relationship_id.0;
 
-        let cardinal_idx = match property_id.role {
-            Role::Subject => CardinalIdx(0),
-            Role::Object => CardinalIdx(1),
+        let edge_cardinal_id = EdgeCardinalId {
+            edge_id,
+            cardinal_idx: match property_id.role {
+                Role::Subject => CardinalIdx(0),
+                Role::Object => CardinalIdx(1),
+            },
         };
 
         let (data_relationship_kind, target) = match repr_kind {
@@ -472,13 +475,7 @@ impl<'m> Compiler<'m> {
                         .map(|properties| properties.identified_by.is_some())
                         .unwrap_or(false)
                 }) {
-                    (
-                        DataRelationshipKind::Edge {
-                            edge_id,
-                            cardinal_idx,
-                        },
-                        target,
-                    )
+                    (DataRelationshipKind::Edge(edge_cardinal_id), target)
                 } else {
                     (DataRelationshipKind::Tree, target)
                 }
@@ -486,13 +483,7 @@ impl<'m> Compiler<'m> {
             _ => {
                 let target = DataRelationshipTarget::Unambiguous(target_def_id);
                 if target_properties.identified_by.is_some() {
-                    (
-                        DataRelationshipKind::Edge {
-                            edge_id,
-                            cardinal_idx,
-                        },
-                        target,
-                    )
+                    (DataRelationshipKind::Edge(edge_cardinal_id), target)
                 } else {
                     let source_properties = self.rel_ctx.properties_by_def_id(source_def_id);
                     let is_entity_id = source_properties

@@ -110,6 +110,8 @@ pub struct Primitives {
     /// Builtin relations
     pub relations: OntolRelations,
 
+    pub edges: OntolEdges,
+
     pub generators: Generators,
 
     pub symbols: OntolSymbols,
@@ -134,6 +136,11 @@ pub struct OntolRelations {
     pub gen: DefId,
     pub order: DefId,
     pub direction: DefId,
+}
+
+#[derive(Debug)]
+pub struct OntolEdges {
+    pub identifies: DefId,
 }
 
 /// Built-in symbols (named subtypes of text)
@@ -200,6 +207,9 @@ impl Primitives {
                 order: defs.add_builtin_relation(BuiltinRelationKind::Order, Some("order")),
                 direction: defs
                     .add_builtin_relation(BuiltinRelationKind::Direction, Some("direction")),
+            },
+            edges: OntolEdges {
+                identifies: defs.add_def(DefKind::Edge, ONTOL_PKG, NO_SPAN),
             },
 
             generators: Generators {

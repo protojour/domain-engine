@@ -197,13 +197,7 @@ pub enum DataRelationshipKind {
     Tree,
     /// Graph data relationships can be circular and involves entities.
     /// The Graph relationship kind must go from one entity to another entity.
-    Edge {
-        /// The edge id that is the source of this data point
-        edge_id: DefId,
-
-        /// The cardinal index of this data point within the edge
-        cardinal_idx: CardinalIdx,
-    },
+    Edge(EdgeCardinalId),
 }
 
 #[derive(Clone, Serialize, Deserialize, OntolDebug)]
@@ -283,3 +277,24 @@ impl Display for CardinalIdx {
         write!(f, "{}", AsAlpha(self.0 as u32, 'A'))
     }
 }
+
+#[derive(Clone, Copy, Serialize, Deserialize)]
+pub struct EdgeCardinalId {
+    /// The cardinal index of this data point within the edge
+    pub cardinal_idx: CardinalIdx,
+
+    /// The edge id that is the source of this data point
+    pub edge_id: DefId,
+}
+
+impl Debug for EdgeCardinalId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}:{}:{}",
+            self.cardinal_idx, self.edge_id.0 .0, self.edge_id.1,
+        )
+    }
+}
+
+impl_ontol_debug!(EdgeCardinalId);

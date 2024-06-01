@@ -45,6 +45,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             DefKind::Relationship(relationship) => {
                 self.check_relationship(def_id, relationship, &def.span)
             }
+            DefKind::Edge => self.types.intern(Type::Tautology),
             DefKind::Primitive(kind, _ident) => self.types.intern(Type::Primitive(*kind, def_id)),
             DefKind::Mapping { .. } => self.types.intern(Type::Tautology),
             DefKind::Constant(pat_id) => {

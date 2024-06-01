@@ -3,8 +3,10 @@ use std::{borrow::Cow, collections::HashMap, ops::Range};
 use fnv::FnvHashMap;
 use ontol_macros::RustDoc;
 use ontol_runtime::{
-    ontology::domain::{BasicTypeInfo, TypeKind},
-    ontology::ontol::TextLikeType,
+    ontology::{
+        domain::{BasicTypeInfo, TypeKind},
+        ontol::TextLikeType,
+    },
     property::{Cardinality, Role},
     var::VarAllocator,
     DefId, PackageId, RelationshipId,

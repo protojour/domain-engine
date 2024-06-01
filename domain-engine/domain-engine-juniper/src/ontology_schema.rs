@@ -8,7 +8,7 @@ use crate::juniper::{
 use ::juniper::{GraphQLEnum, GraphQLObject};
 use ontol_runtime::{
     ontology::{
-        domain::{self, CardinalIdx, TypeKind},
+        domain::{self, EdgeCardinalId, TypeKind},
         map::MapMeta,
         ontol::TextConstant,
         Ontology,
@@ -38,12 +38,11 @@ struct DataRelationshipInfo {
     def_id: DefId,
     kind: RelationshipKindEnum,
     property_id: PropertyId,
-    edge: Option<(DefId, CardinalIdx)>,
+    edge_cardinal_id: Option<EdgeCardinalId>,
 }
 
 struct DataRelationshipEdge {
-    edge_id: DefId,
-    cardinal_idx: CardinalIdx,
+    id: EdgeCardinalId,
 }
 
 struct Edge {
@@ -189,10 +188,9 @@ impl DataRelationshipInfo {
         self.kind
     }
     fn edge(&self) -> Option<DataRelationshipEdge> {
-        self.edge
-            .map(|(edge_id, cardinal_idx)| DataRelationshipEdge {
-                edge_id,
-                cardinal_idx,
+        self.edge_cardinal_id
+            .map(|edge_cardinal_id| DataRelationshipEdge {
+                id: edge_cardinal_id,
             })
     }
 }
@@ -201,12 +199,12 @@ impl DataRelationshipInfo {
 #[graphql(context = Context)]
 impl DataRelationshipEdge {
     fn cardinal_idx(&self) -> i32 {
-        self.cardinal_idx.0.into()
+        self.id.cardinal_idx.0.into()
     }
 
     fn edge(&self) -> Edge {
         Edge {
-            edge_id: self.edge_id,
+            edge_id: self.id.edge_id,
         }
     }
 }
@@ -368,23 +366,22 @@ impl TypeInfo {
             .data_relationships
             .iter()
             .map(|(property_id, dri)| {
-                let (kind, edge) = match dri.kind {
+                let (kind, edge_cardinal_id) = match dri.kind {
                     ontol_runtime::ontology::domain::DataRelationshipKind::Id => {
                         (RelationshipKindEnum::Id, None)
                     }
                     ontol_runtime::ontology::domain::DataRelationshipKind::Tree => {
                         (RelationshipKindEnum::Tree, None)
                     }
-                    ontol_runtime::ontology::domain::DataRelationshipKind::Edge {
-                        edge_id,
-                        cardinal_idx,
-                    } => (RelationshipKindEnum::Edge, Some((edge_id, cardinal_idx))),
+                    ontol_runtime::ontology::domain::DataRelationshipKind::Edge(cardinal_id) => {
+                        (RelationshipKindEnum::Edge, Some(cardinal_id))
+                    }
                 };
                 DataRelationshipInfo {
                     kind,
                     def_id: self.id,
                     property_id: *property_id,
-                    edge,
+                    edge_cardinal_id,
                 }
             })
             .collect()
