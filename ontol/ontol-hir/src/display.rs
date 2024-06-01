@@ -567,12 +567,12 @@ impl<'a, L: Lang> Display for Binding<'a, L> {
 
 impl Debug for Label {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Label({})", AsAlpha(self.0))
+        write!(f, "Label({})", AsAlpha(self.0, 'a'))
     }
 }
 
 impl Display for Label {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "@{}", AsAlpha(self.0))
+        write!(f, "@{}", AsAlpha(self.0, 'a'))
     }
 }

@@ -122,7 +122,7 @@ where
     }
 }
 
-pub fn try_alpha_to_u32(sym: &str) -> Option<u32> {
+pub fn try_alpha_to_u32(sym: &str, base: char) -> Option<u32> {
     if sym.is_empty() {
         return None;
     }
@@ -135,7 +135,7 @@ pub fn try_alpha_to_u32(sym: &str) -> Option<u32> {
             return None;
         }
 
-        let value = u32::from(char) - u32::from('a');
+        let value = u32::from(char) - u32::from(base);
         num += value;
 
         if iterator.peek().is_some() {
@@ -146,16 +146,16 @@ pub fn try_alpha_to_u32(sym: &str) -> Option<u32> {
     Some(num)
 }
 
-pub struct AsAlpha(pub u32);
+pub struct AsAlpha(pub u32, pub char);
 
 impl Display for AsAlpha {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.0 >= 26 {
-            write!(f, "{}", AsAlpha((self.0 / 26) - 1))?;
+            write!(f, "{}", AsAlpha((self.0 / 26) - 1, self.1))?;
         }
 
         let rem = self.0 % 26;
-        write!(f, "{}", char::from_u32(u32::from('a') + rem).unwrap())
+        write!(f, "{}", char::from_u32(u32::from(self.1) + rem).unwrap())
     }
 }
 
@@ -175,10 +175,10 @@ impl<'a> Debug for Literal<'a> {
 
 #[test]
 fn test_as_alpha() {
-    assert_eq!("a", format!("{}", AsAlpha(0)));
-    assert_eq!("z", format!("{}", AsAlpha(25)));
-    assert_eq!("aa", format!("{}", AsAlpha(26)));
-    assert_eq!("az", format!("{}", AsAlpha(51)));
-    assert_eq!("ba", format!("{}", AsAlpha(52)));
-    assert_eq!("yq", format!("{}", AsAlpha(666)));
+    assert_eq!("a", format!("{}", AsAlpha(0, 'a')));
+    assert_eq!("z", format!("{}", AsAlpha(25, 'a')));
+    assert_eq!("aa", format!("{}", AsAlpha(26, 'a')));
+    assert_eq!("az", format!("{}", AsAlpha(51, 'a')));
+    assert_eq!("ba", format!("{}", AsAlpha(52, 'a')));
+    assert_eq!("YQ", format!("{}", AsAlpha(666, 'A')));
 }

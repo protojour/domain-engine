@@ -37,19 +37,19 @@ impl FromStr for Var {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let next = s.strip_prefix('$').ok_or(())?;
-        try_alpha_to_u32(next).map(Var).ok_or(())
+        try_alpha_to_u32(next, 'a').map(Var).ok_or(())
     }
 }
 
 impl Display for Var {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "${}", AsAlpha(self.0))
+        write!(f, "${}", AsAlpha(self.0, 'a'))
     }
 }
 
 impl Debug for Var {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "${}", AsAlpha(self.0))
+        write!(f, "${}", AsAlpha(self.0, 'a'))
     }
 }
 
