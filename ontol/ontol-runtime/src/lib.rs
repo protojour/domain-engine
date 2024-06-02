@@ -24,6 +24,10 @@ mod equality;
 
 extern crate self as ontol_runtime;
 
+/// Property mirroring is the old ONTOL property model,
+/// trying to remove this by using edge cardinals instead
+pub const MIRROR_PROP: bool = false;
+
 /// Identifies one "package" of ONTOL code.
 /// One package represents a domain,
 /// but one package can consist of internal subdomains (probably).
@@ -151,3 +155,16 @@ impl ::std::fmt::Debug for RelationshipId {
 }
 
 impl_ontol_debug!(RelationshipId);
+
+/// The ID of some relationship between ONTOL types.
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+pub struct EdgeId(pub DefId);
+
+/// This forces single-line output even when pretty-printed
+impl ::std::fmt::Debug for EdgeId {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        write!(f, "edge@{}:{}", self.0 .0 .0, self.0 .1)
+    }
+}
+
+impl_ontol_debug!(EdgeId);

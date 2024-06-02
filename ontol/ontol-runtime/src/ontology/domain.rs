@@ -15,7 +15,7 @@ use crate::{
     interface::serde::operator::SerdeOperatorAddr,
     property::{Cardinality, PropertyId},
     query::order::Direction,
-    DefId, RelationshipId,
+    DefId, EdgeId, RelationshipId,
 };
 
 use super::ontol::{TextConstant, ValueGenerator};
@@ -30,7 +30,7 @@ pub struct Domain {
     /// Types by DefId.1 (the type's index within the domain)
     types: Vec<TypeInfo>,
 
-    edges: BTreeMap<DefId, EdgeInfo>,
+    edges: BTreeMap<EdgeId, EdgeInfo>,
 }
 
 impl Domain {
@@ -67,12 +67,12 @@ impl Domain {
         self.types.iter()
     }
 
-    pub fn edges(&self) -> impl Iterator<Item = (&DefId, &EdgeInfo)> {
+    pub fn edges(&self) -> impl Iterator<Item = (&EdgeId, &EdgeInfo)> {
         self.edges.iter()
     }
 
-    pub fn find_edge(&self, edge_id: DefId) -> Option<&EdgeInfo> {
-        self.edges.get(&edge_id)
+    pub fn find_edge(&self, id: EdgeId) -> Option<&EdgeInfo> {
+        self.edges.get(&id)
     }
 
     pub fn find_type_by_name(&self, name: TextConstant) -> Option<&TypeInfo> {
@@ -108,7 +108,7 @@ impl Domain {
             .find(|type_info| type_info.name() == Some(name))
     }
 
-    pub fn set_edges(&mut self, edges: impl IntoIterator<Item = (DefId, EdgeInfo)>) {
+    pub fn set_edges(&mut self, edges: impl IntoIterator<Item = (EdgeId, EdgeInfo)>) {
         self.edges = edges.into_iter().collect();
     }
 }
@@ -144,10 +144,15 @@ impl TypeInfo {
         }
     }
 
-    pub fn edge_relationships(&self) -> impl Iterator<Item = (&PropertyId, &DataRelationshipInfo)> {
+    pub fn edge_relationships(
+        &self,
+    ) -> impl Iterator<Item = (&PropertyId, &DataRelationshipInfo, EdgeCardinalId)> {
         self.data_relationships
             .iter()
-            .filter(|(_, info)| matches!(info.kind, DataRelationshipKind::Edge { .. }))
+            .filter_map(|(prop_id, info)| match info.kind {
+                DataRelationshipKind::Edge(edge_cardinal) => Some((prop_id, info, edge_cardinal)),
+                _ => None,
+            })
     }
 }
 
@@ -280,11 +285,11 @@ impl Display for CardinalIdx {
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
 pub struct EdgeCardinalId {
+    /// The edge id that is the source of this data point
+    pub id: EdgeId,
+
     /// The cardinal index of this data point within the edge
     pub cardinal_idx: CardinalIdx,
-
-    /// The edge id that is the source of this data point
-    pub edge_id: DefId,
 }
 
 impl Debug for EdgeCardinalId {
@@ -292,7 +297,7 @@ impl Debug for EdgeCardinalId {
         write!(
             f,
             "{}:{}:{}",
-            self.cardinal_idx, self.edge_id.0 .0, self.edge_id.1,
+            self.id.0 .0 .0, self.id.0 .1, self.cardinal_idx,
         )
     }
 }

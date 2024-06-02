@@ -178,7 +178,7 @@ fn test_map_relation_sequence_default_fallback() {
     "
     def foo_inner (rel .'foo_id'|id: (rel .is: text))
     def bar_inner (rel .'bar_id'|id: (rel .is: text))
-    rel {foo_inner} 'bars'::'foos' {bar_inner}
+    rel {foo_inner} 'bars'::'foos'? {bar_inner}
 
     def bar (
         rel .'id'|id: (rel .is: text)

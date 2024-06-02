@@ -8,6 +8,7 @@ use ontol_parser::{
     ParserError, U32Span,
 };
 use ontol_runtime::{
+    ontology::domain::{CardinalIdx, EdgeCardinalId},
     property::{PropertyCardinality, ValueCardinality},
     var::{Var, VarAllocator},
     DefId, PackageId,
@@ -50,6 +51,7 @@ pub struct Private(pub Option<U32Span>);
 pub struct Extern(pub Option<U32Span>);
 pub struct Symbol(pub Option<U32Span>);
 
+#[derive(Clone, Copy)]
 pub enum RelationKey {
     Named(DefId),
     Builtin(DefId),
@@ -226,6 +228,10 @@ impl<'c, 'm> LoweringCtx<'c, 'm> {
                     relationship_id,
                     DefKind::Relationship(Relationship {
                         relation_def_id: self.compiler.primitives.relations.is,
+                        edge_cardinal_id: EdgeCardinalId {
+                            cardinal_idx: CardinalIdx(0),
+                            id: self.compiler.primitives.edges.is,
+                        },
                         relation_span: span,
                         subject: (def_id, span),
                         subject_cardinality: (

@@ -1,12 +1,12 @@
 use anyhow::anyhow;
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    ontology::domain::DataRelationshipKind,
+    ontology::domain::{CardinalIdx, DataRelationshipKind},
     property::{PropertyId, Role},
     query::condition::{Clause, CondTerm, Condition, SetOperator},
     value::{Attribute, Value},
     var::Var,
-    DefId,
+    DefId, MIRROR_PROP,
 };
 
 use domain_engine_core::{
@@ -153,33 +153,43 @@ impl InMemoryStore {
                                 ctx,
                             )?);
                         }
-                        DataRelationshipKind::Edge { .. } => {
+                        DataRelationshipKind::Edge(edge_cardinal) => {
                             let Some(key) = dynamic_key else {
                                 return Err(ProofError::Domain(DomainError::DataStore(anyhow!(
-                                    "cannot filter entity-graph without dynamic key"
+                                    "cannot filter edge without dynamic key"
                                 ))));
                             };
 
                             let edge_collection = self
                                 .edge_collections
-                                .get(&prop_id.relationship_id.0)
+                                .get(&edge_cardinal.id)
                                 .ok_or(ProofError::Disproven)?;
 
-                            let (target_key, rel_params) = match prop_id.role {
-                                Role::Subject => edge_collection.edges.iter().find_map(|edge| {
+                            let cardinal_idx = if MIRROR_PROP {
+                                match prop_id.role {
+                                    Role::Subject => CardinalIdx(0),
+                                    Role::Object => CardinalIdx(1),
+                                }
+                            } else {
+                                edge_cardinal.cardinal_idx
+                            };
+
+                            let (target_key, rel_params) = match cardinal_idx.0 {
+                                0 => edge_collection.edges.iter().find_map(|edge| {
                                     if edge.from.dynamic_key == *key {
                                         Some((&edge.to, &edge.params))
                                     } else {
                                         None
                                     }
                                 }),
-                                Role::Object => edge_collection.edges.iter().find_map(|edge| {
+                                1 => edge_collection.edges.iter().find_map(|edge| {
                                     if edge.to.dynamic_key == *key {
                                         Some((&edge.from, &edge.params))
                                     } else {
                                         None
                                     }
                                 }),
+                                _ => None,
                             }
                             .ok_or(ProofError::Disproven)?;
 

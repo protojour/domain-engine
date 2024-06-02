@@ -1,8 +1,8 @@
 use anyhow::anyhow;
 use fnv::FnvHashMap;
 use ontol_runtime::{
-    ontology::domain::{DataRelationshipKind, DataRelationshipTarget, TypeInfo},
-    property::{PropertyId, Role, ValueCardinality},
+    ontology::domain::{DataRelationshipKind, DataRelationshipTarget, EdgeCardinalId, TypeInfo},
+    property::{PropertyId, ValueCardinality},
     query::{
         filter::Filter,
         select::{EntitySelect, Select, StructOrUnionSelect, StructSelect},
@@ -166,11 +166,11 @@ impl InMemoryStore {
 
             let data_relationship = find_data_relationship(type_info, property_id)?;
 
-            if !matches!(data_relationship.kind, DataRelationshipKind::Edge { .. }) {
+            let DataRelationshipKind::Edge(edge_cardinal) = data_relationship.kind else {
                 continue;
-            }
+            };
 
-            let attrs = self.sub_query_attributes(*property_id, subselect, entity_key, ctx)?;
+            let attrs = self.sub_query_attributes(edge_cardinal, subselect, entity_key, ctx)?;
 
             match data_relationship.cardinality.1 {
                 ValueCardinality::Unit => {
@@ -199,33 +199,33 @@ impl InMemoryStore {
 
     fn sub_query_attributes(
         &self,
-        property_id: PropertyId,
+        edge_cardinal: EdgeCardinalId,
         select: &Select,
         parent_key: &DynamicKey,
         ctx: &DbContext,
     ) -> DomainResult<Vec<Attribute>> {
-        let relationship_id = property_id.relationship_id;
         let edge_collection = self
             .edge_collections
-            .get(&relationship_id.0)
+            .get(&edge_cardinal.id)
             .expect("No edge collection");
 
         let mut out = vec![];
 
         for edge in &edge_collection.edges {
-            let entity = match property_id.role {
-                Role::Subject => {
+            let entity = match edge_cardinal.cardinal_idx.0 {
+                0 => {
                     if &edge.from.dynamic_key != parent_key {
                         continue;
                     }
                     self.sub_query_entity(&edge.to, select, ctx)?
                 }
-                Role::Object => {
+                1 => {
                     if &edge.to.dynamic_key != parent_key {
                         continue;
                     }
                     self.sub_query_entity(&edge.from, select, ctx)?
                 }
+                _ => panic!("unsupported edge cardinal idx"),
             };
 
             out.push(Attribute {

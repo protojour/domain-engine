@@ -6,7 +6,7 @@ use ontol_runtime::{
         domain::{CardinalIdx, EdgeCardinalId},
         ontol::TextConstant,
     },
-    DefId, RelationshipId,
+    DefId, EdgeId, RelationshipId,
 };
 
 #[derive(Default)]
@@ -14,9 +14,9 @@ pub struct EdgeCtx {
     /// Entrypoints into the edges are the relation symbols defined by the edge.
     ///
     /// This table maps from a symbol definition to an edge definition.
-    pub symbols: FnvHashMap<DefId, DefId>,
+    pub symbols: FnvHashMap<DefId, EdgeId>,
 
-    pub edges: FnvHashMap<DefId, Edge>,
+    pub edges: FnvHashMap<EdgeId, MaterializedEdge>,
 
     pub rel_to_edge: FnvHashMap<RelationshipId, EdgeCardinalId>,
 
@@ -26,7 +26,7 @@ pub struct EdgeCtx {
 impl EdgeCtx {
     /// Look up an edge using a symbol from that edge
     #[allow(unused)]
-    pub fn edge_by_symbol(&self, symbol: DefId) -> Option<&Edge> {
+    pub fn edge_by_symbol(&self, symbol: DefId) -> Option<&MaterializedEdge> {
         let edge_id = self.symbols.get(&symbol)?;
         self.edges.get(edge_id)
     }
@@ -35,7 +35,7 @@ impl EdgeCtx {
 /// An edge models relationships between certain symbols in a domain.
 ///
 /// These symbols represents the _aspect_ of an edge when seen from a certain viewpoint.
-pub struct Edge {
+pub struct MaterializedEdge {
     /// There is one slot per edge symbol one slot connects two vertices together using a symbol.
     pub slots: FnvHashMap<DefId, Slot>,
 
@@ -44,10 +44,6 @@ pub struct Edge {
     /// cardinality of 2 is a classical edge.
     /// cardinality of more than 2 is a "hyperedge".
     pub cardinality: u8,
-
-    /// Whether the edge is conceptually materialized.
-    /// Only the ONTOL domain has non-materialized edges.
-    pub materialized: bool,
 }
 
 pub struct Slot {

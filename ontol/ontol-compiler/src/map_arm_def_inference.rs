@@ -1,9 +1,10 @@
 use fnv::FnvHashMap;
 use indexmap::IndexMap;
 use ontol_runtime::{
+    ontology::domain::{CardinalIdx, EdgeCardinalId},
     property::{PropertyCardinality, PropertyId, ValueCardinality},
     var::Var,
-    DefId,
+    DefId, EdgeId,
 };
 use tracing::{debug, info};
 
@@ -152,8 +153,14 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                         ValueCardinality::Unit
                     };
 
+                    let relationship_id = self.defs.alloc_def_id(self.map_def_id.package_id());
+
                     let relationship = Relationship {
                         relation_def_id,
+                        edge_cardinal_id: EdgeCardinalId {
+                            id: EdgeId(relationship_id),
+                            cardinal_idx: CardinalIdx(0),
+                        },
                         relation_span: pattern.span,
                         subject: (parent_def_id, pattern.span),
                         subject_cardinality: if flags.is_option {
@@ -170,7 +177,6 @@ impl<'c, 'm> MapArmDefInferencer<'c, 'm> {
                         rel_params: RelParams::Unit,
                     };
 
-                    let relationship_id = self.defs.alloc_def_id(self.map_def_id.package_id());
                     self.defs.table.insert(
                         relationship_id,
                         Def {

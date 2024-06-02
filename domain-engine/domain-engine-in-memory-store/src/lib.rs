@@ -9,7 +9,7 @@ use fnv::FnvHashMap;
 use ontol_runtime::interface::serde::processor::ProcessorMode;
 use ontol_runtime::ontology::{config::DataStoreConfig, Ontology};
 use ontol_runtime::property::ValueCardinality;
-use ontol_runtime::{DefId, PackageId};
+use ontol_runtime::{DefId, EdgeId, PackageId};
 use tokio::sync::RwLock;
 
 use domain_engine_core::{
@@ -48,7 +48,7 @@ impl InMemoryDb {
         let domain = ontology.find_domain(package_id).unwrap();
 
         let mut collections: FnvHashMap<DefId, EntityTable<DynamicKey>> = Default::default();
-        let mut edge_collections: FnvHashMap<DefId, EdgeCollection> = Default::default();
+        let mut edge_collections: FnvHashMap<EdgeId, EdgeCollection> = Default::default();
 
         for type_info in domain.type_infos() {
             if let Some(entity_info) = type_info.entity_info() {

@@ -22,7 +22,7 @@ use crate::{
         ontol_vm::OntolVm,
         proc::{Lib, Procedure},
     },
-    DefId, MapKey, PackageId, RelationshipId,
+    DefId, EdgeId, MapKey, PackageId, RelationshipId,
 };
 
 use self::{
@@ -167,9 +167,9 @@ impl Ontology {
             .unwrap_or(&[])
     }
 
-    pub fn find_edge(&self, edge_id: DefId) -> Option<&EdgeInfo> {
-        let domain = self.data.domain_table.get(&edge_id.package_id())?;
-        domain.find_edge(edge_id)
+    pub fn find_edge(&self, id: EdgeId) -> Option<&EdgeInfo> {
+        let domain = self.data.domain_table.get(&id.0.package_id())?;
+        domain.find_edge(id)
     }
 
     pub fn extended_entity_info(&self, def_id: DefId) -> Option<&ExtendedEntityInfo> {

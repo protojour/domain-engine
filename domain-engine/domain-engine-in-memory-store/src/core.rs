@@ -10,7 +10,7 @@ use ontol_runtime::{
     },
     property::PropertyId,
     value::{Attribute, Serial, Value},
-    DefId,
+    DefId, EdgeId,
 };
 use smallvec::SmallVec;
 use tracing::warn;
@@ -19,7 +19,7 @@ use domain_engine_core::{system::ArcSystemApi, DomainError, DomainResult};
 
 pub(super) struct InMemoryStore {
     pub collections: FnvHashMap<DefId, EntityTable<DynamicKey>>,
-    pub edge_collections: FnvHashMap<DefId, EdgeCollection>,
+    pub edge_collections: FnvHashMap<EdgeId, EdgeCollection>,
     pub serial_counter: u64,
 }
 

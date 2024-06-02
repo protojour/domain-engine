@@ -1,8 +1,11 @@
 use ontol_macros::test;
 use ontol_runtime::{
-    ontology::map::{PropertyFlow, PropertyFlowData},
+    ontology::{
+        domain::{CardinalIdx, EdgeCardinalId},
+        map::{PropertyFlow, PropertyFlowData},
+    },
     property::{PropertyCardinality, ValueCardinality},
-    DefId, RelationshipId,
+    DefId, EdgeId, RelationshipId,
 };
 use ontol_test_utils::expect_eq;
 use tracing::debug;
@@ -17,6 +20,10 @@ use crate::{
 
 const MOCK_RELATIONSHIP: Relationship = Relationship {
     relation_def_id: DefId::unit(),
+    edge_cardinal_id: EdgeCardinalId {
+        cardinal_idx: CardinalIdx(0),
+        id: EdgeId(DefId::unit()),
+    },
     relation_span: NO_SPAN,
     subject: (DefId::unit(), NO_SPAN),
     subject_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::Unit),

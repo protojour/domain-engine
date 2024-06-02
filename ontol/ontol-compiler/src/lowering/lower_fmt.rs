@@ -6,8 +6,9 @@ use ontol_parser::{
     U32Span,
 };
 use ontol_runtime::{
+    ontology::domain::{CardinalIdx, EdgeCardinalId},
     property::{PropertyCardinality, ValueCardinality},
-    DefId,
+    DefId, EdgeId,
 };
 use tracing::debug;
 
@@ -108,6 +109,10 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
         Some(self.ctx.define_anonymous(
             DefKind::Relationship(Relationship {
                 relation_def_id,
+                edge_cardinal_id: EdgeCardinalId {
+                    id: EdgeId(relation_def_id),
+                    cardinal_idx: CardinalIdx(0),
+                },
                 relation_span: self.ctx.source_span(from.1),
                 subject: (from.0, self.ctx.source_span(from.1)),
                 subject_cardinality: (PropertyCardinality::Mandatory, ValueCardinality::IndexSet),

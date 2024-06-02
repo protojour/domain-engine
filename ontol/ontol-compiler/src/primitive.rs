@@ -1,5 +1,5 @@
 use ontol_macros::RustDoc;
-use ontol_runtime::DefId;
+use ontol_runtime::{DefId, EdgeId};
 
 use crate::{
     def::{BuiltinRelationKind, DefKind, Defs, TypeDef, TypeDefFlags},
@@ -140,7 +140,8 @@ pub struct OntolRelations {
 
 #[derive(Debug)]
 pub struct OntolEdges {
-    pub identifies: DefId,
+    pub is: EdgeId,
+    pub identifies: EdgeId,
 }
 
 /// Built-in symbols (named subtypes of text)
@@ -209,7 +210,8 @@ impl Primitives {
                     .add_builtin_relation(BuiltinRelationKind::Direction, Some("direction")),
             },
             edges: OntolEdges {
-                identifies: defs.add_def(DefKind::Edge, ONTOL_PKG, NO_SPAN),
+                is: EdgeId(defs.add_def(DefKind::Edge, ONTOL_PKG, NO_SPAN)),
+                identifies: EdgeId(defs.add_def(DefKind::Edge, ONTOL_PKG, NO_SPAN)),
             },
 
             generators: Generators {

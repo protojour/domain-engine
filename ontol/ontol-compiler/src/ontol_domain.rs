@@ -2,16 +2,11 @@
 
 use std::ops::Range;
 
-use fnv::FnvHashMap;
 use ontol_hir::OverloadFunc;
-use ontol_runtime::{
-    ontology::{domain::CardinalIdx, ontol::TextLikeType},
-    DefId,
-};
+use ontol_runtime::{ontology::ontol::TextLikeType, DefId};
 
 use crate::{
     def::{BuiltinRelationKind, DefKind, TypeDef, TypeDefFlags},
-    edge::{Edge, Slot},
     mem::Intern,
     namespace::Space,
     package::ONTOL_PKG,
@@ -157,6 +152,13 @@ impl<'m> Compiler<'m> {
             self.type_check().check_def(def_id);
         }
 
+        // "is" edge
+        {
+            self.edge_ctx
+                .symbols
+                .insert(self.primitives.relations.is, self.primitives.edges.is);
+        }
+
         // "identifies" edge
         {
             let edge_id = self.primitives.edges.identifies;
@@ -166,32 +168,6 @@ impl<'m> Compiler<'m> {
             self.edge_ctx
                 .symbols
                 .insert(self.primitives.relations.identifies, edge_id);
-
-            self.edge_ctx.edges.insert(
-                edge_id,
-                Edge {
-                    slots: FnvHashMap::from_iter([
-                        (
-                            self.primitives.relations.identifies,
-                            Slot {
-                                left: Some(CardinalIdx(0)),
-                                depth: 0,
-                                right: CardinalIdx(1),
-                            },
-                        ),
-                        (
-                            self.primitives.relations.id,
-                            Slot {
-                                left: Some(CardinalIdx(1)),
-                                depth: 0,
-                                right: CardinalIdx(0),
-                            },
-                        ),
-                    ]),
-                    cardinality: 2,
-                    materialized: false,
-                },
-            );
         }
 
         self.seal_domain(ONTOL_PKG);

@@ -17,7 +17,7 @@ use ontol_runtime::{
     },
     property::{PropertyCardinality, PropertyId, Role, ValueCardinality},
     rustdoc::RustDoc,
-    DefId, PackageId,
+    DefId, EdgeId, PackageId, MIRROR_PROP,
 };
 use std::{
     collections::{BTreeSet, HashMap},
@@ -25,8 +25,10 @@ use std::{
 };
 
 use crate::{
-    def::{BuiltinRelationKind, DefKind, LookupRelationshipMeta, RelationshipMeta, TypeDef},
-    def::{RelParams, TypeDefFlags},
+    def::{
+        BuiltinRelationKind, DefKind, LookupRelationshipMeta, RelParams, RelationshipMeta, TypeDef,
+        TypeDefFlags,
+    },
     interface::{
         graphql::generate_schema::generate_graphql_schema,
         serde::{serde_generator::SerdeGenerator, SerdeKey, EDGE_PROPERTY},
@@ -142,7 +144,7 @@ impl<'m> Compiler<'m> {
                 builder.add_package_config(package_id, package_config);
             }
 
-            let mut edges: FnvHashMap<DefId, EdgeInfo> = Default::default();
+            let mut edges: FnvHashMap<EdgeId, EdgeInfo> = Default::default();
 
             for (type_name, type_def_id) in type_namespace {
                 let type_name_constant = serde_gen.str_ctx.intern_constant(type_name);
@@ -343,7 +345,7 @@ impl<'m> Compiler<'m> {
         &self,
         type_def_id: DefId,
         union_member_cache: &UnionMemberCache,
-        edges: &mut FnvHashMap<DefId, EdgeInfo>,
+        edges: &mut FnvHashMap<EdgeId, EdgeInfo>,
         strings: &mut StringCtx<'m>,
     ) -> FnvHashMap<PropertyId, DataRelationshipInfo> {
         let mut relationships = FnvHashMap::default();
@@ -395,7 +397,7 @@ impl<'m> Compiler<'m> {
         &self,
         type_def_id: DefId,
         relationships: &mut FnvHashMap<PropertyId, DataRelationshipInfo>,
-        edges: &mut FnvHashMap<DefId, EdgeInfo>,
+        edges: &mut FnvHashMap<EdgeId, EdgeInfo>,
         strings: &mut StringCtx<'m>,
     ) {
         let Some(properties) = self.rel_ctx.properties_by_def_id(type_def_id) else {
@@ -419,7 +421,7 @@ impl<'m> Compiler<'m> {
         property_id: PropertyId,
         source: DataRelationshipSource,
         relationships: &mut FnvHashMap<PropertyId, DataRelationshipInfo>,
-        edges: &mut FnvHashMap<DefId, EdgeInfo>,
+        edges: &mut FnvHashMap<EdgeId, EdgeInfo>,
         strings: &mut StringCtx<'m>,
     ) {
         let meta = self.defs.relationship_meta(property_id.relationship_id);
@@ -453,16 +455,22 @@ impl<'m> Compiler<'m> {
             RelParams::Unit | RelParams::IndexRange(_) => None,
         };
 
-        // For now, the edge_id is just the relationship, but this will change
-        // when for more complex edge models
-        let edge_id = property_id.relationship_id.0;
+        let edge_id = if MIRROR_PROP {
+            EdgeId(property_id.relationship_id.0)
+        } else {
+            meta.relationship.edge_cardinal_id.id
+        };
 
-        let edge_cardinal_id = EdgeCardinalId {
-            edge_id,
-            cardinal_idx: match property_id.role {
-                Role::Subject => CardinalIdx(0),
-                Role::Object => CardinalIdx(1),
-            },
+        let edge_cardinal_id = if MIRROR_PROP {
+            EdgeCardinalId {
+                id: edge_id,
+                cardinal_idx: match property_id.role {
+                    Role::Subject => CardinalIdx(0),
+                    Role::Object => CardinalIdx(1),
+                },
+            }
+        } else {
+            meta.relationship.edge_cardinal_id
         };
 
         let (data_relationship_kind, target) = match repr_kind {
@@ -508,7 +516,7 @@ impl<'m> Compiler<'m> {
         if let DataRelationshipKind::Edge { .. } = &data_relationship_kind {
             let edge_info = edges.entry(edge_id).or_insert_with(|| EdgeInfo {
                 cardinals: vec![],
-                store_key: self.edge_ctx.store_keys.get(&edge_id).copied(),
+                store_key: self.edge_ctx.store_keys.get(&edge_id.0).copied(),
             });
 
             edge_info.cardinals.resize_with(2, || EdgeCardinal {
@@ -517,20 +525,28 @@ impl<'m> Compiler<'m> {
                 is_entity: false,
             });
 
-            match property_id.role {
-                Role::Subject => {
-                    edge_info.cardinals[0] = EdgeCardinal {
-                        target: target.clone(),
-                        cardinality: meta.relationship.subject_cardinality,
-                        is_entity: true,
-                    };
+            if MIRROR_PROP {
+                match property_id.role {
+                    Role::Subject => {
+                        edge_info.cardinals[0] = EdgeCardinal {
+                            target: target.clone(),
+                            cardinality: meta.relationship.subject_cardinality,
+                            is_entity: true,
+                        };
+                    }
+                    Role::Object => {
+                        edge_info.cardinals[1] = EdgeCardinal {
+                            target: target.clone(),
+                            cardinality: meta.relationship.object_cardinality,
+                            is_entity: true,
+                        };
+                    }
                 }
-                Role::Object => {
-                    edge_info.cardinals[1] = EdgeCardinal {
-                        target: target.clone(),
-                        cardinality: meta.relationship.object_cardinality,
-                        is_entity: true,
-                    };
+            } else {
+                edge_info.cardinals[edge_cardinal_id.cardinal_idx.0 as usize] = EdgeCardinal {
+                    target: target.clone(),
+                    cardinality: meta.relationship.subject_cardinality,
+                    is_entity: true,
                 }
             }
 

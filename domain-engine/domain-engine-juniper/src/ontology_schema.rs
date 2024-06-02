@@ -14,7 +14,7 @@ use ontol_runtime::{
         Ontology,
     },
     property::{self, PropertyId},
-    DefId, MapKey, PackageId,
+    DefId, EdgeId, MapKey, PackageId,
 };
 
 struct Domain {
@@ -46,7 +46,7 @@ struct DataRelationshipEdge {
 }
 
 struct Edge {
-    edge_id: DefId,
+    id: EdgeId,
 }
 
 struct EdgeCardinal {
@@ -203,9 +203,7 @@ impl DataRelationshipEdge {
     }
 
     fn edge(&self) -> Edge {
-        Edge {
-            edge_id: self.id.edge_id,
-        }
+        Edge { id: self.id.id }
     }
 }
 
@@ -213,11 +211,11 @@ impl DataRelationshipEdge {
 #[graphql(context = Context)]
 impl Edge {
     fn type_info(&self) -> TypeInfo {
-        TypeInfo { id: self.edge_id }
+        TypeInfo { id: self.id.0 }
     }
 
     fn cardinals(&self, context: &Context) -> Vec<EdgeCardinal> {
-        let edge = context.find_edge(self.edge_id).unwrap();
+        let edge = context.find_edge(self.id).unwrap();
         edge.cardinals
             .iter()
             .enumerate()

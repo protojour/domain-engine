@@ -60,15 +60,7 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     }
                     Kind::SingleQuoteText | Kind::DoubleQuoteText => {
                         let unescaped = self.ctx.unescape(token.literal_text()?)?;
-                        match unescaped.as_str() {
-                            "" => Some(self.ctx.compiler.primitives.empty_text),
-                            other => Some(
-                                self.ctx
-                                    .compiler
-                                    .defs
-                                    .def_text_literal(other, &mut self.ctx.compiler.str_ctx),
-                            ),
-                        }
+                        Some(self.unescaped_text_literal_def_id(unescaped.as_str()))
                     }
                     Kind::Regex => {
                         let regex_literal = unescape_regex(token.slice());
@@ -132,6 +124,17 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
                     .span_report(range.0.span(), &mut self.ctx);
                 None
             }
+        }
+    }
+
+    pub(super) fn unescaped_text_literal_def_id(&mut self, unescaped: &str) -> DefId {
+        match unescaped {
+            "" => self.ctx.compiler.primitives.empty_text,
+            other => self
+                .ctx
+                .compiler
+                .defs
+                .def_text_literal(other, &mut self.ctx.compiler.str_ctx),
         }
     }
 

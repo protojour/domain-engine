@@ -22,7 +22,7 @@ def instrument (
 def artist (
     rel .'artist-id'[rel .gen: auto]|id: ( fmt '' => text => . )
     rel .'name': text
-    rel {.} 'plays'::'played-by' {instrument}
+    rel {.} 'plays'::'played-by'? {instrument}
 )
 
 map artists(

@@ -5,12 +5,14 @@ use ontol_parser::cst::{
     view::NodeView,
 };
 use ontol_runtime::{
+    ontology::domain::{CardinalIdx, EdgeCardinalId},
     property::{PropertyCardinality, ValueCardinality},
-    DefId, RelationshipId,
+    DefId, EdgeId, RelationshipId, MIRROR_PROP,
 };
 
 use crate::{
     def::{DefKind, RelParams, Relationship, TypeDef, TypeDefFlags},
+    edge::MaterializedEdge,
     CompileError,
 };
 
@@ -168,14 +170,40 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
             RelParams::Unit
         };
 
-        let mut relationship = {
-            let object_prop = backward_relation
-                .clone()
-                .and_then(|rel| rel.name())
-                .and_then(|name| name.text())
-                .and_then(|result| self.ctx.unescape(result))
-                .map(|prop| self.ctx.compiler.str_ctx.intern(&prop));
+        // Just reuse relationship id as the edge id
+        let edge_id = EdgeId(relationship_id);
 
+        // for now: auto-allocate edge id for named relations
+        if let RelationKey::Named(_) = &key {
+            self.ctx.compiler.edge_ctx.edges.insert(
+                edge_id,
+                MaterializedEdge {
+                    slots: Default::default(),
+                    cardinality: if let RelParams::Type(_) = rel_params {
+                        3
+                    } else {
+                        2
+                    },
+                },
+            );
+
+            self.ctx.compiler.edge_ctx.rel_to_edge.insert(
+                RelationshipId(relationship_id),
+                EdgeCardinalId {
+                    cardinal_idx: CardinalIdx(0),
+                    id: edge_id,
+                },
+            );
+        };
+
+        let object_prop = backward_relation
+            .clone()
+            .and_then(|rel| rel.name())
+            .and_then(|name| Some((name.clone(), name.text()?)))
+            .and_then(|(name, result)| Some((name, self.ctx.unescape(result)?)))
+            .map(|(name, prop)| (name, self.ctx.compiler.str_ctx.intern(&prop)));
+
+        let mut relationship0 = {
             let subject_cardinality = (
                 property_cardinality(relation.prop_cardinality())
                     .unwrap_or(PropertyCardinality::Mandatory),
@@ -206,33 +234,74 @@ impl<'c, 'm, V: NodeView> CstLowering<'c, 'm, V> {
 
             Relationship {
                 relation_def_id,
+                edge_cardinal_id: EdgeCardinalId {
+                    cardinal_idx: CardinalIdx(0),
+                    id: edge_id,
+                },
                 relation_span: self.ctx.source_span(ident_span),
                 subject: (subject_def, self.ctx.source_span(rel_subject.0.span())),
                 subject_cardinality,
                 object: (object_def, self.ctx.source_span(rel_object.0.span())),
                 object_cardinality,
-                object_prop,
-                rel_params,
+                object_prop: if MIRROR_PROP {
+                    object_prop.as_ref().map(|(_, prop)| *prop)
+                } else {
+                    None
+                },
+                rel_params: rel_params.clone(),
             }
         };
 
-        // HACK(for now): invert relationship
+        if !MIRROR_PROP {
+            if let Some((name, prop)) = object_prop {
+                let relation1_def_id = self.unescaped_text_literal_def_id(prop);
+                let relationship_id1 = self.ctx.compiler.defs.alloc_def_id(self.ctx.package_id);
+
+                let relationship1 = Relationship {
+                    relation_def_id: relation1_def_id,
+                    edge_cardinal_id: EdgeCardinalId {
+                        cardinal_idx: CardinalIdx(1),
+                        id: edge_id,
+                    },
+                    relation_span: self.ctx.source_span(name.view().span()),
+                    subject: relationship0.object,
+                    subject_cardinality: relationship0.object_cardinality,
+                    object: relationship0.subject,
+                    object_cardinality: relationship0.subject_cardinality,
+                    object_prop: None,
+                    rel_params,
+                };
+
+                self.ctx.set_def_kind(
+                    relationship_id1,
+                    DefKind::Relationship(relationship1),
+                    rel_stmt.0.span(),
+                );
+                root_defs.push(relationship_id1);
+            }
+        }
+
+        // HACK(for now): invert id relationship
         if relation_def_id == self.ctx.compiler.primitives.relations.id {
-            relationship = Relationship {
+            relationship0 = Relationship {
                 relation_def_id: self.ctx.compiler.primitives.relations.identifies,
-                relation_span: relationship.relation_span,
-                subject: relationship.object,
-                subject_cardinality: relationship.object_cardinality,
-                object: relationship.subject,
-                object_cardinality: relationship.subject_cardinality,
+                edge_cardinal_id: EdgeCardinalId {
+                    cardinal_idx: CardinalIdx(0),
+                    id: edge_id,
+                },
+                relation_span: relationship0.relation_span,
+                subject: relationship0.object,
+                subject_cardinality: relationship0.object_cardinality,
+                object: relationship0.subject,
+                object_cardinality: relationship0.subject_cardinality,
                 object_prop: None,
-                rel_params: relationship.rel_params,
+                rel_params: relationship0.rel_params,
             };
         }
 
         self.ctx.set_def_kind(
             relationship_id,
-            DefKind::Relationship(relationship),
+            DefKind::Relationship(relationship0),
             rel_stmt.0.span(),
         );
         root_defs.push(relationship_id);
