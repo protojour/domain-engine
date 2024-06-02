@@ -1537,9 +1537,8 @@ async fn test_extension_and_member_from_foreign_domain() {
     .compile_schemas([src_name("entry")]);
 }
 
+/// Regresssion test for `no PatchEdges available for relation sequence "targets"``
 #[test(tokio::test)]
-// BUG: The 'const' triggers this:
-#[should_panic(expected = "no PatchEdges available for relation sequence \"targets\"")]
 async fn test_const_in_union_bug() {
     "
     def union (

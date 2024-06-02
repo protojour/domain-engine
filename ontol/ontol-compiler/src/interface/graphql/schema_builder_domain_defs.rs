@@ -3,32 +3,29 @@ use indexmap::IndexMap;
 use ontol_runtime::{
     debug::NoFmt,
     interface::{
-        discriminator::LeafDiscriminantScalarUnion,
+        discriminator::{
+            leaf_discriminant_scalar_union_for_has_attribute, Discriminant,
+            LeafDiscriminantScalarUnion, VariantDiscriminator,
+        },
         graphql::{
             argument,
             data::{
-                ConnectionData, EdgeData, FieldData, FieldKind, NativeScalarKind, NativeScalarRef,
-                NodeData, ObjectData, ObjectInterface, ObjectKind, Optionality, ScalarData,
-                TypeAddr, TypeData, TypeKind, TypeModifier, TypeRef, UnionData, UnitTypeRef,
+                ConnectionData, ConnectionPropertyField, EdgeData, FieldData, FieldKind,
+                NativeScalarKind, NativeScalarRef, NodeData, ObjectData, ObjectInterface,
+                ObjectKind, Optionality, ScalarData, TypeAddr, TypeData, TypeKind, TypeModifier,
+                TypeRef, UnionData, UnitTypeRef,
             },
             schema::InterfaceImplementor,
         },
         serde::{
             operator::{SerdeOperator, SerdeStructFlags},
-            SerdeModifier,
+            SerdeDef, SerdeModifier,
         },
-    },
-    interface::{
-        discriminator::{
-            leaf_discriminant_scalar_union_for_has_attribute, Discriminant, VariantDiscriminator,
-        },
-        graphql::data::ConnectionPropertyField,
-        serde::SerdeDef,
     },
     ontology::ontol::TextConstant,
     phf::PhfIndexMap,
     property::{PropertyCardinality, PropertyId, Role, ValueCardinality},
-    DefId, RelationshipId,
+    DefId, RelationshipId, MIRROR_PROP,
 };
 use thin_vec::thin_vec;
 use tracing::{trace, trace_span, warn};
@@ -652,6 +649,8 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
 
         if let Some(union_memberships) = self.union_member_cache.cache.get(&def_id) {
             for union_def_id in union_memberships {
+                let _entered = trace_span!("membership", id = ?union_def_id).entered();
+
                 let Some(properties) = self.relations.properties_by_def_id(*union_def_id) else {
                     continue;
                 };
@@ -662,7 +661,13 @@ impl<'a, 's, 'c, 'm> SchemaBuilder<'a, 's, 'c, 'm> {
                 for (property_id, property) in table {
                     let meta = self.defs.relationship_meta(property_id.relationship_id);
 
-                    if meta.relationship.object.0 == *union_def_id {
+                    let match_side = if MIRROR_PROP {
+                        meta.relationship.object
+                    } else {
+                        meta.relationship.subject
+                    };
+
+                    if match_side.0 == *union_def_id {
                         self.harvest_struct_field(
                             *property_id,
                             property,

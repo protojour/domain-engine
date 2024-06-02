@@ -2,7 +2,7 @@
 def Repository (
     rel .'id'[rel .gen: auto]|id: (rel .is: uuid)
     rel .'handle': text
-    rel {.}'owner'::'repositories' RepositoryOwner
+    rel {.}'owner'::'repositories'? RepositoryOwner
     rel .'origin'?: .
 )
 
