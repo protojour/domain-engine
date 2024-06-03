@@ -3,6 +3,7 @@ members = [
     "domain-engine/domain-engine-core",
     "domain-engine/domain-engine-in-memory-store",
     "domain-engine/domain-engine-juniper",
+    "domain-engine/domain-engine-grpc",
     "domain-engine/domain-engine-test-templates",
     "domain-engine/domain-engine-test-utils",
     "ontol/ontol-compiler",

@@ -842,6 +842,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "domain-engine-grpc"
+version = "0.1.0"
+dependencies = [
+ "domain-engine-core",
+ "domain-engine-test-utils",
+ "ontol-macros",
+ "ontol-runtime",
+ "ontol-test-utils",
+ "pretty_assertions",
+ "prost",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "domain-engine-in-memory-store"
 version = "0.1.0"
 dependencies = [
@@ -2710,6 +2726,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b33eb56c327dec362a9e55b3ad14f9d2f0904fb5a5b03b513ab5465399e9f43"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "prost"
+version = "0.12.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "deb1435c188b76130da55f17a466d252ff7b1418b2ad3e037d127b94e3411f29"
+dependencies = [
+ "bytes",
+ "prost-derive",
+]
+
+[[package]]
+name = "prost-derive"
+version = "0.12.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "81bddcdb20abf9501610992b6759a4c888aef7d1a7247ef75e2404275ac24af1"
+dependencies = [
+ "anyhow",
+ "itertools 0.11.0",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
