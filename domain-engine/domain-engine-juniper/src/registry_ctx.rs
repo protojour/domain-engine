@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{ops::ControlFlow, sync::Arc};
 
 use juniper::{GraphQLValue, ID};
 use ontol_runtime::{
@@ -6,7 +6,6 @@ use ontol_runtime::{
     interface::{
         discriminator::{
             leaf_discriminant_scalar_union_for_has_attribute, LeafDiscriminantScalarUnion,
-            VariantPurpose,
         },
         graphql::{
             argument::{ArgKind, DefaultArg, DomainFieldArg, FieldArg},
@@ -24,6 +23,7 @@ use ontol_runtime::{
             processor::ProcessorProfileFlags,
         },
     },
+    ontology::domain::{CardinalIdx, DataRelationshipKind, TypeInfo},
     RelationshipId,
 };
 use tracing::{debug, trace, trace_span};
@@ -125,12 +125,14 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
         output: &mut Vec<juniper::meta::Argument<'r, GqlScalar>>,
         typing_purpose: TypingPurpose,
         filter: ArgumentFilter,
-    ) -> Result<(), CollectOperatorError> {
+    ) -> Result<ControlFlow<(), CardinalIdx>, CollectOperatorError> {
         let serde_operator = &self.schema_ctx.ontology[operator_addr];
 
         match serde_operator {
             SerdeOperator::Struct(struct_op) => {
+                let struct_info = self.schema_ctx.ontology.get_type_info(struct_op.def.def_id);
                 let (mode, _) = typing_purpose.mode_and_level();
+                let mut control_flow = ControlFlow::Break(());
 
                 for (key, property) in
                     struct_op.filter_properties(mode, None, ProcessorProfileFlags::default())
@@ -148,7 +150,14 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                         continue;
                     }
 
-                    if !filter.filter_property(key.arc_str(), Some(property.rel_id), output) {
+                    if !self.filter_argument_property(
+                        struct_info,
+                        key.arc_str(),
+                        Some(property.rel_id),
+                        &filter,
+                        &mut control_flow,
+                        output,
+                    ) {
                         continue;
                     }
 
@@ -217,7 +226,7 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                     output.push(argument);
                 }
 
-                Ok(())
+                Ok(control_flow)
             }
             SerdeOperator::Union(union_op) => {
                 let (mode, level) = typing_purpose.mode_and_level();
@@ -236,44 +245,38 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                             NoFmt(union_op.unfiltered_variants())
                         );
 
+                        // add edge cardinals in increasing order.
+                        // the control flow tells the loop whether to continue searching
+                        let mut control_flow: ControlFlow<(), CardinalIdx> =
+                            ControlFlow::Continue(CardinalIdx(0));
+
                         // FIXME: Instead of just deduplicating the properties,
                         // the documentation for each of them should be combined in some way.
                         // When a union is used as an InputValue, the GraphQL functions purely
                         // as a documentation layer anyway.
-                        for variant in possible_variants {
-                            self.collect_operator_arguments(
-                                variant.addr,
-                                output,
-                                TypingPurpose::PartialInput,
-                                ArgumentFilter {
-                                    deduplicate: true,
-                                    skip_subject: false,
-                                    skip_object: true,
-                                },
-                            )?;
-                        }
+                        while let ControlFlow::Continue(edge_cardinal_idx) = control_flow {
+                            control_flow = ControlFlow::Break(());
 
-                        for variant in possible_variants {
-                            match variant.purpose {
-                                VariantPurpose::Data | VariantPurpose::RawDynamicEntity => {
-                                    self.collect_operator_arguments(
-                                        variant.addr,
-                                        output,
-                                        TypingPurpose::PartialInput,
-                                        ArgumentFilter {
-                                            deduplicate: true,
-                                            skip_subject: true,
-                                            skip_object: false,
-                                        },
-                                    )?;
+                            for variant in possible_variants {
+                                let next = self.collect_operator_arguments(
+                                    variant.addr,
+                                    output,
+                                    TypingPurpose::PartialInput,
+                                    ArgumentFilter {
+                                        deduplicate: true,
+                                        edge_cardinal_idx,
+                                    },
+                                )?;
+
+                                if next.is_continue() {
+                                    control_flow = next;
                                 }
-                                VariantPurpose::Identification { .. } => {}
                             }
                         }
                     }
                 }
 
-                Ok(())
+                Ok(ControlFlow::Break(()))
             }
             SerdeOperator::Alias(alias_op) => {
                 self.collect_operator_arguments(
@@ -283,11 +286,19 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                     filter,
                 )?;
 
-                Ok(())
+                Ok(ControlFlow::Break(()))
             }
-            SerdeOperator::IdSingletonStruct(_entity_id, property_name, id_operator_addr) => {
+            SerdeOperator::IdSingletonStruct(entity_id, property_name, id_operator_addr) => {
+                let entity_info = self.schema_ctx.ontology.get_type_info(*entity_id);
                 let property_name = &self.schema_ctx.ontology[*property_name];
-                if filter.filter_property(property_name, None, output) {
+                if self.filter_argument_property(
+                    entity_info,
+                    property_name,
+                    None,
+                    &filter,
+                    &mut ControlFlow::Break(()),
+                    output,
+                ) {
                     output.push(self.get_operator_argument(
                         property_name,
                         *id_operator_addr,
@@ -298,10 +309,48 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
                     ));
                 }
 
-                Ok(())
+                Ok(ControlFlow::Break(()))
             }
             _ => Err(CollectOperatorError::Scalar),
         }
+    }
+
+    fn filter_argument_property(
+        &self,
+        subject_info: &TypeInfo,
+        name: &str,
+        rel_id: Option<RelationshipId>,
+        filter: &ArgumentFilter,
+        control_flow: &mut ControlFlow<(), CardinalIdx>,
+        output: &Vec<juniper::meta::Argument<GqlScalar>>,
+    ) -> bool {
+        if filter.deduplicate {
+            for arg in output {
+                if arg.name == name {
+                    return false;
+                }
+            }
+        }
+
+        if let Some(rel_id) = rel_id {
+            if let Some(data_relationship) = subject_info.data_relationships.get(&rel_id) {
+                match &data_relationship.kind {
+                    DataRelationshipKind::Edge(cardinal_id) => {
+                        if cardinal_id.cardinal_idx < filter.edge_cardinal_idx {
+                            return false;
+                        } else if cardinal_id.cardinal_idx > filter.edge_cardinal_idx {
+                            *control_flow =
+                                ControlFlow::Continue(CardinalIdx(filter.edge_cardinal_idx.0 + 1));
+
+                            return false;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        true
     }
 
     fn get_operator_argument(
@@ -688,28 +737,17 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
     }
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy)]
 pub struct ArgumentFilter {
     deduplicate: bool,
-    skip_subject: bool,
-    skip_object: bool,
+    edge_cardinal_idx: CardinalIdx,
 }
 
-impl ArgumentFilter {
-    fn filter_property(
-        &self,
-        name: &str,
-        _rel_id: Option<RelationshipId>,
-        output: &Vec<juniper::meta::Argument<GqlScalar>>,
-    ) -> bool {
-        if self.deduplicate {
-            for arg in output {
-                if arg.name == name {
-                    return false;
-                }
-            }
+impl Default for ArgumentFilter {
+    fn default() -> Self {
+        Self {
+            deduplicate: false,
+            edge_cardinal_idx: CardinalIdx(0),
         }
-
-        true
     }
 }
