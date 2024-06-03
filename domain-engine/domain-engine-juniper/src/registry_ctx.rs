@@ -1,4 +1,4 @@
-use std::{ops::ControlFlow, sync::Arc};
+use std::{cmp::Ordering, ops::ControlFlow, sync::Arc};
 
 use juniper::{GraphQLValue, ID};
 use ontol_runtime::{
@@ -334,18 +334,19 @@ impl<'a, 'r> RegistryCtx<'a, 'r> {
 
         if let Some(rel_id) = rel_id {
             if let Some(data_relationship) = subject_info.data_relationships.get(&rel_id) {
-                match &data_relationship.kind {
-                    DataRelationshipKind::Edge(cardinal_id) => {
-                        if cardinal_id.cardinal_idx < filter.edge_cardinal_idx {
+                if let DataRelationshipKind::Edge(cardinal_id) = &data_relationship.kind {
+                    match cardinal_id.cardinal_idx.cmp(&filter.edge_cardinal_idx) {
+                        Ordering::Less => {
                             return false;
-                        } else if cardinal_id.cardinal_idx > filter.edge_cardinal_idx {
+                        }
+                        Ordering::Equal => {}
+                        Ordering::Greater => {
                             *control_flow =
                                 ControlFlow::Continue(CardinalIdx(filter.edge_cardinal_idx.0 + 1));
 
                             return false;
                         }
                     }
-                    _ => {}
                 }
             }
         }

@@ -116,7 +116,7 @@ impl<'c, 'm> TypeCheck<'c, 'm> {
             }
 
             if let Some((generator_def_id, gen_span)) =
-                self.rel_ctx.value_generators_unchecked.remove(&rel_id)
+                self.rel_ctx.value_generators_unchecked.remove(rel_id)
             {
                 actions.push(Action::CheckValueGenerator {
                     relationship_id: *rel_id,
